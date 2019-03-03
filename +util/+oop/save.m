@@ -166,13 +166,16 @@ function file_handle = save(obj, filename, varargin)
         
 %     group_handle_cleanup = onCleanup(@() H5G.close(group_handle));
     
-    props = util.oop.list_props(obj); % get the property list, including dynamic properties... 
+%     props = util.oop.list_props(obj); % get the property list, including dynamic properties... 
+    props = properties(obj);
     
     % now go over the properties and save them all... 
     for ii = 1:length(props)
-        name = props(ii).Name;
+%         name = props{ii};
+        name = props{ii};
         try
-            if props(ii).Transient                
+            p = findprop(obj, name);
+            if p.Transient
                 if input.debug_bit, disp(['prop: ' name ' is transient. Skipping...']); end
             else
                 group_handle = saveProperty(group_handle, name, obj.(name), input);
@@ -192,10 +195,11 @@ function file_handle = save(obj, filename, varargin)
         try
             for ii = 1:length(props)
                 
-                name = props(ii).Name;
+                name = props{ii};
                 value = obj.(name);
-                
-                if isobject(value) && props(ii).Transient==0 && ~isa(value, 'datetime') && ~isa(value, 'containers.Map') && length(value)<2 && isempty(checkList(value, input.handle_list))
+                p = findprop(obj, name);
+               
+                if isobject(value) && p.Transient==0 && ~isa(value, 'datetime') && ~isa(value, 'containers.Map') && length(value)<2 && isempty(checkList(value, input.handle_list))
                     
                     if input.debug_bit, disp(['prop: ' name ' now saved as object...']); end
                     
@@ -203,7 +207,7 @@ function file_handle = save(obj, filename, varargin)
                 
                 elseif isa(value, 'datetime') || isa(value, 'containers.Map')
                     continue;
-                elseif isobject(value) && props(ii).Transient==0 && length(value)>1
+                elseif isobject(value) && p.Transient==0 && length(value)>1
                     
                     for jj = 1:length(value)
                         
@@ -221,7 +225,7 @@ function file_handle = save(obj, filename, varargin)
                     
                     for jj = 1:length(value)
                         
-                        if isobject(value{jj}) && props(ii).Transient==0 && ~isa(value{jj}, 'datetime') && length(value)<2 && isempty(checkList(value{jj}, input.handle_list))
+                        if isobject(value{jj}) && p.Transient==0 && ~isa(value{jj}, 'datetime') && length(value)<2 && isempty(checkList(value{jj}, input.handle_list))
                         
                             if input.debug_bit, disp(['prop: ' name '{' num2str(jj) '} now saved as object...']); end
                         
@@ -236,7 +240,7 @@ function file_handle = save(obj, filename, varargin)
             end
             
         catch ME
-            warning(['ERROR when saving "' props(ii).Name '": ' ME.getReport]);
+            warning(['ERROR when saving "' props{ii} '": ' ME.getReport]);
         end
     end
     

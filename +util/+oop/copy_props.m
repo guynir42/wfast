@@ -16,13 +16,15 @@ function copy_props(obj_to, obj_from, deep)
         deep = 0;
     end
     
-    props = util.oop.list_props(obj_from);
+    props = properties(obj_from);
+    
     
     for ii = 1:length(props)
         
-        name = props(ii).Name;
+        name = props{ii};
+        p = findprop(obj_from, name);
         
-        if props(ii).Dependent==0
+        if p.Dependent==0
             
             if ~isprop(obj_to, name) % no such property in obj_to               
                 if isa(obj_to, 'dynamicprops') % maybe it is a dynamicprops type
