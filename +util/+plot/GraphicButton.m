@@ -354,7 +354,7 @@ classdef GraphicButton < handle
             elseif cs(obj.type, 'info')
                 
                 obj.FontSize = obj.owner.gui.([font_size 'font_size']);
-                obj.String = [obj.str1 util.text.f2s(obj.owner.(obj.variable)) obj.str2];
+                obj.String = [obj.str1 num2str(obj.owner.(obj.variable)) obj.str2];
                 
             elseif cs(obj.type, 'custom', 'input custom')
                 

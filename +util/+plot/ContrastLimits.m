@@ -192,8 +192,6 @@ classdef ContrastLimits < handle
         
         function update(obj, ~, ~)
             
-            import util.text.f2s;
-            
             if ~obj.check
                 return;
             end
@@ -206,8 +204,8 @@ classdef ContrastLimits < handle
                 obj.input_clim.String = sprintf('CLim= %4.2f %4.2f', obj.clim(1), obj.clim(2));
             end
             
-            obj.button_min.String = f2s(obj.min_val);
-            obj.button_max.String = f2s(obj.max_val);
+            obj.button_min.String = num2str(obj.min_val);
+            obj.button_max.String = num2str(obj.max_val);
                         
             obj.slider_low.Min = obj.min_val;
             obj.slider_low.Max = obj.max_val;

@@ -203,11 +203,13 @@ classdef CameraControl < file.AstroData
         
         function setupFocuser(obj)
             
+            % add check for different types of focuser at some point...
+            
             try
-                obj.focuser = obs.focus.FocusControl;
+                obj.focuser = obs.focus.FocusSpider;
             catch ME
                 disp('Cannot connect to focuser...');
-                obj.focuser = obs.focus.FocusControl.empty;
+                obj.focuser = [];
             end
             
             if obj.gui.check
