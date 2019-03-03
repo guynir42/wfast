@@ -355,7 +355,6 @@ classdef Parameters < dynamicprops
         function f = folder(obj) % to be depricated!
             
             import util.text.cs;
-            import util.text.slash_append;
             
             f = obj.date_folder;
             
@@ -371,7 +370,7 @@ classdef Parameters < dynamicprops
                 end
                 
                 if ~isempty(name)
-                    f = slash_append(f,  name);
+                    f = fullfile(f,  name);
                 end
                 
             end
@@ -386,17 +385,15 @@ classdef Parameters < dynamicprops
         
         function f = date_folder(obj) % to be depricated!
             
-            import util.text.slash_append;
-            
             f = obj.datapath;
             
             if obj.use_folder_date && ~builtin('isempty', obj.run_start_datetime)
             
-                f = slash_append(f, datestr(obj.run_start_datetime, 'yyyy-mm-dd/'));
+                f = fullfile(f, datestr(obj.run_start_datetime, 'yyyy-mm-dd/'));
                                 
             elseif obj.use_folder_date && ~isempty(obj.t_end)
                 
-                f = [slash_append(f, obj.t_end(1:10)) '/'];
+                f = [fullfile(f, obj.t_end(1:10)) '/'];
                 
             end
             

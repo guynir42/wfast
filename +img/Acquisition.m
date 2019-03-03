@@ -2,7 +2,7 @@ classdef Acquisition < file.AstroData
 
     properties(Transient=true)
         
-        gui@img.gui.PipeGUI;
+        gui;
         audio@util.sys.AudioControl;
         
     end
@@ -23,14 +23,13 @@ classdef Acquisition < file.AstroData
         back@img.Background;
         clip@img.Clipper;
         clip_bg@img.Clipper;
-        fit_psf@img.FitPSF;
         photo@img.PhotoSimple;
         flux_buf@util.vec.CircularBuffer;
         % output to file
         buf@file.BufferWheel;
         
         % utilities
-        prog@util.time.ProgressBar;
+        prog@util.sys.ProgressBar;
         
         % various observational parameter inputs
         input_recording@util.text.InputVars;
@@ -112,7 +111,6 @@ classdef Acquisition < file.AstroData
                 obj.clip.use_adjust = 0; % adjust through photometry object?
                 obj.clip_bg = img.Clipper;
                 obj.clip_bg.use_adjust = 0;
-                obj.fit_psf = img.FitPSF;
                 obj.photo = img.PhotoSimple;
                 obj.flux_buf = util.vec.CircularBuffer;
                 

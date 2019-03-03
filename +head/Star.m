@@ -593,8 +593,6 @@ classdef Star < matlab.mixin.Copyable
         
         function str_out = printout(obj)
            
-            import util.text.pipe_append;
-            
             str = '';
             
             if ~isempty(obj.name)
@@ -604,14 +602,13 @@ classdef Star < matlab.mixin.Copyable
             str = pipe_append(str, 'M= %5.2f', obj.mag);
             
             if isempty(obj.primary_ref)
-                str = pipe_append(str, '(x,y)= (%d,%d)', round(obj.getFinalX('pixels')), round(obj.getFinalY('pixels')));
+                str = [str sprintf(' | (x,y)= (%d,%d)', round(obj.getFinalX('pixels')), round(obj.getFinalY('pixels')))];
             else
-                
-                str = pipe_append(str, '(%d)--> %4.2f",%3d^o', obj.primary_index, obj.getOffsetSep('arcsec'), obj.getOffsetAngle('degrees'));
+                str = [str sprintf(' | (%d)--> %4.2f",%3d^o', obj.primary_index, obj.getOffsetSep('arcsec'), obj.getOffsetAngle('degrees'))];
             end
             
             if ~isempty(obj.type)
-                str = pipe_append(str, '"%s" type', obj.type);
+                str = [str, sprintf(' | "%s" type', obj.type)];
             end
             
             if nargout==0

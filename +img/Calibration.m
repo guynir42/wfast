@@ -70,8 +70,7 @@ classdef Calibration < handle
         reader_dark@file.Reader; % reads the dark images to generate the dark frame
         reader_flat@file.Reader; % reads the flat images to generate the flat frame
         
-        prog@util.time.ProgressBar; % prints how much time is left to make dark/flat
-        timing_data@util.time.TimingData; % keeps track of how much time it takes to do each part of the calculation
+        prog@util.sys.ProgressBar; % prints how much time is left to make dark/flat
         
     end
     
@@ -183,8 +182,7 @@ classdef Calibration < handle
                 obj.reader_flat = file.Reader;
 
                 obj.audio = util.sys.AudioControl;
-                obj.prog = util.time.ProgressBar;
-                obj.timing_data = util.time.TimingData;
+                obj.prog = util.sys.ProgressBar;
 
             end
             
@@ -242,7 +240,6 @@ classdef Calibration < handle
         function clear(obj)
             
             obj.num_pixels_removed = 0;
-            obj.timing_data.clear;
             
         end
         
@@ -843,8 +840,6 @@ classdef Calibration < handle
                 
         function updateCutouts(obj, clipper, cut_size) % check if we need to adjust the dark_mean_cut etc. 
             
-            obj.timing_data.start('clipping');
-            
             if nargin<3 || isempty(cut_size)
                 cut_size = obj.clip.cut_size;
             end
@@ -878,8 +873,6 @@ classdef Calibration < handle
                 
             end
             
-            obj.timing_data.finish('clipping');
-                        
         end
                 
         function I = input(obj, varargin) % input images to be calibrated
@@ -951,29 +944,19 @@ classdef Calibration < handle
             
             %%%%%%%%%%%%%%%%% SUBTRACT DARK %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
-            obj.timing_data.start('dark');            
             I = bsxfun(@minus, I, D); % subtract the mean dark image
-            obj.timing_data.finish('dark');
             
             %%%%%%%%%%%%%%%%% DIVIDE BY FLAT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            
-            obj.timing_data.start('flat');                        
             
             if input.flat && obj.checkFlat
                 I = bsxfun(@rdivide, I, F);
             end
-            
-            obj.timing_data.finish('flat');
                         
             %%%%%%%%%%%%%%%%% SUBTRACT MEDIAN %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            
-            obj.timing_data.start('median');
                         
             if input.median
                 I = bsxfun(@minus, I, util.stat.median2(I));
             end
-                        
-            obj.timing_data.finish('median');                        
             
             %%%%%%%%%%%%%%%%% DIVIDE BY GAIN %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -982,8 +965,6 @@ classdef Calibration < handle
             end
             
             %%%%%%%%%%%%%%%%% PIXEL MASK %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            
-            obj.timing_data.start('mask');
             
             if ~isempty(DM)
                                 
@@ -1020,19 +1001,13 @@ classdef Calibration < handle
                 end
                                 
             end
-                        
-            obj.timing_data.finish('mask');
-
-            %%%%%%%%%%%%%%%%% HANDLE BAD PIXELS %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
-            obj.timing_data.start('bad pixels');
+            %%%%%%%%%%%%%%%%% HANDLE BAD PIXELS %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
             if obj.use_noise_removal
                 [I, pix_mask] = util.img.maskBadPixels(I);
                 obj.num_pixels_removed = sum(pix_mask(:)); % number of noisy pixels detected
             end
-            
-            obj.timing_data.finish('bad pixels');
             
         end
         

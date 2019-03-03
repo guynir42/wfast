@@ -486,18 +486,15 @@ classdef BufferWheel < file.AstroData
         
         function text_file_name = getReadmeFilename(obj, prefix)
   
-            import util.text.slash_append;
-            import util.text.sub_append;
-            
             if nargin<2 || isempty(prefix)
                 prefix = 'A';
             end
             
-            text_file_name = slash_append(obj.directory, [prefix '_README.txt']);
+            text_file_name = fullfile(obj.directory, [prefix '_README.txt']);
             
             for ii = 1:1000
                 if exist(text_file_name, 'file')
-                    text_file_name = slash_append(obj.directory, [prefix '_README' num2str(ii) '.txt']);
+                    text_file_name = fullfile(obj.directory, [prefix '_README' num2str(ii) '.txt']);
                 else 
                     break;
                 end

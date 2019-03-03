@@ -4,13 +4,15 @@ function obj = save_defaults(obj)
 % This allows the user to change the default values after instantiating an
 % object, which is useful for GUI inputs and such. 
 
-    list = util.oop.list_props(obj);
-    
+%     list = util.oop.list_props(obj);
+
+    list = properties(obj);
+
     for ii = 1:length(list)
         
-        name = ['default_' list(ii).Name];
+        name = ['default_' list{ii}];
         if isprop(obj, name)
-            obj.(name) = obj.(list(ii).Name);
+            obj.(name) = obj.(list{ii});
         end
         
     end

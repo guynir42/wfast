@@ -1,4 +1,4 @@
-classdef AstroData < util.oop.DynamicObject
+classdef AstroData < dynamicprops
 % Contains all the outputs from image analysis (images, cutouts, etc.)
 % Since the long and ever expanding list of data products is shared by
 % several objects (file.Reader, file.BufferWheel, file.Deflator,
