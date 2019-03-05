@@ -92,9 +92,9 @@ classdef AstroHaven < handle
             
             obj.hndl = serial(obj.port_name);
             
-            obj.hndl.BytesAvailableFcn = @obj.getReply;
-            obj.hndl.BytesAvailableFcnCount = 1;
-            obj.hndl.BytesAvailableFcnMode = 'byte';
+%             obj.hndl.BytesAvailableFcn = @obj.getReply;
+%             obj.hndl.BytesAvailableFcnCount = 1;
+%             obj.hndl.BytesAvailableFcnMode = 'byte';
             obj.hndl.Terminator = '';
             
             try 
@@ -263,7 +263,11 @@ classdef AstroHaven < handle
         function getReply(obj, ~, ~)
             
 %             disp('reading serial');
-            obj.reply = char(fread(obj.hndl, 1));
+            try
+                obj.reply = char(fread(obj.hndl, 1));
+            catch ME
+                obj.reply = '';
+            end
             
             if strcmp(obj.reply, '0') % reset all timers when closed
                 obj.open_time1 = 0;
@@ -307,9 +311,16 @@ classdef AstroHaven < handle
         
         function update(obj)
             
-            obj.hndl.BytesAvailableFcn = @obj.getReply; % make sure the reply read function is working! 
+%             obj.hndl.BytesAvailableFcn = @obj.getReply; % make sure the reply read function is working! 
             
+            obj.getReply;
             
+            if isempty(obj.reply)
+                obj.status = 0;
+            else
+                obj.status = 1;
+            end
+
         end
         
         function openBoth(obj, number)

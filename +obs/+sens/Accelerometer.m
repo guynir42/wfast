@@ -8,7 +8,7 @@ classdef Accelerometer < handle
         
         hndl@Bluetooth; % bluetooth serial object
         
-        Data@stack;
+        Data@util.vec.CircularBuffer;
         
     end
     

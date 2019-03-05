@@ -2,8 +2,9 @@ classdef StatusChecker < handle
 
     properties(Transient=true)
         
-        short@timer;
-        long@timer;
+        t1; % quick timer (every minute or so) just to update sensors/devices
+        t2; % check that everything is connected and that weather is good, print to log file
+        t3; % verify that the other two are still running (every half an hour or so)
         
     end
     
@@ -66,8 +67,9 @@ classdef StatusChecker < handle
     
     properties % switches/controls
         
-        period_short = 10; % time for equipment check
-        period_long = 600; % time for verifying short timer is working (and other tests?)
+        period1 = 60
+        period2 = 300; % time for equipment/weather check and log file
+        period3 = 1800; % time for verifying shorter timers are working (and other tests?)
         
         % light and clouds may be just binary, so we can skip plotting and thresholding them...?
         max_light = 1; % units??
@@ -112,17 +114,25 @@ classdef StatusChecker < handle
             if ~isempty(varargin) && isa(varargin{1}, 'obs.StatusChecker')
                 if obj.debug_bit, fprintf('StatusChecker copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
-            else
+            
+            elseif ~isempty(varargin) && isa(varargin{1}, 'obs.Manager')
                 
                 if obj.debug_bit, fprintf('StatusChecker constructor v%4.2f\n', obj.version); end
             
+                obj.owner = varargin{1};
+                
                 obj.status_log = util.sys.Logger('Observatory_status');
                 obj.weather_log = util.sys.Logger('Weather_report');
                 
-%                 obj.connect;
+                obj.connect;
                 
-                obj.setup_long;
-                obj.setup_short;
+                obj.setup_t3;
+                obj.setup_t2;
+                obj.setup_t1;
+                
+            else
+                
+                error('Must supply a "Manager" object to StatusChecker constructor...');
 
             end
             
@@ -145,11 +155,11 @@ classdef StatusChecker < handle
                 
                 if isobject(obj.owner.(name))
                     
-                    if strcmp(class(obj.owner.(name)), obj.device_classes)
+                    if any(strcmp(class(obj.owner.(name)), obj.device_classes))
                         obj.devices{end+1} = obj.owner.(name);
                     end
                     
-                    if strcmp(class(obj.owner.(name)), obj.sensor_classes)
+                    if any(strcmp(class(obj.owner.(name)), obj.sensor_classes))
                         obj.sensors{end+1} = obj.owner.(name);
                     end
                     
@@ -165,8 +175,9 @@ classdef StatusChecker < handle
         
         function reset(obj)
             
-            obj.setup_long;
-            obj.setup_short;
+            obj.setup_t3;
+            obj.setup_t2;
+            obj.setup_t1;
             
             obj.reset_light;
             obj.reset_clouds;
@@ -234,10 +245,48 @@ classdef StatusChecker < handle
     
     methods % timer related
         
-        
-        function callback_short(obj, ~, ~)
+        function callback_t1(obj, ~, ~)
             
-            disp('Running short timer now!');
+            for ii = 1:length(obj.devices)
+                if ismethod(obj.devices{ii}, 'update')
+                    obj.devices{ii}.update;
+                end
+            end
+            
+            for ii = 1:length(obj.sensors)
+                if ismethod(obj.sensors{ii}, 'update')
+                    obj.sensors{ii}.update;
+                end
+            end
+            
+        end
+        
+        function setup_t1(obj, ~, ~)
+            
+            if ~isempty(obj.t1) && isa(obj.t1, 'timer') && isvalid(obj.t1)
+                if strcmp(obj.t1.Running, 'on')
+                    stop(obj.t1);
+                    delete(obj.t1);
+                    obj.t1 = [];
+                end
+            end
+            
+            obj.t1 = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'Status-check-t1', ...
+                'Period', obj.period1, 'StartDelay', obj.period1, ...
+                'TimerFcn', @obj.callback_t1, 'ErrorFcn', @obj.setup_t1);
+            
+            start(obj.t1);
+        end
+        
+        function stop_t1(obj, ~, ~)
+            
+            stop(obj.t1);
+            
+        end 
+        
+        function callback_t2(obj, ~, ~)
+            
+%             disp('Running t2 timer now!');
             
             str = '';
             obj.collect_light;
@@ -266,29 +315,43 @@ classdef StatusChecker < handle
             
         end
         
-        function setup_short(obj, ~, ~)
+        function setup_t2(obj, ~, ~)
             
-            if ~isempty(obj.short) && isvalid(obj.short)
-                if strcmp(obj.short.Running, 'on')
-                    obj.short.stop;
+            if ~isempty(obj.t2) && isa(obj.t2, 'timer') && isvalid(obj.t2)
+                if strcmp(obj.t2.Running, 'on')
+                    stop(obj.t2);
+                    delete(obj.t2);
+                    obj.t2 = [];
                 end
             end
             
-            obj.short = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'Status-check-short', ...
-                'Period', obj.period_short, 'StartDelay', obj.period_short, ...
-                'TimerFcn', @obj.callback_short, 'ErrorFcn', @obj.setup_short);
+            obj.t2 = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'Status-check-t2', ...
+                'Period', obj.period2, 'StartDelay', obj.period2, ...
+                'TimerFcn', @obj.callback_t2, 'ErrorFcn', @obj.setup_t2);
             
-            obj.short.start;
-            
-        end
-        
-        function val = callback_long(obj, ~, ~)
+            start(obj.t2);
             
         end
         
-        function setup_long(obj, ~, ~)
+        function stop_t2(obj, ~, ~)
+            
+            stop(obj.t2);
+            
+        end 
+        
+        function val = callback_t3(obj, ~, ~)
             
         end
+        
+        function setup_t3(obj, ~, ~)
+            
+        end
+        
+        function stop_t3(obj, ~, ~)
+            
+            stop(obj.t3);
+            
+        end 
         
     end
     
@@ -402,22 +465,30 @@ classdef StatusChecker < handle
         
         function val = decision_devices(obj)
             
-            val = 1;
+            obj.dev_str = '';
+            
+            status_all = [];
             
             for ii = 1:length(obj.devices)
                 
                 if isprop(obj.devices{ii}, 'status') 
-                    val = obj.devices{ii}.status;
+                    status = obj.devices{ii}.status;
                 elseif isprop(obj.devices{ii}, 'Status') 
-                    val = obj.devices{ii}.Status;
+                    status = obj.devices{ii}.Status;
                 else
-                    val = 1;
+                    status = NaN;
                 end
                 
-                if val==0
-                    return;
-                end
+                status_all = [status_all status];
                 
+                obj.dev_str = [obj.dev_str obj.getInstrID(obj.devices{ii}) ': ' num2str(status)];
+                
+            end
+            
+            if any(status_all==0)
+                val = 0;
+            else
+                val = 1;
             end
             
         end
@@ -427,6 +498,7 @@ classdef StatusChecker < handle
             % should I add a rain-checker also??
             
             obj.status = 1;
+            obj.report = 'OK';
             
             if obj.decision_devices==0
                 obj.status = 0;
