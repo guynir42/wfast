@@ -41,15 +41,28 @@ classdef Boltwood < handle
         temp_dew_point = NaN; % Dew point temperature
         wind_speed = NaN; % Wind speed
         humidity = NaN; % Humiditiy
-        rain = NaN; % Rain
+        rain = NaN; % Rain (is this in mm or logical 0/1??)
         
         % Text conditions from Boltwood
-        day_condition   = '';                        % Day condition
+        light_condition   = '';                        % Day condition
         cloud_condition = '';                        % Cloud condition
         wind_condition  = '';                        % Wind condition
         rain_condition  = '';                        % Rain condition 
         
         debug_bit = 1;
+        
+    end
+    
+    properties(Dependent=true)
+        
+        light_value_average;
+        temperature_average;
+        temp_sky_average;
+        temp_sensor_average;
+        temp_dew_point_average;
+        wind_speed_average;
+        humidity_average;
+        rain_average;
         
     end
     
@@ -100,6 +113,70 @@ classdef Boltwood < handle
         
     end
     
+    methods % getters
+        
+        function val = get.light_value_average(obj)
+            
+            val = obj.data.median;
+            val = val(2);
+            
+        end
+        
+        function val = get.temperature_average(obj)
+            
+            val = obj.data.median;
+            val = val(3);
+            
+        end
+        
+        function val = get.temp_sky_average(obj)
+            
+            val = obj.data.median;
+            val = val(4);
+            
+        end
+        
+        function val = get.temp_sensor_average(obj)
+            
+            val = obj.data.median;
+            val = val(5);
+            
+        end
+        
+        function val = get.temp_dew_point_average(obj)
+            
+            val = obj.data.median;
+            val = val(6);
+            
+        end
+        
+        function val = get.wind_speed_average(obj)
+            
+            val = obj.data.median;
+            val = val(7);
+            
+        end
+        
+        function val = get.humidity_average(obj)
+            
+            val = obj.data.median;
+            val = val(8);
+            
+        end
+        
+        function val = get.rain_average(obj)
+            % this is logical values!!
+            val = obj.data.median;
+            val = val(9);
+            
+        end
+        
+        
+        
+        
+        
+    end
+    
     methods
         
         function reset(obj)
@@ -123,7 +200,7 @@ classdef Boltwood < handle
             obj.humidity = NaN;
             obj.rain = NaN;
 
-            obj.day_condition   = '';
+            obj.light_condition   = '';
             obj.cloud_condition = '';
             obj.wind_condition  = '';
             obj.rain_condition  = '';
@@ -182,7 +259,7 @@ classdef Boltwood < handle
             obj.rain = obj.hndl.RainF; % Rain (in mm?)
 
             % Text conditions from Boltwood
-            obj.day_condition = obj.hndl.DayCondition; % Day condition
+            obj.light_condition = obj.hndl.DayCondition; % Day condition
             obj.cloud_condition = obj.hndl.CloudCondition; % Cloud condition
             obj.wind_condition = obj.hndl.WindCondition; % Wind condition
             obj.rain_condition = obj.hndl.RainCondition; % Rain condition

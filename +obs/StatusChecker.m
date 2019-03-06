@@ -244,6 +244,14 @@ classdef StatusChecker < handle
             
         end
         
+        function val = is_running(obj)
+            
+            val(1) = strcmp(obj.t1.Running, 'on');
+            val(2) = strcmp(obj.t2.Running, 'on');
+            val(3) = strcmp(obj.t3.Running, 'on');
+            
+        end
+        
     end
     
     methods % setters
@@ -411,12 +419,14 @@ classdef StatusChecker < handle
                 sens = obj.sensors{ii};
                 new_val = [];
                 
-                if isprop(sens, 'light')
+                if isprop(sens, 'light_value_average')
+                    new_val = sens.light_value_average;
+                elseif isprop(sens, 'light_value')
+                    new_val = sens.light_value;
+                elseif isprop(sens, 'light')
                     new_val = sens.light;
                 elseif isprop(sens, 'Light')
                     new_val = sens.Light;
-                elseif isprop(sens, 'light_value')
-                    new_val = sens.light_value;
                 elseif isprop(sens, 'daylight')
                     new_val = sens.daylight;
                 end
@@ -443,7 +453,7 @@ classdef StatusChecker < handle
             
             if size(val,2)==size(obj.light_all,2)
                 obj.light_all = [obj.light_all; val];
-                obj.light_jul = [obj.light_jul j]; 
+                obj.light_jul = [obj.light_jul; j]; 
             elseif isempty(val)
                 % pass
             else
@@ -463,13 +473,15 @@ classdef StatusChecker < handle
                 
                 sens = obj.sensors{ii};
                 new_val = [];
-                
-                if isprop(sens, 'clouds')
+                if isprop(sens, 'temp_sky_average')
+                    new_val = sens.temp_sky_average;
+                elseif isprop(sens, 'temp_sky')
+                    new_val = sens.temp_sky;
+                elseif isprop(sens, 'clouds')
                     new_val = sens.clouds;
                 elseif isprop(sens, 'Clouds')
                     new_val = sens.Clouds;
-                elseif isprop(sens, 'temp_sky')
-                    new_val = sens.temp_sky;
+                
                 end
                 
                 if sens.status==0
@@ -494,7 +506,7 @@ classdef StatusChecker < handle
             
             if size(val,2)==size(obj.clouds_all,2)
                 obj.clouds_all = [obj.clouds_all; val];
-                obj.clouds_jul = [obj.clouds_jul j]; 
+                obj.clouds_jul = [obj.clouds_jul; j]; 
             elseif isempty(val)
                 % pass
             else
@@ -515,14 +527,17 @@ classdef StatusChecker < handle
                 sens = obj.sensors{ii};
                 new_val = [];
                 
-                if isprop(sens, 'temp')
-                    new_val = sens.temp;
-                elseif isprop(sens, 'Temp')
-                    new_val = sens.Temp;
+                if isprop(sens, 'temperature_average')
+                    new_val = sens.temperature_average;
                 elseif isprop(sens, 'temperature')
                     new_val = sens.temperature;
                 elseif isprop(sens, 'Temperature')
                     new_val = sens.Temperature;
+                    
+                elseif isprop(sens, 'temp')
+                    new_val = sens.temp;
+                elseif isprop(sens, 'Temp')
+                    new_val = sens.Temp;
                 end
                 
                 if sens.status==0
@@ -547,7 +562,7 @@ classdef StatusChecker < handle
             
             if size(val,2)==size(obj.temp_all,2)
                 obj.temp_all = [obj.temp_all; val];
-                obj.temp_jul = [obj.temp_jul j]; 
+                obj.temp_jul = [obj.temp_jul; j]; 
             elseif isempty(val)
                 % pass
             else
@@ -567,15 +582,16 @@ classdef StatusChecker < handle
                 
                 sens = obj.sensors{ii};
                 new_val = [];
-                
-                if isprop(sens, 'wind')
-                    new_val = sens.wind;
-                elseif isprop(sens, 'Wind')
-                    new_val = sens.Wind;
+                if isprop(sens, 'wind_speed_average')
+                    new_val = sens.wind_speed_average;
                 elseif isprop(sens, 'wind_speed')
                     new_val = sens.wind_speed;
                 elseif isprop(sens, 'WindSpeed')
                     new_val = sens.WindSpeed;
+                elseif isprop(sens, 'wind')
+                    new_val = sens.wind;
+                elseif isprop(sens, 'Wind')
+                    new_val = sens.Wind;
                 end
                 
                 if sens.status==0
@@ -600,7 +616,7 @@ classdef StatusChecker < handle
             
             if size(val,2)==size(obj.wind_all,2)
                 obj.wind_all = [obj.wind_all; val];
-                obj.wind_jul = [obj.wind_jul j]; 
+                obj.wind_jul = [obj.wind_jul; j]; 
             elseif isempty(val)
                 % pass
             else
@@ -621,7 +637,9 @@ classdef StatusChecker < handle
                 sens = obj.sensors{ii};
                 new_val = [];
                 
-                if isprop(sens, 'wind_az')
+                if isprop(sens, 'wind_az_average')
+                    new_val = sens.wind_az_average;
+                elseif isprop(sens, 'wind_az')
                     new_val = sens.wind_az;
                 elseif isprop(sens, 'WindAz')
                     new_val = sens.WindAz;
@@ -653,7 +671,7 @@ classdef StatusChecker < handle
             
             if size(val,2)==size(obj.wind_az_all,2)
                 obj.wind_az_all = [obj.wind_az_all; val];
-                obj.wind_az_jul = [obj.wind_jul j]; 
+                obj.wind_az_jul = [obj.wind_jul; j]; 
             elseif isempty(val)
                 % pass
             else
@@ -674,14 +692,17 @@ classdef StatusChecker < handle
                 sens = obj.sensors{ii};
                 new_val = [];
                 
-                if isprop(sens, 'humid')
-                    new_val = sens.humid;
-                elseif isprop(sens, 'Humid')
-                    new_val = sens.Humid;
+                if isprop(sens, 'humidity_average')
+                    new_val = sens.humidity_average;
                 elseif isprop(sens, 'humidity')
                     new_val = sens.humidity;
                 elseif isprop(sens, 'Humidity')
                     new_val = sens.Humidity;
+                elseif isprop(sens, 'humid')
+                    new_val = sens.humid;
+                elseif isprop(sens, 'Humid')
+                    new_val = sens.Humid;
+                
                 end
                 
                 if sens.status==0
@@ -706,7 +727,7 @@ classdef StatusChecker < handle
             
             if size(val,2)==size(obj.humid_all,2)
                 obj.humid_all = [obj.humid_all; val];
-                obj.humid_jul = [obj.humid_jul j]; 
+                obj.humid_jul = [obj.humid_jul; j]; 
             elseif isempty(val)
                 % pass
             else

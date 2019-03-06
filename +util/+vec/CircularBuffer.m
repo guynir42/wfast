@@ -142,6 +142,30 @@ classdef CircularBuffer < dynamicprops
             
         end
         
+        function str_out = printout(obj)
+            
+            str = '';
+            
+            for ii = 1:size(obj.data, 1)
+                
+                for jj = 1:size(obj.data,2)
+                
+                    str = [str sprintf('% 12.10g ', obj.data(ii,jj))];
+                    
+                end
+                
+                str = [str '\n'];
+                
+            end
+            
+            fprintf(str);
+            
+            if nargout>0
+                str_out = str;
+            end
+            
+        end
+        
     end
     
 end
