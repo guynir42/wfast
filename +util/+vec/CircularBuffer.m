@@ -51,7 +51,7 @@ classdef CircularBuffer < dynamicprops
         function input(obj, matrix)
             
             if size(matrix,1)>1
-                error('Must give a matrix with scalar first dimension. Instead got size(matrix)= %d', size(matrix));
+                error('Must give a matrix with scalar first dimension. Instead got size(matrix)= %s', util.text.print_vec(size(matrix)));
             end
             
             if ~isempty(obj.size_vec) && length(obj.size_vec)>1
@@ -112,6 +112,18 @@ classdef CircularBuffer < dynamicprops
             
         end
         
+        function val = mean(obj)
+            
+            val = mean(obj.data, 1, 'omitnan');
+            
+        end
+        
+        function val = median(obj)
+            
+            val = median(obj.data, 1, 'omitnan');
+            
+        end
+        
         function set.data(obj, val)
             
             obj.raw_data = val;
@@ -127,6 +139,30 @@ classdef CircularBuffer < dynamicprops
         function val = is_empty(obj)
             
             val = isempty(obj.data);
+            
+        end
+        
+        function str_out = printout(obj)
+            
+            str = '';
+            
+            for ii = 1:size(obj.data, 1)
+                
+                for jj = 1:size(obj.data,2)
+                
+                    str = [str sprintf('% 12.10g ', obj.data(ii,jj))];
+                    
+                end
+                
+                str = [str '\n'];
+                
+            end
+            
+            fprintf(str);
+            
+            if nargout>0
+                str_out = str;
+            end
             
         end
         

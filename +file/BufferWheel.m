@@ -383,14 +383,16 @@ classdef BufferWheel < file.AstroData
                 val = obj.date_dir_override;                
             else
                 
-                date = obj.current_datetime;
-                
-                % make sure each night is in the same folder, even after midnight.
-                if date.Hour<12 % this is 14:00 local time, pretty safe to say it is after midnight of the next night...
-                    date.Day = date.Day - 1;
-                end
-                
-                val = datestr(date, 'yyyy-mm-dd/');
+%                 date = obj.current_datetime;
+%                 
+%                 % make sure each night is in the same folder, even after midnight.
+%                 if date.Hour<12 % this is 14:00 local time, pretty safe to say it is after midnight of the next night...
+%                     date.Day = date.Day - 1;
+%                 end
+%                 
+%                 val = datestr(date, 'yyyy-mm-dd/');
+
+                val = util.sys.date_dir(date); 
                 
             end
             

@@ -1,1 +1,1 @@
-addpath('D:\wfast');
+addpath(getenv('WFAST'));
