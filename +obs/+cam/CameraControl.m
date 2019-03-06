@@ -62,8 +62,8 @@ classdef CameraControl < file.AstroData
         left; % ROI left corner
         top; % ROI top corner
         
-        f = 100; % frame rate (Hz)
-        T = 0.007; % exposure time (seconds)
+        frame_rate = 30; % frame rate (Hz)
+        expT = 0.025; % exposure time (seconds)
         
         preview_time = 1; % seconds (used when calling preview action)
         num_frames_record = 2; % default number of frames to record
@@ -208,8 +208,8 @@ classdef CameraControl < file.AstroData
             try
                 obj.focuser = obs.focus.FocusSpider;
             catch ME
-                disp('Cannot connect to focuser...');
-                obj.focuser = [];
+                disp('Cannot connect to focuser, using simulator instead');
+                obj.focuser = obs.focus.Simulator;
             end
             
             if obj.gui.check
@@ -376,22 +376,22 @@ classdef CameraControl < file.AstroData
             
         end
         
-        function set.T(obj, val)
+        function set.expT(obj, val)
             
-            obj.T = val;
+            obj.expT = val;
             
             if obj.setExpTimeHW(val) % if you succeed in setting this parameter, update the "pars" object
-                obj.pars.T = val;
+                obj.pars.expT = val;
             end
             
         end
         
-        function set.f(obj, val)
+        function set.frame_rate(obj, val)
             
-            obj.f = val;
+            obj.frame_rate = val;
             
             if obj.setFrameRateHW(val) % if you succeed in setting this parameter, update the "pars" object
-                obj.pars.f = val;
+                obj.pars.frame_rate = val;
             end
             
         end
@@ -470,7 +470,7 @@ classdef CameraControl < file.AstroData
             input = obj.makeInputVars(varargin{:});
             input.num_batches = 1e6; % arbitrary timeout
             input.batch_size = 1;
-            input.f = min(10, 0.95./input.T);
+            input.frame_rate = min(10, 0.95./input.expT);
             
             obj.startup(input, obj.buf_live);
             
@@ -546,10 +546,10 @@ classdef CameraControl < file.AstroData
             
             input = obj.makeInputVars(varargin{:});
             input.input_var('range', 500);
-            input.T = 1;
+            input.expT = 1;
             input.num_batches = 100; % arbitrary timeout
             input.batch_size = 1;
-            input.f = min(10, 0.95./input.T);
+            input.frame_rate = min(10, 0.95./input.expT);
             input.scan_vars(varargin{:});
             
             obj.startup(input, obj.buf_live);
@@ -824,7 +824,7 @@ classdef CameraControl < file.AstroData
         function check = setFrameRateHW(obj, val)
             
             if nargin<2 || isempty(val)
-                val = obj.f;
+                val = obj.frame_rate;
             end
             
             if obj.is_capturing
@@ -1081,8 +1081,8 @@ classdef CameraControl < file.AstroData
             input = util.text.InputVars;
             input.input_var('num_batches', obj.num_batches, 'Nbatches');
             input.input_var('batch_size', obj.batch_size);
-            input.input_var('f', obj.f, 'frame rate', 'frequency');
-            input.input_var('T', obj.T, 'exposure time', 'expT');
+            input.input_var('frame_rate', obj.frame_rate, 'frequency');
+            input.input_var('expT', obj.expT, 'exposure time', 'expT');
             input.input_var('height', obj.height);
             input.input_var('width', obj.width);
             input.input_var('top', obj.top);
@@ -1173,8 +1173,8 @@ classdef CameraControl < file.AstroData
             import util.text.cs;
             
             % update hardware of any new settings
-            obj.setExpTimeHW(input.T);
-            obj.setFrameRateHW(input.f);
+            obj.setExpTimeHW(input.expT);
+            obj.setFrameRateHW(input.frame_rate);
             obj.setHeightHW(input.height);
             obj.setWidthHW(input.width);
             obj.setTopHW(input.top);
@@ -1217,8 +1217,10 @@ classdef CameraControl < file.AstroData
             
             obj.pars.datapath = obj.buffers.base_dir;
             
-            obj.pars.T = obj.getExpTimeHW;
-            obj.pars.f = obj.getFrameRateHW;
+            obj.pars.expT = obj.getExpTimeHW;
+            obj.pars.frame_rate = obj.getFrameRateHW;
+            
+            obj.pars.focus = obj.focuser.pos;
             
             obj.pars.AOI_height = obj.getHeightHW;
             obj.pars.AOI_top = obj.getTopHW;

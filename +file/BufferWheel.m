@@ -642,7 +642,7 @@ classdef BufferWheel < file.AstroData
 %             obj.loadDataFromBuffer(obj.next_buf);
             obj.clear;
 %             obj.markAsRead; % the data in obj is now overwritten by the data from next_buf
-            util.vec.mex_change(obj.this_buf.mex_flag_read, 1, 0)            
+            util.vec.mex_change(obj.this_buf.mex_flag_read, 1, 0);
             obj.index = obj.index + 1;
             if obj.index > length(obj.buf)
                 obj.index = 1;
@@ -696,7 +696,7 @@ classdef BufferWheel < file.AstroData
             end
             
             if nargin<3 || isempty(timeout)
-                timeout = max(10, obj.pars.T.*5*size(buf.images,3)); % seconds
+                timeout = max(10, obj.pars.expT.*5*size(buf.images,3)); % seconds
             end
             
             if obj.debug_bit>1, fprintf('waitForRecording. record_flag= %d %d\n', buf.mex_flag_record(1), buf.mex_flag_record(2)); end
@@ -885,8 +885,8 @@ classdef BufferWheel < file.AstroData
             obj.waitForRecording(buf);
             obj.waitForWriting(buf);
             
-            if isempty(buf.images) && isempty(buf.images) && isempty(buf.images_proc) && ...
-                    isempty(buf.cutouts) && isempty(buf.cutouts_proc) && isempty(buf.stack) && ...
+            if isempty(buf.images) && isempty(buf.images) && ...
+                    isempty(buf.cutouts) && isempty(buf.stack) && ...
                     isempty(buf.psfs) && isempty(buf.lightcurves) % no images of any type, PSFs or lightcurves are available. 
                 return;
             end
@@ -935,8 +935,8 @@ classdef BufferWheel < file.AstroData
                 end
                 
                 % right now mex write is only for HDF5 files
-                file.mex.write(filename, buf.mex_flag_write, 'images', buf.images, 'images_proc', buf.cutouts_proc, ...
-                    'cutouts', buf.cutouts, 'cutouts_proc', buf.cutouts_proc, 'positions', buf.positions,...
+                file.mex.write(filename, buf.mex_flag_write, 'images', buf.images, ...
+                    'cutouts', buf.cutouts,  'positions', buf.positions,...
                     'stack', buf.stack, 'num_sum', buf.num_sum,...
                     'timestamps', buf.timestamps, 't_end_stamp', buf.t_end_stamp, 't_end', buf.t_end, 't_start', buf.t_start,...
                     'psfs', buf.psfs, 'sampling_psf', buf.sampling_psf, 'lightcurves', buf.lightcurves, 'parameters', obj.pars_struct_cell,...

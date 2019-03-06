@@ -119,7 +119,7 @@ classdef CamGUI < handle
             obj.panel_inputs = GraphicPanel(obj.owner, [0 2/15 0.2 3/15], 'inputs');
             obj.panel_inputs.number = 3;
             obj.panel_inputs.addButton('input_batch_size', 'batch_size', 'input');
-            obj.panel_inputs.addButton('input_exp_time', 'T', 'input');
+            obj.panel_inputs.addButton('input_exp_time', 'expT', 'input');
             obj.panel_inputs.make;
             
             obj.grey_list = [obj.grey_list, {obj.panel_inputs.input_batch_size, obj.panel_inputs.input_exp_time}];
@@ -193,7 +193,7 @@ classdef CamGUI < handle
             obj.panel_focus = util.plot.GraphicPanel(obj.owner.focuser, [0.8 5/15 0.2 2/15], 'focus');
             obj.panel_focus.number = 2;
             
-            if ~isempty(obj.owner.focuser) && ~isempty(obj.owner.focuser.hndl) && obj.owner.focuser.hndl.Connected
+            if ~isempty(obj.owner.focuser) % && ~isempty(obj.owner.focuser.hndl) && obj.owner.focuser.hndl.Connected
                 obj.panel_focus.addButton('button_down', 'down', 'push', 'DOWN', '', 'small', 0.3);
                 obj.panel_focus.addButton('input_step', 'step', 'input', 'step= ', '', '', 0.4);
                 obj.panel_focus.addButton('button_up', 'up', 'push', 'UP', '', 'small', 0.3);

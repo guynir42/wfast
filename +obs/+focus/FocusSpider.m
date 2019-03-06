@@ -22,6 +22,8 @@ classdef FocusSpider < handle
         tip_vec = [1 -0.5 -0.5];
         tilt_vec = [0 0.5 -0.5];
         
+        gui;
+        
     end
     
     properties % switches and controls
@@ -31,6 +33,7 @@ classdef FocusSpider < handle
         min_pos = 0;
         max_pos = 20;
         max_tip_tilt = 5; % this is absolute tip/tilt        
+        step = 0.05;
         
         debug_bit = 1;
         
@@ -186,19 +189,19 @@ classdef FocusSpider < handle
     
     methods % commands
         
-        function step(obj, val)
+        function posStep(obj, val)
             
             obj.pos = obj.pos + val;
             
         end
         
-        function tip_step(obj, val)
+        function tipStep(obj, val)
             
             obj.tip = obj.tip + val;
             
         end
         
-        function tilt_step(obj, val)
+        function tiltStep(obj, val)
             
             obj.tilt = obj.tilt + val;
             
@@ -220,6 +223,18 @@ classdef FocusSpider < handle
                 end
                 
             end
+            
+        end
+        
+        function up(obj)
+            
+            obj.pos = obj.pos + obj.step;
+            
+        end
+        
+        function down(obj)
+            
+            obj.pos = obj.pos - obj.step;
             
         end
         

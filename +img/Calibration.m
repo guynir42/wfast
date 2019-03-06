@@ -121,7 +121,7 @@ classdef Calibration < handle
         use_gain = 0; % normalize by the gain
         
         use_interp_mask = 0; % interpolate over bad pixels
-        use_conv_mask = 1; % replace bad pixels by mean of surrounding pixels (using convolution)
+        use_conv_mask = 0; % replace bad pixels by mean of surrounding pixels (using convolution)
         replace_value = NaN;
         
         dark_mask_sigma = 5; % how hot a pixel must be (relative to dark noise) to be considered a "bad pixel"
@@ -192,13 +192,13 @@ classdef Calibration < handle
     
     methods % reset and copy utilities
              
-        function reset(obj)
-
-            obj.resetDark;
-            obj.resetFlat;
-            
-        end
-                
+%         function reset(obj)
+% 
+%             obj.resetDark;
+%             obj.resetFlat;
+%             
+%         end
+        
         function resetDark(obj)
             
             obj.num_darks = 0;
@@ -901,7 +901,7 @@ classdef Calibration < handle
             input.use_ordered_numeric = 1;
             input.input_var('images', []);
             input.input_var('clipper', [], 'cut_pos');
-            input.input_var('num_sum', 1);
+            input.input_var('num_sum', 1, 'sum');
             input.input_var('flat', obj.use_flat);
             input.input_var('median', obj.use_subtract_median, 'subtract_median');
             input.input_var('gain', obj.use_gain);

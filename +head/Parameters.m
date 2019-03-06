@@ -22,12 +22,12 @@ classdef Parameters < dynamicprops
         
         im_size;
         
-        aperture = 40;
-        f_number = 25; 
+        aperture = 57;
+        f_number = 1.8947; 
                      
         % needs to be updated from camera/simulation or read from file
-        f = 100;
-        T = 0.007;
+        frame_rate = 30;
+        expT = 0.025;
         
 %         clockFreq;
 %         shutter;
@@ -38,13 +38,15 @@ classdef Parameters < dynamicprops
         
         psf_sampling;
         
+        focus;
+        
         t_start; % most recent file (when it started filming)
         t_end; % most recent file (when it finished filming)
         
         target_name = 'star1';
         type = '';
         
-        project = 'Kraar';
+        project = 'WFAST';
         instrument = 'Zyla_5.5';
         
         is_dark = 0;
@@ -107,9 +109,9 @@ classdef Parameters < dynamicprops
         
         QE = 1;
         
-        default_aperture = 40;
-        default_f_number = 25;
-        default_filter_name = 'V';
+        default_aperture;
+        default_f_number;
+        default_filter_name = 'clear';
         default_im_size = [2160 2560];
         
         datapath;
@@ -135,8 +137,8 @@ classdef Parameters < dynamicprops
         latitude = 31.907867; % of the observatory
         longitude = 34.811363; % of the observatory
         
-        default_project = 'Kraar';
-        default_instrument = 'Zyla_5.5';
+        default_project;
+        default_instrument;
         
         numImagesPerFile;
         
@@ -165,6 +167,8 @@ classdef Parameters < dynamicprops
                 
                 obj.filter = head.Filter;
                 obj.ephem = head.Ephemeris(obj);
+                
+                util.oop.save_defaults(obj);
                 
                 obj.update; % set the time to now. 
                 

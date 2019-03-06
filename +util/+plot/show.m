@@ -298,9 +298,7 @@ function hndl = show(M, varargin)
         if fancy
             
             colorbar(ax);
-            title(ax, sprintf('mx=%s \\mu=%s \\sigma=%s c.\\mu=%s c.\\sigma=%s',...
-                f2s(MAX), f2s(MEAN), f2s(STD), f2s(CMEAN), f2s(CSTD)),...
-                'FontSize', font_size);
+            title(ax, sprintf('mx=%g \\mu=%g \\sigma=%g c.\\mu=%g c.\\sigma=%g', MAX, MEAN, STD, CMEAN, CSTD), 'FontSize', font_size);
         
         else
             set(ax,'XTick',[]);

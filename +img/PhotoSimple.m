@@ -100,50 +100,65 @@ classdef PhotoSimple < handle
     
     methods % calculations
         
-        function input(obj, cutouts, varargin) 
+        function input(obj, varargin) 
             
             import util.stat.sum2;
-            import util.text.cs;
-            import util.text.parse_bool;
+
+            input = util.text.InputVars;
+            input.use_ordered_numeric = 1;
+            input.input_var('cutouts', [], 'images');
+            input.input_var('moments', 1);
+            input.scan_vars(varargin{:});
             
-            use_moments = 0;
+            obj.cutouts = input.cutouts;
             
-            for ii = 1:2:varargin
-                key = varargin{ii};
-                val = varargin{ii+1};
-                
-                if cs(key, 'moments', 'width', 'offsets')
-                    use_moments = parse_bool(val);
-                end
-                
-            end
-            
-            obj.cutouts = cutouts;
-            
-            cut_size = size(cutouts);
+            cut_size = size(input.cutouts);
             cut_size = cut_size(1:2);
             
-            if use_moments
+            if input.moments
                 
-                [X,Y] = meshgrid((1:cut_size(2))-floor(cut_size(2)/2)-1, 1:cut_size(1)-floor(cut_size(1)/2)-1); 
+                [X,Y] = meshgrid((1:cut_size(2))-floor(cut_size(2)/2)-1, (1:cut_size(1))-floor(cut_size(1)/2)-1); 
 
-                S = sum2(cutouts);
-                m1x = sum2(cutouts.*X)./S;
-                m1y = sum2(cutouts.*Y)./S;
-                m2x = sum2(cutouts.*(X-m1x).^2)./S;
-                m2y = sum2(cutouts.*(Y-m1y).^2)./S;
-
-                obj.widths = permute(sqrt(m2x+m2y), [3,4,2,1]);
+                I = input.cutouts;
+%                 I(I<0) = NaN;
+                S = sum2(I);
+                I2 = I;
+                I2(I2<0) = 0;
+                S2 = sum2(I2);
+                
+                m1x = sum2(I.*X)./S;
+                m1y = sum2(I.*Y)./S;
+                m2x = sum2(I2.*(X-m1x).^2)./S2;
+                m2y = sum2(I2.*(Y-m1y).^2)./S2;
+                mxy = sum2(I2.*(X-m1x).*(Y-m1y))./S2;
+                
+                % make sure there are no S==0 elements
+                m1x(S==0) = 0;
+                m1y(S==0) = 0;
+                m2x(S==0) = NaN;
+                m2y(S==0) = NaN;
+                mxy(S==0) = NaN;
+                
+                % make sure there are no negative second moments
+                m2x(m2x<0) = NaN;
+                m2y(m2y<0) = NaN;
+                
+                % should we ever reach such values??
+                m1x(abs(m1x)>cut_size(2)) = NaN;
+                m1y(abs(m1y)>cut_size(1)) = NaN;
+                
                 obj.offsets_x = permute(m1x, [3,4,2,1]);
                 obj.offsets_y = permute(m1y, [3,4,2,1]);
 
+                obj.widths = permute(sqrt(m2x+m2y), [3,4,2,1]); % should we add mxy too?
+                
             end
             
             % use the first moment to adjust positions inside the aperture?
             
             obj.aperture.tile_size = cut_size;
             
-            obj.fluxes = permute(sum2(obj.aperture.mask.*cutouts), [3,4,2,1]); 
+            obj.fluxes = permute(sum2(obj.aperture.mask.*input.cutouts), [3,4,2,1]); 
             obj.weights = repmat(obj.aperture.weight, size(obj.fluxes));
             
         end

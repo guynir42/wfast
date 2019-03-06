@@ -41,15 +41,23 @@ classdef Acquisition < file.AstroData
     
     properties % inputs/outputs
         
+        cutouts_proc;
         cutouts_sub;
+        cutouts_bg_proc;
+        
         stack_cutouts; 
         stack_cutouts_sub;
         stack_cutouts_bg;
-        adjust_pos; % latest adjustment to x and y
-        average_width; % of all stars in the stack
         stack_rem; % do we need this???
         
+        adjust_pos; % latest adjustment to x and y
+        average_width; % of all stars in the stack
         
+        focus_curve_pos;
+        focus_curve_width;
+        
+        batch_counter = 0;
+
     end
     
     properties % switches/controls
@@ -62,8 +70,10 @@ classdef Acquisition < file.AstroData
         use_flip = 0; % flip view by 180 degrees (for meridien flip)
         
         % size of samples used for autofocus
-        focus_num_batches = 30;
-        focus_batch_size = 100;
+        focus_batch_size = 10;
+        
+        focus_curve_range = 1;
+        focus_curve_step = 0.01;
         
         debug_bit = 1;
         
@@ -75,6 +85,7 @@ classdef Acquisition < file.AstroData
         num_batches;
         batch_size;
         num_stars;
+        num_backgrounds;
         expT;
         
     end
@@ -86,6 +97,7 @@ classdef Acquisition < file.AstroData
         default_num_batches = 2;
         default_batch_size = 100;
         default_num_stars = 10;
+        default_num_backgrounds = 20;
         default_expT = 0.025;
         
         version = 1.00;
@@ -117,16 +129,26 @@ classdef Acquisition < file.AstroData
                 obj.buf = file.BufferWheel;
                 
                 % initialize the paramter parser for different work modes
-                obj.input_recording = obj.makeInputVars('save', 1);
-                obj.input_preview = obj.makeInputVars('num_batches', 1, 'batch_size', 1, 'expT', 1, 'num_stars', 0);
-                obj.input_live = obj.makeInputVars('num_batches', 1e6, 'batch_size', 1, 'num_stars', 0);
-                obj.input_focus = obj.makeInputVars('num_batches', obj.focus_num_batches, 'batch_size', obj.focus_batch_size, 'expT', 1, 'num_stars', 0);
+                
+                obj.updateInputObjects;
                 
                 obj.pars = head.Parameters; % this also gives "pars" to all sub-objects
+                
+                obj.prog = util.sys.ProgressBar;
+                obj.audio = util.sys.AudioControl;
                 
                 obj.src = obj.reader;
                 
             end
+            
+        end
+        
+        function updateInputObjects(obj)
+            
+            obj.input_recording = obj.makeInputVars('save', 0);
+            obj.input_preview = obj.makeInputVars('num_batches', 1, 'batch_size', 1, 'expT', 1, 'num_stars', 0);
+            obj.input_live = obj.makeInputVars('num_batches', 1e6, 'batch_size', 1, 'num_stars', 0);
+            obj.input_focus = obj.makeInputVars('batch_size', obj.focus_batch_size, 'expT', 1, 'num_stars', 0);
             
         end
         
@@ -146,6 +168,8 @@ classdef Acquisition < file.AstroData
                 
             end
             
+            obj.batch_counter = 0;
+
         end
         
         function clear(obj)
@@ -181,6 +205,12 @@ classdef Acquisition < file.AstroData
         function val = get.num_stars(obj)
             
             val = obj.input_recording.num_stars;
+            
+        end
+        
+        function val = get.num_backgrounds(obj)
+            
+            val = obj.input_recording.num_backgrounds;
             
         end
         
@@ -228,6 +258,12 @@ classdef Acquisition < file.AstroData
             
         end
         
+        function set.num_backgrounds(obj, val)
+            
+            obj.input_recording.num_backgrounds = val;
+            
+        end
+        
         function set.expT(obj, val)
             
             obj.input_recording.expT = val;
@@ -255,13 +291,18 @@ classdef Acquisition < file.AstroData
             input.input_var('num_batches', obj.default_num_batches, 'Nbatches');
             input.input_var('batch_size', obj.default_batch_size, 'frames');
             input.input_var('num_stars', obj.default_num_stars, 'Nstars');
+            input.input_var('num_backgrounds', obj.default_num_backgrounds, 'Nbackgrounds');
             input.input_var('expT', obj.default_expT, 'T', 'exposure time');
             input.input_var('save', 0, 'use_save');
-            input.input_var('show', 0, 'use_show');
+            input.input_var('show', 1, 'use_show');
             input.input_var('use_random_pos', 0);
             input.input_var('use_mextractor', 0);
             input.input_var('use_sounds', 1);
             input.input_var('use_rough_focus', 1);
+            input.input_var('use_audio', 1);
+            input.input_var('random_positions',0, 'use_random_positions');
+            input.input_var('background', 1, 'use_background_subtraction');
+            input.input_var('axes', [], 'axis');
 %             input.input_var('use
             input.scan_vars(varargin{:});
             
@@ -314,8 +355,7 @@ classdef Acquisition < file.AstroData
                 elseif cs(source, 'simulator')
                     
                     if isempty(obj.sim)
-                        error('Simulator is not yet implemented!');
-                        obj.sim = sim.Simulator;
+                        obj.sim = img.Simulator;
                         obj.sim.pars = obj.pars;
                     end
                     
@@ -391,7 +431,7 @@ classdef Acquisition < file.AstroData
         
     end
     
-    methods % calculations
+    methods % commands/calculations
         
         function run(obj, varargin)
             
@@ -408,7 +448,7 @@ classdef Acquisition < file.AstroData
             cleanup = onCleanup(@() obj.finishup(input));
             obj.startup(input);
             
-            for ii = 1:obj.num_batches
+            for ii = 1:input.num_batches
 
                 if obj.brake_bit
                     return;
@@ -428,9 +468,15 @@ classdef Acquisition < file.AstroData
         
         function startup(obj, input)
             
+            if ~obj.cal.checkDark
+                error('Cannot start a new run without loading darks into calibration object!');
+            end
+                
             obj.brake_bit = 0;
             
-            if input.use_mextractor
+            if input.random_positions
+                obj.clip.arbitraryPositions; % maybe add some input parameters?
+            elseif input.use_mextractor
                 % add the code for mextractor+astrometry here
             end
             
@@ -444,6 +490,9 @@ classdef Acquisition < file.AstroData
             if input.use_audio
                 try obj.audio.playTakeForever; catch ME, warning(ME.getReport); end
             end
+            
+            obj.clip.num_stars = input.num_stars;
+            obj.clip_bg.num_stars = input.num_backgrounds;
             
             obj.src.startup(input.num_batches);
             
@@ -468,21 +517,26 @@ classdef Acquisition < file.AstroData
                 return;
             end
             
+            obj.clear;
+            
             obj.src.batch; % produce the data (from camera, file, or simulator)
             
-            obj.gui.update; drawnow; % make sure commands to the GUI and other callbacks are noticed... 
+            if ~isempty(obj.gui) && obj.gui.check
+                obj.gui.update; 
+            end
             
-            obj.clear; % only clear data once a new batch is done successfully. 
+            drawnow; % make sure commands to the GUI and other callbacks are noticed... 
             
             obj.copyFrom(obj.src); % get the data into this object
             
-            obj.calcStack;
-            obj.calcCutouts;
-            obj.calcLightcurves;
-            obj.calcTrigger;
+            obj.calcStack(input);
+            obj.calcCutouts(input);
+            obj.calcLightcurves(input);
+            obj.calcTrigger(input);
             
             if input.save
                 obj.buf.copyFrom(obj);
+                obj.buf.images = [];
                 obj.buf.save;
                 
                 % check triggering then call the camera save mode
@@ -491,40 +545,59 @@ classdef Acquisition < file.AstroData
             
             obj.batch_counter = obj.batch_counter + 1;
             
+            if ismethod(obj.src, 'next')
+                obj.src.next;
+            end
+            
+            obj.prog.showif(obj.batch_counter);
+            
             if input.show
                 obj.show;
             end
             
         end
         
-        function calcStack(obj)
+        function calcStack(obj, input)
+            
+            if nargin<2 || isempty(input)
+                input = obj.input_recording;
+            end
             
             obj.num_sum = size(obj.images,3);
             obj.stack = obj.cal.input(sum(obj.images,3), 'sum', obj.num_sum);
-                
+            
+            obj.clip.positions = []; % debugging only!!
             obj.stack_cutouts = obj.clip.input(obj.stack); % if no positions are known, it will call "findStars"
             
-            if isempty(obj.bg_clip.positions) % only if we didn't already assign positions to the bg_cutouts
-                obj.bg_clip.arbitraryPositions('im_size', size(obj.stack));
+            if isempty(obj.clip_bg.positions) % only if we didn't already assign positions to the bg_cutouts
+                obj.clip_bg.arbitraryPositions('im_size', size(obj.stack));
             end
             
             obj.stack_cutouts_bg = obj.clip_bg.input(obj.stack); % dim 1&2 are y&x, dim 3 is scalar, dim 4 is star number.
+
+            if input.background
             
-            obj.back.input(obj.stack_cutouts, obj.clip_bg.positions);
-            
-            B = obj.back.getPoints(obj.clip.positions);
-            B = permute(B, [4,3,2,1]); % turn the column vector into a 4D vector
-            % can also get variance from background object...
-            
-            obj.stack_cutouts_sub = obj.stack_cutouts - B; 
+                obj.back.input(obj.stack_cutouts, obj.clip_bg.positions);            
+                B = obj.back.getPoints(obj.clip.positions);
+                B = permute(B, [4,3,2,1]); % turn the column vector into a 4D vector
+                % should also get variance from background object...
+
+                obj.stack_cutouts_sub = obj.stack_cutouts - B; 
+
+            else
+                obj.stack_cutouts_sub = obj.stack_cutouts;
+            end
             
             obj.photo.input(obj.stack_cutouts_sub, 'moments', 1); % run photometry on the stack to verify flux and adjust positions
             
             obj.flux_buf.input(obj.photo.fluxes);
             
             % get the average width and offsets (weighted by the flux of each star...)
-            obj.adjust_pos = [median(obj.photo.fluxes.*obj.photo.offsets_x), median(obj.photo.fluxes.*obj.photo.offsets_y)];
-            obj.average_width = median(obj.photo.fluxes.*obj.photo.widths);
+            M = mean(obj.photo.fluxes);
+            obj.adjust_pos = [median(obj.photo.fluxes./M.*obj.photo.offsets_x, 'omitnan'), median(obj.photo.fluxes./M.*obj.photo.offsets_y, 'omitnan')];
+            obj.adjust_pos(isnan(obj.adjust_pos)) = 0;
+            
+            obj.average_width = median(obj.photo.fluxes./M.*obj.photo.widths, 'omitnan'); % maybe find the average width of each image and not the stack??
             
             if obj.use_adjust_cutouts
                 obj.clip.positions = obj.clip.positions + obj.adjust_pos;
@@ -534,15 +607,21 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function calcCutouts(obj)
+        function calcCutouts(obj, input)
             
-            [obj.cutouts, obj.positions] = obj.clip.input(obj.images);
+            if nargin<2 || isempty(input)
+                input = obj.input_recording;
+            end
+            
+            obj.cutouts = obj.clip.input(obj.images);
+            obj.positions = obj.clip.positions;
             
             obj.cutouts_proc = obj.cal.input(obj.cutouts, 'clip', obj.clip);
             
-            [obj.bg_cutouts, obj.bg_positions] = obj.clip_bg.input(obj.image);
+            obj.cutouts_bg = obj.clip_bg.input(obj.images);
+            obj.positions_bg = obj.clip_bg.positions;
             
-            obj.bg_cutouts_proc = obj.cal.input(obj.bg_cutouts, 'clip', obj.clip_bg);
+            obj.cutouts_bg_proc = obj.cal.input(obj.cutouts_bg, 'clip', obj.clip_bg);
             
             B = obj.back.getPoints(obj.clip.positions); 
             B = permute(B, [4,3,2,1]); % turn the column vector into a 4D vector
@@ -558,22 +637,103 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function calcLightcurves(obj)
+        function calcLightcurves(obj, input)
+            
+            if nargin<2 || isempty(input)
+                input = obj.input_recording;
+            end
             
             obj.photo.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps); % add variance input? 
             
             obj.lightcurves = obj.photo.fluxes;
-            obj.widths = obj.photo.widths;
+%             obj.widths = obj.photo.widths;
             
         end
         
-        function calcTrigger(obj)
+        function calcTrigger(obj, input)
+            
+            if nargin<2 || isempty(input)
+                input = obj.input_recording;
+            end
+            
             % to be implemented!
         end
         
     end
     
+    methods % optional run commands
+        
+        function runFocus(obj, varargin)
+            
+            if isempty(varargin) || ~isa(varargin{1}, 'util.text.InputVars')
+                input = util.oop.full_copy(obj.input_focus);
+                input.scan_vars(varargin{:});
+            elseif isa(varargin{1}, 'util.text.InputVars')
+                input = varargin{1};
+                input.scan_vars(varargin{2:end});
+            else
+                input = obj.makeInputVars(varargin{:});
+            end
+            
+            if isempty(obj.cam) || isempty(obj.cam.focuser)
+                error('must be connected to camera and focuser!');
+            end
+            
+            if isempty(input.axes)
+                if ~isempty(obj.gui) && obj.gui.check
+                    input.axes = obj.gui.axes_image;
+                else
+                    input.axes = gca;
+                end
+            end
+            
+            obj.focus_curve_pos = obj.cam.focuser.pos + (-obj.focus_curve_range:obj.focus_curve_step:obj.focus_curve_range);
+            obj.focus_curve_width = NaN(length(obj.focus_curve_pos),1);
+            
+            input.num_batches = length(obj.focus_curve_pos);
+            
+            cleanup = onCleanup(@() obj.finishup(input));
+            obj.startup(input);
+            
+            for ii = 1:input.num_batches
+
+                if obj.brake_bit
+                    return;
+                end
+                
+                try 
+                    obj.cam.focuser.pos = obj.focus_curve_pos(ii);
+                catch ME
+                    warning(ME.getReport);
+                end
+                
+                obj.batch(input);
+                
+                obj.focus_curve_pos(ii) = obj.cam.focuser.pos;
+                obj.focus_curve_width(ii) = obj.average_width;
+                
+                plot(input.axes, obj.focus_curve_pos, obj.focus_curve_width);
+                
+                drawnow;
+            
+            end
+            
+            
+        end
+        
+    end
+    
     methods % plotting tools / GUI
+        
+        function makeGUI(obj)
+            
+            if isempty(obj.gui)
+                obj.gui = img.gui.AcqGUI(obj);
+            end
+            
+            obj.gui.make;
+            
+        end
         
         function show(obj, varargin)
             
@@ -584,7 +744,7 @@ classdef Acquisition < file.AstroData
             input.scan_vars(varargin{:});
             
             if isempty(input.ax)
-                if obj.gui.check
+                if ~isempty(obj.gui) && obj.gui.check
                     input.ax = obj.gui.axes_image;
                 else
                     input.ax = gca;
@@ -592,8 +752,6 @@ classdef Acquisition < file.AstroData
             end
             
             if cs(obj.display_what, 'images')
-                I = obj.images_proc(:,:,end);
-            elseif cs(obj.display_what, 'raw')
                 I = obj.images(:,:,end);
             elseif cs(obj.display_what, 'stack')
                 I = obj.stack;
@@ -601,11 +759,13 @@ classdef Acquisition < file.AstroData
                 error('Unknown option for "display_what". Use "images", "raw", or "stack"');
             end
             
+            I = obj.cutouts(:,:,1,1); % debug only!!
+            
             if obj.use_flip
                 I = rot90(I,2);
             end
             
-            util.plot.setImage(I(:,:,ii), ax);
+            util.plot.setImage(I, input.ax);
             drawnow;
             
         end

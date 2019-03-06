@@ -274,9 +274,9 @@ classdef Background < handle
             end
             
             if cs(obj.model_type, 'median')
-                
+                obj.output_backgrounds = repmat(obj.median_background, [size(positions,1),1]);
             elseif cs(obj.model_type, 'mean')
-                
+                obj.output_backgrounds = repmat(obj.mean_background, [size(positions,1),1]);
             elseif cs(obj.model_type, 'poly')
                 
                 A = ones(size(positions,1));
