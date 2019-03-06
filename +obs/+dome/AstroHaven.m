@@ -14,8 +14,11 @@ classdef AstroHaven < handle
     properties % objects
         
         hndl; % serial port object
+        
         acc1@obs.sens.Accelerometer; % accelerometer for shutter1
         acc2@obs.sens.Accelerometer; % accelerometer for shutter2
+        
+        log@util.sys.Logger;
         
     end
     
@@ -30,7 +33,24 @@ classdef AstroHaven < handle
         
         reply = '';
         
-        % make these hidden later:
+        debug_bit = 1;
+        
+    end
+    
+    properties (Dependent = true)
+        
+        is_closed;
+        shutter1;
+        shutter1_deg;
+        shutter2;
+        shutter2_deg;
+        
+    end
+    
+    properties (Hidden = true)
+        
+        counter = 0;
+        
         acc_name = 'HC-06';
         acc_id1 = '';
         acc_id2 = '';
@@ -54,21 +74,7 @@ classdef AstroHaven < handle
         timeout = 10; % how many seconds to wait before returning the control 
         loop_res = 10; % how many times to call "open" or "close" when in a loop
         
-    end
-    
-    properties (Dependent = true)
-        
-        is_closed;
-        shutter1;
-        shutter1_deg;
-        shutter2;
-        shutter2_deg;
-        
-    end
-    
-    properties (Hidden = true)
-        
-        
+        version = 1.00;
         
     end
     
@@ -76,51 +82,74 @@ classdef AstroHaven < handle
         
         function obj = AstroHaven(varargin)
             
-            try
-                obj.connect;
-            catch ME
-                warning(ME.getReport);
+            if isempty(varargin)
+            
+                if obj.debug_bit, fprintf('Boltwood default constructor v%4.2f\n', obj.version); end
+                
+                obj.log = util.sys.Logger('AstroHaven_dome');
+                
             end
+            
+            
+            obj.connect;
+            
         end
         
         function connect(obj)
             
-            if ~isempty(obj.hndl) && isvalid(obj.hndl)
-                fclose(obj.hndl);
-                delete(obj.hndl);
+            obj.log.input('Connecting to dome via serial port');
+            
+            try
+                
+                if ~isempty(obj.hndl) && isvalid(obj.hndl)
+                    fclose(obj.hndl);
+                    delete(obj.hndl);
+                end
+
+                obj.hndl = serial(obj.port_name);
+    % These 
+    %             obj.hndl.BytesAvailableFcn = @obj.getReply;
+    %             obj.hndl.BytesAvailableFcnCount = 1;
+    %             obj.hndl.BytesAvailableFcnMode = 'byte';
+                obj.hndl.Terminator = '';
+
+                try 
+                    fopen(obj.hndl);
+                catch 
+                    fopen(obj.hndl);
+                end
+
+                obj.update;
+
+                if obj.use_accelerometers
+                    obj.connectAccelerometers;
+                end
+
+            catch ME
+                obj.log.error(ME.getReport);
+                warning(ME.getReport);
             end
-            
-            obj.hndl = serial(obj.port_name);
-            
-%             obj.hndl.BytesAvailableFcn = @obj.getReply;
-%             obj.hndl.BytesAvailableFcnCount = 1;
-%             obj.hndl.BytesAvailableFcnMode = 'byte';
-            obj.hndl.Terminator = '';
-            
-            try 
-                fopen(obj.hndl);
-            catch 
-                fopen(obj.hndl);
-            end
-            
-            obj.update;
-            
-            if obj.use_accelerometers
-                obj.connectAccelerometers;
-            end
-            
             
         end
         
         function disconnect(obj)
             
-            fclose(obj.hndl);
-            delete(obj.hndl);
-            obj.hndl = [];
+            obj.log.input('Disconnecting from dome');
+            
+            try 
+                fclose(obj.hndl);
+                delete(obj.hndl);
+                obj.hndl = [];
+            catch ME
+                obj.log.error(ME.getReport);
+                warning(ME.getReport);
+            end
             
         end
         
         function connectAccelerometers(obj)
+            
+            obj.log.input('Connecting to accelerometers.');
             
             try
                 
@@ -128,6 +157,7 @@ classdef AstroHaven < handle
                 
             catch ME
                 
+                obj.log.error(ME.getReport);
                 obj.acc1 = obs.sens.Accelerometer.empty;
                 warning(ME.getWarning);
                 
@@ -139,6 +169,7 @@ classdef AstroHaven < handle
                 
             catch ME
                 
+                obj.log.error(ME.getReport);
                 obj.acc2 = obs.sens.Accelerometer.empty;
                 warning(ME.getWarning);
                 
@@ -204,6 +235,291 @@ classdef AstroHaven < handle
             
         end
         
+    end
+    
+    methods % commands
+                
+        function emergencyClose(obj)
+            
+            obj.log.input('Emergency close!');
+            
+            try 
+                obj.counter = 0;
+                obj.send('C');
+                obj.closeBoth(100);
+                obj.update;
+            catch ME
+                obj.log.error(ME.getReport);
+                warning(ME.getReport);
+            end
+            
+        end
+        
+        function openBoth(obj, number)
+            
+            if nargin<2 || isempty(number)
+                number = 1;
+            end
+            
+            obj.log.input(['Open both. N= ' num2str(number)]);
+            
+            try
+            
+                for ii = 1:number
+
+                    t = tic;
+
+                    obj.counter = 0;
+                    obj.send('a');
+                    obj.send('b');
+
+                    pause(0.2);
+
+                    obj.open_time1 = obj.open_time1 + toc(t);
+                    obj.open_time2 = obj.open_time2 + toc(t);
+
+                end
+
+            catch ME
+                obj.log.error(ME.getReport);
+                warning(ME.getReport);
+            end
+            
+        end
+        
+        function closeBoth(obj, number)
+            
+            obj.log.input(['Close both. N= ' num2str(number)]);
+            
+            if nargin<2 || isempty(number)
+                number = 1;
+            end
+            
+            try
+                
+                for ii = 1:number
+
+                    t = tic;
+                    
+                    obj.counter = 0;
+                    obj.send('A');
+                    obj.send('B');
+
+                    pause(0.2);
+
+                    obj.close_time1 = obj.close_time1 + toc(t);
+                    obj.close_time2 = obj.close_time2 + toc(t);
+
+                end
+                
+            catch ME
+                obj.log.error(ME.getReport);
+                warning(ME.getReport);
+            end
+            
+        end
+                
+        function open1(obj, number)
+            
+            if nargin<2 || isempty(number)
+                number = 1;
+            end
+            
+            obj.log.input(['Open shutter 1. N= ' num2str(number)]);
+            
+            try
+
+                command = 'a';
+
+                for ii = 1:number
+
+                    t = tic;
+
+                    obj.counter = 0;
+                    obj.send(command);
+
+                    pause(0.2);
+
+                    obj.open_time1 = obj.open_time1 + toc(t);
+
+                end
+
+            catch ME
+                obj.log.error(ME.getReport);
+                warning(ME.getReport);
+            end
+            
+        end
+        
+        function open2(obj, number)
+            
+            if nargin<2 || isempty(number)
+                number = 1;
+            end
+            
+            obj.log.input(['Open shutter 2. N= ' num2str(number)]);
+
+            try
+                
+                command = 'b';
+
+                for ii = 1:number
+
+                    t = tic;
+
+                    obj.send(command);
+
+                    pause(0.2);
+
+                    obj.open_time2 = obj.open_time2 + toc(t);
+
+                end
+
+            catch ME
+                obj.log.error(ME.getReport);
+                warning(ME.getReport);
+            end
+            
+        end
+        
+        function close1(obj, number)
+            
+            if nargin<2 || isempty(number)
+                number = 1;
+            end
+            
+            obj.log.input(['Close shutter 1. N= ' num2str(number)]);
+            
+            try
+                
+                command = 'A';
+
+                for ii = 1:number
+
+                    t = tic;
+
+                    obj.send(command);
+    %                 fprintf(obj.hndl, command);
+
+                    pause(0.2);
+
+                    obj.close_time1 = obj.close_time1 + toc(t);
+
+                end
+
+            catch ME
+                obj.log.error(ME.getReport);
+                warning(ME.getReport);
+            end
+            
+        end
+        
+        function close2(obj, number)
+                      
+            if nargin<2 || isempty(number)
+                number = 1;
+            end
+            
+            obj.log.input(['Close shutter 2. N= ' num2str(number)]);
+
+            try
+
+                command = 'B';
+
+                for ii = 1:number
+
+                    t = tic;
+
+                    obj.send(command);
+
+                    pause(0.2);
+
+                    obj.close_time2 = obj.close_time2 + toc(t);
+
+                end
+
+            catch ME
+                obj.log.error(ME.getReport);
+                warning(ME.getReport);
+            end
+            
+        end
+        
+        function open1Full(obj)
+            
+        end
+        
+        function close1Full(obj)
+            
+        end
+        
+        function open2Full(obj)
+            
+        end
+        
+        function close2Full(obj)
+            
+        end
+        
+    end
+    
+    methods % internal functions (to be made hidden/private)
+        
+        function send(obj, command)
+            
+            try 
+                fprintf(obj.hndl, command);
+                
+            catch ME
+                
+                if strcmp(ME.identifier, 'MATLAB:serial:fprintf:opfailed')
+                    pause(0.1);
+                    obj.connect;
+                    obj.counter = obj.counter + 1;
+                    if obj.counter<10 % infinite-loop prevention
+                        obj.send(command);
+                    end
+                else
+                    rethrow(ME);
+                end
+                
+            end
+            
+            obj.update;
+            
+        end
+        
+        function update(obj)
+            
+%             obj.hndl.BytesAvailableFcn = @obj.getReply; % make sure the reply read function is working! 
+            
+            obj.getReply;
+            
+            if isempty(obj.reply)
+                obj.status = 0;
+            else
+                obj.status = 1;
+            end
+
+        end
+        
+        function getReply(obj, ~, ~)
+            
+            try
+                obj.reply = char(fread(obj.hndl, 1));
+            catch ME
+                obj.reply = '';
+            end
+            
+            if strcmp(obj.reply, '0') % reset all time estimates when closed
+                obj.open_time1 = 0;
+                obj.close_time1 = 0;
+                obj.open_time2 = 0;
+                obj.close_time2 = 0; 
+            end
+            
+        end
+        
         function val = calcAngle(obj, shutter)
 
             if nargin<2 || isempty(shutter)
@@ -257,239 +573,6 @@ classdef AstroHaven < handle
                 end
                 
             end
-            
-        end
-        
-        function getReply(obj, ~, ~)
-            
-%             disp('reading serial');
-            try
-                obj.reply = char(fread(obj.hndl, 1));
-            catch ME
-                obj.reply = '';
-            end
-            
-            if strcmp(obj.reply, '0') % reset all timers when closed
-                obj.open_time1 = 0;
-                obj.close_time1 = 0;
-                obj.open_time2 = 0;
-                obj.close_time2 = 0; 
-            end
-            
-        end
-        
-    end
-    
-    methods % commands
-                
-        function emergencyClose(obj)
-            
-            obj.send('C');
-            
-            obj.closeBoth(100);
-            
-        end
-        
-        function send(obj, command)
-            
-            try 
-                fprintf(obj.hndl, command);
-                
-            catch ME
-                
-                if strcmp(ME.identifier, 'MATLAB:serial:fprintf:opfailed')
-                    pause(0.1);
-                    obj.connect;
-                    obj.send(command); % dangerous loop right here! 
-                else
-                    rethrow(ME);
-                end
-                
-            end
-            
-        end
-        
-        function update(obj)
-            
-%             obj.hndl.BytesAvailableFcn = @obj.getReply; % make sure the reply read function is working! 
-            
-            obj.getReply;
-            
-            if isempty(obj.reply)
-                obj.status = 0;
-            else
-                obj.status = 1;
-            end
-
-        end
-        
-        function openBoth(obj, number)
-            
-            if nargin<2 || isempty(number)
-                number = 1;
-            end
-            
-            for ii = 1:number
-                
-                t = tic;
-            
-                obj.send('a');
-                obj.send('b');
-                
-                pause(0.2);
-                
-                obj.open_time1 = obj.open_time1 + toc(t);
-                obj.open_time2 = obj.open_time2 + toc(t);
-
-            end
-            
-            
-        end
-        
-        function closeBoth(obj, number)
-            
-            if nargin<2 || isempty(number)
-                number = 1;
-            end
-            
-            for ii = 1:number
-                
-                t = tic;
-            
-                obj.send('A');
-                obj.send('B');
-                
-                pause(0.2);
-                
-                obj.close_time1 = obj.close_time1 + toc(t);
-                obj.close_time2 = obj.close_time2 + toc(t);
-
-            end
-            
-            
-        end
-                
-        function open1(obj, number)
-            
-            if nargin<2 || isempty(number)
-                number = 1;
-            end
-            
-            command = 'a';
-%             res = 0.01;
-%             timeout = 1;            
-            
-            for ii = 1:number
-                
-                t = tic;
-                
-%                 disp('opening now');
-                
-%                 obj.reply = '';
-                obj.send(command);
-                pause(0.2);
-%                 for jj = 1:timeout/res
-%                 
-%                     if strcmp(obj.reply, 'a')
-%                         break;
-%                     end
-%                     
-%                     obj.reply = '';
-%                     
-%                     pause(res);
-%                     
-%                 end
-%                 
-%                 if jj==timeout/res
-%                     error('timeout while waiting for dome to reply after %f seconds...', timeout);
-%                 end
-                
-                obj.open_time1 = obj.open_time1 + toc(t);
-                
-            end
-            
-        end
-        
-        function open2(obj, number)
-            
-            if nargin<2 || isempty(number)
-                number = 1;
-            end
-            
-            command = 'b';
-            
-            for ii = 1:number
-                
-                t = tic;
-            
-                obj.send(command);
-                
-                pause(0.2);
-                
-                obj.open_time2 = obj.open_time2 + toc(t);
-
-            end
-            
-        end
-        
-        function close1(obj, number)
-            
-            if nargin<2 || isempty(number)
-                number = 1;
-            end
-            
-            command = 'A';
-
-            for ii = 1:number
-
-                t = tic;
-                
-                obj.send(command);
-%                 fprintf(obj.hndl, command);
-            
-                pause(0.2);
-
-                obj.close_time1 = obj.close_time1 + toc(t);
-
-            end
-                
-        end
-        
-        function close2(obj, number)
-                      
-            if nargin<2 || isempty(number)
-                number = 1;
-            end
-            
-            command = 'B';
-
-            for ii = 1:number
-
-                t = tic;
-            
-                obj.send(command);
-            
-                pause(0.2);
-
-                obj.close_time2 = obj.close_time2 + toc(t);
-
-            end
-            
-        end
-        
-        function open1Full(obj)
-            
-        end
-        
-        function close1Full(obj)
-            
-        end
-        
-        function open2Full(obj)
-            
-        end
-        
-        function close2Full(obj)
             
         end
         

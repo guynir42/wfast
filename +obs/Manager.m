@@ -8,6 +8,8 @@ classdef Manager < handle
     
     properties % objects
         
+        log@util.sys.Logger;
+        
         checker@obs.StatusChecker;
         
         dome;
@@ -52,8 +54,11 @@ classdef Manager < handle
             else
                 if obj.debug_bit, fprintf('Manager constructor v%4.2f\n', obj.version); end
             
-                obj.connect;
-                obj.checker = obs.StatusChecker(obj);
+                obj.log = util.sys.Logger('Top_level_manager'); % keep track of commands given and errors received... 
+                
+                obj.connect; % connect to all hardware
+                
+                obj.checker = obs.StatusChecker(obj); % has timers that check weather/hardware status
                 
             end
             
@@ -61,9 +66,22 @@ classdef Manager < handle
         
         function connect(obj)
             
+            obj.connectDome;
+            obj.connectMount;
+            obj.connectBoltwood;
+            
+        end
+        
+        function connectDome(obj)
+            
+            obj.log.input('Connecting to dome');
+            
             try 
                 obj.dome = obs.dome.AstroHaven;
             catch ME
+                
+                obj.log.error(ME.getReport);
+                obj.log.input('Connecting dome simulator.');
                 
                 warning(ME.getReport);
                 
@@ -72,14 +90,24 @@ classdef Manager < handle
                 try
                     obj.dome = obs.dome.Simulator;
                 catch ME
+                    obj.log.error(ME.getReport);
                     warning(ME.getReport);
                 end
                 
             end
             
+        end
+        
+        function connectMount(obj)
+            
+            obj.log.input('Connecting to mount.');
+            
             try 
                 obj.mount = obs.mount.ASA;
             catch ME
+                
+                obj.log.error(ME.getReport);
+                obj.log.input('Connecting to mount simulator.');
                 
                 warning(ME.getReport);
                 
@@ -88,15 +116,24 @@ classdef Manager < handle
                 try 
                     obj.mount = obs.mount.Simulator;
                 catch ME
+                    obj.log.error(ME.getReport);
                     warning(ME.getReport);
                 end
                 
             end
             
+        end
+        
+        function connectBoltwood(obj)
+            
+            obj.log.input('Connecting to Boltwood weather station.');
+            
             try 
                 obj.weather = sens.Boltwood;
             catch ME
                 
+                obj.log.error(ME.getReport);
+                obj.log.input('Connecting to weather simulator.');
                 warning(ME.getReport);
                 
                 disp('Cannot connect to Boltwood weather station. Using simulator instead...');
@@ -104,6 +141,7 @@ classdef Manager < handle
                 try
                     obj.weather = obs.sens.Simulator;
                 catch ME
+                    obj.log.error(ME.getReport);
                     warning(ME.getReport);
                 end
                 

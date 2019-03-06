@@ -93,13 +93,21 @@ classdef Logger < handle
         
     end
     
-    methods % calculations
+    methods % commands
         
-        function input(obj, text)
+        function input(obj, text, errflag)
+            
+            if nargin<3 || isempty(errflag)
+                errflag = 0;
+            end
             
             obj.time = datetime('now', 'timezone', 'UTC');
             timestamp = datestr(obj.time, 'hh:MM:ss.FFF');
-            obj.report = [timestamp ': ' text];
+            if errflag==0
+                obj.report = sprintf('%s: %s', timestamp, text);
+            else
+                obj.report = sprintf('************ EXCEPTION *****************\n%s: %s', timestamp, text);
+            end
             
             if isempty(obj.hndl) || obj.hndl<0
                 obj.makeFile;
@@ -110,6 +118,12 @@ classdef Logger < handle
             catch ME
                 warning(ME.getReport);
             end
+            
+        end
+        
+        function error(obj, text)
+            
+            obj.input(text, 1); % use the errflag! 
             
         end
         
