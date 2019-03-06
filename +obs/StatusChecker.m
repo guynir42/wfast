@@ -48,10 +48,10 @@ classdef StatusChecker < handle
         wind_all;
         wind_jul;
         
-        wind_dir_now;
-        wind_dir_str;
-        wind_dir_all;
-        wind_dir_jul;
+        wind_az_now;
+        wind_az_str;
+        wind_az_all;
+        wind_az_jul;
         
         humid_now;
         humid_str;
@@ -75,8 +75,8 @@ classdef StatusChecker < handle
         max_light = 1; % units??
         min_light = -Inf;
         
-        max_clouds = 1; % units??
-        min_clouds = -Inf; 
+        max_clouds = 20; % degree difference to sky??
+        min_clouds = -10; % negative --> cloudy??
         
         max_temp = 30;
         min_temp = 0;
@@ -215,6 +215,13 @@ classdef StatusChecker < handle
             
         end
         
+        function reset_wind_az(obj)
+            
+            obj.wind_az_all = [];
+            obj.wind_az_jul = [];
+            
+        end
+        
         function reset_humid(obj)
             
             obj.humid_all = [];
@@ -245,6 +252,14 @@ classdef StatusChecker < handle
     
     methods % timer related
         
+        function stop_timers(obj)
+            
+            obj.stop_t3;
+            obj.stop_t2;
+            obj.stop_t1;
+            
+        end
+        
         function callback_t1(obj, ~, ~)
             
             for ii = 1:length(obj.devices)
@@ -271,11 +286,14 @@ classdef StatusChecker < handle
                 end
             end
             
+            delete(timerfind('name', 'Status-check-t1'));
+            
             obj.t1 = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'Status-check-t1', ...
                 'Period', obj.period1, 'StartDelay', obj.period1, ...
                 'TimerFcn', @obj.callback_t1, 'ErrorFcn', @obj.setup_t1);
             
             start(obj.t1);
+            
         end
         
         function stop_t1(obj, ~, ~)
@@ -286,8 +304,11 @@ classdef StatusChecker < handle
         
         function callback_t2(obj, ~, ~)
             
-%             disp('Running t2 timer now!');
-            
+            % make sure t1 is running! 
+            if isempty(obj.t1) || ~isvalid(obj.t1) || strcmp(obj.t1.Running, 'off')
+                obj.setup_t1;
+            end
+
             str = '';
             obj.collect_light;
             str = [str 'LIGHT: ' obj.light_str];
@@ -325,6 +346,8 @@ classdef StatusChecker < handle
                 end
             end
             
+            delete(timerfind('name', 'Status-check-t2'));
+            
             obj.t2 = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'Status-check-t2', ...
                 'Period', obj.period2, 'StartDelay', obj.period2, ...
                 'TimerFcn', @obj.callback_t2, 'ErrorFcn', @obj.setup_t2);
@@ -339,11 +362,32 @@ classdef StatusChecker < handle
             
         end 
         
-        function val = callback_t3(obj, ~, ~)
+        function callback_t3(obj, ~, ~)
+            
+            % make sure t2 is running! 
+            if isempty(obj.t2) || ~isvalid(obj.t2) || strcmp(obj.t2.Running, 'off')
+                obj.setup_t2;
+            end
             
         end
         
         function setup_t3(obj, ~, ~)
+            
+            if ~isempty(obj.t3) && isa(obj.t3, 'timer') && isvalid(obj.t3)
+                if strcmp(obj.t3.Running, 'on')
+                    stop(obj.t3);
+                    delete(obj.t3);
+                    obj.t3 = [];
+                end
+            end
+            
+            delete(timerfind('name', 'Status-check-t3'));
+            
+            obj.t3 = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'Status-check-t3', ...
+                'Period', obj.period3, 'StartDelay', obj.period3, ...
+                'TimerFcn', @obj.callback_t3, 'ErrorFcn', @obj.setup_t3);
+            
+            start(obj.t3);
             
         end
         
@@ -359,9 +403,105 @@ classdef StatusChecker < handle
         
         function collect_light(obj)
             
+            val = [];
+            str = '';
+            
+            for ii = 1:length(obj.sensors)
+                
+                sens = obj.sensors{ii};
+                new_val = [];
+                
+                if isprop(sens, 'light')
+                    new_val = sens.light;
+                elseif isprop(sens, 'Light')
+                    new_val = sens.Light;
+                elseif isprop(sens, 'light_value')
+                    new_val = sens.light_value;
+                elseif isprop(sens, 'daylight')
+                    new_val = sens.daylight;
+                end
+                
+                if sens.status==0
+                    new_val = NaN;
+                end
+                
+                if ~isempty(new_val)
+                    
+                    val = [val new_val];
+                    
+                    new_str = sprintf('%s=%4.2f ', obj.getInstrID(sens), new_val);
+                    
+                    str = [str new_str];
+                    
+                end
+                
+            end
+            
+            obj.light_now = val; 
+            j = juliandate(datetime('now', 'timezone', 'UTC'));
+            obj.light_str = str;
+            
+            if size(val,2)==size(obj.light_all,2)
+                obj.light_all = [obj.light_all; val];
+                obj.light_jul = [obj.light_jul j]; 
+            elseif isempty(val)
+                % pass
+            else
+                obj.reset_light;
+                obj.light_all = val;
+                obj.light_jul = j;
+            end
+            
         end
         
         function collect_clouds(obj)
+            
+            val = [];
+            str = '';
+            
+            for ii = 1:length(obj.sensors)
+                
+                sens = obj.sensors{ii};
+                new_val = [];
+                
+                if isprop(sens, 'clouds')
+                    new_val = sens.clouds;
+                elseif isprop(sens, 'Clouds')
+                    new_val = sens.Clouds;
+                elseif isprop(sens, 'temp_sky')
+                    new_val = sens.temp_sky;
+                end
+                
+                if sens.status==0
+                    new_val = NaN;
+                end
+                
+                if ~isempty(new_val)
+                    
+                    val = [val new_val];
+                    
+                    new_str = sprintf('%s=%4.2f ', obj.getInstrID(sens), new_val);
+                    
+                    str = [str new_str];
+                    
+                end
+                
+            end
+            
+            obj.clouds_now = val; 
+            j = juliandate(datetime('now', 'timezone', 'UTC'));
+            obj.clouds_str = str;
+            
+            if size(val,2)==size(obj.clouds_all,2)
+                obj.clouds_all = [obj.clouds_all; val];
+                obj.clouds_jul = [obj.clouds_jul j]; 
+            elseif isempty(val)
+                % pass
+            else
+                obj.reset_clouds;
+                obj.clouds_all = val;
+                obj.clouds_jul = j;
+            end
             
         end
         
@@ -393,7 +533,7 @@ classdef StatusChecker < handle
                     
                     val = [val new_val];
                     
-                    new_str = sprintf('%s: %4.2f ', obj.getInstrID(sens), new_val);
+                    new_str = sprintf('%s=%4.2f ', obj.getInstrID(sens), new_val);
                     
                     str = [str new_str];
                     
@@ -403,6 +543,7 @@ classdef StatusChecker < handle
             
             obj.temp_now = val; 
             j = juliandate(datetime('now', 'timezone', 'UTC'));
+            obj.temp_str = str;
             
             if size(val,2)==size(obj.temp_all,2)
                 obj.temp_all = [obj.temp_all; val];
@@ -419,51 +560,164 @@ classdef StatusChecker < handle
         
         function collect_wind(obj)
             
-        end
-        
-        function collect_humid(obj)
+            val = [];
+            str = '';
             
-        end
-        
-        function check_devices(obj)
+            for ii = 1:length(obj.sensors)
+                
+                sens = obj.sensors{ii};
+                new_val = [];
+                
+                if isprop(sens, 'wind')
+                    new_val = sens.wind;
+                elseif isprop(sens, 'Wind')
+                    new_val = sens.Wind;
+                elseif isprop(sens, 'wind_speed')
+                    new_val = sens.wind_speed;
+                elseif isprop(sens, 'WindSpeed')
+                    new_val = sens.WindSpeed;
+                end
+                
+                if sens.status==0
+                    new_val = NaN;
+                end
+                
+                if ~isempty(new_val)
+                    
+                    val = [val new_val];
+                    
+                    new_str = sprintf('%s=%4.2f ', obj.getInstrID(sens), new_val);
+                    
+                    str = [str new_str];
+                    
+                end
+                
+            end
             
-        end
-        
-        function val = decision_light(obj)
+            obj.wind_now = val; 
+            j = juliandate(datetime('now', 'timezone', 'UTC'));
+            obj.wind_str = str;
             
-            val = 1;
-            
-        end
-        
-        function val = decision_clouds(obj)
-            
-            val = 1;
-            
-        end
-        
-        function val = decision_temp(obj)
-            
-            if any(obj.temp_now>obj.max_temp) || any(obj.temp_now<obj.min_temp)
-                val = 0;
+            if size(val,2)==size(obj.wind_all,2)
+                obj.wind_all = [obj.wind_all; val];
+                obj.wind_jul = [obj.wind_jul j]; 
+            elseif isempty(val)
+                % pass
             else
-                val = 1;
+                obj.reset_wind;
+                obj.wind_all = val;
+                obj.wind_jul = j;
             end
             
         end
         
-        function val = decision_wind(obj)
+        function collect_wind_az(obj)
             
-            val = 1;
+            val = [];
+            str = '';
+            
+            for ii = 1:length(obj.sensors)
+                
+                sens = obj.sensors{ii};
+                new_val = [];
+                
+                if isprop(sens, 'wind_az')
+                    new_val = sens.wind_az;
+                elseif isprop(sens, 'WindAz')
+                    new_val = sens.WindAz;
+                elseif isprop(sens, 'wind_direction')
+                    new_val = sens.wind_direction;
+                elseif isprop(sens, 'WindDirection')
+                    new_val = sens.WindDirection;
+                end
+                
+                if sens.status==0
+                    new_val = NaN;
+                end
+                
+                if ~isempty(new_val)
+                    
+                    val = [val new_val];
+                    
+                    new_str = sprintf('%s=%4.2f ', obj.getInstrID(sens), new_val);
+                    
+                    str = [str new_str];
+                    
+                end
+                
+            end
+            
+            obj.wind_az_now = val; 
+            j = juliandate(datetime('now', 'timezone', 'UTC'));
+            obj.wind_az_str = str;
+            
+            if size(val,2)==size(obj.wind_az_all,2)
+                obj.wind_az_all = [obj.wind_az_all; val];
+                obj.wind_az_jul = [obj.wind_jul j]; 
+            elseif isempty(val)
+                % pass
+            else
+                obj.reset_wind_az;
+                obj.wind_az_all = val;
+                obj.wind_az_jul = j;
+            end
             
         end
         
-        function val = decision_humid(obj)
+        function collect_humid(obj)
             
-            val = 1;
+            val = [];
+            str = '';
+            
+            for ii = 1:length(obj.sensors)
+                
+                sens = obj.sensors{ii};
+                new_val = [];
+                
+                if isprop(sens, 'humid')
+                    new_val = sens.humid;
+                elseif isprop(sens, 'Humid')
+                    new_val = sens.Humid;
+                elseif isprop(sens, 'humidity')
+                    new_val = sens.humidity;
+                elseif isprop(sens, 'Humidity')
+                    new_val = sens.Humidity;
+                end
+                
+                if sens.status==0
+                    new_val = NaN;
+                end
+                
+                if ~isempty(new_val)
+                    
+                    val = [val new_val];
+                    
+                    new_str = sprintf('%s=%4.2f ', obj.getInstrID(sens), new_val);
+                    
+                    str = [str new_str];
+                    
+                end
+                
+            end
+            
+            obj.humid_now = val; 
+            j = juliandate(datetime('now', 'timezone', 'UTC'));
+            obj.humid_str = str;
+            
+            if size(val,2)==size(obj.humid_all,2)
+                obj.humid_all = [obj.humid_all; val];
+                obj.humid_jul = [obj.humid_jul j]; 
+            elseif isempty(val)
+                % pass
+            else
+                obj.reset_humid;
+                obj.humid_all = val;
+                obj.humid_jul = j;
+            end
             
         end
         
-        function val = decision_devices(obj)
+        function status_all = check_devices(obj)
             
             obj.dev_str = '';
             
@@ -484,6 +738,62 @@ classdef StatusChecker < handle
                 obj.dev_str = [obj.dev_str obj.getInstrID(obj.devices{ii}) ': ' num2str(status)];
                 
             end
+            
+        end
+        
+        function val = decision_light(obj)
+            
+            if any(obj.light_now>obj.max_temp) || any(obj.light_now<obj.min_light)
+                val = 0;
+            else
+                val = 1;
+            end
+            
+        end
+        
+        function val = decision_clouds(obj)
+            
+            if any(obj.clouds_now>obj.max_clouds) || any(obj.clouds_now<obj.min_clouds)
+                val = 0;
+            else
+                val = 1;
+            end
+            
+        end
+        
+        function val = decision_temp(obj)
+            
+            if any(obj.temp_now>obj.max_temp) || any(obj.temp_now<obj.min_temp)
+                val = 0;
+            else
+                val = 1;
+            end
+            
+        end
+        
+        function val = decision_wind(obj)
+            
+            if any(obj.wind_now>obj.max_wind) || any(obj.wind_now<obj.min_wind)
+                val = 0;
+            else
+                val = 1;
+            end
+            
+        end
+        
+        function val = decision_humid(obj)
+            
+            if any(obj.humid_now>obj.max_humid) || any(obj.humid_now<obj.min_humid)
+                val = 0;
+            else
+                val = 1;
+            end
+            
+        end
+        
+        function val = decision_devices(obj)
+            
+            status_all = obj.check_devices;
             
             if any(status_all==0)
                 val = 0;

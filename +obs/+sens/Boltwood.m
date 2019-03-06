@@ -27,6 +27,7 @@ classdef Boltwood < handle
     
         % generic fields
         status = 0; % false - readings are unreliable, true - ok
+        id = 'BWW'; 
         data@util.vec.CircularBuffer; % Stack object containing data history
         data_col = {'JD', 'DayLightV', 'AmbientT', 'RelSkyT', 'SensorT', 'DewPointT', 'WindSpeed', 'Humidity', 'Rain'}; % Stack object columns
         data_units = {'day', 'relative', 'deg C', 'deg C', 'deg C', 'deg C', 'km/h', 'percentage', 'mm'}; % Stack object column units
@@ -54,10 +55,9 @@ classdef Boltwood < handle
     
     properties(Hidden=true)
         
-        version = 1.00;
+        version = 1.01;
         
     end
-    
     
     methods % Constructor
         
@@ -77,48 +77,97 @@ classdef Boltwood < handle
             
         end
         
-
-    end
-    
-    
-    methods % getters/setters
-
-      
-    end
-    
-    methods
         function connect(obj) % Open Boltwood weather application. Also open connection to application if not already opened.
             
             obj.hndl = actxserver('ClarityII.CloudSensorII');
             
+            obj.update;
+            
         end
 
+        function disconnect(obj)
+            
+            delete(obj.hndl);
+            obj.hndl = [];
+            
+        end
+        
+        function delete(obj)
+            
+            obj.disconnect;
+            
+        end
+        
+    end
+    
+    methods
+        
+        function reset(obj)
+            
+            obj.data.reset;
+            
+            obj.clear;
+            
+        end
+        
+        function clear(obj)
+            
+            obj.status = 0;
+            obj.jd = NaN;
+            obj.light_value = NaN;
+            obj.temperature = NaN;
+            obj.temp_sky = NaN;
+            obj.temp_sensor = NaN;
+            obj.temp_dew_point = NaN;
+            obj.wind_speed = NaN;
+            obj.humidity = NaN;
+            obj.rain = NaN;
+
+            obj.day_condition   = '';
+            obj.cloud_condition = '';
+            obj.wind_condition  = '';
+            obj.rain_condition  = '';
+            
+        end
+        
         function update(obj) % Read weather parameters
             
             % if status is ok than set the time of the last query
-            Dummy = obj.hndl.dataReady;
+            Dummy = obj.hndl.DataReady;
             if (Dummy)
                % Update status
+               obj.clear;
                obj.status = 1;
             else
                obj.status = 0;
                return;
             end
             
-            % get current time [JD]
-            obj.jd = celestial.time.julday;
-            
             % If the weather application is down then reinitiate it
             try
-                obj.hndl.dataReady;
+                
+                for ii = 1:100
+                    
+                    if obj.hndl.DataReady
+                        break;
+                    end
+                    
+                    pause(0.05);
+                    
+                end
+                
             catch
-%                obs.sens.Boltwood(false); % call constructor without update
+
                 pause(5)
-                obj.status = false;
-                obj.open;
+                obj.status = 0;
+                obj.disconnect;
+                obj.connect;
+                
             end
 
-            % send query to Boltwood and get answer
+            % get current time [JD]
+            obj.jd = juliandate(datetime('now', 'timezone', 'UTC'));
+            
             obj.light_value = obj.hndl.DayLightV; % Day light value
             
             obj.temperature = obj.hndl.AmbientT; % Ambient temperature
@@ -138,14 +187,12 @@ classdef Boltwood < handle
             obj.wind_condition = obj.hndl.WindCondition; % Wind condition
             obj.rain_condition = obj.hndl.RainCondition; % Rain condition
             
-            obj.data.input([obj.jd, obj.light_value, obj.temperature, obj.temp_sky, obj.temp_sky, obj.temp_dew_point, ...
+            obj.data.input([obj.jd, obj.light_value, obj.temperature, obj.temp_sky, obj.temp_sensor, obj.temp_dew_point, ...
                          obj.wind_speed, obj.humidity, obj.rain]);
             
         end
         
     end
-    
-    
     
 end
 

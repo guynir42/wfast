@@ -67,14 +67,14 @@ classdef Manager < handle
         function connect(obj)
             
             obj.connectDome;
-            obj.connectMount;
+%             obj.connectMount;
             obj.connectBoltwood;
             
         end
         
         function connectDome(obj)
             
-            obj.log.input('Connecting to dome');
+            obj.log.input('Connecting to dome.');
             
             try 
                 obj.dome = obs.dome.AstroHaven;
@@ -129,7 +129,7 @@ classdef Manager < handle
             obj.log.input('Connecting to Boltwood weather station.');
             
             try 
-                obj.weather = sens.Boltwood;
+                obj.weather = obs.sens.Boltwood;
             catch ME
                 
                 obj.log.error(ME.getReport);

@@ -95,6 +95,12 @@ classdef AstroHaven < handle
             
         end
         
+        function delete(obj)
+            
+            obj.disconnect;
+            
+        end
+        
         function connect(obj)
             
             obj.log.input('Connecting to dome via serial port');

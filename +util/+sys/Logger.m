@@ -136,7 +136,7 @@ classdef Logger < handle
             end
             
             if isempty(obj.filename)
-                obj.filename = [obj.name '_' util.sys.date_dir(obj.time) '.txt'];
+                obj.filename = [util.sys.date_dir(obj.time) '_' obj.name '.txt'];
             end
             
             try 
