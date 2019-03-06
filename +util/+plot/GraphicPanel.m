@@ -123,7 +123,7 @@ classdef GraphicPanel < dynamicprops
                     if obj.is_vertical
                         pos = [split_pos (N-ii)/N button.split 1/N];
                     else
-                        pos = [(N-ii)/N split_pos 1/N button.split];
+                        pos = [(ii-1)/N split_pos 1/N button.split];
                     end
 
                     if ~isprop(obj, button.button_name)
