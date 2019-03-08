@@ -185,6 +185,9 @@ classdef StatusChecker < handle
             obj.reset_wind;
             obj.reset_humid;
             
+            obj.weather_log.reset;
+            obj.status_log.reset;
+            
         end
         
         function reset_light(obj)
@@ -839,31 +842,31 @@ classdef StatusChecker < handle
             
             if obj.decision_light==0
                 obj.status = 0;
-                obj.report = ['Light: ' obj.temp_str];
+                obj.report = ['Light too bright! ' obj.light_str];
                 return;
             end
             
             if obj.decision_clouds==0
                 obj.status = 0;
-                obj.report = ['Clouds: ' obj.temp_str];
+                obj.report = ['Sky is cloudy! ' obj.clouds_str];
                 return;
             end
             
             if obj.decision_temp==0
                 obj.status = 0;
-                obj.report = ['Temperature: ' obj.temp_str];
+                obj.report = ['Temperature out of range! ' obj.temp_str];
                 return;
             end
             
             if obj.decision_wind==0
                 obj.status = 0;
-                obj.report = ['Wind: ' obj.temp_str];
+                obj.report = ['Wind too strong! ' obj.wind_str];
                 return;
             end
             
             if obj.decision_humid==0
                 obj.status = 0;
-                obj.report = ['Humidity: ' obj.temp_str];
+                obj.report = ['Humidity too high! ' obj.humid_str];
                 return;
             end
             

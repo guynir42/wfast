@@ -171,10 +171,6 @@ classdef Boltwood < handle
             
         end
         
-        
-        
-        
-        
     end
     
     methods
