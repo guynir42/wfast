@@ -101,8 +101,16 @@ classdef Logger < handle
                 errflag = 0;
             end
             
-            obj.time = datetime('now', 'timezone', 'UTC');
+            new_time = datetime('now', 'timezone', 'UTC');
+            
+            if new_time.Day>=obj.time.Day && new_time.Hour>=12 && obj.time.Hour<12
+                obj.reset;
+            end
+            
+            obj.time = new_time;
+            
             timestamp = datestr(obj.time, 'hh:MM:ss.FFF');
+            
             if errflag==0
                 obj.report = sprintf('%s: %s', timestamp, text);
             else

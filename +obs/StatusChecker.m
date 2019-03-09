@@ -72,7 +72,7 @@ classdef StatusChecker < handle
         period3 = 1800; % time for verifying shorter timers are working (and other tests?)
         
         % light and clouds may be just binary, so we can skip plotting and thresholding them...?
-        max_light = 1; % units??
+        max_light = 200; % units??
         min_light = -Inf;
         
         max_clouds = 20; % degree difference to sky??
