@@ -125,6 +125,37 @@ classdef InputVars < dynamicprops
             
         end
         
+        function scan_obj(obj, other)
+            
+            if ~isobject(other) && ~isstruct(other)
+                error('Cannot scan a %s type object. Must supply an object or struct', class(other));
+            end
+            
+            if isobject(other)
+                list = properties(other);
+            elseif isstruct(other)
+                list = fields(others);
+            end
+            
+            all_keys = obj.alias_dictionary.keys;
+            
+            for ii = 1:length(all_keys)
+                
+                idx = find(strcmp(all_keys{ii}, list), 1, 'first');
+                
+                if ~isempty(idx)
+                    
+                    name = list{idx};
+                    
+                    obj.(name) = other.(name);
+                    
+                end
+                
+                
+            end
+            
+        end
+        
         function printout(obj)
             
             keys = obj.alias_dictionary.keys;

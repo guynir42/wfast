@@ -18,7 +18,8 @@ function setImage(I, ax)
     im_handle = findobj(ax, 'Type', 'Image');
     if isempty(im_handle)
         imagesc(ax, I);
-        ax.PlotBoxAspectRatio = [1 1 1];
+%         ax.PlotBoxAspectRatio = [1 1 1];
+        axis(ax, 'image');
         colorbar(ax);
     else
         im_handle.CData = I;

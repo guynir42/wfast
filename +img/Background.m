@@ -153,19 +153,19 @@ classdef Background < handle
             import util.text.cs;
             
             if cs(obj.pixel_mode, 'mean')
-                obj.backgrounds = permute(util.stat.mean2(obj.cutouts), [3,4,1,2]);
-                obj.variances = permute(util.stat.var2(obj.cutouts), [3,4,1,2]);
+                obj.backgrounds = permute(util.stat.mean2(obj.cutouts), [4,3,1,2]);
+                obj.variances = permute(util.stat.var2(obj.cutouts), [4,3,1,2]);
             elseif cs(obj.pixel_mode, 'median')
-                obj.backgrounds = permute(util.stat.median2(obj.cutouts), [3,4,1,2]);
-                obj.variances = permute(util.stat.var2(obj.cutouts), [3,4,1,2]); % need something like median only for variance...
+                obj.backgrounds = permute(util.stat.median2(obj.cutouts), [4,3,1,2]);
+                obj.variances = permute(util.stat.var2(obj.cutouts), [4,3,1,2]); % need something like median only for variance...
             elseif cs(obj.pixel_mode, 'sigma clipping')
                 for ii = 1:size(obj.cutouts,4)
                     for jj = 1:size(obj.cutouts,3)
                         C = obj.cutouts(:,:,jj,ii);
                         C = C(:);
                         [mu, sig] = util.stat.sigma_clipping(C, 'nsigma', obj.num_sigmas);
-                        obj.backgrounds(jj,ii) = mu;
-                        obj.variances(jj,ii) = sig.^2;
+                        obj.backgrounds(ii,jj) = mu;
+                        obj.variances(ii,jj) = sig.^2;
                     end
                 end
             else
@@ -279,7 +279,7 @@ classdef Background < handle
                 obj.output_backgrounds = repmat(obj.mean_background, [size(positions,1),1]);
             elseif cs(obj.model_type, 'poly')
                 
-                A = ones(size(positions,1));
+                A = ones(size(positions,1),1);
 
                 x = positions(:,1);
                 y = positions(:,2);
@@ -344,9 +344,9 @@ classdef Background < handle
             im_size = util.vec.imsize(im_size);
             
             if cs(obj.model_type, 'median')
-                
+                obj.output_image = ones(im_size).*obj.median_background;
             elseif cs(obj.model_type, 'mean')
-                
+                obj.output_image = ones(im_size).*obj.mean_background;
             elseif cs(obj.model_type, 'poly')
                 
                 [X,Y] = meshgrid(1:im_size(2), 1:im_size(1));

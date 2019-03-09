@@ -8,6 +8,8 @@ classdef CircularBuffer < dynamicprops
         
         size_vec = [];
         
+        titles = {};
+        
     end
     
     properties(Dependent=true)
@@ -145,6 +147,16 @@ classdef CircularBuffer < dynamicprops
         function str_out = printout(obj)
             
             str = '';
+            
+            if ~isempty(obj.titles)
+                
+                for ii = 1:length(obj.titles)
+                    str = [str sprintf('% 12s ', obj.titles{ii})];
+                end
+                
+                str = [str '\n'];
+                
+            end
             
             for ii = 1:size(obj.data, 1)
                 

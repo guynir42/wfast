@@ -955,6 +955,10 @@ classdef Clipper < handle
             
             import util.plot.show;
             
+            if isempty(obj.cutouts)
+                return;
+            end
+            
             N = min(size(obj.cutouts, 4), obj.number_cuts_display);
             pos = obj.subframe_pos;
             
@@ -981,7 +985,7 @@ classdef Clipper < handle
             
         end
         
-        function showRectangles(obj, ap_size, varargin)
+        function showRectangles(obj, varargin)
             
             import util.text.cs;
             import util.text.parse_bool;
@@ -989,10 +993,8 @@ classdef Clipper < handle
             ax = [];
             flip = [];
             num = [];
-            
-            if nargin<2 || isempty(ap_size)
-                ap_size = [];
-            end
+            color = [];
+            del = 1;
             
             for ii = 1:2:length(varargin)
                if cs(varargin{ii}, {'axes', 'axis'})
@@ -1001,6 +1003,10 @@ classdef Clipper < handle
                    flip = parse_bool(varargin{ii+1});
                elseif cs(varargin{ii}, 'number')
                    num = varargin{ii+1};
+               elseif cs(varargin{ii}, 'color')
+                   color = varargin{ii+1};
+               elseif cs(varargin{ii}, 'delete')
+                   del = parse_bool(varargin{ii+1});
                end
             end
 
@@ -1016,8 +1022,10 @@ classdef Clipper < handle
                 C = fliplr(S) - C;
             end
             
-            delete(findobj(ax, 'type', 'rectangle'));
-            delete(findobj(ax, 'type', 'text'));
+            if del
+                delete(findobj(ax, 'type', 'rectangle'));
+                delete(findobj(ax, 'type', 'text'));
+            end
             
             if ~isempty(num) && num<obj.N
                 text(0.05*S(2),0.95*S(1), sprintf('showing %d/%d cutouts!', num, obj.N), 'FontSize', 16, 'Parent', ax);
@@ -1029,12 +1037,8 @@ classdef Clipper < handle
                 try
                     
                     text(C(ii,1), C(ii,2), ['clip ' num2str(ii)],'FontSize', 16, 'Parent', ax);
-                    rectangle('Position', [obj.lower_corner(C(ii,:)) obj.cut_size obj.cut_size], 'Parent', ax);
-
-                    if ~isempty(ap_size)
-                        viscircles([C(:,1), C(:,2)], repmat(ap_size/2,[size(C,1),1]),'LineWidth',.1,'Color','r', 'Parent', ax);
-                    end
-                
+                    rectangle('Position', [obj.lower_corner(C(ii,:)) obj.cut_size obj.cut_size], 'Parent', ax, 'EdgeColor', color);
+                    
                 catch ME
                     warning(ME.getReport);
                 end
