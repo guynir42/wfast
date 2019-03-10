@@ -392,7 +392,7 @@ classdef BufferWheel < file.AstroData
 %                 
 %                 val = datestr(date, 'yyyy-mm-dd/');
 
-                val = util.sys.date_dir(date); 
+                val = util.sys.date_dir; 
                 
             end
             
