@@ -757,6 +757,40 @@ classdef StatusChecker < handle
                     status = NaN;
                 end
                 
+                if status==0
+                    
+                    if obj.debug_bit, fprintf('Device %s is malfunctioning. Attempting to reconnect...\n', class(obj.devices{ii})); end
+                    
+                    obj.logger.input(sprintf('Device %s is malfunctioning. Attempting to reconnect...\n', class(obj.devices{ii})));
+                    
+                    try
+                        
+                        if ismethod(obj.devices{ii}, 'disconnect')
+                            obj.devices{ii}.disconnect;
+                        end
+
+                        pause(0.05);
+
+                        if ismethod(obj.devices{ii}, 'connect')
+                            obj.devices{ii}.connect;
+                        end
+
+                        pause(0.05);
+
+                    catch ME
+                        warning(ME.getReport);
+                    end
+                    
+                    if isprop(obj.devices{ii}, 'status')
+                        status = obj.devices{ii}.status;
+                    elseif isprop(obj.devices{ii}, 'Status') 
+                        status = obj.devices{ii}.Status;
+                    else
+                        status = NaN;
+                    end
+
+                end
+                
                 status_all = [status_all status];
                 
                 obj.dev_str = [obj.dev_str obj.getInstrID(obj.devices{ii}) ': ' num2str(status)];
@@ -767,7 +801,7 @@ classdef StatusChecker < handle
         
         function val = decision_light(obj)
             
-            if any(obj.light_now>obj.max_temp) || any(obj.light_now<obj.min_light)
+            if any(obj.light_now>obj.max_light) || any(obj.light_now<obj.min_light)
                 val = 0;
             else
                 val = 1;
