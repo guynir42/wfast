@@ -117,57 +117,90 @@ classdef Boltwood < handle
         
         function val = get.light_value_average(obj)
             
-            val = obj.data.median;
-            val = val(2);
+            if isempty(obj.data)
+                val = [];
+            else
+                val = obj.data.median;
+                val = val(2);
+            end
             
         end
         
         function val = get.temperature_average(obj)
             
-            val = obj.data.median;
-            val = val(3);
+            if isempty(obj.data)
+                val = [];
+            else
+                val = obj.data.median;
+                val = val(3);
+            end
             
         end
         
         function val = get.temp_sky_average(obj)
             
-            val = obj.data.median;
-            val = val(4);
+            if isempty(obj.data)
+                val = [];
+            else
+                val = obj.data.median;
+                val = val(4);
+            end
             
         end
         
         function val = get.temp_sensor_average(obj)
             
-            val = obj.data.median;
-            val = val(5);
+            if isempty(obj.data)
+                val = [];
+            else
+                val = obj.data.median;
+                val = val(5);
+            end
             
         end
         
         function val = get.temp_dew_point_average(obj)
             
-            val = obj.data.median;
-            val = val(6);
+            if isempty(obj.data)
+                val = [];
+            else
+                val = obj.data.median;
+                val = val(6);
+            end
             
         end
         
         function val = get.wind_speed_average(obj)
             
-            val = obj.data.median;
-            val = val(7);
+            if isempty(obj.data)
+                val = [];
+            else
+                val = obj.data.median;
+                val = val(7);
+            end
             
         end
         
         function val = get.humidity_average(obj)
             
-            val = obj.data.median;
-            val = val(8);
+            if isempty(obj.data)
+                val = [];
+            else
+                val = obj.data.median;
+                val = val(8);
+            end
             
         end
         
         function val = get.rain_average(obj)
             % this is logical values!!
-            val = obj.data.median;
-            val = val(9);
+            
+            if isempty(obj.data)
+                val = [];
+            else
+                val = obj.data.median;
+                val = val(9);
+            end
             
         end
         

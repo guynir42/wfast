@@ -7,7 +7,7 @@ classdef Logger < handle
     properties % objects
         
         hndl; % file handle
-        time@datetime;
+        time; % datetime object
         
     end
     
@@ -103,7 +103,7 @@ classdef Logger < handle
             
             new_time = datetime('now', 'timezone', 'UTC');
             
-            if new_time.Day>=obj.time.Day && new_time.Hour>=12 && obj.time.Hour<12
+            if ~isempty(obj.time) && new_time.Day>=obj.time.Day && new_time.Hour>=12 && obj.time.Hour<12
                 obj.reset;
             end
             

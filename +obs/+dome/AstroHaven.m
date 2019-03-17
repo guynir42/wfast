@@ -27,7 +27,7 @@ classdef AstroHaven < handle
         status = 0;
         id = 'dome';
         
-        port_name = 'COM9'; % change this later
+        port_name = 'COM10'; % change this later
         
         use_accelerometers = 0;
         
@@ -499,6 +499,8 @@ classdef AstroHaven < handle
             
 %             obj.hndl.BytesAvailableFcn = @obj.getReply; % make sure the reply read function is working! 
             
+            flushinput(obj.hndl);
+
             obj.getReply;
             
             if isempty(obj.reply)
