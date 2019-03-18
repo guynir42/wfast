@@ -19,8 +19,8 @@ classdef FocusSpider < handle
         serial_numbers = {'0165500035', '0165500253', '0165500280'};
         
         % direction vectors for tip/tilt action
-        tip_vec = [1 -0.5 -0.5];
-        tilt_vec = [0 0.5 -0.5];
+        tip_vec = [-0.5 1 -0.5];
+        tilt_vec = [0.5 0 -0.5];
         
         gui;
         

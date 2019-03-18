@@ -207,6 +207,18 @@ classdef Accelerometer < handle
             
         end
         
+        function setupTimer(obj, period)
+            
+            if ~strcmp(obj.hndl.Status, 'open')
+                error('Device is closed, use fopen or connect function');
+            end
+            
+            fprintf(obj.hndl, 'timer, %f;', period);
+            
+            obj.update;
+            
+        end
+        
         function read_data(obj, ~, ~)
             
             obj.reply = fgetl(obj.hndl);

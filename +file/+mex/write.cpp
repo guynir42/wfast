@@ -45,19 +45,16 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	
 	s->mex_flag=mxGetPr(prhs[1]);
 	s->parseVararginPairs(nrhs, prhs);
-		
+	
 	if(s->debug_bit>2){// get back some feedback on inputs...
 
 		mexPrintf("\nfilename: '%s'\n", s->filename);
 		mexPrintf("mex_flag_write= %g %g\n", s->mex_flag[0], s->mex_flag[1]);
 		
 		s->images.printout();
-		s->images_raw.printout();
-		s->images_cal.printout();
-		s->cutouts_raw.printout();
-		s->cutouts_cal.printout();
+		s->cutouts.printout();
 		s->positions.printout();
-		s->full_sum.printout();
+		s->stack.printout();
 		s->timestamps.printout();
 		s->psfs.printout();
 		s->lightcurves.printout();

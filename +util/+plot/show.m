@@ -362,8 +362,8 @@ function hndl = show(M, varargin)
             if fancy
                 
                 title(ax, sprintf('mx=%s \\mu=%s \\sigma=%s c.\\mu=%s c.\\sigma=%s', ...
-                    f2s(MAX(ii)), f2s(MEAN(ii)), f2s(STD(ii)), ...
-                    f2s(CMEAN(ii)), f2s(CSTD(ii))),'FontSize', font_size);
+                    num2str(MAX(ii)), num2str(MEAN(ii)), num2str(STD(ii)), ...
+                    num2str(CMEAN(ii)), num2str(CSTD(ii))),'FontSize', font_size);
                 
                 colorbar(ax);
         

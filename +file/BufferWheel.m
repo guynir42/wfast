@@ -245,6 +245,15 @@ classdef BufferWheel < file.AstroData
             
         end
         
+        function clearImages(obj)
+            
+            obj.images = [];
+            for ii = 1:length(obj.buf)
+                obj.buf(ii).images = [];
+            end
+            
+        end
+        
     end 
     
     methods % getters
