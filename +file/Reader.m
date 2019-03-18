@@ -738,7 +738,11 @@ classdef Reader < file.AstroData
                     
                     if cs(data_name, obj.dataset_names.images) && all(data_size) % dataset_names.images may be a cell array of different optional names
                         
-                        num_images_on_file = data_size(3);
+                        if length(data_size)>=3
+                            num_images_on_file = data_size(3);
+                        else
+                            num_images_on_file = 1;
+                        end
                         
                         if frame_start>num_images_on_file || (~isempty(obj.temp_frame_index_finish) && frame_start>obj.temp_frame_index_finish) % if the index of the first frame is already out of this file
                             obj.advanceFile; % this is not supposed to happen because of the "advanceFile" at the end of this function
@@ -748,8 +752,10 @@ classdef Reader < file.AstroData
                         num_frames = min(num_frames, num_images_on_file-obj.temp_frame_index_start+1); % make sure we don't ask for more frames than we have on file
                         start_vec = [top, left, frame_start];
                         step_vec = [height, width, num_frames];
-                        
-                        if length(data_size)==4
+                        if length(data_size)==2
+                            start_vec = start_vec(1:2);
+                            step_vec = step_vec(1:2);
+                        elseif length(data_size)==4
                             start_vec = [start_vec 1];
                             step_vec = [step_vec data_size(4)];
                         end

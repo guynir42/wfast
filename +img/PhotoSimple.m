@@ -120,10 +120,11 @@ classdef PhotoSimple < handle
                 [X,Y] = meshgrid((1:cut_size(2))-floor(cut_size(2)/2)-1, (1:cut_size(1))-floor(cut_size(1)/2)-1); 
 
                 I = input.cutouts;
+                I = I - util.stat.median2(I);
 %                 I(I<0) = NaN;
                 S = sum2(I);
                 I2 = I;
-                I2(I2<0) = 0;
+                I2(I2<3.*util.stat.std2(I2)) = 0;
                 S2 = sum2(I2);
                 
                 m1x = sum2(I.*X)./S;

@@ -136,6 +136,12 @@ classdef Calibration < handle
         brake_bit = 1; % stop in mid calculation loop
         mode = ''; % keeps track if we are looping (calculating) dark or flat
         
+        use_roi = 0;
+        roi_x1 = [];
+        roi_x2 = [];
+        roi_y1 = [];
+        roi_y2 = [];
+        
         use_downsample = 0;
         downsampling = 2;
         
@@ -331,11 +337,19 @@ classdef Calibration < handle
                 
                 obj.dark_mean_transformed = obj.dark_mean;
                 
-                if obj.use_downsample
-                    obj.dark_mean_transformed = util.img.downsample(obj.dark_mean_transformed, obj.downsampling);
+                if ~isempty(obj.dark_mean)
+
+                    if obj.use_roi
+                        obj.dark_mean_transformed = obj.dark_mean_transformed(obj.roi_y1:obj.roi_y2,obj.roi_x1:obj.roi_x2);
+                    end
+
+                    if obj.use_downsample
+                        obj.dark_mean_transformed = util.img.downsample(obj.dark_mean_transformed, obj.downsampling);
+                    end
+
+                    % add additional transformations here... 
+
                 end
-            
-                % add additional transformations here... 
                 
             end
             
@@ -348,12 +362,20 @@ classdef Calibration < handle
             if isempty(obj.dark_mask_transformed)
                 
                 obj.dark_mask_transformed = obj.dark_mask;
-                
-                if obj.use_downsample
-                    obj.dark_mask_transformed = util.img.downsample(obj.dark_mask_transformed, obj.downsampling);
+
+                if ~isempty(obj.dark_mask)
+
+                    if obj.use_roi
+                        obj.dark_mask_transformed = obj.dark_mask_transformed(obj.roi_y1:obj.roi_y2,obj.roi_x1:obj.roi_x2);
+                    end
+
+                    if obj.use_downsample
+                        obj.dark_mask_transformed = util.img.downsample(obj.dark_mask_transformed, obj.downsampling);
+                    end
+
+                    % add additional transformations here... 
+
                 end
-            
-                % add additional transformations here... 
                 
             end
             
@@ -367,11 +389,19 @@ classdef Calibration < handle
                 
                 obj.dark_var_transformed = obj.dark_var;
                 
-                if obj.use_downsample
-                    obj.dark_var_transformed = util.img.downsample(obj.dark_var_transformed, obj.downsampling);
+                if ~isempty(obj.dark_var)
+
+                    if obj.use_roi
+                        obj.dark_var_transformed = obj.dark_var_transformed(obj.roi_y1:obj.roi_y2,obj.roi_x1:obj.roi_x2);
+                    end
+
+                    if obj.use_downsample
+                        obj.dark_var_transformed = util.img.downsample(obj.dark_var_transformed, obj.downsampling);
+                    end
+
+                    % add additional transformations here... 
+
                 end
-            
-                % add additional transformations here... 
                 
             end
             
@@ -384,12 +414,20 @@ classdef Calibration < handle
             if isempty(obj.flat_mean_transformed)
                 
                 obj.flat_mean_transformed = obj.flat_mean;
-                
-                if obj.use_downsample
-                    obj.flat_mean_transformed = util.img.downsample(obj.flat_mean_transformed, obj.downsampling);
+
+                    if ~isempty(obj.flat_mean)
+
+                    if obj.use_roi
+                        obj.flat_mean_transformed = obj.flat_mean_transformed(obj.roi_y1:obj.roi_y2,obj.roi_x1:obj.roi_x2);
+                    end
+
+                    if obj.use_downsample
+                        obj.flat_mean_transformed = util.img.downsample(obj.flat_mean_transformed, obj.downsampling);
+                    end
+
+                    % add additional transformations here... 
+
                 end
-            
-                % add additional transformations here... 
                 
             end
             
@@ -403,11 +441,19 @@ classdef Calibration < handle
                 
                 obj.flat_var_transformed = obj.flat_var;
                 
-                if obj.use_downsample
-                    obj.flat_var_transformed = util.img.downsample(obj.flat_var_transformed, obj.downsampling);
+                if ~isempty(obj.flat_var)
+
+                    if obj.use_roi
+                        obj.dark_var_transformed = obj.flat_var_transformed(obj.roi_y1:obj.roi_y2,obj.roi_x1:obj.roi_x2);
+                    end
+
+                    if obj.use_downsample
+                        obj.flat_var_transformed = util.img.downsample(obj.flat_var_transformed, obj.downsampling);
+                    end
+
+                    % add additional transformations here... 
+
                 end
-            
-                % add additional transformations here... 
                 
             end
             
@@ -421,11 +467,19 @@ classdef Calibration < handle
                 
                 obj.flat_field_transformed = obj.flat_field;
                 
-                if obj.use_downsample
-                    obj.flat_field_transformed = util.img.downsample(obj.flat_field_transformed, obj.downsampling);
+                if ~isempty(obj.flat_field)
+                
+                    if obj.use_roi
+                        obj.flat_field_transformed = obj.flat_field_transformed(obj.roi_y1:obj.roi_y2,obj.roi_x1:obj.roi_x2);
+                    end
+
+                    if obj.use_downsample
+                        obj.flat_field_transformed = util.img.downsample(obj.flat_field_transformed, obj.downsampling);
+                    end
+
+                    % add additional transformations here... 
+
                 end
-            
-                % add additional transformations here... 
                 
             end
             
@@ -537,6 +591,86 @@ classdef Calibration < handle
             
             obj.flat_field_transformed = val;
             obj.flat_field_cut = [];
+            
+        end
+        
+        function set.use_roi(obj, val)
+            
+            if val==obj.use_roi
+                % pass
+            else
+                obj.use_roi = val;
+                obj.dark_mean_transformed = [];
+                obj.dark_var_transformed = [];
+                obj.dark_mask_transformed = [];
+                obj.flat_mean_transformed = [];
+                obj.flat_var_transformed = [];
+                obj.flat_field_transformed = [];
+            end
+            
+        end
+        
+        function set.roi_x1(obj, val)
+            
+            if val==obj.roi_x1
+                % pass
+            else
+                obj.roi_x1 = val;
+                obj.dark_mean_transformed = [];
+                obj.dark_var_transformed = [];
+                obj.dark_mask_transformed = [];
+                obj.flat_mean_transformed = [];
+                obj.flat_var_transformed = [];
+                obj.flat_field_transformed = [];
+            end
+            
+        end
+        
+        function set.roi_x2(obj, val)
+            
+            if val==obj.roi_x2
+                % pass
+            else
+                obj.roi_x2 = val;
+                obj.dark_mean_transformed = [];
+                obj.dark_var_transformed = [];
+                obj.dark_mask_transformed = [];
+                obj.flat_mean_transformed = [];
+                obj.flat_var_transformed = [];
+                obj.flat_field_transformed = [];
+            end
+            
+        end
+        
+        function set.roi_y1(obj, val)
+            
+            if val==obj.roi_y1
+                % pass
+            else
+                obj.roi_y1 = val;
+                obj.dark_mean_transformed = [];
+                obj.dark_var_transformed = [];
+                obj.dark_mask_transformed = [];
+                obj.flat_mean_transformed = [];
+                obj.flat_var_transformed = [];
+                obj.flat_field_transformed = [];
+            end
+            
+        end
+        
+        function set.roi_y2(obj, val)
+            
+            if val==obj.roi_y2
+                % pass
+            else
+                obj.roi_y2 = val;
+                obj.dark_mean_transformed = [];
+                obj.dark_var_transformed = [];
+                obj.dark_mask_transformed = [];
+                obj.flat_mean_transformed = [];
+                obj.flat_var_transformed = [];
+                obj.flat_field_transformed = [];
+            end
             
         end
         
@@ -914,7 +1048,7 @@ classdef Calibration < handle
             assert(~isempty(input.images), 'cannot do calibration without any images!');
             I = double(input.images); 
                     
-            if ~isempty(input.clipper)
+            if ~isempty(input.clipper) % this means we are working with cutouts
                 
                 if ~isa(input.clipper, 'img.Clipper') || (isnumeric(input.clipper) && size(input.clipper, 2)==2)
                     error('must input the "clipper" object as an img.Clipper type object. or an Nx2 matrix. class given is "%s"', class(input.clipper));
@@ -925,21 +1059,22 @@ classdef Calibration < handle
                 DM = obj.dark_mask_cut;
                 F = obj.flat_field_cut;
                 
-            else
+            else % full frame images
                 
                 D = obj.dark_mean_transformed;
                 DM = obj.dark_mask_transformed;
                 F = obj.flat_field_transformed;
                 
             end
-                                
+            
             if input.num_sum>1
                 D = D*input.num_sum; % if we need to subtract multiple darks from a summed image...
                 I = sum(I,3); % just making sure the input images are summed 
             end
             
             if size(I,1)~=size(D,1) || size(I,2)~=size(D,2)
-                error(['size mismatch! ' util.text.print_size(I,D)]);
+%                 error(['size mismatch! ' util.text.print_size(I,D)]);
+                error('size mismatch!');
             end
             
             %%%%%%%%%%%%%%%%% SUBTRACT DARK %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

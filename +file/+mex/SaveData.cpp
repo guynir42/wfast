@@ -45,13 +45,14 @@ void SaveData::parseVararginPairs(int N, const mxArray *vars[]){
 		
 		// the third parameters tells MyMatrix if we want to deflate it (ignored if we are not using deflate at all)
 		if(cs(keyword, "images")) images.input("images", value, 1); 
-		else if(cs(keyword, "images_raw")) images_raw.input("images_raw", value, 1);
-		else if(cs(keyword, "images_cal")) images_cal.input("images_cal", value, 1);
-		else if(cs(keyword, "cutouts_raw")) cutouts_raw.input("cutouts_raw", value, 1);
-		else if(cs(keyword, "cutouts_cal")) cutouts_cal.input("cutouts_cal", value, 1);
+		//else if(cs(keyword, "images_raw")) images_raw.input("images_raw", value, 1);
+		//else if(cs(keyword, "images_cal")) images_cal.input("images_cal", value, 1);
+		//else if(cs(keyword, "cutouts_raw")) cutouts_raw.input("cutouts_raw", value, 1);
+		//else if(cs(keyword, "cutouts_cal")) cutouts_cal.input("cutouts_cal", value, 1);
+		else if(cs(keyword, "cutouts")) cutouts.input("cutouts", value, 1);
 		else if(cs(keyword, "positions")) positions.input("positions", value, 0);
-		else if(cs(keyword, "full_sum")) full_sum.input("full_sum", value, 1);
-		else if(cs(keyword, "num_sum")) full_sum.attributes.push_back(MyAttribute("num_sum", value));
+		else if(cs(keyword, "stack")) stack.input("stack", value, 1);
+		else if(cs(keyword, "num_sum")) stack.attributes.push_back(MyAttribute("num_sum", value));
 		else if(cs(keyword, "timestamps")) timestamps.input("timestamps", value, 0);
 		else if(cs(keyword, "t_start", "file_start_datestring", 16)) timestamps.attributes.push_back(MyAttribute("t_start", value));
 		else if(cs(keyword, "t_end", "file_write_datestring", 16)) timestamps.attributes.push_back(MyAttribute("t_end", value));
@@ -126,13 +127,15 @@ void SaveData::print_help(){
 	mexPrintf("OPTIONAL ARGUMENTS \n");
 	mexPrintf("--------------------------------\n");
 	mexPrintf("Data inputs (must be given explicitely): \n");
-	mexPrintf("-images: old input, try not to use this anymore. Can be uint16 or double\n");
-	mexPrintf("-images_raw: new variable for uncalibrated files from camera. Usually uint16. \n");
-	mexPrintf("-images_cal: full set of calibrated images. Usually double. \n");
-	mexPrintf("cutouts_raw: when saving only cutouts around stars. Prefer to save raw cutouts, usually uint16. \n");	
-	mexPrintf("cutouts_cal: when saving only cutouts around stars. Already calibrated, usually double. \n");
+	mexPrintf("-images: full frame images.\n");
+	//mexPrintf("-images_raw: new variable for uncalibrated files from camera. Usually uint16. \n");
+	//mexPrintf("-images_cal: full set of calibrated images. Usually double. \n");
+	//mexPrintf("cutouts_raw: when saving only cutouts around stars. Prefer to save raw cutouts, usually uint16. \n");	
+	//mexPrintf("cutouts_cal: when saving only cutouts around stars. Already calibrated, usually double. \n");
+	mexPrintf("cutouts: when saving only cutouts around stars. Not calibrated, uint16. \n");
 	mexPrintf("-positions: positions of centers of cutouts (x,y pairs).\n");
 	mexPrintf("-timestamps: time of each frame. \n");
+	mexPrintf("-stack: sum of  full franme images (calibrated)\n");
 	mexPrintf("-psfs: if PSF data is given from WFS or from simulation.\n");
 	mexPrintf("-lightcurves: photometry data for each cutout. \n");
 	mexPrintf("-buffer: BufferWheel object used to extract add-on metadata.\n");

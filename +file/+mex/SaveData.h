@@ -43,12 +43,13 @@ class SaveData {
 	static double *mex_flag; // flag[0]: started writing, flag[1]: finished writing, flag[2]: error
 	
 	MyMatrix images;
-	MyMatrix images_raw;
-	MyMatrix images_cal;
-	MyMatrix cutouts_raw;
-	MyMatrix cutouts_cal;	
+	//MyMatrix images_raw;
+	//MyMatrix images_cal;
+	//MyMatrix cutouts_raw;
+	//MyMatrix cutouts_cal;	
+	MyMatrix cutouts;
 	MyMatrix positions;
-	MyMatrix full_sum;
+	MyMatrix stack;
 	MyMatrix timestamps; // 1D vector of times	
 	MyMatrix psfs;
 	MyMatrix lightcurves;

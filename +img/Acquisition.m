@@ -90,6 +90,12 @@ classdef Acquisition < file.AstroData
         use_autofocus = 1;
         use_rough_focus = 0;
         
+        use_roi = 0;
+        roi_x1 = 1;
+        roi_x2 = 512;
+        roi_y1 = 1;
+        roi_y2 = 512;
+        
         use_save = 0; % must change this when we are ready to really start
         use_triggered_save = 0;
         
@@ -106,7 +112,7 @@ classdef Acquisition < file.AstroData
         % size of samples used for autofocus
         focus_batch_size = 10;
         
-        focus_curve_range = 1;
+        focus_curve_range = 0.2;
         focus_curve_step = 0.01;
         
         debug_bit = 1;
@@ -164,6 +170,7 @@ classdef Acquisition < file.AstroData
                 obj.flux_buf = util.vec.CircularBuffer;
                 
                 obj.buf = file.BufferWheel;
+                obj.buf.product_type = 'Cutouts';
                 
                 obj.runtime_buffer = util.vec.CircularBuffer;
                 obj.runtime_buffer.titles = {'time', 'num_frames'};
@@ -673,6 +680,38 @@ classdef Acquisition < file.AstroData
             
             obj.copyFrom(obj.src); % get the data into this object
             
+            if obj.use_roi
+                
+                S = size(obj.images);
+                
+                x1 = obj.roi_x1;
+                if x1<1, x1 = 1; end
+                if x1>S(2), x1 = S(2)-1; end
+                
+                x2 = obj.roi_x2;
+                if x2<x1, x2 = x1+1; end
+                if x2>S(2), x2 = S(2); end
+                
+                y1 = obj.roi_y1;
+                if y1<1, y1 = 1; end
+                if y1>S(1), y1 = S(1)-1; end
+                
+                y2 = obj.roi_y2;
+                if y2<y1, y2 = y1+1; end
+                if y2>S(1), y2 = S(1); end
+                
+                obj.images = obj.images(y1:y2, x1:x2,:);
+                
+                obj.cal.use_roi = 1;
+                obj.cal.roi_x1 = x1;
+                obj.cal.roi_x2 = x2;
+                obj.cal.roi_y1 = y1;
+                obj.cal.roi_y2 = y2;
+                
+            else
+                obj.cal.use_roi = 0;
+            end
+            
             obj.calcStack(input);
             
             if input.use_cutouts
@@ -682,10 +721,10 @@ classdef Acquisition < file.AstroData
             end
             
             if input.use_save
-                obj.buf.copyFrom(obj);
-                obj.buf.images = [];
+                obj.buf.input(obj);
+                obj.buf.clearImages;
                 obj.buf.save;
-                
+                obj.buf.nextBuffer;
                 % check triggering then call the camera save mode
                 
             end
@@ -899,6 +938,48 @@ classdef Acquisition < file.AstroData
             % to be implemented!
         end
         
+        function roi(obj, position)
+            
+            import util.text.cs;
+            
+            if cs(position, 'none')
+                obj.use_roi = 0;
+            elseif cs(position, 'center')
+                obj.use_roi = 1;
+                obj.roi_x1 = 2160-256; % must change this to width/height of source
+                obj.roi_x2 = 2160+255;
+                obj.roi_y1 = 2560-256;
+                obj.roi_y2 = 2560+255;
+            elseif cs(position, 'northwest')
+                obj.use_roi = 1;
+                obj.roi_x1 = 1;
+                obj.roi_x2 = 512;
+                obj.roi_y1 = 1;
+                obj.roi_y2 = 512;
+            elseif cs(position, 'northeast')
+                obj.use_roi = 1;
+                obj.roi_x1 = 2160-512+1;
+                obj.roi_x2 = 2160;
+                obj.roi_y1 = 1;
+                obj.roi_y2 = 512;
+            elseif cs(position, 'southeast')
+                obj.use_roi = 1;
+                obj.roi_x1 = 2160-512+1;
+                obj.roi_x2 = 2160;
+                obj.roi_y1 = 2560-512+1;
+                obj.roi_y2 = 2560;
+            elseif cs(position, 'southwest')
+               obj.use_roi = 1;
+               obj.roi_x1 = 1;
+                obj.roi_x2 = 512;
+                obj.roi_y1 = 2560-512+1;
+                obj.roi_y2 = 2560;
+            else
+                error('Unknown ROI position "%s". Use "center", "none", "NorthEast" etc...', position);
+            end
+            
+        end
+        
     end
     
     methods % optional run commands
@@ -937,7 +1018,7 @@ classdef Acquisition < file.AstroData
                 input = varargin{1};
                 input.scan_vars(varargin{2:end});
             else
-                input = obj.makeInputVars('batch_size', obj.focus_batch_size, 'expT', 1, 'num_stars', 0, varargin{:});
+                input = obj.makeInputVars('batch_size', obj.focus_batch_size, 'expT', 3, 'num_stars', 1, 'cut_size', 20, 'use audio', 0, varargin{:});
             end
             
             if isempty(obj.cam) || isempty(obj.cam.focuser)
@@ -952,14 +1033,16 @@ classdef Acquisition < file.AstroData
                 end
             end
             
-            obj.focus_curve_pos = obj.cam.focuser.pos + (-obj.focus_curve_range:obj.focus_curve_step:obj.focus_curve_range);
+            obj.focus_curve_pos = obj.cam.focuser.pos + (-obj.focus_curve_range:obj.focus_curve_step:obj.focus_curve_range)';
             obj.focus_curve_width = NaN(length(obj.focus_curve_pos),1);
             
             input.num_batches = length(obj.focus_curve_pos);
             
-            cleanup = onCleanup(@() obj.finishup(input));
+            obj.cam.focuser.pos = obj.focus_curve_pos(1);
+            pause(0.1);
             obj.startup(input);
-            
+            cleanup = onCleanup(@() obj.finishup(input));
+                        
             for ii = 1:input.num_batches
 
                 if obj.brake_bit
@@ -973,15 +1056,38 @@ classdef Acquisition < file.AstroData
                 end
                 
                 obj.batch(input);
+%                 s = SIM;
+%                 s.Im = obj.stack;
+%                 s = s.mextractor;
+%                 [~,H] = s.curve_growth_psf;
+%                 W = H.*2;
                 
                 obj.focus_curve_pos(ii) = obj.cam.focuser.pos;
                 obj.focus_curve_width(ii) = obj.average_width;
+%                 obj.focus_curve_width(ii) = W;
                 
-                plot(input.axes, obj.focus_curve_pos, obj.focus_curve_width);
+                if isvalid(input.axes)
+                    plot(input.axes, obj.focus_curve_pos, obj.focus_curve_width);
+                end
                 
+%                 plot(obj.focus_curve_pos, obj.focus_curve_width);
+
                 drawnow;
-            
+                                
             end
+            
+            fr = fit(obj.focus_curve_pos, obj.focus_curve_width, 'poly2')
+            best_pos = -fr.p2./2./fr.p1
+            
+%             if best_pos<obj.focus_curve_pos(1) || best_pos>obj.focus_curve_pos(2)
+%                 error('focus best pos is out of range');
+%             end
+            
+            disp(['moving pos to ' best_pos]);            
+            obj.cam.focuser.pos = best_pos;
+            
+            plot(input.axes, obj.focus_curve_pos, obj.focus_curve_width, obj.focus_curve_pos, feval(fr, obj.focus_curve_pos));
+                           
             
         end
         
