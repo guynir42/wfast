@@ -1046,6 +1046,89 @@ classdef Reader < file.AstroData
             
         end
         
+        function convert2fits(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('RA', [], 'right ascention');
+            input.input_var('DE', [], 'declination');
+            input.input_var('name', '', 'target_name');
+            input.input_var('filter', '');
+            input.input_var('num_batches', []);
+            input.input_var('folder', [], 'directory');
+            input.scan_vars(varargin{:});
+            
+            if isempty(input.folder)
+                input.folder = pwd;
+            elseif isa(input.folder, 'util.sys.WorkingDirectory')
+                input.folder = input.folder.pwd;
+            end
+            
+            obj.startup;
+            
+            N = obj.num_batches;
+            if isinf(N), N = 1e6; end
+            
+            for ii = 1:N
+                
+                if obj.brake_bit || obj.is_finished
+                    break;
+                end
+                
+                obj.batch;
+                
+                if ~isempty(input.RA)
+                    obj.pars.RA = input.RA;
+                end
+
+                if ~isempty(input.DE)
+                    obj.pars.DE = input.DE;
+                end
+
+                if ~isempty(input.name)
+                    obj.pars.target_name = input.name;
+                end
+                
+                if ~isempty(input.filter)
+                    obj.pars.filter = input.filter;
+                end
+                
+                [~, name, ~] = fileparts(obj.prev_filename);
+                
+                ext = '.fit';
+                
+                for jj = 1:size(obj.images,3)
+                    
+                    I = obj.images(:,:,jj);
+                    I = int32(I);
+%                     I = I - 2^15;
+%                     I = int16(I);
+                    
+                    if size(obj.images,3)==1
+                        filename = fullfile(input.folder, sprintf('%s%s', name, ext));
+                    elseif size(obj.images,3)<=10
+                        filename = fullfile(input.folder, sprintf('%s_%d%s', name, jj-1, ext));
+                    elseif size(obj.images,3)<=100
+                        filename = fullfile(input.folder, sprintf('%s_%02d%s', name, jj-1, ext));
+                    elseif size(obj.images,3)<=1000
+                        filename = fullfile(input.folder, sprintf('%s_%03d%s', name, jj-1, ext));
+                    end
+                    
+                    if obj.debug_bit, fprintf('Writing FITS file: %s\n', filename); end
+                    
+                    fitswrite(I, filename, 'WriteMode', 'overwrite', 'Compression', 'gzip');
+                    
+                    obj.pars.writeFITS(filename, obj.timestamps(jj)-obj.timestamps(1));
+                    
+                    drawnow;
+                    
+                end
+                
+            end
+            
+            obj.finishup;
+            
+        end
+        
         function val = is_finished(obj)
                         
             if obj.counter_batches >= obj.temp_num_batches

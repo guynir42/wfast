@@ -145,7 +145,9 @@ void ZylaCameraControl::record(int idx){
 	t_vec_ptrs[idx][1]=getPosixTime();
 	
 	// add a final timestamp that corresponds to this system time...
-	clock=getTimestamps(buf, (int) ImageSizeBytes);	
+	// clock=getTimestamps(buf, (int) ImageSizeBytes);	// this gets the start of last frame!
+	
+	AT_GetInt((AT_H) hndl, L"TimestampClock", &clock); // current time! 
 	t_vec_ptrs[idx][2]=((double)clock)/clockFreq;
 	
 }

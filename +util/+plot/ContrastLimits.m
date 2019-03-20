@@ -305,7 +305,7 @@ classdef ContrastLimits < handle
                 new_lim(1) = new_lim(2).*0.8;
             end
             
-            obj.clim = new_lim
+            obj.clim = new_lim;
             
             if obj.clim(1)<0 
                 obj.min_val = -2.^ceil(log2(abs(obj.clim(1)))); 

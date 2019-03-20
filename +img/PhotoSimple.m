@@ -48,7 +48,7 @@ classdef PhotoSimple < handle
         
         function obj = PhotoSimple(varargin)
             
-            if ~isempty(varargin) && isa(varargin{1}, 'CLASS')
+            if ~isempty(varargin) && isa(varargin{1}, 'img.PhotoSimple')
                 if obj.debug_bit, fprintf('PhotoSimple copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else

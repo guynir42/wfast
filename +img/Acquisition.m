@@ -25,6 +25,7 @@ classdef Acquisition < file.AstroData
         clip_bg@img.Clipper;
         photo@img.PhotoSimple;
         flux_buf@util.vec.CircularBuffer;
+        af@obs.focus.AutoFocus;
         
         % output to file
         buf@file.BufferWheel;
@@ -53,11 +54,13 @@ classdef Acquisition < file.AstroData
         ref_stack;
         ref_positions;
         
+        full_lightcurves;
+        
         adjust_pos; % latest adjustment to x and y
         average_width; % of all stars in the stack
         
-        focus_curve_pos;
-        focus_curve_width;
+%         focus_curve_pos;
+%         focus_curve_width;
         
         batch_counter = 0;
         batch_index = 1;
@@ -110,10 +113,10 @@ classdef Acquisition < file.AstroData
         use_audio = 1;
         
         % size of samples used for autofocus
-        focus_batch_size = 10;
-        
-        focus_curve_range = 0.2;
-        focus_curve_step = 0.01;
+%         focus_batch_size = 10;
+%         
+%         focus_curve_range = 0.2;
+%         focus_curve_step = 0.01;
         
         debug_bit = 1;
         
@@ -168,6 +171,7 @@ classdef Acquisition < file.AstroData
                 obj.clip_bg.use_adjust = 0;
                 obj.photo = img.PhotoSimple;
                 obj.flux_buf = util.vec.CircularBuffer;
+                obj.af = obs.focus.AutoFocus;
                 
                 obj.buf = file.BufferWheel;
                 obj.buf.product_type = 'Cutouts';
@@ -217,6 +221,8 @@ classdef Acquisition < file.AstroData
             obj.batch_counter = 0;
             obj.batch_index = 1;
 
+            obj.full_lightcurves = [];
+            
         end
         
         function clear(obj)
@@ -762,6 +768,21 @@ classdef Acquisition < file.AstroData
             
         end
         
+        function single(obj, input)
+            
+            input = util.oop.full_copy(input);
+            input.use_audio = 0;
+            input.num_batches = 1;
+            input.batch_size = 1;
+            
+            
+            cleanup = onCleanup(@() obj.finishup(input));
+            obj.startup(input);
+            
+            obj.batch;
+            
+        end
+        
         function calcStack(obj, input)
             
             if nargin<2 || isempty(input)
@@ -925,6 +946,7 @@ classdef Acquisition < file.AstroData
             obj.photo.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps); % add variance input? 
             
             obj.lightcurves = obj.photo.fluxes;
+            obj.full_lightcurves = cat(1, obj.full_lightcurves, obj.lightcurves); % consider replacing this with some storage object...
 %             obj.widths = obj.photo.widths;
             
         end
@@ -1018,28 +1040,26 @@ classdef Acquisition < file.AstroData
                 input = varargin{1};
                 input.scan_vars(varargin{2:end});
             else
-                input = obj.makeInputVars('batch_size', obj.focus_batch_size, 'expT', 3, 'num_stars', 1, 'cut_size', 20, 'use audio', 0, varargin{:});
+                input = obj.makeInputVars('batch_size', 1, 'expT', 3, 'num_stars', 5, 'cut_size', 20, 'use audio', 0, varargin{:});
             end
             
             if isempty(obj.cam) || isempty(obj.cam.focuser)
                 error('must be connected to camera and focuser!');
             end
             
-            if isempty(input.axes)
-                if ~isempty(obj.gui) && obj.gui.check
-                    input.axes = obj.gui.axes_image;
-                else
-                    input.axes = gca;
-                end
-            end
+            obj.single(input);
+            obj.findStarsFocus(input);
             
-            obj.focus_curve_pos = obj.cam.focuser.pos + (-obj.focus_curve_range:obj.focus_curve_step:obj.focus_curve_range)';
-            obj.focus_curve_width = NaN(length(obj.focus_curve_pos),1);
+            obj.af.pos = obj.cam.focuser.pos + (-obj.af.range:obj.af.step:obj.af.range)';
+            obj.af.width = NaN(length(obj.af.pos), input.num_stars);
+            obj.af.weight = NaN(length(obj.af.pos), input.num_stars);
+            obj.af.xy_pos = obj.clip.positions;
             
             input.num_batches = length(obj.focus_curve_pos);
             
-            obj.cam.focuser.pos = obj.focus_curve_pos(1);
+            obj.cam.focuser.pos = obj.af.pos(1);
             pause(0.1);
+            
             obj.startup(input);
             cleanup = onCleanup(@() obj.finishup(input));
                         
@@ -1056,38 +1076,95 @@ classdef Acquisition < file.AstroData
                 end
                 
                 obj.batch(input);
+                
+                %%% calculate the widths/fluxes somehow
+                
 %                 s = SIM;
 %                 s.Im = obj.stack;
 %                 s = s.mextractor;
 %                 [~,H] = s.curve_growth_psf;
 %                 W = H.*2;
                 
-                obj.focus_curve_pos(ii) = obj.cam.focuser.pos;
-                obj.focus_curve_width(ii) = obj.average_width;
-%                 obj.focus_curve_width(ii) = W;
+                obj.af.pos(ii) = obj.cam.focuser.pos;
+                obj.af.width(ii,:) = obj.photo.widths;
+                obj.af.weights(ii,:) = obj.photo.fluxes;
                 
-                if isvalid(input.axes)
-                    plot(input.axes, obj.focus_curve_pos, obj.focus_curve_width);
-                end
+                obj.af.plot;
                 
-%                 plot(obj.focus_curve_pos, obj.focus_curve_width);
-
                 drawnow;
                                 
             end
             
-            fr = fit(obj.focus_curve_pos, obj.focus_curve_width, 'poly2')
-            best_pos = -fr.p2./2./fr.p1
+            obj.af.calculate;
             
+%             fr = fit(obj.focus_curve_pos, obj.focus_curve_width, 'poly2')
+%             best_pos = -fr.p2./2./fr.p1
+%             
 %             if best_pos<obj.focus_curve_pos(1) || best_pos>obj.focus_curve_pos(2)
 %                 error('focus best pos is out of range');
 %             end
             
-            disp(['moving pos to ' best_pos]);            
-            obj.cam.focuser.pos = best_pos;
+            fprintf('FOCUSER RESULTS: pos= %f | tip= %f | tilt= %f\n', obj.af.found_pos, obj.af.found_tip, obj.af.found_tilt);
             
-            plot(input.axes, obj.focus_curve_pos, obj.focus_curve_width, obj.focus_curve_pos, feval(fr, obj.focus_curve_pos));
-                           
+            obj.cam.focuser.pos = obj.af.found_pos;
+            
+            if isprop(obj.cam.focuse, 'tip')
+                obj.cam.focuser.tip = obj.af.found_tip;
+            end
+            
+            if isprop(obj.cam.focuse, 'tilt')
+                obj.cam.focuser.tilt = obj.af.found_tilt;
+            end
+            
+            obj.af.plot;
+            
+            obj.clip.reset; % don't save these star positions! 
+            
+        end
+        
+        function findStarsFocus(obj, input) % find stars in order in five locations around the sensor
+            
+            I = obj.stack;
+            S = size(I);
+            C = input.cut_size;
+            
+            I = util.img.maskBadPixels(I);
+            I = conv2(I, util.img.gaussian2(2), 'same'); % smoothing filter
+            
+            markers = round(S.*[1/3 2/3]); % divide the sensor to 1/3rds 
+            
+            mask{1} = false(S);
+            mask{1}(markers(1,1):markers(1,2), markers(2,1):markers(2,2)) = 1; % only the central part is unmasked
+            
+            mask{2} = false(S);
+            mask{2}(C:markers(1,1), C:markers(2,1)) = 1; % upper left corner
+            
+            mask{3} = false(S);
+            mask{3}(markers(1,2):end-C+1, C:markers(2,1)) = 1; % lower left corner
+            
+            mask{4} = false(S);
+            mask{4}(C:markers(1,1), markers(2,2):end-C+1) = 1; % upper right corner
+            
+            mask{5} = false(S);
+            mask{5}(markers(1,2):end-C+1, markers(2,2):end-C+1) = 1; % lower right corner
+            
+            pos = zeros(input.num_stars, 2);
+            
+            for ii = 1:input.num_stars
+                
+                [~,idx] = util.stat.max2(I.*mask{mod(ii,5)}); % find the maximum in each masked area
+                
+                pos(ii,:) = flip(idx); % x then y!
+                
+                I(idx(1)-floor(C/2):idx(1)+floor(C/2)+1, idx(2)-floor(C/2):idx(2)+floor(C/2)+1) = NaN; % remove found stars
+                
+            end
+            
+            obj.clip.positions = pos;
+            
+            if obj.gui.check
+                obj.show;
+            end
             
         end
         

@@ -702,31 +702,40 @@ classdef Parameters < dynamicprops
         function writeFITS(obj, filename, timestamp)
             
             file_ptr = matlab.io.fits.openFile(filename,'readwrite');
+            cleanup = onCleanup(@() matlab.io.fits.closeFile(file_ptr));
             
             if nargin<3 || isempty(timestamp)
-                timestamp = obj.obs_time_days;
-                if isempty(timestamp)
-                    timestamp = datenum(clock);
-                end
+%                 timestamp = obj.obs_time_days;
+%                 if isempty(timestamp)
+%                     timestamp = datenum(clock);
+%                 end
+                timestamp = [];
             end
             
             try
                 
-                obj.writeFitsHeader(file_prt, timestamp);
+                obj.writeFitsHeader(file_ptr, timestamp);
                 
             catch ME
-                matlab.io.fits.closeFile(file_ptr);
-                error(ME.getReport);
+                rethrow(ME);
             end
-            
-            matlab.io.fits.closeFile(file_ptr);
             
         end
         
-        function writeFitsHeader(obj, file_ptr)
+        function writeFitsHeader(obj, file_ptr, time_delay)
             
-            if ~isempty(obj.t_start), matlab.io.fits.writeKey(file_ptr, 'DATE-OBS', obj.t_start); end
-            if ~isempty(obj.T), matlab.io.fits.writeKey(file_ptr, 'EXPTIME',obj.T, 'seconds'); end
+            if nargin<2 || isempty(time_delay)
+                start_time_str = obj.stamp2str(time_delay);
+            else
+                start_time_str = obj.t_start;
+            end
+            
+            if ~isempty(start_time_str)
+                obj.ephem.time = util.text.str2time(start_time_str);
+                matlab.io.fits.writeKey(file_ptr, 'DATE-OBS', start_time_str); 
+            end
+            
+            if ~isempty(obj.expT), matlab.io.fits.writeKey(file_ptr, 'EXPTIME',obj.expT, 'seconds'); end
             if ~isempty(obj.pixel_size), matlab.io.fits.writeKey(file_ptr, 'XPIXSZ',obj.pixel_size, 'microns'); end
             if ~isempty(obj.pixel_size), matlab.io.fits.writeKey(file_ptr, 'YPIXSZ',obj.pixel_size, 'microns'); end
             if ~isempty(obj.xbin), matlab.io.fits.writeKey(file_ptr, 'XBINNING',obj.xbin); end
@@ -740,7 +749,7 @@ classdef Parameters < dynamicprops
             if ~isempty(obj.target_name), matlab.io.fits.writeKey(file_ptr, 'OBJECT',obj.target_name); end
             if ~isempty(obj.RA), matlab.io.fits.writeKey(file_ptr, 'OBJCTRA',obj.RA, 'hours'); end
             if ~isempty(obj.DE), matlab.io.fits.writeKey(file_ptr, 'OBJCTDEC',obj.DE, 'degree'); end
-            if ~isempty(obj.HA), matlab.io.fits.writeKey(file_ptr, 'OBJCTHA', astro.ephem.ra2rad(obj.HA)/2/pi*24, 'hours'); end
+            if ~isempty(obj.HA), matlab.io.fits.writeKey(file_ptr, 'OBJCTHA', head.Ephemeris.ra2rad(obj.HA)/2/pi*24, 'hours'); end
             if ~isempty(obj.latitude), matlab.io.fits.writeKey(file_ptr, 'SITELAT', obj.latitude, 'degrees'); end
             if ~isempty(obj.longitude), matlab.io.fits.writeKey(file_ptr, 'SITELONG', obj.longitude, 'degrees'); end
             if ~isempty(obj.juldate), matlab.io.fits.writeKey(file_ptr, 'JD', obj.juldate); end
@@ -760,10 +769,20 @@ classdef Parameters < dynamicprops
             
         end
         
-        function updateObsTimeOffset(obj, time_offset_seconds)
+        function updateObsTimeOffset(obj, time_offset_seconds) % to be depricated?
             
             obj.obs_time = obj.obs_time + time_offset_seconds/24/3600;
                         
+        end
+        
+        function val = stamp2str(obj, time_delay)
+            
+            time = util.text.str2time(obj.t_start);
+            
+            time.Second = time.Second + time_delay;
+            
+            val = util.text.time2str(time);
+            
         end
         
     end

@@ -78,7 +78,7 @@ classdef ZylaControl < handle
                 addpath(getenv('ZYLA'));
                 rc = AT_InitialiseLibrary; AT_CheckError(rc);
                 
-                [rc, obj.hndl] = AT_Open(0); AT_CheckError(rc);
+                [rc, obj.hndl] = AT_Open(-1); AT_CheckError(rc);
                 
                 [rc] = AT_SetBool(obj.hndl, 'SensorCooling', 1); AT_CheckWarning(rc);        
               
