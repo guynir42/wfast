@@ -806,11 +806,12 @@ classdef Reader < file.AstroData
                         
                         loaded_cutouts = h5read(filename, sa('/', data_name), start_vec, step_vec);
                         
-                        if cs(data_name, 'cutouts_proc', 'cutouts_cal', 9) % in the very odd case that we saved the processed cutouts... 
-                            obj.cutouts_proc = cat(3, obj.cutouts_proc, loaded_cutouts); % append to the images from previous files
-                        else
-                            obj.cutouts = cat(3, obj.cutouts, loaded_cutouts); % append to the images from previous files
-                        end
+                        obj.cutouts = cat(3, obj.cutouts, loaded_cutouts); % append to the images from previous files
+%                         if cs(data_name, 'cutouts_proc', 'cutouts_cal', 9) % in the very odd case that we saved the processed cutouts... 
+%                             obj.cutouts = cat(3, obj.cutouts, loaded_cutouts); % append to the images from previous files
+%                         else
+%                             obj.cutouts = cat(3, obj.cutouts, loaded_cutouts); % append to the images from previous files
+%                         end
                         
                         if ~num_images_loaded % if the file doesn't have images but does have cutouts, count the cutout frames
                             num_images_loaded = size(loaded_cutouts,3);
