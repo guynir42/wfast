@@ -32,10 +32,12 @@ classdef Ephemeris < handle
     end
     
     properties(Hidden=true)
-       
         
-        latitude = 31.907867; % of the observatory
-        longitude = 34.811363; % of the observatory
+        latitude = 30.597296; % updated from google maps
+        longitude = -34.761897; % updated from google maps
+        
+%         latitude = 31.907867; % of the observatory
+%         longitude = 34.811363; % of the observatory
                 
         version = 1.00;
         
@@ -113,7 +115,7 @@ classdef Ephemeris < handle
         
         function [ha, l] = getHAandLST(obj)
 
-            l = obj.lst(obj.juldate, degtorad(obj.longitude)); % in fractions of day
+            l = obj.lst(obj.juldate, deg2rad(abs(obj.longitude))); % in fractions of day
             
             ha = 2*pi*l - obj.RA_rad; % in radians
             

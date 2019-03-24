@@ -5,6 +5,8 @@ function I = gaussian2(varargin)
 %   -sigma_x: the width sigma parameter in the X direction. 
 %   -sigma_y: the width sigma in Y. Default is same as X. 
 %   -rot_frac: rotation angle in units of 0 to 1 (=90 degrees). 
+%   -x_shift: move the center of the Gaussian in the x direction;
+%   -y_shift: move the center of the Gaussian in the y direction;
 %   -S: size of image (assumed square). Default is ceil(max(sigma_x,sigma_y)*10),
 %       adjusted to be an odd-number.
 %   -norm: choose normalization option. 
@@ -19,6 +21,8 @@ function I = gaussian2(varargin)
     input = util.text.InputVars;
     input.input_var('sigma_x', [], 'CX');
     input.input_var('sigma_y', [], 'CY');
+    input.input_var('x_shift', [], 'dx');
+    input.input_var('y_shift', [], 'dy');
     input.input_var('rot_frac', 0);
     input.input_var('S', [], 'size', 'imsize');
     input.input_var('norm', 0, 'normalization');
@@ -46,6 +50,14 @@ function I = gaussian2(varargin)
     else
         x2 = +x*cos(pi/2*input.rot_frac)+y*sin(pi/2*input.rot_frac);
         y2 = -x*sin(pi/2*input.rot_frac)+y*cos(pi/2*input.rot_frac);
+    end
+    
+    if ~isempty(input.x_shift)
+        x2 = x2 - input.x_shift;
+    end
+    
+    if ~isempty(input.y_shift)
+        y2 = y2 - input.y_shift;
     end
     
     I = exp(-0.5*((x2./input.sigma_x).^2 + (y2./input.sigma_y).^2));

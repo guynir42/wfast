@@ -32,7 +32,7 @@ classdef AstroData < dynamicprops
         psfs; % output PSFs from file (if available)
         sampling_psf; % if loaded PSFs need to be binned (this is the binning factor)
         
-        lightcurves; % amount of light (total) in each cutout. 
+        fluxes; % amount of light (total) in each cutout. 
         
     end
     
@@ -108,7 +108,7 @@ classdef AstroData < dynamicprops
             obj.psfs = [];
             obj.sampling_psf = [];
 
-            obj.lightcurves = [];
+            obj.fluxes = [];
             
         end
                 

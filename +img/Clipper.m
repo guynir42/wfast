@@ -700,8 +700,11 @@ classdef Clipper < handle
                 I = maskBadPixels(I); % in case we don't get a clean image... 
             end
             
+%             I(isnan(I)) = util.stat.median2(I);
+            
             if obj.use_filtering
-                I = conv2(I, gaussian2(obj.filter_sigma, [], [], obj.filter_size), 'same'); % smoothing filter
+                I(isnan(I)) = 0;
+                I = conv2(I, gaussian2(obj.filter_sigma, 'size', obj.filter_size), 'same'); % smoothing filter
             end
             
             noise_std = sqrt(var2(I));
@@ -995,6 +998,7 @@ classdef Clipper < handle
             num = [];
             color = [];
             del = 1;
+            use_text = 1;
             
             for ii = 1:2:length(varargin)
                if cs(varargin{ii}, {'axes', 'axis'})
@@ -1007,6 +1011,8 @@ classdef Clipper < handle
                    color = varargin{ii+1};
                elseif cs(varargin{ii}, 'delete')
                    del = parse_bool(varargin{ii+1});
+               elseif cs(varargin{ii}, 'text', 'use_text')
+                   use_text = parse_bool(varargin{ii+1});
                end
             end
 
@@ -1024,7 +1030,7 @@ classdef Clipper < handle
             
             if del
                 delete(findobj(ax, 'type', 'rectangle'));
-                delete(findobj(ax, 'type', 'text'));
+                if use_text, delete(findobj(ax, 'type', 'text')); end
             end
             
             if ~isempty(num) && num<obj.N
@@ -1036,7 +1042,7 @@ classdef Clipper < handle
             for ii = 1:num
                 try
                     
-                    text(C(ii,1), C(ii,2), ['clip ' num2str(ii)],'FontSize', 16, 'Parent', ax);
+                    if use_text, text(C(ii,1), C(ii,2), ['clip ' num2str(ii)],'FontSize', 16, 'Parent', ax); end
                     rectangle('Position', [obj.lower_corner(C(ii,:)) obj.cut_size obj.cut_size], 'Parent', ax, 'EdgeColor', color);
                     
                 catch ME

@@ -90,6 +90,9 @@ classdef Parameters < dynamicprops
         AZ;        
         airmass;
         
+        longitude;
+        latitude;
+        
         run_start_datestr;
         night_start_datestr;
         juldate;
@@ -134,8 +137,8 @@ classdef Parameters < dynamicprops
         
         debug_bit = 0;
         
-        latitude = 31.907867; % of the observatory
-        longitude = 34.811363; % of the observatory
+%         latitude = 31.907867; % of the observatory
+%         longitude = 34.811363; % of the observatory
         
         default_project;
         default_instrument;
@@ -562,6 +565,18 @@ classdef Parameters < dynamicprops
             % add varargin overrides to internal properties
             
             val = obj.filter.getCount(obj.magnitude, obj.aperture_area, obj.T);
+            
+        end
+        
+        function val = get.latitude(obj)
+            
+            val = obj.ephem.latitude;
+            
+        end
+        
+        function val = get.longitude(obj)
+            
+            val = obj.ephem.longitude;
             
         end
         

@@ -26,17 +26,26 @@ classdef Lightcurves < handle
     end
     
     properties(Dependent=true)
-        
-        raw;
-        cal;
+                
+        fluxes;
+        fluxes_cal;
+        weights;
+        offsets_x;
+        offsets_y;
+        widths;
+        backgrounds;
         
     end
     
     properties(Hidden=true)
-       
-        raw_full;
-        cal_full;
-        has_cal = 0;
+            
+        fluxes_full;
+        fluxes_cal_full;
+        weights_full;
+        offsets_x_full;
+        offsets_y_full;
+        widths_full;
+        backgrounds_full;
         
         show_what_list = {'raw', 'cal', 'both'};
         
@@ -64,9 +73,14 @@ classdef Lightcurves < handle
         
         function reset(obj)
             
-            obj.raw_full = [];
-            obj.cal_full = [];
-            obj.has_cal = 0;
+            obj.fluxes_full = [];
+            obj.fluxes_cal_full = [];
+            obj.weights_full = [];
+            obj.offsets_x_full = [];
+            obj.offsets_y_full = [];
+            obj.widths_full = [];
+            obj.backgrounds_full = [];
+            
             obj.frame_index = 0;
             
         end
@@ -75,15 +89,45 @@ classdef Lightcurves < handle
     
     methods % getters
         
-        function val = get.raw(obj)
+        function val = get.fluxes(obj)
             
-            val = obj.raw_full(1:obj.frame_index,:);
+            val = obj.fluxes_full(1:obj.frame_index,:);
             
         end
         
-        function val = get.cal(obj)
+        function val = get.fluxes_cal(obj)
             
-            val = obj.cal_full(1:obj.frame_index,:);
+            val = obj.fluxes_cal_full(1:obj.frame_index,:);
+            
+        end
+        
+        function val = get.weights(obj)
+            
+            val = obj.weights_full(1:obj.frame_index,:);
+            
+        end
+        
+        function val = get.offsets_x(obj)
+            
+            val = obj.offsets_x_full(1:obj.frame_index,:);
+            
+        end
+        
+        function val = get.offsets_y(obj)
+            
+            val = obj.offsets_y_full(1:obj.frame_index,:);
+            
+        end
+        
+        function val = get.widths(obj)
+            
+            val = obj.widths_full(1:obj.frame_index,:);
+            
+        end
+        
+        function val = get.backgrounds(obj)
+            
+            val = obj.backgrounds_full(1:obj.frame_index,:);
             
         end
         
@@ -97,29 +141,52 @@ classdef Lightcurves < handle
         
         function startup(obj, num_frames, num_stars)
             
-            obj.raw_full = NaN(num_frames, num_stars);
-            obj.cal_full = NaN(num_frames, num_stars);
+            obj.fluxes_full = NaN(num_frames, num_stars);
+            obj.fluxes_cal_full = NaN(num_frames, num_stars);
+            obj.weights_full = NaN(num_frames, num_stars);
+            obj.offsets_x_full = NaN(num_frames, num_stars);
+            obj.offsets_y_full = NaN(num_frames, num_stars);
+            obj.widths_full = NaN(num_frames, num_stars);
+            obj.backgrounds_full = NaN(num_frames, num_stars);
             
         end
         
-        function input(obj, fluxes_raw, fluxes_cal)
+        function input(obj, varargin)
             
-            if nargin<3 || isempty(fluxes_cal)
-                fluxes_cal = [];
+            input = util.text.InputVars;
+            input.use_ordered_numeric = 1;
+            input.input_var('fluxes', [], 'fluxes_raw');
+            input.input_var('weights', []);
+            input.input_var('offsets_x', []);
+            input.input_var('offsets_y', []);
+            input.input_var('widths', []);
+            input.input_var('backgrounds', []);
+            input.scan_vars(varargin{:});
+            
+            N = size(input.fluxes,1);
+            
+            obj.fluxes_full(obj.frame_index+1:obj.frame_index+N,:) = input.fluxes;
+            
+            if ~isempty(input.weights)
+                obj.weights_full(obj.frame_index+1:obj.frame_index+N,:) = input.weights;
             end
             
-            N = size(fluxes_raw,1);
-            
-            obj.raw_full(obj.frame_index+1:obj.frame_index+N,:) = fluxes_raw;
-            
-            
-            if ~isempty(fluxes_cal)
-                
-                obj.cal_full(obj.frame_index+1:obj.frame_index+N,:) = fluxes_cal;
-                obj.has_cal = 1;
-                
+            if ~isempty(input.offsets_x)
+                obj.offsets_x_full(obj.frame_index+1:obj.frame_index+N,:) = input.offsets_x;
             end
-                
+            
+            if ~isempty(input.offsets_y)
+                obj.offsets_y_full(obj.frame_index+1:obj.frame_index+N,:) = input.offsets_y;
+            end
+            
+            if ~isempty(input.widths)
+                obj.widths_full(obj.frame_index+1:obj.frame_index+N,:) = input.widths;
+            end
+            
+            if ~isempty(input.backgrounds)
+                obj.backgrounds_full(obj.frame_index+1:obj.frame_index+N,:) = input.backgrounds;
+            end
+            
             obj.frame_index = obj.frame_index + N;
             
         end

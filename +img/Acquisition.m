@@ -23,8 +23,11 @@ classdef Acquisition < file.AstroData
         back@img.Background;
         clip@img.Clipper;
         clip_bg@img.Clipper;
-        photo@img.PhotoSimple;
+        photo_stack@img.Photometry;
+        photo@img.Photometry;
         flux_buf@util.vec.CircularBuffer;
+        lightcurves@img.Lightcurves;
+        
         af@obs.focus.AutoFocus;
         
         % output to file
@@ -53,8 +56,6 @@ classdef Acquisition < file.AstroData
         prev_stack;        
         ref_stack;
         ref_positions;
-        
-        full_lightcurves;
         
         adjust_pos; % latest adjustment to x and y
         average_width; % of all stars in the stack
@@ -146,7 +147,9 @@ classdef Acquisition < file.AstroData
         
         show_what_list = {'images', 'stack'};
         
-        version = 1.01;
+        latest_input@util.text.InputVars;
+        
+        version = 1.02;
         
     end
     
@@ -169,8 +172,14 @@ classdef Acquisition < file.AstroData
                 obj.clip.use_adjust = 0; % adjust through photometry object?
                 obj.clip_bg = img.Clipper;
                 obj.clip_bg.use_adjust = 0;
-                obj.photo = img.PhotoSimple;
+                
+                obj.photo_stack = img.Photometry;
+                obj.photo_stack.use_aperture = 0;
                 obj.flux_buf = util.vec.CircularBuffer;
+                
+                obj.photo = img.Photometry;
+                obj.lightcurves = img.Lightcurves;
+                
                 obj.af = obs.focus.AutoFocus;
                 
                 obj.buf = file.BufferWheel;
@@ -221,8 +230,6 @@ classdef Acquisition < file.AstroData
             obj.batch_counter = 0;
             obj.batch_index = 1;
 
-            obj.full_lightcurves = [];
-            
         end
         
         function clear(obj)
@@ -554,6 +561,8 @@ classdef Acquisition < file.AstroData
             
             obj.reset;
             
+            obj.lightcurves.startup(input.num_batches.*input.batch_size, input.num_stars);
+            
         end
         
         function run(obj, varargin)
@@ -564,6 +573,8 @@ classdef Acquisition < file.AstroData
             else
                 input = obj.makeInputVars(varargin{:});
             end
+            
+            obj.latest_input = input;
             
             if obj.debug_bit>1, disp(['Starting run "' input.run_name '" for ' num2str(input.num_batches) ' batches.']); end
             
@@ -601,7 +612,11 @@ classdef Acquisition < file.AstroData
             if ~obj.cal.checkDark
                 error('Cannot start a new run without loading darks into calibration object!');
             end
-                
+            
+            if nargin<2 || isempty(input)
+                input = obj.latest_input;
+            end
+            
             obj.brake_bit = 0;
             
             obj.update;
@@ -644,6 +659,10 @@ classdef Acquisition < file.AstroData
         
         function finishup(obj, input)
             
+            if nargin<2 || isempty(input)
+                input = obj.latest_input;
+            end
+            
             obj.prog.finish;
             
             obj.src.finishup;
@@ -663,6 +682,10 @@ classdef Acquisition < file.AstroData
         end
         
         function batch(obj, input)
+            
+            if nargin<2 || isempty(input)
+                input = obj.latest_input;
+            end
             
             if obj.src.is_finished
                 obj.brake_bit = 1;
@@ -770,6 +793,10 @@ classdef Acquisition < file.AstroData
         
         function single(obj, input)
             
+            if nargin<2 || isempty(input)
+                input = obj.latest_input;
+            end
+            
             input = util.oop.full_copy(input);
             input.use_audio = 0;
             input.num_batches = 1;
@@ -784,6 +811,10 @@ classdef Acquisition < file.AstroData
         end
         
         function calcStack(obj, input)
+            
+            if nargin<2 || isempty(input)
+                input = obj.latest_input;
+            end
             
             if nargin<2 || isempty(input)
                 input = obj.input_main_survey;
@@ -812,7 +843,6 @@ classdef Acquisition < file.AstroData
                 obj.stack_sub = obj.stack;
             end
             
-            
             if obj.batch_counter==0
                 obj.findStars(input); % this replaces the clipper findStars with somethinig better, or just runs it explicitely... 
             end
@@ -827,19 +857,19 @@ classdef Acquisition < file.AstroData
                 obj.stack_cutouts_sub = obj.stack_cutouts;
             end
             
-            obj.photo.input(obj.stack_cutouts_sub, 'moments', 1); % run photometry on the stack to verify flux and adjust positions
+            obj.photo_stack.input(obj.stack_cutouts_sub); % run photometry on the stack to verify flux and adjust positions
             
             obj.checkRealign(input);
             
             % store the latest fluxes from the stack cutouts
-            obj.flux_buf.input(obj.photo.fluxes);
+            obj.flux_buf.input(obj.photo_stack.fluxes);
             
             % get the average width and offsets (weighted by the flux of each star...)
-            M = mean(obj.photo.fluxes);
-            obj.adjust_pos = [median(obj.photo.fluxes./M.*obj.photo.offsets_x, 'omitnan'), median(obj.photo.fluxes./M.*obj.photo.offsets_y, 'omitnan')];
+            M = mean(obj.photo_stack.fluxes);
+            obj.adjust_pos = [median(obj.photo_stack.fluxes./M.*obj.photo_stack.offsets_x, 'omitnan'), median(obj.photo_stack.fluxes./M.*obj.photo_stack.offsets_y, 'omitnan')];
             obj.adjust_pos(isnan(obj.adjust_pos)) = 0;
             
-            obj.average_width = median(obj.photo.fluxes./M.*obj.photo.widths, 'omitnan'); % maybe find the average width of each image and not the stack??
+            obj.average_width = median(obj.photo_stack.fluxes./M.*obj.photo_stack.widths, 'omitnan'); % maybe find the average width of each image and not the stack??
             
             if obj.use_adjust_cutouts
                 obj.clip.positions = obj.clip.positions + obj.adjust_pos;
@@ -850,6 +880,10 @@ classdef Acquisition < file.AstroData
         end
         
         function findStars(obj, input)
+            
+            if nargin<2 || isempty(input)
+                input = obj.latest_input;
+            end
             
             if input.use_arbitrary_pos
                 obj.clip.arbitraryPositions; % maybe add some input parameters?
@@ -866,12 +900,16 @@ classdef Acquisition < file.AstroData
         
         function checkRealign(obj, input)
             
+            if nargin<2 || isempty(input)
+                input = obj.latest_input;
+            end
+            
             if ~is_empty(obj.flux_buf) % check that stars are still aligned properly... 
                 
                 mean_fluxes = obj.flux_buf.mean;
                 mean_fluxes(mean_fluxes<=0) = NaN;
 
-                new_fluxes = obj.photo.fluxes;
+                new_fluxes = obj.photo_stack.fluxes;
                 new_fluxes(isnan(mean_fluxes)) = [];
                 mean_fluxes(isnan(mean_fluxes)) = [];
 
@@ -897,7 +935,7 @@ classdef Acquisition < file.AstroData
                         obj.stack_cutouts_sub = obj.stack_cutouts;
                     end
 
-                    obj.photo.input(obj.stack_cutouts_sub, 'moments', 1); % run photometry on the stack to verify flux and adjust positions
+                    obj.photo_stack.input(obj.stack_cutouts_sub, 'moments', 1); % run photometry on the stack to verify flux and adjust positions
 
                 end
 
@@ -910,7 +948,7 @@ classdef Acquisition < file.AstroData
         function calcCutouts(obj, input)
             
             if nargin<2 || isempty(input)
-                input = obj.input_main_survey;
+                input = obj.latest_input;
             end
             
             obj.cutouts = obj.clip.input(obj.images);
@@ -940,13 +978,14 @@ classdef Acquisition < file.AstroData
         function calcLightcurves(obj, input)
             
             if nargin<2 || isempty(input)
-                input = obj.input_main_survey;
+                input = obj.latest_input;
             end
             
             obj.photo.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps); % add variance input? 
             
-            obj.lightcurves = obj.photo.fluxes;
-            obj.full_lightcurves = cat(1, obj.full_lightcurves, obj.lightcurves); % consider replacing this with some storage object...
+            obj.fluxes = obj.photo.fluxes;
+            obj.lightcurves.input(obj.photo.fluxes, obj.photo.weights, obj.photo.offsets_x, obj.photo.offsets_y, obj.photo.widths, obj.photo.backgrounds); % store the full lightcurves...
+            
 %             obj.widths = obj.photo.widths;
             
         end
@@ -954,7 +993,7 @@ classdef Acquisition < file.AstroData
         function calcTrigger(obj, input)
             
             if nargin<2 || isempty(input)
-                input = obj.input_main_survey;
+                input = obj.latest_input;
             end
             
             % to be implemented!
@@ -1215,7 +1254,7 @@ classdef Acquisition < file.AstroData
             util.plot.setImage(I, input.ax);
             
             obj.clip.showRectangles('num', obj.num_rect_stars, 'color', 'black', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 1);
-            obj.clip_bg.showRectangles('num', obj.num_rect_bg, 'color', 'red', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 0);
+            obj.clip_bg.showRectangles('num', obj.num_rect_bg, 'color', 'red', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 0, 'text', 0);
             
             catch ME
                 warning(ME.getReport);

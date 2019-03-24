@@ -5,7 +5,7 @@ classdef BufferWheel < file.AstroData
 %
 % Uses index (and index_rec) to keep track of which buffer to use when
 % recording, reading and writing to file. Each buffer struct can have all 
-% the inputs and outputs (e.g. images, lightcurves, psfs, etc.). 
+% the inputs and outputs (e.g. images, fluxes, psfs, etc.). 
 %
 % Model 1: input data from camera/sim/pipeline using input method, then
 % immediately use save method which also brings up new buffer. If you try
@@ -29,7 +29,7 @@ classdef BufferWheel < file.AstroData
 %
 % SWITCHES & CONTROLS:
 %   -product_type: string telling which kind of output (raw? cutouts?
-%    lightcurves? dark/flat? etc.). Will print this in the filename. 
+%    fluxes? dark/flat? etc.). Will print this in the filename. 
 %   -base_dir: set to [] to use getenv('DATA') as the base dir. 
 %   -date_dir: set to [] to use this night's date dir. 
 %   -target_dir: set to [] to use "pars.target_name" as target_dir. 
@@ -632,7 +632,7 @@ classdef BufferWheel < file.AstroData
 %                     'full_sum', [], 'num_sum', [],...
 %                     'timestamps', [], 't_start', [], 't_end', [], 't_end_stamp', [], 't_vec', [], ...
 %                     'psfs', [], 'psf_sampling', [],...
-%                     'lightcurves', [], 'latest_filename', [], ...
+%                     'fluxes', [], 'latest_filename', [], ...
 %                     'mex_flag_record', [0 0 0 0], 'mex_flag_write', [0 0 0 0], 'mex_flag_read', [0 0 0 0],...
 %                     'buf_number', idx);
             
@@ -898,7 +898,7 @@ classdef BufferWheel < file.AstroData
             
             if isempty(buf.images) && isempty(buf.images) && ...
                     isempty(buf.cutouts) && isempty(buf.stack) && ...
-                    isempty(buf.psfs) && isempty(buf.lightcurves) % no images of any type, PSFs or lightcurves are available. 
+                    isempty(buf.psfs) && isempty(buf.fluxes) % no images of any type, PSFs or fluxes are available. 
                 return;
             end
             
@@ -950,7 +950,7 @@ classdef BufferWheel < file.AstroData
                     'cutouts', buf.cutouts,  'positions', buf.positions,...
                     'stack', buf.stack, 'num_sum', buf.num_sum,...
                     'timestamps', buf.timestamps, 't_end_stamp', buf.t_end_stamp, 't_end', buf.t_end, 't_start', buf.t_start,...
-                    'psfs', buf.psfs, 'sampling_psf', buf.sampling_psf, 'lightcurves', buf.lightcurves, 'parameters', obj.pars_struct_cell,...
+                    'psfs', buf.psfs, 'sampling_psf', buf.sampling_psf, 'fluxes', buf.fluxes, 'parameters', obj.pars_struct_cell,...
                     'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit);
                     % should also mark the mex_flag_write as finished writing... 
                     
@@ -1080,9 +1080,9 @@ classdef BufferWheel < file.AstroData
                 
             end
                         
-            if ~isempty(obj.lightcurves)
-                h5create(filename, '/lightcurves', size(obj.lightcurves,2))
-                h5write(filename, '/lightcurves', obj.lightcurves);
+            if ~isempty(obj.fluxes)
+                h5create(filename, '/fluxes', size(obj.fluxes,2))
+                h5write(filename, '/fluxes', obj.fluxes);
             end
                         
             if obj.use_write_pars && ~isempty(obj.pars)
@@ -1165,7 +1165,7 @@ classdef BufferWheel < file.AstroData
 
             end
 
-            if ~isempty(lightcurves)
+            if ~isempty(fluxes)
 
             end
 
@@ -1240,9 +1240,9 @@ classdef BufferWheel < file.AstroData
                 list_pars{end+1} = 'psf_sampling';
             end
             
-            if ~isempty(obj.lightcurves)
-                lightcurves = obj.lightcurves;
-                list_pars{end+1} = 'lightcurves';
+            if ~isempty(obj.fluxes)
+                fluxes = obj.fluxes;
+                list_pars{end+1} = 'fluxes';
             end
             
             if obj.use_write_pars && ~isempty(obj.pars)
@@ -1272,7 +1272,7 @@ classdef BufferWheel < file.AstroData
       
     methods (Static=true) % static save (old, non-mex methods) to be depricated!!!
         
-        function ok = saveHDF5Static(filename, deflate, chunk, images, positions, timestamps, t_end_stamp, t_end, t_start, psfs, psf_sampling, lightcurves, pars, use_write_pars, debug_bit)
+        function ok = saveHDF5Static(filename, deflate, chunk, images, positions, timestamps, t_end_stamp, t_end, t_start, psfs, psf_sampling, fluxes, pars, use_write_pars, debug_bit)
             
             ok = 0;
             
@@ -1290,7 +1290,7 @@ classdef BufferWheel < file.AstroData
             if nargin<9, t_start = []; end
             if nargin<10, psfs = []; end
             if nargin<11, psf_sampling = []; end
-            if nargin<12, lightcurves = []; end
+            if nargin<12, fluxes = []; end
             if nargin<13, pars = []; end
             if nargin<14 || isempty(use_write_pars), use_write_pars = 0; end            
             if nargin<15 || isempty(debug_bit), debug_bit = 0; end
@@ -1364,9 +1364,9 @@ classdef BufferWheel < file.AstroData
                                 
             end
                         
-            if ~isempty(lightcurves)
-                h5create(filename, '/lightcurves', size(lightcurves,2))
-                h5write(filename, '/lightcurves', lightcurves);
+            if ~isempty(fluxes)
+                h5create(filename, '/fluxes', size(fluxes,2))
+                h5write(filename, '/fluxes', fluxes);
             end
                         
             if use_write_pars && ~isempty(pars)
@@ -1377,7 +1377,7 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function ok = saveFitsStatic(filename, deflate, chunk, images, positions, timestamps, t_end_stamp, t_end, t_start, psfs, psf_sampling, lightcurves, pars, use_write_pars, debug_bit)
+        function ok = saveFitsStatic(filename, deflate, chunk, images, positions, timestamps, t_end_stamp, t_end, t_start, psfs, psf_sampling, fluxes, pars, use_write_pars, debug_bit)
                             
             if nargin<1
                 error(['cannot run saveFitsStatic without a filename!']);    
@@ -1393,7 +1393,7 @@ classdef BufferWheel < file.AstroData
             if nargin<9, t_start = []; end
             if nargin<10, psfs = []; end
             if nargin<11, psf_sampling = []; end
-            if nargin<12, lightcurves = []; end
+            if nargin<12, fluxes = []; end
             if nargin<13, pars = []; end
             if nargin<14, use_write_pars = 0; end            
             if nargin<15 || isempty(debug_bit), debug_bit = 0; end        
@@ -1475,7 +1475,7 @@ classdef BufferWheel < file.AstroData
 
                 end
 
-                if ~isempty(lightcurves)
+                if ~isempty(fluxes)
                     
                 end
 
@@ -1504,7 +1504,7 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function ok = saveMatFileStatic(filename, images, positions, timestamps, t_end_stamp, t_end, t_start, psfs, psf_sampling, lightcurves, pars, use_save_pars, debug_bit)
+        function ok = saveMatFileStatic(filename, images, positions, timestamps, t_end_stamp, t_end, t_start, psfs, psf_sampling, fluxes, pars, use_save_pars, debug_bit)
             
             ok = 0;
             
@@ -1516,7 +1516,7 @@ classdef BufferWheel < file.AstroData
             if nargin<7, t_start = []; end            
             if nargin<8, psfs = []; end
             if nargin<9, psf_sampling = []; end
-            if nargin<10, lightcurves = []; end
+            if nargin<10, fluxes = []; end
             if nargin<11, pars = []; end
             if nargin<12, use_save_pars = ''; end
             if nargin<13 || isempty(debuf_bit), debug_bit = 0; end
@@ -1524,9 +1524,9 @@ classdef BufferWheel < file.AstroData
             name = util.text.extension(filename, '.mat');
             
             if use_save_pars
-                save(name, 'images', 'positions', 'timestamps', 'psfs', 'psf_sampling', 'lightcurves', 'pars');
+                save(name, 'images', 'positions', 'timestamps', 'psfs', 'psf_sampling', 'fluxes', 'pars');
             else
-                save(name, 'images', 'positions', 'timestamps', 'psfs', 'psf_sampling', 'lightcurves');
+                save(name, 'images', 'positions', 'timestamps', 'psfs', 'psf_sampling', 'fluxes');
             end
             
             ok = 1;

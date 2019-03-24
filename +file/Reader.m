@@ -48,7 +48,7 @@ classdef Reader < file.AstroData
 %  timestamps to absolute time). 
 % -psf: image of the PSF if it was measured / simulated. 
 % -psf_sampling: in units of lambda/D per pixel (default is 2-> Nyquist).
-% -lightcurves: values of the amount of light extracted per star/cutout. 
+% -fluxes: values of the amount of light extracted per star/cutout. 
 %
 % Other useful parameters incude:
 % -glob_string (default= "*.h5*"): This string is used in glob-expansion to
@@ -101,7 +101,7 @@ classdef Reader < file.AstroData
 %         psfs; % output PSFs from file (if available)        
 %         psf_sampling; % if loaded PSFs need to be binned (this is the binning factor)
 %         
-%         lightcurves;
+%         fluxes;
         
         input_filename = '';
         
@@ -273,7 +273,7 @@ classdef Reader < file.AstroData
             obj.dataset_names.psfs = {'psfs'};
             obj.attribute_names.psf_sampling = {'psf_sampling', 'psf_binning'};
             
-            obj.dataset_names.lightcurves = {'lightcurves'};
+            obj.dataset_names.fluxes = {'fluxes', 'lightcurves'};
             
             obj.dataset_names.pars = {'pars'};
             
@@ -355,7 +355,7 @@ classdef Reader < file.AstroData
 %             obj.psfs = [];
 %             obj.psf_sampling = [];
 %             
-%             obj.lightcurves = [];
+%             obj.fluxes = [];
             
             clear@file.AstroData(obj);
 
@@ -721,7 +721,7 @@ classdef Reader < file.AstroData
                     end
                 end
                 
-                % maybe add a quick check that the number of frames in "images", "psfs", and "timestamps" (and "lightcurves") all match?                                
+                % maybe add a quick check that the number of frames in "images", "psfs", and "timestamps" (and "fluxes") all match?                                
                 
                 num_images_loaded = 0; % can be number of images or number of PSFs (if no images exist)                  
                 
@@ -862,14 +862,14 @@ classdef Reader < file.AstroData
                             num_images_loaded = size(loaded_psfs,3);
                         end
                         
-                    elseif cs(data_name, obj.dataset_names.lightcurves) && data_size(1) % data_names.lightcurves may be a cell array of different optional names
+                    elseif cs(data_name, obj.dataset_names.fluxes) && data_size(1) % data_names.fluxes may be a cell array of different optional names
                         
-                        num_images_on_file = data_size(1); % lightcurves should be 2D with number of frames in the 1st dim
+                        num_images_on_file = data_size(1); % fluxes should be 2D with number of frames in the 1st dim
                         
                         num_frames = min(num_frames, num_images_on_file); % make sure we don't ask for more frames than we have on file
                         
-                        loaded_lightcurves = h5read(filename, sa('/', data_name), [frame_start 1], [num_frames Inf]); % must check the dimensions on file fit what I think I am saving...
-                        obj.lightcurves = cat(1, obj.lightcurves, loaded_lightcurves); % append to the existing images
+                        loaded_fluxes = h5read(filename, sa('/', data_name), [frame_start 1], [num_frames Inf]); % must check the dimensions on file fit what I think I am saving...
+                        obj.fluxes = cat(1, obj.fluxes, loaded_fluxes); % append to the existing images
                         
                     elseif cs(data_name, obj.dataset_names.pars) 
                         obj.loadParsHDF5(filename, loaded_pars, data_name, att_names);
