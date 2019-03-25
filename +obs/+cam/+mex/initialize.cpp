@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 #include "atcore.h"
-#include "atutility.h"
+// #include "atutility.h"
 
 #include <iostream> 
 using namespace std;
@@ -24,7 +24,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
     AT_64 iNumberDevices = 0;
     AT_GetInt(AT_HANDLE_SYSTEM, L"Device Count", &iNumberDevices);
     if (iNumberDevices <= 0) {
-      mexPrintf("No cameras detected!\n");
+      mexPrintf("No cameras detected! iNumberDevices= %d\n", iNumberDevices);
     }
     else {
       AT_H Hndl;
@@ -49,11 +49,6 @@ void mexFunction( int nlhs, mxArray *plhs[],
     AT_FinaliseLibrary();
   }
 
-  cout << endl << "Press any key then enter to close" << endl;
-  char ch;
-  cin >> ch;
-
-	
 }
 
 void func(){
