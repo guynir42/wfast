@@ -128,7 +128,7 @@ SaveDataHDF5::MyDataset::MyDataset(MyFilePointer &file, const char *location, My
 	if (matrix.use_deflate && deflate>0){ // if this matrix needs to be deflated and if we are using deflate (in general)
 		
 		hsize_t chunk_dims_c[4]={1};
-		for(int i=0;i<matrix.ndims;i++) chunk_dims_c[matrix.ndims-1-i]=chunk_size;
+		for(int i=0;i<matrix.ndims;i++) chunk_dims_c[matrix.ndims-1-i]=chunk;
 		
 		int status=0;
 		
