@@ -1076,7 +1076,7 @@ classdef Acquisition < file.AstroData
                 input = varargin{1};
                 input.scan_vars(varargin{2:end});
             else
-                input = obj.makeInputVars('batch_size', 1, 'expT', 3, 'num_stars', 5, 'cut_size', 20, 'use audio', 0, varargin{:});
+                input = obj.makeInputVars('batch_size', 100, 'expT', 0.025, 'num_stars', 5, 'cut_size', 20, 'use audio', 0, varargin{:});
             end
             
             if isempty(obj.cam) || isempty(obj.cam.focuser)
@@ -1123,8 +1123,8 @@ classdef Acquisition < file.AstroData
 %                 W = H.*2;
                 
                 obj.af.pos(ii) = obj.cam.focuser.pos;
-                obj.af.widths(ii,:) = obj.photo.widths;
-                obj.af.weights(ii,:) = obj.photo.fluxes;
+                obj.af.widths(ii,:) = obj.photo_stack.widths;
+                obj.af.weights(ii,:) = obj.photo_stack.fluxes;
                 
                 obj.af.plot;
                 
