@@ -101,88 +101,6 @@ classdef AstroHaven < handle
             
         end
         
-        function connect(obj)
-            
-            obj.log.input('Connecting to dome via serial port');
-            
-            try
-                
-                if ~isempty(obj.hndl) && isvalid(obj.hndl)
-                    fclose(obj.hndl);
-                    delete(obj.hndl);
-                end
-
-                obj.hndl = serial(obj.port_name);
-    % These 
-    %             obj.hndl.BytesAvailableFcn = @obj.getReply;
-    %             obj.hndl.BytesAvailableFcnCount = 1;
-    %             obj.hndl.BytesAvailableFcnMode = 'byte';
-                obj.hndl.Terminator = '';
-
-                try 
-                    fopen(obj.hndl);
-                catch 
-                    fopen(obj.hndl);
-                end
-
-                obj.update;
-
-                if obj.use_accelerometers
-                    obj.connectAccelerometers;
-                end
-
-            catch ME
-                obj.log.error(ME.getReport);
-                warning(ME.getReport);
-            end
-            
-        end
-        
-        function disconnect(obj)
-            
-            obj.log.input('Disconnecting from dome');
-            
-            try 
-                fclose(obj.hndl);
-                delete(obj.hndl);
-                obj.hndl = [];
-            catch ME
-                obj.log.error(ME.getReport);
-                warning(ME.getReport);
-            end
-            
-        end
-        
-        function connectAccelerometers(obj)
-            
-            obj.log.input('Connecting to accelerometers.');
-            
-            try
-                
-                obj.acc1 = obs.sens.Accelerometer(obj.acc_name, obj.acc_id1);
-                
-            catch ME
-                
-                obj.log.error(ME.getReport);
-                obj.acc1 = obs.sens.Accelerometer.empty;
-                warning(ME.getWarning);
-                
-            end
-            
-            try
-                
-                obj.acc2 = obs.sens.Accelerometer(obj.acc_name, obj.acc_id2);
-                
-            catch ME
-                
-                obj.log.error(ME.getReport);
-                obj.acc2 = obs.sens.Accelerometer.empty;
-                warning(ME.getWarning);
-                
-            end
-            
-        end
-
     end
     
     methods % getters
@@ -271,20 +189,28 @@ classdef AstroHaven < handle
             
             try
             
+                obj.update;
+                
                 for ii = 1:number
 
                     t = tic;
 
                     obj.counter = 0;
+                    
                     obj.send('a');
+                    
+                    pause(0.1); 
+                    
                     obj.send('b');
 
-                    pause(0.2);
+                    pause(0.1);
 
                     obj.open_time1 = obj.open_time1 + toc(t);
                     obj.open_time2 = obj.open_time2 + toc(t);
 
                 end
+                
+                obj.update;
 
             catch ME
                 obj.log.error(ME.getReport);
@@ -303,6 +229,8 @@ classdef AstroHaven < handle
             
             try
                 
+                obj.update;
+                
                 for ii = 1:number
 
                     t = tic;
@@ -317,6 +245,8 @@ classdef AstroHaven < handle
                     obj.close_time2 = obj.close_time2 + toc(t);
 
                 end
+                
+                obj.update;
                 
             catch ME
                 obj.log.error(ME.getReport);
@@ -337,19 +267,23 @@ classdef AstroHaven < handle
 
                 command = 'a';
 
+                obj.update;
+                
                 for ii = 1:number
 
                     t = tic;
 
-                    obj.counter = 0;
+                    obj.counter = 0; % this prevents an infinite loop of send calling itself...
                     obj.send(command);
-
+                    
                     pause(0.2);
-
+                    
                     obj.open_time1 = obj.open_time1 + toc(t);
 
                 end
 
+                obj.update;
+                    
             catch ME
                 obj.log.error(ME.getReport);
                 warning(ME.getReport);
@@ -369,18 +303,23 @@ classdef AstroHaven < handle
                 
                 command = 'b';
 
+                obj.update;
+                
                 for ii = 1:number
 
                     t = tic;
 
+                    obj.counter = 0; % this prevents an infinite loop of send calling itself...
                     obj.send(command);
 
                     pause(0.2);
-
+                    
                     obj.open_time2 = obj.open_time2 + toc(t);
 
                 end
-
+                
+                obj.update;
+                
             catch ME
                 obj.log.error(ME.getReport);
                 warning(ME.getReport);
@@ -398,12 +337,15 @@ classdef AstroHaven < handle
             
             try
                 
+                obj.update;
+                
                 command = 'A';
 
                 for ii = 1:number
 
                     t = tic;
 
+                    obj.counter = 0; % this prevents an infinite loop of send calling itself...
                     obj.send(command);
     %                 fprintf(obj.hndl, command);
 
@@ -412,6 +354,8 @@ classdef AstroHaven < handle
                     obj.close_time1 = obj.close_time1 + toc(t);
 
                 end
+                
+                obj.update;
 
             catch ME
                 obj.log.error(ME.getReport);
@@ -432,10 +376,13 @@ classdef AstroHaven < handle
 
                 command = 'B';
 
+                obj.update;
+                
                 for ii = 1:number
 
                     t = tic;
 
+                    obj.counter = 0; % this prevents an infinite loop of send calling itself...
                     obj.send(command);
 
                     pause(0.2);
@@ -443,6 +390,8 @@ classdef AstroHaven < handle
                     obj.close_time2 = obj.close_time2 + toc(t);
 
                 end
+                
+                obj.update;
 
             catch ME
                 obj.log.error(ME.getReport);
@@ -471,33 +420,152 @@ classdef AstroHaven < handle
     
     methods % internal functions (to be made hidden/private)
         
-        function send(obj, command)
+        function connect(obj)
+            
+            if obj.debug_bit>1, disp('connecting to dome!'); end
+            
+            obj.log.input('Connecting to dome via serial port');
+            
+            try
+                
+                if ~isempty(obj.hndl) && isvalid(obj.hndl)
+                    obj.disconnect;
+                end
+                
+                pause(0.2);
+                
+                obj.hndl = serial(obj.port_name);
+
+    %             obj.hndl.BytesAvailableFcn = @obj.getReply;
+    %             obj.hndl.BytesAvailableFcnCount = 1;
+    %             obj.hndl.BytesAvailableFcnMode = 'byte';
+                obj.hndl.Terminator = '';
+
+                for ii = 1:30
+                
+                    if strcmp(obj.hndl.Status, 'open'), break; end
+                    
+                    try 
+                        fopen(obj.hndl);
+                    catch ME
+                        
+                        if strcmp(ME.identifier, 'MATLAB:serial:fopen:opfailed')
+                            if obj.debug_bit>1, fprintf('failed to open serial port, attempt %d\n', ii); end 
+                        else 
+                            rethrow(ME);
+                        end
+                        
+                    end
+                    
+                    pause(0.1);
+
+                end
+                   
+                if ~strcmp(obj.hndl.Status, 'open')
+                    if obj.debug_bit>1, disp('Giving up on opening serial port...'); end
+                else
+                    if obj.debug_bit>1, disp('Successful reconnect!'); end
+                end
+                    
+                obj.update;
+
+                if obj.use_accelerometers
+                    obj.connectAccelerometers;
+                end
+
+            catch ME
+                obj.log.error(ME.getReport);
+                warning(ME.getReport);
+            end
+            
+        end
+        
+        function disconnect(obj)
+            
+            if obj.debug_bit>1, disp('disconnecting from dome!'); end
+            
+            obj.log.input('Disconnecting from dome');
             
             try 
-                fprintf(obj.hndl, command);
+                fclose(obj.hndl);
+                delete(obj.hndl);
+                obj.hndl = [];
+            catch ME
+                obj.log.error(ME.getReport);
+                warning(ME.getReport);
+            end
+            
+        end
+        
+        function connectAccelerometers(obj)
+            
+            obj.log.input('Connecting to accelerometers.');
+            
+            try
+                
+                obj.acc1 = obs.sens.Accelerometer(obj.acc_name, obj.acc_id1);
                 
             catch ME
                 
-                if strcmp(ME.identifier, 'MATLAB:serial:fprintf:opfailed')
-                    pause(0.1);
-                    obj.connect;
-                    obj.counter = obj.counter + 1;
-                    if obj.counter<10 % infinite-loop prevention
-                        obj.send(command);
-                    end
-                else
-                    rethrow(ME);
-                end
+                obj.log.error(ME.getReport);
+                obj.acc1 = obs.sens.Accelerometer.empty;
+                warning(ME.getWarning);
                 
             end
             
-            obj.update;
+            try
+                
+                obj.acc2 = obs.sens.Accelerometer(obj.acc_name, obj.acc_id2);
+                
+            catch ME
+                
+                obj.log.error(ME.getReport);
+                obj.acc2 = obs.sens.Accelerometer.empty;
+                warning(ME.getWarning);
+                
+            end
+            
+        end
+
+        function send(obj, command)
+            
+            if obj.debug_bit>1, disp(['seding command ' command]); end
+            
+            for ii = 1:3
+                
+                try 
+                    fprintf(obj.hndl, command);
+                    return;
+                catch ME
+
+                    if strcmp(ME.identifier, 'MATLAB:serial:fprintf:opfailed')
+                        if obj.debug_bit>1, disp('Failed to send command, trying again...'); end
+                    else
+                        rethrow(ME);
+                    end
+
+                end
+                
+                pause(0.05);
+
+            end
+            
+            if obj.debug_bit>1, disp('Gave up on sending this command... trying to reconnect!'); end
+            
+            pause(0.1);
+            obj.connect;
+            obj.counter = obj.counter + 1;
+            if obj.counter<10 % infinite-loop prevention
+                obj.send(command);
+            else
+                if obj.debug_bit>1, disp('Not trying any more reconnects in send loop...'); end
+            end
             
         end
         
         function update(obj)
             
-%             obj.hndl.BytesAvailableFcn = @obj.getReply; % make sure the reply read function is working! 
+            if obj.debug_bit>1, fprintf('updating data...'); end
             
             flushinput(obj.hndl);
 
@@ -513,10 +581,20 @@ classdef AstroHaven < handle
         
         function getReply(obj, ~, ~)
             
+            num=0;
+            
             try
-                obj.reply = char(fread(obj.hndl, 1));
+                [obj.reply, num] = fread(obj.hndl, 1);
+                obj.reply = char(obj.reply);
             catch ME
+                disp('--read failed--');
                 obj.reply = '';
+            end
+            
+            if num==0
+                if obj.debug_bit>1, disp('Couldnt read reply from serial port... reconnecting'); end
+                warning('off', 'MATLAB:serial:fread:unsuccessfulRead');
+                obj.connect;
             end
             
             if strcmp(obj.reply, '0') % reset all time estimates when closed
@@ -525,6 +603,8 @@ classdef AstroHaven < handle
                 obj.open_time2 = 0;
                 obj.close_time2 = 0; 
             end
+            
+            if obj.debug_bit>1, fprintf(' reply: %s\n', obj.reply); end
             
         end
         

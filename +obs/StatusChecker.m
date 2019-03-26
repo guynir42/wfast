@@ -761,7 +761,7 @@ classdef StatusChecker < handle
                     
                     if obj.debug_bit, fprintf('Device %s is malfunctioning. Attempting to reconnect...\n', class(obj.devices{ii})); end
                     
-                    obj.logger.input(sprintf('Device %s is malfunctioning. Attempting to reconnect...\n', class(obj.devices{ii})));
+                    obj.status_log.input(sprintf('Device %s is malfunctioning. Attempting to reconnect...\n', class(obj.devices{ii})));
                     
                     try
                         
