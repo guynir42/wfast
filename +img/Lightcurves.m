@@ -10,8 +10,8 @@ classdef Lightcurves < handle
     
     properties % inputs/outputs
         
-        frame_index;
-        num_frames;
+        frame_index = 0;
+        num_frames = 0;
         
     end
     
@@ -148,6 +148,8 @@ classdef Lightcurves < handle
             obj.offsets_y_full = NaN(num_frames, num_stars);
             obj.widths_full = NaN(num_frames, num_stars);
             obj.backgrounds_full = NaN(num_frames, num_stars);
+            
+            obj.frame_index = 0;
             
         end
         

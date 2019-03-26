@@ -196,6 +196,7 @@ classdef Acquisition < file.AstroData
                 obj.audio = util.sys.AudioControl;
                 
                 obj.src = obj.reader;
+                obj.latest_input = makeInputVars;
                 
             end
             
@@ -806,7 +807,7 @@ classdef Acquisition < file.AstroData
             cleanup = onCleanup(@() obj.finishup(input));
             obj.startup(input);
             
-            obj.batch;
+            obj.batch(input);
             
         end
         
@@ -815,11 +816,7 @@ classdef Acquisition < file.AstroData
             if nargin<2 || isempty(input)
                 input = obj.latest_input;
             end
-            
-            if nargin<2 || isempty(input)
-                input = obj.input_main_survey;
-            end
-            
+                        
             % make the basic, calibrated stack image
             obj.num_sum = size(obj.images,3);
             obj.stack = obj.cal.input(sum(obj.images,3), 'sum', obj.num_sum);
@@ -1086,15 +1083,16 @@ classdef Acquisition < file.AstroData
                 error('must be connected to camera and focuser!');
             end
             
+            obj.reset;
             obj.single(input);
             obj.findStarsFocus(input);
             
             obj.af.pos = obj.cam.focuser.pos + (-obj.af.range:obj.af.step:obj.af.range)';
-            obj.af.width = NaN(length(obj.af.pos), input.num_stars);
-            obj.af.weight = NaN(length(obj.af.pos), input.num_stars);
+            obj.af.widths = NaN(length(obj.af.pos), input.num_stars);
+            obj.af.weights = NaN(length(obj.af.pos), input.num_stars);
             obj.af.xy_pos = obj.clip.positions;
             
-            input.num_batches = length(obj.focus_curve_pos);
+            input.num_batches = length(obj.af.pos);
             
             obj.cam.focuser.pos = obj.af.pos(1);
             pause(0.1);
@@ -1109,7 +1107,7 @@ classdef Acquisition < file.AstroData
                 end
                 
                 try 
-                    obj.cam.focuser.pos = obj.focus_curve_pos(ii);
+                    obj.cam.focuser.pos = obj.af.pos(ii);
                 catch ME
                     warning(ME.getReport);
                 end
@@ -1125,7 +1123,7 @@ classdef Acquisition < file.AstroData
 %                 W = H.*2;
                 
                 obj.af.pos(ii) = obj.cam.focuser.pos;
-                obj.af.width(ii,:) = obj.photo.widths;
+                obj.af.widths(ii,:) = obj.photo.widths;
                 obj.af.weights(ii,:) = obj.photo.fluxes;
                 
                 obj.af.plot;
@@ -1147,11 +1145,11 @@ classdef Acquisition < file.AstroData
             
             obj.cam.focuser.pos = obj.af.found_pos;
             
-            if isprop(obj.cam.focuse, 'tip')
+            if isprop(obj.cam.focuser, 'tip') && ~isempty(obj.af.found_tip)
                 obj.cam.focuser.tip = obj.af.found_tip;
             end
             
-            if isprop(obj.cam.focuse, 'tilt')
+            if isprop(obj.cam.focuser, 'tilt') && ~isempty(obj.af.found_tilt)
                 obj.cam.focuser.tilt = obj.af.found_tilt;
             end
             
@@ -1170,7 +1168,7 @@ classdef Acquisition < file.AstroData
             I = util.img.maskBadPixels(I);
             I = conv2(I, util.img.gaussian2(2), 'same'); % smoothing filter
             
-            markers = round(S.*[1/3 2/3]); % divide the sensor to 1/3rds 
+            markers = round(S'.*[1/3 2/3]); % divide the sensor to 1/3rds 
             
             mask{1} = false(S);
             mask{1}(markers(1,1):markers(1,2), markers(2,1):markers(2,2)) = 1; % only the central part is unmasked
@@ -1191,7 +1189,7 @@ classdef Acquisition < file.AstroData
             
             for ii = 1:input.num_stars
                 
-                [~,idx] = util.stat.max2(I.*mask{mod(ii,5)}); % find the maximum in each masked area
+                [~,idx] = util.stat.max2(I.*mask{mod(ii-1,5)+1}); % find the maximum in each masked area
                 
                 pos(ii,:) = flip(idx); % x then y!
                 

@@ -745,7 +745,7 @@ classdef CameraControl < file.AstroData
         function check = setExpTimeHW(obj, val)
             
             if nargin<2 || isempty(val)
-                val = obj.T;
+                val = obj.expT;
             end
             
             if obj.is_capturing

@@ -75,12 +75,6 @@ classdef AutoFocus < handle
         
         function reset(obj)
             
-            obj.clear;
-            
-        end
-        
-        function clear(obj)
-            
             obj.pos = [];
             obj.widths = [];
             obj.weights = [];
@@ -93,6 +87,12 @@ classdef AutoFocus < handle
             obj.found_pos = [];
             obj.found_tip = [];
             obj.found_tilt = [];
+            
+            obj.clear;
+            
+        end
+        
+        function clear(obj)
             
         end
         
@@ -111,8 +111,9 @@ classdef AutoFocus < handle
         function calculate(obj)
             
             obj.fitCurves;
-            obj.fitSurface;
-            obj.findPosTipTilt;
+%             obj.fitSurface;
+%             obj.findPosTipTilt;
+            obj.findPosOnly;
             
         end
         
@@ -145,6 +146,12 @@ classdef AutoFocus < handle
             
         end
         
+        function findPosOnly(obj)
+            
+            obj.found_pos = mean(obj.min_positions);
+        
+        end
+        
         function findPosTipTilt(obj)
             
             obj.found_pos = obj.surface_coeffs(1);
@@ -172,13 +179,13 @@ classdef AutoFocus < handle
                 obj.ax = axes('Parent', obj.fig);
             end
             
-            plot(obj.ax, obj.pos, obj.width);
+            plot(obj.ax, obj.pos, obj.widths);
             
             hold(obj.ax, 'on');
             
             for ii = 1:length(obj.fit_results)
                 
-                plot(obj.ax, obj.pos, feval(obj.fit_results));
+                plot(obj.ax, obj.pos, feval(obj.fit_results{ii}, obj.pos));
                 
             end
             

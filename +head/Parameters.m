@@ -168,7 +168,7 @@ classdef Parameters < dynamicprops
                     obj.datapath = pwd;
                 end
                 
-                obj.filter = head.Filter;
+                obj.filter = head.Filter('clear');
                 obj.ephem = head.Ephemeris(obj);
                 
                 util.oop.save_defaults(obj);
