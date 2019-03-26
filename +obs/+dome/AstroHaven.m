@@ -529,7 +529,7 @@ classdef AstroHaven < handle
 
         function send(obj, command)
             
-            if obj.debug_bit>1, disp(['seding command ' command]); end
+            if obj.debug_bit>1, disp(['sending command ' command]); end
             
             for ii = 1:3
                 
