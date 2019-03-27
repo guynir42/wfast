@@ -180,13 +180,14 @@ classdef AutoFocus < handle
             end
             
             plot(obj.ax, obj.pos, obj.widths);
-            
+            legend(obj.ax, {'center', 'upper left', 'lower left', 'upper right', 'lower right'});
             hold(obj.ax, 'on');
             
             for ii = 1:length(obj.fit_results)
                 
                 plot(obj.ax, obj.pos, feval(obj.fit_results{ii}, obj.pos));
-                
+                xlabel(obj.ax, 'focuser position (mm)');
+                ylabel(obj.ax, 'width (second moment)');
             end
             
             hold(obj.ax, 'off');

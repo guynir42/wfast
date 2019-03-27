@@ -33,8 +33,17 @@ classdef Ephemeris < handle
     
     properties(Hidden=true)
         
-        latitude = 30.597296; % updated from google maps
-        longitude = -34.761897; % updated from google maps
+        latitude = 30.59678; % from my phone inside the dome (using whatsmylocation.net)
+        longitude = 34.76202; % from my phone inside the dome (using whatsmylocation.net)
+        
+%         latitude = 30.5968322; % from my phone (outside the dome)
+%         longitude = 34.7619663; % from my phone (outside the dome)
+        
+%         latitude = 30.59583333333; % WISE observatory (from wikipedia)
+%         longitude = 34.76333333333; % WISE observatory (from wikipedia)
+        
+%         latitude = 30.597296; % updated from google maps
+%         longitude = -34.761897; % updated from google maps
         
 %         latitude = 31.907867; % of the observatory
 %         longitude = 34.811363; % of the observatory

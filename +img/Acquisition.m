@@ -196,7 +196,7 @@ classdef Acquisition < file.AstroData
                 obj.audio = util.sys.AudioControl;
                 
                 obj.src = obj.reader;
-                obj.latest_input = makeInputVars;
+                obj.latest_input = obj.makeInputVars;
                 
             end
             
@@ -1076,7 +1076,7 @@ classdef Acquisition < file.AstroData
                 input = varargin{1};
                 input.scan_vars(varargin{2:end});
             else
-                input = obj.makeInputVars('batch_size', 100, 'expT', 0.025, 'num_stars', 5, 'cut_size', 20, 'use audio', 0, varargin{:});
+                input = obj.makeInputVars('batch_size', 100, 'expT', 0.025, 'num_stars', 5, 'cut_size', 20, 'use audio', 0, 'use_save', 0, varargin{:});
             end
             
             if isempty(obj.cam) || isempty(obj.cam.focuser)

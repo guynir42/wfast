@@ -310,13 +310,13 @@ classdef ZylaControl < handle
         
         function setLeft(obj, val)
             
-            rc = AT_SetInt(obj.hndl, 'AOILeft', val); AT_CheckWarning(rc);
+            rc = AT_SetInt(obj.hndl, 'AOITop', val); AT_CheckWarning(rc);
             
         end
         
         function setTop(obj, val)
             
-            rc = AT_SetInt(obj.hndl, 'AOITop', val); AT_CheckWarning(rc);
+            rc = AT_SetInt(obj.hndl, 'AOILeft', val); AT_CheckWarning(rc);
             
         end
         
@@ -333,7 +333,7 @@ classdef ZylaControl < handle
         
         function setCenterY(obj, val)
             
-            height = obj.getWidth;
+            height = obj.getHeight;
             top = val - floor(height/2) + 1;
             
             assert(top>1, ['cannot set center_y to ' num2str(val) ' the height ' num2str(height) ' is too big!']);
