@@ -39,9 +39,6 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	}
 	
 	// check argument 4
-	int use_replace=0;
-	if(nlhs>1) use_replace=1;
-	
 	double replace_value=0;
 	if(nrhs>4 && mxIsEmpty(prhs[4])==0){
 		if(mxIsNumeric(prhs[4])==0) mexErrMsgIdAndTxt("MATLAB:util:img:mexCutout:inputNotNumeric", "Input 5 to mexCutout is not numeric...");
@@ -188,9 +185,9 @@ void mexFunction( int nlhs, mxArray *plhs[],
 
 	mxSetData(plhs[0], out_array);
 	
-	if(use_replace){ // replace the INPUT matrix values where the cutouts were with some filler (zero or NaN usually)
-		mxArray *image_subtracted=mxDuplicateArray(prhs[0]); // make a deep copy and remove stars from that
-		unsigned char *out_array2=(unsigned char*) mxGetData(image_subtracted);
+	if(nlhs>1){ // replace the INPUT matrix values where the cutouts were with some filler (zero or NaN usually)
+		plhs[1]=mxDuplicateArray(prhs[0]); // make a deep copy and remove stars from that
+		unsigned char *out_array2=(unsigned char*) mxGetData(plhs[1]);
 		
 		for(int c=0; c<num_cuts; c++){
 			
@@ -219,6 +216,9 @@ void mexFunction( int nlhs, mxArray *plhs[],
 				else for(int i=push_y; i<cut_size_y; i++) memcpy(&src[i*num_bytes], &replace_value_bytes, num_bytes); // for non-zero must go over memory locations one-by-one (copy num_bytes in each location)
 			}
 		}
+		
+		// mxSetData(plhs[1], out_array2);
+		
 	}
 	
 	for(int j=0; j<2; j++) mxFree(pos[j]);

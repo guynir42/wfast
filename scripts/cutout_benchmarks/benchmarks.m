@@ -41,7 +41,7 @@ for ii = 1:N_cuts
         
         for kk = 1:N_iter 
             tic;
-            C1 = util.img.mexCutout3(I, pos(1:N_pos(jj),:), cut_size(ii), 1, [], 0, 0); % pad non-zero uses one-by-one initialization. Last input zero uses one-by-one copy
+            C1 = util.img.mexCutout(I, pos(1:N_pos(jj),:), cut_size(ii), 1, [], 0, 0); % pad non-zero uses one-by-one initialization. Last input zero uses one-by-one copy
             T(kk) = toc;
         end
         
@@ -53,7 +53,7 @@ for ii = 1:N_cuts
         
         for kk = 1:N_iter
             tic;
-            C2 = util.img.mexCutout3(I, pos(1:N_pos(jj),:), cut_size(ii), 0, [], 0, 0); % pad zero uses memset initialization. Last input zero uses one-by-one copy
+            C2 = util.img.mexCutout(I, pos(1:N_pos(jj),:), cut_size(ii), 0, [], 0, 0); % pad zero uses memset initialization. Last input zero uses one-by-one copy
             T(kk) = toc;
         end
         
@@ -65,7 +65,7 @@ for ii = 1:N_cuts
         
         for kk = 1:N_iter
             tic;
-            C3 = util.img.mexCutout3(I, pos(1:N_pos(jj),:), cut_size(ii), 0, [], 0, 1); % pad zero uses memset initialization. Last input one uses mempcy copy
+            C3 = util.img.mexCutout(I, pos(1:N_pos(jj),:), cut_size(ii), 0, [], 0, 1); % pad zero uses memset initialization. Last input one uses mempcy copy
             T(kk) = toc;
         end
         
@@ -79,7 +79,7 @@ for ii = 1:N_cuts
             I2 = I;
             I2(1)=I2(1);
             tic;            
-            C4 = util.img.mexCutout3(I2, pos(1:N_pos(jj),:), cut_size(ii), 0, 0, 0, 1); % same as previous one, but replace values in input matrix with zeros (remove stars)
+            [C4, I_rem] = util.img.mexCutout(I2, pos(1:N_pos(jj),:), cut_size(ii), 0, 0, 0, 1); % same as previous one, but replace values in input matrix with zeros (remove stars)
             T(kk) = toc;
         end
         
@@ -149,9 +149,11 @@ ylabel(ax, 'runtime \mus/star/frame');
 
 legend(ax, title_str, 'Location', 'NorthWest');
 
+%% save the plots
 
+dirname = fullfile(getenv('WFAST'), '/scripts/cutout_benchmarks/plots');
 
-
+util.sys.print(fullfile(dirname, 'benchmark_cutout_size'));
 
 
 
