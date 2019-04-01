@@ -693,10 +693,10 @@ classdef Acquisition < file.AstroData
                 return;
             end
             
+            t = tic;
+            
             obj.prev_stack = obj.stack_sub; % keep one stack from last batch
             obj.clear;
-            
-            t = tic;
             
             obj.src.batch; % produce the data (from camera, file, or simulator)
             
@@ -763,13 +763,6 @@ classdef Acquisition < file.AstroData
                 obj.sensor_temp = obj.src.getTemperature;
             end
             
-            obj.runtime_buffer.input([toc(t), size(obj.images,3)]);
-            
-            T = sum(obj.runtime_buffer.data(:,1));
-            N = sum(obj.runtime_buffer.data(:,2));
-            
-            obj.frame_rate = N./T;
-            
             if ismethod(obj.src, 'next')
                 obj.src.next;
             end
@@ -789,6 +782,13 @@ classdef Acquisition < file.AstroData
             end
             
             drawnow;
+            
+            obj.runtime_buffer.input([toc(t), size(obj.images,3)]);
+            
+            T = sum(obj.runtime_buffer.data(:,1));
+            N = sum(obj.runtime_buffer.data(:,2));
+            
+            obj.frame_rate = N./T;
             
         end
         

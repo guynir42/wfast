@@ -234,7 +234,11 @@ classdef AcqGUI < handle
             end
             
             if obj.owner.brake_bit
-                obj.button_run.String = 'RUN';
+                if obj.owner.batch_index>1
+                    obj.button_run.String = 'CONTINUE';
+                else
+                    obj.button_run.String = 'RUN';
+                end
 %                 obj.button_run.Enable = 'on';
             else
                 obj.button_run.String = 'STOP';

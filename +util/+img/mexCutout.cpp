@@ -20,7 +20,12 @@ void mexFunction( int nlhs, mxArray *plhs[],
     if(nrhs<3){ printf("USAGE: [cutouts, image_subtracted] = mexCutout(image, positions, cut_size, pad_value=0, replace_value=0, debug_bit=0, use_memcpy=1\n"); return; }
 	
 	// check argument 0 
-	if(mxIsNumeric(prhs[0])==0) mexErrMsgIdAndTxt("MATLAB:util:img:mexCutout:inputNotNumeric", "Input 1 to mexCutout is not numeric...");
+	if(mxIsNumeric(prhs[0])==0 && mxIsLogical(prhs[0])==0) mexErrMsgIdAndTxt("MATLAB:util:img:mexCutout:inputNotNumeric", "Input 1 to mexCutout is not numeric nor logical!");
+	if(mxIsEmpty(prhs[0])){ // empty input matrix just returns an empty matrix
+		plhs[0]=mxDuplicateArray(prhs[0]);
+		if(nlhs>1) plhs[1]=mxDuplicateArray(prhs[0]);
+		return; 
+	}
 	if( mxGetN(prhs[0])<2 || mxGetM(prhs[0])<2 || mxGetNumberOfDimensions(prhs[0])>3 ) mexErrMsgIdAndTxt("MATLAB:util:img:mexCutout:inputNotMatrix", "Must input a (2D or 3D) matrix to mexCutout!");
 
 	// check argument 1
@@ -109,6 +114,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	
 	if(mxIsClass(prhs[0], "uint16")){
 		if(isnan(pad_value) || pad_value<0) pad_value=0; // cannot have NaN or negative values in the uint16 matrix
+		if(isnan(replace_value) || replace_value<0) replace_value=0; // cannot have NaN or negative values in the uint16 matrix
 		num_bytes=sizeof(unsigned short int);
 		plhs[0]=mxCreateNumericArray(4, out_dims, mxUINT16_CLASS, mxREAL);
 		unsigned short int pad_value_uint16=(unsigned short int) pad_value;
@@ -133,6 +139,16 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		memcpy(&pad_value_bytes, &pad_value_float, num_bytes); // only copy the first 4 bytes into this array... 		
 		float replace_value_float=(float) replace_value;
 		memcpy(&replace_value_bytes, &replace_value_float, num_bytes); // only copy the first 4 bytes into this array... 
+	}
+	else if(mxIsLogical(prhs[0])){
+		if(isnan(pad_value) || pad_value<0) pad_value=0; // cannot have NaN or negative values in the boolean matrix
+		if(isnan(replace_value) || replace_value<0) replace_value=0; // cannot have NaN or negative values in the boolean matrix
+		num_bytes=sizeof(bool);
+		plhs[0]=mxCreateLogicalArray(4,out_dims);
+		bool pad_value_bool=(bool) pad_value;
+		memcpy(&pad_value_bytes, &pad_value_bool, num_bytes);
+		bool replace_value_bool=(bool) replace_value;
+		memcpy(&replace_value_bytes, &replace_value_bool, num_bytes);
 	}
 	else{
 		mexErrMsgIdAndTxt("MATLAB:util:img:mexCutout:inputTypeNotRecongnized", "Input must be uint16 or double or single...");
@@ -216,9 +232,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 				else for(int i=push_y; i<cut_size_y; i++) memcpy(&src[i*num_bytes], &replace_value_bytes, num_bytes); // for non-zero must go over memory locations one-by-one (copy num_bytes in each location)
 			}
 		}
-		
-		// mxSetData(plhs[1], out_array2);
-		
+				
 	}
 	
 	for(int j=0; j<2; j++) mxFree(pos[j]);
