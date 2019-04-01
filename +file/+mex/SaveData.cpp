@@ -45,12 +45,11 @@ void SaveData::parseVararginPairs(int N, const mxArray *vars[]){
 		
 		// the third parameters tells MyMatrix if we want to deflate it (ignored if we are not using deflate at all)
 		if(cs(keyword, "images")) images.input("images", value, 1); 
-		//else if(cs(keyword, "images_raw")) images_raw.input("images_raw", value, 1);
-		//else if(cs(keyword, "images_cal")) images_cal.input("images_cal", value, 1);
-		//else if(cs(keyword, "cutouts_raw")) cutouts_raw.input("cutouts_raw", value, 1);
-		//else if(cs(keyword, "cutouts_cal")) cutouts_cal.input("cutouts_cal", value, 1);
 		else if(cs(keyword, "cutouts")) cutouts.input("cutouts", value, 1);
 		else if(cs(keyword, "positions")) positions.input("positions", value, 0);
+		else if(cs(keyword, "coordinates")) coordinates.input("coordinates", value, 0);
+		else if(cs(keyword, "magnitudes")) magnitudes.input("magnitudes", value, 0);
+		else if(cs(keyword, "temperatures")) temperatures.input("temperature", value, 0);
 		else if(cs(keyword, "stack")) stack.input("stack", value, 1);
 		else if(cs(keyword, "num_sum")) stack.attributes.push_back(MyAttribute("num_sum", value));
 		else if(cs(keyword, "timestamps")) timestamps.input("timestamps", value, 0);

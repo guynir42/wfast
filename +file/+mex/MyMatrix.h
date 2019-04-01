@@ -30,9 +30,12 @@ public:
 	bool is_empty();
 	bool is_double();
 	bool is_uint16();
+	bool is_float();
 	
 	unsigned short int *matrix_uint16=0;
 	double *matrix_double=0;
+	float *matrix_float=0;
+	
 	
 	char data_name[STRLN];
 	int ndims=0;

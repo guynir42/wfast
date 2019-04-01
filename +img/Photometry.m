@@ -190,7 +190,11 @@ classdef Photometry < handle
             input.input_var('cutouts', [], 'images');
             input.scan_vars(varargin{:});
             
-            obj.cutouts = double(input.cutouts);
+            if isa(input.cutouts, 'single')
+                obj.cutouts = input.cutouts;
+            else
+                obj.cutouts = double(input.cutouts);
+            end
             
             obj.cut_size = size(input.cutouts);
             obj.cut_size = obj.cut_size(1:2);

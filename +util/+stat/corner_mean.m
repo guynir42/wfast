@@ -24,7 +24,9 @@ function M = corner_mean(img, num_pix)
         return;
     end
 
-    img = double(img);
+    if ~isa(img, 'single') % single precision is fine, no need to convert
+        img = double(img);
+    end
 
     if num_pix>=size(img,1)
         num_pix = size(img,1)-1;

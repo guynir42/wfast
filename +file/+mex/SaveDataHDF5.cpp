@@ -17,6 +17,9 @@ void SaveDataHDF5::writeData(){ // write to file all the main data sets (images,
 	writeMatrix(file, images);
 	writeMatrix(file, cutouts);
 	writeMatrix(file, positions);
+	writeMatrix(file, coordinates);
+	writeMatrix(file, magnitudes);
+	writeMatrix(file, temperatures);
 	writeMatrix(file, stack);
 	writeMatrix(file, timestamps);
 	writeMatrix(file, psfs);
@@ -80,6 +83,7 @@ SaveDataHDF5::MyDataspace::MyDataspace(MyMatrix matrix){
 	id=H5Screate_simple(matrix.ndims, matrix.dims_c, NULL); 
 	data_type=H5T_NATIVE_DOUBLE;
 	if(matrix.is_uint16()) data_type=H5T_NATIVE_UINT16;
+	if(matrix.is_float()) data_type=H5T_NATIVE_FLOAT;
 	
 	if(id<0){ 
 		mex_flag[2]=-1; 
@@ -122,6 +126,7 @@ SaveDataHDF5::MyDataset::MyDataset(MyFilePointer &file, const char *location, My
 	
 	int data_type=H5T_NATIVE_DOUBLE; // default data type is double
 	if(matrix.is_uint16()) data_type=H5T_NATIVE_USHORT; 
+	if(matrix.is_float()) data_type=H5T_NATIVE_FLOAT;
 	
 	hid_t plist_id=H5Pcreate(H5P_DATASET_CREATE);
 	
@@ -167,6 +172,15 @@ SaveDataHDF5::MyDataset::MyDataset(MyFilePointer &file, const char *location, My
 		if(status<0){ 
 			mex_flag[2]=-1; 
 			mexErrMsgIdAndTxt( "MATLAB:file:mex:SaveDataHDF5:write_dataset", "Something wrong when writing dataset for %s (uint16)!", matrix.data_name); 
+		}
+	}
+	else if(matrix.is_float()){// write float data
+	
+		status = H5Dwrite(id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, matrix.matrix_float);
+		if(debug_bit>2) mexPrintf("saving %s: file_id= %d | dataspace_id= %d | dataset_id= %d | status= %d\n", matrix.data_name, file.id, dataspace.id, id, status);
+		if(status<0){ 
+			mex_flag[2]=-1; 
+			mexErrMsgIdAndTxt( "MATLAB:file:mex:SaveDataHDF5:write_dataset", "Something wrong when writing dataset for %s (float)!", matrix.data_name); 
 		}
 	}
 	

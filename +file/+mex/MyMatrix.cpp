@@ -14,7 +14,8 @@ void MyMatrix::input(const char *name, const mxArray *matrix, bool deflate){
 	
 	if(mxIsClass(matrix, "uint16")){ matrix_uint16 = (unsigned short int*) mxGetData(matrix); bits=2; }
 	else if(mxIsClass(matrix, "double")){ matrix_double = mxGetPr(matrix); bits=8; }
-	else mexErrMsgIdAndTxt( "MATLAB:file:mex:mexWrite:wrongDataType", "images must be uint16 or double!");
+	else if(mxIsClass(matrix, "single")){ matrix_float = (float*) mxGetData(matrix); bits=4; }
+	else mexErrMsgIdAndTxt( "MATLAB:file:mex:mexWrite:wrongDataType", "images must be uint16, float or double!");
 	
 	// data_name=std::string(name);
 	snprintf(data_name, STRLN, "%s", name);
@@ -27,7 +28,7 @@ void MyMatrix::input(const char *name, const mxArray *matrix, bool deflate){
 	rows=dims[0];
 	cols=dims[1];
 	if(ndims>=3) frames=dims[2];
-	if(ndims>=4) cutouts=dims[3];	
+	if(ndims>=4) cutouts=dims[3];
 	
 	for(int i=0;i<ndims;i++) dims_c[ndims-i-1]=dims[i];
 	
@@ -37,7 +38,7 @@ void MyMatrix::input(const char *name, const mxArray *matrix, bool deflate){
 
 bool MyMatrix::is_empty(){
 	
-	return matrix_uint16==0 && matrix_double==0;
+	return matrix_uint16==0 && matrix_double==0 && matrix_float==0;
 }
 
 bool MyMatrix::is_double(){
@@ -50,6 +51,11 @@ bool MyMatrix::is_uint16(){
 	return matrix_uint16!=0;
 }
 
+bool MyMatrix::is_float(){
+
+	return matrix_float!=0;
+}
+
 void MyMatrix::printout(){
 	
 	if(is_empty()) return;
@@ -57,6 +63,7 @@ void MyMatrix::printout(){
 	for(int i=1; i<ndims; i++) printf("x%ld", dims[i]);
 	if(is_double()) printf(" (double)\n");
 	if(is_uint16()) printf(" (uint16)\n");
+	if(is_float()) printf(" (single)\n");
 	
 	for(int i=0;i<attributes.size();i++) attributes[i].printout();
 	

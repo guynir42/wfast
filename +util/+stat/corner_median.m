@@ -22,7 +22,9 @@ function M = corner_median(img, num_pix)
         return;
     end
 
-    img = double(img);
+    if ~isa(img, 'single') % single precision is fine, no need to convert
+        img = double(img);
+    end
 
     values1 = img(1:num_pix,1:num_pix,:,:);
     values2 = img(1:num_pix,end-num_pix:end,:,:);
