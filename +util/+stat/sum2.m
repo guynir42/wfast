@@ -10,7 +10,11 @@ function S = sum2(I, outtype, nan_flag)
     end
 
     if nargin<2 || isempty(outtype)
-        outtype = 'double';
+        if isa(I, 'single')
+            outtype = 'native';
+        else
+            outtype = 'double';
+        end
     end
     
     if nargin<3 || isempty(nan_flag)

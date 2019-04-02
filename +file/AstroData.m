@@ -9,19 +9,19 @@ classdef AstroData < dynamicprops
         
         % make sure anything you add is added to clear...
         images; % this is raw images and it is usually what we save on file
-%         images_proc; % this is after calibration, subtraction, etc. If no processing is done, put a pointer to the raw data. 
         
         cutouts; % this is raw cutouts and it is usually what we save on file
-%         cutouts_proc; % this is after calibration, subtraction, etc. If no processing is done, put a pointer to the raw data. 
         positions; % only for cutouts. a 2xN matrix (X then Y, N is the number of cutouts). 
+        coordinates; % match each star/cutout position with RA/DEC (in degrees)
+        magnitudes; % each star's magnitude (from catalog)
+        temperature; % each star's temperature in K (from catalog)
+        fluxes; % amount of light (total) in each cutout
         
         cutouts_bg; % samples of the raw images at random locations to calculate the backgrounds
-%         bg_cutouts_proc; % this is after calibration, subtraction, etc. If no processing is done, put a pointer to the raw data. 
         positions_bg; % only for bg_cutouts. a 2xN matrix (X then Y, N is the number of cutouts). 
-%         backgrounds; % value of the average number of photons per pixel (of the background)
+        backgrounds; % value of the average number of photons per pixel (of the background)
         
         stack % sum of the full frame image
-%         stack_proc; % this is after calibration, subtraction, etc. If no processing is done, put a pointer to the raw data. 
         num_sum; % if the images are summed, how many frames were added. If equal to 1, the sum is the same as the images. 
         
         timestamps; % output timestamps (if available)
@@ -32,7 +32,6 @@ classdef AstroData < dynamicprops
         psfs; % output PSFs from file (if available)
         sampling_psf; % if loaded PSFs need to be binned (this is the binning factor)
         
-        fluxes; % amount of light (total) in each cutout. 
         
     end
     

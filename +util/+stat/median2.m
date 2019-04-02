@@ -8,7 +8,7 @@ function M = median2(I)
         return;
     end
 
-    M = zeros(1,1,size(I,3), size(I,4));
+    M = zeros(1,1,size(I,3), size(I,4), 'like', I);
 
     for ii = 1:size(I,3)
         for jj = 1:size(I,4)

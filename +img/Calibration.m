@@ -115,6 +115,7 @@ classdef Calibration < handle
         
         % switches for calibrating images
         use_flat = 1; % when calibrating images, choose if to divide by flat
+        use_single = 1; % output everything in single precision... 
         
         use_noise_removal = 0; % when calibrating images, choose if to use maskBadPixels
         use_subtract_median = 0; % after subtracting dark, subtract residual median of each image
@@ -127,24 +128,22 @@ classdef Calibration < handle
         dark_mask_sigma = 5; % how hot a pixel must be (relative to dark noise) to be considered a "bad pixel"
         dark_mask_var_ratio = 0.99; % what fraction of pixel variance is considered "bad pixels" 
         
-        % switches for making darks/flats
+        % switches for making darks/flats (can we get rid of this??)
         use_calc_gain = 0;
         use_mv_points = 0; % choose if to collect mean and variance data when making flats (used for calculating gain)
         
-        autosave = 1; % once dark or flat is calculated, save it as a .mat file
-        
-        brake_bit = 1; % stop in mid calculation loop
         mode = ''; % keeps track if we are looping (calculating) dark or flat
         
+        % transformations: 
         use_roi = 0;
-        roi_x1 = [];
-        roi_x2 = [];
-        roi_y1 = [];
-        roi_y2 = [];
+        ROI = []; % in pixels, defined as [top, left, height, width]
         
         use_downsample = 0;
         downsampling = 2;
         
+        % switches: 
+        autosave = 1; % once dark or flat is calculated, save it as a .mat file
+        brake_bit = 1; % stop in mid calculation loop
         debug_bit = 1;
         
     end
@@ -162,8 +161,7 @@ classdef Calibration < handle
         flat_var_transformed;
         flat_mean_transformed;
         
-        
-        version = 1.04;
+        version = 1.05;
         
     end
     
@@ -335,21 +333,7 @@ classdef Calibration < handle
             
             if isempty(obj.dark_mean_transformed)
                 
-                obj.dark_mean_transformed = obj.dark_mean;
-                
-                if ~isempty(obj.dark_mean)
-
-                    if obj.use_roi
-                        obj.dark_mean_transformed = obj.dark_mean_transformed(obj.roi_y1:obj.roi_y2,obj.roi_x1:obj.roi_x2);
-                    end
-
-                    if obj.use_downsample
-                        obj.dark_mean_transformed = util.img.downsample(obj.dark_mean_transformed, obj.downsampling);
-                    end
-
-                    % add additional transformations here... 
-
-                end
+                obj.dark_mean_transformed = obj.transform(obj.dark_mean);
                 
             end
             
@@ -361,22 +345,8 @@ classdef Calibration < handle
             
             if isempty(obj.dark_mask_transformed)
                 
-                obj.dark_mask_transformed = obj.dark_mask;
+                obj.dark_mask_transformed = obj.transform(obj.dark_mask);
 
-                if ~isempty(obj.dark_mask)
-
-                    if obj.use_roi
-                        obj.dark_mask_transformed = obj.dark_mask_transformed(obj.roi_y1:obj.roi_y2,obj.roi_x1:obj.roi_x2);
-                    end
-
-                    if obj.use_downsample
-                        obj.dark_mask_transformed = util.img.downsample(obj.dark_mask_transformed, obj.downsampling);
-                    end
-
-                    % add additional transformations here... 
-
-                end
-                
             end
             
             val = obj.dark_mask_transformed;
@@ -387,21 +357,7 @@ classdef Calibration < handle
             
             if isempty(obj.dark_var_transformed)
                 
-                obj.dark_var_transformed = obj.dark_var;
-                
-                if ~isempty(obj.dark_var)
-
-                    if obj.use_roi
-                        obj.dark_var_transformed = obj.dark_var_transformed(obj.roi_y1:obj.roi_y2,obj.roi_x1:obj.roi_x2);
-                    end
-
-                    if obj.use_downsample
-                        obj.dark_var_transformed = util.img.downsample(obj.dark_var_transformed, obj.downsampling);
-                    end
-
-                    % add additional transformations here... 
-
-                end
+                obj.dark_var_transformed = obj.transform(obj.dark_var);
                 
             end
             
@@ -413,22 +369,8 @@ classdef Calibration < handle
             
             if isempty(obj.flat_mean_transformed)
                 
-                obj.flat_mean_transformed = obj.flat_mean;
+                obj.flat_mean_transformed = obj.transform(obj.flat_mean);
 
-                    if ~isempty(obj.flat_mean)
-
-                    if obj.use_roi
-                        obj.flat_mean_transformed = obj.flat_mean_transformed(obj.roi_y1:obj.roi_y2,obj.roi_x1:obj.roi_x2);
-                    end
-
-                    if obj.use_downsample
-                        obj.flat_mean_transformed = util.img.downsample(obj.flat_mean_transformed, obj.downsampling);
-                    end
-
-                    % add additional transformations here... 
-
-                end
-                
             end
             
             val = obj.flat_mean_transformed;
@@ -439,21 +381,7 @@ classdef Calibration < handle
             
             if isempty(obj.flat_var_transformed)
                 
-                obj.flat_var_transformed = obj.flat_var;
-                
-                if ~isempty(obj.flat_var)
-
-                    if obj.use_roi
-                        obj.dark_var_transformed = obj.flat_var_transformed(obj.roi_y1:obj.roi_y2,obj.roi_x1:obj.roi_x2);
-                    end
-
-                    if obj.use_downsample
-                        obj.flat_var_transformed = util.img.downsample(obj.flat_var_transformed, obj.downsampling);
-                    end
-
-                    % add additional transformations here... 
-
-                end
+                obj.flat_var_transformed = obj.transform(obj.flat_var);
                 
             end
             
@@ -465,25 +393,55 @@ classdef Calibration < handle
             
             if isempty(obj.flat_field_transformed)
                 
-                obj.flat_field_transformed = obj.flat_field;
-                
-                if ~isempty(obj.flat_field)
-                
-                    if obj.use_roi
-                        obj.flat_field_transformed = obj.flat_field_transformed(obj.roi_y1:obj.roi_y2,obj.roi_x1:obj.roi_x2);
-                    end
-
-                    if obj.use_downsample
-                        obj.flat_field_transformed = util.img.downsample(obj.flat_field_transformed, obj.downsampling);
-                    end
-
-                    % add additional transformations here... 
-
-                end
+                obj.flat_field_transformed = obj.transform(obj.flat_field);
                 
             end
             
             val = obj.flat_field_transformed;
+            
+        end
+        
+        function M_trans = transform(obj, M)
+            
+            M_trans = M;
+            
+            if isempty(M), return; end
+            
+            if isa(M_trans, 'double') && obj.use_single
+                M_trans = single(M_trans);
+            end
+            
+            if obj.use_roi
+                M_trans = M_trans(obj.roi_y1:obj.roi_y2, obj.roi_x1:obj.roi_x2);
+            end
+            
+            if obj.use_downsample
+                M_trans = util.img.downsample(M_trans, obj.downsampling);
+            end
+            
+        end
+        
+        function val = roi_x1(obj)
+            
+            val = obj.ROI(2);
+            
+        end
+        
+        function val = roi_x2(obj)
+            
+            val = obj.ROI(2)+obj.ROI(4);
+            
+        end
+        
+        function val = roi_y1(obj)
+            
+            val = obj.ROI(1);
+            
+        end
+        
+        function val = roi_y2(obj)
+            
+            val = obj.ROI(1)+obj.ROI(3);
             
         end
         
@@ -594,6 +552,23 @@ classdef Calibration < handle
             
         end
         
+        function set.use_single(obj, val)
+            
+            if val==obj.use_single
+                % pass
+            else
+                obj.use_single = val;
+                
+                obj.dark_mean_transformed = [];
+                obj.dark_var_transformed = [];
+                obj.flat_mean_transformed = [];
+                obj.flat_var_transformed = [];
+                obj.flat_field_transformed = [];
+                
+            end
+            
+        end
+        
         function set.use_roi(obj, val)
             
             if val==obj.use_roi
@@ -610,60 +585,12 @@ classdef Calibration < handle
             
         end
         
-        function set.roi_x1(obj, val)
+        function set.ROI(obj, val)
             
-            if val==obj.roi_x1
+            if isequal(val, obj.ROI)
                 % pass
             else
-                obj.roi_x1 = val;
-                obj.dark_mean_transformed = [];
-                obj.dark_var_transformed = [];
-                obj.dark_mask_transformed = [];
-                obj.flat_mean_transformed = [];
-                obj.flat_var_transformed = [];
-                obj.flat_field_transformed = [];
-            end
-            
-        end
-        
-        function set.roi_x2(obj, val)
-            
-            if val==obj.roi_x2
-                % pass
-            else
-                obj.roi_x2 = val;
-                obj.dark_mean_transformed = [];
-                obj.dark_var_transformed = [];
-                obj.dark_mask_transformed = [];
-                obj.flat_mean_transformed = [];
-                obj.flat_var_transformed = [];
-                obj.flat_field_transformed = [];
-            end
-            
-        end
-        
-        function set.roi_y1(obj, val)
-            
-            if val==obj.roi_y1
-                % pass
-            else
-                obj.roi_y1 = val;
-                obj.dark_mean_transformed = [];
-                obj.dark_var_transformed = [];
-                obj.dark_mask_transformed = [];
-                obj.flat_mean_transformed = [];
-                obj.flat_var_transformed = [];
-                obj.flat_field_transformed = [];
-            end
-            
-        end
-        
-        function set.roi_y2(obj, val)
-            
-            if val==obj.roi_y2
-                % pass
-            else
-                obj.roi_y2 = val;
+                obj.ROI = val;
                 obj.dark_mean_transformed = [];
                 obj.dark_var_transformed = [];
                 obj.dark_mask_transformed = [];
@@ -1046,7 +973,11 @@ classdef Calibration < handle
             input.scan_vars(varargin{:});
             
             assert(~isempty(input.images), 'cannot do calibration without any images!');
-            I = double(input.images); 
+            if obj.use_single
+                I = single(input.images);
+            else
+                I = double(input.images); 
+            end
                     
             if ~isempty(input.clipper) % this means we are working with cutouts
                 
@@ -1188,7 +1119,7 @@ classdef Calibration < handle
             
         end
         
-        function new = makeROIcalibration(obj, ROI_vec, offset) % create a new calibration object, for a smaller region of interest 
+        function new = makeROIcalibration(obj, ROI_vec, offset) % create a new calibration object, for a smaller region of interest (to be depricated when using transformations)
             
             new = img.Calibration(obj);
             

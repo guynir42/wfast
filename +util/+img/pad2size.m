@@ -23,11 +23,11 @@ function M_out = pad2size(M_in, size_needed, pad_value)
     if size_needed(1)>S_in(1) || size_needed(2)>S_in(2)
         
         if pad_value==0
-            M_out = zeros(max(size_needed(1), S_in(1)), max(size_needed(2), S_in(2)), size(M_in,3), size(M_in,4));
+            M_out = zeros(max(size_needed(1), S_in(1)), max(size_needed(2), S_in(2)), size(M_in,3), size(M_in,4), 'like', M_in);
         elseif isnan(pad_value)
-            M_out = nan(max(size_needed(1), S_in(1)), max(size_needed(2), S_in(2)), size(M_in,3), size(M_in,4));
+            M_out = nan(max(size_needed(1), S_in(1)), max(size_needed(2), S_in(2)), size(M_in,3), size(M_in,4), 'like', M_in);
         elseif isnumeric(pad_value)
-            M_out = pad_value.*ones(max(size_needed(1), S_in(1)), max(size_needed(2), S_in(2)), size(M_in,3), size(M_in,4));
+            M_out = pad_value.*ones(max(size_needed(1), S_in(1)), max(size_needed(2), S_in(2)), size(M_in,3), size(M_in,4), 'like', M_in);
         else
             error('"pad_value" must be numeric or NaN!');
         end

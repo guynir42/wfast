@@ -16,10 +16,17 @@ classdef AutoFocus < handle
         pos; % focuser position at each iteration
         widths; % one or multiple measurements per focus position
         weights; % weight of each sampling point (proportional to star flux)
+        weights_reduced; % sum all exposures, not including NaNs and negative values (and NaNs in min_positions)
         xy_pos; % position of sampling points
+        xy_pos_reduced; % positions of good points
+        
+        % need to update these at some point
+        x_max = 2160;
+        y_max = 2560;
         
         fit_results = {};
         min_positions; % minimum of curves for each star
+        min_positions_reduced; % replace NaNs with zeros
         
         surface_coeffs;
         
@@ -78,10 +85,13 @@ classdef AutoFocus < handle
             obj.pos = [];
             obj.widths = [];
             obj.weights = [];
+            obj.weights_reduced = [];
             obj.xy_pos = [];
+            obj.xy_pos_reduced = [];
             
             obj.fit_results = {};
             obj.min_positions = [];
+            obj.min_positions_reduced = [];
             obj.surface_coeffs = [];
             
             obj.found_pos = [];
@@ -108,12 +118,30 @@ classdef AutoFocus < handle
     
     methods % calculations
         
+        function startup(obj, focuser_pos, xy_positions, num_stars)
+            
+            obj.pos = focuser_pos + (-obj.range:obj.step:obj.range);
+            obj.widths = NaN(num_stars, length(obj.pos));
+            obj.weights = NaN(num_stars, length(obj.pos));
+            obj.min_positions = NaN(num_stars,1);
+            obj.xy_pos = xy_positions;
+            
+        end
+        
+        function input(obj, idx, position, widths, fluxes)
+            
+            obj.pos(idx) = position;
+            obj.widths(:,idx) = util.vec.tocolumn(widths);
+            obj.weights(:,idx) = util.vec.tocolumn(fluxes);
+            
+        end
+        
         function calculate(obj)
             
             obj.fitCurves;
-%             obj.fitSurface;
-%             obj.findPosTipTilt;
-            obj.findPosOnly;
+            obj.fitSurface;
+            obj.findPosTipTilt;
+%             obj.findPosOnly;
             
         end
         
@@ -121,25 +149,74 @@ classdef AutoFocus < handle
             
             obj.fit_results = {};
             
-            for ii = 1:size(obj.widths, 2)
+            for ii = 1:size(obj.widths, 2) % number of stars
                 
-                obj.fit_results{ii} = fit(obj.pos, obj.widths(:,ii), 'poly2');
+                x = obj.pos';
+                y = obj.widths(ii,:)';
+                
+                % remove the NaN values
+                x(isnan(y)) = [];
+                y(isnan(y)) = [];
+                
+                if length(y)<5 % not enough points to do the fit
+                    continue;
+                end
+                
+                try % fit failed for some reason
+                    obj.fit_results{ii} = fit(x, y, 'poly2');
+                catch ME
+                    warning(ME.getReport);
+                    continue;
+                end
+                
+                if ~obj.checkFit(x, y, obj.fit_results{ii}) % fit is not good enough, or doesn't have a minimum
+                    continue;
+                end
                 
                 obj.min_positions(ii) = -obj.fit_results{ii}.p2./(2*obj.fit_results{ii}.p1);
                 
             end
             
+            obj.weights_reduced = sum(obj.weights,2);
+            
+            bad_points = isnan(obj.min_positions) | obj.weights_reduced<=0 | isnan(obj.weights_reduced);
+            
+            obj.min_positions_reduced = obj.min_positions(~bad_points);
+            obj.weights_reduced = obj.weights_reduced(~bad_points);
+            obj.weights_reduced = obj.weights_reduced./mean(obj.weights_reduced);
+            obj.xy_pos_reduced = obj.xy_pos(~bad_points,:);
+            
+        end
+        
+        function val = checkFit(obj, x, y, fr)
+            
+            if fr.p1>0 % no minimum
+                val = 0;
+                return;
+            end
+            
+            y_model = feval(fr, x);
+            chi2 = sum((y_model-y).^2); 
+            
+            if chi2>length(x)*2 % what would be a reasonable check on chi2 if the errors are not normalized??
+                val = 0;
+                return;
+            end
+            
+            val = 1;
+            
         end
         
         function fitSurface(obj)
             
-            m = size(obj.xy_pos,1); % number of measurements
-                        
-            B = obj.min_positions; % measured best position for each location
-            w = obj.weights; % flux of each star gives the level of conifidence
+            m = size(obj.xy_pos_reduced,1); % number of measurements
             
-            xy_rot = obj.xy_pos*[cosd(obj.angle), -sind(obj.angle); sind(obj.angle), cosd(obj.angle)]; 
-                        
+            B = obj.min_positions_reduced; % measured best position for each location
+            w = obj.weights_reduced;  % total flux of each position 
+            
+            % rotate to the direction of the actuators... 
+            xy_rot = obj.xy_pos_reduced*[cosd(obj.angle), -sind(obj.angle); sind(obj.angle), cosd(obj.angle)]; 
+            
             A = [ones(m,1) xy_rot(:,1) xy_rot(:,2)]; % design matrix! 
 
             obj.surface_coeffs = lscov(A,B,w); % coeffs are: piston, x (tilt) and y (tip)
@@ -179,19 +256,52 @@ classdef AutoFocus < handle
                 obj.ax = axes('Parent', obj.fig);
             end
             
-            plot(obj.ax, obj.pos, obj.widths);
-            
+            cla(obj.ax);
             hold(obj.ax, 'on');
             
-            for ii = 1:length(obj.fit_results)
+            N = min(size(obj.widths,2), 10); 
+            
+            for ii = 1:N
                 
-                plot(obj.ax, obj.pos, feval(obj.fit_results{ii}, obj.pos));
+                h(ii) = plot(obj.ax, obj.pos, obj.widths(ii,:));
+                
+                if length(obj.fit_results)>=ii
+                    plot(obj.ax, obj.pos, feval(obj.fit_results{ii}, obj.pos), ':', 'Color', h(ii).Color);
+                end
                 
             end
             
             hold(obj.ax, 'off');
             
+            xlabel(obj.ax, 'focuser position (mm)');
+            ylabel(obj.ax, 'width (second moment)');
             
+%             legend(h, {'center', 'upper left', 'lower left', 'upper right', 'lower right'}, 'Parent', obj.fig);
+            
+        end
+        
+        function show(obj, varargin)
+           
+            if isempty(obj.fig) || ~isvalid(obj.fig)
+                obj.fig = figure;
+            end 
+            
+            if isempty(obj.ax) || ~isvalid(obj.ax)
+                obj.ax = axes('Parent', obj.fig);
+            end
+            
+            [X,Y] = meshgrid(1:obj.x_max, 1:obj.y_max);
+            
+            util.plot.show(obj.surface_coeffs(1) + obj.surface_coeffs(2).*Y + obj.surface_coeffs(3).*X);
+            hold(obj.ax, 'on');
+            scatter(obj.xy_pos_reduced(:,1), obj.xy_pos_reduced(:,2), obj.weights_reduced*10, obj.min_positions_reduced, 'filled'); 
+%             axis(obj.ax, 'image');
+%             colorbar(obj.ax); 
+%             obj.ax.XLim = [1,obj.x_max];
+%             obj.ax.YLim = [1,obj.y_max];
+            
+            hold(obj.ax, 'off');
+
         end
         
     end

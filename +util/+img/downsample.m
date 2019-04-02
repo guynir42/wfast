@@ -33,13 +33,14 @@ function I_out = downsample(I, binning, normalization, memory_limit)
     end
     
     binning = round(binning);
-    k = ones(binning);
+    k = ones(binning, 'like', I);
+    
     if util.text.cs(normalization, 'mean')    
         k = k./sum(k(:));
     end
     
     % conv_f will choose if to use FFT convolution, also might loop through 3D matrix 
-    I_conv = util.fft.conv_f(k, I, 'mem_limit', memory_limit); 
+    I_conv = util.img.conv_f(k, I, 'mem_limit', memory_limit); 
     
     index = mod(size(I),binning)+1; % starting index for sampling...
     I_out = I_conv(index(1):binning:end-binning, index(2):binning:end-binning, :);

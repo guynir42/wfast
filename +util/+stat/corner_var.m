@@ -4,7 +4,9 @@ function S = corner_var(img, num_pix)
 % the number of pixels by default is 15% of the size of image. 
 % handles 3D and 4D matrices.
 
-    img = double(img);
+    if ~isa(img, 'single') % single precision is fine, no need to convert
+        img = double(img);
+    end
 
     if nargin==0
         help('util.stat.corner_var');

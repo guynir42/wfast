@@ -50,7 +50,7 @@ classdef Clipper < handle
         
         use_adjust = 1;
         use_lock_adjust = 1; % force adjustment of all cutouts together (e.g., telescope drift)
-        use_mex = 0; % use util.img.mexCutout (this is about x10 faster)
+        use_mex = 1; % use util.img.mexCutout (this is about x10 faster)
         use_moments = 1;
         pad_value = 0; % when clipping outside the edges of the frame...
         use_padding_warning = 0;
@@ -993,6 +993,10 @@ classdef Clipper < handle
             import util.text.cs;
             import util.text.parse_bool;
             
+            if isempty(obj.positions)
+                return;
+            end
+            
             ax = [];
             flip = [];
             num = [];
@@ -1023,7 +1027,7 @@ classdef Clipper < handle
             h = findobj(ax, 'Type', 'Image');
             S = size(h.CData);
             
-            C = obj.positions;
+            C = double(obj.positions);
             if flip
                 C = fliplr(S) - C;
             end

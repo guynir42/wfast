@@ -1,6 +1,5 @@
 *.asv
 ARCHIVE/
-scripts/
 test.*
 obj.*
 normal_code.m

@@ -119,6 +119,8 @@ classdef Acquisition < file.AstroData
 %         focus_curve_range = 0.2;
 %         focus_curve_step = 0.01;
         
+        saturation_value = 50000;
+        
         debug_bit = 1;
         
     end
@@ -196,7 +198,7 @@ classdef Acquisition < file.AstroData
                 obj.audio = util.sys.AudioControl;
                 
                 obj.src = obj.reader;
-                obj.latest_input = makeInputVars;
+                obj.latest_input = obj.makeInputVars;
                 
             end
             
@@ -387,6 +389,7 @@ classdef Acquisition < file.AstroData
             
             input = util.text.InputVars;
             input.input_var('run_name', 'test_run', 'name');
+            input.input_var('reset', 0, 'use_reset'); 
             input.input_var('expT', [], 'T', 'exposure time');
             input.input_var('num_batches', [], 'Nbatches');
             input.input_var('use_cutouts', 1);
@@ -554,18 +557,6 @@ classdef Acquisition < file.AstroData
     
     methods % commands/calculations
         
-        function new_run(obj, varargin)
-            
-            input = obj.makeInputVars(varargin);
-            
-            obj.parseInput(input);
-            
-            obj.reset;
-            
-            obj.lightcurves.startup(input.num_batches.*input.batch_size, input.num_stars);
-            
-        end
-        
         function run(obj, varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'util.text.InputVars')
@@ -577,7 +568,13 @@ classdef Acquisition < file.AstroData
             
             obj.latest_input = input;
             
-            if obj.debug_bit>1, disp(['Starting run "' input.run_name '" for ' num2str(input.num_batches) ' batches.']); end
+            if input.reset
+                
+                obj.reset;
+                
+                if obj.debug_bit>1, disp(['Starting run "' input.run_name '" for ' num2str(input.num_batches) ' batches.']); end
+            
+            end
             
             cleanup = onCleanup(@() obj.finishup(input));
             obj.startup(input);
@@ -654,6 +651,10 @@ classdef Acquisition < file.AstroData
             
             obj.src.startup(input.num_batches);
             
+            if input.reset
+                obj.lightcurves.startup(input.num_batches.*input.batch_size, input.num_stars);
+            end
+            
             obj.prog.start(input.num_batches);
             
         end
@@ -693,10 +694,10 @@ classdef Acquisition < file.AstroData
                 return;
             end
             
+            t = tic;
+            
             obj.prev_stack = obj.stack_sub; % keep one stack from last batch
             obj.clear;
-            
-            t = tic;
             
             obj.src.batch; % produce the data (from camera, file, or simulator)
             
@@ -763,13 +764,6 @@ classdef Acquisition < file.AstroData
                 obj.sensor_temp = obj.src.getTemperature;
             end
             
-            obj.runtime_buffer.input([toc(t), size(obj.images,3)]);
-            
-            T = sum(obj.runtime_buffer.data(:,1));
-            N = sum(obj.runtime_buffer.data(:,2));
-            
-            obj.frame_rate = N./T;
-            
             if ismethod(obj.src, 'next')
                 obj.src.next;
             end
@@ -789,6 +783,13 @@ classdef Acquisition < file.AstroData
             end
             
             drawnow;
+            
+            obj.runtime_buffer.input([toc(t), size(obj.images,3)]);
+            
+            T = sum(obj.runtime_buffer.data(:,1));
+            N = sum(obj.runtime_buffer.data(:,2));
+            
+            obj.frame_rate = N./T;
             
         end
         
@@ -1076,7 +1077,8 @@ classdef Acquisition < file.AstroData
                 input = varargin{1};
                 input.scan_vars(varargin{2:end});
             else
-                input = obj.makeInputVars('batch_size', 1, 'expT', 3, 'num_stars', 5, 'cut_size', 20, 'use audio', 0, varargin{:});
+                input = obj.makeInputVars('reset', 1, 'batch_size', 100, 'expT', 0.025, ...
+                    'num_stars', 25, 'cut_size', 20, 'use audio', 0, 'use_save', 0, varargin{:});
             end
             
             if isempty(obj.cam) || isempty(obj.cam.focuser)
@@ -1087,70 +1089,61 @@ classdef Acquisition < file.AstroData
             obj.single(input);
             obj.findStarsFocus(input);
             
-            obj.af.pos = obj.cam.focuser.pos + (-obj.af.range:obj.af.step:obj.af.range)';
-            obj.af.widths = NaN(length(obj.af.pos), input.num_stars);
-            obj.af.weights = NaN(length(obj.af.pos), input.num_stars);
-            obj.af.xy_pos = obj.clip.positions;
+            obj.af.startup(obj.cam.focuser.pos, obj.clip.positions, input.num_stars);
             
             input.num_batches = length(obj.af.pos);
             
-            obj.cam.focuser.pos = obj.af.pos(1);
-            pause(0.1);
+            old_pos = obj.cam.focuser.pos; % keep this in case of error/failure
             
-            obj.startup(input);
-            cleanup = onCleanup(@() obj.finishup(input));
-                        
-            for ii = 1:input.num_batches
+            try
+            
+                obj.cam.focuser.pos = obj.af.pos(1);
+                pause(0.1);
 
-                if obj.brake_bit
-                    return;
+                obj.startup(input);
+                cleanup = onCleanup(@() obj.finishup(input));
+
+                for ii = 1:input.num_batches
+
+                    if obj.brake_bit
+                        return;
+                    end
+
+                    try 
+                        obj.cam.focuser.pos = obj.af.pos(ii);
+                    catch ME
+                        warning(ME.getReport);
+                    end
+
+                    obj.batch(input);
+                    
+                    obj.af.input(ii, obj.cam.focuser.pos, obj.photo_stack.widths, obj.photo_stack.fluxes);
+                    
+                    obj.af.plot;
+
+                    drawnow;
+
                 end
-                
-                try 
-                    obj.cam.focuser.pos = obj.af.pos(ii);
-                catch ME
-                    warning(ME.getReport);
-                end
-                
-                obj.batch(input);
-                
-                %%% calculate the widths/fluxes somehow
-                
-%                 s = SIM;
-%                 s.Im = obj.stack;
-%                 s = s.mextractor;
-%                 [~,H] = s.curve_growth_psf;
-%                 W = H.*2;
-                
-                obj.af.pos(ii) = obj.cam.focuser.pos;
-                obj.af.widths(ii,:) = obj.photo.widths;
-                obj.af.weights(ii,:) = obj.photo.fluxes;
-                
-                obj.af.plot;
-                
-                drawnow;
-                                
+            
+                obj.af.calculate;
+            
+                fprintf('FOCUSER RESULTS: pos= %f | tip= %f | tilt= %f\n', obj.af.found_pos, obj.af.found_tip, obj.af.found_tilt);
+            
+            catch ME
+                disp(['Focus has failed, returning focuser to previous position= ' num2str(old_pos)]); 
+                obj.cam.focuser.pos = old_pos; 
+                obj.clip.reset; % don't save these star positions! 
+                rethrow(ME);
             end
-            
-            obj.af.calculate;
-            
-%             fr = fit(obj.focus_curve_pos, obj.focus_curve_width, 'poly2')
-%             best_pos = -fr.p2./2./fr.p1
-%             
-%             if best_pos<obj.focus_curve_pos(1) || best_pos>obj.focus_curve_pos(2)
-%                 error('focus best pos is out of range');
-%             end
-            
-            fprintf('FOCUSER RESULTS: pos= %f | tip= %f | tilt= %f\n', obj.af.found_pos, obj.af.found_tip, obj.af.found_tilt);
-            
+                
             obj.cam.focuser.pos = obj.af.found_pos;
             
             if isprop(obj.cam.focuser, 'tip') && ~isempty(obj.af.found_tip)
-                obj.cam.focuser.tip = obj.af.found_tip;
+                obj.cam.focuser.tip = obj.cam.focuser.tip + obj.af.found_tip;
             end
             
             if isprop(obj.cam.focuser, 'tilt') && ~isempty(obj.af.found_tilt)
-                obj.cam.focuser.tilt = obj.af.found_tilt;
+                obj.cam.focuser.tilt = obj.cam.focuser.tilt + obj.af.found_tilt;
             end
             
             obj.af.plot;
@@ -1189,15 +1182,25 @@ classdef Acquisition < file.AstroData
             
             for ii = 1:input.num_stars
                 
-                [~,idx] = util.stat.max2(I.*mask{mod(ii-1,5)+1}); % find the maximum in each masked area
+                for jj = 1:100
                 
-                pos(ii,:) = flip(idx); % x then y!
+                    [mx,idx] = util.stat.max2(I.*mask{mod(ii-1,5)+1}); % find the maximum in each masked area
+                    I(idx(1)-floor(C/2):idx(1)+floor(C/2)+1, idx(2)-floor(C/2):idx(2)+floor(C/2)+1) = NaN; % remove found stars
                 
-                I(idx(1)-floor(C/2):idx(1)+floor(C/2)+1, idx(2)-floor(C/2):idx(2)+floor(C/2)+1) = NaN; % remove found stars
+                    if mx<obj.saturation_value % found a good star
+                        pos(ii,:) = flip(idx); % x then y!
+                        break; % pick this star and keep going
+                    else % continue to look for stars in this quadrant
+                        if obj.debug_bit, disp(['Star is saturated max= ' num2str(mx)]); end
+                    end
+                    
+                end
+                
                 
             end
             
             obj.clip.positions = pos;
+            obj.positions = pos;
             
             if obj.gui.check
                 obj.show;
