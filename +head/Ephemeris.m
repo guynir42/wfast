@@ -379,13 +379,25 @@ classdef Ephemeris < handle
                 degrees = degrees(:,1);
             end
             
+            if minutes<0 || seconds<0
+                error('Why did we get negative minutes/seconds??');
+            end
+            
+            s = sign(degrees);
+            degrees = abs(degrees);
             total_secs = degrees*3600 + minutes*60 + seconds;
             
-            degrees   = floor(total_secs/3600);
-            minutes = floor(mod(total_secs,3600)/60);
+            degrees = fix(total_secs/3600);
+            minutes = fix(mod(total_secs,3600)/60);
             seconds = mod(total_secs,60);
             
-            str = sprintf('%-02d %02d %04.1f', degrees, minutes, seconds);
+            if s>0
+                sign_str = '+';
+            else
+                sign_str = '-';
+            end
+                
+            str = sprintf('%s%02d %02d %04.1f', sign_str, degrees, minutes, seconds);
             
         end
         
@@ -393,7 +405,7 @@ classdef Ephemeris < handle
             
             degrees = radians*360/(2*pi);
             
-            str = num2ra(degrees);
+            str = head.Ephemeris.num2dec(degrees);
             
         end
         

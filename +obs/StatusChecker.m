@@ -271,6 +271,14 @@ classdef StatusChecker < handle
             
         end
         
+        function start_timers(obj)
+            
+            obj.setup_t3;
+            obj.setup_t2;
+            obj.setup_t1;
+            
+        end
+        
         function callback_t1(obj, ~, ~)
             
             for ii = 1:length(obj.devices)

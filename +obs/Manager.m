@@ -56,7 +56,7 @@ classdef Manager < handle
                 
                 obj.log = util.sys.Logger('Top_level_manager'); % keep track of commands given and errors received... 
                 
-%                 obj.connect; % connect to all hardware
+                obj.connect; % connect to all hardware
                 
                 obj.checker = obs.StatusChecker(obj); % has timers that check weather/hardware status
                 
