@@ -8,6 +8,8 @@ classdef ASA < handle
         
         hndl;
         
+        target@head.Ephemeris;
+        
     end
     
     properties % inputs/outputs
@@ -20,31 +22,32 @@ classdef ASA < handle
         
         debug_bit = 1;
         
-        RA_target; % in degrees        
-        DE_target; % in degrees
-        
     end
     
     properties(Dependent=true)
         
+        RA_target; % in degrees        
+        DE_target; % in degrees
+        
         RA_target_str;
         DE_target_str;
-        
-        RA_str;
-        DE_str;
-        LST_str;
-        
-        RA;
-        DE;
-        LST;
-        HA;
-        
-        ALT;
-        AZ;
         
         HA_target;
         ALT_target;
         AZ_target;
+        
+        RA;
+        DE;        
+        
+        RA_str;
+        DE_str;
+        
+        HA;
+        ALT;
+        AZ;
+        
+        LST;
+        LST_str;
         
         % can we get motor status from hndl??
         tracking;
@@ -53,7 +56,7 @@ classdef ASA < handle
     
     properties(Hidden=true)
        
-        version = 1.00;
+        version = 1.01;
         
     end
     
@@ -69,15 +72,23 @@ classdef ASA < handle
             
             end
             
+            obj.target = head.Ephemeris;
+            
             obj.connect;
+            
+            obj.update;
             
         end
         
         function connect(obj)
             
             try 
+                
                 obj.hndl = actxserver('AstrooptikServer.Telescope');
             
+                obj.hndl.SiteLatitude = obj.target.latitude;
+                obj.hndl.SiteLongitude = obj.target.longitude;
+                
                 obj.hndl.Connected = 1;
             
                 obj.hndl.MotorOn;
@@ -97,19 +108,55 @@ classdef ASA < handle
     
     methods % reset/clear
         
+        function reset(obj)
+            
+            obj.target.reset;
+            
+        end
+        
     end
     
     methods % getters
         
+        function val = get.RA_target(obj)
+            
+            val = rad2deg(obj.target.RA_rad);
+            
+        end
+        
+        function val = get.DE_target(obj)
+            
+            val = rad2deg(obj.target.DE_rad);
+            
+        end
+        
         function val = get.RA_target_str(obj)
             
-            val = head.Ephemeris.rad2ra(deg2rad(obj.RA_target));
+            val = obj.target.RA; 
             
         end
         
         function val = get.DE_target_str(obj)
             
-            val = head.Ephemeris.rad2dec(deg2rad(obj.DE_target));
+            val = obj.target.DE;
+            
+        end
+        
+        function val = get.HA_target(obj)
+            
+            val = obj.target.HA;
+            
+        end
+        
+        function val = get.ALT_target(obj)
+            
+            val = obj.target.ALT;
+            
+        end
+        
+        function val = get.AZ_target(obj)
+            
+            val = obj.target.AZ;
             
         end
         
@@ -119,15 +166,15 @@ classdef ASA < handle
             
         end
         
-        function val = get.RA_str(obj)
-            
-            val = head.Ephemeris.rad2ra(deg2rad(obj.RA));
-            
-        end
-        
         function val = get.DE(obj)
             
             val = obj.hndl.Declination;
+            
+        end
+        
+        function val = get.RA_str(obj)
+            
+            val = head.Ephemeris.rad2ra(deg2rad(obj.RA));
             
         end
         
@@ -149,15 +196,15 @@ classdef ASA < handle
             
         end
         
-        function val = get.LST(obj)
-            
-            val = obj.hndl.SiderealTime/24*360; % in degrees...
-            
-        end
-        
         function val = get.HA(obj)
             
             val = obj.LST - obj.RA;
+            
+        end
+        
+        function val = get.LST(obj)
+            
+            val = obj.hndl.SiderealTime/24*360; % in degrees...
             
         end
         
@@ -167,32 +214,18 @@ classdef ASA < handle
             
         end
         
-        function val = get.HA_target(obj)
-            
-            val = obj.LST - obj.RA_target;
-            
-        end
-        
-        function val = get.ALT_target(obj)
-            
-            
-            
-        end
-        
-        function val = get.AZ_target(obj)
-            
-        end
-        
         function val = latitutde(obj)
             
-            val = obj.hndl.SiteLatitude;
+%             val = obj.hndl.SiteLatitude;
+            val = obj.target.latitude;
             
         end
         
         function val = longitude(obj)
            
-            val = obj.hndl.SiteLongitude;
-            
+%             val = obj.hndl.SiteLongitude;
+            val = obj.target.longitude;
+
         end
         
     end
@@ -232,6 +265,12 @@ classdef ASA < handle
         function goto(obj, varargin)
             
             
+            
+        end
+        
+        function update(obj)
+            
+            obj.target.update;
             
         end
         

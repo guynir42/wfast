@@ -2,7 +2,7 @@ classdef Ephemeris < handle
 
     properties % objects
         
-        pars@head.Parameters;        
+%         pars@head.Parameters;        
         time@datetime;
         
     end
@@ -62,13 +62,13 @@ classdef Ephemeris < handle
             else
                 if obj.debug_bit, fprintf('Ephemeris constructor v%4.2f\n', obj.version); end
                 
-                time = datetime('now', 'TimeZone', 'utc');
+                obj.update;
                 
                 for ii = 1:length(varargin)
                     
-                    if isa(varargin{ii}, 'head.Parameters')
-                        obj.pars = varargin{ii};
-                    elseif isa(varargin{ii}, 'datetime')
+%                     if isa(varargin{ii}, 'head.Parameters')
+%                         obj.pars = varargin{ii};
+                    if isa(varargin{ii}, 'datetime')
                         obj.time = varargin{ii};
                     end
                     
@@ -204,6 +204,46 @@ classdef Ephemeris < handle
     end
     
     methods % calculations
+        
+        function input(obj, RA,DE,time)
+            
+            if nargin<3
+                disp('Usage: input(RA,DE,time)');
+            end
+            
+            if ischar(RA)
+                obj.RA = RA;
+            elseif isnumeric(RA)
+                obj.RA_rad = RA;
+            end
+            
+            if ischar(DE)
+                obj.DE = DE;
+            elseif isnumeric(DE)
+                obj.DE_rad = DE;
+            end
+            
+            if nargin>3 && ~isempty(time)
+                
+                if isa(time, 'datetime')
+                    obj.time = time;
+                elseif ischar(time) && util.text.cs(time, 'now', 'update')
+                    obj.update;
+                elseif ischar(time)
+                    obj.time = util.text.str2time(time);
+                elseif isnumeric(time) % juldate??
+                    obj.time = datetime(time, 'ConvertFrom', 'juliandate', 'TimeZone', 'UTC');
+                end
+                
+            end
+            
+        end
+        
+        function update(obj)
+            
+            obj.time = datetime('now', 'timezone', 'UTC');
+            
+        end
         
     end
     
