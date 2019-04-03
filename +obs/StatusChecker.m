@@ -281,17 +281,7 @@ classdef StatusChecker < handle
         
         function callback_t1(obj, ~, ~)
             
-            for ii = 1:length(obj.devices)
-                if ismethod(obj.devices{ii}, 'update')
-                    obj.devices{ii}.update;
-                end
-            end
-            
-            for ii = 1:length(obj.sensors)
-                if ismethod(obj.sensors{ii}, 'update')
-                    obj.sensors{ii}.update;
-                end
-            end
+            obj.update;
             
         end
         
@@ -910,6 +900,28 @@ classdef StatusChecker < handle
                 obj.status = 0;
                 obj.report = ['Humidity too high! ' obj.humid_str];
                 return;
+            end
+            
+        end
+        
+    end
+    
+    methods % other utilities
+        
+        function update(obj)
+            
+            % add updates of this object here...
+            
+            for ii = 1:length(obj.devices)
+                if ismethod(obj.devices{ii}, 'update')
+                    obj.devices{ii}.update;
+                end
+            end
+            
+            for ii = 1:length(obj.sensors)
+                if ismethod(obj.sensors{ii}, 'update')
+                    obj.sensors{ii}.update;
+                end
             end
             
         end
