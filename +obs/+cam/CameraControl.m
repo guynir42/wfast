@@ -62,7 +62,7 @@ classdef CameraControl < file.AstroData
         left; % ROI left corner
         top; % ROI top corner
         
-        frame_rate = 30; % frame rate (Hz)
+        frame_rate = 28; % frame rate (Hz)
         expT = 0.025; % exposure time (seconds)
         
         preview_time = 1; % seconds (used when calling preview action)
@@ -1444,6 +1444,7 @@ classdef CameraControl < file.AstroData
             obj.pars.ephem.time = util.text.str2time(buf.t_start);
             obj.end_times(obj.batch_counter) = toc(obj.start_time);
             obj.mean_frame_rate = obj.getMeanFrameRate;
+            obj.pars.frame_rate_measured = obj.getMeanFrameRate;
             obj.num_frames_in_last_batch = size(I,3);
             
             % check for clipping 

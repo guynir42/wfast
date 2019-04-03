@@ -38,6 +38,8 @@ classdef Acquisition < file.AstroData
         
         runtime_buffer@util.vec.CircularBuffer;
         
+        deflator@file.Deflator;
+        
     end
     
     properties % inputs/outputs
@@ -69,8 +71,6 @@ classdef Acquisition < file.AstroData
     end
     
     properties % switches/controls
-        
-        run_name = 'run1';
         
         expT = 0.025;
         
@@ -127,7 +127,7 @@ classdef Acquisition < file.AstroData
     
     properties(Dependent=true)
         
-        
+        run_name;
         buf_full; % camera's buffers are used for full-frame dump on triggers
         
     end
@@ -199,6 +199,8 @@ classdef Acquisition < file.AstroData
                 
                 obj.src = obj.reader;
                 obj.latest_input = obj.makeInputVars;
+                
+                obj.deflator = file.Deflator;
                 
             end
             
@@ -292,7 +294,14 @@ classdef Acquisition < file.AstroData
 %             end
 %             
 %         end
-%         
+%       
+
+        function val = get.run_name(obj)
+            
+            val = obj.pars.target_name;
+            
+        end
+        
         function val = get.buf_full(obj)
             
             if isempty(obj.cam)
@@ -320,6 +329,12 @@ classdef Acquisition < file.AstroData
                 end
                 
             end
+            
+        end
+        
+        function set.run_name(obj, val)
+            
+            obj.pars.target_name = val;
             
         end
         
@@ -601,7 +616,7 @@ classdef Acquisition < file.AstroData
         
         function update(obj) % do we need this??
             
-            
+            obj.pars.update;
             
         end
         
@@ -621,7 +636,7 @@ classdef Acquisition < file.AstroData
             
             if input.use_save
                 filename = obj.buf.getReadmeFilename;
-                util.oop.save(obj, filename, 'name', 'camera'); 
+                util.oop.save(obj, filename, 'name', 'acquisition'); 
             end
             
             if input.use_audio
@@ -668,6 +683,11 @@ classdef Acquisition < file.AstroData
             obj.prog.finish;
             
             obj.src.finishup;
+            
+            if obj.use_save
+                filename = obj.buf.getReadmeFilename('Z');
+                util.oop.save(obj, filename, 'name', 'acquisition'); 
+            end
             
             if obj.debug_bit, disp(['Finished run "' input.run_name '" with ' num2str(obj.batch_counter) ' batches.']); end
             
