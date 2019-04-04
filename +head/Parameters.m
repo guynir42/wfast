@@ -13,7 +13,7 @@ classdef Parameters < dynamicprops
         
         filter; % must be a head.Filter (enforced in the setter...)
         ephem@head.Ephemeris;
-        run_start_datetime@datetime;
+        run_start_datetime;
         stars@head.Star;
         
     end
@@ -26,8 +26,9 @@ classdef Parameters < dynamicprops
         f_number = 1.8947; 
                      
         % needs to be updated from camera/simulation or read from file
-        frame_rate = 30;
-        expT = 0.025;
+        expT;
+        frame_rate;
+        frame_rate_measured;
         
 %         clockFreq;
 %         shutter;
@@ -184,14 +185,20 @@ classdef Parameters < dynamicprops
     methods % reset methods
        
         function reset(obj)
+            
+            
+            
+        end
+        
+        function initialize(obj)
 
-            obj.resetTarget;
-            obj.resetInstrument;
-            obj.resetStars;
+            obj.initializeTarget;
+            obj.initializeInstrument;
+            obj.initializeStars;
                         
         end
         
-        function resetTarget(obj)
+        function initializeTarget(obj)
             
             obj.RA = '';
             obj.DE = '';
@@ -208,7 +215,7 @@ classdef Parameters < dynamicprops
             
         end
         
-        function resetInstrument(obj)
+        function initializeInstrument(obj)
             
             obj.aperture = obj.default_aperture;
             obj.f_number = obj.default_f_number;
@@ -216,7 +223,7 @@ classdef Parameters < dynamicprops
             
         end        
         
-        function resetStars(obj)
+        function initializeStars(obj)
            
             obj.stars = head.Star.empty;
             
@@ -780,7 +787,8 @@ classdef Parameters < dynamicprops
         
         function update(obj, varargin)
            
-            obj.run_start_datetime = datetime('now', 'timezone', 'utc');
+            obj.ephem.update;
+            obj.run_start_datetime = obj.ephem.time;
             
         end
         

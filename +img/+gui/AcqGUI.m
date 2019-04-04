@@ -149,7 +149,8 @@ classdef AcqGUI < handle
             obj.panel_objects.addButton('button_calibration', 'cal', 'push', 'Calibration GUI');
             obj.panel_objects.addButton('button_background', 'back', 'push', 'Background GUI');
             obj.panel_objects.addButton('button_clipper', 'clip', 'push', 'Clipper GUI');
-            obj.panel_objects.addButton('button_clipper_bg', 'clip_bg', 'push', 'Clipper BG GUI');            
+            obj.panel_objects.addButton('button_clipper_bg', 'clip_bg', 'push', 'Clipper BG GUI');
+            obj.panel_objects.addButton('button_deflator', 'deflator', 'push', 'Deflator GUI');
             obj.panel_objects.make;
             
             %%%%%%%%%%% panel save %%%%%%%%%%%%%%%%%%%

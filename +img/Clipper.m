@@ -993,6 +993,10 @@ classdef Clipper < handle
             import util.text.cs;
             import util.text.parse_bool;
             
+            if isempty(obj.positions)
+                return;
+            end
+            
             ax = [];
             flip = [];
             num = [];
@@ -1023,7 +1027,7 @@ classdef Clipper < handle
             h = findobj(ax, 'Type', 'Image');
             S = size(h.CData);
             
-            C = obj.positions;
+            C = double(obj.positions);
             if flip
                 C = fliplr(S) - C;
             end

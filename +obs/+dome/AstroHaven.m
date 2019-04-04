@@ -33,7 +33,7 @@ classdef AstroHaven < handle
         
         reply = '';
         
-        debug_bit = 1;
+        debug_bit = 2;
         
     end
     
@@ -50,6 +50,7 @@ classdef AstroHaven < handle
     properties (Hidden = true)
         
         counter = 0;
+        reconnect_counter = 0;
         
         acc_name = 'HC-06';
         acc_id1 = '';
@@ -422,6 +423,11 @@ classdef AstroHaven < handle
         
         function connect(obj)
             
+            if obj.reconnect_counter>=10
+                disp(['Cannot connect to dome, giving up after ' num2str(obj.reconnect_counter) ' tries']);
+                return;
+            end
+            
             if obj.debug_bit>1, disp('connecting to dome!'); end
             
             obj.log.input('Connecting to dome via serial port');
@@ -529,7 +535,7 @@ classdef AstroHaven < handle
 
         function send(obj, command)
             
-            if obj.debug_bit>1, disp(['seding command ' command]); end
+            if obj.debug_bit>1, disp(['sending command ' command]); end
             
             for ii = 1:3
                 
@@ -594,7 +600,11 @@ classdef AstroHaven < handle
             if num==0
                 if obj.debug_bit>1, disp('Couldnt read reply from serial port... reconnecting'); end
                 warning('off', 'MATLAB:serial:fread:unsuccessfulRead');
+                obj.reconnect_counter = obj.reconnect_counter + 1;
                 obj.connect;
+                
+            else
+                obj.reconnect_counter = 0;
             end
             
             if strcmp(obj.reply, '0') % reset all time estimates when closed
