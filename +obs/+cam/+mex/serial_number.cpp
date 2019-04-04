@@ -47,30 +47,9 @@ void mexFunction( int nlhs, mxArray *plhs[],
       AT_Close(Hndl);
     }
     AT_FinaliseLibrary();
+	
+	cout << "Disconnected from camera!" << endl << endl;
+	
   }
 
 }
-
-void func(){
-	
-	int rc=0; // return code! 
-	
-	long int *output = (long int *) mxCalloc(1, sizeof(long int));
-	output[0] = AT_HANDLE_SYSTEM;
-	
-	rc = AT_InitialiseLibrary();
-	if(rc) mexErrMsgIdAndTxt( "MATLAB:obs:cam:initialize:initialize_library", "Got error code %d when calling AT_InitializeLibrary!", rc);
-	
-	AT_64 num_devices=0;
-	rc=AT_GetInt(AT_HANDLE_SYSTEM, L"DeviceCount", &num_devices);
-	if(rc) mexErrMsgIdAndTxt( "MATLAB:obs:cam:initialize:device_count", "Got error code %d when getting DeviceCount!", rc);
-	if(num_devices<=0) mexErrMsgIdAndTxt( "MATLAB:obs:cam:initialize:num_devices", "Found %d devices...", num_devices);
-	
-	
-	
-	
-	mwSize dims[2] = {1,1};
-	//plhs[0]=mxCreateNumericArray(1,dims, mxUINT64_CLASS, mxREAL);
-	//mxSetData(plhs[0], output);
-	
-	}
