@@ -348,6 +348,10 @@ classdef Deflator < file.AstroData
 %                 'timestamps', obj.timestamps, 't_end_stamp', obj.t_end_stamp, 't_end', obj.t_end,...
 %                 'psfs', obj.psfs, 'psf_sampling', obj.psf_sampling, 'lightcurves', obj.lightcurves);
             
+            if obj.buffers.use_deflate && strcmpi(ext, '.h5')
+                ext = [ext 'z'];
+            end
+
             obj.buffers.input(obj);
 
             obj.buffers.directory = obj.out_subdir.pwd; % do we need this??
