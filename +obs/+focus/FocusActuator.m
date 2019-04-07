@@ -61,6 +61,7 @@ classdef FocusActuator < handle
         
         function delete(obj)
            
+            if obj.debug_bit, disp(['disconnecting from actuator ' obj.controller_serial]); end
             obj.hndl.CloseConnection;
             obj.hndl.Destroy;
             

@@ -363,6 +363,10 @@ classdef Parameters < dynamicprops
             else 
                 name = obj.target_name;
             end
+            
+            if isempty(name) || ~ischar(name)
+                error('Parameters.folder_name is not a string!');
+            end
 
         end
         
@@ -595,7 +599,7 @@ classdef Parameters < dynamicprops
         function set.ephem(obj, val)
             
             obj.ephem = val;
-            obj.ephem.pars = obj;
+%             obj.ephem.pars = obj;
             
         end
         

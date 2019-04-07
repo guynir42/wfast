@@ -97,7 +97,8 @@ classdef Lightcurves < handle
         
         function val = get.fluxes_cal(obj)
             
-            val = obj.fluxes_cal_full(1:obj.frame_index,:);
+            val = []; % need to fix this! 
+%             val = obj.fluxes_cal_full(1:obj.frame_index,:);
             
         end
         
