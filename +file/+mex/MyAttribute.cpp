@@ -84,6 +84,7 @@ void MyAttribute::printout(){
 	
 	if(is_empty()) return;
 	printf("%s: ", att_name);
+	if(is_empty()) printf("[]");
 	if(is_scalar) printf("%f", scalar);
 	if(is_vec) for(int i=0; i<vec.size(); i++) printf(" %f", vec[i]);
 	if(is_str) printf("%s", str.c_str());

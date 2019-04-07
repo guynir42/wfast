@@ -10,7 +10,11 @@ function V = var2(I)
     end
 
     M = mean2(I); % could have 3rd or 4th non scalar dimensions... 
-
-    V = mean2((I-M).^2);
+    
+    if isa(M, 'single')
+        V = mean2((single(I)-M).^2);
+    else
+        V = mean2((double(I)-M).^2);
+    end
    
 end
