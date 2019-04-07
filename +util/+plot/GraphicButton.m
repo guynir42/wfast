@@ -440,7 +440,9 @@ classdef GraphicButton < handle
         
         function callback_input_text(obj, hndl, ~)
             
-            value = strip(hndl.String);
+            str = hndl.String;
+            substr = split(str, '=');
+            value = strip(substr{end});
             
             if obj.owner.gui.debug_bit, disp(['callback: ' obj.variable '= ' value]); end
             
