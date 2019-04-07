@@ -28,6 +28,8 @@ classdef FocusActuator < handle
     
     properties(Dependent=true) % info outputs
         
+        status;
+        
         pos;
         
     end
@@ -117,6 +119,12 @@ classdef FocusActuator < handle
         function val = isConnected(obj)
             
             val = obj.hndl.IsConnected;
+            
+        end
+        
+        function val = get.status
+            
+            val = obj.isConnected; % can we add additional tests on this??
             
         end
         
