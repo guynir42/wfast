@@ -95,9 +95,10 @@ SaveDataHDF5::MyDataspace::MyDataspace(MyMatrix matrix){
 SaveDataHDF5::MyDataspace::MyDataspace(MyAttribute attribute){
 	
 	// default is to use a scalar...
-	size_t dims_temp=1;
+	size_t dims_temp=0;
 	data_type=H5T_NATIVE_DOUBLE;
 	
+	if(attribute.is_scalar) dims_temp=1;
 	if(attribute.is_vec) dims_temp=attribute.vec.size(); // allow for vector attributes
 	
 	id=H5Screate_simple(1, &dims_temp, NULL);
@@ -133,7 +134,11 @@ SaveDataHDF5::MyDataset::MyDataset(MyFilePointer &file, const char *location, My
 	if (matrix.use_deflate && deflate>0){ // if this matrix needs to be deflated and if we are using deflate (in general)
 		
 		hsize_t chunk_dims_c[4]={1};
-		for(int i=0;i<matrix.ndims;i++) chunk_dims_c[matrix.ndims-1-i]=chunk;
+		// for(int i=0;i<matrix.ndims;i++) chunk_dims_c[matrix.ndims-1-i]=chunk;
+		chunk_dims_c[3]=chunk;
+		chunk_dims_c[2]=chunk;
+		chunk_dims_c[1]=matrix.frames;
+		chunk_dims_c[0]=1;
 		
 		int status=0;
 		
