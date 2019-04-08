@@ -867,7 +867,7 @@ classdef Acquisition < file.AstroData
             
             obj.stack_cutouts = obj.clip.input(obj.stack); % if no positions are known, it will call "findStars"
             
-            if input.use_background
+            if input.use_background % if we already used background subtraction on all pixels, why not just cutout from stack_sub??
                 BC = obj.back.getPoints(obj.clip.positions);
                 BC = permute(BC, [4,3,2,1]); % turn the column vector into a 4D vector
                 obj.stack_cutouts_sub = obj.stack_cutouts - BC; 
@@ -890,7 +890,8 @@ classdef Acquisition < file.AstroData
             obj.average_width = median(obj.photo_stack.fluxes./M.*obj.photo_stack.widths, 'omitnan'); % maybe find the average width of each image and not the stack??
             
             if obj.use_adjust_cutouts
-                obj.clip.positions = obj.clip.positions + obj.adjust_pos;
+                obj.positions = obj.positions + obj.adjust_pos;
+                obj.clip.positions = obj.positions;
             else
                 % must send the average adjustment back to mount controller
             end
@@ -937,7 +938,8 @@ classdef Acquisition < file.AstroData
                     disp('Lost star positions, using quick_align');
                     
                     [~,shift] = util.img.quick_align(obj.stack_sub, obj.ref_stack);
-                    obj.clip.positions = obj.ref_positions + flip(shift);
+                    obj.positions = obj.ref_positions + flip(shift);
+                    obj.clip.positions = obj.positions;
 
                     % this shift should also be reported back to mount controller? 
 

@@ -595,7 +595,7 @@ classdef Parameters < dynamicprops
         function set.ephem(obj, val)
             
             obj.ephem = val;
-            obj.ephem.pars = obj;
+%             obj.ephem.pars = obj;
             
         end
         

@@ -905,10 +905,10 @@ classdef Calibration < handle
                 cut_size = obj.clip.cut_size;
             end
             
-            if isempty(clipper) || is_empty(clipper)
+            if isempty(clipper) || (isa(clipper, 'img.Clipper') && is_empty(clipper))
                 return;
             end
-            
+                        
             if isempty(obj.dark_mean_cut) || isempty(obj.dark_mask_cut) || isempty(obj.flat_field_cut) || isempty(obj.clip) ...
                     || ~obj.clip.is_equal(clipper) || cut_size~=obj.clip.cut_size
                 
@@ -981,8 +981,9 @@ classdef Calibration < handle
                     
             if ~isempty(input.clipper) % this means we are working with cutouts
                 
-                if ~isa(input.clipper, 'img.Clipper') || (isnumeric(input.clipper) && size(input.clipper, 2)==2)
-                    error('must input the "clipper" object as an img.Clipper type object. or an Nx2 matrix. class given is "%s"', class(input.clipper));
+                if ~isa(input.clipper, 'img.Clipper') && ~(isnumeric(input.clipper) && size(input.clipper, 2)==2)
+                    error('Must input the "clipper" object as an img.Clipper type object, or an Nx2 matrix. What is given is a %s "%s"',...
+                        class(input.clipper), util.text.print_vec(size(input.clipper), 'x'));
                 end
 
                 obj.updateCutouts(input.clipper, size(input.images,1));
