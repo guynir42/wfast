@@ -35,6 +35,13 @@ classdef AstroData < dynamicprops
         
     end
     
+    properties(Access=private)
+        
+        positions_;
+        positions_bg_;
+        
+    end
+    
     methods % constructor
         
         function obj = AstroData(varargin)
@@ -48,6 +55,38 @@ classdef AstroData < dynamicprops
         end
         
     end
+    
+    methods % getters
+        
+        function val = get.positions(obj)
+            
+            val = obj.getPositions;
+            
+        end
+        
+        function val = get.positions_bg(obj)
+            
+            val = obj.getPositionsBG;
+            
+        end
+        
+    end
+    
+    methods % setters
+        
+        function set.positions(obj, val)
+            
+            obj.setPositions(val);
+            
+        end
+        
+        function set.positions_bg(obj, val)
+            
+            obj.setPositionsBG(val);
+            
+        end
+        
+    end 
     
     methods % other utilities
         
@@ -111,6 +150,34 @@ classdef AstroData < dynamicprops
             
         end
                 
+    end
+    
+    methods(Access=protected)
+        
+        function val = getPositions(obj)
+            
+            val = obj.positions_;
+            
+        end
+        
+        function setPositions(obj, val)
+            
+            obj.positions_ = val;
+            
+        end
+        
+        function val = getPositionsBG(obj)
+            
+            val = obj.positions_bg_;
+            
+        end
+        
+        function setPositionsBG(obj, val)
+            
+            obj.positions_bg_ = val;
+            
+        end
+        
     end
     
 end

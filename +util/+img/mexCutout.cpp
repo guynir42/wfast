@@ -30,7 +30,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 
 	// check argument 1
 	if(mxIsNumeric(prhs[1])==0) mexErrMsgIdAndTxt("MATLAB:util:img:mexCutout:inputNotNumeric", "Input 2 to mexCutout is not numeric...");
-	if( mxGetN(prhs[1])!=2) mexErrMsgIdAndTxt("MATLAB:util:img:mexCutout:inputWrongSize", "Second input must be a 2xN matrix of x and y center positions");
+	if( mxGetN(prhs[1])!=2) mexErrMsgIdAndTxt("MATLAB:util:img:mexCutout:inputWrongSize", "Second input must be a Nx2 matrix of x and y center positions");
 	
 	// check argument 2
 	if(mxIsNumeric(prhs[2])==0) mexErrMsgIdAndTxt("MATLAB:util:img:mexCutout:inputNotNumeric", "Input 3 to mexCutout is not numeric...");
@@ -96,7 +96,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	
 		for(int j=0; j<2; j++){
 			
-			pos[j][i]=(int) pos_ptr[num_cuts*j+i]-1; // minus one for conversion btw matlab indices and C indices
+			pos[j][i]=(int) round(pos_ptr[num_cuts*j+i])-1; // minus one for conversion btw matlab indices and C indices
 			
 		}// for j
 		

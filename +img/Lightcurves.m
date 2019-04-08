@@ -81,6 +81,7 @@ classdef Lightcurves < handle
         function reset(obj)
             
             obj.fluxes_full = [];
+            obj.timestamps_full = [];
             obj.weights_full = [];
             obj.offsets_x_full = [];
             obj.offsets_y_full = [];
@@ -97,7 +98,13 @@ classdef Lightcurves < handle
         
         function val = get.fluxes(obj)
             
-            val = obj.fluxes_full(1:obj.frame_index,:);
+            val = obj.fluxes_full;
+            
+            if isempty(val)
+                return;
+            end
+            
+            val = val(1:obj.frame_index,:);
             
             if all(isnan(val))
                 val = [];
@@ -126,7 +133,13 @@ classdef Lightcurves < handle
         
         function val = get.timestamps(obj)
             
-            val = obj.timestamps_full(1:obj.frame_index,:);
+            val = obj.timestamps_full;
+            
+            if isempty(val)
+                return;
+            end
+            
+            val = val(1:obj.frame_index);
             
             if all(isnan(val))
                 val = 1:obj.num_frames;
@@ -136,7 +149,13 @@ classdef Lightcurves < handle
         
         function val = get.weights(obj)
             
-            val = obj.weights_full(1:obj.frame_index,:);
+            val = obj.weights_full;
+            
+            if isempty(val)
+                return;
+            end
+            
+            val = val(1:obj.frame_index,:);
             
             if all(isnan(val))
                 val = [];
@@ -146,7 +165,13 @@ classdef Lightcurves < handle
         
         function val = get.offsets_x(obj)
             
-            val = obj.offsets_x_full(1:obj.frame_index,:);
+            val = obj.offsets_x_full;
+            
+            if isempty(val)
+                return;
+            end
+            
+            val = val(1:obj.frame_index,:);
             
             if all(isnan(val))
                 val = [];
@@ -156,7 +181,13 @@ classdef Lightcurves < handle
         
         function val = get.offsets_y(obj)
             
-            val = obj.offsets_y_full(1:obj.frame_index,:);
+            val = obj.offsets_y_full;
+            
+            if isempty(val)
+                return;
+            end
+            
+            val = val(1:obj.frame_index,:);
             
             if all(isnan(val))
                 val = [];
@@ -166,7 +197,13 @@ classdef Lightcurves < handle
         
         function val = get.widths(obj)
             
-            val = obj.widths_full(1:obj.frame_index,:);
+            val = obj.widths_full;
+            
+            if isempty(val)
+                return;
+            end
+            
+            val = val(1:obj.frame_index,:);
             
             if all(isnan(val))
                 val = [];
@@ -176,7 +213,13 @@ classdef Lightcurves < handle
         
         function val = get.backgrounds(obj)
             
-            val = obj.backgrounds_full(1:obj.frame_index,:);
+            val = obj.backgrounds_full;
+            
+            if isempty(val)
+                return;
+            end
+            
+            val = val(1:obj.frame_index,:);
             
             if all(isnan(val))
                 val = [];
@@ -196,6 +239,7 @@ classdef Lightcurves < handle
             
             obj.fluxes_full = NaN(num_frames, num_stars);
             obj.fluxes_cal_full = NaN(num_frames, num_stars);
+            obj.timestamps_full = NaN(num_frames,1);
             obj.weights_full = NaN(num_frames, num_stars);
             obj.offsets_x_full = NaN(num_frames, num_stars);
             obj.offsets_y_full = NaN(num_frames, num_stars);
@@ -228,7 +272,7 @@ classdef Lightcurves < handle
             obj.fluxes_full(obj.frame_index+1:obj.frame_index+N,:) = input.fluxes;
             
             if ~isempty(input.timestamps)
-                obj.timestamps_full(obj.frame_index+1:obj.frame_index+N,:) = input.timestamps;
+                obj.timestamps_full(obj.frame_index+1:obj.frame_index+N) = input.timestamps;
             end
             
             if ~isempty(input.weights)

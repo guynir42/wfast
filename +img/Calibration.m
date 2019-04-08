@@ -309,7 +309,7 @@ classdef Calibration < handle
                 return;
             end
                         
-            if isempty(obj.dark_mask_cut)
+            if isempty(obj.dark_mask_cut) && ~isempty(obj.clip.positions)
                 obj.dark_mask_cut = obj.clip.cutMatrix(obj.dark_mask); % lazy load the cutouts of the dark mask
             end
             

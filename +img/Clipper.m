@@ -93,7 +93,7 @@ classdef Clipper < handle
         
         default_number_cuts_display;
         
-        version = 1.05;
+        version = 1.06;
         
     end
     
@@ -220,12 +220,26 @@ classdef Clipper < handle
             if isempty(center_ind)
                 ind = [];
             else
-                ind = center_ind - floor(im_size/2) + 1;
+                ind = center_ind - floor(im_size/2);
             end
             
         end
         
         function ind = upper_corner(obj, center_ind, im_size)
+            
+            if nargin<2 || isempty(center_ind)
+                center_ind = obj.positions;
+            end
+            
+            if nargin<3 || isempty(im_size)
+                im_size = obj.cut_size;
+            end
+            
+            ind = obj.lower_corner(center_ind, im_size) + im_size - 1;
+            
+        end
+        
+        function ind = upper_corner_old(obj, center_ind, im_size)
         
             if nargin<2 || isempty(center_ind)
                 center_ind = obj.positions;
@@ -1047,7 +1061,7 @@ classdef Clipper < handle
                 try
                     
                     if use_text, text(C(ii,1), C(ii,2), ['clip ' num2str(ii)],'FontSize', 16, 'Parent', ax); end
-                    rectangle('Position', [obj.lower_corner(C(ii,:)) obj.cut_size obj.cut_size], 'Parent', ax, 'EdgeColor', color);
+                    rectangle('Position', [obj.lower_corner(C(ii,:))-0.5 obj.cut_size obj.cut_size], 'Parent', ax, 'EdgeColor', color);
                     
                 catch ME
                     warning(ME.getReport);

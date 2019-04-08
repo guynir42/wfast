@@ -254,47 +254,6 @@ classdef Acquisition < file.AstroData
     end
     
     methods % getters
-%         
-%         function val = get.num_stars(obj)
-%             
-%             if isempty(obj.clip)
-%                 val = obj.num_stars;
-%             else
-%                 val = obj.clip.num_stars;
-%             end
-%             
-%         end
-%         
-%         function val = get.cut_size(obj)
-%             
-%             if isempty(obj.clip)
-%                 val = obj.cut_size;
-%             else
-%                 val = obj.clip.cut_size;
-%             end
-%             
-%         end
-%         
-%         function val = get.num_backgrounds(obj)
-%             
-%             if isempty(obj.clip_bg)
-%                 val = obj.num_backgrounds;
-%             else
-%                 val = obj.clip_bg.num_stars;
-%             end
-%             
-%         end
-%         
-%         function val = get.cut_size_bg(obj)
-%             
-%             if isempty(obj.clip_bg)
-%                 val = obj.cut_size_bg;
-%             else
-%                 val = obj.clip_bg.cut_size;
-%             end
-%             
-%         end
-%       
 
         function val = get.run_name(obj)
             
@@ -352,46 +311,6 @@ classdef Acquisition < file.AstroData
             
         end
         
-%         function set.num_stars(obj, val)
-%             
-%             if ~isempty(obj.clip)
-%                 obj.clip.num_stars = val;
-%             end
-%             
-%             obj.num_stars = val;
-%             
-%         end
-%         
-%         function set.cut_size(obj, val)
-%             
-%             if ~isempty(obj.clip)
-%                 obj.clip.cut_size = val;
-%             end
-%             
-%             obj.cut_size = val;
-%             
-%         end
-%         
-%         function set.num_backgrounds(obj, val)
-%             
-%             if ~isempty(obj.clip_bg)
-%                 obj.clip_bg.num_stars = val;
-%             end
-%             
-%             obj.num_backgrounds = val;
-%             
-%         end
-%         
-%         function set.cut_size_bg(obj, val)
-%             
-%             if ~isempty(obj.clip_bg)
-%                 obj.clip_bg.cut_size = val;
-%             end
-%             
-%             obj.cut_size_bg = val;
-%             
-%         end
-%         
         function set.brake_bit(obj, val)
             
             obj.brake_bit = val;
@@ -905,7 +824,6 @@ classdef Acquisition < file.AstroData
             
             if obj.use_adjust_cutouts
                 obj.positions = obj.positions + obj.adjust_pos;
-                obj.clip.positions = obj.positions;
             else
                 % must send the average adjustment back to mount controller
             end
@@ -953,8 +871,7 @@ classdef Acquisition < file.AstroData
                     
                     [~,shift] = util.img.quick_align(obj.stack_sub, obj.ref_stack);
                     obj.positions = obj.ref_positions + flip(shift);
-                    obj.clip.positions = obj.positions;
-
+                    
                     % this shift should also be reported back to mount controller? 
 
                     obj.stack_cutouts = obj.clip.input(obj.stack);
@@ -986,12 +903,10 @@ classdef Acquisition < file.AstroData
             end
             
             obj.cutouts = obj.clip.input(obj.images);
-            obj.positions = obj.clip.positions;
             
             obj.cutouts_proc = obj.cal.input(obj.cutouts, 'clip', obj.clip);
             
             obj.cutouts_bg = obj.clip_bg.input(obj.images);
-            obj.positions_bg = obj.clip_bg.positions;
             
             obj.cutouts_bg_proc = obj.cal.input(obj.cutouts_bg, 'clip', obj.clip_bg);
             
@@ -1018,7 +933,7 @@ classdef Acquisition < file.AstroData
             obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps); % add variance input? 
             
             obj.fluxes = obj.phot.fluxes;
-            obj.lightcurves.input(obj.phot.fluxes, obj.phot.weights, obj.phot.offsets_x, obj.phot.offsets_y, obj.phot.widths, obj.phot.backgrounds); % store the full lightcurves...
+            obj.lightcurves.input(obj.phot.fluxes, obj.timestamps, obj.phot.weights, obj.phot.offsets_x, obj.phot.offsets_y, obj.phot.widths, obj.phot.backgrounds); % store the full lightcurves...
             
 %             obj.widths = obj.phot.widths;
             
@@ -1300,6 +1215,34 @@ classdef Acquisition < file.AstroData
         end
         
     end    
+    
+    methods(Access=protected) % bullshit functions to override setter/getter in AstroData
+        
+        function val = getPositions(obj)
+            
+            val = obj.clip.positions;
+            
+        end
+        
+        function setPositions(obj, val)
+            
+            obj.clip.positions = val;
+            
+        end
+        
+        function val = getPositionsBG(obj)
+            
+            val = obj.clip_bg.positions;
+            
+        end
+        
+        function setPositionsBG(obj, val)
+            
+            obj.clip_bg.positions = val;
+            
+        end
+        
+    end
     
 end
 
