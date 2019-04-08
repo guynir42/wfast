@@ -52,6 +52,8 @@ classdef ASA < handle
         % can we get motor status from hndl??
         tracking;
         
+        rate;
+        
     end
     
     properties(Hidden=true)
