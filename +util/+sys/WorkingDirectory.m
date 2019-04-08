@@ -245,7 +245,7 @@ classdef WorkingDirectory < handle
             
             [~, c] = fileparts(a);
             
-            d = util.text.slash_append(c,b);
+            d = fullfile(c,b);
             
         end
     end
@@ -397,8 +397,8 @@ classdef WorkingDirectory < handle
             
             D = obj.dir(CWD);
             
-            if exist(util.text.slash_append(CWD, str),'dir')
-                obj.cd(util.text.slash_append(CWD, str))
+            if exist(fullfile(CWD, str), 'dir')
+                obj.cd(fullfile(CWD, str))
                 success = 1;
             else
                 
@@ -409,7 +409,7 @@ classdef WorkingDirectory < handle
                     fnd = strfind(D{ii}, str);
                     
                     if ~isempty(fnd)
-                        obj.cd(util.text.slash_append(CWD, D{ii}));
+                        obj.cd(fullfile(CWD, D{ii}));
                         success = 1;
                         return;
                     end
