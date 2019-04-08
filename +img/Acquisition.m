@@ -23,8 +23,8 @@ classdef Acquisition < file.AstroData
         back@img.Background;
         clip@img.Clipper;
         clip_bg@img.Clipper;
-        photo_stack@img.Photometry;
-        photo@img.Photometry;
+        phot_stack@img.Photometry;
+        phot@img.Photometry;
         flux_buf@util.vec.CircularBuffer;
         lightcurves@img.Lightcurves;
         
@@ -175,11 +175,11 @@ classdef Acquisition < file.AstroData
                 obj.clip_bg = img.Clipper;
                 obj.clip_bg.use_adjust = 0;
                 
-                obj.photo_stack = img.Photometry;
-                obj.photo_stack.use_aperture = 0;
+                obj.phot_stack = img.Photometry;
+                obj.phot_stack.use_aperture = 0;
                 obj.flux_buf = util.vec.CircularBuffer;
                 
-                obj.photo = img.Photometry;
+                obj.phot = img.Photometry;
                 obj.lightcurves = img.Lightcurves;
                 
                 obj.af = obs.focus.AutoFocus;
@@ -865,7 +865,7 @@ classdef Acquisition < file.AstroData
 
             if input.use_background
             
-                obj.back.input(obj.stack_cutouts_bg, obj.clip_bg.positions);            
+                obj.back.input(obj.stack_cutouts_bg, obj.clip_bg.positions);
                 % should also get variance from background object...
                 
                 B = obj.back.getImage(size(obj.stack));
@@ -889,19 +889,19 @@ classdef Acquisition < file.AstroData
                 obj.stack_cutouts_sub = obj.stack_cutouts;
             end
             
-            obj.photo_stack.input(obj.stack_cutouts_sub); % run photometry on the stack to verify flux and adjust positions
+            obj.phot_stack.input(obj.stack_cutouts_sub); % run photometry on the stack to verify flux and adjust positions
             
             obj.checkRealign(input);
             
             % store the latest fluxes from the stack cutouts
-            obj.flux_buf.input(obj.photo_stack.fluxes);
+            obj.flux_buf.input(obj.phot_stack.fluxes);
             
             % get the average width and offsets (weighted by the flux of each star...)
-            M = mean(obj.photo_stack.fluxes);
-            obj.adjust_pos = [median(obj.photo_stack.fluxes./M.*obj.photo_stack.offsets_x, 'omitnan'), median(obj.photo_stack.fluxes./M.*obj.photo_stack.offsets_y, 'omitnan')];
+            M = mean(obj.phot_stack.fluxes);
+            obj.adjust_pos = [median(obj.phot_stack.fluxes./M.*obj.phot_stack.offsets_x, 'omitnan'), median(obj.phot_stack.fluxes./M.*obj.phot_stack.offsets_y, 'omitnan')];
             obj.adjust_pos(isnan(obj.adjust_pos)) = 0;
             
-            obj.average_width = median(obj.photo_stack.fluxes./M.*obj.photo_stack.widths, 'omitnan'); % maybe find the average width of each image and not the stack??
+            obj.average_width = median(obj.phot_stack.fluxes./M.*obj.phot_stack.widths, 'omitnan'); % maybe find the average width of each image and not the stack??
             
             if obj.use_adjust_cutouts
                 obj.positions = obj.positions + obj.adjust_pos;
@@ -942,7 +942,7 @@ classdef Acquisition < file.AstroData
                 mean_fluxes = obj.flux_buf.mean;
                 mean_fluxes(mean_fluxes<=0) = NaN;
 
-                new_fluxes = obj.photo_stack.fluxes;
+                new_fluxes = obj.phot_stack.fluxes;
                 new_fluxes(isnan(mean_fluxes)) = [];
                 mean_fluxes(isnan(mean_fluxes)) = [];
 
@@ -969,7 +969,7 @@ classdef Acquisition < file.AstroData
                         obj.stack_cutouts_sub = obj.stack_cutouts;
                     end
 
-                    obj.photo_stack.input(obj.stack_cutouts_sub, 'moments', 1); % run photometry on the stack to verify flux and adjust positions
+                    obj.phot_stack.input(obj.stack_cutouts_sub, 'moments', 1); % run photometry on the stack to verify flux and adjust positions
 
                 end
 
@@ -1015,12 +1015,12 @@ classdef Acquisition < file.AstroData
                 input = obj.latest_input;
             end
             
-            obj.photo.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps); % add variance input? 
+            obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps); % add variance input? 
             
-            obj.fluxes = obj.photo.fluxes;
-            obj.lightcurves.input(obj.photo.fluxes, obj.photo.weights, obj.photo.offsets_x, obj.photo.offsets_y, obj.photo.widths, obj.photo.backgrounds); % store the full lightcurves...
+            obj.fluxes = obj.phot.fluxes;
+            obj.lightcurves.input(obj.phot.fluxes, obj.phot.weights, obj.phot.offsets_x, obj.phot.offsets_y, obj.phot.widths, obj.phot.backgrounds); % store the full lightcurves...
             
-%             obj.widths = obj.photo.widths;
+%             obj.widths = obj.phot.widths;
             
         end
         
@@ -1153,7 +1153,7 @@ classdef Acquisition < file.AstroData
 
                     obj.batch(input);
                     
-                    obj.af.input(ii, obj.cam.focuser.pos, obj.photo_stack.widths, obj.photo_stack.fluxes);
+                    obj.af.input(ii, obj.cam.focuser.pos, obj.phot_stack.widths, obj.phot_stack.fluxes);
                     
                     obj.af.plot;
 
