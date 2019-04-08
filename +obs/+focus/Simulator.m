@@ -2,7 +2,7 @@ classdef Simulator < handle
     
     properties(Transient=true)
         
-        gui;
+        gui_cam; % handle to the camera GUI for feedback;
         
     end
     

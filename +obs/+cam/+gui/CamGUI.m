@@ -190,7 +190,7 @@ classdef CamGUI < handle
             
         function makeFocusPanel(obj)
 
-            obj.panel_focus = util.plot.GraphicPanel(obj.owner.focuser, [0.8 5/15 0.2 2/15], 'focus');
+            obj.panel_focus = util.plot.GraphicPanel(obj.owner.focuser, [0.8 5/15 0.2 2/15], 'focus', 1, 'gui_cam');
             obj.panel_focus.number = 2;
             
             if ~isempty(obj.owner.focuser) % && ~isempty(obj.owner.focuser.hndl) && obj.owner.focuser.hndl.Connected

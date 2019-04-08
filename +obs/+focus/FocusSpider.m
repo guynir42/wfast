@@ -12,6 +12,13 @@ classdef FocusSpider < handle
 % 
 % HARDWARE SETUP: the controller switches must all be ON except 7 and 8. 
 
+    properties(Transient=true)
+        
+        gui@obs.focus.gui.SpiderGUI;
+        gui_cam; % handle to the camera GUI for feedback
+        
+    end
+
     properties % internal info and objects
         
         actuators@obs.focus.FocusActuator;
@@ -21,8 +28,6 @@ classdef FocusSpider < handle
         % direction vectors for tip/tilt action
         tip_vec = [-0.5 1 -0.5];
         tilt_vec = [0.5 0 -0.5];
-        
-        gui;
         
     end
     
@@ -306,7 +311,7 @@ classdef FocusSpider < handle
         
     end
     
-    methods % printouts
+    methods % plotting / printouts
        
         function printout(obj)
            
@@ -321,6 +326,16 @@ classdef FocusSpider < handle
             if nargout<1
                 disp(str);
             end
+            
+        end
+        
+        function makeGUI(obj)
+            
+            if isempty(obj.gui)
+                obj.gui = obs.focus.gui.SpiderGUI(obj);
+            end
+            
+            obj.gui.make;
             
         end
         
