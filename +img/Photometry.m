@@ -140,7 +140,6 @@ classdef Photometry < handle
             obj.cutouts_proc = [];
             obj.cutouts_ap = [];
             obj.cutouts_psf = [];
-            obj.cut_size = [];
             
             obj.fluxes = [];
             obj.weights = [];
@@ -239,7 +238,7 @@ classdef Photometry < handle
             
         end
         
-        function [flux, weight, offset_x, offset_y, width, background] = calculate(obj, shape, bg_shape)
+        function [flux, weight, offset_x, offset_y, width, background] = calculate(obj, shape, bg_shape, iterations)
 
             import util.stat.sum2;
             import util.stat.median2;
@@ -320,7 +319,7 @@ classdef Photometry < handle
                     dy = offset_y(jj,ii);
                     if isnan(dy), dy = 0; end
                     
-                    for kk = 1:obj.iterations
+                    for kk = 1:iterations
                         
                         I = obj.cutouts(:,:,jj,ii);
                         
@@ -338,13 +337,14 @@ classdef Photometry < handle
                         end
                         
                         S = sum2(ap);
-                        I = I.*ap.*sum2(ap.^2)./S;
-                        m0 = sum2(I); 
-                        m1x = sum2(I.*obj.X)./S;
-                        m1y = sum2(I.*obj.Y)./S;
-                        m2x = sum2(I.*(obj.Y-m1x).^2)./S;
-                        m2y = sum2(I.*(obj.Y-m1y).^2)./S;
-%                         mxy = sum2(I.*(obj.X-m1x).*(obj.Y-m1y))./S;
+                        ap = ap./S;
+                        I = I.*ap./sum2(ap.^2);
+                        m0 = sum2(I);
+                        m1x = sum2(I.*obj.X)./m0;
+                        m1y = sum2(I.*obj.Y)./m0;
+                        m2x = sum2(I.*(obj.Y-m1x).^2)./m0;
+                        m2y = sum2(I.*(obj.Y-m1y).^2)./m0;
+%                         mxy = sum2(I.*(obj.X-m1x).*(obj.Y-m1y))./m0;
                         
                         % quality checks:
                         if S==0
@@ -361,7 +361,7 @@ classdef Photometry < handle
                         dx = m1x;
                         dy = m1y;
                         
-                        W = sqrt(sum([m2x,m2y], 'omitnan')); % should we add mxy??
+                        W = sqrt(mean([m2x,m2y], 'omitnan')); % should we add mxy??
                         
                     end
 
@@ -371,6 +371,8 @@ classdef Photometry < handle
                     offset_y(jj,ii) = dy;
                     width(jj,ii) = W;
                     background(jj,ii) = B;
+                    
+                    % add break point if dx and dy don't change much...
                     
                 end
 
@@ -412,12 +414,12 @@ classdef Photometry < handle
             R = obj.aperture;
             
             r = sqrt((obj.X-dx).^2+(obj.Y-dy).^2);
-            val = r<R;
+            val = R+0.5-r;
+            val(val>1) = 1;
+            val(val<0) = 0;
             
             if isa(obj.cutouts, 'single')
                 val = single(val);
-            else
-                val = double(val);
             end
             
             val(val==0) = NaN;
@@ -468,7 +470,7 @@ classdef Photometry < handle
             
             import util.stat.sum2;
             
-            [f,w,x,y,W,b] = obj.calculate('none', 'corner');
+            [f,w,x,y,W,b] = obj.calculate('none', 'corner', 1);
             
             obj.fluxes_basic = f;
             obj.weights_basic = w;
@@ -489,7 +491,7 @@ classdef Photometry < handle
         
         function calcAperture(obj)
             
-            [f,w,x,y,W,b] = obj.calculate('circle', 'annulus');
+            [f,w,x,y,W,b] = obj.calculate('circle', 'annulus', obj.iterations);
             
             obj.fluxes_ap = f;
             obj.weights_ap = w;
@@ -510,7 +512,7 @@ classdef Photometry < handle
         
         function calcGaussian(obj)
            
-            [f,w,x,y,W,b] = obj.calculate('gaussian', 'annulus');
+            [f,w,x,y,W,b] = obj.calculate('gaussian', 'annulus', obj.iterations);
             
             obj.fluxes_psf = f;
             obj.weights_psf = w;
