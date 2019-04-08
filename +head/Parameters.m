@@ -363,6 +363,10 @@ classdef Parameters < dynamicprops
             else 
                 name = obj.target_name;
             end
+            
+            if isempty(name) || ~ischar(name)
+                error('Parameters.folder_name is not a string!');
+            end
 
         end
         

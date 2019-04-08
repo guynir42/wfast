@@ -298,7 +298,11 @@ classdef Acquisition < file.AstroData
 
         function val = get.run_name(obj)
             
-            val = obj.pars.target_name;
+            if ~isempty(obj.pars)
+                val = obj.pars.target_name;
+            else
+                val = [];
+            end
             
         end
         
@@ -334,7 +338,9 @@ classdef Acquisition < file.AstroData
         
         function set.run_name(obj, val)
             
-            obj.pars.target_name = val;
+            if ~isempty(obj.pars)
+                obj.pars.target_name = val;
+            end
             
         end
         
@@ -635,8 +641,12 @@ classdef Acquisition < file.AstroData
             obj.update;
             
             if input.use_save
-                filename = obj.buf.getReadmeFilename;
-                util.oop.save(obj, filename, 'name', 'acquisition'); 
+                try    
+                    filename = obj.buf.getReadmeFilename;
+                    util.oop.save(obj, filename, 'name', 'acquisition'); 
+                catch ME
+                    warning(ME.getReport);
+                end
             end
             
             if input.use_audio
@@ -685,8 +695,12 @@ classdef Acquisition < file.AstroData
             obj.src.finishup;
             
             if obj.use_save
-                filename = obj.buf.getReadmeFilename('Z');
-                util.oop.save(obj, filename, 'name', 'acquisition'); 
+                try
+                    filename = obj.buf.getReadmeFilename('Z');
+                    util.oop.save(obj, filename, 'name', 'acquisition'); 
+                catch ME
+                    warning(ME.getReport);
+                end
             end
             
             if obj.debug_bit, disp(['Finished run "' input.run_name '" with ' num2str(obj.batch_counter) ' batches.']); end

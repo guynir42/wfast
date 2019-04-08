@@ -417,6 +417,10 @@ classdef BufferWheel < file.AstroData
                 val = 'run1';
             end
             
+            if isnumeric(val)
+                val = num2str(val);
+            end
+            
             if ~isempty(obj.dir_extension)
                 val = util.text.sub_append(val, obj.dir_extension);
             elseif obj.use_dir_types && ~isempty(obj.product_type)
