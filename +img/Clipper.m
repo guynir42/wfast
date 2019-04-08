@@ -48,13 +48,13 @@ classdef Clipper < handle
         start_stack; % the stack image from which we found the stars (for realign).
         start_cuts;  % the cutouts from when we found the stars (for realign).
         
-        use_adjust = 1;
+        use_adjust = 0; % we shouldn't be using internal adjustments anymore... 
         use_lock_adjust = 1; % force adjustment of all cutouts together (e.g., telescope drift)
         use_mex = 1; % use util.img.mexCutout (this is about x10 faster)
         use_moments = 1;
         pad_value = 0; % when clipping outside the edges of the frame...
         use_padding_warning = 0;
-        use_find_stars_for_realign = 0; % if you want to refind all stars when realign is called. 
+        use_find_stars_for_realign = 0; % if you want to refind all stars when realign is called. (we need to cancel this option...)
         
         % for use in findStars:
         num_stars = 1; % how many stars to find?
@@ -476,7 +476,9 @@ classdef Clipper < handle
             
         end
         
-        function shift = adjustCuts(obj, cutouts) % assumes the images are calibrated!
+        function shift = adjustCuts(obj, cutouts) % to be depricated!
+            
+            error('Please do not use this function any more! Instead, adjust the positions from external class...');
             
             import util.stat.sum2;
             import util.stat.max2;
