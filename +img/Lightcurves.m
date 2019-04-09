@@ -12,8 +12,9 @@ classdef Lightcurves < handle
     
     properties % inputs/outputs
         
-        frame_index = 0;
+        frame_index = 1;
         num_frames = 0;
+        total_frames;
         
     end
     
@@ -25,6 +26,8 @@ classdef Lightcurves < handle
         show_what = 'flux'; % can choose "flux", "weight", "offsets", "widths" or "backgrounds"
         use_show_full = 0; % if turned on, will show entire run, if off will show just what was already recorded. 
         show_num_stars = 10; % up to this number of stars are shown.
+        
+        double_up = 1; % choose if you want to expand the data storage by factor of 2 each time when space runs out... 
         
         debug_bit = 1;
         
@@ -88,7 +91,7 @@ classdef Lightcurves < handle
             obj.widths_full = [];
             obj.backgrounds_full = [];
             
-            obj.frame_index = 0;
+            obj.frame_index = 1;
             
         end
         
@@ -104,7 +107,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index,:);
+            val = val(1:obj.frame_index-1,:);
             
             if all(isnan(val))
                 val = [];
@@ -139,7 +142,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index);
+            val = val(1:obj.frame_index-1);
             
             if all(isnan(val))
                 val = 1:obj.num_frames;
@@ -155,7 +158,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index,:);
+            val = val(1:obj.frame_index-1,:);
             
             if all(isnan(val))
                 val = [];
@@ -171,7 +174,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index,:);
+            val = val(1:obj.frame_index-1,:);
             
             if all(isnan(val))
                 val = [];
@@ -187,7 +190,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index,:);
+            val = val(1:obj.frame_index-1,:);
             
             if all(isnan(val))
                 val = [];
@@ -203,7 +206,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index,:);
+            val = val(1:obj.frame_index-1,:);
             
             if all(isnan(val))
                 val = [];
@@ -219,7 +222,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index,:);
+            val = val(1:obj.frame_index-1,:);
             
             if all(isnan(val))
                 val = [];
@@ -235,22 +238,17 @@ classdef Lightcurves < handle
     
     methods % calculations
         
-        function startup(obj, num_frames, num_stars)
+        function startup(obj, total_frames) % do we need this??
             
-            obj.fluxes_full = NaN(num_frames, num_stars);
-            obj.fluxes_cal_full = NaN(num_frames, num_stars);
-            obj.timestamps_full = NaN(num_frames,1);
-            obj.weights_full = NaN(num_frames, num_stars);
-            obj.offsets_x_full = NaN(num_frames, num_stars);
-            obj.offsets_y_full = NaN(num_frames, num_stars);
-            obj.widths_full = NaN(num_frames, num_stars);
-            obj.backgrounds_full = NaN(num_frames, num_stars);
+            obj.total_frames = total_frames;
             
-            obj.frame_index = 0;
+            obj.frame_index = 1;
             
         end
         
         function input(obj, varargin)
+            
+            import util.vec.insert_matrix;
             
             if isscalar(varargin) && isa(varargin{1}, 'util.text.InputVars')
                 input = varargin{1};
@@ -269,31 +267,13 @@ classdef Lightcurves < handle
             
             N = size(input.fluxes,1);
             
-            obj.fluxes_full(obj.frame_index+1:obj.frame_index+N,:) = input.fluxes;
-            
-            if ~isempty(input.timestamps)
-                obj.timestamps_full(obj.frame_index+1:obj.frame_index+N) = input.timestamps;
-            end
-            
-            if ~isempty(input.weights)
-                obj.weights_full(obj.frame_index+1:obj.frame_index+N,:) = input.weights;
-            end
-            
-            if ~isempty(input.offsets_x)
-                obj.offsets_x_full(obj.frame_index+1:obj.frame_index+N,:) = input.offsets_x;
-            end
-            
-            if ~isempty(input.offsets_y)
-                obj.offsets_y_full(obj.frame_index+1:obj.frame_index+N,:) = input.offsets_y;
-            end
-            
-            if ~isempty(input.widths)
-                obj.widths_full(obj.frame_index+1:obj.frame_index+N,:) = input.widths;
-            end
-            
-            if ~isempty(input.backgrounds)
-                obj.backgrounds_full(obj.frame_index+1:obj.frame_index+N,:) = input.backgrounds;
-            end
+            obj.fluxes_full = insert_matrix(obj.fluxes_full, input.fluxes, [obj.frame_index,1], NaN, obj.double_up);
+            obj.timestamps_full = insert_matrix(obj.timestamps_full, input.timestamps, [obj.frame_index,1], NaN, obj.double_up);
+            obj.weights_full = insert_matrix(obj.weights_full, input.weights, [obj.frame_index,1], NaN, obj.double_up);
+            obj.offsets_x_full = insert_matrix(obj.offsets_x_full, input.offsets_x, [obj.frame_index,1], NaN, obj.double_up);
+            obj.offsets_y_full = insert_matrix(obj.offsets_y, input.offsets_y, [obj.frame_index,1], NaN, obj.double_up);
+            obj.widths_full = insert_matrix(obj.widths_full, input.widths, [obj.frame_index,1], NaN, obj.double_up);
+            obj.backgrounds_full = insert_matrix(obj.backgrounds_full, input.backgrounds, [obj.frame_index,1], NaN, obj.double_up);
             
             obj.frame_index = obj.frame_index + N;
             
@@ -305,10 +285,10 @@ classdef Lightcurves < handle
                 type = '';
             end
             
-            list = {'fluxes', 'timestamps', 'weights', 'offsets_x', 'offsets_y', 'widths', 'backgrounds'};
+            list = {'fluxes', 'weights', 'offsets_x', 'offsets_y', 'widths', 'backgrounds'};
             
             if ~isempty(type)
-                list2 = strcat(list, type);
+                list2 = strcat(list, ['_' type]);
             else
                 list2 = list;
             end
@@ -318,6 +298,8 @@ classdef Lightcurves < handle
             for ii = 1:length(list)
                 input.input_var(list{ii}, photometry.(list2{ii}));
             end
+            
+            input.input_var('timestamps', photometry.timestamps);
             
             obj.input(input);
             
@@ -347,13 +329,13 @@ classdef Lightcurves < handle
             
             if cs(obj.show_what, 'fluxes')
                 
-                if cs(obj.show_cal, 'raw')
-                    addPlots(input.ax, obj.fluxes);
-                elseif cs(obj.show_cal, 'cal')
-                    addPlots(input.ax, obj.fluxes_cal);
-                elseif cs(obj.show_cal, 'both')
-                    obj.plotData(input.ax, obj.fluxes, ':');
-                    obj.plotData(input.ax, obj.fluxes_cal, '-');
+                if cs(obj.show_flux_cal, 'raw')
+                    obj.addPlots(input.ax, obj.fluxes);
+                elseif cs(obj.show_flux_cal, 'cal')
+                    obj.addPlots(input.ax, obj.fluxes_cal);
+                elseif cs(obj.show_flux_cal, 'both')
+                    obj.addPlots(input.ax, obj.fluxes, ':');
+                    obj.addPlots(input.ax, obj.fluxes_cal, '-');
                 end
                 
             elseif cs(obj.show_what, 'weights')
@@ -383,7 +365,7 @@ classdef Lightcurves < handle
             ax.ColorOrderIndex = 1;
             
             for ii = 1:obj.show_num_stars
-                plot(ax, obj.timestamps, data, line_str);
+                plot(ax, obj.timestamps, data(:,ii), line_str);
             end
             
         end

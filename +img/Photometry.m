@@ -21,6 +21,8 @@ classdef Photometry < handle
         cutouts_ap;
         cutouts_psf;
         
+        timestamps;
+        
         psf; % either given or found from the image
         
         % outputs
@@ -140,6 +142,8 @@ classdef Photometry < handle
             obj.cutouts_proc = [];
             obj.cutouts_ap = [];
             obj.cutouts_psf = [];
+            obj.timestamps = [];
+            obj.psf = [];
             
             obj.fluxes = [];
             obj.weights = [];
@@ -201,6 +205,7 @@ classdef Photometry < handle
             input = util.text.InputVars;
             input.use_ordered_numeric = 1;
             input.input_var('cutouts', [], 'images');
+            input.input_var('timestamps', [], 'times');
             input.scan_vars(varargin{:});
             
             if isa(input.cutouts, 'single')
@@ -208,6 +213,8 @@ classdef Photometry < handle
             else
                 obj.cutouts = double(input.cutouts);
             end
+            
+            obj.timestamps = input.timestamps;
             
             obj.cut_size_latest = size(input.cutouts);
             obj.cut_size_latest = obj.cut_size(1:2);
