@@ -920,7 +920,7 @@ classdef Acquisition < file.AstroData
                 % object (based on the stack). 
             end
             
-            obj.cutouts_sub = obj.cutouts_proc - B;
+            obj.cutouts_sub = obj.cutouts_proc - B/obj.num_sum;
             
         end
         

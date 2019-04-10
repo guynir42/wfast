@@ -347,7 +347,7 @@ classdef Background < handle
                 obj.output_image = ones(im_size).*obj.median_background;
             elseif cs(obj.model_type, 'mean')
                 obj.output_image = ones(im_size).*obj.mean_background;
-            elseif cs(obj.model_type, 'poly')
+            elseif cs(obj.model_type, 'polynomial')
                 
                 [X,Y] = meshgrid(1:im_size(2), 1:im_size(1));
                 m = (length(obj.poly_coeffs_background)-1)/2;
@@ -389,7 +389,7 @@ classdef Background < handle
                 end
 
             else
-                error('Unknown model_type "%s". Use "median" or "mean" or "polynomial" or "interp".');
+                error('Unknown model_type "%s". Use "median" or "mean" or "polynomial" or "interp".', obj.model_type);
             end
             
             if nargout>0
