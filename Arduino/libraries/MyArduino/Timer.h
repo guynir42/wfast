@@ -18,7 +18,9 @@ public:
   
   // getters
   float getRunningTime();
+  float getTimeInInterval();
   float getRemainingInInterval();
+  float getTimeInPulse();
   float getRemainingInPulse();
   int getState();
   float getInterval() const;
