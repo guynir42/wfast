@@ -103,7 +103,7 @@ function file_handle = save(obj, filename, varargin)
         if input.append
             par_list = [par_list, '-append'];
         end
-            
+        
         save(par_list{:}); 
         return; % don't bother with the more complicated stuff...
     end

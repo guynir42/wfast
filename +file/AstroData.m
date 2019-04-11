@@ -48,7 +48,17 @@ classdef AstroData < dynamicprops
         function obj = AstroData(varargin)
         
             if ~isempty(varargin) && isa(varargin{1}, 'file.AstroData')
-                obj = util.oop.full_copy(varargin{1});
+%                 obj = util.oop.full_copy(varargin{1});
+                
+                % only save the properties that exist in AstroData
+                % this means derived objects can be given to this
+                % constructor and we get back an AstroData object.
+                list = properties(file.AstroData);
+                
+                for ii = 1:length(list)
+                    obj.(list{ii}) = varargin{1}.(list{ii});
+                end
+
             else
                 
             end

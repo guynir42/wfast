@@ -210,18 +210,25 @@ classdef InputVars < dynamicprops
        
         function setupDataInput(obj)
             
-            obj.input_var('images', []);
-            obj.input_var('cutouts', []);
-            obj.input_var('positions', [], 'cut_pos');
-            obj.input_var('stack', [], 'images_sum', 'full_sum');
-            obj.input_var('num_sum', []);
-            obj.input_var('timestamps', []);
-            obj.input_var('t_start', [], 'write_datestr', 'datestring', 'file_write_datestr');
-            obj.input_var('t_end_stamp', [], 'write_timestamp', 'file_write_timestamp');
-            obj.input_var('t_end', [], 'write_datestr', 'file_write_datestr');
-            obj.input_var('psfs', []);
-            obj.input_var('sampling_psf', []);
-            obj.input_var('fluxes', [], 'lightcurves');
+%             obj.input_var('images', []);
+%             obj.input_var('cutouts', []);
+%             obj.input_var('positions', [], 'cut_pos');
+%             obj.input_var('stack', [], 'images_sum', 'full_sum');
+%             obj.input_var('num_sum', []);
+%             obj.input_var('timestamps', []);
+%             obj.input_var('t_start', [], 'write_datestr', 'datestring', 'file_write_datestr');
+%             obj.input_var('t_end_stamp', [], 'write_timestamp', 'file_write_timestamp');
+%             obj.input_var('t_end', [], 'write_datestr', 'file_write_datestr');
+%             obj.input_var('psfs', []);
+%             obj.input_var('sampling_psf', []);
+%             obj.input_var('fluxes', [], 'lightcurves');
+
+            list = properties(file.AstroData);
+            
+            for ii = 1:length(list)
+                obj.input_var(list{ii}, []);
+            end
+
             obj.use_ordered_numeric = 1;
             
         end

@@ -750,10 +750,10 @@ classdef Parameters < dynamicprops
         
         function writeFitsHeader(obj, file_ptr, time_delay)
             
-            if nargin<2 || isempty(time_delay)
-                start_time_str = obj.stamp2str(time_delay);
-            else
+            if nargin<3 || isempty(time_delay)
                 start_time_str = obj.t_start;
+            else
+                start_time_str = obj.stamp2str(time_delay);
             end
             
             if ~isempty(start_time_str)

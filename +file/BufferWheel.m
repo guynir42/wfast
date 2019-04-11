@@ -58,7 +58,19 @@ classdef BufferWheel < file.AstroData
 % 
 %   *Additional qualifiers may include "Sim" for simulated images, "cal" or 
 %    "proc" for calibrated/processed full or cutout frames. 
-
+%
+% NOTE: mex_flags are used to tell matlab that a certain buffer is still 
+%       working on something and shouldn't be altered. Three things can 
+%       occupy a buffer: 
+%       * recording (i.e., by the camera in a separate thread) 
+%       * reading by the analysis program 
+%       * writing to disk (i.e., by a separate thread using mex-write). 
+%       Each of these flags is a 2-element vector that is passed to mex
+%       functions that can read and change the value under the hood. That's
+%       why you must not change these vectors directly (then there will be
+%       a different vector for matlab and for the mex thread). 
+%       The first element of each vector is the lock (0- open, 1-locked).
+%       The second is the number of seconds spent waiting for the lock. 
 
     properties(Transient=true)
         
@@ -290,7 +302,7 @@ classdef BufferWheel < file.AstroData
                 buf = obj.this_buf;
             end
             
-            val = buf.mex_flat_write(1)==1;
+            val = buf.mex_flag_write(1)==1;
             
 %             flag = buf.mex_flag_write;
 %             val = flag(1)==1; % && flag(2)~=1;
@@ -303,7 +315,7 @@ classdef BufferWheel < file.AstroData
                 buf = obj.this_buf;
             end
             
-            val = buf.mex_flat_record(1)==1;
+            val = buf.mex_flag_record(1)==1;
             
 %             flag = buf.mex_flag_record;
 %             val = flag(1)==1; %&& flag(2)~=1;
@@ -561,7 +573,7 @@ classdef BufferWheel < file.AstroData
     
     methods % setters
         
-        function set.this_buf(obj, val)
+        function set.this_buf(obj, val) % protect the current buffer in case it is reading/writing/recording
             
             if ~obj.checkInputability
                 return;
@@ -571,37 +583,37 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function set.index_rec(obj, val)
+        function set.index_rec(obj, val) % protects index_rec from being changed by matlab (that could replace the vector and ruin everything)
             
             util.vec.mex_change(obj.index_rec_vec, 1, val-1);
             
         end
         
-        function set.base_dir(obj, val)
+        function set.base_dir(obj, val) % setting this property just sets the override (hidden) property 
             
             obj.base_dir_override = val;
             
         end
         
-        function set.date_dir(obj, val)
+        function set.date_dir(obj, val) % setting this property just sets the override (hidden) property 
             
             obj.date_dir_override = val;
             
         end
         
-        function set.target_dir(obj, val)
+        function set.target_dir(obj, val) % setting this property just sets the override (hidden) property 
             
             obj.target_dir_override = val;
             
         end
         
-        function set.directory(obj, val)
+        function set.directory(obj, val) % setting this property just sets the override (hidden) property 
             
             obj.directory_override = val;
             
         end
         
-        function set.filename(obj, val)
+        function set.filename(obj, val) % setting this property just sets the override (hidden) property 
                         
             obj.filename_override = val;
             
@@ -633,7 +645,7 @@ classdef BufferWheel < file.AstroData
         
     end 
     
-    methods % actions
+    methods % internal functionality
         
         function addBuffer(obj) % this is where we define the content of individual buffers (based on file.AstroData)
             
@@ -660,7 +672,7 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function nextBuffer(obj, serial) % only call this when you are done processing the data! 
+        function nextBuffer(obj, serial) % cycle to the next buffer (only call this when you are done processing the data!) 
             
             if obj.debug_bit>2
                 disp(['moving on to buffer ' num2str(obj.next_buf.buf_number)]);
@@ -674,21 +686,19 @@ classdef BufferWheel < file.AstroData
                 obj.index = 1;
             end
             
-            if nargin>1 && ~isempty(serial)
+            if nargin>1 && ~isempty(serial) % make sure the next buffer continues with the same serial number as the last (or override it)
                 obj.this_buf.serial = serial;
             end
             
         end
         
-        function loadDataFromBuffer(obj, idx) % copies pointers from the buffer into obj
-            
-%             disp('loading data from buffer');
+        function loadDataFromBuffer(obj, idx) % copies pointers from the buffer struct into the object (remember copy on write)
             
             if nargin<2 || isempty(idx)
                 idx = obj.index;
             end
             
-%             util.vec.mex_change(obj.buf(idx).mex_flag_read, 1, 1);
+            util.vec.mex_change(obj.buf(idx).mex_flag_read, 1, 1); % lock the buffer for reading/processing?
             
             % load the pointers to the data stored in the buffers
             list = properties(file.AstroData);
@@ -696,24 +706,7 @@ classdef BufferWheel < file.AstroData
                 obj.(list{ii}) = obj.buf(idx).(list{ii});
             end
             
-%             util.vec.mex_change(obj.buf(idx).mex_flag_read, 1, 0);
-%             util.vec.mex_change(obj.buf(idx).mex_flag_read, 3, 0);
-
-%             fprintf('Loading data finished, idx= %d, flag(1)= %d, flag(2)= %d\n', idx, obj.buf(idx).mex_flag_read(1), obj.buf(idx).mex_flag_read(2));
-            
         end
-        
-%         function markAsRead(obj, buf) % release the buffer to rewrite (only do this when done processing!)
-%             
-%             if nargin<2 || isempty(buf)
-%                 buf = obj.this_buf;
-%             end
-%             
-% %             util.vec.mex_change(obj.buf(index).mex_flag_read, 1, 0);
-%             util.vec.mex_change(buf.mex_flag_read, 2, 1);
-%             util.vec.mex_change(buf.mex_flag_read, 3, 0);
-%             
-%         end
         
         function waitForRecording(obj, buf, timeout) % check if the current buffer has finished recording (or never started recording)
             
@@ -728,14 +721,14 @@ classdef BufferWheel < file.AstroData
             if obj.debug_bit>1, fprintf('waitForRecording. record_flag= %d %d\n', buf.mex_flag_record(1), buf.mex_flag_record(2)); end
             
             res = 0.01; % time resolution
-%             buf.mex_flag_read(3)
+
             for ii = 1:timeout/res
                 
                 if ~obj.isRecording(buf)
                     return;
                 end
                 
-                util.vec.mex_change(buf.mex_flag_record, 2); % how many milliseconds (total) have we waited for this flag...
+                util.vec.mex_change(buf.mex_flag_record, 2, res); % how many seconds (total) have we waited for this flag...
                 
                 if ii==1
                     
@@ -781,7 +774,7 @@ classdef BufferWheel < file.AstroData
                     return;
                 end
                 
-                util.vec.mex_change(buf.mex_flag_record, 2); % how many milliseconds (total) have we waited for this flag...
+                util.vec.mex_change(buf.mex_flag_record, 2, res); % how many seconds (total) have we waited for this flag...
 
                 if ii==1
                     if obj.debug_bit>2
@@ -815,7 +808,7 @@ classdef BufferWheel < file.AstroData
                     return;
                 end
                 
-                util.vec.mex_change(buf.mex_flag_write, 2); % how many milliseconds (total) have we waited for this flag...
+                util.vec.mex_change(buf.mex_flag_write, 2, res); % how many seconds (total) have we waited for this flag...
                 
                 if ii==1
                     
@@ -832,7 +825,7 @@ classdef BufferWheel < file.AstroData
                         
         end
         
-        function unlockMexFlag(obj)
+        function unlockMexFlag(obj) % use this after errors that leave some buffers locked (careful! leave enough time to clear recording/writing to disk)
             
             for ii = 1:length(obj.buf)
                 
@@ -848,25 +841,26 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function input(obj, varargin)
+    end
+    
+    methods % actions!
+        
+        function input(obj, varargin) % give data to the buffer (use "save" to dump data to disk)
             
             if isempty(varargin)
-                % pass
-            elseif isa(varargin{1}, 'file.AstroData')
+                return; % do not call clear (or anything) if you didn't get any data... 
+            elseif isa(varargin{1}, 'file.AstroData') % just grab the data from the object given (including derived classes e.g., img.Acquisition)
                 input = varargin{1};
-                list = properties(file.AstroData);
             else
                 input = util.text.InputVars;
                 input.setupDataInput; % default used for scanning all sort of inputs
                 input.scan_vars(varargin{:});
-                list = input.list_added_properties;
             end
             
+            list = properties(file.AstroData);
             obj.clear;
             
-%             obj.setHasData;
-            
-            for ii = 1:length(list)
+            for ii = 1:length(list) % copy the data from the input object into the buffer... 
                 
                 name = list{ii};
                 
@@ -878,46 +872,30 @@ classdef BufferWheel < file.AstroData
                 
             end
             
+            obj.loadDataFromBuffer; % make sure the data is reflected in the object (not only the buffer)
+            
             obj.gui.update;
             
         end
         
-%         function setHasData(obj)
-%             
-%             util.vec.mex_change(obj.this_buf.mex_flag_read, 3, 1); % tells the buffer there is something to read
-%             
-%         end
+        function save(obj, buf) % dump existing data to disk
         
-        function startWriting(obj, buf)
-            
-            if nargin<2 || isempty(buf)
-                buf = obj.this_buf;
-            end
-            
-            util.vec.mex_change(buf.mex_flag_write, 1, 1);
-            
-        end
-        
-        function save(obj, buf)
-        
-            if nargin<2 || isempty(buf)
-                buf = obj.this_buf;
-            end
-            
             import util.text.cs;
             
+            if nargin<2 || isempty(buf)
+                buf = obj.this_buf;
+            end
+            
             obj.gui.update;
             
-            obj.waitForRecording(buf);
-            obj.waitForWriting(buf);
+            obj.waitForRecording(buf); % make sure the buffer is not being recorded into (by camera)
+            obj.waitForWriting(buf); % make sure this buffer isn't already writing to disk...
             
-            if isempty(buf.images) && isempty(buf.images) && ...
-                    isempty(buf.cutouts) && isempty(buf.stack) && ...
+            if isempty(buf.images)  && isempty(buf.cutouts) && isempty(buf.stack) && ...
                     isempty(buf.psfs) && isempty(buf.fluxes) % no images of any type, PSFs or fluxes are available. 
                 return;
             end
             
-%             util.vec.mex_change(buf.mex_flag_write, 2, 0); % not done writing...
             util.vec.mex_change(buf.mex_flag_write, 1, 1); % started writing...
             
             tStart = tic;
@@ -929,27 +907,27 @@ classdef BufferWheel < file.AstroData
                 mkdir(this_dir);
             end
             
-            filename = fullfile(obj.directory, obj.filename);
-            if exist(filename, 'file') % what to do with pre-existing file?
+            this_filename = fullfile(this_dir, obj.filename);
+            if exist(this_filename, 'file') % what to do with pre-existing file?
                 if obj.use_overwrite
-                    disp(['file ' filename ' already exists. rewriting it now!']);
-                    delete(filename);
+                    disp(['file ' this_filename ' already exists. rewriting it now!']);
+                    delete(this_filename);
                 else
-                    error(['file ' filename ' already exists, cannot save again (rewrite disabled!)']);
+                    error(['file ' this_filename ' already exists, cannot save again (rewrite disabled!)']);
                 end
             end
             
-            obj.vec2times(buf);
+            obj.vec2times(buf); % transform camera output posix time vectors into formatted time strings for saving
             
             if ~isempty(obj.pars) % update the pars object when batch started/ended
                 obj.pars.t_start = buf.t_start;
                 obj.pars.t_end = buf.t_end;
             end
             
-            obj.buf(buf.buf_number).latest_filename = filename;
+            obj.buf(buf.buf_number).latest_filename = this_filename; % keep track of the latest filename writen to disk
             
             if obj.debug_bit
-                fprintf('Buffer %d saving file % 4d  : %s (async: %d defalte: %d)\n', buf.buf_number, obj.serial, filename, obj.use_async, obj.use_deflate);
+                fprintf('Buffer %d saving file % 4d  : %s (async: %d defalte: %d)\n', buf.buf_number, obj.serial, this_filename, obj.use_async, obj.use_deflate);
             end
             
             if obj.use_mex
@@ -961,7 +939,7 @@ classdef BufferWheel < file.AstroData
                 end
                 
                 % right now mex write is only for HDF5 files
-                file.mex.write(filename, buf.mex_flag_write, 'images', buf.images, ...
+                file.mex.write(this_filename, buf.mex_flag_write, 'images', buf.images, ...
                     'cutouts', buf.cutouts,  'positions', buf.positions,...
                     'stack', buf.stack, 'num_sum', buf.num_sum,...
                     'timestamps', buf.timestamps, 't_end_stamp', buf.t_end_stamp, 't_end', buf.t_end, 't_start', buf.t_start,...
@@ -969,14 +947,14 @@ classdef BufferWheel < file.AstroData
                     'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit);
                     % should also mark the mex_flag_write as finished writing... 
                     
-            else % use the old saveHDF5Static+parpool saving method
+            else % use the old, non-mex writing method
 
                 if isempty(obj.file_type) || cs(obj.file_type, {'hdf5', 'h5'})
-                    obj.saveHDF5(filename);
+                    obj.saveHDF5(this_filename);
                 elseif cs(obj.file_type, 'fits')
-                    obj.saveFits(filename);
+                    obj.saveFits(this_filename);
                 elseif cs(obj.file_type, 'mat')
-                    obj.saveMatFile(filename);
+                    obj.saveMatFile(this_filename);
                 else
                     error('unknown file type: %s', obj.file_type);
                 end
@@ -985,11 +963,13 @@ classdef BufferWheel < file.AstroData
             
             end
             
-            obj.serial = obj.serial + 1;
+            obj.serial = obj.serial + 1; % keep track of the number of files saved (for all runs?)
             
+            % track the average save time for this run
             this_save_time = toc(tStart);
             obj.save_time = obj.save_time + this_save_time;
             obj.num_saved_batches = obj.num_saved_batches + 1;
+            
             if obj.debug_bit>1, display(['write time= ' num2str(this_save_time)]); end
             
             obj.gui.update;
@@ -1004,35 +984,35 @@ classdef BufferWheel < file.AstroData
             
             if obj.debug_bit>2, disp(['this is saveHDF5. deflate: ' num2str(obj.deflate) ' class(images)= ' class(obj.images)]); end
             
-            if ~isempty(obj.images_raw)
+            if ~isempty(obj.images)
                 
                 chunk = [obj.chunk obj.chunk 1 1];
-                chunk = chunk(1:ndims(obj.images_raw));
-                chunk = min(chunk, size(obj.images_raw));
-                                
+                chunk = chunk(1:ndims(obj.images));
+                chunk = min(chunk, size(obj.images));
+                
                 if obj.use_deflate>0
-                    h5create(filename, '/images_raw', size(obj.images_raw), 'DataType', class(obj.images_raw), 'ChunkSize', chunk, 'Deflate', obj.use_deflate);
+                    h5create(filename, '/images', size(obj.images), 'DataType', class(obj.images), 'ChunkSize', chunk, 'Deflate', obj.use_deflate);
                 else
-                    h5create(filename, '/images_raw', size(obj.images_raw), 'DataType', class(obj.images_raw));
+                    h5create(filename, '/images', size(obj.images), 'DataType', class(obj.images));
                 end
                 
-                h5write(filename, '/images_raw', obj.images_raw);
+                h5write(filename, '/images', obj.images);
                 
             end
             
-            if ~isempty(obj.cutouts_raw)
+            if ~isempty(obj.cutouts)
                 
                 chunk = [obj.chunk obj.chunk 1 1];
-                chunk = chunk(1:ndims(obj.cutouts_raw));
-                chunk = min(chunk, size(obj.cutouts_raw));
+                chunk = chunk(1:ndims(obj.cutouts));
+                chunk = min(chunk, size(obj.cutouts));
                 
                 if obj.deflate>0
-                    h5create(filename, '/cutouts_raw', size(obj.cutouts_raw), 'DataType', class(obj.cutouts_raw), 'ChunkSize', chunk, 'Deflate', obj.deflate);
+                    h5create(filename, '/cutouts', size(obj.cutouts), 'DataType', class(obj.cutouts), 'ChunkSize', chunk, 'Deflate', obj.deflate);
                 else
-                    h5create(filename, '/cutouts_raw', size(obj.cutouts_raw), 'DataType', class(obj.cutouts_raw));
+                    h5create(filename, '/cutouts', size(obj.cutouts), 'DataType', class(obj.cutouts));
                 end
                 
-                h5write(filename, '/cutouts_raw', obj.cutouts_raw);
+                h5write(filename, '/cutouts', obj.cutouts);
                 
             end
             
@@ -1041,38 +1021,59 @@ classdef BufferWheel < file.AstroData
                 h5write(filename, '/positions', obj.positions);
             end
             
-            if ~isempty(obj.full_sum)
+            if ~isempty(obj.cutouts_bg)
                 
                 chunk = [obj.chunk obj.chunk 1 1];
-                chunk = chunk(1:ndims(obj.full_sum));
-                chunk = min(chunk, size(obj.full_sum));
+                chunk = chunk(1:ndims(obj.cutouts_bg));
+                chunk = min(chunk, size(obj.cutouts_bg));
                 
                 if obj.deflate>0
-                    h5create(filename, '/full_sum', size(obj.full_sum), 'DataType', class(obj.full_sum), 'ChunkSize', chunk, 'Deflate', obj.deflate);
+                    h5create(filename, '/cutouts_bg', size(obj.cutouts_bg), 'DataType', class(obj.cutouts_bg), 'ChunkSize', chunk, 'Deflate', obj.deflate);
                 else
-                    h5create(filename, '/full_sum', size(obj.full_sum), 'DataType', class(obj.full_sum));
+                    h5create(filename, '/cutouts_bg', size(obj.cutouts_bg), 'DataType', class(obj.cutouts_bg));
                 end
                 
-                h5write(filename, '/full_sum', obj.full_sum);
+                h5write(filename, '/cutouts_bg', obj.cutouts_bg);
                 
-                h5writeatt(filename, '/full_sum', obj.num_sum);
+            end
+            
+            if ~isempty(obj.positions_bg)
+                h5create(filename, '/positions_bg', size(obj.positions_bg), 'DataType', 'double');
+                h5write(filename, '/positions_bg', obj.positions_bg);
+            end
+            
+            if ~isempty(obj.stack)
+                
+                chunk = [obj.chunk obj.chunk 1 1];
+                chunk = chunk(1:ndims(obj.stack));
+                chunk = min(chunk, size(obj.stack));
+                
+                if obj.deflate>0
+                    h5create(filename, '/stack', size(obj.stack), 'DataType', class(obj.stack), 'ChunkSize', chunk, 'Deflate', obj.deflate);
+                else
+                    h5create(filename, '/stack', size(obj.stack), 'DataType', class(obj.stack));
+                end
+                
+                h5write(filename, '/stack', obj.stack);
+                
+                h5writeatt(filename, '/stack', 'num_sum', obj.num_sum);
                 
             end
             
             if ~isempty(obj.timestamps)
-                h5create(filename, '/time', size(obj.timestamps));
-                h5write(filename, '/time', obj.timestamps);
+                h5create(filename, '/timestamps', size(obj.timestamps));
+                h5write(filename, '/timestamps', obj.timestamps);
                 
                 if ~isempty(obj.t_start)
-                    h5writeatt(filename, '/time', 't_start', obj.t_start);
+                    h5writeatt(filename, '/timestamps', 't_start', obj.t_start);
                 end
                 
                 if ~isempty(obj.t_end_stamp)
-                    h5writeatt(filename, '/time', 't_end_stamp', obj.t_end_stamp);
+                    h5writeatt(filename, '/timestamps', 't_end_stamp', obj.t_end_stamp);
                 end
                 
                 if ~isempty(obj.t_end)
-                    h5writeatt(filename, '/time', 't_end', obj.t_end);
+                    h5writeatt(filename, '/timestamps', 't_end', obj.t_end);
                 end
                 
             end
@@ -1094,7 +1095,7 @@ classdef BufferWheel < file.AstroData
                 h5writeatt(filename, '/psfs', 'psf_sampling', obj.psf_sampling);
                 
             end
-                        
+            
             if ~isempty(obj.fluxes)
                 h5create(filename, '/fluxes', size(obj.fluxes,2))
                 h5write(filename, '/fluxes', obj.fluxes);
@@ -1107,65 +1108,65 @@ classdef BufferWheel < file.AstroData
         end
         
         function saveFits(obj, filename) % need to finish this!!!
-                            
+            
             if nargin<2 || isempty(filename)
                 error('cannot run saveFits without a filename!');    
             end
             
             file_ptr = matlab.io.fits.createFile(filename);
             file_cleanup = onCleanup(@()matlab.io.fits.closeFile(file_ptr));
-                                   
-            if ~isempty(obj.images_raw)
+            
+            if ~isempty(obj.images)
 
                 chunk = [obj.chunk obj.chunk 1 1];
-                chunk = chunk(1:ndims(obj.images_raw));
-                chunk = min(chunk, size(obj.images_raw));
+                chunk = chunk(1:ndims(obj.images));
+                chunk = min(chunk, size(obj.images));
 
-                S = size(obj.images_raw);
+                S = size(obj.images);
 
-                if deflate>0
+                if obj.use_deflate>0
                     matlab.io.fits.setCompressionType(file_ptr,'GZIP2');
                     matlab.io.fits.setTileDim(file_ptr, chunk);
                 end
 
-                if isa(obj.images_raw, 'uint16')
+                if isa(obj.images, 'uint16')
 
                     matlab.io.fits.createImg(file_ptr, 'int16', S);
-                    matlab.io.fits.writeImg(file_ptr, int16(double(obj.images_raw)-2^15));
+                    matlab.io.fits.writeImg(file_ptr, int16(double(obj.images)-2^15));
 
                     matlab.io.fits.writeKey(file_ptr, 'BSCALE', 1);
                     matlab.io.fits.writeKey(file_ptr, 'BZERO', 2^15);
 
-                elseif isa(obj.images_raw, 'double')
+                elseif isa(obj.images, 'double')
 
                     matlab.io.fits.createImg(file_ptr, 'double', S);
-                    matlab.io.fits.writeImg(file_ptr, obj.images_raw);
+                    matlab.io.fits.writeImg(file_ptr, obj.images);
 
                 end
 
             end
 
-            if ~isempty(positions)
+            if ~isempty(obj.positions)
 
             end
 
-            if ~isempty(timestamps)
+            if ~isempty(obj.timestamps)
 
             end
 
             if ~isempty(obj.psfs)
 
-                if chunk(1)>size(psfs,1)
-                    chunk(1) = size(psfs,1);
+                if chunk(1)>size(obj.psfs,1)
+                    chunk(1) = size(obj.psfs,1);
                 end
 
-                if chunk(2)>size(psfs,2)
-                    chunk(2) = size(psfs,2);
+                if chunk(2)>size(obj.psfs,2)
+                    chunk(2) = size(obj.psfs,2);
                 end
 
-                chunk = chunk(1:ndims(psfs));
+                chunk = chunk(1:ndims(obj.psfs));
 
-                if deflate>0
+                if obj.use_deflate>0
 
                 else
 
@@ -1180,7 +1181,7 @@ classdef BufferWheel < file.AstroData
 
             end
 
-            if ~isempty(fluxes)
+            if ~isempty(obj.fluxes)
 
             end
 
@@ -1193,79 +1194,12 @@ classdef BufferWheel < file.AstroData
         function saveMatFile(obj, filename)
                        
             if nargin<2 || isempty(filename)
-                error('cannot run saveFits without a filename!');    
+                error('cannot run saveMatFile without a filename!');    
             end
             
-            filename = util.text.extension(filename, '.mat');
+            data = file.AstroData(obj); % cast this object into an AstroData to be saved
             
-            list_pars = {};
-            
-            if ~isempty(obj.images_raw)
-                images_raw = obj.images_raw;
-                list_pars{end+1} = 'images_raw';
-            end
-            
-            if ~isempty(obj.cutouts_raw)
-                cutouts_raw = obj.cutouts_raw;
-                list_pars{end+1} = 'cutouts_raw';
-            end
-            
-            if ~isempty(obj.positions)
-                positions = obj.positions;
-                list_pars{end+1} = 'positions';
-            end
-            
-            if ~isempty(obj.full_sum)
-                full_sum = obj.full_sum;
-                list_pars{end+1} = 'full_sum';
-            end
-            
-            if ~isempty(obj.num_sum)
-                num_sum = obj.num_sum;
-                list_pars{end+1} = 'num_sum';
-            end
-            
-            if ~isempty(obj.timestamps)
-                timestamps = obj.timestamps;
-                list_pars{end+1} = 'timestamps';
-            end
-            
-            if ~isempty(obj.t_start)
-                t_start = obj.t_start;
-                list_pars{end+1} = 't_start';
-            end
-            
-            if ~isempty(obj.t_end)
-                t_end = obj.t_end;
-                list_pars{end+1} = 't_end';
-            end
-            
-            if ~isempty(obj.t_end_stamp)
-                t_end_stamp = obj.t_end_stamp;
-                list_pars{end+1} = 't_end_stamp';
-            end
-            
-            if ~isempty(obj.psfs)
-                psfs = obj.psfs;
-                list_pars{end+1} = 'psfs';
-            end
-            
-            if ~isempty(obj.psf_sampling)
-                psf_sampling = obj.psf_sampling;
-                list_pars{end+1} = 'psf_sampling';
-            end
-            
-            if ~isempty(obj.fluxes)
-                fluxes = obj.fluxes;
-                list_pars{end+1} = 'fluxes';
-            end
-            
-            if obj.use_write_pars && ~isempty(obj.pars)
-                pars = obj.pars;
-                list_pars{end+1} = 'pars';
-            end
-            
-            save(filename, list_pars{:});
+            util.oop.save(data, filename, 'format', 'mat');
             
         end
         
