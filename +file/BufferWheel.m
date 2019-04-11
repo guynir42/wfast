@@ -700,7 +700,7 @@ classdef BufferWheel < file.AstroData
                 idx = obj.index;
             end
             
-            util.vec.mex_change(obj.buf(idx).mex_flag_read, 1, 1); % lock the buffer for reading/processing?
+%             util.vec.mex_change(obj.buf(idx).mex_flag_read, 1, 1); % lock the buffer for reading/processing?
             
             % load the pointers to the data stored in the buffers
             list = properties(file.AstroData);
@@ -730,7 +730,7 @@ classdef BufferWheel < file.AstroData
                     return;
                 end
                 
-                util.vec.mex_change(buf.mex_flag_record, 2, res); % how many seconds (total) have we waited for this flag...
+                util.vec.mex_change(buf.mex_flag_record, 2); % how many seconds (total) have we waited for this flag...
                 
                 if ii==1
                     
@@ -776,7 +776,7 @@ classdef BufferWheel < file.AstroData
                     return;
                 end
                 
-                util.vec.mex_change(buf.mex_flag_record, 2, res); % how many seconds (total) have we waited for this flag...
+                util.vec.mex_change(buf.mex_flag_read, 2); % how many seconds (total) have we waited for this flag...
 
                 if ii==1
                     if obj.debug_bit>2
@@ -810,7 +810,7 @@ classdef BufferWheel < file.AstroData
                     return;
                 end
                 
-                util.vec.mex_change(buf.mex_flag_write, 2, res); % how many seconds (total) have we waited for this flag...
+                util.vec.mex_change(buf.mex_flag_write, 2); % how many seconds (total) have we waited for this flag...
                 
                 if ii==1
                     

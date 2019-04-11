@@ -8,17 +8,18 @@ if isempty(getenv('ANDOR'))
 end
 
 filename = 'capture.cpp';
-dirname = sa(getenv('MAT'), '+obs/+cam/+mex');
+dirname = sa(getenv('WFAST'), '+obs/+cam/+mex');
 
 str = '';
 str = 'mex CXXFLAGS="$CXXFLAGS -std=c++11"';
 str = [str ' -I"' getenv('ANDOR') '"'];
+str = [str ' -I"' sa(dirname, 'include') '"'];
 str = [str ' "' sa(getenv('ANDOR'), 'atcorem.lib"')];
 str = [str ' "' sa(getenv('ANDOR'), 'atutilitym.lib"')];
 str = [str ' ' sa(dirname, filename) ' -outdir ' dirname];
-str = [str ' ' sa(dirname, 'CameraControl.cpp')];
-str = [str ' ' sa(dirname, 'SimCameraControl.cpp')];
-str = [str ' ' sa(dirname, 'ZylaCameraControl.cpp')];
+str = [str ' ' sa(dirname, 'src/CameraControl.cpp')];
+str = [str ' ' sa(dirname, 'src/SimCameraControl.cpp')];
+str = [str ' ' sa(dirname, 'src/ZylaCameraControl.cpp')];
 % add other camera control types here...
 
 str
