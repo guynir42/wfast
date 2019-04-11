@@ -4,46 +4,61 @@ classdef BufferWheel < file.AstroData
 % and emptied to file. 
 %
 % Uses index (and index_rec) to keep track of which buffer to use when
-% recording, reading and writing to file. Each buffer struct can have all 
-% the inputs and outputs (e.g. images, fluxes, psfs, etc.). 
+% recording or reading and writing to file. Each buffer struct can have all 
+% the inputs and outputs (e.g. images, fluxes, psfs, etc.) as defined in 
+% file.AstroData class.
 %
 % Model 1: input data from camera/sim/pipeline using input method, then
 % immediately use save method which also brings up new buffer. If you try
 % to input to a buffer that is still saving, you get an error. 
-% (this is used for all but FullRaw data products).
+% (this is used by Acquisition and Deflator classes to save cutouts etc.).
 % 
 % Model 2: Give the camera all the buffers and have it track which one it
-% is writing to using index_rec. If buffer is still saving or in analysis, 
-% delay camera. When camera finishes, it gets the next buffer in line. 
+% is writing to using "index_rec". If buffer is still saving or analysing, 
+% camera is delayed. When camera finishes, it gets the next buffer in line. 
 % Run analysis on any buffers released from camera (if analysis slows down,
 % you may need to catch up or skip buffers). Keep track of which buffer is
-% under analysis at any time using index. Use "save" to save one or more
-% buffers (defined by num2save) when e.g. there is a trigger in the buffer
-% you are now analyzing. 
+% under analysis at any time using "index". Use "save" to save current 
+% buffer, e.g., when there is a trigger in the buffer you are now analyzing. 
 %
 % OBJECTS:
 %   -buf: vector of Buffer structs. 
 %   -pars: link back to parent object.
-%   -gui: Optional GUI for all contained Buffers. 
-%   -this_buf, next_buf, prev_buf: handles into "buf", based on index. 
+%   -gui: Optional GUI object.
+%   -this_buf, next_buf, prev_buf: getters from "buf", based on index.
+%    (NOTE: these shortcuts can ONLY be used for READING data from buffers). 
 %
 % SWITCHES & CONTROLS:
 %   -product_type: string telling which kind of output (raw? cutouts?
 %    fluxes? dark/flat? etc.). Will print this in the filename. 
-%   -base_dir: set to [] to use getenv('DATA') as the base dir. 
+%   -base_dir: set to [] to use getenv('DATA_TEMP') or getenv('DATA') 
 %   -date_dir: set to [] to use this night's date dir. 
 %   -target_dir: set to [] to use "pars.target_name" as target_dir. 
-%     *** full-path will be set to base_dir/date_dir/target_dir. ***
+%     *** "full_path" is: base_dir/date_dir/target_dir. ***
 %   -dir_extension: overrides the automatic extension to the dir name. 
 %   -use_dir_type: automatically adds "product_type" to the dir name. 
 %   -use_overwrite: silently delete existing files (default is true).
 %   -use_write_pars: try to save the "pars" object into file.
 %   -use_deflate: if non-zero, use deflation (can be anything from 1 to 10)
-%   -use_async: write in separate thread/job. 
+%   -use_async: write in separate thread (mex only!). 
 %   -use_mex: use the mex function to write to file (HDF5 only, for now). 
 %   -use_disable_mex_async_deflate: when this is enabled, doesn't let you
-%    add deflate when mex and async are used (avoids crashes). 
+%    use deflate when using mex and async (avoids crashes). 
 %   -chunk: used for deflation. Default is [64 64].
+%
+% NOTE: product types:
+%
+% There are five (main) file types: 
+% 1) Full: full-frame data. Usually Raw data is saved straight from camera 
+%          in case of trigger, or when observing slow mode or burst mode. 
+% 3) Dark: Same as "Full", only for dark frames. These are always full raw. 
+% 4) Flat: Same as "Full", only for flat frames. These are always full raw. 
+% 5) Cutouts: including cutouts, positions, stacks, lightcurves, etc. This 
+%             is the main product type for normal W-FAST operations. 
+% 
+%   *Additional qualifiers may include "Sim" for simulated images, "cal" or 
+%    "proc" for calibrated/processed full or cutout frames. 
+
 
     properties(Transient=true)
         
@@ -53,40 +68,32 @@ classdef BufferWheel < file.AstroData
 
     properties % objects
         
-        pars@head.Parameters;
-        buf@struct;
-        pars_struct_cell = {};
+        pars@head.Parameters; % link back to owner object's pars
+        buf@struct; % struct array with the actual data saved in each element's fields
         
     end
     
     properties % switches
         
-%         dark_applied;
-%         flat_applied;
-%         is_sim;
-%         is_dark;
-%         is_flat;
-        
-        index = 1;
-        product_type = 'RawFull'; % can be RawFull, RawCut, dark, flat, CalCut, CalSum, LCs, PSFs, etc...         
+        index = 1; % which "buf" is now active for reading/saving 
+        product_type = 'Full'; % can be Full, ROI, Cutouts (including stacks), dark (always full), flat (always full). Can append additional strings like "Sim" or "Cal" or "Proc"
         dir_extension = ''; % overrides any automatic directory extensions... 
         use_dir_types = 0; % automatically add a dir_extension equal to "type"
         
         % write parameters
-        use_overwrite = 1;
-        use_write_pars = 1;        
-        use_deflate = 0; % also can specify how much deflation you want (1 to 10)
-        use_async = 0;
-        use_mex = 1;
-        use_datestrings = 1;
-        chunk = 64;
+        use_overwrite = 1; % delete existing files (this should not happen in normal operations because of unique filenames) 
+        use_write_pars = 1; % write pars object to each file
+        use_deflate = 0; % also can specify how much deflation you want, between 1 to 10 (more than 1 is usually slow and doesn't change much)
+        use_async = 0; % write files in a different thread (mex only)
+        use_mex = 1; % use mex interface to write files (use 0 as backup if mex fails or if you want other file types)
+        chunk = 64; % chunk size (for deflate only)
         
-        file_type = 'hdf5'; % support is added for "fits", "mat", and "tiff"
+        file_type = 'hdf5'; % support is added for "fits", "mat", and "tiff" in use_mex==0
                 
-        serial = 1;
+        serial = 1; % keeps track of the number of files saved since object is initialized (should this go to 1 in "reset"?)
         
-        save_time = 0;
-        num_saved_batches = 0;
+        save_time = 0; % time to save images, since run started (seconds)
+        num_saved_batches = 0; % number of batches saved since run started. 
         
         timeout = 5; % defualt timeout, in seconds
         
@@ -96,64 +103,72 @@ classdef BufferWheel < file.AstroData
     
     properties(Dependent=true)
         
-        index_rec;
+        index_rec; % depends on hidden value that is updated internally by camera mex file
             
-        this_buf;
-        prev_buf;
-        next_buf;
+        this_buf; % link to current buffer (this is a copy of a struct, so do not change its properties)
+        prev_buf; % link to previous buffer (this is a copy of a struct, so do not change its properties)
+        next_buf; % link to next buffer (this is a copy of a struct, so do not change its properties)
                
-        im_size;
+        im_size; % depends on size of images that were given
         
-        base_dir;
-        date_dir;
-        target_dir;
-        directory;
-        filename;
-        prev_name;
+        base_dir; % where is the data stored (default is getenv('DATA_TEMP') or getenev('DATA'))
+        date_dir; % YYYY-MM-DD sub-directory
+        target_dir; % name of target/object/run as subfolder below date_dir
+        directory; % full folder name is base_dir/date_dir/target_dir
+        filename; % filename composed of naming convention, or overriden by user
+        prev_name; % full file name (including path) to last file that was saved (use h5disp on this to inspect file)
                 
     end
     
     properties(Hidden=true)
         
-        index_rec_vec = [0 0];
+        index_rec_vec = [0 0]; % do not change this vector (interacts under the hood with camera mex file)
+        pars_struct_cell = {}; % transform the "pars" object into a cell of structs before saving it. 
         
-        % naming convention
-        base_dir_override;
+        % naming convention override (user can override any of these)
+        base_dir_override; 
         date_dir_override;
         target_dir_override;
         directory_override;
         filename_override;
-        dark_dir_name = 'dark'; % what to call the directory for darks
-        flat_dir_name = 'flat'; % what to call the directory for flats
         
-        default_product_type;
+        % what to call the directory for darks/flats (used when product_type is dark/flat)
+        dark_dir_name = 'dark';
+        flat_dir_name = 'flat'; 
+        
+        default_product_type; 
         default_dir_extension;
         default_use_dir_types;
-        default_project = 'Kraar';
+        default_project = 'WFAST';
         default_camera = 'Zyla';
         
         default_use_overwrite;
         default_use_write_pars;
         default_use_deflate;
-        default_use_asnc;
+        default_use_async;
         default_use_mex;
         default_chunk;
         default_file_type;
         
-        use_disable_mex_async_deflate = 1; % if you try to defalte using mex file and async write, it will silently cancel deflation... if you try to do this Matlab will crash...
+        use_disable_mex_async_deflate = 1; % if you try to defalte using mex file and async write, it will silently cancel deflation... if you override this, Matlab may crash...
         
-%         pars_struct; % we must keep a copy of this object so it doesn't get deleted until it is written by mex file...
+        camera_mex_flag; % used for interaction with camera mex. Do not change this vector!
+        % vector elements: 
+        %      (1) is the camera running 
+        %      (2) error flag from camera 
+        %      (3) how many milliseconds is camera waiting for write
         
-        camera_mex_flag;
-        
-        version = 1.01;
+        version = 1.02;
         
     end
     
     methods % constructor
         
         function obj = BufferWheel(num_buffers, pars)
-            
+        % Constructor for BufferWheel. Default number of buffers is 5. 
+        % Second argument links the Parameters object with owner. Default
+        % is to create a new pars object. 
+        
             if nargin<1 || isempty(num_buffers)
                 num_buffers = 5;
             end
@@ -172,16 +187,16 @@ classdef BufferWheel < file.AstroData
             end
             
             if isempty(pars)
-                pars = head.Parameters;
+                obj.pars = head.Parameters;
+            else
+                obj.pars = pars; % link to pars handle as given
             end
             
             for ii = 1:num_buffers
-                obj.addBuffer;
+                obj.addBuffer; % this generates each buffer with all the data it needs (based on file.AstroData class)
             end
             
-            obj.pars = pars;
-            
-            util.oop.save_defaults(obj); % we don't have any defaults here
+            util.oop.save_defaults(obj); % save default value of property "X" to "default_X" if it exists
             
         end
         
@@ -189,63 +204,74 @@ classdef BufferWheel < file.AstroData
     
     methods % resetters
         
-        function initialize(obj)
+        function initialize(obj) % return to class defaults
                       
             util.oop.load_defaults(obj);
             obj.reset;
                         
         end
         
-        function reset(obj)
-                        
+        function reset(obj) % prepare object for new run
+                 
+            reset@file.AstroData(obj);
+            
             for ii = 1:length(obj.buf)
-                
-                obj.buf(ii).images = [];
-                obj.buf(ii).images_raw = [];
-                obj.buf(ii).images_cal = [];
-                obj.buf(ii).cutouts_raw = [];
-                obj.buf(ii).cutouts_cal = [];
-                obj.buf(ii).full_sum = [];
-                obj.buf(ii).positions = [];
-                obj.buf(ii).num_sum = [];
-                
-                obj.buf(ii).timestamps = [];
-                obj.buf(ii).t_start = [];
-                obj.buf(ii).t_end = [];
-                obj.buf(ii).t_vec = [];
-                
-                obj.buf(ii).psfs = [];
-                obj.buf(ii).psf_sampling = [];
-                obj.buf(ii).latest_filename = [];
-                
-                util.vec.mex_change(obj.buf(ii).mex_flag_record, 2, 0);
-                util.vec.mex_change(obj.buf(ii).mex_flag_read, 2, 0);
-                util.vec.mex_change(obj.buf(ii).mex_flag_write, 2, 0);
-                
+                obj.clearBuf(ii);
             end
             
             obj.index = 1;
             obj.index_rec = 1;
             
+            obj.save_time = 0; 
+            obj.num_saved_batches = 0; 
+        
             obj.unlockMexFlag;
             
             obj.pars_struct_cell = {};
             
         end
                 
-        function clear(obj)
+        function clear(obj) % prepare object for new batch
         
-            clear@file.AstroData(obj);
-            
-            for ii = 1:length(obj.buf)
-                obj.buf(ii).t_start = [];
-                obj.buf(ii).t_end = [];
-                obj.buf(ii).t_end_stamp = [];
-            end
+            obj.clearBuf(obj.index);
             
         end
         
-        function clearImages(obj)
+        function clearBuf(obj, idx) % clear data inside a single buffer
+            
+%             obj.buf(idx).images = [];
+% 
+%             obj.buf(idx).cutouts = [];
+%             obj.buf(idx).positions = [];
+% 
+%             obj.buf(idx).cutouts_bg = [];
+%             obj.buf(idx).positions_bg = [];
+% 
+%             obj.buf(idx).stack = [];
+%             obj.buf(idx).num_sum = [];
+% 
+%             obj.buf(idx).timestamps = [];
+%             obj.buf(idx).t_start = [];
+%             obj.buf(idx).t_end = [];
+%             obj.buf(idx).t_vec = [];
+% 
+%             obj.buf(idx).psfs = [];
+%             obj.buf(idx).psf_sampling = [];
+
+            list = properties(file.AstroData);
+            for ii = 1:length(list)
+                obj.buf(idx).(list{ii}) = [];
+            end
+            
+            obj.buf(idx).latest_filename = [];
+
+            util.vec.mex_change(obj.buf(idx).mex_flag_record, 2, 0);
+            util.vec.mex_change(obj.buf(idx).mex_flag_read, 2, 0);
+            util.vec.mex_change(obj.buf(idx).mex_flag_write, 2, 0);
+            
+        end
+        
+        function clearImages(obj) % get rid of full frame images only
             
             obj.images = [];
             for ii = 1:length(obj.buf)
@@ -258,37 +284,43 @@ classdef BufferWheel < file.AstroData
     
     methods % getters
 
-        function val = isWriting(obj, buf)
+        function val = isWriting(obj, buf) % check if mex process for saving to disk is still running on "buf" (default is "this_buf")
             
             if nargin<2 || isempty(buf)
                 buf = obj.this_buf;
             end
             
-            flag = buf.mex_flag_write;
-            val = flag(1)==1; % && flag(2)~=1;
+            val = buf.mex_flat_write(1)==1;
+            
+%             flag = buf.mex_flag_write;
+%             val = flag(1)==1; % && flag(2)~=1;
             
         end
         
-        function val = isRecording(obj, buf)
+        function val = isRecording(obj, buf) % check if mex process for recording in camera is still running on "buf" (default is "this_buf")
             
             if nargin<2 || isempty(buf)
                 buf = obj.this_buf;
             end
             
-            flag = buf.mex_flag_record;
-            val = flag(1)==1; %&& flag(2)~=1;
+            val = buf.mex_flat_record(1)==1;
+            
+%             flag = buf.mex_flag_record;
+%             val = flag(1)==1; %&& flag(2)~=1;
 %             val = val || ~buf.mex_flag_read(2); % add second check to see if there is any data in the buffer at all (if not, consider it still under recording...)
             
         end
         
-        function val = isReading(obj, buf)
+        function val = isReading(obj, buf) % check if current analysis is still running on "buf" (default is "this_buf")
             
             if nargin<2 || isempty(buf)
                 buf = obj.this_buf;
             end
             
-            flag = buf.mex_flag_read;
-            val = flag(1)==1; %&& flag(2)~=1;
+            val = buf.mex_flag_read(1)==1;
+            
+%             flag = buf.mex_flag_read;
+%             val = flag(1)==1; %&& flag(2)~=1;
             
         end
         
@@ -310,37 +342,37 @@ classdef BufferWheel < file.AstroData
             
         end
           
-        function val = get.index_rec(obj)
+        function val = get.index_rec(obj) % convert from mex-compatible vector to matlab index
             
             val = obj.index_rec_vec(1) + 1;
             
         end
         
-        function val = mod(obj, index)
+        function val = mod(obj, index) % cycle index over the number of buffers in the wheel
             
             val = mod(index-1, length(obj.buf))+1;
             
         end
         
-        function val = get.this_buf(obj)
+        function val = get.this_buf(obj) % buffer being read from right now (as set by "index")
             
             val = obj.buf(obj.mod(obj.index));
             
         end
         
-        function val = get.next_buf(obj)
+        function val = get.next_buf(obj) % buffer for index+1
            
             val = obj.buf(obj.mod(obj.index+1));
             
         end
         
-        function val = get.prev_buf(obj)
+        function val = get.prev_buf(obj) % buffer for index-1
            
             val = obj.buf(obj.mod(obj.index-1));
             
         end
         
-        function val = get.im_size(obj)
+        function val = get.im_size(obj) % size of images in current buffer (if images is empty, use PSF size)
            
             if ~isempty(obj.this_buf.images)
                 val = util.vec.imsize(obj.this_buf.images);
@@ -352,7 +384,7 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function val = get.use_deflate(obj)
+        function val = get.use_deflate(obj) % can be overriden by "use_disable_mex_async_deflate" 
             
             val = obj.use_deflate;
             
@@ -362,7 +394,7 @@ classdef BufferWheel < file.AstroData
             
         end                
         
-        function val = get.base_dir(obj)
+        function val = get.base_dir(obj) % check for override. Default: use getenv('DATA_TEMP') on SSD or getenv('DATA') on storage or PWD if no environmentals are found 
             
             if ~isempty(obj.base_dir_override)
                 val = obj.base_dir_override;
@@ -376,7 +408,7 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function date = current_datetime(obj)
+        function date = current_datetime(obj) % create a datetime object from camera's "t_end" datestr or from current time
             
             if ~isempty(obj.this_buf.t_end)
                 date = util.text.str2time(obj.this_buf.t_end); % best time estimate is when the file has finished recording (matched from camera)
@@ -386,28 +418,19 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function val = get.date_dir(obj) 
+        function val = get.date_dir(obj) % check for override. Default: get YYYY-MM-DD format dirname. Will change day at noon UTC! 
                        
             if ~isempty(obj.date_dir_override)
                 val = obj.date_dir_override;                
             else
-                
-%                 date = obj.current_datetime;
-%                 
-%                 % make sure each night is in the same folder, even after midnight.
-%                 if date.Hour<12 % this is 14:00 local time, pretty safe to say it is after midnight of the next night...
-%                     date.Day = date.Day - 1;
-%                 end
-%                 
-%                 val = datestr(date, 'yyyy-mm-dd/');
-
+            
                 val = util.sys.date_dir; 
                 
             end
             
         end
         
-        function val = get.target_dir(obj)
+        function val = get.target_dir(obj) % check for override. Default: get subfolder name from pars object (uses <target_name> or "dark" or "flat")
             
             if ~isempty(obj.target_dir_override)
                 val = obj.target_dir_override;                
@@ -422,14 +445,14 @@ classdef BufferWheel < file.AstroData
             end
             
             if ~isempty(obj.dir_extension)
-                val = util.text.sub_append(val, obj.dir_extension);
+                val = [val '_' obj.dir_extension];
             elseif obj.use_dir_types && ~isempty(obj.product_type)
-                val = util.text.sub_append(val, obj.product_type);
+                val = [val '_' obj.product_type];
             end
             
         end
         
-        function val = get.directory(obj)
+        function val = get.directory(obj) % check for override. Default: directory is made from <base_dir>/<date_dir>/<target_dir>
             
             if ~isempty(obj.directory_override)
                 val = obj.directory_override;
@@ -439,7 +462,7 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function val = get.filename(obj)
+        function val = get.filename(obj) %  check for override. Default: naming convention in "makeFilename"
             
             if ~isempty(obj.filename_override)
                 val = obj.filename_override;
@@ -449,7 +472,7 @@ classdef BufferWheel < file.AstroData
             
         end
                 
-        function val = makeFullpath(obj)
+        function val = makeFullpath(obj) % directory is made from <base_dir>/<date_dir>/<target_dir>
             
             d = obj.target_dir;
             
@@ -463,22 +486,23 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function val = makeFilename(obj)
+        function val = makeFilename(obj) % apply filename convention 
            
             import util.text.cs;
             
-            date = obj.current_datetime;
+            date = obj.current_datetime; % datetime object of now (or buffer's t_end, if it exists)
             
-            str = datestr(date, 'yyyymmdd-HHMMSS-FFF');
+            time_str = datestr(date, 'yyyymmdd-HHMMSS-FFF'); % convert using matlab's own datetime functions 
             
-            if isempty(obj.pars)
-                project = obj.default_project;
-                camera = obj.default_camera;
-            else
+            if ~isempty(obj.pars)
                 project = obj.pars.project;
                 camera = obj.pars.cam_name;
+            else
+                project = obj.default_project;
+                camera = obj.default_camera;
             end
-                
+            
+            % do we really need these??
             ccd_id = 0;
             amp_id = 0;
             
@@ -494,12 +518,12 @@ classdef BufferWheel < file.AstroData
                 ext = 'mat';
             end
             
-            val = sprintf('%s_%s_%s_%d_%d_%s_%06d.%s', project, camera, str, ccd_id, amp_id, obj.product_type, obj.serial, ext);
-%             val = sprintf('test_%d.%s', obj.serial, ext); % debug
+            % EXAMPLE FILENAME: WFAST_ZYLA_20190410-155223-035_0_0_Full_000021.h5
+            val = sprintf('%s_%s_%s_%d_%d_%s_%06d.%s', project, camera, time_str, ccd_id, amp_id, obj.product_type, obj.serial, ext);
             
         end
         
-        function text_file_name = getReadmeFilename(obj, prefix)
+        function text_file_name = getReadmeFilename(obj, prefix) % generate filename for readme file appended to beginning and end of each folder
   
             if nargin<2 || isempty(prefix)
                 prefix = 'A';
@@ -517,8 +541,8 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function val = getMeanSaveTime(obj)
-           
+        function val = getMeanSaveTime(obj) % how much time is spent writing each file to disk, on average (in seconds)
+            
             if obj.save_time>0
                 val = obj.save_time./obj.num_saved_batches;
             else
@@ -527,7 +551,7 @@ classdef BufferWheel < file.AstroData
             
         end
                 
-        function val = get.prev_name(obj)
+        function val = get.prev_name(obj) % shortcut to get the full filename of previous buf. Use this to inspect what is saved. 
             
             val = obj.prev_buf.latest_filename;
             
@@ -583,7 +607,7 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function vec2times(obj, buf)
+        function vec2times(obj, buf) % convert internal posix-time vector given by camera into date-strings
 
             if nargin<2 || isempty(buf)
                 buf = obj.this_buf;
@@ -611,7 +635,7 @@ classdef BufferWheel < file.AstroData
     
     methods % actions
         
-        function addBuffer(obj) % this is where we define the content of individual buffers
+        function addBuffer(obj) % this is where we define the content of individual buffers (based on file.AstroData)
             
             idx = length(obj.buf)+1;
 
@@ -621,24 +645,12 @@ classdef BufferWheel < file.AstroData
                 temp_buf.(list{ii}) = [];
             end
             
-            temp_buf.latest_filename = '';
-%             temp_buf.mex_flag_record = [0 0 0 0];
-%             temp_buf.mex_flag_write = [0 0 0 0];
-%             temp_buf.mex_flag_read = [0 0 0 0];            
+            temp_buf.latest_filename = '';    
             temp_buf.mex_flag_record = [0 0];
             temp_buf.mex_flag_write = [0 0];
             temp_buf.mex_flag_read = [0 0];
             temp_buf.buf_number = idx;
             temp_buf.t_vec = [];
-            
-%             temp_buf = struct('images', [], 'images_raw', [], 'images_cal', [],...
-%                     'cutouts_raw', [], 'cutouts_cal', [], 'positions', [], ...
-%                     'full_sum', [], 'num_sum', [],...
-%                     'timestamps', [], 't_start', [], 't_end', [], 't_end_stamp', [], 't_vec', [], ...
-%                     'psfs', [], 'psf_sampling', [],...
-%                     'fluxes', [], 'latest_filename', [], ...
-%                     'mex_flag_record', [0 0 0 0], 'mex_flag_write', [0 0 0 0], 'mex_flag_read', [0 0 0 0],...
-%                     'buf_number', idx);
             
             if idx==1
                 obj.buf = temp_buf;
@@ -654,10 +666,9 @@ classdef BufferWheel < file.AstroData
                 disp(['moving on to buffer ' num2str(obj.next_buf.buf_number)]);
             end
             
-%             obj.loadDataFromBuffer(obj.next_buf);
             obj.clear;
-%             obj.markAsRead; % the data in obj is now overwritten by the data from next_buf
-            util.vec.mex_change(obj.this_buf.mex_flag_read, 1, 0);
+            util.vec.mex_change(obj.this_buf.mex_flag_read, 1, 0); % unlock the current buffer
+            
             obj.index = obj.index + 1;
             if obj.index > length(obj.buf)
                 obj.index = 1;
@@ -666,7 +677,7 @@ classdef BufferWheel < file.AstroData
             if nargin>1 && ~isempty(serial)
                 obj.this_buf.serial = serial;
             end
-                        
+            
         end
         
         function loadDataFromBuffer(obj, idx) % copies pointers from the buffer into obj
@@ -924,7 +935,7 @@ classdef BufferWheel < file.AstroData
                     disp(['file ' filename ' already exists. rewriting it now!']);
                     delete(filename);
                 else
-                    warning(['file ' filename ' already exists, cannot save again (rewrite disabled!)']);
+                    error(['file ' filename ' already exists, cannot save again (rewrite disabled!)']);
                 end
             end
             
