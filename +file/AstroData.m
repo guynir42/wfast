@@ -12,11 +12,15 @@ classdef AstroData < dynamicprops
         
         timestamps; % output timestamps (if available)
         
+        t_start; % absolute date and time (UTC) when first image is taken
+        t_end; % absolute date and time (UTC) when batch is finished
+        t_end_stamp; % timestamp when batch is finished (hopefully, this is the same time that t_end is recorded). 
+        
         cutouts; % this is raw cutouts and it is usually what we save on file
         positions; % only for cutouts. a 2xN matrix (X then Y, N is the number of cutouts). 
         coordinates; % match each star/cutout position with RA/DEC (in degrees)
         magnitudes; % each star's magnitude (from catalog)
-        temperature; % each star's temperature in K (from catalog)
+        temperatures; % each star's temperature in K (from catalog)
         
         fluxes; % amount of light (total) in each cutout
         
@@ -26,11 +30,7 @@ classdef AstroData < dynamicprops
         
         stack % sum of the full frame image
         num_sum; % if the images are summed, how many frames were added. If equal to 1, the sum is the same as the images. 
-        
-        t_start; % absolute date and time (UTC) when first image is taken
-        t_end; % absolute date and time (UTC) when batch is finished
-        t_end_stamp; % timestamp when batch is finished (hopefully, this is the same time that t_end is recorded). 
-                
+         
         psfs; % output PSFs from file (if available)
         sampling_psf; % if loaded PSFs need to be binned (this is the binning factor)
         
@@ -148,7 +148,7 @@ classdef AstroData < dynamicprops
             obj.positions = [];
             obj.coordinates = [];
             obj.magnitudes = [];
-            obj.temperature = [];
+            obj.temperatures = [];
         
             obj.fluxes = [];
             

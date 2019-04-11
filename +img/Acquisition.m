@@ -186,6 +186,7 @@ classdef Acquisition < file.AstroData
                 
                 obj.buf = file.BufferWheel;
                 obj.buf.product_type = 'Cutouts';
+                obj.buf.use_save_raw_images = 0; % do not save the full frame images! 
                 
                 obj.runtime_buffer = util.vec.CircularBuffer;
                 obj.runtime_buffer.titles = {'time', 'num_frames'};

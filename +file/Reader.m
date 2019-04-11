@@ -256,19 +256,25 @@ classdef Reader < file.AstroData
             
             % aliases for the different data products (for backward compatibility)
             obj.dataset_names.images = {'cube','images','images_raw'};
-%             obj.dataset_names.images_raw = {'images_raw', 'images_full'};
             obj.dataset_names.images_proc = {'images_proc', 'images_cal'};
             obj.dataset_names.images = [obj.dataset_names.images, obj.dataset_names.images_proc];
-            obj.dataset_names.cutouts = {'cutouts', 'cutouts_raw', 'images_cut', 'images_stamps', 'image_cutouts'};
-            obj.dataset_names.cutouts_proc = {'cutouts_proc', 'cutouts_cal'};
-            obj.dataset_names.cutouts = [obj.dataset_names.cutouts, obj.dataset_names.cutouts_proc];
-            obj.dataset_names.stack = {'stack', 'full_sum', 'images_sum', 'image_sum', 'summed_image', 'images_stack', 'image_stack'};
-            obj.dataset_names.positions = {'positions', 'cut_pos'};
             
             obj.dataset_names.timestamps = {'timestamps', 'times'};
             obj.attribute_names.t_start = {'t_start', 'file_start_datetime'};
             obj.attribute_names.t_end = {'t_end', 'file_write_datetime'};
             obj.attribute_names.t_end_stamp = {'t_end_stamp', 'file_write_timestamp'};
+            
+            obj.dataset_names.cutouts = {'cutouts', 'cutouts_raw', 'images_cut', 'images_stamps', 'image_cutouts'};
+            obj.dataset_names.cutouts_proc = {'cutouts_proc', 'cutouts_cal'};
+            obj.dataset_names.cutouts = [obj.dataset_names.cutouts, obj.dataset_names.cutouts_proc];
+            
+            obj.dataset_names.positions = {'positions', 'cut_pos'};
+            obj.dataset_names.coordinates = {'coordinates'};
+            obj.dataset_names.magnitudes = {'magnitudes'};
+            obj.dataset_names.temperatures = {'temperatures'};
+            
+            obj.dataset_names.stack = {'stack', 'full_sum', 'images_sum', 'image_sum', 'summed_image', 'images_stack', 'image_stack'};
+            obj.attribute_names.num_sum = {'num_sum'};
             
             obj.dataset_names.psfs = {'psfs'};
             obj.attribute_names.psf_sampling = {'psf_sampling', 'psf_binning'};
@@ -288,7 +294,7 @@ classdef Reader < file.AstroData
             util.oop.load_defaults(obj);
             
             obj.filenames = {}; % cell array of file names that match
-        
+            
             % batch limits
             obj.num_batches = Inf; % if you only want to read a few batches
         
@@ -762,20 +768,6 @@ classdef Reader < file.AstroData
                         
                         loaded_images = h5read(filename, sa('/', data_name), start_vec, step_vec);
                         
-%                         if cs(data_name, 'images_raw', 'images_full', 8)
-%                             obj.images_raw = cat(3, obj.images_raw, loaded_images);
-%                         elseif cs(data_name, 'images_cal', 8)
-%                             obj.images_cal = cat(3, obj.images_cal, loaded_images);
-%                         elseif cs(data_name, 'cutouts_raw', 'cutouts', 9)
-%                             obj.cutouts_raw = cat(3, obj.cutouts_raw, loaded_images);
-%                             elseif cs(data_name, 'cutouts_cal', 9)
-%                             obj.cutouts_cal = cat(3, obj.cutouts_cal, loaded_images);
-%                         elseif cs(data_name, 'full_sum', 'images_sum', 8)
-%                             obj.full_sum = cat(3, obj.full_sum, loaded_images);
-%                         else % just any kind of image
-%                             obj.images = cat(3, obj.images, loaded_images); % append to the existing images
-%                         end
-
                         if cs(data_name, 'images_proc', 'images_cal', 8) % in the very odd case that we saved the processed images... 
                             obj.images_proc = cat(3, obj.images_proc, loaded_images); % append to the images from previous files
                         else
@@ -784,9 +776,7 @@ classdef Reader < file.AstroData
                         
                         num_images_loaded = size(loaded_images,3);
                         
-%                         obj.getAttribute(filename, data_name, att_names, 'num_sum'); % need to add this to the "stack" property
-                        
-                    elseif cs(data_name, obj.dataset_names.cutouts) && all(data_size) % dataset_names.images may be a cell array of different optional names
+                    elseif cs(data_name, obj.dataset_names.cutouts) && all(data_size) % dataset_names.cutouts is a cell array of different optional names for this dataset
                         
                         num_images_on_file = data_size(3);
                         
@@ -807,11 +797,6 @@ classdef Reader < file.AstroData
                         loaded_cutouts = h5read(filename, sa('/', data_name), start_vec, step_vec);
                         
                         obj.cutouts = cat(3, obj.cutouts, loaded_cutouts); % append to the images from previous files
-%                         if cs(data_name, 'cutouts_proc', 'cutouts_cal', 9) % in the very odd case that we saved the processed cutouts... 
-%                             obj.cutouts = cat(3, obj.cutouts, loaded_cutouts); % append to the images from previous files
-%                         else
-%                             obj.cutouts = cat(3, obj.cutouts, loaded_cutouts); % append to the images from previous files
-%                         end
                         
                         if ~num_images_loaded % if the file doesn't have images but does have cutouts, count the cutout frames
                             num_images_loaded = size(loaded_cutouts,3);
@@ -822,10 +807,27 @@ classdef Reader < file.AstroData
                         loaded_positions = h5read(filename, sa('/', data_name)); % read the entire "positions" dataset, if it exists
                         obj.positions = cat(3, obj.positions, loaded_positions);
                         
+                    elseif cs(data_name, obj.dataset_names.coordinates) && all(data_size) % data_names.coordinates may be a cell array of different optional names
+                        
+                        loaded_coordinates = h5read(filename, sa('/', data_name)); % read the entire "cordinates" dataset, if it exists
+                        obj.positions = cat(3, obj.coordinates, loaded_coordinates);
+                        
+                    elseif cs(data_name, obj.dataset_names.magnitudes) && all(data_size) % data_names.magnitudes may be a cell array of different optional names
+                        
+                        loaded_magnitudes = h5read(filename, sa('/', data_name)); % read the entire "magnitudes" dataset, if it exists
+                        obj.magnitudes = cat(3, obj.magnitudes, loaded_magnitudes);
+                        
+                    elseif cs(data_name, obj.dataset_names.temperatures) && all(data_size) % data_names.temperatures may be a cell array of different optional names
+                        
+                        loaded_temperatures = h5read(filename, sa('/', data_name)); % read the entire "temperatures" dataset, if it exists
+                        obj.temperatures = cat(3, obj.temperatures, loaded_temperatures);
+                        
                     elseif cs(data_name, obj.dataset_names.stack) && all(data_size)
                         
                         loaded_stack = h5read(filename, sa('/', data_name)); % if there are any stack images (or "full_sum" images) just get them from the file. 
                         obj.stack = cat(3, obj.stack, loaded_stack); % append to previous file's results. 
+                        
+                        obj.getAttribute(filename, data_name, att_names, 'num_sum'); % need to add this to the "stack" property
                         
                     elseif cs(data_name, obj.dataset_names.timestamps) && all(data_size) % data_names.timestamps may be a cell array of different optional names
                         
@@ -903,9 +905,9 @@ classdef Reader < file.AstroData
                 end
                 
             elseif cs(ext, '.mat')
-                
+                error('Reading MAT files is still not implemented!');
             elseif cs(ext, '.fits')
-                
+                error('Reading FITS files is still not implemented!');
             else
                 error(['Filename ' obj.filenames{obj.this_file_index} ' has unknown format... use HDF5 or mat']);
             end

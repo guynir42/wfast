@@ -13,17 +13,22 @@ void SaveDataHDF5::writeData(){ // write to file all the main data sets (images,
 	
 	// MyFilePointer file(filename);
 	
+	// mexPrintf("writing data into HDF5\n");
+	
 	// if any of these is empty, they will get skipped...
 	writeMatrix(file, images);
+	writeMatrix(file, timestamps);
 	writeMatrix(file, cutouts);
 	writeMatrix(file, positions);
 	writeMatrix(file, coordinates);
 	writeMatrix(file, magnitudes);
 	writeMatrix(file, temperatures);
+	writeMatrix(file, fluxes);
+	writeMatrix(file, cutouts_bg);
+	writeMatrix(file, positions_bg);
+	writeMatrix(file, backgrounds);
 	writeMatrix(file, stack);
-	writeMatrix(file, timestamps);
 	writeMatrix(file, psfs);
-	writeMatrix(file, lightcurves);
 	
 }
 

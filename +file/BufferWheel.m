@@ -93,6 +93,7 @@ classdef BufferWheel < file.AstroData
         use_dir_types = 0; % automatically add a dir_extension equal to "type"
         
         % write parameters
+        use_save_raw_images = 1; % if set to 0, will not save to disk the full frame raw images! 
         use_overwrite = 1; % delete existing files (this should not happen in normal operations because of unique filenames) 
         use_write_pars = 1; % write pars object to each file
         use_deflate = 0; % also can specify how much deflation you want, between 1 to 10 (more than 1 is usually slow and doesn't change much)
@@ -245,6 +246,7 @@ classdef BufferWheel < file.AstroData
                 
         function clear(obj) % prepare object for new batch
         
+            clear@file.AstroData(obj);
             obj.clearBuf(obj.index);
             
         end
@@ -283,7 +285,7 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function clearImages(obj) % get rid of full frame images only
+        function clearImages(obj) % get rid of full frame images only (to be depricated!)
             
             obj.images = [];
             for ii = 1:length(obj.buf)
@@ -715,7 +717,7 @@ classdef BufferWheel < file.AstroData
             end
             
             if nargin<3 || isempty(timeout)
-                timeout = max(10, obj.pars.expT.*5*size(buf.images,3)); % seconds
+                timeout = max([10, obj.pars.expT.*5*size(buf.images,3)]); % seconds
             end
             
             if obj.debug_bit>1, fprintf('waitForRecording. record_flag= %d %d\n', buf.mex_flag_record(1), buf.mex_flag_record(2)); end
@@ -857,9 +859,9 @@ classdef BufferWheel < file.AstroData
                 input.scan_vars(varargin{:});
             end
             
-            list = properties(file.AstroData);
             obj.clear;
             
+            list = properties(file.AstroData);
             for ii = 1:length(list) % copy the data from the input object into the buffer... 
                 
                 name = list{ii};
@@ -938,15 +940,23 @@ classdef BufferWheel < file.AstroData
                     obj.pars_struct_cell = {};
                 end
                 
-                % right now mex write is only for HDF5 files
-                file.mex.write(this_filename, buf.mex_flag_write, 'images', buf.images, ...
-                    'cutouts', buf.cutouts,  'positions', buf.positions,...
-                    'stack', buf.stack, 'num_sum', buf.num_sum,...
-                    'timestamps', buf.timestamps, 't_end_stamp', buf.t_end_stamp, 't_end', buf.t_end, 't_start', buf.t_start,...
-                    'psfs', buf.psfs, 'sampling_psf', buf.sampling_psf, 'fluxes', buf.fluxes, 'parameters', obj.pars_struct_cell,...
+%                 file.mex.write(this_filename, buf.mex_flag_write, 'images', buf.images, ...
+%                     'cutouts', buf.cutouts,  'positions', buf.positions,...
+%                     'stack', buf.stack, 'num_sum', buf.num_sum,...
+%                     'timestamps', buf.timestamps, 't_end_stamp', buf.t_end_stamp, 't_end', buf.t_end, 't_start', buf.t_start,...
+%                     'psfs', buf.psfs, 'sampling_psf', buf.sampling_psf, 'fluxes', buf.fluxes, 'parameters', obj.pars_struct_cell,...
+%                     'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit);
+                
+                % right now mex write is only for HDF5 files    
+                if obj.use_save_raw_images
+                    file.mex.write(this_filename, buf.mex_flag_write, buf, 'parameters', obj.pars_struct_cell,...
                     'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit);
-                    % should also mark the mex_flag_write as finished writing... 
-                    
+                else
+                    file.mex.write(this_filename, buf.mex_flag_write, buf, 'parameters', obj.pars_struct_cell,...
+                    'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit,...
+                    'images', []); % last line overwrites the "images" in the buf and sets it to empty... 
+                end
+                
             else % use the old, non-mex writing method
 
                 if isempty(obj.file_type) || cs(obj.file_type, {'hdf5', 'h5'})
