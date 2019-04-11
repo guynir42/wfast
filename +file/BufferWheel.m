@@ -229,7 +229,7 @@ classdef BufferWheel < file.AstroData
             reset@file.AstroData(obj);
             
             for ii = 1:length(obj.buf)
-                obj.clearBuf(ii);
+%                 obj.clearBuf(ii);
             end
             
             obj.index = 1;
@@ -252,7 +252,7 @@ classdef BufferWheel < file.AstroData
         end
         
         function clearBuf(obj, idx) % clear data inside a single buffer
-            
+
 %             obj.buf(idx).images = [];
 % 
 %             obj.buf(idx).cutouts = [];
@@ -680,7 +680,7 @@ classdef BufferWheel < file.AstroData
                 disp(['moving on to buffer ' num2str(obj.next_buf.buf_number)]);
             end
             
-            obj.clear;
+%             obj.clear;
             util.vec.mex_change(obj.this_buf.mex_flag_read, 1, 0); % unlock the current buffer
             
             obj.index = obj.index + 1;

@@ -102,9 +102,9 @@ classdef AstroData < dynamicprops
     methods % other utilities
         
         function takeFrom(obj, other)
-            
+            error('Do not use this!');
             obj.copyFrom(other);
-            other.clear;
+            other.clear; % this is very dangerous, especially when taking from BufferWheel, as it resets the buffers as well... 
             
         end
         
