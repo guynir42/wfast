@@ -130,6 +130,9 @@ classdef StatusChecker < handle
                 obj.setup_t2;
                 obj.setup_t1;
                 
+                obj.callback_t1;
+                obj.callback_t2;
+                
             else
                 
                 error('Must supply a "Manager" object to StatusChecker constructor...');

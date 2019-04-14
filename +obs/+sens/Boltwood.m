@@ -121,7 +121,7 @@ classdef Boltwood < handle
                 val = [];
             else
                 val = obj.data.median;
-                val = val(2);
+                if length(val)>=2, val = val(2); end
             end
             
         end
@@ -132,7 +132,7 @@ classdef Boltwood < handle
                 val = [];
             else
                 val = obj.data.median;
-                val = val(3);
+                if length(val)>=3, val = val(3); end
             end
             
         end
@@ -143,7 +143,7 @@ classdef Boltwood < handle
                 val = [];
             else
                 val = obj.data.median;
-                val = val(4);
+                if length(val)>=4, val = val(4); end
             end
             
         end
@@ -154,7 +154,7 @@ classdef Boltwood < handle
                 val = [];
             else
                 val = obj.data.median;
-                val = val(5);
+                if length(val)>=5, val = val(5); end
             end
             
         end
@@ -176,7 +176,7 @@ classdef Boltwood < handle
                 val = [];
             else
                 val = obj.data.median;
-                val = val(7);
+                if length(val)>=7, val = val(7); end
             end
             
         end
@@ -187,7 +187,7 @@ classdef Boltwood < handle
                 val = [];
             else
                 val = obj.data.median;
-                val = val(8);
+                if length(val)>=8, val = val(8); end
             end
             
         end
@@ -199,7 +199,7 @@ classdef Boltwood < handle
                 val = [];
             else
                 val = obj.data.median;
-                val = val(9);
+                if length(val)>=9, val = val(9); end
             end
             
         end
