@@ -27,13 +27,13 @@ classdef AstroHaven < handle
         status = 0;
         id = 'dome';
         
-        port_name = 'COM10'; % change this later
+        port_name = 'COM13'; % change this later
         
         use_accelerometers = 0;
         
         reply = '';
         
-        debug_bit = 1;
+        debug_bit = 2;
         
     end
     
@@ -49,8 +49,10 @@ classdef AstroHaven < handle
     
     properties (Hidden = true)
         
-        counter = 0;
-        reconnect_counter = 0;
+        fail_reply_counter = 0;
+        max_fail_reply = 3;
+        fail_connect_counter = 0;
+        max_fail_connect = 3;
         
         acc_name = 'HC-06';
         acc_id1 = '';
@@ -99,6 +101,17 @@ classdef AstroHaven < handle
         function delete(obj)
             
             obj.disconnect;
+            
+        end
+        
+    end
+    
+    methods % resetters
+        
+        function reset(obj)
+            
+            obj.fail_reply_counter = 0;
+            obj.fail_reply_counter = 0;
             
         end
         
@@ -169,7 +182,7 @@ classdef AstroHaven < handle
             obj.log.input('Emergency close!');
             
             try 
-                obj.counter = 0;
+                % obj.counter = 0;
                 obj.send('C');
                 obj.closeBoth(100);
                 obj.update;
@@ -196,7 +209,7 @@ classdef AstroHaven < handle
 
                     t = tic;
 
-                    obj.counter = 0;
+                    % obj.counter = 0;
                     
                     obj.send('a');
                     
@@ -236,7 +249,7 @@ classdef AstroHaven < handle
 
                     t = tic;
                     
-                    obj.counter = 0;
+                    % obj.counter = 0;
                     obj.send('A');
                     obj.send('B');
 
@@ -274,7 +287,7 @@ classdef AstroHaven < handle
 
                     t = tic;
 
-                    obj.counter = 0; % this prevents an infinite loop of send calling itself...
+                    % obj.counter = 0; % this prevents an infinite loop of send calling itself...
                     obj.send(command);
                     
                     pause(0.2);
@@ -310,7 +323,7 @@ classdef AstroHaven < handle
 
                     t = tic;
 
-                    obj.counter = 0; % this prevents an infinite loop of send calling itself...
+                    % obj.counter = 0; % this prevents an infinite loop of send calling itself...
                     obj.send(command);
 
                     pause(0.2);
@@ -346,7 +359,7 @@ classdef AstroHaven < handle
 
                     t = tic;
 
-                    obj.counter = 0; % this prevents an infinite loop of send calling itself...
+                    % obj.counter = 0; % this prevents an infinite loop of send calling itself...
                     obj.send(command);
     %                 fprintf(obj.hndl, command);
 
@@ -383,7 +396,7 @@ classdef AstroHaven < handle
 
                     t = tic;
 
-                    obj.counter = 0; % this prevents an infinite loop of send calling itself...
+                    % obj.counter = 0; % this prevents an infinite loop of send calling itself...
                     obj.send(command);
 
                     pause(0.2);
@@ -423,14 +436,19 @@ classdef AstroHaven < handle
         
         function connect(obj)
             
-            if obj.reconnect_counter>=10
-                disp(['Cannot connect to dome, giving up after ' num2str(obj.reconnect_counter) ' tries']);
-                return;
+            str = sprintf('connecting to dome! attempt %d', obj.fail_connect_counter);
+            
+            if obj.debug_bit>1, disp(str); end
+            
+            obj.log.input(str);
+            
+            if obj.fail_connect_counter>=3
+                disp(['Cannot connect to dome, giving up after ' num2str(obj.fail_connect_counter) ' tries']);
+                obj.hndl = [];
+                err_msg = sprintf('Cannot attempt additional connections to dome (limited to %d attempts)', obj.max_fail_connect);
+                obj.log.error(err_msg);
+                error(err_msg);
             end
-            
-            if obj.debug_bit>1, disp('connecting to dome!'); end
-            
-            obj.log.input('Connecting to dome via serial port');
             
             try
                 
@@ -438,16 +456,13 @@ classdef AstroHaven < handle
                     obj.disconnect;
                 end
                 
-                pause(0.2);
+                pause(0.1);
                 
                 obj.hndl = serial(obj.port_name);
 
-    %             obj.hndl.BytesAvailableFcn = @obj.getReply;
-    %             obj.hndl.BytesAvailableFcnCount = 1;
-    %             obj.hndl.BytesAvailableFcnMode = 'byte';
                 obj.hndl.Terminator = '';
 
-                for ii = 1:30
+                for ii = 1:3
                 
                     if strcmp(obj.hndl.Status, 'open'), break; end
                     
@@ -465,12 +480,26 @@ classdef AstroHaven < handle
                     
                     pause(0.1);
 
-                end
+                    fprintf(obj.hndl, 'R');
+                    
+                end % loop over trying to connect
                    
                 if ~strcmp(obj.hndl.Status, 'open')
+                    
                     if obj.debug_bit>1, disp('Giving up on opening serial port...'); end
+                    
+                    obj.fail_connect_counter = obj.fail_connect_counter + 1;
+                    if ~isempty(obj.hndl)
+                        delete(obj.hndl);
+                        obj.hndl = [];
+                    end
+                    
                 else
+                    
                     if obj.debug_bit>1, disp('Successful reconnect!'); end
+                    
+                    obj.fail_connect_counter = 0;
+                    
                 end
                     
                 obj.update;
@@ -493,8 +522,10 @@ classdef AstroHaven < handle
             obj.log.input('Disconnecting from dome');
             
             try 
-                fclose(obj.hndl);
-                delete(obj.hndl);
+                if ~isempty(obj.hndl)
+                    fclose(obj.hndl);
+                    delete(obj.hndl);
+                end
                 obj.hndl = [];
             catch ME
                 obj.log.error(ME.getReport);
@@ -540,7 +571,9 @@ classdef AstroHaven < handle
             for ii = 1:3
                 
                 try 
-                    fprintf(obj.hndl, command);
+                    if ~isempty(obj.hndl)
+                        fprintf(obj.hndl, command);
+                    end
                     return;
                 catch ME
 
@@ -560,21 +593,20 @@ classdef AstroHaven < handle
             
             pause(0.1);
             obj.connect;
-            obj.counter = obj.counter + 1;
-            if obj.counter<10 % infinite-loop prevention
-                obj.send(command);
-            else
-                if obj.debug_bit>1, disp('Not trying any more reconnects in send loop...'); end
-            end
             
         end
         
         function update(obj)
             
-            if obj.debug_bit>1, fprintf('updating data...'); end
+            if obj.debug_bit>1, fprintf('updating data...\n'); end
             
-            flushinput(obj.hndl);
-
+            if isempty(obj.hndl)
+                obj.status = 0;
+                return;
+            else
+                flushinput(obj.hndl);
+            end
+            
             obj.getReply;
             
             if isempty(obj.reply)
@@ -595,16 +627,21 @@ classdef AstroHaven < handle
             catch ME
                 disp('--read failed--');
                 obj.reply = '';
+                
             end
             
-            if num==0
-                if obj.debug_bit>1, disp('Couldnt read reply from serial port... reconnecting'); end
+            if num==0 || isempty(obj.reply)
+                if obj.debug_bit>1, disp(['Couldnt read reply from serial port... reconnecting (fail_reply_counter= ' num2str(obj.fail_reply_counter) ')']); end
                 warning('off', 'MATLAB:serial:fread:unsuccessfulRead');
-                obj.reconnect_counter = obj.reconnect_counter + 1;
+
+                if obj.fail_reply_counter>obj.max_fail_reply % too many attempts to reconnect
+                    error('Could not get reply from dome...');
+                else
+                    obj.fail_reply_counter = obj.fail_reply_counter + 1;
+                end
+                
                 obj.connect;
                 
-            else
-                obj.reconnect_counter = 0;
             end
             
             if strcmp(obj.reply, '0') % reset all time estimates when closed
@@ -614,7 +651,9 @@ classdef AstroHaven < handle
                 obj.close_time2 = 0; 
             end
             
-            if obj.debug_bit>1, fprintf(' reply: %s\n', obj.reply); end
+            obj.fail_reply_counter = 0; % after successful reply we can reset the counter
+            
+            if obj.debug_bit>1, fprintf('                reply: %s\n', obj.reply); end
             
         end
         
