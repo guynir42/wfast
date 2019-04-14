@@ -62,7 +62,7 @@ classdef FocusActuator < handle
         end
         
         function delete(obj)
-           
+            
             if obj.debug_bit, disp(['disconnecting from actuator ' obj.controller_serial]); end
             obj.hndl.CloseConnection;
             obj.hndl.Destroy;
@@ -123,7 +123,7 @@ classdef FocusActuator < handle
             
         end
         
-        function val = get.status
+        function val = get.status(obj)
             
             val = obj.isConnected; % can we add additional tests on this??
             
