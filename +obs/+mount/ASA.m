@@ -152,13 +152,13 @@ classdef ASA < handle
         
         function val = get.ALT_target(obj)
             
-            val = obj.target.ALT;
+            val = rad2deg(obj.target.ALT);
             
         end
         
         function val = get.AZ_target(obj)
             
-            val = obj.target.AZ;
+            val = rad2deg(obj.target.AZ);
             
         end
         
@@ -237,16 +237,16 @@ classdef ASA < handle
         function set.RA_target(obj, val)
             
             obj.hndl.TargetRightAscension = val*24/360;
-            
-            obj.RA_target = val; % should we make this dependent?
+            obj.target.RA = deg2rad(val);
+%             obj.RA_target = val; % should we make this dependent?
             
         end
         
         function set.DE_target(obj, val)
             
             obj.hndl.TargetDeclination = val;
-            
-            obj.DE_target = val; % should we make this dependent?
+            obj.target.DE = deg2rad(val);
+%             obj.DE_target = val; % should we make this dependent?
             
         end
         
@@ -266,7 +266,7 @@ classdef ASA < handle
         
         function goto(obj, varargin)
             
-            
+            error('Not yet implemented!');
             
         end
         
