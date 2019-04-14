@@ -33,7 +33,7 @@ classdef AstroHaven < handle
         
         reply = '';
         
-        debug_bit = 2;
+        debug_bit = 1;
         
     end
     
