@@ -10,9 +10,34 @@ MyMatrix::MyMatrix(const char *name, const mxArray *matrix, bool deflate){
 	
 }
 
+void MyMatrix::clear(){
+	
+	matrix_uint16=0;
+	matrix_double=0;
+	matrix_float=0;
+	
+	ndims=0;
+	dims=0;
+	for(int i=0;i<4;i++) dims_c[i]=0;
+	numel=0;	
+	rows=0;
+	cols=0;
+	frames=1;
+	cutouts=1;
+	bits=0;
+	use_deflate=0; 
+	
+	attributes.clear();
+	
+
+}
+
 void MyMatrix::input(const char *name, const mxArray *matrix, bool deflate){
 	
-	if(mxIsClass(matrix, "uint16")){ matrix_uint16 = (unsigned short int*) mxGetData(matrix); bits=2; }
+	clear(); // make sure that for any consecutive calls to "input", only the last is used... 
+	
+	if(mxIsEmpty(matrix)) return; // if we got an empty matrix, we can't really do anything except clear this object and keep going
+	else if(mxIsClass(matrix, "uint16")){ matrix_uint16 = (unsigned short int*) mxGetData(matrix); bits=2; }
 	else if(mxIsClass(matrix, "double")){ matrix_double = mxGetPr(matrix); bits=8; }
 	else if(mxIsClass(matrix, "single")){ matrix_float = (float*) mxGetData(matrix); bits=4; }
 	else mexErrMsgIdAndTxt( "MATLAB:file:mex:mexWrite:wrongDataType", "images must be uint16, float or double!");

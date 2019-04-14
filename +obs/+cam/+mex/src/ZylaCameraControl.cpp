@@ -100,9 +100,9 @@ void ZylaCameraControl::record(int idx){
 	ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
 	if(ret!=AT_SUCCESS){ report_error("record>software trigger", ret, mex_flag_cam); return; }
 	
-	unsigned long long int clock=0;
+	AT_64 clock=0;
 		
-	for(int i=0; i<batch_size; i++){
+	for(unsigned int i=0; i<batch_size; i++){
 		
 		int error_counter=0; // to make sure we are not in an endless loop... 
 		

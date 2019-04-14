@@ -363,6 +363,10 @@ classdef Parameters < dynamicprops
             else 
                 name = obj.target_name;
             end
+            
+            if isempty(name) || ~ischar(name)
+                error('Parameters.folder_name is not a string!');
+            end
 
         end
         
@@ -595,7 +599,7 @@ classdef Parameters < dynamicprops
         function set.ephem(obj, val)
             
             obj.ephem = val;
-            obj.ephem.pars = obj;
+%             obj.ephem.pars = obj;
             
         end
         
@@ -746,10 +750,10 @@ classdef Parameters < dynamicprops
         
         function writeFitsHeader(obj, file_ptr, time_delay)
             
-            if nargin<2 || isempty(time_delay)
-                start_time_str = obj.stamp2str(time_delay);
-            else
+            if nargin<3 || isempty(time_delay)
                 start_time_str = obj.t_start;
+            else
+                start_time_str = obj.stamp2str(time_delay);
             end
             
             if ~isempty(start_time_str)

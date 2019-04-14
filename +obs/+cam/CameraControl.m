@@ -1425,7 +1425,7 @@ classdef CameraControl < file.AstroData
                 disp(['reading out batch ' num2str(obj.batch_counter) ' from buffer ' num2str(buf.index) ' | read_flag: ' util.text.print_vec(buf.this_buf.mex_flag_read)]);
             end
             
-            obj.takeFrom(buf); % copies the pointers to the data in "buf"
+            obj.copyFrom(buf); % copies the pointers to the data in "buf"
             
 %             I = buf.this_buf.images_raw;
 %             if ~isempty(I), I(1) = I(1); end % do we need to make a copy of the data...?
@@ -1613,8 +1613,8 @@ classdef CameraControl < file.AstroData
                 obj.gui = obs.cam.gui.CamGUI(obj);                
             end
             
-            if ~isempty(obj.focuser) && isempty(obj.focuser.gui)
-                obj.focuser.gui = obj.gui;
+            if ~isempty(obj.focuser) && isempty(obj.focuser.gui_cam)
+                obj.focuser.gui_cam = obj.gui;
             end
             
             obj.gui.make;

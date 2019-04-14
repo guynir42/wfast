@@ -46,7 +46,7 @@ void CameraControl::loadFromCamera(const mxArray *camera){
 }
 
 void CameraControl::loadFromBuffers(mxArray *buffers){
-		
+	
 	num_buffers=(int) mxGetNumberOfElements(buffers);
 	mxArray *prop=0;
 	
@@ -80,6 +80,7 @@ void CameraControl::loadFromBuffers(mxArray *buffers){
 			
 			// assuming MATLAB uses memory aligned to 8-byte boundary...
 			if(debug_bit>2) mexPrintf("Allocating a new matrix...\n");
+
 			images_ptrs[b]=(unsigned short int*) mxCalloc((int) (height*width*batch_size), 2); // use 2 to initialize a uint16
 			mwSize dims[3] = {(mwSize) height, (mwSize) width, (mwSize) batch_size};
 			mxArray *array=mxCreateNumericArray(3, dims, mxUINT16_CLASS, mxREAL);

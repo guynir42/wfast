@@ -13,17 +13,22 @@ void SaveDataHDF5::writeData(){ // write to file all the main data sets (images,
 	
 	// MyFilePointer file(filename);
 	
+	// mexPrintf("writing data into HDF5\n");
+	
 	// if any of these is empty, they will get skipped...
 	writeMatrix(file, images);
+	writeMatrix(file, timestamps);
 	writeMatrix(file, cutouts);
 	writeMatrix(file, positions);
 	writeMatrix(file, coordinates);
 	writeMatrix(file, magnitudes);
 	writeMatrix(file, temperatures);
+	writeMatrix(file, fluxes);
+	writeMatrix(file, cutouts_bg);
+	writeMatrix(file, positions_bg);
+	writeMatrix(file, backgrounds);
 	writeMatrix(file, stack);
-	writeMatrix(file, timestamps);
 	writeMatrix(file, psfs);
-	writeMatrix(file, lightcurves);
 	
 }
 
@@ -69,7 +74,12 @@ void SaveDataHDF5::writeAttribute(MyAttribute att, hid_t group_or_dataset_id){ /
 	
 	if(status<0){ 
 		mex_flag[2]=-1; 
-		mexErrMsgIdAndTxt( "MATLAB:file:mex:SaveDataHDF5:writeAttribute", "Something wrong when writing attribute '%s'", att.att_name); 
+		char str[10];
+		if(att.is_empty()) strncpy(str, "empty", 10);
+		else if(att.is_scalar) strncpy(str, "scalar", 10);
+		else if(att.is_vec) strncpy(str, "vector", 10); 
+		else if(att.is_str) strncpy(str, "string", 10);
+		mexErrMsgIdAndTxt( "MATLAB:file:mex:SaveDataHDF5:writeAttribute", "Something wrong when writing %s attribute '%s'", str, att.att_name); 
 	}
 	
 	H5Tclose(dataspace.data_type);
@@ -95,21 +105,29 @@ SaveDataHDF5::MyDataspace::MyDataspace(MyMatrix matrix){
 SaveDataHDF5::MyDataspace::MyDataspace(MyAttribute attribute){
 	
 	// default is to use a scalar...
-	size_t dims_temp=1;
+	// size_t dims_temp=0;
 	data_type=H5T_NATIVE_DOUBLE;
 	
-	if(attribute.is_vec) dims_temp=attribute.vec.size(); // allow for vector attributes
-	
-	id=H5Screate_simple(1, &dims_temp, NULL);
-	
-	if(attribute.is_str){
+	if(attribute.is_empty()) id=H5Screate(H5S_NULL);
+	else if(attribute.is_scalar) id=H5Screate(H5S_SCALAR);
+	else if(attribute.is_vec){ // allow for vector attributes
+		id=H5Screate(H5S_SIMPLE); 
+		size_t dims[1]={attribute.vec.size()};
+		H5Sset_extent_simple(id, 1, dims, NULL);
+	}
+	else if(attribute.is_str){
 		
+		id=H5Screate(H5S_SIMPLE); 
+		size_t dims[1]={1};
+		H5Sset_extent_simple(id, 1, dims, NULL);
 		data_type = H5Tcopy(H5T_C_S1);
 		H5Tset_size(data_type, attribute.str.length());
 		// H5Tset_size(data_type, H5T_VARIABLE);
 		H5Tset_strpad(data_type, H5T_STR_NULLTERM);
 		
 	}
+	
+	// id=H5Screate_simple(1, &dims_temp, NULL);
 	
 	if(id<0){ 
 		mex_flag[2]=-1; 
@@ -133,7 +151,11 @@ SaveDataHDF5::MyDataset::MyDataset(MyFilePointer &file, const char *location, My
 	if (matrix.use_deflate && deflate>0){ // if this matrix needs to be deflated and if we are using deflate (in general)
 		
 		hsize_t chunk_dims_c[4]={1};
-		for(int i=0;i<matrix.ndims;i++) chunk_dims_c[matrix.ndims-1-i]=chunk;
+		// for(int i=0;i<matrix.ndims;i++) chunk_dims_c[matrix.ndims-1-i]=chunk;
+		chunk_dims_c[3]=chunk;
+		chunk_dims_c[2]=chunk;
+		chunk_dims_c[1]=matrix.frames;
+		chunk_dims_c[0]=1;
 		
 		int status=0;
 		

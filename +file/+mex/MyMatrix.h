@@ -25,6 +25,7 @@ public:
 	
 	MyMatrix();
 	MyMatrix(const char *name, const mxArray *image, bool deflate=0);
+	void clear();
 	void input(const char *name, const mxArray *image, bool deflate=0);
 	void printout();
 	bool is_empty();
@@ -39,8 +40,8 @@ public:
 	
 	char data_name[STRLN];
 	int ndims=0;
-	size_t *dims;
-	size_t dims_c[4];
+	size_t *dims=0;
+	size_t dims_c[4]={0};
 	size_t numel=0;	
 	size_t rows=0;
 	size_t cols=0;

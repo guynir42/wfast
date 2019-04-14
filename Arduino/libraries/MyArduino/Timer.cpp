@@ -52,7 +52,7 @@ void Timer::time2hms(char *buf, float time, int units){
 	
 	snprintf(buf, Parser::STRN, "");
 	if(minus) snprintf(buf, Parser::STRN, "-");
-		
+	if(hours<=0 && minutes<=0 && seconds<=0) snprintf(buf, Parser::STRN, "0");
 	if(hours>0) snprintf(buf, Parser::STRN, "%s%dh", buf, hours);
 	if(minutes>0 || (hours>0 && seconds>0) ) snprintf(buf, Parser::STRN, "%s%dm", buf, minutes);
 	if(seconds>0) snprintf(buf, Parser::STRN, "%s%ds", buf, seconds);
@@ -99,8 +99,8 @@ char *Timer::printout(){
 		break;
 		
 	case ALTER:
-		time2hms(remaining, getRemainingInInterval());
-		if(getState()){			
+		time2hms(remaining, getTimeInInterval());
+		if(getState()){
 			snprintf(_out_buf, Parser::MAXN, "%s (ON) | int= %s of %s", getModeString(), remaining, interval);
 		}
 			
@@ -113,13 +113,13 @@ char *Timer::printout(){
   
 		if(getState()){
 		  
-			time2hms(remaining, getRemainingInPulse());
+			time2hms(remaining, getTimeInPulse());
 			snprintf(_out_buf, Parser::MAXN, "%s (ON) | int= %s | pul: %s of %s ", getModeString(), interval, remaining, pulse);
 	  
 		}
 		else{
 		  
-			time2hms(remaining, getRemainingInInterval());
+			time2hms(remaining, getTimeInInterval());
 			snprintf(_out_buf, Parser::MAXN, "%s (OFF) | int= %s of %s | pul: %s ", getModeString(), remaining, interval, pulse);
 		  
 		}
@@ -167,12 +167,50 @@ char *Timer::printout(){
 // getters
 float Timer::getRunningTime(){
  
-	float time=((float) (millis()-_start_time_milli))/1000.0; // convert to seconds!
+	long int milli_seconds_mod = (millis()-_start_time_milli); 
+	if (_current_mode==ALTER) milli_seconds_mod = milli_seconds_mod%((int) (_interval*2*1000) ); // keep this number inside the range of ON and OFF intervals (convert _interval to ms)
+	if (_current_mode==PULSED) milli_seconds_mod = milli_seconds_mod%((int)((_interval+_pulse_length)*1000)); // keep this number inside the range of OFF interval and ON pulse (convert _interval/_pulse_length to ms)
+	
+	float time=((float) milli_seconds_mod)/1000.0; // convert to seconds!
 	if(_current_unit==Timer::MIN) time=time/60;
 	else if(_current_unit==Timer::HOUR) time=time/3600;
 	if(time<0) resetTime(); // to handle when the Arduino built in timer resets itself
 	return time;
   
+}
+
+float Timer::getTimeInInterval(){
+	
+	switch(_current_mode){
+		
+		case COUNT:
+		case EXPIRE:
+			if(getRunningTime()>_interval) return _interval;
+			else return getRunningTime();
+			
+		case ALTER:
+			if(getRunningTime()<=_interval) return getRunningTime();
+			if(getRunningTime()<=2*_interval) return getRunningTime() - _interval;
+			
+		case PULSED: 
+		case SINGLE: 
+			if(_first_pulse==0){
+				if(getRunningTime()<=_interval) return getRunningTime(); // still in the interval
+				else return _interval; // interval has passed...
+			}
+			else{
+				if(getRunningTime()>=_pulse_length && getRunningTime()<_interval+_pulse_length) return getRunningTime() - _pulse_length; // passed the initial pulse, now inside the interval...
+				else if (getRunningTime()<_pulse_length) return 0;
+				else return _pulse_length + _interval;
+			}
+		
+		default:
+			return 0;	
+
+	}// switch 
+	
+				
+	
 }
 
 float Timer::getRemainingInInterval(){
@@ -189,23 +227,51 @@ float Timer::getRemainingInInterval(){
 			if(getRunningTime()<2*_interval) return 2*_interval-getRunningTime();
 			
 		case PULSED: 
+		case SINGLE: 
 			if(_first_pulse==0){
-				if(getRunningTime()>_interval) return 0;
-				else return _interval-getRunningTime();
+				if(getRunningTime()<=_interval) return _interval-getRunningTime(); // still in the interval
+				else return 0; // interval has passed...
 			}
 			else{
-				if(getRunningTime()>=_pulse_length && getRunningTime()<=_pulse_length+_interval) return _interval+_pulse_length-getRunningTime();
+				if(getRunningTime()>=_pulse_length && getRunningTime()<_interval+_pulse_length) return _interval+_pulse_length-getRunningTime(); // passed the initial pulse, now inside the interval...
 				else return 0;
 			}
-				
-		case SINGLE: 
-			if(getRunningTime()>_interval) return 0;
-			else return _interval-getRunningTime();
 		
 		default:
 			return 0;	
 
 	}// switch 
+	
+}
+
+float Timer::getTimeInPulse(){
+		
+		switch(_current_mode){
+				
+		case COUNT:
+		case EXPIRE:
+			return 0;
+			
+		case ALTER:
+			return 0;
+			
+		case PULSED: 
+		case SINGLE: 
+			if(_first_pulse==0){
+				if(getRunningTime()>_interval && getRunningTime()<=_interval+_pulse_length) return getRunningTime() - _interval; // passed the interval, now in the pulse
+				else if(getRunningTime()<_interval) return 0;
+				else return _pulse_length;
+			}
+			else{
+				if(getRunningTime()>=0 && getRunningTime()<_pulse_length) return getRunningTime(); // still inside the initial pulse
+				else return _pulse_length;
+			}
+		
+		default:
+			return 0;	
+
+	}// switch 
+	
 	
 }
 
@@ -221,18 +287,15 @@ float Timer::getRemainingInPulse(){
 			return 0;
 			
 		case PULSED: 
+		case SINGLE: 
 			if(_first_pulse==0){
-				if(getRunningTime()>_interval && getRunningTime()<=_interval+_pulse_length) return _interval+_pulse_length-getRunningTime();
+				if(getRunningTime()>_interval && getRunningTime()<=_interval+_pulse_length) return _interval+_pulse_length-getRunningTime(); // passed the interval, now in the pulse
 				else return 0;
 			}
 			else{
-				if(getRunningTime()>=0 && getRunningTime()<_pulse_length) return _pulse_length-getRunningTime();
+				if(getRunningTime()>=0 && getRunningTime()<_pulse_length) return _pulse_length-getRunningTime(); // still inside the initial pulse
 				else return 0;
 			}
-				
-		case SINGLE: 
-			if(getRunningTime()>_interval && getRunningTime()<_interval+_pulse_length) return _interval+_pulse_length-getRunningTime();
-			else return 0;
 		
 		default:
 			return 0;	
@@ -259,28 +322,23 @@ int Timer::getState(){
     case ALTER:
       
       if(((int)(getRunningTime()/_interval))%2==0) return _first_pulse;
-      if(getRunningTime()>=_interval*2){ resetTime(); return _first_pulse; }
+      if(getRunningTime()>=_interval*2){ return _first_pulse; }
       else return !_first_pulse;
       
-    case PULSED:
-      
+    case PULSED:      
+    case SINGLE:
+	
       if(_first_pulse==0){
 		if(getRunningTime()>=_interval && getRunningTime()<=_interval+_pulse_length) return 1;
-		else if(getRunningTime()>_interval+_pulse_length){ resetTime(); return 0; }
+		else if(getRunningTime()>_interval+_pulse_length){ return 0; }
 		else return 0;
       }
       else{
 		if(getRunningTime()>=0 && getRunningTime()<=_pulse_length) return 1;
-		else if(getRunningTime()>_pulse_length+_interval){ resetTime(); return 0; }
+		else if(getRunningTime()>_pulse_length+_interval){ return 0; }
 		else return 0;
       }
 	
-    case SINGLE:
-      
-      if(getRunningTime()>=_interval && getRunningTime()<=_interval+_pulse_length) return 1;
-      else if(getRunningTime()>_interval+_pulse_length){ return 0; }
-      else return 0;
-      
     case OFF:
       return 0;
       
@@ -603,7 +661,7 @@ void Timer::parse(char *arg){
   
   else if(Parser::partialMatch(str1, "off")){ 
     
-    setMode(ON); 
+    setMode(OFF); 
     snprintf(_out_buf, Parser::MAXN, "timer is OFF"); 
     
   }

@@ -5,7 +5,7 @@ double *SaveData::mex_flag=0;
 int SaveData::debug_bit=0;
 int SaveData::deflate=0;
 size_t SaveData::chunk_size=64;
-bool SaveData::async_write=0;
+int SaveData::async_write=0;
 
 
 SaveData::SaveData(const char *filename){
@@ -34,50 +34,110 @@ void SaveData::parseVararginPairs(int N, const mxArray *vars[]){
 	// if(nrhs%2==1) mexErrMsgIdAndTxt( "MATLAB:obs:mexWrite:vararginNotPairs", "varargin must be given as pairs!");
 	for(int i=2; i<N;i+=2){
 		
-		if(mxIsChar(vars[i])==0) mexErrMsgIdAndTxt( "MATLAB:file:mex:mexWrite:inputNotString", "keyword must be a string.");
-		const char *keyword=mxArrayToString(vars[i]);
+		if(mxIsChar(vars[i])==0 && mxIsStruct(vars[i])==0) mexErrMsgIdAndTxt( "MATLAB:file:mex:mexWrite:inputNotStringOrStruct", "Keyword must be a string or a struct.");
+		if(mxIsStruct(vars[i])){ readStruct(vars[i]); i--; continue; } // skip this element and see if there are any more inputs to parse... 
 		
+		const char *keyword=mxArrayToString(vars[i]);
 		
 		// if we decide this pair is worth parsing, use keyword and value variables:
 		const mxArray *value=mxCreateDoubleScalar(1); // the positive approach
 		if(i+1<N) value=vars[i+1];	
-		if(mxIsEmpty(value)) continue; // just skip empty inputs
+		// if(mxIsEmpty(value)) continue; // just skip empty inputs
 		
 		// the third parameters tells MyMatrix if we want to deflate it (ignored if we are not using deflate at all)
 		if(cs(keyword, "images")) images.input("images", value, 1); 
+		else if(cs(keyword, "timestamps")) timestamps.input("timestamps", value, 0);
+		else if(cs(keyword, "t_start", "file_start_datestring", 16)) timestamps.attributes.push_back(MyAttribute("t_start", value));
+		else if(cs(keyword, "t_end", "file_write_datestring", 16)) timestamps.attributes.push_back(MyAttribute("t_end", value));
+		else if(cs(keyword, "t_end_stamp", "file_write_timestamp", 17)) timestamps.attributes.push_back(MyAttribute("t_end_stamp", value));
 		else if(cs(keyword, "cutouts")) cutouts.input("cutouts", value, 1);
 		else if(cs(keyword, "positions")) positions.input("positions", value, 0);
 		else if(cs(keyword, "coordinates")) coordinates.input("coordinates", value, 0);
 		else if(cs(keyword, "magnitudes")) magnitudes.input("magnitudes", value, 0);
 		else if(cs(keyword, "temperatures")) temperatures.input("temperature", value, 0);
+		else if(cs(keyword, "fluxes")) fluxes.input("fluxes", value, 0);
+		else if(cs(keyword, "cutouts_bg")) cutouts.input("cutouts", value, 1);
+		else if(cs(keyword, "positions_bg")) positions.input("positions", value, 0);
+		else if(cs(keyword, "backgrounds")) fluxes.input("backgrounds", value, 0);
 		else if(cs(keyword, "stack")) stack.input("stack", value, 1);
 		else if(cs(keyword, "num_sum")) stack.attributes.push_back(MyAttribute("num_sum", value));
-		else if(cs(keyword, "timestamps")) timestamps.input("timestamps", value, 0);
-		else if(cs(keyword, "t_start", "file_start_datestring", 16)) timestamps.attributes.push_back(MyAttribute("t_start", value));
-		else if(cs(keyword, "t_end", "file_write_datestring", 16)) timestamps.attributes.push_back(MyAttribute("t_end", value));
-		else if(cs(keyword, "t_end_stamp", "file_write_timestamp", 17)) timestamps.attributes.push_back(MyAttribute("t_end_stamp", value));
 		else if(cs(keyword, "psfs", 4)) psfs.input("psfs", value, 0);		
-		else if(cs(keyword, "psf_sampling",4)) timestamps.attributes.push_back(MyAttribute("psf_sampling", value));
-		else if(cs(keyword, "lightcurves")) lightcurves.input("lightcurves", value, 0);
+		else if(cs(keyword, "sampling_psf",4)) psfs.attributes.push_back(MyAttribute("sampling_psf", value));
+		// add more names to the list if new data fields are added
 		else if(cs(keyword, "pars", "parameters", "cell")) readParsCellArray(value);
-		else if(cs(keyword, "buffers", "buffer wheel")) parseBufferWheelObject(value); // this can replace some of the definitions (not yet implemented...)
 		else if(cs(keyword, "debug_bit")) debug_bit=(int) mxGetScalar(value);
 		else if(cs(keyword, "deflate")) deflate=(int) mxGetScalar(value);
 		else if(cs(keyword, "chunk")) chunk_size=(int) mxGetScalar(value);
-		else if(cs(keyword, "async_write")) async_write=mxGetScalar(value);
+		else if(cs(keyword, "async_write")) async_write=(int) mxGetScalar(value);
 		
 	}
 
+}
+
+void SaveData::readStruct(const mxArray *buf){
+	
+	// mexPrintf("reading data from struct...\n");
+	
+	std::vector<std::string> names;
+	names.push_back("images");
+	names.push_back("timestamps");
+	names.push_back("t_start");
+	names.push_back("t_end");
+	names.push_back("t_end_stamp");
+	names.push_back("cutouts");
+	names.push_back("positions");
+	names.push_back("coordinates");
+	names.push_back("magnitudes");
+	names.push_back("temperatures");
+	names.push_back("fluxes");
+	names.push_back("cutouts_bg");
+	names.push_back("positions_bg");
+	names.push_back("backgrounds");
+	names.push_back("stack");
+	names.push_back("num_sum");
+	names.push_back("psfs");
+	names.push_back("sampling_psf");
+	// add more names to the list if new data fields are added
+	
+	mxArray *value=0;
+	
+	for(int i=0; i<names.size(); i++){
+		
+		// mexPrintf("i= %02d | name: %s\n", i, names[i].c_str());
+		
+		value=mxGetField(buf, 0, names[i].c_str());
+		if(value){
+			
+			const char *keyword=names[i].c_str();
+			
+			if(cs(keyword, "images")) images.input("images", value, 1); 
+			else if(cs(keyword, "timestamps")) timestamps.input("timestamps", value, 0);
+			else if(cs(keyword, "t_start", "file_start_datestring", 16)) timestamps.attributes.push_back(MyAttribute("t_start", value));
+			else if(cs(keyword, "t_end", "file_write_datestring", 16)) timestamps.attributes.push_back(MyAttribute("t_end", value));
+			else if(cs(keyword, "t_end_stamp", "file_write_timestamp", 17)) timestamps.attributes.push_back(MyAttribute("t_end_stamp", value));
+			else if(cs(keyword, "cutouts", 8)) cutouts.input("cutouts", value, 1);
+			else if(cs(keyword, "positions", 9)) positions.input("positions", value, 0);
+			else if(cs(keyword, "coordinates")) coordinates.input("coordinates", value, 0);
+			else if(cs(keyword, "magnitudes")) magnitudes.input("magnitudes", value, 0);
+			else if(cs(keyword, "temperatures")) temperatures.input("temperature", value, 0);
+			else if(cs(keyword, "fluxes")) fluxes.input("fluxes", value, 0);
+			else if(cs(keyword, "cutouts_bg", 8)) cutouts_bg.input("cutouts_bg", value, 1);
+			else if(cs(keyword, "positions_bg", 9)) positions_bg.input("positions_bg", value, 0);
+			else if(cs(keyword, "backgrounds")) backgrounds.input("backgrounds", value, 0);
+			else if(cs(keyword, "stack")) stack.input("stack", value, 1);
+			else if(cs(keyword, "num_sum")) stack.attributes.push_back(MyAttribute("num_sum", value));
+			else if(cs(keyword, "psfs", 4)) psfs.input("psfs", value, 0);		
+			else if(cs(keyword, "sampling_psf",4)) psfs.attributes.push_back(MyAttribute("psf_sampling", value));
+			// add more names to the list if new data fields are added
+		}
+		
+	}
 }
 
 void SaveData::dataChecks(){
 	
 	if(positions.cols!=2) mexErrMsgIdAndTxt( "MATLAB:file:mex:mexWrite:positionsWrongDimension", "positions must be a two-column matrix!");
 	// add all other data checks...
-}
-
-void SaveData::parseBufferWheelObject(const mxArray *buf){
-	
 }
 
 void SaveData::readParsCellArray(const mxArray *cell){
@@ -127,26 +187,25 @@ void SaveData::print_help(){
 	mexPrintf("--------------------------------\n");
 	mexPrintf("Data inputs (must be given explicitely): \n");
 	mexPrintf("-images: full frame images.\n");
-	//mexPrintf("-images_raw: new variable for uncalibrated files from camera. Usually uint16. \n");
-	//mexPrintf("-images_cal: full set of calibrated images. Usually double. \n");
-	//mexPrintf("cutouts_raw: when saving only cutouts around stars. Prefer to save raw cutouts, usually uint16. \n");	
-	//mexPrintf("cutouts_cal: when saving only cutouts around stars. Already calibrated, usually double. \n");
+	mexPrintf("-timestamps: time of each frame. \n");
 	mexPrintf("cutouts: when saving only cutouts around stars. Not calibrated, uint16. \n");
 	mexPrintf("-positions: positions of centers of cutouts (x,y pairs).\n");
-	mexPrintf("-timestamps: time of each frame. \n");
+	mexPrintf("-coordinates: positions of centers of cutouts (RA,DE pairs).\n");
+	mexPrintf("-magnitudes: of each star in each cutout, based on some catalog.\n");
+	mexPrintf("-temperatures: of each star in each cutout, based on some catalog (degrees Kelvin).\n");
 	mexPrintf("-stack: sum of  full franme images (calibrated)\n");
 	mexPrintf("-psfs: if PSF data is given from WFS or from simulation.\n");
-	mexPrintf("-lightcurves: photometry data for each cutout. \n");
-	mexPrintf("-buffer: BufferWheel object used to extract add-on metadata.\n");
+	mexPrintf("-fluxes: photometry data for each cutout. \n");
+	// mexPrintf("-buffer: BufferWheel object used to extract add-on metadata.\n");
 	mexPrintf("-pars_cell: cell array of address-struct pairs with metadata for this exposure. \n");
 	mexPrintf("            (Use util.oop.save with output type 'struct').\n");
 	
-	mexPrintf("\n");
-	mexPrintf("Metadata addons for the data-sets (or just give the BufferWheel object):");
-	mexPrintf("-file_write_timestamp: when the file was sent to be written, relative to timestamps.\n");
-	mexPrintf("-file_write_datestr: when the file was sent to be written, relative to system clock. \n");
-	mexPrintf("-file_start_datestr: when the first exposure on file was started, relative to system clock. \n");
-	mexPrintf("-psf_sampling: in units of pixels per lambda/D.\n");	
+	// mexPrintf("\n");
+	// mexPrintf("Metadata addons for the data-sets (or just give the BufferWheel object):");
+	// mexPrintf("-file_write_timestamp: when the file was sent to be written, relative to timestamps.\n");
+	// mexPrintf("-file_write_datestr: when the file was sent to be written, relative to system clock. \n");
+	// mexPrintf("-file_start_datestr: when the first exposure on file was started, relative to system clock. \n");
+	// mexPrintf("-psf_sampling: in units of pixels per lambda/D.\n");	
 	
 	mexPrintf("\n");
 	mexPrintf("Parameters and controls: \n");

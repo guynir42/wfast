@@ -2,22 +2,27 @@ classdef Photometry < handle
 
     properties(Transient=true)
         
+        gui;
+        
     end
     
     properties % objects
         
-        aperture@img.Aperture;
+        
         
     end
     
     properties % inputs/outputs
         
         % inputs
-        cutouts;
-        cutouts_proc;
-        cutouts_shifted;
-        cutouts_aperture;
-        cut_size;
+        cutouts; % cutouts as given from analysis/acquisition (after calibration)
+        cutouts_proc; % subtract backround, kill spurius negative pixels, etc
+        
+        cutouts_ap;
+        cutouts_psf;
+        
+        timestamps;
+        
         psf; % either given or found from the image
         
         % outputs
@@ -28,25 +33,25 @@ classdef Photometry < handle
         widths;
         backgrounds;
         
-        % save the data from the entire run
-%         fluxes_all;
-%         weights_all;
-%         offsets_x_all;
-%         offsets_y_all;
-%         widths_all;
-%         backgrounds_all;
-        
     end
     
     properties % switches/controls
         
-        use_subtract_corner = 0;
+        use_backgrounds = 0; % remove background from individual cutout
+        corner_size = 0.15; % fraction of the cut_size or pixel value (must be smaller than cut_size!)
         
         use_aperture = 1;
-        ap_iterations = 3;
+        aperture = 5;
+        annulus = 8;
+        annulus_outer = []; % empty means take the rest of the cutout
+        iterations = 3; % 
+        
+        use_gaussian = 1;
+        gauss_sigma = 2;
+        gauss_thresh = 1e-6;
         
         use_fitter = 0;
-        use_gaussian_psf = 1; % just use a simple PSF 
+%         use_gaussian_psf = 1; % just use a simple PSF 
         
         bg_noise = 1;
         gain = 1;
@@ -62,18 +67,23 @@ classdef Photometry < handle
     
     properties(Dependent=true)
         
-        ap_size; % how many pixels is the aperture?
+        cut_size;
         
     end
     
     properties(Hidden=true)
         
-        fluxes_raw;
-        weights_raw;
-        offsets_x_raw;
-        offsets_y_raw;
-        widths_raw;
-        backgrounds_raw;
+        X; % output from meshgrid
+        Y; % output from meshgrid
+        
+        cut_size_latest;
+        
+        fluxes_basic;
+        weights_basic;
+        offsets_x_basic;
+        offsets_y_basic;
+        widths_basic;
+        backgrounds_basic;
         
         fluxes_ap;
         weights_ap;
@@ -81,6 +91,13 @@ classdef Photometry < handle
         offsets_y_ap;
         widths_ap;
         backgrounds_ap;
+        
+        fluxes_psf;
+        weights_psf;
+        offsets_x_psf;
+        offsets_y_psf;
+        widths_psf;
+        backgrounds_psf;
         
         fluxes_fit;
         weights_fit;
@@ -91,7 +108,7 @@ classdef Photometry < handle
         
         default_ap_size = 3;
         
-        version = 1.00;
+        version = 1.01;
         
     end
     
@@ -104,10 +121,7 @@ classdef Photometry < handle
                 obj = util.oop.full_copy(varargin{1});
             else
                 if obj.debug_bit, fprintf('Photometry constructor v%4.2f\n', obj.version); end
-                
-                obj.aperture = img.Aperture;
-                obj.aperture.plateau_size = obj.default_ap_size;
-                
+                                
             end
             
         end
@@ -125,9 +139,11 @@ classdef Photometry < handle
         function clear(obj)
             
             obj.cutouts = [];
-            obj.cutouts_shifted = [];
-            obj.cutouts_aperture = [];
-            obj.cut_size = [];
+            obj.cutouts_proc = [];
+            obj.cutouts_ap = [];
+            obj.cutouts_psf = [];
+            obj.timestamps = [];
+            obj.psf = [];
             
             obj.fluxes = [];
             obj.weights = [];
@@ -136,12 +152,12 @@ classdef Photometry < handle
             obj.widths = [];
             obj.backgrounds = [];
             
-            obj.fluxes_raw = [];
-            obj.weights_raw = [];
-            obj.offsets_x_raw = [];
-            obj.offsets_y_raw = [];
-            obj.widths_raw = [];
-            obj.backgrounds_raw = [];
+            obj.fluxes_basic = [];
+            obj.weights_basic = [];
+            obj.offsets_x_basic = [];
+            obj.offsets_y_basic = [];
+            obj.widths_basic = [];
+            obj.backgrounds_basic = [];
             
             obj.fluxes_ap = [];
             obj.weights_ap = [];
@@ -149,6 +165,13 @@ classdef Photometry < handle
             obj.offsets_y_ap = [];
             obj.widths_ap = [];
             obj.backgrounds_ap = [];
+            
+            obj.fluxes_psf = [];
+            obj.weights_psf = [];
+            obj.offsets_x_psf = [];
+            obj.offsets_y_psf = [];
+            obj.widths_psf = [];
+            obj.backgrounds_psf = [];
             
             obj.fluxes_fit = [];
             obj.weights_fit = [];
@@ -163,21 +186,15 @@ classdef Photometry < handle
     
     methods % getters
         
-        function val = get.ap_size(obj)
+        function val = get.cut_size(obj)
             
-            val = obj.aperture.plateau_size;
+            val = obj.cut_size_latest;
             
         end
         
     end
     
     methods % setters
-        
-        function set.ap_size(obj, val)
-            
-            obj.aperture.plateau_size = val;
-            
-        end
         
     end
     
@@ -188,6 +205,7 @@ classdef Photometry < handle
             input = util.text.InputVars;
             input.use_ordered_numeric = 1;
             input.input_var('cutouts', [], 'images');
+            input.input_var('timestamps', [], 'times');
             input.scan_vars(varargin{:});
             
             if isa(input.cutouts, 'single')
@@ -196,13 +214,19 @@ classdef Photometry < handle
                 obj.cutouts = double(input.cutouts);
             end
             
-            obj.cut_size = size(input.cutouts);
-            obj.cut_size = obj.cut_size(1:2);
+            obj.timestamps = input.timestamps;
             
-            obj.calcRaw;
+            obj.cut_size_latest = size(input.cutouts);
+            obj.cut_size_latest = obj.cut_size(1:2);
+            
+            obj.calcBasic;
             
             if obj.use_aperture
                 obj.calcAperture;
+            end
+            
+            if obj.use_gaussian
+                obj.calcGaussian;
             end
             
             if obj.use_fitter
@@ -211,105 +235,309 @@ classdef Photometry < handle
             
         end
         
-        function calcRaw(obj)
+        function preprocess(obj)
             
-            import util.stat.sum2;
-
             I = obj.cutouts;
-            B = util.stat.corner_median(obj.cutouts);
-            
-            if obj.use_subtract_corner
-                I = I - B;
-            end
             
             I(I<-3.*util.stat.std2(I)) = NaN;
             
             obj.cutouts_proc = I;
             
-            [m1x, m1y, m2x, m2y, ~] = util.img.moments(I);
-            
-            obj.fluxes_raw = permute(sum2(I), [3,4,2,1]);
-            obj.weights_raw = permute(sum2(~isnan(I)), [3,4,2,1]);
-            
-            obj.offsets_x_raw = permute(m1x, [3,4,2,1]);
-            obj.offsets_y_raw = permute(m1y, [3,4,2,1]);
+        end
+        
+        function [flux, weight, offset_x, offset_y, width, background] = calculate(obj, shape, bg_shape, iterations)
 
-            obj.widths_raw = permute(sqrt(m2x+m2y), [3,4,2,1]); % should we add mxy too?
-
-            obj.backgrounds_raw = permute(B, [3,4,2,1]);
+            import util.stat.sum2;
+            import util.stat.median2;
+            import util.text.cs;
             
-            obj.fluxes = obj.fluxes_raw;
-            obj.weights = obj.weights_raw;
-            obj.offsets_x = obj.offsets_x_raw;
-            obj.offsets_y = obj.offsets_y_raw;
-            obj.widths = obj.widths_raw;
-            obj.backgrounds = obj.backgrounds_raw;
+            if nargin<2 || isempty(shape)
+                shape = 'circle';
+            end
+            
+            if nargin<3 || isempty(bg_shape)
+                bg_shape = 'corner';
+            end
+            
+            if cs(shape, 'none')
+                make_shape = @(x,y) ones(obj.cut_size, 'like', obj.cutouts);
+            elseif cs(shape, 'circle', 'aperture')
+                make_shape = @(x,y) obj.makeCircle(x,y);
+            elseif cs(shape, 'gaussian')
+                make_shape = @(x,y) obj.makeGaussian(x,y);
+            else
+                error('Unknown shape "%s". Use "none", "circle" or "gaussian"', shape);
+            end
+            
+            if cs(bg_shape, 'corner')
+                make_bg_shape = @(x,y) obj.makeCorners(x,y);
+            elseif cs(bg_shape, 'annulus')
+                make_bg_shape = @(x,y) obj.makeAnnulus(x,y);
+            else
+                error('Unknown background shape "%s". Use "corner" or "annulus"', bg_shape);
+            end
+            
+            c = size(obj.cutouts); c = c(1:2);
+            [obj.X,obj.Y] = meshgrid((1:c(2))-floor(c(2)/2)-1, (1:c(1))-floor(c(1)/2)-1); 
+            
+            if ~isempty(obj.fluxes)
+                flux = obj.fluxes;
+            else
+                flux = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
+            end
+            
+            if ~isempty(obj.weights)
+                weight = obj.weights;
+            else
+                weight = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
+            end
+            
+            if ~isempty(obj.offsets_x)
+                offset_x = obj.offsets_x;
+            else
+                offset_x = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
+            end
+            
+            if ~isempty(obj.offsets_y)
+                offset_y = obj.offsets_y;
+            else
+                offset_y = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
+            end
+            
+            if ~isempty(obj.widths)
+                width = obj.widths;
+            else
+                width = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
+            end
+            
+            if ~isempty(obj.backgrounds)
+                background = obj.backgrounds;
+            else
+                background = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
+            end
+            
+            % go over each cutout and shift it to the center
+            for ii = 1:size(obj.cutouts,4) % go over different stars
+
+                for jj = 1:size(obj.cutouts,3) % go over frames of the same star
+                    
+                    dx = offset_x(jj,ii);
+                    if isnan(dx), dx = 0; end
+                    dy = offset_y(jj,ii);
+                    if isnan(dy), dy = 0; end
+                    
+                    for kk = 1:iterations
+                        
+                        I = obj.cutouts(:,:,jj,ii);
+                        
+                        ap = make_shape(dx,dy); % should we also let radius/psf_sigma change with the width?? 
+                        
+                        ap(isnan(I)) = nan; % aperture must have NaN values in the same places (for weight calculation)
+                        
+                        ann = make_bg_shape(dx,dy);
+                        ann(isnan(I)) = nan;
+                        
+                        B = median2(I.*ann); % background per pixel...
+                        
+                        if obj.use_backgrounds
+                            I = I - B;
+                        end
+                        
+                        S = sum2(ap);
+                        ap = ap./S;
+                        I = I.*ap./sum2(ap.^2);
+                        m0 = sum2(I);
+                        m1x = sum2(I.*obj.X)./m0;
+                        m1y = sum2(I.*obj.Y)./m0;
+                        m2x = sum2(I.*(obj.Y-m1x).^2)./m0;
+                        m2y = sum2(I.*(obj.Y-m1y).^2)./m0;
+%                         mxy = sum2(I.*(obj.X-m1x).*(obj.Y-m1y))./m0;
+                        
+                        % quality checks:
+                        if S==0
+                            m1x = 0;
+                            m1y = 0;
+                            m2x = NaN;
+                            m2y = NaN;
+%                             mxy = NaN;
+                        end
+                        
+                        if m2x<0, m2x = NaN; end
+                        if m2y<0, m2y = NaN; end
+                        
+                        dx = m1x;
+                        dy = m1y;
+                        
+                        W = sqrt(mean([m2x,m2y], 'omitnan')); % should we add mxy??
+                        
+                    end
+
+                    flux(jj,ii) = m0;
+                    weight(jj,ii) = S;
+                    offset_x(jj,ii) = dx;
+                    offset_y(jj,ii) = dy;
+                    width(jj,ii) = W;
+                    background(jj,ii) = B;
+                    
+                    % add break point if dx and dy don't change much...
+                    
+                end
+
+            end
+            
+        end
+        
+        function val = makeCorners(obj, ~, ~)
+            
+            val = zeros(obj.cut_size);
+            
+            if obj.corner_size<1
+                pixels = obj.corner_size.*obj.cut_size;
+            elseif obj.corner_size<obj.cut_size
+                pixels = obj.corner_size;
+            else
+                error('Wrong corner_size= %d. Input a fraction or a pixel number smaller than cut_size= %d', obj.corner_size, obj.cut_size);
+            end
+            
+            pixels = round(pixels);
+            
+            val(1:pixels, 1:pixels) = 1;
+            val(end-pixels+1:end, 1:pixels) = 1;            
+            val(1:pixels, end-pixels+1:end) = 1;
+            val(end-pixels+1:end, end-pixels+1:end) = 1;
+            
+            if isa(obj.cutouts, 'single')
+                val = single(val);
+            else
+                val = double(val);
+            end
+            
+            val(val==0) = NaN;
+            
+        end
+        
+        function val = makeCircle(obj, dx, dy)
+            
+            R = obj.aperture;
+            
+            r = sqrt((obj.X-dx).^2+(obj.Y-dy).^2);
+            val = R+0.5-r;
+            val(val>1) = 1;
+            val(val<0) = 0;
+            
+            if isa(obj.cutouts, 'single')
+                val = single(val);
+            end
+            
+            val(val==0) = NaN;
+            
+        end
+        
+        function val = makeAnnulus(obj, dx, dy)
+           
+            R1 = obj.annulus;
+            
+            if isempty(obj.annulus_outer)
+                R2 = Inf;
+            else
+                R2 = obj.annulus_outer;
+            end
+            
+            r = sqrt((obj.X-dx).^2+(obj.Y-dy).^2);
+            
+            val = r>R1 & r<R2;
+            
+            if isa(obj.cutouts, 'single')
+                val = single(val);
+            else
+                val = double(val);
+            end
+            
+            val(val==0) = NaN;
+            
+        end
+        
+        function val = makeGaussian(obj, dx, dy)
+        
+            sig = obj.gauss_sigma;
+            
+            r = sqrt((obj.X-dx).^2+(obj.Y-dy).^2);
+            
+            val = exp(-0.5.*(r./sig).^2);
+            
+            if isa(obj.cutouts, 'single')
+                val = single(val);
+            end
+            
+            val(val<obj.gauss_thresh) = NaN;
+            
+        end
+        
+        function calcBasic(obj)
+            
+            import util.stat.sum2;
+            
+            [f,w,x,y,W,b] = obj.calculate('none', 'corner', 1);
+            
+            obj.fluxes_basic = f;
+            obj.weights_basic = w;
+            obj.offsets_x_basic = x;
+            obj.offsets_y_basic = y;
+            obj.widths_basic = W; 
+            obj.backgrounds_basic = b;
+            
+            % update the newest values
+            obj.fluxes = obj.fluxes_basic;
+            obj.weights = obj.weights_basic;
+            obj.offsets_x = obj.offsets_x_basic;
+            obj.offsets_y = obj.offsets_y_basic;
+            obj.widths = obj.widths_basic;
+            obj.backgrounds = obj.backgrounds_basic;
             
         end
         
         function calcAperture(obj)
             
-            % use the first moment to adjust positions inside the aperture?
+            [f,w,x,y,W,b] = obj.calculate('circle', 'annulus', obj.iterations);
             
-            import util.stat.sum2;
-
-            obj.aperture.tile_size = obj.cut_size;
+            obj.fluxes_ap = f;
+            obj.weights_ap = w;
+            obj.offsets_x_ap = x;
+            obj.offsets_y_ap = y;
+            obj.widths_ap = W; 
+            obj.backgrounds_ap =b;
             
-            obj.cutouts_shifted = zeros(size(obj.cutouts));
+            % update the newest values
+            obj.fluxes = obj.fluxes_ap;
+            obj.weights = obj.weights_ap;
+            obj.offsets_x = obj.offsets_x_ap;
+            obj.offsets_y = obj.offsets_y_ap;
+            obj.widths = obj.widths_ap;
+            obj.backgrounds = obj.backgrounds_ap;
+
+        end
+        
+        function calcGaussian(obj)
+           
+            [f,w,x,y,W,b] = obj.calculate('gaussian', 'annulus', obj.iterations);
             
-            for ii = 1:obj.ap_iterations
+            obj.fluxes_psf = f;
+            obj.weights_psf = w;
+            obj.offsets_x_psf = x;
+            obj.offsets_y_psf = y;
+            obj.widths_psf = W;
+            obj.backgrounds_psf =b;
             
-                % go over each cutout and shift it to the center
-                for kk = 1:size(obj.cutouts,4) % go over different stars
-
-                    for jj = 1:size(obj.cutouts,3) % go over frames of the same star
-
-                        if ~isnan(obj.offsets_x(jj,kk)) && ~isnan(obj.offsets_y(jj,kk))
-                            obj.cutouts_shifted(:,:,jj,kk) = util.img.imshift(obj.cutouts_proc(:,:,jj,kk), -obj.offsets_y(jj,kk), -obj.offsets_x(jj,kk));
-                        else
-                            obj.cutouts_shifted(:,:,jj,kk) = obj.cutouts_proc(:,:,jj,kk);
-                        end
-                        
-                    end
-
-                end
-
-                % calculate new moments
-                obj.cutouts_aperture = obj.cutouts_shifted.*obj.aperture.mask;
-                
-                I = obj.cutouts_aperture;
-                
-                [m1x, m1y, m2x, m2y, ~] = util.img.moments(I);
-                
-                % calculate new fluxes
-                obj.fluxes_ap = permute(sum2(I), [3,4,2,1]);
-                obj.weights_ap = repmat(obj.aperture.weight, size(obj.fluxes_ap));
-                % need to think of a way to also count the NaN pixels in the weight...
-
-                obj.offsets_x_ap = permute(m1x, [3,4,2,1]);
-                obj.offsets_y_ap = permute(m1y, [3,4,2,1]);
-
-                obj.widths_ap = permute(sqrt(m2x+m2y), [3,4,2,1]); % should we add mxy too?
-
-                % update the newest values
-                obj.fluxes = obj.fluxes_ap;
-                obj.weights = obj.weights_ap;
-                obj.offsets_x = obj.offsets_x_ap;
-                obj.offsets_y = obj.offsets_y_ap;
-                obj.widths = obj.widths_ap;
-                % add annulus if you want a background estimate here... 
-                
-            end % go over iterations
+            % update the newest values
+            obj.fluxes = obj.fluxes_psf;
+            obj.weights = obj.weights_psf;
+            obj.offsets_x = obj.offsets_x_psf;
+            obj.offsets_y = obj.offsets_y_psf;
+            obj.widths = obj.widths_psf;
+            obj.backgrounds = obj.backgrounds_psf;
             
         end
         
-        function calcPSF(obj) % make a Gaussian PSF or an image based PSF (both normalized to unity)
-            
-            obj.psf = sum(obj.cutouts_aperture, 4, 'omitnan');
-            obj.psf = obj.psf./util.stat.sum2(obj.psf);
-            
-        end
-                
         function calcFit(obj)
             
             if obj.use_gaussian_psf
@@ -441,6 +669,13 @@ classdef Photometry < handle
             P = util.img.FourierShift2D(psf, -[x_shift, y_shift]);
             
             M = bg + flux.*P;
+            
+        end
+        
+        function makePSF(obj) % make an image based PSF
+            
+            obj.psf = sum(obj.cutouts_aperture, 4, 'omitnan');
+            obj.psf = obj.psf./util.stat.sum2(obj.psf);
             
         end
         

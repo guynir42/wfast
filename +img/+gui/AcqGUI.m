@@ -99,7 +99,7 @@ classdef AcqGUI < handle
             obj.panel_controls.addButton('button_source_gui', 'src', 'push', 'GUI', '', '', 0.3);
             
             obj.panel_controls.addButton('button_reset', 'reset', 'push', 'RESET', '', '', 0.3);
-            obj.panel_controls.addButton('input_name', 'run_name', 'input', 'name= ', '', '', 0.7);
+            obj.panel_controls.addButton('input_name', 'run_name', 'input_text', 'name= ', '', '', 0.7);
             
             obj.panel_controls.addButton('input_num_batches', 'num_batches', 'input', 'Nbatches= ', '', '', 0.5);
             obj.panel_controls.addButton('input_batch_size', 'batch_size', 'input', 'Nframes= ', '', '', 0.5);

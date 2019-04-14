@@ -4,8 +4,10 @@ classdef InputVars < dynamicprops
 
     properties
         
-        alias_dictionary;
-        logical_dictionary;
+        alias_dictionary; % keep track of the names of each of the parameters
+        logical_dictionary; % keep track which parameter is logical (use parse_bool to scan inputs)
+        number_dictionary; % keep track of the minimal number of letters required for util.text.cs to match
+        
         use_ordered_numeric = 0;
         list_added_properties = {}; % a list of keywords, in the order added when defining the object
         list_scan_properties = {}; % a list of keywords in the order they are given by the varargin pairs
@@ -18,6 +20,7 @@ classdef InputVars < dynamicprops
             
             obj.alias_dictionary = containers.Map;
             obj.logical_dictionary = containers.Map;
+            obj.number_dictionary = containers.Map;
             
         end
         
@@ -37,8 +40,9 @@ classdef InputVars < dynamicprops
             
             name = strrep(name, ' ', '_');
             
-            if strcmp(name, 'alias_dictionary')
-                error('Cannot have a new property called "alias_dictionary", it already exists in the class!');
+            if any(strcmp(name, {'alias_dictionary', 'logical_dictionary', 'number_dictionary', ...
+                    'use_ordered_numeric', 'list_added_properties', 'list_scan_properties'}))
+                error('Cannot have a new property called "%s", it already exists in the class!', name);
             end
             
             if obj.alias_dictionary.isKey(name)
@@ -59,8 +63,20 @@ classdef InputVars < dynamicprops
             
             if nargin<4 || isempty(varargin)
                 obj.alias_dictionary(name) = {};
+                obj.number_dictionary(name) = []; % no restriction on the number of letters required for a match
             else
+                
+                idx_num = find(~cellfun(@ischar, varargin));
+                
+                if isempty(idx_num)
+                    obj.number_dictionary(name) = []; % no restriction on the number of letters required for a match
+                else
+                    obj.number_dictionary(name) = varargin{idx_num(end)}; % keep track of how many characters we need for cs to match
+                    varargin(idx_num) = []; % get rid of numeric values
+                end
+                
                 obj.alias_dictionary(name) = varargin;
+                
             end
             
         end
@@ -92,7 +108,7 @@ classdef InputVars < dynamicprops
                 varargin{end+1} = 1; % positive approach
             end
             
-            all_keys = obj.alias_dictionary.keys;
+            all_keys = obj.alias_dictionary.keys; % every parameter on the list 
             
             for ii = 1:2:length(varargin)
                 
@@ -110,8 +126,9 @@ classdef InputVars < dynamicprops
                     return;
                 end
                 
-                for jj = 1:obj.alias_dictionary.length
-                    if util.text.cs(key, [all_keys{jj}, obj.alias_dictionary(all_keys{jj})])
+                for jj = 1:obj.alias_dictionary.length % go over all parameters
+                    
+                    if util.text.cs(key, [all_keys{jj}, obj.alias_dictionary(all_keys{jj}), obj.number_dictionary(all_keys{jj})])
                         if obj.logical_dictionary(all_keys{jj})
                             obj.(all_keys{jj}) = util.text.parse_bool(val);
                         else
@@ -178,7 +195,11 @@ classdef InputVars < dynamicprops
                 end
                 
                 if ~isempty(vals{ii})
-                    fprintf(' [%s]', strjoin(vals{ii}, ', '));                    
+                    fprintf(' [%s]', strjoin(vals{ii}, ', '));
+                end
+                
+                if ~isempty(obj.number_dictionary(keys{ii}))
+                    fprintf(' (match number= %d)', obj.number_dictionary(keys{ii}));
                 end
                 
                 fprintf('\n');
@@ -210,19 +231,21 @@ classdef InputVars < dynamicprops
        
         function setupDataInput(obj)
             
-            obj.input_var('images', []);
-            obj.input_var('cutouts', []);
-            obj.input_var('positions', [], 'cut_pos');
-            obj.input_var('stack', [], 'images_sum', 'full_sum');
-            obj.input_var('num_sum', []);
-            obj.input_var('timestamps', []);
-            obj.input_var('t_start', [], 'write_datestr', 'datestring', 'file_write_datestr');
-            obj.input_var('t_end_stamp', [], 'write_timestamp', 'file_write_timestamp');
-            obj.input_var('t_end', [], 'write_datestr', 'file_write_datestr');
-            obj.input_var('psfs', []);
-            obj.input_var('sampling_psf', []);
-            obj.input_var('fluxes', [], 'lightcurves');
+            list = properties(file.AstroData);
+            
+            for ii = 1:length(list)
+                obj.input_var(list{ii}, []);
+            end
+
             obj.use_ordered_numeric = 1;
+            
+            % make sure there are no ambiguities in the name matching
+            obj.number_dictionary('cutouts') = 8;
+            obj.number_dictionary('cutouts_bg') = 8;
+            obj.number_dictionary('positions') = 10;
+            obj.number_dictionary('positions_bg') = 10;            
+            obj.number_dictionary('t_end') = 6;
+            obj.number_dictionary('t_end_stamp') = 6;
             
         end
         

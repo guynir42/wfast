@@ -23,8 +23,8 @@ classdef Acquisition < file.AstroData
         back@img.Background;
         clip@img.Clipper;
         clip_bg@img.Clipper;
-        photo_stack@img.Photometry;
-        photo@img.Photometry;
+        phot_stack@img.Photometry;
+        phot@img.Photometry;
         flux_buf@util.vec.CircularBuffer;
         lightcurves@img.Lightcurves;
         
@@ -175,17 +175,18 @@ classdef Acquisition < file.AstroData
                 obj.clip_bg = img.Clipper;
                 obj.clip_bg.use_adjust = 0;
                 
-                obj.photo_stack = img.Photometry;
-                obj.photo_stack.use_aperture = 0;
+                obj.phot_stack = img.Photometry;
+                obj.phot_stack.use_aperture = 0;
                 obj.flux_buf = util.vec.CircularBuffer;
                 
-                obj.photo = img.Photometry;
+                obj.phot = img.Photometry;
                 obj.lightcurves = img.Lightcurves;
                 
                 obj.af = obs.focus.AutoFocus;
                 
                 obj.buf = file.BufferWheel;
                 obj.buf.product_type = 'Cutouts';
+                obj.buf.use_save_raw_images = 0; % do not save the full frame images! 
                 
                 obj.runtime_buffer = util.vec.CircularBuffer;
                 obj.runtime_buffer.titles = {'time', 'num_frames'};
@@ -254,51 +255,14 @@ classdef Acquisition < file.AstroData
     end
     
     methods % getters
-%         
-%         function val = get.num_stars(obj)
-%             
-%             if isempty(obj.clip)
-%                 val = obj.num_stars;
-%             else
-%                 val = obj.clip.num_stars;
-%             end
-%             
-%         end
-%         
-%         function val = get.cut_size(obj)
-%             
-%             if isempty(obj.clip)
-%                 val = obj.cut_size;
-%             else
-%                 val = obj.clip.cut_size;
-%             end
-%             
-%         end
-%         
-%         function val = get.num_backgrounds(obj)
-%             
-%             if isempty(obj.clip_bg)
-%                 val = obj.num_backgrounds;
-%             else
-%                 val = obj.clip_bg.num_stars;
-%             end
-%             
-%         end
-%         
-%         function val = get.cut_size_bg(obj)
-%             
-%             if isempty(obj.clip_bg)
-%                 val = obj.cut_size_bg;
-%             else
-%                 val = obj.clip_bg.cut_size;
-%             end
-%             
-%         end
-%       
 
         function val = get.run_name(obj)
             
-            val = obj.pars.target_name;
+            if ~isempty(obj.pars)
+                val = obj.pars.target_name;
+            else
+                val = [];
+            end
             
         end
         
@@ -334,7 +298,9 @@ classdef Acquisition < file.AstroData
         
         function set.run_name(obj, val)
             
-            obj.pars.target_name = val;
+            if ~isempty(obj.pars)
+                obj.pars.target_name = val;
+            end
             
         end
         
@@ -346,46 +312,6 @@ classdef Acquisition < file.AstroData
             
         end
         
-%         function set.num_stars(obj, val)
-%             
-%             if ~isempty(obj.clip)
-%                 obj.clip.num_stars = val;
-%             end
-%             
-%             obj.num_stars = val;
-%             
-%         end
-%         
-%         function set.cut_size(obj, val)
-%             
-%             if ~isempty(obj.clip)
-%                 obj.clip.cut_size = val;
-%             end
-%             
-%             obj.cut_size = val;
-%             
-%         end
-%         
-%         function set.num_backgrounds(obj, val)
-%             
-%             if ~isempty(obj.clip_bg)
-%                 obj.clip_bg.num_stars = val;
-%             end
-%             
-%             obj.num_backgrounds = val;
-%             
-%         end
-%         
-%         function set.cut_size_bg(obj, val)
-%             
-%             if ~isempty(obj.clip_bg)
-%                 obj.clip_bg.cut_size = val;
-%             end
-%             
-%             obj.cut_size_bg = val;
-%             
-%         end
-%         
         function set.brake_bit(obj, val)
             
             obj.brake_bit = val;
@@ -635,8 +561,12 @@ classdef Acquisition < file.AstroData
             obj.update;
             
             if input.use_save
-                filename = obj.buf.getReadmeFilename;
-                util.oop.save(obj, filename, 'name', 'acquisition'); 
+                try    
+                    filename = obj.buf.getReadmeFilename;
+                    util.oop.save(obj, filename, 'name', 'acquisition'); 
+                catch ME
+                    warning(ME.getReport);
+                end
             end
             
             if input.use_audio
@@ -685,8 +615,12 @@ classdef Acquisition < file.AstroData
             obj.src.finishup;
             
             if obj.use_save
-                filename = obj.buf.getReadmeFilename('Z');
-                util.oop.save(obj, filename, 'name', 'acquisition'); 
+                try
+                    filename = obj.buf.getReadmeFilename('Z');
+                    util.oop.save(obj, filename, 'name', 'acquisition'); 
+                catch ME
+                    warning(ME.getReport);
+                end
             end
             
             if obj.debug_bit, disp(['Finished run "' input.run_name '" with ' num2str(obj.batch_counter) ' batches.']); end
@@ -851,7 +785,7 @@ classdef Acquisition < file.AstroData
 
             if input.use_background
             
-                obj.back.input(obj.stack_cutouts_bg, obj.clip_bg.positions);            
+                obj.back.input(obj.stack_cutouts_bg, obj.clip_bg.positions);
                 % should also get variance from background object...
                 
                 B = obj.back.getImage(size(obj.stack));
@@ -867,7 +801,7 @@ classdef Acquisition < file.AstroData
             
             obj.stack_cutouts = obj.clip.input(obj.stack); % if no positions are known, it will call "findStars"
             
-            if input.use_background
+            if input.use_background % if we already used background subtraction on all pixels, why not just cutout from stack_sub??
                 BC = obj.back.getPoints(obj.clip.positions);
                 BC = permute(BC, [4,3,2,1]); % turn the column vector into a 4D vector
                 obj.stack_cutouts_sub = obj.stack_cutouts - BC; 
@@ -875,22 +809,22 @@ classdef Acquisition < file.AstroData
                 obj.stack_cutouts_sub = obj.stack_cutouts;
             end
             
-            obj.photo_stack.input(obj.stack_cutouts_sub); % run photometry on the stack to verify flux and adjust positions
+            obj.phot_stack.input(obj.stack_cutouts_sub); % run photometry on the stack to verify flux and adjust positions
             
             obj.checkRealign(input);
             
             % store the latest fluxes from the stack cutouts
-            obj.flux_buf.input(obj.photo_stack.fluxes);
+            obj.flux_buf.input(obj.phot_stack.fluxes);
             
             % get the average width and offsets (weighted by the flux of each star...)
-            M = mean(obj.photo_stack.fluxes);
-            obj.adjust_pos = [median(obj.photo_stack.fluxes./M.*obj.photo_stack.offsets_x, 'omitnan'), median(obj.photo_stack.fluxes./M.*obj.photo_stack.offsets_y, 'omitnan')];
+            M = mean(obj.phot_stack.fluxes);
+            obj.adjust_pos = [median(obj.phot_stack.fluxes./M.*obj.phot_stack.offsets_x, 'omitnan'), median(obj.phot_stack.fluxes./M.*obj.phot_stack.offsets_y, 'omitnan')];
             obj.adjust_pos(isnan(obj.adjust_pos)) = 0;
             
-            obj.average_width = median(obj.photo_stack.fluxes./M.*obj.photo_stack.widths, 'omitnan'); % maybe find the average width of each image and not the stack??
+            obj.average_width = median(obj.phot_stack.fluxes./M.*obj.phot_stack.widths, 'omitnan'); % maybe find the average width of each image and not the stack??
             
             if obj.use_adjust_cutouts
-                obj.clip.positions = obj.clip.positions + obj.adjust_pos;
+                obj.positions = obj.positions + obj.adjust_pos;
             else
                 % must send the average adjustment back to mount controller
             end
@@ -927,7 +861,7 @@ classdef Acquisition < file.AstroData
                 mean_fluxes = obj.flux_buf.mean;
                 mean_fluxes(mean_fluxes<=0) = NaN;
 
-                new_fluxes = obj.photo_stack.fluxes;
+                new_fluxes = obj.phot_stack.fluxes;
                 new_fluxes(isnan(mean_fluxes)) = [];
                 mean_fluxes(isnan(mean_fluxes)) = [];
 
@@ -937,8 +871,8 @@ classdef Acquisition < file.AstroData
                     disp('Lost star positions, using quick_align');
                     
                     [~,shift] = util.img.quick_align(obj.stack_sub, obj.ref_stack);
-                    obj.clip.positions = obj.ref_positions + flip(shift);
-
+                    obj.positions = obj.ref_positions + flip(shift);
+                    
                     % this shift should also be reported back to mount controller? 
 
                     obj.stack_cutouts = obj.clip.input(obj.stack);
@@ -953,7 +887,7 @@ classdef Acquisition < file.AstroData
                         obj.stack_cutouts_sub = obj.stack_cutouts;
                     end
 
-                    obj.photo_stack.input(obj.stack_cutouts_sub, 'moments', 1); % run photometry on the stack to verify flux and adjust positions
+                    obj.phot_stack.input(obj.stack_cutouts_sub, 'moments', 1); % run photometry on the stack to verify flux and adjust positions
 
                 end
 
@@ -970,12 +904,10 @@ classdef Acquisition < file.AstroData
             end
             
             obj.cutouts = obj.clip.input(obj.images);
-            obj.positions = obj.clip.positions;
             
             obj.cutouts_proc = obj.cal.input(obj.cutouts, 'clip', obj.clip);
             
             obj.cutouts_bg = obj.clip_bg.input(obj.images);
-            obj.positions_bg = obj.clip_bg.positions;
             
             obj.cutouts_bg_proc = obj.cal.input(obj.cutouts_bg, 'clip', obj.clip_bg);
             
@@ -989,7 +921,7 @@ classdef Acquisition < file.AstroData
                 % object (based on the stack). 
             end
             
-            obj.cutouts_sub = obj.cutouts_proc - B;
+            obj.cutouts_sub = obj.cutouts_proc - B/obj.num_sum;
             
         end
         
@@ -999,12 +931,12 @@ classdef Acquisition < file.AstroData
                 input = obj.latest_input;
             end
             
-            obj.photo.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps); % add variance input? 
+            obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps); % add variance input? 
             
-            obj.fluxes = obj.photo.fluxes;
-            obj.lightcurves.input(obj.photo.fluxes, obj.photo.weights, obj.photo.offsets_x, obj.photo.offsets_y, obj.photo.widths, obj.photo.backgrounds); % store the full lightcurves...
+            obj.fluxes = obj.phot.fluxes;
+            obj.lightcurves.input(obj.phot.fluxes, obj.timestamps, obj.phot.weights, obj.phot.offsets_x, obj.phot.offsets_y, obj.phot.widths, obj.phot.backgrounds); % store the full lightcurves...
             
-%             obj.widths = obj.photo.widths;
+%             obj.widths = obj.phot.widths;
             
         end
         
@@ -1137,7 +1069,7 @@ classdef Acquisition < file.AstroData
 
                     obj.batch(input);
                     
-                    obj.af.input(ii, obj.cam.focuser.pos, obj.photo_stack.widths, obj.photo_stack.fluxes);
+                    obj.af.input(ii, obj.cam.focuser.pos, obj.phot_stack.widths, obj.phot_stack.fluxes);
                     
                     obj.af.plot;
 
@@ -1284,6 +1216,34 @@ classdef Acquisition < file.AstroData
         end
         
     end    
+    
+    methods(Access=protected) % bullshit functions to override setter/getter in AstroData
+        
+        function val = getPositions(obj)
+            
+            val = obj.clip.positions;
+            
+        end
+        
+        function setPositions(obj, val)
+            
+            obj.clip.positions = val;
+            
+        end
+        
+        function val = getPositionsBG(obj)
+            
+            val = obj.clip_bg.positions;
+            
+        end
+        
+        function setPositionsBG(obj, val)
+            
+            obj.clip_bg.positions = val;
+            
+        end
+        
+    end
     
 end
 

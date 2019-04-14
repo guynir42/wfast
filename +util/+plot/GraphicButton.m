@@ -16,12 +16,14 @@ classdef GraphicButton < handle
         str1 = '';
         str2 = '';
         
-        font_size = ''; % default is regular (large) font. Otherwise use 'edit' or 'small'. actual size is define by owner.gui
+        font_size = ''; % default is regular (large) font. Otherwise use 'edit' or 'small'. actual size is define by owner.(obj.self_name)
         
         color_on; % apply this color when on
         color_off;
         
         func = @owner.update; % callback for this object
+        
+        self_name; % containing object should have a "gui" object (or something else)
         
         control@matlab.ui.control.UIControl;
         
@@ -159,9 +161,9 @@ classdef GraphicButton < handle
             obj.type = type;
             obj.str1 = str1;
             obj.str2 = str2;
+            obj.self_name = self_name;
             obj.color_on = color_on;
             obj.color_off = color_off;
-
             obj.update;
             
             if isprop(obj.owner.(self_name), buttons_name)
@@ -292,7 +294,7 @@ classdef GraphicButton < handle
             if cs(obj.type, 'push')
                 
                 obj.String = [obj.str1 obj.str2];
-                obj.FontSize = obj.owner.gui.([font_size 'font_size']);
+                obj.FontSize = obj.owner.(obj.self_name).([font_size 'font_size']);
                 
             elseif cs(obj.type, 'toggle')
                 
@@ -312,7 +314,7 @@ classdef GraphicButton < handle
                     end
                 end
                 
-                obj.FontSize = obj.owner.gui.([font_size 'font_size']);
+                obj.FontSize = obj.owner.(obj.self_name).([font_size 'font_size']);
                 
             elseif cs(obj.type, 'auto')
                 
@@ -335,7 +337,7 @@ classdef GraphicButton < handle
                     end
                 end
                 
-                obj.FontSize = obj.owner.gui.([font_size 'font_size']);
+                obj.FontSize = obj.owner.(obj.self_name).([font_size 'font_size']);
                 
             elseif cs(obj.type, 'input', 'input text')
                 
@@ -346,22 +348,22 @@ classdef GraphicButton < handle
                 end
                 
                 if isempty(obj.font_size)
-                    obj.FontSize = obj.owner.gui.edit_font_size;
+                    obj.FontSize = obj.owner.(obj.self_name).edit_font_size;
                 else
-                    obj.FontSize = obj.owner.gui.([font_size 'font_size']);
+                    obj.FontSize = obj.owner.(obj.self_name).([font_size 'font_size']);
                 end
                 
             elseif cs(obj.type, 'info')
                 
-                obj.FontSize = obj.owner.gui.([font_size 'font_size']);
+                obj.FontSize = obj.owner.(obj.self_name).([font_size 'font_size']);
                 obj.String = [obj.str1 num2str(obj.owner.(obj.variable)) obj.str2];
                 
             elseif cs(obj.type, 'custom', 'input custom')
                 
-                obj.FontSize = obj.owner.gui.([font_size 'font_size']);
+                obj.FontSize = obj.owner.(obj.self_name).([font_size 'font_size']);
             
             else
-                obj.FontSize = obj.owner.gui.([font_size 'font_size']);
+                obj.FontSize = obj.owner.(obj.self_name).([font_size 'font_size']);
             end
             
         end
@@ -372,7 +374,7 @@ classdef GraphicButton < handle
         
         function callback_push(obj, ~, ~)
             
-            if obj.owner.gui.debug_bit, disp(['callback: ' obj.variable]); end
+            if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable]); end
             
             if isempty(obj.str2)
                 if ismethod(obj.owner, obj.variable)
@@ -384,23 +386,23 @@ classdef GraphicButton < handle
                 obj.owner.(obj.variable).(obj.str2);
             end
             
-            obj.owner.gui.update;
+            obj.owner.(obj.self_name).update;
             
         end
         
         function callback_toggle(obj, ~, ~)
             
-            if obj.owner.gui.debug_bit, disp(['callback: ' obj.variable]); end
+            if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable]); end
                 
             obj.owner.(obj.variable) = ~obj.owner.(obj.variable);
             
-            obj.owner.gui.update;
+            obj.owner.(obj.self_name).update;
             
         end
         
         function callback_auto(obj, ~, ~)
             
-            if obj.owner.gui.debug_bit, disp(['callback: ' obj.variable]); end
+            if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable]); end
                 
             if isempty(obj.owner.(obj.variable))
                 obj.owner.(obj.variable) = 0;
@@ -410,7 +412,7 @@ classdef GraphicButton < handle
                 obj.owner.(obj.variable) = 1;
             end
             
-            obj.owner.gui.update;
+            obj.owner.(obj.self_name).update;
             
         end
         
@@ -420,7 +422,7 @@ classdef GraphicButton < handle
             
             value = value{1};
             
-            if obj.owner.gui.debug_bit, disp(['callback: ' obj.variable '= ' num2str(value)]); end
+            if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable '= ' num2str(value)]); end
             
             if isempty(value)
                 if isprop(obj.owner, ['default_' obj.variable])
@@ -434,15 +436,17 @@ classdef GraphicButton < handle
                 obj.owner.(obj.variable) = value;
             end
                         
-            obj.owner.gui.update;
+            obj.owner.(obj.self_name).update;
             
         end
         
         function callback_input_text(obj, hndl, ~)
             
-            value = strip(hndl.String);
+            str = hndl.String;
+            substr = split(str, '=');
+            value = strip(substr{end});
             
-            if obj.owner.gui.debug_bit, disp(['callback: ' obj.variable '= ' value]); end
+            if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable '= ' value]); end
             
             if isempty(value)
                 if isprop(obj.owner, ['default_' obj.variable])
@@ -456,15 +460,15 @@ classdef GraphicButton < handle
                 obj.owner.(obj.variable) = value;
             end
                         
-            obj.owner.gui.update;
+            obj.owner.(obj.self_name).update;
             
         end
         
         function callback_info(obj, ~, ~)
             
-            if obj.owner.gui.debug_bit, disp('callback: update'); end
+            if obj.owner.(obj.self_name).debug_bit, disp('callback: update'); end
 
-            obj.owner.gui.update;            
+            obj.owner.(obj.self_name).update;            
             
         end
         

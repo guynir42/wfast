@@ -12,6 +12,13 @@ classdef FocusSpider < handle
 % 
 % HARDWARE SETUP: the controller switches must all be ON except 7 and 8. 
 
+    properties(Transient=true)
+        
+        gui@obs.focus.gui.SpiderGUI;
+        gui_cam; % handle to the camera GUI for feedback
+        
+    end
+
     properties % internal info and objects
         
         actuators@obs.focus.FocusActuator;
@@ -22,8 +29,6 @@ classdef FocusSpider < handle
         tip_vec = [-0.5 1 -0.5];
         tilt_vec = [0.5 0 -0.5];
         
-        gui;
-        
     end
     
     properties % switches and controls
@@ -33,7 +38,10 @@ classdef FocusSpider < handle
         min_pos = 0;
         max_pos = 20;
         max_tip_tilt = 5; % this is absolute tip/tilt        
+        
         step = 0.05;
+        step_tip = 0.01;
+        step_tilt = 0.01;
         
         debug_bit = 1;
         
@@ -41,6 +49,8 @@ classdef FocusSpider < handle
     
     properties(Dependent=true)
        
+        status;
+        
         pos;
         tip;
         tilt;
@@ -81,6 +91,12 @@ classdef FocusSpider < handle
     end
     
     methods % getters
+        
+        function val = get.status(obj)
+            
+            val = all([obj.actuators.status]);
+            
+        end
         
         function val = get.pos(obj)
             
@@ -189,19 +205,19 @@ classdef FocusSpider < handle
     
     methods % commands
         
-        function posStep(obj, val)
+        function posRelativeMove(obj, val)
             
             obj.pos = obj.pos + val;
             
         end
         
-        function tipStep(obj, val)
+        function tipRelativeMove(obj, val)
             
             obj.tip = obj.tip + val;
             
         end
         
-        function tiltStep(obj, val)
+        function tiltRelativeMove(obj, val)
             
             obj.tilt = obj.tilt + val;
             
@@ -238,6 +254,32 @@ classdef FocusSpider < handle
             
         end
         
+        function tip_up(obj)
+            
+            obj.pos = obj.tip + obj.step_tip;
+            
+        end
+        
+        function tip_down(obj)
+            
+            obj.pos = obj.tip - obj.step_tip;
+            
+        end
+        
+        function tilt_up(obj)
+            
+            obj.pos = obj.tilt + obj.step_tilt;
+            
+        end
+        
+        function tilt_down(obj)
+            
+            obj.pos = obj.tilt - obj.step_tilt;
+            
+        end
+        
+        
+        
         function demo(obj)
            
             obj.home(30);
@@ -269,7 +311,7 @@ classdef FocusSpider < handle
         
     end
     
-    methods % printouts
+    methods % plotting / printouts
        
         function printout(obj)
            
@@ -284,6 +326,16 @@ classdef FocusSpider < handle
             if nargout<1
                 disp(str);
             end
+            
+        end
+        
+        function makeGUI(obj)
+            
+            if isempty(obj.gui)
+                obj.gui = obs.focus.gui.SpiderGUI(obj);
+            end
+            
+            obj.gui.make;
             
         end
         

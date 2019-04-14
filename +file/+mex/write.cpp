@@ -52,15 +52,18 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		mexPrintf("mex_flag_write= %g %g\n", s->mex_flag[0], s->mex_flag[1]);
 		
 		s->images.printout();
+		s->timestamps.printout();
 		s->cutouts.printout();
 		s->positions.printout();
 		s->coordinates.printout();
 		s->magnitudes.printout();
 		s->temperatures.printout();
+		s->fluxes.printout();
+		s->cutouts_bg.printout();
+		s->positions_bg.printout();
+		s->backgrounds.printout();
 		s->stack.printout();
-		s->timestamps.printout();
 		s->psfs.printout();
-		s->lightcurves.printout();
 		
 		mexPrintf("debug= %d | deflate= %d | chunk= %d | async= %d \n\n", s->debug_bit, s->deflate, s->chunk_size, s->async_write);
 		

@@ -43,20 +43,29 @@ function file_handle = save(obj, filename, varargin)
         return;
     end
     
-    input = util.text.InputVars;
-    input.input_var('att_length', 10, 'attribute_length');
-    input.input_var('deflate', [], 'zip', 'compress');
-    input.input_var('chunk', [64,64]);
-    input.input_var('location', '/');
-    input.input_var('recursive', 1);
-    input.input_var('data_save', 1);
-    input.input_var('format', [], 'type');
-    input.input_var('append', 0);
-    input.input_var('name', inputname(1));    
-    input.input_var('debug_bit', 0);
-    input.input_var('handle_list', {});
+    if ~isempty(varargin) && isa(varargin{1}, 'util.text.InputVars')
+        
+        input = varargin{1};
+        input.scan_vars(varargin{2:end});
+        
+    else
+        
+        input = util.text.InputVars;
+        input.input_var('att_length', 10, 'attribute_length');
+        input.input_var('deflate', [], 'zip', 'compress');
+        input.input_var('chunk', [64,64]);
+        input.input_var('location', '/');
+        input.input_var('recursive', 1);
+        input.input_var('data_save', 1);
+        input.input_var('format', [], 'type');
+        input.input_var('append', 0);
+        input.input_var('name', inputname(1));    
+        input.input_var('debug_bit', 0);
+        input.input_var('handle_list', {});
 
-    input.scan_vars(varargin);
+        input.scan_vars(varargin);
+    
+    end
     
     if builtin('isempty', obj), file_handle = filename; return; end
     
@@ -94,7 +103,7 @@ function file_handle = save(obj, filename, varargin)
         if input.append
             par_list = [par_list, '-append'];
         end
-            
+        
         save(par_list{:}); 
         return; % don't bother with the more complicated stuff...
     end
@@ -154,16 +163,17 @@ function file_handle = save(obj, filename, varargin)
     % make sure we are not saving the same (handle) object multiple times... 
     if input.recursive && isa(obj, 'handle')
         
-        if ~isempty(checkList(obj, input.handle_list))
-            return;
+        if isempty(checkList(obj, input.handle_list))
+            input.handle_list{end+1} = {obj, sa(input.location, input.name)}; % add this object to the list, then save it... 
+        else
+            return; % don't save this object, it is already on the list...
         end
-        
-        input.handle_list{end+1} = {obj, sa(input.location, input.name)};
         
     end
     
     group_handle = saveHeader(file_handle, obj, input); % make a header / create new group for the object
-        
+    this_location = input.location; % keep the location of this object before recursively going into sub-objects
+    
 %     group_handle_cleanup = onCleanup(@() H5G.close(group_handle));
     
 %     props = util.oop.list_props(obj); % get the property list, including dynamic properties... 
@@ -176,7 +186,7 @@ function file_handle = save(obj, filename, varargin)
         try
             p = findprop(obj, name);
             if p.Transient
-                if input.debug_bit, disp(['prop: ' name ' is transient. Skipping...']); end
+                if input.debug_bit, disp(['prop: "' name '" is transient. Skipping...']); end
             else
                 group_handle = saveProperty(group_handle, name, obj.(name), input);
             end
@@ -201,9 +211,9 @@ function file_handle = save(obj, filename, varargin)
                
                 if isobject(value) && p.Transient==0 && ~isa(value, 'datetime') && ~isa(value, 'containers.Map') && length(value)<2 && isempty(checkList(value, input.handle_list))
                     
-                    if input.debug_bit, disp(['prop: ' name ' now saved as object...']); end
+                    if input.debug_bit, disp(['prop: "' name '" now saved as object...       **********************']); end
                     
-                    file_handle = util.oop.save(value, file_handle, input.output_vars{:}, 'name', name);
+                    file_handle = util.oop.save(value, file_handle, input, 'name', name, 'location', this_location);
                 
                 elseif isa(value, 'datetime') || isa(value, 'containers.Map')
                     continue;
@@ -213,7 +223,7 @@ function file_handle = save(obj, filename, varargin)
                         
                         if ~isa(value(jj), 'datetime') && ~isa(value(jj), 'containers.Map') && isempty(checkList(value(jj), input.handle_list))
                         
-                            if input.debug_bit, disp(['prop: ' name '(' num2str(jj) ') now saved as object...']); end
+                            if input.debug_bit, disp(['prop: "' name '(' num2str(jj) ')" now saved as object...']); end
                         
                             file_handle = util.oop.save(value(jj), file_handle, input.output_vars{:}, 'name', [name '(' num2str(jj) ')']);
                             
@@ -227,7 +237,7 @@ function file_handle = save(obj, filename, varargin)
                         
                         if isobject(value{jj}) && p.Transient==0 && ~isa(value{jj}, 'datetime') && length(value)<2 && isempty(checkList(value{jj}, input.handle_list))
                         
-                            if input.debug_bit, disp(['prop: ' name '{' num2str(jj) '} now saved as object...']); end
+                            if input.debug_bit, disp(['prop: "' name '{' num2str(jj) '}" now saved as object...']); end
                         
                             file_handle = util.oop.save(value{jj}, file_handle, input.output_vars{:}, 'name', [name '{' num2str(jj) '}']);
                             
@@ -288,13 +298,13 @@ function file_handle = saveProperty(file_handle, name, value, input)
     
     if ischar(value)
         
-        if input.debug_bit, disp(['prop: ' name ' is string. Writing as attribute...']); end
+        if input.debug_bit, disp(['prop: "' name '" is string. Writing as attribute...']); end
         
         file_handle = saveString(file_handle, name, value, input);
         
     elseif iscell(value)
         
-        if input.debug_bit, disp(['prop: ' name ' is cell array. Writing as as separate attributes/datasets...']); end
+        if input.debug_bit, disp(['prop: "' name '" is cell array. Writing as as separate attributes/datasets...']); end
         
         file_handle = saveCell(file_handle, name, value, input);
         
@@ -302,26 +312,26 @@ function file_handle = saveProperty(file_handle, name, value, input)
         
         if isempty(value)
             
-            if input.debug_bit, disp(['prop: ' name ' is empty. Writing as attribute...']); end
+            if input.debug_bit, disp(['prop: "' name '" is empty. Writing as attribute...']); end
             
             file_handle = saveNumericAtt(file_handle, name, value, input);
             
         elseif isscalar(value)
             
-            if input.debug_bit, disp(['prop: ' name ' is scalar. Writing as attribute...']); end
+            if input.debug_bit, disp(['prop: "' name '" is scalar. Writing as attribute...']); end
             
             file_handle = saveNumericAtt(file_handle, name, value, input);
             
         elseif isvector(value) && length(value)<=input.att_length
             
-            if input.debug_bit, disp(['prop: ' name ' is a vector shorter/equal to ' num2str(input.att_length) '. Writing as attribute...']); end
+            if input.debug_bit, disp(['prop: "' name '" is a vector shorter/equal to ' num2str(input.att_length) '. Writing as attribute...']); end
             
             file_handle = saveNumericAtt(file_handle, name, value, input);
             
         elseif isvector(value) && length(value)>input.att_length
             
             if input.debug_bit
-                fprintf('prop: %s is a vector longer than %d...', name, input.att_length);
+                fprintf('prop: "%s" is a vector longer than %d...', name, input.att_length);
                 if util.text.cs(input.format, 'hdf5', 'h5', 'h5z', 'struct', 'cell')
                     fprintf('Writing as dataset to %s\n', util.text.sa(input.location, name));
                 elseif util.text.cs(input.format, 'text', 'txt')
@@ -334,7 +344,7 @@ function file_handle = saveProperty(file_handle, name, value, input)
         elseif ismatrix(value)
             
             if input.debug_bit 
-                fprintf('prop: %s is a matrix... ', name);
+                fprintf('prop: "%s" is a matrix... ', name);
                 if util.text.cs(input.format, 'hdf5', 'h5', 'h5z', 'struct', 'cell')
                     fprintf('Writing as dataset to %s\n', util.text.sa(input.location, name)); 
                 elseif util.text.cs(input.format, 'text', 'txt')
@@ -348,7 +358,7 @@ function file_handle = saveProperty(file_handle, name, value, input)
         
     elseif isobject(value)
                 
-        if input.debug_bit, disp(['prop: ' name ' is an object... placing link.']); end
+        if input.debug_bit, disp(['prop: "' name '" is an object... placing link.']); end
         file_handle = saveObject(file_handle, name, value, input);
         
     end
@@ -587,6 +597,7 @@ function file_handle = saveObject(file_handle, name, value, input)
                 fprintf(file_handle, '\n');
             end
         end
+        
     elseif cs(input.format, 'struct', 'cell')
         if builtin('isempty', value)
             str = sprintf('[%s %s]', util.text.print_vec(size_vec, 'x'), class(value));
