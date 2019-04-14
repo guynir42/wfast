@@ -29,8 +29,8 @@ function val = cs(str, varargin)
 
         if iscell(varargin{ii})
             cell_array = [cell_array, varargin{ii}{:}];
-        elseif ischar(varargin{ii})
-            cell_array = [cell_array, varargin{ii}];
+        elseif ischar(varargin{ii}) || isnumeric(varargin{ii})
+            cell_array = [cell_array, varargin{ii}];        
         end
 
     end

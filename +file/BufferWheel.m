@@ -88,7 +88,7 @@ classdef BufferWheel < file.AstroData
     properties % switches
         
         index = 1; % which "buf" is now active for reading/saving 
-        product_type = 'Full'; % can be Full, ROI, Cutouts (including stacks), dark (always full), flat (always full). Can append additional strings like "Sim" or "Cal" or "Proc"
+        product_type = 'Raw'; % can be Raw, ROI, Cutouts (including stacks), dark (always raw), flat (always raw). Can append additional strings like "Sim" or "Cal" or "Proc"
         dir_extension = ''; % overrides any automatic directory extensions... 
         use_dir_types = 0; % automatically add a dir_extension equal to "type"
         
@@ -247,7 +247,7 @@ classdef BufferWheel < file.AstroData
         function clear(obj) % prepare object for new batch
         
             clear@file.AstroData(obj);
-            obj.clearBuf(obj.index);
+%             obj.clearBuf(obj.index);
             
         end
         
@@ -516,9 +516,12 @@ classdef BufferWheel < file.AstroData
                 camera = obj.default_camera;
             end
             
-            % do we really need these??
-            ccd_id = 0;
-            amp_id = 0;
+            field_id = 0; % default field is zero, which means observing on non-defined field
+            
+            filter_name = 'unknown';
+            if ~isempty(obj.pars) && ~isempty(obj.pars.filter_name)
+                filter_name = obj.pars.filter_name;
+            end
             
             if cs(obj.file_type, 'hdf5', 'h5')
                 if obj.use_deflate
@@ -532,8 +535,8 @@ classdef BufferWheel < file.AstroData
                 ext = 'mat';
             end
             
-            % EXAMPLE FILENAME: WFAST_ZYLA_20190410-155223-035_0_0_Full_000021.h5
-            val = sprintf('%s_%s_%s_%d_%d_%s_%06d.%s', project, camera, time_str, ccd_id, amp_id, obj.product_type, obj.serial, ext);
+            % EXAMPLE FILENAME: WFAST_ZYLA_20190410-155223-035_clear_0_Raw.h5
+            val = sprintf('%s_%s_%s_%s_%d_%s.%s', project, camera, time_str, filter_name, field_id, obj.product_type, ext);
             
         end
         
