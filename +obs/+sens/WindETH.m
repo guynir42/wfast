@@ -27,6 +27,7 @@ classdef WindETH < handle
     properties
         
         % generic fields
+        id = 'wind';
         status = 0; % false - readings are unreliable, true - ok
         data@util.vec.CircularBuffer; % Stack object containing data history
         dataCol = {'JD','WindSpeed','WindAz'};   % Stack object columns
@@ -37,10 +38,10 @@ classdef WindETH < handle
         
         % replies from hndl
         jd = NaN; % JD of last sucessful reading
-        speed = NaN; % last wind speed
-        speed_status; % if speed measurement is ok or error
-        az = NaN; % last wind azimuth
-        az_status; % if azimuth measurement is ok or error
+        wind_speed = NaN; % last wind speed
+        wind_speed_status; % if speed measurement is ok or error
+        wind_az = NaN; % last wind azimuth
+        wind_az_status; % if azimuth measurement is ok or error
         
         reply = ''; % verbatim reply from hardware
         
@@ -73,7 +74,7 @@ classdef WindETH < handle
             
         end
         
-        function connect(obj)
+        function connect(obj, ip, port)
             
             if nargin>=1 && ~isempty(ip)
                 obj.ip = ip;
@@ -158,35 +159,35 @@ classdef WindETH < handle
             % set Wind speed/dir status
             switch WindSpeedStatus
                 case '80'
-                    obj.speed_status = 'ok';
+                    obj.wind_speed_status = 'ok';
                 case '88'
-                    obj.speed_status = 'out of range';
+                    obj.wind_speed_status = 'out of range';
                 otherwise
-                    obj.speed_status = 'error';
+                    obj.wind_speed_status = 'error';
                     obj.status = 0;
             end
             
             switch WindAzStatus
                 case '80'
-                    obj.az_status = 'ok';
+                    obj.wind_az_status = 'ok';
                 case '88'
-                    obj.az_status = 'out of range';
+                    obj.wind_az_status = 'out of range';
                 otherwise
-                    obj.az_status = 'error';
+                    obj.wind_az_status = 'error';
                     obj.status = 0;
             end
             
             % convert speed/dir to numeric values
             if (obj.status)
                 % if status ok - convert wind Az/spped to numeric values
-                obj.speed = str2double(WindSpeedString);
+                obj.wind_speed = str2double(WindSpeedString);
                 
                 Az = obs.sens.WindETH.dir2az(WindAzString);
                 if (isnan(Az))
                     obj.status = 0;
                 end
                 
-                obj.az = Az;
+                obj.wind_az = Az;
                 
             end
             
@@ -196,7 +197,7 @@ classdef WindETH < handle
                obj.jd = juliandate(datetime('now', 'timezone', 'utc'));
             end
             
-            obj.data.input([obj.jd, obj.speed, obj.az]);
+            obj.data.input([obj.jd, obj.wind_speed, obj.wind_az]);
              
         end
         

@@ -55,7 +55,7 @@ classdef StatusChecker < handle
         
         dev_str;
         dev_status = [];
-        dev_critical_failures = [];
+        dev_critical = [];
         sens_status = [];
         
         status = 1;
@@ -92,6 +92,7 @@ classdef StatusChecker < handle
     properties(Dependent=true)
         
         dev_all;
+        dev_critical_failures;
         
     end
     
@@ -145,7 +146,7 @@ classdef StatusChecker < handle
             obj.ignore_devices = containers.Map;
         
             obj.ignore_devices('obs.dome.AstroHaven') = 1;
-            obj.ignore_devices('obs.sens.WindETH') = 1;
+            obj.ignore_devices('obs.sens.WindETH') = 0;
             
             obj.critical_devices('obs.mount.ASA') = 0;
             obj.critical_devices('obs.dome.AstroHaven') = 0; 
@@ -254,6 +255,12 @@ classdef StatusChecker < handle
         function val = get.dev_all(obj)
             
             val = [obj.devices, obj.sensors];
+            
+        end
+        
+        function val = get.dev_critical_failures(obj)
+            
+            val = ~obj.dev_status & obj.dev_critical;
             
         end
         
@@ -840,7 +847,7 @@ classdef StatusChecker < handle
             
             obj.dev_str = '';
             obj.dev_status = [];
-            obj.dev_critical_failures = [];
+            obj.dev_critical = [];
             
             for ii = 1:length(obj.dev_all)
                 
@@ -875,10 +882,9 @@ classdef StatusChecker < handle
                 end
                 
                 obj.dev_status(ii) = status_temp;
+                obj.dev_critical(ii) = obj.isCritical(obj.dev_all{ii});
                 
-                obj.dev_critical_failures(ii) = ~status_temp && obj.isCritical(obj.dev_all{ii});
-                
-                obj.dev_str = [obj.dev_str obj.getInstrID(obj.dev_all{ii}) ': ' num2str(status_temp)];
+                obj.dev_str = [obj.dev_str ' ' obj.getInstrID(obj.dev_all{ii}) ': ' num2str(status_temp)];
                 
             end
             

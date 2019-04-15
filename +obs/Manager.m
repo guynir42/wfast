@@ -152,7 +152,20 @@ classdef Manager < handle
         
         function connectWindETH(obj)
             
+            obj.log.input('Connecting to WindETH');
             
+            try 
+                obj.wind = obs.sens.WindETH;
+            catch ME
+                
+                
+                obj.log.error(ME.getReport);
+                
+                warning(ME.getReport);
+                
+                disp('Cannot connect to WindETH sensor.');
+                
+            end
             
         end
         
