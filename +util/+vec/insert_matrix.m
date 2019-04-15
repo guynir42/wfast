@@ -1,5 +1,5 @@
 function [M_out, idx_end] = insert_matrix(M_old, M_new, idx, fill_value, double_up)
-% usage: [M_out, idx_end] = insert_matrix(M_old, M_new, idx, fill_value=0, double_up=1)
+% usage: [M_out, idx_end] = insert_matrix(M_old, M_new, idx, fill_value=0, double_up=0)
 %
 % Insert matrix M_new into matrix M_old at position idx (upper left corner). 
 % If M_old is too small it will expand based on the following rules:
@@ -32,7 +32,7 @@ function [M_out, idx_end] = insert_matrix(M_old, M_new, idx, fill_value, double_
     end
     
     if nargin<5 || isempty(double_up)
-        double_up = 1;
+        double_up = 0;
     end
     
     if ~isscalar(double_up)
