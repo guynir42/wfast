@@ -15,6 +15,7 @@ classdef CircularBuffer < dynamicprops
     properties(Dependent=true)
         
         data;
+        data_ordered;
         
     end
         
@@ -111,6 +112,17 @@ classdef CircularBuffer < dynamicprops
                 vec{1} = 1:min(obj.N, obj.counter);
                 val = obj.raw_data(vec{:});
             end
+            
+        end
+        
+        function val = get.data_ordered(obj)
+            
+            if obj.idx<1
+                val = [];
+                return;
+            end
+            
+            val = vertcat(obj.data(obj.idx:end,:), obj.data(1:obj.idx-1,:));
             
         end
         

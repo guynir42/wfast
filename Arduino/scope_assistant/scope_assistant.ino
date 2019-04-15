@@ -17,9 +17,11 @@
 #include "Timer.h"
 
 #include "Ultrasonic.h"
-#include "Accelerometer.h"
+#include <SparkFun_ADXL345.h>         // SparkFun ADXL345 Library
 
-Parser parser("scope", "ScopeAssistant v1.00");
+Parser parser("scope", "ScopeAssistant v1.01");
+// v1.01 -- now ouput timer interval as 5th output of "measure"
+
 
 // define the accelerometer 
 // pinout MEGA2560: SCL->SCL and SDA->SDA and VCC to 3.3v and GND->GND)
@@ -119,7 +121,10 @@ void measure(char *arg){
   Serial.print(", ");
   Serial.print(z);
   Serial.print(", ");
-  Serial.println(ultra.getDistance());
+  Serial.print(ultra.getDistance());
+  Serial.print(", ");
+  if(timer.getMode()==Timer::OFF) Serial.println("0");
+  else Serial.println(timer.getInterval());
   
 }
 

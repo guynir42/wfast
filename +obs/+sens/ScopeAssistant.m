@@ -1,4 +1,4 @@
-classdef Accelerometer < handle
+classdef ScopeAssistant < handle
 
     properties(Transient=true)
         
@@ -6,7 +6,7 @@ classdef Accelerometer < handle
     
     properties % objects
         
-        hndl@Bluetooth; % bluetooth serial object
+        hndl % serial object
         
         data@util.vec.CircularBuffer;
         
@@ -14,7 +14,11 @@ classdef Accelerometer < handle
     
     properties % inputs/outputs
         
-        dataCol = {'X', 'Y', 'Z'};
+        dataCol = {'X', 'Y', 'Z', 'dist'};
+        
+        distance; % in cm (from ultrasonic sensor)
+        
+        period; % what interval we use for getting feedback from the sensor (zero for no automatic updates)
         
         % acc_vec = acc_vec_data/gain + bias
         gain; % x,y,z
@@ -26,8 +30,7 @@ classdef Accelerometer < handle
     
     properties % switches/controls
         
-        bluetooth_name = 'HC-06';
-        bluetooth_id = ''; 
+        port_name = 'COM1';
         
         status = 0;
         time;
@@ -53,14 +56,14 @@ classdef Accelerometer < handle
     
     methods % constructor
         
-        function obj = Accelerometer(varargin)
+        function obj = ScopeAssistant(varargin)
             
-            if ~isempty(varargin) && isa(varargin{1}, 'obs.sens.Accelerometer')
-                if obj.debug_bit, fprintf('Accelerometer copy-constructor v%4.2f\n', obj.version); end
+            if ~isempty(varargin) && isa(varargin{1}, 'obs.sens.ScopeAssistant')
+                if obj.debug_bit, fprintf('ScopeAssistant copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('Accelerometer constructor v%4.2f\n', obj.version); end
-                                
+                if obj.debug_bit, fprintf('ScopeAssistant constructor v%4.2f\n', obj.version); end
+                
                 obj.connect(varargin{:});
                 obj.data = util.vec.CircularBuffer(100);
                 obj.reset;
@@ -69,14 +72,10 @@ classdef Accelerometer < handle
             
         end
         
-        function connect(obj, name, id)
+        function connect(obj, port_name)
             
-            if nargin>1 && ~isempty(name)
-                obj.bluetoot_name = name;
-            end
-            
-            if nargin>2 && ~isempty(id)
-                obj.bluetooth_id = id;
+            if nargin>1 && ~isempty(port_name)
+                obj.port_name = port_name;
             end
             
             % first, make sure to close existing connections...
@@ -85,46 +84,28 @@ classdef Accelerometer < handle
                 delete(obj.hndl);
             end
             
-            if isempty(obj.bluetooth_name)
-                error('Must supply a name for a bluetooth device (e.g., HC-06)');
+            if isempty(obj.port_name)
+                error('Must supply a port name serial device (e.g., COM1)');
             end
             
             % must be paired to the bluetooth device! 
-            obj.hndl = Bluetooth(obj.bluetooth_name, 1); % second argument is channel==1
-            
-            if isempty(obj.bluetooth_id) || isnumeric(obj.bluetooth_id)
-                
-                in = instrhwinfo('bluetooth', obj.bluetooth_name);
-                
-                if isnumeric(obj.bluetooth_id) && obj.bluetooth_id>0
-                    idx = obj.bluetooth_id;
-                else
-                    idx = 1;
-                end
-                
-                if idx>length(in)
-                    error('Cannot open device number %d, there are only %d devices named "%s".', idx, length(in), obj.bluetooth_name);
-                end
-                
-                if isempty(in(idx).RemoteID)
-                    error('Device not found. Make sure to pair the device!');
-                end
-                
-                if obj.debug_bit
-                    fprintf('Found a bluetooth device with ID: %s\n', obj.bluetooth_id);
-                end
-                
-                obj.bluetooth_id = in(idx).RemoteID(9:end);
-                
-            end
-            
-            obj.hndl.RemoteID = obj.bluetooth_id; 
+            obj.hndl = serial(obj.port_name);
             
             fopen(obj.hndl);
             
             pause(0.1);
             
             obj.update;
+            
+        end
+        
+        function disconnect(obj)
+            
+            if ~isempty(obj.hndl)
+                fclose(obj.hndl);
+                delete(obj.hndl);
+                obj.hndl = [];
+            end
             
         end
         
@@ -172,6 +153,12 @@ classdef Accelerometer < handle
             
         end
         
+        function val = distance_mean(obj)
+            
+            val = mean(obj.data.data(:,5));
+            
+        end
+        
     end
     
     methods % setters
@@ -190,32 +177,7 @@ classdef Accelerometer < handle
             
             obj.hndl.BytesAvailableFcn = @obj.read_data;
             
-            fprintf(obj.hndl, 'status;');
-            
-%             res = 0.001;
-%             timeout = 5;
-%             
-%             if obj.hndl.BytesAvailable % flush any existing data from before
-%                 fgetl(obj.hndl);
-%             end
-%             
-%             for ii = 1:timeout/res
-%                
-%                 if obj.hndl.BytesAvailable
-%                     
-%                     obj.read_data;
-%                     
-%                     obj.status = 1;
-%             
-%                     return;
-%                     
-%                 end
-%                 
-%                 pause(res);
-%                 
-%             end
-%             
-%             error('Timeout reached after %f seconds while waiting for Bluetooth response...', timeout);
+            fprintf(obj.hndl, 'measure;');
             
         end
         
@@ -233,13 +195,23 @@ classdef Accelerometer < handle
         
         function read_data(obj, ~, ~)
             
-            obj.reply = fgetl(obj.hndl);
-            obj.acc_vec_raw = str2double(regexp(obj.reply,'-?\d*','Match'));
+            obj.reply = strip(fgetl(obj.hndl)); % text reply
+
+%             reply = str2double(regexp(obj.reply,'-?\d*','Match'));
+            numeric_reply = str2double(split(obj.reply, ','))';
+            
+            if isnan(numeric_reply), disp(obj.reply); end
+            
+            if length(numeric_reply)<5, return; end
+            
+            obj.acc_vec_raw = numeric_reply(1:3);
+            obj.distance = numeric_reply(4);
+            obj.period = numeric_reply(5);
             obj.time = datetime('now', 'timezone', 'UTC');
             obj.jd = juliandate(obj.time);
             obj.status = 1;
             
-            obj.data.input([obj.jd obj.acc_vec]);
+            obj.data.input([obj.jd obj.acc_vec obj.distance]);
             
         end
         
@@ -345,7 +317,7 @@ classdef Accelerometer < handle
                 
                 pause(input.interval);
                 
-                color = linspace(0,1,size(obj.data.data,1));                
+                color = linspace(0,1,obj.data.N);
                 color = [color', zeros(size(color,2),2)];
                 
                 if ~isvalid(input.ax)
@@ -353,14 +325,14 @@ classdef Accelerometer < handle
                 end
                 
                 if ~isempty(obj.data.data)
-                    scatter3(input.ax, obj.data.data(:,2), obj.data.data(:,3), obj.data.data(:,4), 3, color);
+                    scatter3(input.ax, obj.data.data(:,2), obj.data.data(:,3), obj.data.data(:,4), 3, color(1:size(obj.data.data,1),:));
                 end
                 
                 input.ax.XLim = [-1 1]*1.2;
                 input.ax.YLim = [-1 1]*1.2;
                 input.ax.ZLim = [-1 1]*1.2;
                 
-                title(input.ax, num2str(obj.acc_vec));
+                title(input.ax, ['Acc (x,y,z)= (' num2str(obj.acc_vec,2) ') | d= ' num2str(obj.distance) 'cm'], 'FontSize', 14);
                 drawnow;
                 
             end
@@ -379,21 +351,24 @@ classdef Accelerometer < handle
                 input.ax = gca;
             end
             
+            start_jd = juliandate(datetime('now', 'timezone', 'utc'));
+            
             for ii = 1:input.N
                 
-                obj.update; 
+                if obj.period==0
+                    obj.update; 
+                end
                 
                 pause(input.interval);
-                
-                color = linspace(0,1,size(obj.data.data,1));                
-                color = [color', zeros(size(color,2),2)];
                 
                 if ~isvalid(input.ax)
                     return;
                 end
                 
+                d = vertcat(obj.data.data_ordered);
+                
                 if ~isempty(obj.data.data)
-                    plot(input.ax, obj.data.data(:,1), obj.data.data(:,2:4));
+                    plot(input.ax, (d(:,1)-start_jd)*24*3600, d(:,2:4));
                 end
                 
                 drawnow;
@@ -402,7 +377,7 @@ classdef Accelerometer < handle
             
         end
         
-    end    
+    end
    
     methods (Static=true)
        
