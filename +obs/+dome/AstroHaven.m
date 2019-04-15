@@ -33,7 +33,7 @@ classdef AstroHaven < handle
         
         reply = '';
         
-        debug_bit = 2;
+        debug_bit = 1;
         
     end
     
@@ -479,8 +479,6 @@ classdef AstroHaven < handle
                     end
                     
                     pause(0.1);
-
-                    fprintf(obj.hndl, 'R');
                     
                 end % loop over trying to connect
                    

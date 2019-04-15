@@ -15,11 +15,6 @@ classdef StatusChecker < handle
         devices = {}; % all critical devices that must have status==1
         
         sensors = {}; % all the sensors we have... 
-%         sensors_light = {};
-%         sensors_clouds = {};
-%         sensors_temp = {};
-%         sensors_wind = {};
-%         sensors_humid = {};
         
         status_log@util.sys.Logger;
         weather_log@util.sys.Logger;
@@ -59,6 +54,9 @@ classdef StatusChecker < handle
         humid_jul;
         
         dev_str;
+        dev_status = [];
+        dev_critical_failures = [];
+        sens_status = [];
         
         status = 1;
         report = 'OK';
@@ -93,17 +91,19 @@ classdef StatusChecker < handle
     
     properties(Dependent=true)
         
-        
+        dev_all;
         
     end
     
     properties(Hidden=true)
         
         % list all the classes that status checker is following
-        sensor_classes = {'obs.sens.Simulator', 'obs.sens.Boltwood'}; 
+        sensor_classes = {'obs.sens.Simulator', 'obs.sens.Boltwood', 'obs.sens.WindETH'}; 
         device_classes = {'obs.dome.Simulator', 'obs.dome.AstroHaven', 'obs.mount.Simulator', 'obs.mount.ASA'};
+        critical_devices@containers.Map;
+        ignore_devices@containers.Map;
         
-        version = 1.00;
+        version = 1.01;
         
     end
     
@@ -124,20 +124,32 @@ classdef StatusChecker < handle
                 obj.status_log = util.sys.Logger('Observatory_status');
                 obj.weather_log = util.sys.Logger('Weather_report');
                 
+                obj.defineCrititcalDevices;
                 obj.connect;
                 
                 obj.setup_t3;
                 obj.setup_t2;
                 obj.setup_t1;
                 
-                obj.callback_t1;
-                obj.callback_t2;
-                
             else
                 
                 error('Must supply a "Manager" object to StatusChecker constructor...');
 
             end
+            
+        end
+        
+        function defineCrititcalDevices(obj) % define who is needed for continued operations
+            
+            obj.critical_devices = containers.Map;
+            obj.ignore_devices = containers.Map;
+        
+            obj.ignore_devices('obs.dome.AstroHaven') = 1;
+            obj.ignore_devices('obs.sens.WindETH') = 1;
+            
+            obj.critical_devices('obs.mount.ASA') = 0;
+            obj.critical_devices('obs.dome.AstroHaven') = 0; 
+            obj.critical_devices('obs.sens.Boltwood') = 1;
             
         end
         
@@ -239,6 +251,12 @@ classdef StatusChecker < handle
     
     methods % getters
         
+        function val = get.dev_all(obj)
+            
+            val = [obj.devices, obj.sensors];
+            
+        end
+        
         function val = getInstrID(~, other)
             
             if isprop(other, 'id') || ismethod(other, 'id')
@@ -246,6 +264,50 @@ classdef StatusChecker < handle
             else
                 c = split(class(other), '.');
                 val = c{end};
+            end
+            
+        end
+        
+        function val = getStatus(obj, device)
+            
+            if isprop(device, 'status') || ismethod(device, 'status')
+                val = device.status;
+            elseif isprop(device, 'status') || ismethod(device, 'status')
+                val = device.Status;
+            else
+                val = NaN;
+            end
+            
+        end
+        
+        function val = isCritical(obj, device)
+            
+            if ischar(device)
+                dev_class = device;
+            else
+                dev_class = class(device);
+            end
+            
+            if isKey(obj.critical_devices, dev_class)
+                val = obj.critical_devices(dev_class);
+            else
+                val = 0; % if it isn't in the dictionary, it isn't critical! 
+            end
+            
+        end
+        
+        function val = isIgnored(obj, device)
+            
+            if ischar(device)
+                dev_class = device;
+            else
+                dev_class = class(device);
+            end
+            
+            if isKey(obj.ignore_devices, dev_class)
+                val = obj.ignore_devices(dev_class);
+            else
+                val = 0; % if it isn't in the dictionary, it isn't ignored! 
             end
             
         end
@@ -284,7 +346,7 @@ classdef StatusChecker < handle
         
         function callback_t1(obj, ~, ~)
             
-            obj.update;
+            obj.updateDevices;
             
         end
         
@@ -320,27 +382,9 @@ classdef StatusChecker < handle
             if isempty(obj.t1) || ~isvalid(obj.t1) || strcmp(obj.t1.Running, 'off')
                 obj.setup_t1;
             end
-
-            str = '';
-            obj.collect_light;
-            str = [str 'LIGHT: ' obj.light_str];
             
-            obj.collect_clouds;
-            str = [str 'CLOUDS: ' obj.clouds_str];
-            
-            obj.collect_temp;
-            str = [str 'TEMP: ' obj.temp_str];
-            
-            obj.collect_wind;
-            str = [str 'WIND: ' obj.wind_str];
-            
-            obj.collect_humid;
-            str = [str 'HUMID: ' obj.humid_str];
-            
-            obj.weather_log.input(str);
-            
-            obj.decision_all;
-            obj.status_log.input(obj.report);
+            obj.updateDevices;
+            obj.update;
             
             if obj.status==0
                 % do something to owner? close dome maybe?
@@ -742,64 +786,6 @@ classdef StatusChecker < handle
             
         end
         
-        function status_all = check_devices(obj)
-            
-            obj.dev_str = '';
-            
-            status_all = [];
-            
-            for ii = 1:length(obj.devices)
-                
-                if isprop(obj.devices{ii}, 'status') 
-                    status = obj.devices{ii}.status;
-                elseif isprop(obj.devices{ii}, 'Status') 
-                    status = obj.devices{ii}.Status;
-                else
-                    status = NaN;
-                end
-                
-                if status==0
-                    
-                    if obj.debug_bit, fprintf('Device %s is malfunctioning. Attempting to reconnect...\n', class(obj.devices{ii})); end
-                    
-                    obj.status_log.input(sprintf('Device %s is malfunctioning. Attempting to reconnect...\n', class(obj.devices{ii})));
-                    
-                    try
-                        
-                        if ismethod(obj.devices{ii}, 'disconnect')
-                            obj.devices{ii}.disconnect;
-                        end
-
-                        pause(0.05);
-
-                        if ismethod(obj.devices{ii}, 'connect')
-                            obj.devices{ii}.connect;
-                        end
-
-                        pause(0.05);
-
-                    catch ME
-                        warning(ME.getReport);
-                    end
-                    
-                    if isprop(obj.devices{ii}, 'status')
-                        status = obj.devices{ii}.status;
-                    elseif isprop(obj.devices{ii}, 'Status') 
-                        status = obj.devices{ii}.Status;
-                    else
-                        status = NaN;
-                    end
-
-                end
-                
-                status_all = [status_all status];
-                
-                obj.dev_str = [obj.dev_str obj.getInstrID(obj.devices{ii}) ': ' num2str(status)];
-                
-            end
-            
-        end
-        
         function val = decision_light(obj)
             
             if any(obj.light_now>obj.max_light) || any(obj.light_now<obj.min_light)
@@ -850,11 +836,59 @@ classdef StatusChecker < handle
             
         end
         
+        function check_devices(obj)
+            
+            obj.dev_str = '';
+            obj.dev_status = [];
+            obj.dev_critical_failures = [];
+            
+            for ii = 1:length(obj.dev_all)
+                
+                status_temp = obj.getStatus(obj.dev_all{ii});
+                
+                if status_temp==0 && ~obj.isIgnored(obj.dev_all{ii})
+                    
+                    if obj.debug_bit, fprintf('Device %s is malfunctioning. Attempting to reconnect...\n', class(obj.dev_all{ii})); end
+                    
+                    obj.status_log.input(sprintf('Device %s is malfunctioning. Attempting to reconnect...\n', class(obj.dev_all{ii})));
+                    
+                    try
+                        
+                        if ismethod(obj.dev_all{ii}, 'disconnect')
+                            obj.dev_all{ii}.disconnect;
+                        end
+
+                        pause(0.05);
+
+                        if ismethod(obj.dev_all{ii}, 'connect')
+                            obj.dev_all{ii}.connect;
+                        end
+
+                        pause(0.05);
+
+                    catch ME
+                        warning(ME.getReport);
+                    end
+                    
+                    status_temp = obj.getStatus(obj.dev_all{ii});
+
+                end
+                
+                obj.dev_status(ii) = status_temp;
+                
+                obj.dev_critical_failures(ii) = ~status_temp && obj.isCritical(obj.dev_all{ii});
+                
+                obj.dev_str = [obj.dev_str obj.getInstrID(obj.dev_all{ii}) ': ' num2str(status_temp)];
+                
+            end
+            
+        end
+        
         function val = decision_devices(obj)
             
-            status_all = obj.check_devices;
+            obj.check_devices;
             
-            if any(status_all==0)
+            if any(obj.dev_critical_failures)
                 val = 0;
             else
                 val = 1;
@@ -912,6 +946,31 @@ classdef StatusChecker < handle
     methods % other utilities
         
         function update(obj)
+            
+            str = '';
+            obj.collect_light;
+            str = [str 'LIGHT: ' obj.light_str];
+            
+            obj.collect_clouds;
+            str = [str 'CLOUDS: ' obj.clouds_str];
+            
+            obj.collect_temp;
+            str = [str 'TEMP: ' obj.temp_str];
+            
+            obj.collect_wind;
+            str = [str 'WIND: ' obj.wind_str];
+            
+            obj.collect_humid;
+            str = [str 'HUMID: ' obj.humid_str];
+            
+            obj.weather_log.input(str);
+            
+            obj.decision_all;
+            obj.status_log.input(obj.report);
+            
+        end
+        
+        function updateDevices(obj)
             
             % add updates of this object here...
             
