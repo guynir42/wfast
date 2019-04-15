@@ -239,8 +239,7 @@ classdef Boltwood < handle
         function update(obj) % Read weather parameters
             
             % if status is ok than set the time of the last query
-            Dummy = obj.hndl.DataReady;
-            if (Dummy)
+            if (obj.hndl.DataReady)
                % Update status
                obj.clear;
                obj.status = 1;
