@@ -97,7 +97,7 @@ classdef BufferWheel < file.AstroData
         use_overwrite = 1; % delete existing files (this should not happen in normal operations because of unique filenames) 
         use_write_pars = 1; % write pars object to each file
         use_deflate = 0; % also can specify how much deflation you want, between 1 to 10 (more than 1 is usually slow and doesn't change much)
-        use_async = 0; % write files in a different thread (mex only)
+        use_async = 1; % write files in a different thread (mex only)
         use_mex = 1; % use mex interface to write files (use 0 as backup if mex fails or if you want other file types)
         chunk = 64; % chunk size (for deflate only)
         
@@ -229,7 +229,7 @@ classdef BufferWheel < file.AstroData
             reset@file.AstroData(obj);
             
             for ii = 1:length(obj.buf)
-%                 obj.clearBuf(ii);
+                obj.clearBuf(ii);
             end
             
             obj.index = 1;
@@ -634,15 +634,15 @@ classdef BufferWheel < file.AstroData
                 return;
             end
             
-            if ~isempty(buf.t_vec) && buf.t_vec(1)>0 && isempty(buf.t_start)
+            if ~isempty(buf.t_vec) && buf.t_vec(1)>0
                 obj.buf(buf.buf_number).t_start = util.text.time2str(datetime(buf.t_vec(1), 'ConvertFrom', 'posixtime', 'TimeZone', 'utc'));
             end
             
-            if ~isempty(buf.t_vec) && buf.t_vec(2)>0 && isempty(buf.t_end)
+            if ~isempty(buf.t_vec) && buf.t_vec(2)>0
                 obj.buf(buf.buf_number).t_end = util.text.time2str(datetime(buf.t_vec(2), 'ConvertFrom', 'posixtime', 'TimeZone', 'utc'));
             end
             
-            if ~isempty(buf.t_vec) && buf.t_vec(3)>0 && isempty(buf.t_end_stamp)
+            if ~isempty(buf.t_vec) && buf.t_vec(3)>0
                 obj.buf(buf.buf_number).t_end_stamp = buf.t_vec(3);
             end
             

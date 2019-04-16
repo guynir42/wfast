@@ -1425,6 +1425,7 @@ classdef CameraControl < file.AstroData
                 disp(['reading out batch ' num2str(obj.batch_counter) ' from buffer ' num2str(buf.index) ' | read_flag: ' util.text.print_vec(buf.this_buf.mex_flag_read)]);
             end
             
+            buf.vec2times; % update the timing data from t_vec to t_start, t_end and t_end_stamp
             obj.copyFrom(buf); % copies the pointers to the data in "buf"
             
 %             I = buf.this_buf.images_raw;
@@ -1440,7 +1441,6 @@ classdef CameraControl < file.AstroData
 %             [MX,MN,SD,CM,CS,FR] = obj.getStats;
 %             obj.mean_frame_rate = FR.*size(I,3);
             
-            buf.vec2times; % update the timing data from t_vec to t_start, t_end and t_end_stamp
             obj.pars.ephem.time = util.text.str2time(buf.t_start);
             obj.end_times(obj.batch_counter) = toc(obj.start_time);
             obj.mean_frame_rate = obj.getMeanFrameRate;
