@@ -1,0 +1,3 @@
+To compile the Andor (and HDF5) mex files you need to use Visual Studio compiler. 
+To use "threads" you need c++11 which is included in Visual Studio Professional 2015. 
+Don't use Windows SDK7 or other versions. You also need to do mex -setup C++ before compiling. 

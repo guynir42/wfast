@@ -177,9 +177,12 @@ classdef Acquisition < file.AstroData
                 
                 obj.phot_stack = img.Photometry;
                 obj.phot_stack.use_aperture = 0;
+                obj.phot_stack.use_gaussian = 0;
                 obj.flux_buf = util.vec.CircularBuffer;
                 
                 obj.phot = img.Photometry;
+                obj.phot.use_aperture = 0;
+                obj.phot.use_gaussian = 0;
                 obj.lightcurves = img.Lightcurves;
                 
                 obj.af = obs.focus.AutoFocus;
@@ -321,7 +324,7 @@ classdef Acquisition < file.AstroData
             end
             
         end
-        
+                
     end
     
     methods % utilities
@@ -665,7 +668,7 @@ classdef Acquisition < file.AstroData
             
             obj.copyFrom(obj.src); % get the data into this object
             
-            if obj.use_roi
+            if obj.use_roi % need to implement new ROI interface
                 
                 S = size(obj.images);
                 
@@ -704,6 +707,9 @@ classdef Acquisition < file.AstroData
                 obj.calcLightcurves(input);
                 obj.calcTrigger(input);
             end
+            
+            obj.positions = obj.clip.positions;
+            obj.positions_bg = obj.clip_bg.positions;
             
             if input.use_save
                 obj.buf.input(obj);
@@ -777,6 +783,7 @@ classdef Acquisition < file.AstroData
             obj.stack = obj.cal.input(sum(obj.images,3), 'sum', obj.num_sum);
             
             % make the background cutouts of the stack 
+            
             if isempty(obj.clip_bg.positions) % only if we didn't already assign positions to the bg_cutouts
                 obj.clip_bg.arbitraryPositions('im_size', size(obj.stack));
             end
@@ -824,7 +831,7 @@ classdef Acquisition < file.AstroData
             obj.average_width = median(obj.phot_stack.fluxes./M.*obj.phot_stack.widths, 'omitnan'); % maybe find the average width of each image and not the stack??
             
             if obj.use_adjust_cutouts
-                obj.positions = obj.positions + obj.adjust_pos;
+                obj.clip.positions = obj.clip.positions + obj.adjust_pos;
             else
                 % must send the average adjustment back to mount controller
             end
@@ -871,7 +878,7 @@ classdef Acquisition < file.AstroData
                     disp('Lost star positions, using quick_align');
                     
                     [~,shift] = util.img.quick_align(obj.stack_sub, obj.ref_stack);
-                    obj.positions = obj.ref_positions + flip(shift);
+                    obj.clip.positions = obj.ref_positions + flip(shift);
                     
                     % this shift should also be reported back to mount controller? 
 
@@ -1152,7 +1159,7 @@ classdef Acquisition < file.AstroData
             end
             
             obj.clip.positions = pos;
-            obj.positions = pos;
+            obj.clip.positions = pos;
             
             if obj.gui.check
                 obj.show;
