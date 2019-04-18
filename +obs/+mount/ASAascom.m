@@ -215,23 +215,25 @@ classdef ASAascom < handle
     end
     
     methods % setters
-        function set.tracking(obj, val)
+        function Ans=set.tracking(obj, val)
             % set tracking [true/false]
+            % Return tru if sucssful
             
         end
         
-        function set.rate(obj, val)
+        function Ans=set.rate(obj, val)
             % set tracking rate speed: <val ["/s]>, ['sidereal'], 'lunar',
             % 'solar'
-            
+            % Return true if sucssful
             
         end
         
     end
     
     methods % critical commands
-        function stop(obj)
+        function Ans=stop(obj)
             % stop telescope motion
+            % Return true if stop sucessfully
             
         end
         
@@ -239,21 +241,30 @@ classdef ASAascom < handle
     end
     
     methods % telescope motion
-        function slewCoo(obj,RA,Dec)
+        function Ans=slewCoo(obj,RA,Dec)
             % Slew to J2000.0 RA/Dec [deg]
+            % Return false if operation is not allowed
             
         end
         
-        function slewAzAlt(obj,Az,Alt)
+        function Ans=slewAzAlt(obj,Az,Alt)
             % Slew to Az, Alt [deg]
+            % Return false if operation is not allowed
         end
         
-        function slewHADec(obj,HA,Dec)
+        function Ans=slewHADec(obj,HA,Dec)
             % Slew to HA, Dec [deg]
+            % Return false if operation is not allowed
             
         end
         
-        function Val = isSlewing(obj)
+        function Ans=park(obj,ParkPos)
+            % Goto praking position
+            % Need to define ParkPos according to cabailities / TBD
+            
+        end
+        
+        function Ans=isSlewing(obj)
             % Retrun true if telescope is slewing, false if on target
             
         end
