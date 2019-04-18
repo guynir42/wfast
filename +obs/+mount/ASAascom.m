@@ -52,6 +52,12 @@ classdef ASAascom < handle
         park % ?
         
         
+        LogError        = true;
+        LogErrorFile    = 'Mount_ASADDM160_LogErr_%s.txt';  % %s is [YYYYMMDD]
+        LogCmd          = true;
+        LogCmdFile      = 'Mount_ASADDM160_LogCmd_%s.txt';  % %s is [YYYYMMDD]
+        
+        
     end
     
     properties(Hidden=true)
@@ -114,6 +120,8 @@ classdef ASAascom < handle
         end
         
     end
+
+    
     
     methods % reset/clear
         
@@ -136,8 +144,20 @@ classdef ASAascom < handle
          function val = get.telRA(obj)
             % get RA of telescope in deg
             % Is this J2000 or equinox of date?
+            % Output : - Mount R.A. J2000(?) in deg.
+            %            Return NaN if error.
             
-            val = 
+            try
+                val = obj.hndl.RightAscension;
+            catch
+                val = NaN;
+                
+                % log error
+                
+            end
+            
+            % Assuming the output is in hours - convert to deg
+            val = val.*15;
             
          end
         
@@ -231,9 +251,17 @@ classdef ASAascom < handle
     end
     
     methods % critical commands
-        function Ans=stop(obj)
-            % stop telescope motion
-            % Return true if stop sucessfully
+        function Ans=abortSlew(obj)
+            % stop/abort telescope motion
+            % Package: obs.mount
+            % Description: Abort telescope slew. This command is effective
+            %              only after call to SlewToTargetAsync, SlewToCoordinatesAsync,
+            %              SlewToAltAzAsync, MoveAxis.
+            %              Tracking is returned to its pre-slew state.
+            %              See p.2 in The ITtelescopeV3 Methods
+            
+            obj.hndl.AbortSlew;
+            
             
         end
         
@@ -241,9 +269,32 @@ classdef ASAascom < handle
     end
     
     methods % telescope motion
-        function Ans=slewCoo(obj,RA,Dec)
-            % Slew to J2000.0 RA/Dec [deg]
-            % Return false if operation is not allowed
+        
+        function [Val,Res]=isTracking(obj)
+            % Return true if telescope is tracking
+            % Output  : - True/false for telescope tracking
+            %           - Error/sucess message
+            
+            
+            try
+                Val = obj.hndl.Tracking;
+                Res = 'valid response';
+            catch
+                Val = NaN;
+                Res = 'Exception while calling isTracking';
+                
+                % log file
+            end
+                
+        end
+        
+        function slewCoo(obj,RA,Dec)
+            % Slew to J2000.0 RA/Dec [deg] return immidetly.
+            
+            RA_hour = RA./15;
+            obj.hndl.SlewToCoordinatesAsync(RA_hour,Dec);  % input: hour,deg
+            
+            
             
         end
         
@@ -262,12 +313,80 @@ classdef ASAascom < handle
             % Goto praking position
             % Need to define ParkPos according to cabailities / TBD
             
+            
+            
         end
+        
+        function Ans=isParking(obj)
+            % True if telescope is parking
+            % Output : - True if telescope parking, NaN if error.
+            
+            try
+                Ans = obj.hndl.AtPark;
+            catch
+                Ans = NaN;
+                
+                % log error
+            end
+            
+        end
+        
+        function Ans=setPark(obj)
+            % set the Telescope parking position to its current position
+            
+        end
+        
         
         function Ans=isSlewing(obj)
             % Retrun true if telescope is slewing, false if on target
             
         end
+        
+        function Ans=sideOfPier(obj,RA,Dec)
+            % Predict side of pier for German equatorial mount
+            % Input  : - ASAascom object
+            %          - RA [deg]
+            %          - Dec [deg]
+            % Output : - Side of pier ?
+            
+            RA_hour = RA./15;
+            Ans = obj.hndl.DestinationSideOfPier(RA_hour,Dec);  % input hours,deg
+            
+            % Check answer validity
+            
+            
+        end
+        
+        function [Ans,Res]=findHome(obj)
+            % find telescope home (synchronous)
+            % Output  : - true/false
+            %           - Error/sucess Message
+            
+            
+            IsPark = obj.isParking;
+            if isnan(IsPark)
+                % can't find home - isParking unknown
+                Ans = false;
+                Res = 'isParking returne NaN - cant find home';
+            else
+                if (IsPark)
+                    % Can't find home while telescope is parking
+                    Ans = false;
+                    Res = 'unpark telescope - cant find home while telescope is parking';
+                else
+                    try
+                        obj.hndl.FindHome;
+                        % synchronous
+                        Ans = true;
+                        Res = 'sucess';
+                    catch
+                        Ans = false;
+                        Res = 'FindHome exception';
+                    end
+                end
+            end
+        end
+        
     end
     
 end
