@@ -88,7 +88,7 @@ classdef ASA < handle
                 
                 obj.hndl = actxserver('AstrooptikServer.Telescope');
             
-                obj.hndl.SiteLatitude = obj.target.latitude;
+                obj.hndl.SiteLatitude  = obj.target.latitude;
                 obj.hndl.SiteLongitude = obj.target.longitude;
                 
                 obj.hndl.Connected = 1;
@@ -121,13 +121,13 @@ classdef ASA < handle
     methods % getters
         
         function val = get.RA_target(obj)
-            
+            % get RA of user target in deg
             val = rad2deg(obj.target.RA_rad);
             
         end
         
         function val = get.DE_target(obj)
-            
+            % get Dec of user target in deg
             val = rad2deg(obj.target.DE_rad);
             
         end
