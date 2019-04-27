@@ -101,8 +101,8 @@ classdef ASAascom < handle
                 
                 obj.hndl = actxserver('AstrooptikServer.Telescope');
             
-                obj.hndl.SiteLatitude  = obj.target.obsLat;
-                obj.hndl.SiteLongitude = obj.target.obsLon;
+                obj.hndl.SiteLatitude  = obj.obsLat;
+                obj.hndl.SiteLongitude = obj.obsLon;
                 
                 obj.hndl.Connected = 1;
             
@@ -125,6 +125,25 @@ classdef ASAascom < handle
     
     methods % reset/clear
         
+        function motorOn(obj)
+            % set MotorOn
+            
+            do_start_cmd(obj);
+            
+            obj.hndl.MotorOn;
+            
+        end
+        
+        function motorOff(obj)
+            % set MotorOff
+            
+            do_start_cmd(obj);
+            
+            obj.hndl.MotorOff;
+            
+        end
+            
+        
         function reset(obj)
             % ???
                         
@@ -139,20 +158,67 @@ classdef ASAascom < handle
         
     end
     
+    methods % do start/end
+        function do_start_cmd(obj)
+            % This command is running in the begining of each command
+            
+            % Log command in log file
+            if (obj.LogCmd)
+                % Log command into log file
+                
+                DB = dbstack; % get from dbstack the name of the caller function
+                
+                % LOG FFU
+            end
+            
+        end
+    end
     
     methods % getters
+        
+         function val=get.status(obj)
+            % get mount status
+            % Package: obs.mount
+            % Description: Return true if mount is responsive
+            
+            obj.do_start_cmd;
+            
+            try
+                val = obj.hndl.RightAscension;
+            catch
+                val = NaN; 
+            end
+            
+            if isnan(Val)
+                % telescope status is not ok
+                val = false;
+            else
+                % telescope is responding assume status is ok
+                val = true;
+            end
+            
+            
+        end
+        
          function val = get.telRA(obj)
             % get RA of telescope in deg
             % Is this J2000 or equinox of date?
             % Output : - Mount R.A. J2000(?) in deg.
             %            Return NaN if error.
             
+            obj.do_start_cmd;
+            
+            
             try
                 val = obj.hndl.RightAscension;
             catch
                 val = NaN;
                 
-                % log error
+                if (obj.LogError)
+                    % Log Error
+                    
+                    % Log FFU
+                end
                 
             end
             
@@ -164,21 +230,23 @@ classdef ASAascom < handle
          function val = get.telDec(obj)
             % get Dec of telescope in deg
             
-            val = 
+            % copy from RA: Declination
+            
             
          end
         
          function val = get.telAz(obj)
             % get Az of telescope in deg
             
-            val = 
+            % copy from RA: Azimuth
+             
             
          end
          
          function val = get.telAlt(obj)
             % get Alt of telescope in deg
             
-            val = 
+            % copy from RA: Altitude
             
          end
          
@@ -237,7 +305,11 @@ classdef ASAascom < handle
     methods % setters
         function Ans=set.tracking(obj, val)
             % set tracking [true/false]
-            % Return tru if sucssful
+            % Return true if sucssful
+            
+            
+            
+            
             
         end
         
@@ -251,6 +323,8 @@ classdef ASAascom < handle
     end
     
     methods % critical commands
+        
+        
         function Ans=abortSlew(obj)
             % stop/abort telescope motion
             % Package: obs.mount
@@ -260,11 +334,35 @@ classdef ASAascom < handle
             %              Tracking is returned to its pre-slew state.
             %              See p.2 in The ITtelescopeV3 Methods
             
+            obj.do_start_cmd;
+            
             obj.hndl.AbortSlew;
             
             
         end
         
+        function Ans=ShutDown
+            % Shut down the mount
+            
+            % ShutDown
+            
+            
+        end
+        
+    end
+    
+    methods (Static)
+        function Long=ang_in_range(Long,Period)
+            % Convert an angle to the 0 to 360 range
+            % Description: Convert an angle to the range 0 to 360.
+            % Input  : - Matrix of angles.
+            %          - Period of angles. Default is 360.
+            % Output : - Angle in the allowed range.
+
+            Long = (Long./Period - floor(Long./Period)).*Period;
+
+            
+        end
         
     end
     
@@ -291,7 +389,18 @@ classdef ASAascom < handle
         function slewCoo(obj,RA,Dec)
             % Slew to J2000.0 RA/Dec [deg] return immidetly.
             
+            do_start_cmd(obj);
+            
+            IsParking = obj.hndl.AtPark;
+            if IsParking
+                % unPark
+                obj.hndl.Unpark;
+            end
+            
             RA_hour = RA./15;
+            
+            % Ans= obj.hndl.DestinationSideOfPier(RA_hour,Dec);
+            
             obj.hndl.SlewToCoordinatesAsync(RA_hour,Dec);  % input: hour,deg
             
             
@@ -306,6 +415,46 @@ classdef ASAascom < handle
         function Ans=slewHADec(obj,HA,Dec)
             % Slew to HA, Dec [deg]
             % Return false if operation is not allowed
+            
+        end
+        
+        function Ans=moveTel(obj,DRA,DDec)
+            % move telescope in RA and Dec [deg]
+            % Input  : - Mount object
+            %          - Delta RA to move [deg of arc]
+            %          - Delta Dec to move [deg of arc]
+            % Output : - false is requested Dec is out of range.
+            
+            do_start_cmd;
+            
+            CurRA  = obj.RA .& 15;  % deg
+            CurDec = obj.Dec;       % deg;
+            
+            RA  = CurRA + DRA./cosd(CurDec);
+            Dec = CurDec + DDec;
+            
+            % make sure in [0 360] range
+            RA = obs.mount.ASAascom.ang_in_range(RA,360);
+            
+            Ans = true;
+            if (Dec>90)
+                Dec = 90;
+                warning('Requested Dec is out of range - set to Dec=90');
+                Ans = false;
+            end
+            if (Dec<-90)
+                Dec = -90;
+                warning('Requested Dec is out of range - set to Dec=-90');
+                Ans = false;
+            end
+            
+            RA_hour = RA./15;
+            
+            % Ans= obj.hndl.DestinationSideOfPier(RA_hour,Dec);
+            
+            obj.hndl.SlewToCoordinatesAsync(RA_hour,Dec);  % input: hour,deg
+            
+            
             
         end
         
@@ -340,6 +489,8 @@ classdef ASAascom < handle
         function Ans=isSlewing(obj)
             % Retrun true if telescope is slewing, false if on target
             
+            % Slewing...
+            
         end
         
         function Ans=sideOfPier(obj,RA,Dec)
@@ -348,6 +499,8 @@ classdef ASAascom < handle
             %          - RA [deg]
             %          - Dec [deg]
             % Output : - Side of pier ?
+            
+            do_start_cmd(obj);
             
             RA_hour = RA./15;
             Ans = obj.hndl.DestinationSideOfPier(RA_hour,Dec);  % input hours,deg
@@ -362,6 +515,7 @@ classdef ASAascom < handle
             % Output  : - true/false
             %           - Error/sucess Message
             
+            do_start_cmd;
             
             IsPark = obj.isParking;
             if isnan(IsPark)
