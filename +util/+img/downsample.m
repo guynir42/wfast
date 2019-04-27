@@ -42,7 +42,9 @@ function I_out = downsample(I, binning, normalization, memory_limit)
     % conv_f will choose if to use FFT convolution, also might loop through 3D matrix 
     I_conv = util.img.conv_f(k, I, 'mem_limit', memory_limit); 
     
-    index = mod(size(I),binning)+1; % starting index for sampling...
-    I_out = I_conv(index(1):binning:end-binning, index(2):binning:end-binning, :);
+%     index = mod(size(I),binning)+ 1; % starting index for sampling...
+%       I_out = I_conv(index(1):binning:end-binning, index(2):binning:end-binning, :);
+
+    I_out = I_conv(binning:binning:end, binning:binning:end);
 
 end
