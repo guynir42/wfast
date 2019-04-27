@@ -49,8 +49,7 @@ classdef ASAascom < handle
         flipOption      = 'preferWest';
         flipStayOnSide  = ?
         
-        park % ?
-        
+        % park - there is a method called park
         
         LogError        = true;
         LogErrorFile    = 'Mount_ASADDM160_LogErr_%s.txt';  % %s is [YYYYMMDD]
@@ -71,7 +70,7 @@ classdef ASAascom < handle
         function obj = ASAascom(varargin)
             % ASAascom constructor
             
-            if ~isempty(varargin) && isa(varargin{1}, 'obs.mount.ASA')
+            if ~isempty(varargin) && isa(varargin{1}, 'obs.mount.ASAascom')
                 if obj.debug_bit
                     fprintf('ASA copy-constructor v%4.2f\n', obj.version);
                 end
@@ -97,6 +96,7 @@ classdef ASAascom < handle
         
         function connect(obj)
             % Connect to the ASA mount using the ASCOM driver
+            
             try 
                 
                 obj.hndl = actxserver('AstrooptikServer.Telescope');
@@ -111,6 +111,9 @@ classdef ASAascom < handle
             catch ME
                 % should we do anything else?
                 warning(ME.getReport);
+                
+                % write log Error
+                log_error(obj,'Error while trying to connect to ASA mount');
             end
             
         end
@@ -125,12 +128,21 @@ classdef ASAascom < handle
     
     methods % reset/clear
         
-        function motorOn(obj)
-            % set MotorOn
+        function Ans=motorOn(obj)
+            % set MotorOn, return false if error
+            % 
             
             do_start_cmd(obj);
             
-            obj.hndl.MotorOn;
+            try
+                obj.hndl.MotorOn;
+                Ans = true;
+            catch
+                Ans=false;
+                % Log error
+                log_error(obj,'MotorOn command failed');
+                
+            end
             
         end
         
@@ -139,7 +151,14 @@ classdef ASAascom < handle
             
             do_start_cmd(obj);
             
-            obj.hndl.MotorOff;
+            try
+                obj.hndl.MotorOff;
+                Ans = true;
+            catch
+                Ans=false;
+                % Log error
+                log_error(obj,'MotorOff command failed');
+            end
             
         end
             
@@ -172,6 +191,16 @@ classdef ASAascom < handle
             end
             
         end
+        
+        function log_error(obj,String)
+            % Log string into error file
+            
+            if (obj.LogError)
+                
+            end
+            
+        end
+        
     end
     
     methods % getters
@@ -336,7 +365,14 @@ classdef ASAascom < handle
             
             obj.do_start_cmd;
             
-            obj.hndl.AbortSlew;
+            try
+                obj.hndl.AbortSlew;
+                Ans = true;
+            catch
+                Ans = false;
+                % Log Error
+                log_error(obj,'AbortSlew command failed');
+            end
             
             
         end
@@ -381,12 +417,13 @@ classdef ASAascom < handle
                 Val = NaN;
                 Res = 'Exception while calling isTracking';
                 
-                % log file
+                % log error
+                log_error(obj,sprintf('isTracking command failed'));
             end
                 
         end
         
-        function slewCoo(obj,RA,Dec)
+        function Ans=slewCoo(obj,RA,Dec)
             % Slew to J2000.0 RA/Dec [deg] return immidetly.
             
             do_start_cmd(obj);
@@ -399,17 +436,24 @@ classdef ASAascom < handle
             
             RA_hour = RA./15;
             
-            % Ans= obj.hndl.DestinationSideOfPier(RA_hour,Dec);
+            try
+                % Ans= obj.hndl.DestinationSideOfPier(RA_hour,Dec);
             
-            obj.hndl.SlewToCoordinatesAsync(RA_hour,Dec);  % input: hour,deg
-            
-            
+                obj.hndl.SlewToCoordinatesAsync(RA_hour,Dec);  % input: hour,deg
+                Ans = true;
+            catch
+                Ans = false;
+                
+                log_error(obj,'SlewToCoordinatesAsync command failed');
+            end
             
         end
         
         function Ans=slewAzAlt(obj,Az,Alt)
             % Slew to Az, Alt [deg]
             % Return false if operation is not allowed
+            
+            % obj.hndl.SlewToAltAzAsync
         end
         
         function Ans=slewHADec(obj,HA,Dec)
@@ -423,7 +467,7 @@ classdef ASAascom < handle
             % Input  : - Mount object
             %          - Delta RA to move [deg of arc]
             %          - Delta Dec to move [deg of arc]
-            % Output : - false is requested Dec is out of range.
+            % Output : - false if command move command failed.
             
             do_start_cmd;
             
@@ -434,26 +478,30 @@ classdef ASAascom < handle
             Dec = CurDec + DDec;
             
             % make sure in [0 360] range
-            RA = obs.mount.ASAascom.ang_in_range(RA,360);
+            RA  = obs.mount.ASAascom.ang_in_range(RA,360);
             
             Ans = true;
             if (Dec>90)
                 Dec = 90;
                 warning('Requested Dec is out of range - set to Dec=90');
-                Ans = false;
             end
             if (Dec<-90)
                 Dec = -90;
                 warning('Requested Dec is out of range - set to Dec=-90');
-                Ans = false;
             end
             
             RA_hour = RA./15;
             
-            % Ans= obj.hndl.DestinationSideOfPier(RA_hour,Dec);
+            try
+                % Ans= obj.hndl.DestinationSideOfPier(RA_hour,Dec);
             
-            obj.hndl.SlewToCoordinatesAsync(RA_hour,Dec);  % input: hour,deg
-            
+                obj.hndl.SlewToCoordinatesAsync(RA_hour,Dec);  % input: hour,deg
+                Ans = true;
+            catch
+                Ans = false;
+                % Log Error
+                log_error('moveTel command failed');
+            end
             
             
         end
@@ -462,20 +510,54 @@ classdef ASAascom < handle
             % Goto praking position
             % Need to define ParkPos according to cabailities / TBD
             
+            obj.do_start_cmd;
+            
+            try
+                obj.hndl.park;
+                Ans = true;
+            catch
+                Ans = false;
+                % Log Error
+                log_error(obj,'park command failed');
+            end
+            
+            % verify that AtPark is true
+            AtPark = obj.hndl.AtPark;
+            if (~AtPark)
+                % error
+                log_error(obj,'park command return, but telescope is not AtPark');
+                Ans = false;
+            end
+            
+            % Verify that telescope is at park position by reading
+            % its Az/Alt
+            try
+                Az  = obj.hndl.Azimuth;
+                Alt = obj.hndl.Altitude;
+                
+                % FFU
+                
+            catch
+                % Log Error
+                log_error('Error while trying to read Az/Alt to verify parking position');
+            end
+            
             
             
         end
         
-        function Ans=isParking(obj)
+        function [Ans]=isParking(obj)
             % True if telescope is parking
-            % Output : - True if telescope parking, NaN if error.
+            % Output : - True if telescope parking, NaN if unknown.
+            
+            obj.do_start_cmd;
             
             try
                 Ans = obj.hndl.AtPark;
             catch
                 Ans = NaN;
-                
                 % log error
+                log_error('isParking command failed');
             end
             
         end
@@ -487,9 +569,17 @@ classdef ASAascom < handle
         
         
         function Ans=isSlewing(obj)
-            % Retrun true if telescope is slewing, false if on target
+            % Retrun true if telescope is slewing, NaN if error.
+           
+            obj.do_start_cmd;
             
-            % Slewing...
+            try
+                Ans = obj.hndl.Slewing;
+            catch
+                Ans = NaN;
+                % log error
+                log_error('isSlewing command failed');
+            end
             
         end
         
@@ -498,14 +588,23 @@ classdef ASAascom < handle
             % Input  : - ASAascom object
             %          - RA [deg]
             %          - Dec [deg]
-            % Output : - Side of pier ?
+            % Output : - Side of pier ?, NaN if error.
             
             do_start_cmd(obj);
             
             RA_hour = RA./15;
-            Ans = obj.hndl.DestinationSideOfPier(RA_hour,Dec);  % input hours,deg
             
-            % Check answer validity
+            try
+                Ans = obj.hndl.DestinationSideOfPier(RA_hour,Dec);  % input hours,deg
+            
+                % Check answer validity
+                % FFU?????
+                
+            catch
+                Ans = NaN;
+                % Log File
+                log_error(obj,'sideOfPier command failed');
+            end
             
             
         end
@@ -536,6 +635,9 @@ classdef ASAascom < handle
                     catch
                         Ans = false;
                         Res = 'FindHome exception';
+                        
+                        % Log Error
+                        log_error(obj,'findHome command failed');
                     end
                 end
             end
