@@ -10,6 +10,12 @@ classdef ASAascom < handle
     properties % objects
         
         hndl;
+        log@util.sys.Logger;
+        %target@head.Ephemeris;
+        
+    end
+    
+    properties % inputs/outputs
         
         targetRA
         targetDec
@@ -29,16 +35,9 @@ classdef ASAascom < handle
         whileMoveAsync  = true;
         
         LogError        = true;
-        LogErrorFile    = 'Mount_ASADDM160_LogErr_%s.txt';  % %s is [YYYYMMDD]
+%         LogErrorFile    = 'Mount_ASADDM160_LogErr_%s.txt';  % %s is [YYYYMMDD]
         LogCmd          = true;
-        LogCmdFile      = 'Mount_ASADDM160_LogCmd_%s.txt';  % %s is [YYYYMMDD]
-        
-        
-        %target@head.Ephemeris;
-        
-    end
-    
-    properties % inputs/outputs
+%         LogCmdFile      = 'Mount_ASADDM160_LogCmd_%s.txt';  % %s is [YYYYMMDD]
         
     end
     
@@ -109,6 +108,8 @@ classdef ASAascom < handle
         function connect(obj)
             % Connect to the ASA mount using the ASCOM driver
             
+            obj.log.input('Connecting to mount.');
+            
             try 
                 
                 obj.hndl = actxserver('AstrooptikServer.Telescope');
@@ -126,6 +127,7 @@ classdef ASAascom < handle
                 
                 % write log Error
                 log_error(obj,'Error while trying to connect to ASA mount');
+                
             end
             
         end
@@ -199,6 +201,7 @@ classdef ASAascom < handle
                 
                 DB = dbstack; % get from dbstack the name of the caller function
                 
+                obj.log.input(DB(2).name); % write the name of the calling function, outside of the "do_start_cmd"
                 % LOG FFU
             end
             
@@ -208,7 +211,7 @@ classdef ASAascom < handle
             % Log string into error file
             
             if (obj.LogError)
-                String
+                obj.log.error(String); 
             end
             
         end
