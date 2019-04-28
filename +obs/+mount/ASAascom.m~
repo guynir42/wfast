@@ -352,7 +352,6 @@ classdef ASAascom < handle
                     
                 end
                 
-                obj.do_after_slewing;
                 
             end
             
@@ -368,7 +367,6 @@ classdef ASAascom < handle
             else
                 stop(T);
                 clear(T);
-                
                 obj.do_after_slewing;
             end
             
@@ -393,13 +391,6 @@ classdef ASAascom < handle
              % Check the status of the accelerometer
              
              
-        end
-        
-        
-        function do_after_slewing(obj)
-            % Commands to do after slewing
-            
-            
         end
         
     end
