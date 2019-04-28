@@ -3,3 +3,4 @@ ARCHIVE/
 test.*
 obj.*
 *.mat
+*.m~
