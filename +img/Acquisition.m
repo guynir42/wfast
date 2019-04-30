@@ -88,6 +88,7 @@ classdef Acquisition < file.AstroData
         
         use_adjust_cutouts = 1; % use adjustments in software (not by moving the mount)
         
+        use_remove_saturated = 1;
         use_mextractor = 0;
         use_arbitrary_pos = 0;
         
@@ -844,12 +845,22 @@ classdef Acquisition < file.AstroData
                 input = obj.latest_input;
             end
             
+            S = obj.stack_sub;
+            
+            if obj.use_remove_saturated
+                mu = median(squeeze(util.stat.corner_mean(util.img.jigsaw(S))));
+                sig = median(squeeze(util.stat.corner_std(util.img.jigsaw(S))));
+                S = util.img.remove_saturated(S, 'saturation', 4.5e4, 'threshold', mu+5*sig, 'dilate', 4);
+            end
+            
+            % do we want to save the saturation-removed stack image somewhere??
+            
             if input.use_arbitrary_pos
                 obj.clip.arbitraryPositions; % maybe add some input parameters?
             elseif input.use_mextractor
                 % add the code for mextractor+astrometry here
             else
-                obj.clip.findStars(obj.stack_sub);                
+                obj.clip.findStars(S);                
             end
             
             obj.ref_stack = obj.stack_sub;
