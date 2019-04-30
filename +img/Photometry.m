@@ -498,8 +498,8 @@ classdef Photometry < handle
             obj.offsets_x_basic = x;
             obj.offsets_y_basic = y;
             if ~isempty(obj.positions)
-                obj.centroids_x_basic = x + obj.positions(:,1);
-                obj.centroids_y_basic = y + obj.positions(:,2);
+                obj.centroids_x_basic = x + obj.positions(:,1)';
+                obj.centroids_y_basic = y + obj.positions(:,2)';
             end
             obj.widths_basic = W; 
             obj.backgrounds_basic = b;
@@ -509,8 +509,10 @@ classdef Photometry < handle
             obj.weights = obj.weights_basic;
             obj.offsets_x = obj.offsets_x_basic;
             obj.offsets_y = obj.offsets_y_basic;
-            obj.centroids_x = obj.centroids_x_basic;
-            obj.centroids_y = obj.centroids_y_basic;
+            if ~isempty(obj.positions)
+                obj.centroids_x = obj.centroids_x_basic;
+                obj.centroids_y = obj.centroids_y_basic;
+            end
             obj.widths = obj.widths_basic;
             obj.backgrounds = obj.backgrounds_basic;
             
@@ -524,8 +526,10 @@ classdef Photometry < handle
             obj.weights_ap = w;
             obj.offsets_x_ap = x;
             obj.offsets_y_ap = y;
-            obj.centroids_x_ap = x + obj.positions(:,1);
-            obj.centroids_y_ap = y + obj.positions(:,2);
+            if ~isempty(obj.positions)
+                obj.centroids_x_ap = x + obj.positions(:,1)';
+                obj.centroids_y_ap = y + obj.positions(:,2)';
+            end
             obj.widths_ap = W; 
             obj.backgrounds_ap = b;
             
@@ -551,8 +555,10 @@ classdef Photometry < handle
             obj.weights_psf = w;
             obj.offsets_x_psf = x;
             obj.offsets_y_psf = y;
-            obj.centroids_x_psf = x + obj.positions(:,1);
-            obj.centroids_y_psf = y + obj.positions(:,2);
+            if ~isempty(obj.positions)
+                obj.centroids_x_psf = x + obj.positions(:,1)';
+                obj.centroids_y_psf = y + obj.positions(:,2)';
+            end
             obj.widths_psf = W;
             obj.backgrounds_psf =b;
             

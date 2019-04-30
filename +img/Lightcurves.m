@@ -429,6 +429,10 @@ classdef Lightcurves < handle
                 line_str = '-';
             end
             
+            if isempty(data)
+                return;
+            end
+            
             if obj.use_smooth
                 data_smoothed = util.img.conv_f(ones(obj.smooth_interval,1)./obj.smooth_interval, data, 'crop', 'same'); 
             end
