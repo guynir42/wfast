@@ -1,18 +1,22 @@
 function compile(varargin)
 % compiles any given file or files in +obs/+cam/+mex
 
-    if nargin==0, help('obs.cam.mex.compile'); return; end
+    if nargin==0, help('obs.cam.mex_new.compile'); return; end
 
     if isempty(getenv('ANDOR'))
         error('Please install the Andor SDK3 and set the environmental variable "ANDOR" to the right place...');
     end
 
-    d = util.sys.WorkingDirectory(fullfile(getenv('WFAST'), '+obs/+cam/+mex'));
+    d = util.sys.WorkingDirectory(fullfile(getenv('WFAST'), '+obs/+cam/+mex_new'));
 
     if isscalar(varargin)
-        filenames = d.match(varargin{1});
-        if isempty(filenames)
-            filenames = d.match([varargin{1} '.cpp']);
+        if strcmp(varargin{1}, 'all')
+            filenames = d.match('*.cpp');
+        else
+            filenames = d.match(varargin{1});
+            if isempty(filenames)
+                filenames = d.match([varargin{1} '.cpp']);
+            end
         end
     else
         filenames = varargin;
@@ -32,20 +36,21 @@ function compile(varargin)
             str = [str ' -I"' getenv('ANDOR') '"'];
             str = [str ' -L"' d.pwd '"'];
             str = [str ' -latcorem -latutilitym'];
-    %         str = [str ' -l' fullfile(d.pwd, 'atutilitym')];
 
-            str = [str ' ' ' -outdir ' d.pwd];
-
-            if strcmp(filenames{ii}, 'startup.cpp')
-                str = [str '  -I' fullfile(d.pwd, 'include')];
-                str = [str ' ' fullfile(d.pwd, 'src/CameraControl.cpp')];
-                str = [str ' ' fullfile(d.pwd, 'src/SimCameraControl.cpp')];
-                str = [str ' ' fullfile(d.pwd, 'src/ZylaCameraControl.cpp')];
+            [~,name] = fileparts(filenames{ii});
+            
+            if strcmp(name, 'startup')
+                str = [str ' ' fullfile(d.pwd, 'src/AndorCamera.cpp')];
+                str = [str ' -I' fullfile(d.pwd, 'include')];
             end
-
+            
             str = [str ' ' filenames{ii}];
             % add other camera control types here...
 
+            str = [str ' ' ' -outdir ' d.pwd];
+
+            str = [str ' -output ' name];
+            
             str
             eval(str);
 

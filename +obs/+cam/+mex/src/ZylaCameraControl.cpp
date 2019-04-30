@@ -101,7 +101,7 @@ void ZylaCameraControl::record(int idx){
 	if(ret!=AT_SUCCESS){ report_error("record>software trigger", ret, mex_flag_cam); return; }
 	
 	AT_64 clock=0;
-		
+	
 	for(unsigned int i=0; i<batch_size; i++){
 		
 		int error_counter=0; // to make sure we are not in an endless loop... 
@@ -121,8 +121,6 @@ void ZylaCameraControl::record(int idx){
 		
 		ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
 		if(ret!=AT_SUCCESS){ report_error("record>software trigger", ret, mex_flag_cam); return; }
-		
-		// if(frame_delay_ms) std::this_thread::sleep_for(std::chrono::milliseconds(frame_delay_ms));
 		
 		int pos=i*height*width; // where inside the buffer to start writing now... 		
 				

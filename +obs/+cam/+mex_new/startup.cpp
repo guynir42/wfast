@@ -15,9 +15,7 @@
 #include <iostream>
 #include <fstream>
 
-#include "CameraControl.h"
-#include "SimCameraControl.h"
-#include "ZylaCameraControl.h"
+#include "AndorCamera.h"
 
 #define STRLN 256
 
@@ -32,14 +30,16 @@ int cs(const char *keyword, const char *str1, const char *str2, int num_letters=
 #define INDEX_SIZE 5
 #define INDEX_LOG 6
 
+// Usage: startup(cam_object, mex_flag, buffer_struct_array, index_rec_vector, num_batches=1, [batch_size], error_log=[])
+
 void mexFunction( int nlhs, mxArray *plhs[],
                   int nrhs, const mxArray *prhs[] ){
 	
 	if(nrhs<1){ // usage is detailed when function is called without arguments!
 		
-		mexPrintf("Usage: capture(cam_object, mex_flag, buffer_struct_array, index_rec_vector, num_batches=1, [batch_size], error_log=[])\n");
+		mexPrintf("Usage: startup(cam_object, mex_flag, buffer_struct_array, index_rec_vector, num_batches=1, [batch_size], error_log=[])\n");
 		mexPrintf("Activates camera and starts to capture images into the buffer structure.\n");
-		mexPrintf("Will stop capturing when 'num_batches' is reached or when 'mex_flag' second element is set to 1\n");
+		mexPrintf("Will stop capturing when 'num_batches' is reached or when 'mex_flag' second element is set to 1.\n");
 		mexPrintf("\nInputs: \n");
 		mexPrintf("-cam_object is a CameraControl object.\n");		
 		mexPrintf("-mex_flag should be input as [0,0,0,0]. \n   mex_flag[0] means camera is now recording, \n   mex_flag[1] is used to stop recording. \n   mex_flag[2] is an error flag, \n   mex_flag[3] is counter\n");
@@ -69,20 +69,9 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	
 	const mxArray *camera=prhs[INDEX_CAM]; // MATLAB object
 	mxArray *buffers=(mxArray*)prhs[INDEX_BUF]; // struct array	
-	mxArray *prop=(mxArray *)mxGetProperty(camera, 0, "cam_name");
-	if(prop==NULL) mexErrMsgIdAndTxt( "MATLAB:obs:cam:capture:cannotFindProperty", "Cannot find property 'cam_name' inside CameraControl!");
-	const char *cam_name=mxArrayToString(prop);
-	
-	CameraControl *cc=0;
-	//	choose which camera to use
-	if (cs("sim", cam_name)){ 
-		cc=new SimCameraControl;
-	}
-	else if (cs("zyla", cam_name)){ 
-		cc=new ZylaCameraControl;
-	}
-	else mexErrMsgIdAndTxt( "MATLAB:obs:cam:capture:unknownCameraName", "Unknown camera name '%s', use 'sim' or 'zyla'...", cam_name);
 
+	AndorCamera *cc=new AndorCamera;
+	
 	cc->mex_flag_cam=mxGetPr(prhs[INDEX_FLAG]);
 	
 	if(cc->mex_flag_cam[0]){
@@ -108,7 +97,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	
 	///////// reading buffer wheel strut //////////
 	
-	std::thread mythread(&CameraControl::loop, cc);
+	std::thread mythread(&AndorCamera::loop, cc);
 	mythread.detach();
 	
 }
