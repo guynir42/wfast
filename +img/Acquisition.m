@@ -816,7 +816,7 @@ classdef Acquisition < file.AstroData
                 obj.stack_cutouts_sub = obj.stack_cutouts;
             end
             
-            obj.phot_stack.input(obj.stack_cutouts_sub); % run photometry on the stack to verify flux and adjust positions
+            obj.phot_stack.input(obj.stack_cutouts_sub, 'positions', obj.positions); % run photometry on the stack to verify flux and adjust positions
             
             obj.checkRealign(input);
             
@@ -894,7 +894,7 @@ classdef Acquisition < file.AstroData
                         obj.stack_cutouts_sub = obj.stack_cutouts;
                     end
 
-                    obj.phot_stack.input(obj.stack_cutouts_sub, 'moments', 1); % run photometry on the stack to verify flux and adjust positions
+                    obj.phot_stack.input(obj.stack_cutouts_sub, 'positions', obj.positions); % run photometry on the stack to verify flux and adjust positions
 
                 end
 
@@ -938,12 +938,16 @@ classdef Acquisition < file.AstroData
                 input = obj.latest_input;
             end
             
-            obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps); % add variance input? 
+            obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps, 'positions', obj.positions); % add variance input? 
             
             obj.fluxes = obj.phot.fluxes;
-            obj.lightcurves.input(obj.phot.fluxes, obj.timestamps, obj.phot.weights, obj.phot.offsets_x, obj.phot.offsets_y, obj.phot.widths, obj.phot.backgrounds); % store the full lightcurves...
+            obj.lightcurves.input(obj.phot.fluxes, obj.timestamps, obj.phot.weights, ...
+                obj.phot.offsets_x, obj.phot.offsets_y, obj.phot.centroids_x, obj.phot.centroids_y, ...
+                obj.phot.widths, obj.phot.backgrounds); % store the full lightcurves...
             
-%             obj.widths = obj.phot.widths;
+            if obj.lightcurves.gui.check
+                obj.lightcurves.gui.update;
+            end
             
         end
         

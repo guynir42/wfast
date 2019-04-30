@@ -2,7 +2,7 @@ classdef Lightcurves < handle
 
     properties(Transient=true)
         
-        gui;
+        gui@img.gui.LightGUI;
         
     end
     
@@ -22,12 +22,13 @@ classdef Lightcurves < handle
         
         use_subtract_backgrounds = 0;
         
-        show_flux_cal = 'raw'; % can choose "raw" or "cal" or "both".
         show_what = 'flux'; % can choose "flux", "weight", "offsets", "widths" or "backgrounds"
-        use_show_full = 0; % if turned on, will show entire run, if off will show just what was already recorded. 
+        show_flux_cal = 'raw'; % can choose "raw" or "cal" or "both".
         show_num_stars = 10; % up to this number of stars are shown.
+        use_smooth = 1;
+        smooth_interval = 10;
         
-        double_up = 1; % choose if you want to expand the data storage by factor of 2 each time when space runs out... 
+        use_double_up = 1; % choose if you want to expand the data storage by factor of 2 each time when space runs out... 
         
         debug_bit = 1;
         
@@ -41,6 +42,8 @@ classdef Lightcurves < handle
         weights;
         offsets_x;
         offsets_y;
+        centroids_x;
+        centroids_y;
         widths;
         backgrounds;
         
@@ -53,13 +56,15 @@ classdef Lightcurves < handle
         weights_full;
         offsets_x_full;
         offsets_y_full;
+        centroids_x_full;
+        centroids_y_full;
         widths_full;
         backgrounds_full;
         
+        show_what_list = {'flux', 'weight', 'offsets', 'centroids', 'widths', 'backgrounds'};
         show_cal_list = {'raw', 'cal', 'both'};
-        sow_what_list = {'flux', 'weight', 'offsets', 'widths', 'backgrounds'};
         
-        version = 1.01;
+        version = 1.02;
         
     end
     
@@ -127,8 +132,8 @@ classdef Lightcurves < handle
                     f = f - obj.backgrounds.*obj.weights;
                 end
                 
-                f_frames_average = median(f,2); 
-                f_frames_average_norm = f_frames_average./median(f_frames_average,1); 
+                f_frames_average = median(f,2, 'omitnan'); 
+                f_frames_average_norm = f_frames_average./median(f_frames_average,1, 'omitnan'); 
                 val = f./f_frames_average_norm;
             
             end
@@ -185,6 +190,38 @@ classdef Lightcurves < handle
         function val = get.offsets_y(obj)
             
             val = obj.offsets_y_full;
+            
+            if isempty(val)
+                return;
+            end
+            
+            val = val(1:obj.frame_index-1,:);
+            
+            if all(isnan(val))
+                val = [];
+            end
+            
+        end
+        
+        function val = get.centroids_x(obj)
+            
+            val = obj.centroids_x_full;
+            
+            if isempty(val)
+                return;
+            end
+            
+            val = val(1:obj.frame_index-1,:);
+            
+            if all(isnan(val))
+                val = [];
+            end
+            
+        end
+        
+        function val = get.centroids_y(obj)
+            
+            val = obj.centroids_y_full;
             
             if isempty(val)
                 return;
@@ -258,6 +295,8 @@ classdef Lightcurves < handle
                 input.input_var('fluxes', [], 'fluxes_raw');
                 input.input_var('timestamps', [], 'times');
                 input.input_var('weights', []);
+                input.input_var('centroids_x', []);
+                input.input_var('centroids_y', []);
                 input.input_var('offsets_x', []);
                 input.input_var('offsets_y', []);
                 input.input_var('widths', []);
@@ -267,13 +306,15 @@ classdef Lightcurves < handle
             
             N = size(input.fluxes,1);
             
-            obj.fluxes_full = insert_matrix(obj.fluxes_full, input.fluxes, [obj.frame_index,1], NaN, obj.double_up);
-            obj.timestamps_full = insert_matrix(obj.timestamps_full, input.timestamps, [obj.frame_index,1], NaN, obj.double_up);
-            obj.weights_full = insert_matrix(obj.weights_full, input.weights, [obj.frame_index,1], NaN, obj.double_up);
-            obj.offsets_x_full = insert_matrix(obj.offsets_x_full, input.offsets_x, [obj.frame_index,1], NaN, obj.double_up);
-            obj.offsets_y_full = insert_matrix(obj.offsets_y, input.offsets_y, [obj.frame_index,1], NaN, obj.double_up);
-            obj.widths_full = insert_matrix(obj.widths_full, input.widths, [obj.frame_index,1], NaN, obj.double_up);
-            obj.backgrounds_full = insert_matrix(obj.backgrounds_full, input.backgrounds, [obj.frame_index,1], NaN, obj.double_up);
+            obj.fluxes_full = insert_matrix(obj.fluxes_full, input.fluxes, [obj.frame_index,1], NaN, obj.use_double_up);
+            obj.timestamps_full = insert_matrix(obj.timestamps_full, input.timestamps, [obj.frame_index,1], NaN, obj.use_double_up);
+            obj.weights_full = insert_matrix(obj.weights_full, input.weights, [obj.frame_index,1], NaN, obj.use_double_up);
+            obj.offsets_x_full = insert_matrix(obj.offsets_x_full, input.offsets_x, [obj.frame_index,1], NaN, obj.use_double_up);
+            obj.offsets_y_full = insert_matrix(obj.offsets_y, input.offsets_y, [obj.frame_index,1], NaN, obj.use_double_up);
+            obj.centroids_x_full = insert_matrix(obj.centroids_x_full, input.centroids_x, [obj.frame_index,1], NaN, obj.use_double_up);
+            obj.centroids_y_full = insert_matrix(obj.centroids_y_full, input.centroids_y, [obj.frame_index,1], NaN, obj.use_double_up);
+            obj.widths_full = insert_matrix(obj.widths_full, input.widths, [obj.frame_index,1], NaN, obj.use_double_up);
+            obj.backgrounds_full = insert_matrix(obj.backgrounds_full, input.backgrounds, [obj.frame_index,1], NaN, obj.use_double_up);
             
             obj.frame_index = obj.frame_index + N;
             
@@ -285,7 +326,7 @@ classdef Lightcurves < handle
                 type = '';
             end
             
-            list = {'fluxes', 'weights', 'offsets_x', 'offsets_y', 'widths', 'backgrounds'};
+            list = {'fluxes', 'weights', 'offsets_x', 'offsets_y', 'centroids_x', 'centroids_y', 'widths', 'backgrounds'};
             
             if ~isempty(type)
                 list2 = strcat(list, ['_' type]);
@@ -305,6 +346,19 @@ classdef Lightcurves < handle
             
         end
         
+        function diskDump(obj, filename)
+            
+            timestamps = obj.timestamps;
+            fluxes = obj.fluxes;
+            widths = obj.widths;
+            weights = obj.weights;
+            centroids_x = obj.centroids_x;
+            centroids_y = obj.centroids_y;
+            
+            save(filename, 'timestamps', 'fluxes', 'widths', 'weights', 'centroids_x', 'centroids_y');
+            
+        end
+        
     end
     
     methods % plotting tools / GUI
@@ -319,13 +373,14 @@ classdef Lightcurves < handle
             
             if isempty(input.ax)
                 if ~isempty(obj.gui) && obj.gui.check
-                    input.ax = obj.gui.image_axes;
+                    input.ax = obj.gui.axes_image;
                 else
                     input.ax = gca;
                 end
             end
             
-            cla(input.ax);
+            delete(allchild(input.ax));
+            delete(findobj(input.ax.Parent, 'type', 'legend'));
             
             if cs(obj.show_what, 'fluxes')
                 
@@ -336,22 +391,35 @@ classdef Lightcurves < handle
                 elseif cs(obj.show_flux_cal, 'both')
                     obj.addPlots(input.ax, obj.fluxes, ':');
                     obj.addPlots(input.ax, obj.fluxes_cal, '-');
+                    legend(input.ax, 'flux (uncalibrated)', 'flux (self-calibrated)', 'location', 'NorthEast');                    
                 end
                 
+                ylabel(input.ax, 'flux (counts)');
+            
             elseif cs(obj.show_what, 'weights')
                 obj.addPlots(input.ax, obj.weights);
+                ylabel(input.ax, 'weights (pixels in aperture)');
             elseif cs(obj.show_what, 'offsets')
                 obj.addPlots(input.ax, obj.offsets_x, '-');
                 obj.addPlots(input.ax, obj.offsets_y, ':');
-            elseif cs(obj.show_what, 'widths')                
+                ylabel(input.ax, 'offset inside cutouts (pixels)');
+            elseif cs(obj.show_what, 'centroids')
+                obj.addPlots(input.ax, obj.centroids_x, '-');
+                obj.addPlots(input.ax, obj.centroids_y, ':');
+                ylabel(input.ax, 'centroid positions in image (pixels)');
+            elseif cs(obj.show_what, 'widths')
                 obj.addPlots(input.ax, obj.widths);
+                ylabel(input.ax, 'widths using 2nd moment (pixels)');
             elseif cs(obj.show_what, 'backgrounds')
                 obj.addPlots(input.ax, obj.backgrounds);
+                ylabel(input.ax, 'background (counts/pixel)');
             else
                 error('Unknown data to show "%s", use "fluxes" or "offset" etc...', obj.show_what);
             end
             
             hold(input.ax, 'off');
+            
+            xlabel(input.ax, 'timestamps (seconds)');
             
         end
         
@@ -361,15 +429,62 @@ classdef Lightcurves < handle
                 line_str = '-';
             end
             
+            if obj.use_smooth
+                data_smoothed = util.img.conv_f(ones(obj.smooth_interval,1)./obj.smooth_interval, data, 'crop', 'same'); 
+            end
+            
             ax.NextPlot = 'add';
             ax.ColorOrderIndex = 1;
             
             for ii = 1:obj.show_num_stars
-                plot(ax, obj.timestamps, data(:,ii), line_str);
+                
+                if obj.use_smooth
+                    h = scatter(ax, obj.timestamps, data(:,ii), 1, 'o', 'MarkerEdgeAlpha', 0.3);
+                    if ~isempty(h), h.HandleVisibility = 'off'; end
+                else
+                    h = plot(ax, obj.timestamps, data(:,ii), line_str, 'LineWidth', 1);
+                    if ii>1 && ~isempty(h), h.HandleVisibility = 'off'; end
+                end
+                
+                if ~isempty(h)
+                    h.UserData = ii;
+                    h.ButtonDownFcn = @obj.callback_cutout_number;
+                end
+                
+                if obj.use_smooth
+                    step = obj.smooth_interval;                    
+                    h = plot(ax, obj.timestamps(step:1:end-step), data_smoothed(step:1:end-step, ii), line_str, 'LineWidth', 3, 'Color', h.CData);
+                    if ii>1 && ~isempty(h), h.HandleVisibility = 'off'; end
+                    if ~isempty(h)
+                        h.UserData = ii;
+                        h.ButtonDownFcn = @obj.callback_cutout_number;
+                    end
+                end
+                
             end
             
         end
         
-    end    
+        function callback_cutout_number(obj, hndl, ~)
+            
+            if obj.gui.check
+                obj.gui.button_cut_number.String = ['cut: ' num2str(hndl.UserData)];
+            else
+                disp(['Cutout number is ' num2str(hndl.UserData)]);
+            end
+            
+        end
+        
+        function makeGUI(obj)
+            
+            if isempty(obj.gui)
+                obj.gui = img.gui.LightGUI(obj);
+            end
+            
+            obj.gui.make;
+            
+        end
+        
+    end
     
 end

@@ -69,7 +69,7 @@ classdef objGUI < handle
             obj.buttons = {};
             
             obj.fig = util.plot.FigHandler('...');
-            
+            obj.fig.clear;
             obj.fig.bottom = 5;
             obj.fig.height = 16;
             obj.fig.width = 25;

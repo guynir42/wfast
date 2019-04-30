@@ -15,6 +15,8 @@ classdef Photometry < handle
     properties % inputs/outputs
         
         % inputs
+        positions; % cutout center positions, given from analysis/acquisition
+        
         cutouts; % cutouts as given from analysis/acquisition (after calibration)
         cutouts_proc; % subtract backround, kill spurius negative pixels, etc
         
@@ -28,6 +30,8 @@ classdef Photometry < handle
         % outputs
         fluxes;
         weights;
+        centroids_x;
+        centroids_y;
         offsets_x;
         offsets_y;
         widths;
@@ -82,6 +86,8 @@ classdef Photometry < handle
         weights_basic;
         offsets_x_basic;
         offsets_y_basic;
+        centroids_x_basic;
+        centroids_y_basic;
         widths_basic;
         backgrounds_basic;
         
@@ -89,6 +95,8 @@ classdef Photometry < handle
         weights_ap;
         offsets_x_ap;
         offsets_y_ap;
+        centroids_x_ap;
+        centroids_y_ap;
         widths_ap;
         backgrounds_ap;
         
@@ -96,6 +104,8 @@ classdef Photometry < handle
         weights_psf;
         offsets_x_psf;
         offsets_y_psf;
+        centroids_x_psf;
+        centroids_y_psf;
         widths_psf;
         backgrounds_psf;
         
@@ -103,12 +113,14 @@ classdef Photometry < handle
         weights_fit;
         offsets_x_fit;
         offsets_y_fit;
+        centroids_x_fit;
+        centroids_y_fit;
         widths_fit;
         backgrounds_fit;
         
         default_ap_size = 3;
         
-        version = 1.01;
+        version = 1.02;
         
     end
     
@@ -205,6 +217,7 @@ classdef Photometry < handle
             input = util.text.InputVars;
             input.use_ordered_numeric = 1;
             input.input_var('cutouts', [], 'images');
+            input.input_var('positions', []);
             input.input_var('timestamps', [], 'times');
             input.scan_vars(varargin{:});
             
@@ -214,6 +227,7 @@ classdef Photometry < handle
                 obj.cutouts = double(input.cutouts);
             end
             
+            obj.positions = input.positions;
             obj.timestamps = input.timestamps;
             
             obj.cut_size_latest = size(input.cutouts);
@@ -483,6 +497,10 @@ classdef Photometry < handle
             obj.weights_basic = w;
             obj.offsets_x_basic = x;
             obj.offsets_y_basic = y;
+            if ~isempty(obj.positions)
+                obj.centroids_x_basic = x + obj.positions(:,1);
+                obj.centroids_y_basic = y + obj.positions(:,2);
+            end
             obj.widths_basic = W; 
             obj.backgrounds_basic = b;
             
@@ -491,6 +509,8 @@ classdef Photometry < handle
             obj.weights = obj.weights_basic;
             obj.offsets_x = obj.offsets_x_basic;
             obj.offsets_y = obj.offsets_y_basic;
+            obj.centroids_x = obj.centroids_x_basic;
+            obj.centroids_y = obj.centroids_y_basic;
             obj.widths = obj.widths_basic;
             obj.backgrounds = obj.backgrounds_basic;
             
@@ -504,14 +524,20 @@ classdef Photometry < handle
             obj.weights_ap = w;
             obj.offsets_x_ap = x;
             obj.offsets_y_ap = y;
+            obj.centroids_x_ap = x + obj.positions(:,1);
+            obj.centroids_y_ap = y + obj.positions(:,2);
             obj.widths_ap = W; 
-            obj.backgrounds_ap =b;
+            obj.backgrounds_ap = b;
             
             % update the newest values
             obj.fluxes = obj.fluxes_ap;
             obj.weights = obj.weights_ap;
             obj.offsets_x = obj.offsets_x_ap;
             obj.offsets_y = obj.offsets_y_ap;
+            if ~isempty(obj.positions)
+                obj.centroids_x = obj.centroids_x_ap;
+                obj.centroids_y = obj.centroids_y_ap;
+            end
             obj.widths = obj.widths_ap;
             obj.backgrounds = obj.backgrounds_ap;
 
@@ -525,6 +551,8 @@ classdef Photometry < handle
             obj.weights_psf = w;
             obj.offsets_x_psf = x;
             obj.offsets_y_psf = y;
+            obj.centroids_x_psf = x + obj.positions(:,1);
+            obj.centroids_y_psf = y + obj.positions(:,2);
             obj.widths_psf = W;
             obj.backgrounds_psf =b;
             
@@ -533,12 +561,16 @@ classdef Photometry < handle
             obj.weights = obj.weights_psf;
             obj.offsets_x = obj.offsets_x_psf;
             obj.offsets_y = obj.offsets_y_psf;
+            if ~isempty(obj.positions)
+                obj.centroids_x = obj.centroids_x_psf;
+                obj.centroids_y = obj.centroids_y_psf;
+            end
             obj.widths = obj.widths_psf;
             obj.backgrounds = obj.backgrounds_psf;
             
         end
         
-        function calcFit(obj)
+        function calcFit(obj) % need to finish this or remove it
             
             if obj.use_gaussian_psf
                 
