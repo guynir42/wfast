@@ -27,17 +27,16 @@ int cs(const char *keyword, const char *str1, const char *str2, int num_letters=
 #define INDEX_BUF 2
 #define INDEX_REC 3
 #define INDEX_NUM 4
-#define INDEX_SIZE 5
-#define INDEX_LOG 6
+#define INDEX_OPTIONS 5
 
-// Usage: startup(cam_object, mex_flag, buffer_struct_array, index_rec_vector, num_batches=1, [batch_size], error_log=[])
+// Usage: startup(cam_object, mex_flag, buffer_struct_array, index_rec_vector, num_batches=1, option_struct=[])
 
 void mexFunction( int nlhs, mxArray *plhs[],
                   int nrhs, const mxArray *prhs[] ){
 	
 	if(nrhs<1){ // usage is detailed when function is called without arguments!
 		
-		mexPrintf("Usage: startup(cam_object, mex_flag, buffer_struct_array, index_rec_vector, num_batches=1, [batch_size], error_log=[])\n");
+		mexPrintf("Usage: startup(cam_object, mex_flag, buffer_struct_array, index_rec_vector, num_batches=1, option_struct=[])\n");
 		mexPrintf("Activates camera and starts to capture images into the buffer structure.\n");
 		mexPrintf("Will stop capturing when 'num_batches' is reached or when 'mex_flag' second element is set to 1.\n");
 		mexPrintf("\nInputs: \n");
@@ -46,30 +45,28 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		mexPrintf("-buffer_struct_array is the struct array inside the BufferWheel.\n");
 		mexPrintf("-index_rec_vector is a vector indicating which struct to write to.\n");
 		mexPrintf("-num_batches specifies how many batches to capture / buffers to fill before stopping (default=1).\n");
-		mexPrintf("-batch_size is an optional argument that overrides the batch_size in cam_object (number of frames per batch).\n");
-		mexPrintf("-error log is used to record non-critical errors from camera.\n");
-
+		mexPrintf("-option_struct is an optional argument to give more parameters that override the variables inside the camera object\n");
+		mexPrintf(" Some fields that can be used with option_struct are:\n");
+		mexPrintf("    expT, frame_rate, batch_size, ROI (left, top, width, height), error_log (for non-critical errors in camera)\n");
+		
 		return;
 	}
 	
 	////////// check minimal inputs ///////////
-	if(nrhs<INDEX_NUM) mexErrMsgIdAndTxt("MATLAB:obs:mexWrite:invalidNumInputs", "At least %d arguments are required!", INDEX_NUM);
-	if(mxIsClass(prhs[INDEX_CAM], "obs.cam.CameraControl")!=1)
-		mexErrMsgIdAndTxt( "MATLAB:obs:cam:capture:inputWrongClass", "Input %d must be a CameraControl object.", INDEX_CAM+1);
+	if(nrhs<INDEX_NUM) mexErrMsgIdAndTxt("MATLAB:obs:cam:startup:invalidNumInputs", "At least %d arguments are required!", INDEX_NUM);
+	if(mxIsClass(prhs[INDEX_CAM], "obs.cam.Andor")!=1)
+		mexErrMsgIdAndTxt( "MATLAB:obs:cam:startup:inputWrongClass", "Input %d must be an obs.cam.Andor object.", INDEX_CAM+1);
 	if(mxGetN(prhs[INDEX_FLAG])!=4 || mxGetM(prhs[INDEX_FLAG])!=1 || mxIsNumeric(prhs[INDEX_FLAG])==0) 
-		mexErrMsgIdAndTxt( "MATLAB:obs:cam:capture:inputSizeMismatch", "Input %d must be a numeric 4 element vector.", INDEX_FLAG+1);
+		mexErrMsgIdAndTxt( "MATLAB:obs:cam:startup:inputSizeMismatch", "Input %d must be a numeric 4 element vector.", INDEX_FLAG+1);
 	if(mxIsStruct(prhs[INDEX_BUF])!=1)
-		mexErrMsgIdAndTxt( "MATLAB:obs:cam:capture:inputNotStruct", "Input %d must be a BufferWheel 'buf' structure array.", INDEX_BUF+1);
+		mexErrMsgIdAndTxt( "MATLAB:obs:cam:startup:inputNotStruct", "Input %d must be a BufferWheel 'buf' structure array.", INDEX_BUF+1);
 	if(mxGetN(prhs[INDEX_REC])!=2 || mxGetM(prhs[INDEX_REC])!=1 || mxIsNumeric(prhs[INDEX_REC])==0) 
-		mexErrMsgIdAndTxt( "MATLAB:obs:cam:capture:inputWrongSize", "Input %d must be a numeric 2 element vector.", INDEX_REC+1); 
+		mexErrMsgIdAndTxt( "MATLAB:obs:cam:startup:inputWrongSize", "Input %d must be a numeric 2 element vector.", INDEX_REC+1); 
 	if(nrhs>=INDEX_NUM && (mxIsEmpty(prhs[INDEX_NUM]) || mxIsScalar(prhs[INDEX_NUM])!=1 || mxIsNumeric(prhs[INDEX_NUM])!=1) ) 
-		mexErrMsgIdAndTxt( "MATLAB:obs:cam:capture:inputNotScalar", "Input %d must be a numeric scalar.", INDEX_NUM+1); 
-	if(nrhs>=INDEX_SIZE && mxIsEmpty(prhs[INDEX_SIZE])!=1 && (mxIsScalar(prhs[INDEX_SIZE])!=1 || mxIsNumeric(prhs[INDEX_SIZE])!=1) )
-		mexErrMsgIdAndTxt( "MATLAB:obs:cam:capture:inputNotScalar", "Input %d must be a numeric scalar.", INDEX_SIZE+1); 
+		mexErrMsgIdAndTxt( "MATLAB:obs:cam:startup:inputNotScalar", "Input %d must be a numeric scalar.", INDEX_NUM+1); 
+	if(nrhs>=INDEX_OPTIONS && mxIsEmpty(prhs[INDEX_OPTIONS])==0 && mxIsStruct(prhs[INDEX_OPTIONS])==0)
+		mexErrMsgIdAndTxt( "MATLAB:obs:cam:startup:inputNotStruct", "Input %d must be a struct.", INDEX_OPTIONS+1); 
 	
-	const mxArray *camera=prhs[INDEX_CAM]; // MATLAB object
-	mxArray *buffers=(mxArray*)prhs[INDEX_BUF]; // struct array	
-
 	AndorCamera *cc=new AndorCamera;
 	
 	cc->mex_flag_cam=mxGetPr(prhs[INDEX_FLAG]);
@@ -78,24 +75,26 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		if(cc->debug_bit) printf("Camera is already recording... \n"); 
 		return; 
 	}
+	
 	cc->num_batches=1;	
 	if(nrhs>INDEX_NUM) cc->num_batches=(unsigned int) mxGetScalar(prhs[INDEX_NUM]);
 	
+	cc->loadFromCamera(prhs[INDEX_CAM]);
 	
-	cc->loadFromCamera(camera);
-	cc->index_rec_vector=mxGetPr(prhs[INDEX_REC]);
+	cc->index_rec_vector=mxGetPr(prhs[INDEX_REC]);	
 	
-	if(nrhs>INDEX_SIZE && mxIsEmpty(prhs[INDEX_SIZE])!=1) 
-		cc->batch_size=mxGetScalar(prhs[INDEX_SIZE]);
+	cc->loadFromBuffers((mxArray*)prhs[INDEX_BUF]);
 	
-	if(nrhs>INDEX_LOG && mxIsEmpty(prhs[INDEX_LOG])!=1) 
-		cc->error_log=mxGetPr(prhs[INDEX_LOG]);
+	if(nrhs>INDEX_OPTIONS && mxIsEmpty(prhs[INDEX_OPTIONS])!=1)
+		cc->loadFromOptionsStruct(prhs[INDEX_OPTIONS]);
 	
-	cc->loadFromBuffers(buffers);
+//	if(nrhs>INDEX_SIZE && mxIsEmpty(prhs[INDEX_SIZE])!=1) 
+//		cc->batch_size=mxGetScalar(prhs[INDEX_SIZE]);
+//	
+//	if(nrhs>INDEX_LOG && mxIsEmpty(prhs[INDEX_LOG])!=1) 
+//		cc->error_log=mxGetPr(prhs[INDEX_LOG]);
 	
 	if(cc->debug_bit>1) cc->printout();
-	
-	///////// reading buffer wheel strut //////////
 	
 	std::thread mythread(&AndorCamera::loop, cc);
 	mythread.detach();

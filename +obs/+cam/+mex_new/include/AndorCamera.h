@@ -41,6 +41,7 @@ class AndorCamera {
 	// general purpose functions:	
 	void loadFromCamera(const mxArray *camera);
 	void loadFromBuffers(mxArray *buffers);
+	void loadFromOptionsStruct(const mxArray *options);
 	void loop();
 	
 	// int waitForRecording(int idx);

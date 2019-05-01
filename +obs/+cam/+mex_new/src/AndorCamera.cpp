@@ -129,6 +129,12 @@ void AndorCamera::loadFromBuffers(mxArray *buffers){ // load mex flags and data 
 	
 }
 
+void AndorCamera::loadFromOptionsStruct(const mxArray *options){ // load additional options to override the Camera object (e.g., expT, ROI, batch_size)
+
+	// need to implement this! 
+
+}
+
 void AndorCamera::startup(){
 	
 	if(debug_bit) printf("starting Andor camera...\n");
