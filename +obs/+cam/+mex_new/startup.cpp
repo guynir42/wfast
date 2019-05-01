@@ -45,10 +45,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		mexPrintf("-buffer_struct_array is the struct array inside the BufferWheel.\n");
 		mexPrintf("-index_rec_vector is a vector indicating which struct to write to.\n");
 		mexPrintf("-num_batches specifies how many batches to capture / buffers to fill before stopping (default=1).\n");
-		mexPrintf("-option_struct is an optional argument to give more parameters that override the variables inside the camera object\n");
-		mexPrintf(" Some fields that can be used with option_struct are:\n");
-		mexPrintf("    expT, frame_rate, batch_size, ROI (left, top, width, height), error_log (for non-critical errors in camera)\n");
-		
+		mexPrintf("-")
 		return;
 	}
 	
