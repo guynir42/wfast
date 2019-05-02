@@ -27,9 +27,9 @@ int cs(const char *keyword, const char *str1, const char *str2, int num_letters=
 #define INDEX_BUF 2
 #define INDEX_REC 3
 #define INDEX_NUM 4
-#define INDEX_OPTIONS 5
+#define INDEX_SIZE 5
 
-// Usage: startup(cam_object, mex_flag, buffer_struct_array, index_rec_vector, num_batches=1, option_struct=[])
+// Usage: startup(cam_object, mex_flag, buffer_struct_array, index_rec_vector, num_batches=1, batch_size=[]);
 
 void mexFunction( int nlhs, mxArray *plhs[],
                   int nrhs, const mxArray *prhs[] ){
@@ -45,7 +45,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		mexPrintf("-buffer_struct_array is the struct array inside the BufferWheel.\n");
 		mexPrintf("-index_rec_vector is a vector indicating which struct to write to.\n");
 		mexPrintf("-num_batches specifies how many batches to capture / buffers to fill before stopping (default=1).\n");
-		mexPrintf("-")
+		mexPrintf("-batch_size specifies how many frames in each batch, overriding the value in the Camera object. \n");
 		return;
 	}
 	
@@ -61,8 +61,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		mexErrMsgIdAndTxt( "MATLAB:obs:cam:startup:inputWrongSize", "Input %d must be a numeric 2 element vector.", INDEX_REC+1); 
 	if(nrhs>=INDEX_NUM && (mxIsEmpty(prhs[INDEX_NUM]) || mxIsScalar(prhs[INDEX_NUM])!=1 || mxIsNumeric(prhs[INDEX_NUM])!=1) ) 
 		mexErrMsgIdAndTxt( "MATLAB:obs:cam:startup:inputNotScalar", "Input %d must be a numeric scalar.", INDEX_NUM+1); 
-	if(nrhs>=INDEX_OPTIONS && mxIsEmpty(prhs[INDEX_OPTIONS])==0 && mxIsStruct(prhs[INDEX_OPTIONS])==0)
-		mexErrMsgIdAndTxt( "MATLAB:obs:cam:startup:inputNotStruct", "Input %d must be a struct.", INDEX_OPTIONS+1); 
+	//if(nrhs>=INDEX_OPTIONS && mxIsEmpty(prhs[INDEX_OPTIONS])==0 && mxIsStruct(prhs[INDEX_OPTIONS])==0)
+	//	mexErrMsgIdAndTxt( "MATLAB:obs:cam:startup:inputNotStruct", "Input %d must be a struct.", INDEX_OPTIONS+1); 
 	
 	AndorCamera *cc=new AndorCamera;
 	
@@ -82,12 +82,12 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	
 	cc->loadFromBuffers((mxArray*)prhs[INDEX_BUF]);
 	
-	if(nrhs>INDEX_OPTIONS && mxIsEmpty(prhs[INDEX_OPTIONS])!=1)
-		cc->loadFromOptionsStruct(prhs[INDEX_OPTIONS]);
+//	if(nrhs>INDEX_OPTIONS && mxIsEmpty(prhs[INDEX_OPTIONS])!=1)
+//		cc->loadFromOptionsStruct(prhs[INDEX_OPTIONS]);
 	
-//	if(nrhs>INDEX_SIZE && mxIsEmpty(prhs[INDEX_SIZE])!=1) 
-//		cc->batch_size=mxGetScalar(prhs[INDEX_SIZE]);
-//	
+	if(nrhs>INDEX_SIZE && mxIsEmpty(prhs[INDEX_SIZE])!=1) 
+		cc->batch_size= (unsigned int) mxGetScalar(prhs[INDEX_SIZE]);
+	
 //	if(nrhs>INDEX_LOG && mxIsEmpty(prhs[INDEX_LOG])!=1) 
 //		cc->error_log=mxGetPr(prhs[INDEX_LOG]);
 	

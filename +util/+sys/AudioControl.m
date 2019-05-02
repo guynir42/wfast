@@ -116,8 +116,10 @@ classdef AudioControl <handle
                 
         function stopTimer(obj)
             
-            stop(obj.stop_timer);
-            delete(obj.stop_timer);
+            if isvalid(obj.stop_timer)
+                stop(obj.stop_timer);
+                delete(obj.stop_timer);
+            end
             
         end
             

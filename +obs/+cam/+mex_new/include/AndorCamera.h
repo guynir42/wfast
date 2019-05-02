@@ -32,7 +32,7 @@ class AndorCamera {
 	// SDK specific calls
 	void startup();
 	void finishup();
-	void record(int idx);
+	void batch(int idx);
 	void restart();
 	
 	unsigned long long int getTimestamps(unsigned char *buf, int ImageSizeBytes);
@@ -58,9 +58,12 @@ class AndorCamera {
 	
 	// parameters:
 	unsigned int num_batches=1;
-	unsigned int height;
-	unsigned int width;
 	unsigned int batch_size;
+	
+	AT_64 height;
+	AT_64 width;
+	AT_64 stride=0;
+	AT_64 clockFreq=0;
 	
 	long int hndl;
 	
@@ -92,11 +95,6 @@ class AndorCamera {
 	alignas(8) unsigned char *temp_buffers[NTEMPBUF]={NULL}; // number of empty pointers for Zyla
 	int image_size_bytes;
 	
-	private:
-	AT_64 this_stride=0;
-	AT_64 this_height=0;
-	AT_64 this_width=0;
-	AT_64 clockFreq=0;
 	
 	
 };

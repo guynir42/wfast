@@ -1,8 +1,9 @@
 classdef ContrastLimits < handle
+% usage: ContrastLimits(ax, parent, position, vertical_mode=1)
 % manipulates the CLim of some axes object. Also has autodyn. 
 % replaces a uipanel inside a GUI object or figure. 
 %
-% TEST PROTOCOL: f1=figure; c=util.ContrastLimits([], f1); delete(f1);
+% EXAMPLE: f1=figure; c=util.plot.ContrastLimits([], f1); 
 
     properties % objects
         

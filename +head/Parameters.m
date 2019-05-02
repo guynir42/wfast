@@ -116,7 +116,7 @@ classdef Parameters < dynamicprops
         default_aperture;
         default_f_number;
         default_filter_name = 'clear';
-        default_im_size = [2160 2560];
+        default_im_size = [2560 2160];
         
         datapath;
         dark_name = 'dark';

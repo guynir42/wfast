@@ -9,6 +9,7 @@ classdef GraphicPanel < dynamicprops
                 
         owner; % the original owner of the GUI object (will own all buttons)
         self_name = 'gui'; % the name of the GUI inside of owner (e.g. if owner has multiple GUIs)
+        buttons@util.plot.GraphicButton;
         
         title = '';
         is_vertical = 1; % if panel goes down or sideways. 
@@ -132,6 +133,8 @@ classdef GraphicPanel < dynamicprops
                     
                     obj.(button.button_name) = util.plot.GraphicButton(obj.panel, pos, obj.owner, button.var_name, button.type, button.str1, button.str2, button.font_size, obj.self_name, [], button.color_on, button.color_off);
                     split_pos = split_pos + button.split;
+                    
+                    obj.buttons(end+1) = obj.(button.button_name);
                     
                 end
                 

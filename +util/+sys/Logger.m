@@ -196,6 +196,8 @@ classdef Logger < handle
                 errflag = 0;
             end
             
+            text = util.text.eraseTags(text);
+            
             new_time = datetime('now', 'timezone', 'UTC'); % update to current time
             
             % if we passed noon UTC we should generate new log files

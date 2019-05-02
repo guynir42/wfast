@@ -24,12 +24,12 @@ void AndorCamera::loadFromCamera(const mxArray *camera){ // load control switche
 	if(prop==NULL) mexErrMsgIdAndTxt( "MATLAB:obs:cam:AndorCamera:cannotFindProperty", "Cannot find property 'use_async' inside AndorCamera!");
 	use_async=(int) mxGetScalar(prop);
 	
-	prop=(mxArray *)mxGetProperty(camera, 0, "im_size");
-	if(prop==NULL) mexErrMsgIdAndTxt( "MATLAB:obs:cam:AndorCamera:cannotFindProperty", "Cannot find property 'im_size' inside AndorCamera!");
-	if(mxIsEmpty(prop)) mexErrMsgIdAndTxt( "MATLAB:obs:cam:AndorCamera:imageSizeEmpty", "Must define an image size in AndorCamera!");
-	double *im_size=mxGetPr(prop);
-	height = (unsigned int) im_size[0];
-	width = (unsigned int) im_size[1];
+	// prop=(mxArray *)mxGetProperty(camera, 0, "im_size");
+	// if(prop==NULL) mexErrMsgIdAndTxt( "MATLAB:obs:cam:AndorCamera:cannotFindProperty", "Cannot find property 'im_size' inside AndorCamera!");
+	// if(mxIsEmpty(prop)) mexErrMsgIdAndTxt( "MATLAB:obs:cam:AndorCamera:imageSizeEmpty", "Must define an image size in AndorCamera!");
+	// double *im_size=mxGetPr(prop);
+	// height = (unsigned int) im_size[0];
+	// width = (unsigned int) im_size[1];
 	
 	prop=(mxArray *)mxGetProperty(camera, 0, "batch_size");
 	if(prop==NULL) mexErrMsgIdAndTxt( "MATLAB:obs:cam:AndorCamera:cannotFindProperty", "Cannot find property 'batch_size' inside AndorCamera!");
@@ -39,6 +39,14 @@ void AndorCamera::loadFromCamera(const mxArray *camera){ // load control switche
 	if(prop==NULL) mexErrMsgIdAndTxt( "MATLAB:obs:cam:AndorCamera:cannotFindProperty", "Cannot find property 'hndl' inside AndorCamera!");
 	hndl=(long int) mxGetScalar(prop);
 	
+	int ret=0;
+	ret=AT_GetInt((AT_H) hndl, L"AOIHeight", &height); 
+	if(ret) mexErrMsgIdAndTxt( "MATLAB:obs:cam:AndorCamera:getHeight", "Cannot get heigh from device.");
+	ret=AT_GetInt((AT_H) hndl, L"AOIWidth", &width);
+	if(ret) mexErrMsgIdAndTxt( "MATLAB:obs:cam:AndorCamera:getWidth", "Cannot get width from device.");
+	ret=AT_GetInt((AT_H) hndl, L"AOIStride", &stride);
+	if(ret) mexErrMsgIdAndTxt( "MATLAB:obs:cam:AndorCamera:getStride", "Cannot get stride from device.");
+
 }
 
 void AndorCamera::loadFromBuffers(mxArray *buffers){ // load mex flags and data arrays from buffer struct
@@ -69,7 +77,7 @@ void AndorCamera::loadFromBuffers(mxArray *buffers){ // load mex flags and data 
 		size_t batch_size_temp=1;
 		if(mxGetNumberOfDimensions(prop)>=3) batch_size_temp=dims[2];
 		
-		if(mxIsEmpty(prop) || height!=dims[0] || width!=dims[1] || batch_size!=batch_size_temp || mxIsClass(prop, "uint16")==0){ // choose uint16 or other data type...
+		if(mxIsEmpty(prop) || height!=dims[1] || width!=dims[0] || batch_size!=batch_size_temp || mxIsClass(prop, "uint16")==0){ // choose uint16 or other data type...
 			
 			if(waitForReading(b)) return; // just making sure we are not allocating over data that is getting read			
 			if(waitForWriting(b)) return; // just making sure we are not allocating over data that is getting written
@@ -78,7 +86,7 @@ void AndorCamera::loadFromBuffers(mxArray *buffers){ // load mex flags and data 
 			if(debug_bit>2) mexPrintf("Allocating a new matrix...\n");
 
 			images_ptrs[b]=(unsigned short int*) mxCalloc((int) (height*width*batch_size), 2); // use 2 to initialize a uint16
-			mwSize dims[3] = {(mwSize) height, (mwSize) width, (mwSize) batch_size};
+			mwSize dims[3] = {(mwSize) width, (mwSize) height, (mwSize) batch_size}; // width <-> height exchanged for C <-> matlab conversion
 			mxArray *array=mxCreateNumericArray(3, dims, mxUINT16_CLASS, mxREAL);
 			mxSetData(array, images_ptrs[b]);
 			mxSetField(buffers, b, "images", array);
@@ -146,18 +154,15 @@ void AndorCamera::startup(){
 	
 	mex_flag_cam[0]=1;
 	
-	// from the SDK manual page 47:
-	// AT_64 this_stride=0;
-	ret=AT_GetInt((AT_H) hndl, L"AOIStride", &this_stride);
-	if(ret!=AT_SUCCESS){ report_error("startup>get stride", ret, mex_flag_cam); return; }
+	// ret=AT_GetInt((AT_H) hndl, L"AOIStride", &this_stride);
+	// if(ret!=AT_SUCCESS){ report_error("startup>get stride", ret, mex_flag_cam); return; }
 	
-	if(ret!=AT_SUCCESS){ report_error("startup>get height", ret, mex_flag_cam); return; }
 	
-	// AT_64 this_width=0;
-	// AT_64 this_height=0;	
-	ret=AT_GetInt((AT_H) hndl, L"AOIHeight", &this_height);
-	ret=AT_GetInt((AT_H) hndl, L"AOIWidth", &this_width);
-	if(ret!=AT_SUCCESS){ report_error("startup>get width", ret, mex_flag_cam); return; }
+	//ret=AT_GetInt((AT_H) hndl, L"AOIHeight", &this_height);
+	// if(ret!=AT_SUCCESS){ report_error("startup>get height", ret, mex_flag_cam); return; }
+	
+	//ret=AT_GetInt((AT_H) hndl, L"AOIWidth", &this_width);
+	//if(ret!=AT_SUCCESS){ report_error("startup>get width", ret, mex_flag_cam); return; }
 	
 	ret=AT_GetFloat((AT_H) hndl, L"ExposureTime", &expT);
 	if(ret!=AT_SUCCESS){ report_error("startup>get expT", ret, mex_flag_cam); return; }
@@ -249,7 +254,7 @@ void AndorCamera::loop(){ // start producing images in a loop over batches
 			(int) mex_flag_record_ptrs[idx][0], (int) mex_flag_record_ptrs[idx][1], 
 			(int) mex_flag_read_ptrs[idx][0], (int) mex_flag_read_ptrs[idx][1]);
 		
-		record(idx);
+		batch(idx);
 		
 		// make sure to flag this buffer as UNREAD
 		//mex_flag_read_ptrs[idx][0]=0; // not started reading
@@ -278,7 +283,7 @@ void AndorCamera::loop(){ // start producing images in a loop over batches
 	
 }
 
-void AndorCamera::record(int idx){
+void AndorCamera::batch(int idx){
 	
 	// ANDOR SDK CODE HERE 
 	// assumes library is initialized when CameraControl is constructed (and handle is openned)
@@ -291,7 +296,7 @@ void AndorCamera::record(int idx){
 	int return_buf_size=0;
 	
 	ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
-	if(ret!=AT_SUCCESS){ report_error("record>software trigger", ret, mex_flag_cam); return; }
+	if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
 	
 	AT_64 clock=0;
 	
@@ -301,23 +306,23 @@ void AndorCamera::record(int idx){
 		
 		ret=AT_WaitBuffer((AT_H) hndl, &buf, &return_buf_size, getTimeout());
 		if(ret!=AT_SUCCESS){ // This is a special error case. We report it but also restart the acquisition... 
-			// report_error("record>wait buffer", ret, mex_flag_cam); 
-			// printf("WARNING: record>wait buffer: return value %d... restarting acquisition!\n", ret); 
-			save_error("record>wait buffer", ret, current_batch); 
+			// report_error("batch>wait buffer", ret, mex_flag_cam); 
+			// printf("WARNING: batch>wait buffer: return value %d... restarting acquisition!\n", ret); 
+			save_error("batch>wait buffer", ret, current_batch); 
 			restart();
 			i--;
 			error_counter++;
-			if(error_counter>10) report_error("record>wait buffer", ret, mex_flag_cam);
+			if(error_counter>10) report_error("batch>wait buffer", ret, mex_flag_cam);
 			continue;
 		}
 		
 		ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
-		if(ret!=AT_SUCCESS){ report_error("record>software trigger", ret, mex_flag_cam); return; }
+		if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
 		
 		int pos=i*height*width; // where inside the buffer to start writing now... 		
-				
-		ret=AT_ConvertBuffer(buf, (AT_U8*)(images_ptrs[idx]+pos), this_width, this_height, this_stride, L"Mono16", L"Mono16");
-		if(ret!=AT_SUCCESS){ report_error("record>convert buffer", ret, mex_flag_cam); return; }
+		printf("height= %d | width= %d | stride= %d\n", height, width, stride);
+		ret=AT_ConvertBuffer(buf, (AT_U8*)(images_ptrs[idx]+pos), width, height, stride, L"Mono16", L"Mono16");
+		if(ret!=AT_SUCCESS){ report_error("batch>convert buffer", ret, mex_flag_cam); return; }
 		
 		clock=getTimestamps(buf, (int) ImageSizeBytes);
 		timestamps_ptrs[idx][i]=((double)clock)/clockFreq;
@@ -327,7 +332,7 @@ void AndorCamera::record(int idx){
 		
 		// printf("i= %d | queue buffer...\n", i);
 		ret=AT_QueueBuffer((AT_H) hndl, buf, static_cast<int> (ImageSizeBytes));
-		if(ret!=AT_SUCCESS){ report_error("record>queue buffer", ret, mex_flag_cam); return; }
+		if(ret!=AT_SUCCESS){ report_error("batch>queue buffer", ret, mex_flag_cam); return; }
 		
 	}
 	
@@ -365,7 +370,7 @@ void AndorCamera::restart(){
 	if(ret!=AT_SUCCESS){ report_error("restart>acquisition start", ret, mex_flag_cam); return; }
 	
 	ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
-	if(ret!=AT_SUCCESS){ report_error("record>software trigger", ret, mex_flag_cam); return; }
+	if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
 	
 }
 
@@ -397,7 +402,7 @@ unsigned long long int AndorCamera::getTimestamps(unsigned char *buf, int ImageS
 	}
 	else{
 		clock=0;
-		report_error("record>get timestamp", AT_ERR_NODATA, mex_flag_cam);
+		report_error("batch>get timestamp", AT_ERR_NODATA, mex_flag_cam);
 	}
 
 	return clock;

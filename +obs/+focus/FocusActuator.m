@@ -53,7 +53,7 @@ classdef FocusActuator < handle
             
             obj.controller_serial = serial_str;
             
-            if obj.debug_bit, fprintf('FocusActuator constructor v%4.2f |  axis: %d | S/N: %s\n', obj.version, obj.axis, obj.controller_serial); end
+            if obj.debug_bit, fprintf('FocusActuator constructor v%4.2f |  axis: %s | S/N: %s\n', obj.version, obj.axis, obj.controller_serial); end
                         
             addpath('C:\Users\Public\PI\PI_MATLAB_Driver_GCS2');
 
@@ -64,8 +64,12 @@ classdef FocusActuator < handle
         function delete(obj)
             
             if obj.debug_bit, disp(['disconnecting from actuator ' obj.controller_serial]); end
-            obj.hndl.CloseConnection;
-            obj.hndl.Destroy;
+            try
+                obj.hndl.CloseConnection;
+%                 obj.hndl.Destroy;
+            catch ME
+                disp(['Something went wrong when closing connection to controller ' obj.controller_serial]);
+            end
             
         end
        
