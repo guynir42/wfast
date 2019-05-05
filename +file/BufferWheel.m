@@ -747,9 +747,9 @@ classdef BufferWheel < file.AstroData
                     timeout = ii*res;
                     if obj.debug_bit, disp('Camera stopped!, skipping wait time...'); end
                     break;
-                elseif ~isempty(obj.camera_mex_flag) && obj.camera_mex_flag(2)~=0
+                elseif ~isempty(obj.camera_mex_flag) && obj.camera_mex_flag(3)~=0
                     timeout = ii*res;
-                    if obj.debug_bit, disp(['Camera error ' num2str(obj.camera_mex_flag(2)) ', skipping wait time...']); end
+                    if obj.debug_bit, disp(['Camera error ' num2str(obj.camera_mex_flag(3)) ', skipping wait time...']); end
                     break;
                 end
                 
@@ -757,7 +757,9 @@ classdef BufferWheel < file.AstroData
                 
             end
             
-            error('timeout (%4.2f sec) when waiting for buffer %d to clear from recording... ', timeout, buf.buf_number);
+            if ~isempty(obj.camera_mex_flag) && obj.camera_mex_flag(2)==0 % only throw an error if the camera has not been stopped
+                error('timeout (%4.2f sec) when waiting for buffer %d to clear from recording... ', timeout, buf.buf_number);
+            end
                         
         end
         

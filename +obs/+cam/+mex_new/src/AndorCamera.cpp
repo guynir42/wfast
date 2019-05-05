@@ -320,7 +320,7 @@ void AndorCamera::batch(int idx){
 		if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
 		
 		int pos=i*height*width; // where inside the buffer to start writing now... 		
-		printf("height= %d | width= %d | stride= %d\n", height, width, stride);
+		// printf("height= %d | width= %d | stride= %d\n", height, width, stride);
 		ret=AT_ConvertBuffer(buf, (AT_U8*)(images_ptrs[idx]+pos), width, height, stride, L"Mono16", L"Mono16");
 		if(ret!=AT_SUCCESS){ report_error("batch>convert buffer", ret, mex_flag_cam); return; }
 		

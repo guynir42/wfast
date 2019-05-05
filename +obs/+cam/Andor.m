@@ -98,17 +98,22 @@ classdef Andor < file.AstroData
         
         gui;
         
+        audio@util.sys.AudioControl;
+        prog@util.sys.ProgressBar;
+        time_buffer@util.vec.CircularBuffer; % keeps track of the last few batches' runtime and number of frames, to calculate frame_rate_measured
+        
     end
     
     properties % objects
         
         pars@head.Parameters; % parameters used in the observations
+        
         buffers@file.BufferWheel;
+        
         focuser;
+        
         log@util.sys.Logger;
-        audio@util.sys.AudioControl;
-        prog@util.sys.ProgressBar;
-        time_buffer@util.vec.CircularBuffer; % keeps track of the last few batches' runtime and number of frames, to calculate frame_rate_measured
+        
         hndl; % pointer to the Andor SDK handle of the camera
         
     end
@@ -732,11 +737,11 @@ classdef Andor < file.AstroData
                 
                 on_cleanup = onCleanup(@obj.finishup);
                 
-                for ii = 1:input.num_batches
+                for ii = 1:obj.num_batches
                     
                     if obj.brake_bit, break; end
                     
-                    obj.batch(input);
+                    obj.batch;
                     
                 end
                 
@@ -758,7 +763,7 @@ classdef Andor < file.AstroData
             
             if input.log_level
                 obj.log.input(sprintf('Starting a new run with %d batches of %d images each. expT= %f, async= %d, save= %d, ROI= %s',...
-                    input.num_batches, input.batch_size, input.expT, input.async, input.save, obj.getZoomStr(input.im_size, input.center_region))); 
+                    input.num_batches, input.batch_size, input.expT, input.use_async, input.use_save, obj.getZoomStr(input.im_size, input.center_region))); 
             end
             
             try 
@@ -766,7 +771,19 @@ classdef Andor < file.AstroData
                 obj.stash_parameters(input); % put the user-defined parameters into hidden "stashed" parameters to be loaded at end of run
             
                 obj.reset;
+                
+                if isempty(obj.audio)
+                    obj.setupAudio;
+                end
+                
+                if isempty(obj.prog)
+                    obj.setupProgressBar;
+                end
 
+                if isempty(obj.time_buffer)
+                    obj.setupTimeBuffer;
+                end
+                
                 % make sure hardware is updated... 
                 obj.setROI_HW(obj.zoom2roi(obj.im_size, obj.center_region)); % if use_roi=0 these parameters just give full-frame
                 obj.setExpTimeHW(obj.expT); 
@@ -895,6 +912,10 @@ classdef Andor < file.AstroData
             
             obj.unstash_parameters; % return all parameters to values they were in before this run
             
+            if ~isempty(obj.gui)
+                obj.gui.update;
+            end
+            
         end
         
         function batch(obj)
@@ -993,7 +1014,7 @@ classdef Andor < file.AstroData
             obj.im_size_zoomed_ = obj.im_size_zoomed;
             obj.center_region_zoomed_ = obj.center_region_zoomed;
             obj.debug_bit_ = obj.debug_bit; 
-            obj.log_level_ = obj.log_leve;
+            obj.log_level_ = obj.log_level;
             obj.use_audio_ = obj.use_audio;
             obj.use_progress_ = obj.use_progress;
             obj.pass_show_ = obj.pass_show;
@@ -1023,7 +1044,7 @@ classdef Andor < file.AstroData
             obj.im_size_zoomed = obj.im_size_zoomed_;
             obj.center_region_zoomed = obj.center_region_zoomed_;
             obj.debug_bit = obj.debug_bit_;
-            obj.log_level = obj.log_leve_;
+            obj.log_level = obj.log_level_;
             obj.use_audio = obj.use_audio_;
             obj.use_progress = obj.use_progress_;
             obj.pass_show = obj.pass_show_;
@@ -1093,15 +1114,15 @@ classdef Andor < file.AstroData
             
             import util.text.cs;
             
-            if cs(input.mode, 'science')
+            if cs(obj.mode, 'science')
                 if obj.use_roi
                     obj.buffers.product_type = 'ROI';
                 else
                     obj.buffers.product_type = 'Raw';
                 end
-            elseif cs(input.mode, 'dark')
+            elseif cs(obj.mode, 'dark')
                 obj.buffers.product_type = 'Dark';
-            elseif cs(input.mode, 'flat')
+            elseif cs(obj.mode, 'flat')
                 obj.buffers.product_type = 'Flat';
             end
             
