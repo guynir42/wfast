@@ -3,7 +3,11 @@ classdef Acquisition < file.AstroData
     properties(Transient=true)
         
         gui;
+        
+        % utilities
+        prog@util.sys.ProgressBar;
         audio@util.sys.AudioControl;
+        runtime_buffer@util.vec.CircularBuffer;
         
     end
     
@@ -34,19 +38,11 @@ classdef Acquisition < file.AstroData
         % output to file
         buf@file.BufferWheel;
         
-        % utilities
-        prog@util.sys.ProgressBar;
-        
-        runtime_buffer@util.vec.CircularBuffer;
-        
         deflator@file.Deflator;
         
     end
     
     properties % inputs/outputs
-        
-        frame_rate = NaN;
-        sensor_temp = NaN;
         
         cutouts_proc;
         cutouts_sub;
@@ -63,71 +59,80 @@ classdef Acquisition < file.AstroData
         adjust_pos; % latest adjustment to x and y
         average_width; % of all stars in the stack
         
+        frame_rate_average; % calculated from this object's timing data
+        
         batch_counter = 0;
-        batch_index = 1;
-
+        
     end
     
     properties % switches/controls
         
-        expT = 0.025;
-        
-        num_batches = 2;
-        batch_size = 100;
-        
-        num_stars = 100;
-        cut_size = 11;
-        
-        num_backgrounds = 20;
-        cut_size_bg = 20;
+        start_index; % if non empty, use this number as initial index for run (e.g., to continue from where we stopped)
         
         use_background = 1;
         use_refine_bg = 0;
         
+        % these swithces determine how stars are picked when run begins
+        use_remove_saturated = true; % remove all stars with any pixels about saturation value
+        saturation_value = 50000; % consider any pixels above this to be saturated
+        use_mextractor = false; % use mextractor to identify stars and find their WCS and catalog mag/temp
+        use_arbitrary_pos = false; % don't look for stars (e.g., when testing with the dome closed)
+        
+        use_cutouts = true;
         use_adjust_cutouts = 1; % use adjustments in software (not by moving the mount)
         
-        use_remove_saturated = 1;
-        use_mextractor = 0;
-        use_arbitrary_pos = 0;
-        
-        use_autofocus = 1;
-        use_rough_focus = 0;
-        
-        use_roi = 0;
-        roi_x1 = 1;
-        roi_x2 = 512;
-        roi_y1 = 1;
-        roi_y2 = 512;
-        
-        use_save = 0; % must change this when we are ready to really start
-        use_triggered_save = 0;
+        use_save = false; % must change this when we are ready to really start
+        use_triggered_save = false;
         
         % display parameters
-        use_show = 1;
+        use_show = true;
+        
         show_what = 'images'; % can choose "images" or "stack"
-        num_rect_stars = 30;
-        num_rect_bg = 30;
+        num_display_stars = 30;
+        num_display_bg = 30;
         
         use_flip = 0; % flip view by 180 degrees (for meridien flip)
         
         use_audio = 1;
+        use_progress = 1;
         
-        % size of samples used for autofocus
-%         focus_batch_size = 10;
-%         
-%         focus_curve_range = 0.2;
-%         focus_curve_step = 0.01;
-        
-        saturation_value = 50000;
+        pass_source = {}; % parameters to pass to camera/reader/simulator
+        pass_cal = {}; % parameters to pass to calibration object
+        pass_back = {}; % parameters to pass to background object
+        pass_phot = {}; % parameters to pass to photometry object
+        pass_show = {}; % parameters to pass to show function
         
         debug_bit = 1;
+        log_level = 1;
         
     end
     
     properties(Dependent=true)
         
-        run_name;
+        run_name; % the parameter "target_name" is used here to give a name to the whole run
         buf_full; % camera's buffers are used for full-frame dump on triggers
+        
+        % these are read only camera info
+        frame_rate_measured;
+        sensor_temperature;
+        
+        % get these from camera/reader
+        num_batches;
+        batch_size;
+        expT;
+        frame_rate;
+        use_roi;
+        roi_size;
+        roi_center;
+        
+        % get these from Clipper
+        num_stars;
+        cut_size;
+        
+        % get these from background Clipper
+        num_backgrounds;
+        cut_size_bg;
+        
         
     end
     
@@ -135,22 +140,25 @@ classdef Acquisition < file.AstroData
        
         brake_bit = 1; % when this is set to 1 (using the GUI, for example), the run stops. 
         
+        default_saturation_value;
+        
         default_run_name;
         
         default_num_batches;
-        
         default_batch_size;
+        default_expT;
+        default_frame_rate;
+        default_roi_size;
+        default_roi_center; 
+        
         default_num_stars;
         default_cut_size;
         default_num_backgrounds;
         default_cut_size_bg;
-        default_expT;
         
         show_what_list = {'images', 'stack'};
         
-        latest_input@util.text.InputVars;
-        
-        version = 1.02;
+        version = 1.03;
         
     end
     
@@ -191,31 +199,25 @@ classdef Acquisition < file.AstroData
                 obj.buf.use_save_raw_images = 0; % do not save the full frame images! 
                 
                 obj.runtime_buffer = util.vec.CircularBuffer;
-                obj.runtime_buffer.titles = {'time', 'num_frames'};
+                obj.runtime_buffer.titles = {'num_frames', 'time'};
                 
-                util.oop.save_defaults(obj); % make sure each default_XXX property is updated with the current XXX property value. 
-
-                obj.pars = head.Parameters; % this also gives "pars" to all sub-objects
-                
-                obj.prog = util.sys.ProgressBar;
-                obj.audio = util.sys.AudioControl;
+                try 
+                    obj.prog = util.sys.ProgressBar;
+                    obj.audio = util.sys.AudioControl;
+                catch ME
+                    obj.log.input(['Warning: ' ME.getReport]);
+                    warning(ME.getReport); 
+                end
                 
                 obj.src = obj.reader;
-                obj.latest_input = obj.makeInputVars;
                 
                 obj.deflator = file.Deflator;
                 
+                obj.pars = head.Parameters; % this also gives "pars" to all sub-objects
+                
+                util.oop.save_defaults(obj); % make sure each default_XXX property is updated with the current XXX property value. 
+                
             end
-            
-            
-        end
-        
-        function updateInputObjects(obj) % to be depricated
-            
-            obj.input_main_survey = obj.makeInputVars;
-            obj.input_preview = obj.makeInputVars('num_batches', 1, 'batch_size', 1, 'expT', 1, 'num_stars', 0);
-            obj.input_live = obj.makeInputVars('num_batches', 1e6, 'batch_size', 1, 'num_stars', 0);
-            obj.input_focus = obj.makeInputVars('batch_size', obj.focus_batch_size, 'expT', 1, 'num_stars', 0);
             
         end
         
@@ -236,7 +238,7 @@ classdef Acquisition < file.AstroData
             end
             
             obj.batch_counter = 0;
-            obj.batch_index = 1;
+            obj.start_index = 1;
 
         end
         
@@ -278,6 +280,140 @@ classdef Acquisition < file.AstroData
             
         end
         
+        function val = get.num_batches(obj)
+            
+            if isprop(obj.src, 'num_batches')
+                val = obj.src.num_batches;
+            else
+                val = [];
+            end 
+            
+        end
+        
+        function val = get.batch_size(obj)
+            
+            if isprop(obj.src, 'batch_size')
+                val = obj.src.batch_size;
+            else
+                val = [];
+            end 
+            
+        end
+        
+        function val = get.expT(obj)
+            
+            if isprop(obj.src, 'expT')
+                val = obj.src.expT;
+            elseif ~isempty(obj.pars)
+                obj.pars.expT;
+            else
+                val = [];
+            end 
+            
+        end
+        
+        function val = get.frame_rate(obj)
+            
+            if isprop(obj.src, 'frame_rate')
+                val = obj.src.frame_rate;
+            elseif ~isempty(obj.pars)
+                obj.pars.frame_rate;
+            else
+                val = [];
+            end 
+            
+        end
+        
+        function val = get.use_roi(obj)
+            
+            if isprop(obj.src, 'use_roi')
+                val = obj.src.use_roi;
+            else
+                val = [];
+            end
+            
+        end
+        
+        function val = get.roi_size(obj)
+            
+            if isprop(obj.src, 'roi_size')
+                val = obj.src.roi_size;
+            elseif isprop(obj.src, 'im_size')
+                val = obj.src.im_size;
+            else
+                val = [];
+            end
+            
+        end
+        
+        function val = get.roi_center(obj)
+            
+            if isprop(obj.src, 'roi_center')
+                val = obj.src.roi_center;
+            elseif isprop(obj.src, 'center_region')
+                val = obj.src.center_region;
+            else
+                val = [];
+            end
+            
+        end
+        
+        function val = get.num_stars(obj)
+            
+            if ~isempty(obj.clip)
+                val = obj.clip.num_stars;
+            else
+                val = [];
+            end
+            
+        end
+        
+        function val = get.cut_size(obj)
+            
+            if ~isempty(obj.clip)
+                val = obj.clip.cut_size;
+            else
+                val = [];
+            end
+            
+        end
+        
+        function val = get.num_backgrounds(obj)
+            
+            if ~isempty(obj.clip_bg)
+                val = obj.clip.num_stars;
+            else
+                val = [];
+            end
+            
+        end
+        
+        function val = get.cut_size_bg(obj)
+            
+            if ~isempty(obj.clip_bg)
+                val = obj.clip.cut_size;
+            else
+                val = [];
+            end
+            
+        end
+        
+        function val = get.frame_rate_measured(obj)
+            
+            if isa(obj.src, 'obs.cam.Andor')
+                val = obj.src.frame_rate_measured;
+            end
+            
+        end
+        
+        function val = get.sensor_temperature(obj)
+            
+            if isa(obj.src, 'obs.cam.Andor')
+                val = obj.src.getTemperatureHW;
+            end
+            
+        end
+        
     end
     
     methods % setters
@@ -306,11 +442,91 @@ classdef Acquisition < file.AstroData
             
         end
         
+        function set.num_batches(obj, val)
+            
+            if isprop(obj.src, 'num_batches')
+                obj.src.num_batches = val;
+            end 
+            
+        end
+        
         function set.batch_size(obj, val)
             
-            obj.batch_size = val;
+            if isprop(obj.src, 'batch_size')
+                obj.src.batch_size = val;
+            end 
             
-            % any other sub-objects? 
+        end
+        
+        function set.expT(obj, val)
+            
+            if isprop(obj.src, 'expT')
+                obj.src.expT = val;
+            end 
+            
+        end
+        
+        function set.frame_rate(obj, val)
+            
+            if isprop(obj.src, 'frame_rate')
+                obj.src.frame_rate = val;
+            end 
+            
+        end
+        
+        function set.use_roi(obj, val)
+            
+            if isprop(obj.src, 'use_roi')
+                obj.src.use_roi = val;
+            end
+            
+        end
+        
+        function set.roi_size(obj, val)
+            
+            if isprop(obj.src, 'roi_size')
+                obj.src.roi_size = val;
+            end
+            
+        end
+        
+        function set.roi_center(obj, val)
+            
+            if isprop(obj.src, 'roi_center')
+                obj.src.roi_center = val;
+            end
+            
+        end
+        
+        function set.num_stars(obj, val)
+            
+            if ~isempty(obj.clip)
+                obj.clip.num_stars = val;
+            end
+            
+        end
+        
+        function set.cut_size(obj, val)
+            
+            if ~isempty(obj.clip)
+                obj.clip.cut_size = val;
+            end
+            
+        end
+        
+        function set.num_backgrounds(obj, val)
+            
+            if ~isempty(obj.clip_bg)
+                obj.clip.num_stars = val;
+            end
+            
+        end
+        
+        function set.cut_size_bg(obj, val)
+            
+            if ~isempty(obj.clip_bg)
+                obj.clip.cut_size = val;
+            end
             
         end
         
@@ -323,7 +539,7 @@ classdef Acquisition < file.AstroData
             end
             
         end
-                
+        
     end
     
     methods % utilities
@@ -341,35 +557,39 @@ classdef Acquisition < file.AstroData
             else % use default values (load them from Acquisition object)
             
                 input = util.text.InputVars;
+                input.input_var('use_reset', 0, 'reset'); 
+                input.input_var('start_index', []);
+                input.input_var('use_background', []);
+                input.input_var('use_refine_bg', []);
+                input.input_var('use_remove_saturated', []);
+                input.input_var('saturation_value', []);
+                input.input_var('use_mextractor', []);
+                input.input_var('use_arbitrary_pos', []);
+                input.input_var('use_cutouts', []);
+                input.input_var('use_adjust_cutouts', []);
+                input.input_var('use_save', [], 'save');
+                input.input_var('use_trigger_save', []);
+                input.input_var('use_show', [], 'show');
+                input.input_var('use_audio', []);
+                input.input_var('use_progress', []);
+                input.input_var('pass_source', {}, 7); % cell array to pass to camera/reader/simulator
+                input.input_var('pass_cal', {}, 7); % cell array to pass to calibration object
+                input.input_var('pass_back', {}, 7); % cell array to pass to background object
+                input.input_var('pass_phot', {}, 7); % cell array to pass to photometry object
+                input.input_var('pass_show', {}, 7) % cell array to pass to show function
+                input.input_var('debug_bit', []);
+                input.input_var('log_level', []);
+                
                 input.input_var('run_name', 'test_run', 'name');
-                input.input_var('reset', 0, 'use_reset'); 
                 input.input_var('expT', [], 'T', 'exposure time');
+                input.input_var('frame_rate', []); 
                 input.input_var('num_batches', [], 'Nbatches');
-                input.input_var('use_cutouts', 1);
                 input.input_var('batch_size', [], 'frames');
                 input.input_var('num_stars', [], 'Nstars');
                 input.input_var('cut_size', []);
                 input.input_var('num_backgrounds', [], 'Nbackgrounds');
                 input.input_var('cut_size_bg', []);
-                input.input_var('use_background', []);
-                input.input_var('use_refine_bg', []);
-                input.input_var('use_adjust_cutouts', []);
-                input.input_var('use_mextractor', []);
-                input.input_var('use_arbitrary_pos', []);
-                input.input_var('use_autofocus', []);
-                input.input_var('use_rough_focus', []);
-                input.input_var('use_save', [], 'save');
-                input.input_var('use_trigger_save', []);
-                input.input_var('use_show', [], 'show');
-                input.input_var('use_audio', []);
-                input.input_var('axes', [], 'axis');
-                input.input_var('start_index', []);
-                input.input_var('debug_bit', []);
-                input.input_var('pass_source', {}, 6); % cell array to pass to camera/reader/simulator
-                input.input_var('pass_cal', {}, 6); % cell array to pass to calibration object
-                input.input_var('pass_back', {}, 6); % cell array to pass to background object
-                input.input_var('pass_phot', {}, 6); % cell array to pass to photometry object
-
+                
                 input.scan_obj(obj); % overwrite defaults using values in Acquisition object
 
             end
@@ -378,17 +598,86 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function parseInput(obj, input) % to be depricated! 
+        function stash_parameters(obj, input) % sets all camera parameters into hidden "stash" parameters. If given an InputVars object, will load parameters from it to the camera object.
             
-            list = properties(input);
+            obj.start_index_ = obj.start_index;
+            obj.use_background_ = obj.use_background;
+            obj.use_refine_bg_ = obj.use_refine_background;
+            obj.use_remove_saturated_ = obj.use_remove_saturated;
+            obj.saturation_value_ = obj.saturation_value;
+            obj.use_mextractor_ = obj.use_mextractor;
+            obj.use_arbitrary_pos_ = obj.use_arbitrary_pos;
+            obj.use_cutouts_ = obj.use_cutouts;
+            obj.use_adjust_cutouts_ = obj.use_adjust_cutouts;
+            obj.use_save_ = obj.use_save;
+            obj.use_triggered_save_ = obj.use_triggered_save;
+            obj.use_show_ = obj.use_show;
+            obj.use_audio_ = obj.use_audio;
+            obj.use_progress_ = obj.use_progress;
+            obj.use_show_ = obj.use_show;
+            obj.pass_source_ = obj.pass_source;
+            obj.pass_cal_ = obj.pass_cal;
+            obj.pass_back_ = obj.pass_back;
+            obj.pass_phot_ = obj.pass_phot;
+            obj.pass_show_ = obj.pass_show;
+            obj.debug_bit_ = obj.debug_bit; 
+            obj.log_level_ = obj.log_level;
             
-            for ii = 1:length(list)
+            obj.run_name_ = obj.run_name;
+            obj.batch_size_ = obj.batch_size;
+            obj.num_batches_ = obj.num_batches;
+            obj.frame_rate_ = obj.frame_rate;
+            obj.expT_ = obj.expT;
             
-                if isprop(obj, list{ii})
-                    obj.(list{ii}) = input.(list{ii});
+            obj.use_roi_ = obj.use_roi;
+            obj.roi_size_ = obj.roi_size;
+            obj.roi_center_ = obj.doi_center;
+            
+            if nargin>1 && ~isempty(input) && isa(input, 'util.text.InputVars')
+                list = properties(input);
+                for ii = 1:length(list)
+                    if isprop(obj, list{ii})
+                        obj.(list{ii}) = input.(list{ii});
+                    end
                 end
-                
             end
+            
+        end
+        
+        function unstash_parameters(obj) % return "stashed" parameters to camera object after run is done. 
+            
+            obj.start_index = obj.start_index_;
+            obj.use_background = obj.use_background_;
+            obj.use_refine_bg = obj.use_refine_background_;
+            obj.use_remove_saturated = obj.use_remove_saturated_;
+            obj.saturation_value = obj.saturation_value_;
+            obj.use_mextractor = obj.use_mextractor_;
+            obj.use_arbitrary_pos = obj.use_arbitrary_pos_;
+            obj.use_cutouts = obj.use_cutouts_;
+            obj.use_adjust_cutouts = obj.use_adjust_cutouts_;
+            obj.use_save = obj.use_save_;
+            obj.use_triggered_save = obj.use_triggered_save_;
+            obj.use_show = obj.use_show_;
+            obj.use_audio = obj.use_audio_;
+            obj.use_progress = obj.use_progress_;
+            obj.use_show = obj.use_show_;
+            obj.pass_source = obj.pass_source_;
+            obj.pass_cal = obj.pass_cal_;
+            obj.pass_back = obj.pass_back_;
+            obj.pass_phot = obj.pass_phot_;
+            obj.pass_show = obj.pass_show_;
+            obj.debug_bit = obj.debug_bit_; 
+            obj.log_level = obj.log_level_;
+            
+            obj.run_name = obj.run_name_;
+            obj.batch_size = obj.batch_size_;
+            obj.num_batches = obj.num_batches_;
+            obj.frame_rate = obj.frame_rate_;
+            obj.expT = obj.expT_;
+            
+            obj.use_roi = obj.use_roi_;
+            obj.roi_size = obj.roi_size_;
+            obj.roi_center = obj.doi_center_;
             
         end
         
@@ -521,39 +810,34 @@ classdef Acquisition < file.AstroData
         
         function run(obj, varargin)
             
-            input = obj.makeInputVars(varargin{:});
-           
-            obj.latest_input = input;
+            obj.startup(varargin);
             
-            if input.reset
+            try 
                 
-                obj.reset;
-                
-                if obj.debug_bit>1, disp(['Starting run "' input.run_name '" for ' num2str(input.num_batches) ' batches.']); end
-            
-            end
-            
-            cleanup = onCleanup(@() obj.finishup(input));
-            obj.startup(input);
-            
-            if input.use_index
-                idx = obj.batch_index;
-            else
-                idx = 1;
-            end
-            
-            for ii = idx:input.num_batches
+                cleanup = onCleanup(@obj.finishup);
 
-                if obj.brake_bit
-                    return;
+                if obj.start_index
+                    idx = obj.start_index;
+                else
+                    idx = 1;
                 end
-                
-                obj.batch(input);
-                
-                obj.prog.showif(obj.batch_counter);
-                
+
+                for ii = idx:input.num_batches
+
+                    if obj.brake_bit
+                        return;
+                    end
+
+                    obj.batch(input);
+
+                    obj.prog.showif(obj.batch_counter);
+
+                end
+
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
             end
-            
         end
         
         function update(obj) % do we need this??
@@ -562,69 +846,72 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function startup(obj, input)
+        function startup(obj, varargin)
             
-            if ~obj.cal.checkDark
-                error('Cannot start a new run without loading darks into calibration object!');
-            end
-            
-            obj.latest_input = input;
-            
-            obj.brake_bit = 0;
-            
-            obj.update;
-            
-            if input.use_save
-                try    
-                    filename = obj.buf.getReadmeFilename;
-                    util.oop.save(obj, filename, 'name', 'acquisition'); 
-                catch ME
-                    warning(ME.getReport);
-                end
-            end
-            
-            if input.use_audio
-                try obj.audio.playTakeForever; catch ME, warning(ME.getReport); end
-            end
-            
-            if isa(obj.src, 'file.Reader')
-                obj.src.num_frames_per_batch = input.batch_size;
-                obj.src.num_files_per_batch = 1;
-                % what if batch_size is bigger than 100??
-            else
-                obj.src.batch_size = input.batch_size;
-            end
-            
-            if input.use_cutouts
+            try 
                 
-                obj.clip.num_stars = input.num_stars;
-                obj.clip.cut_size = input.cut_size;
+                input = obj.makeInputVars(varargin{:});
+            
+                if input.log_level
+                    obj.log.input('Starting a new run with Acquisition.'); % maybe add some more info here...?
+                end
+                
+                if ~obj.cal.checkDark
+                    error('Cannot start a new run without loading darks into calibration object!');
+                end
 
-                obj.clip_bg.num_stars = input.num_backgrounds;
-                obj.clip_bg.cut_size = input.cut_size_bg;
+                obj.stash_parameters(input);
+                
+                if input.reset % this parameter is not saved in the object because we only use it here... 
 
+                    obj.reset;
+                    obj.lightcurves.startup(obj.num_batches.*obj.batch_size, obj.num_stars);
+
+                    if obj.debug_bit, disp(['Starting run "' input.run_name '" for ' num2str(input.num_batches) ' batches.']); end
+
+                end
+
+                obj.update; % not sure if this does anything other than update the "pars" object...
+
+                if obj.use_save
+                    try    
+                        filename = obj.buf.getReadmeFilename;
+                        util.oop.save(obj, filename, 'name', 'acquisition'); 
+                    catch ME
+                        warning(ME.getReport);
+                    end
+                end
+
+                if obj.use_audio
+                    try obj.audio.playTakeForever; catch ME, warning(ME.getReport); end
+                end
+
+                if isa(obj.src, 'file.Reader') % we need to change the reader interface to be more inline with the camera...
+                    obj.src.num_frames_per_batch = obj.batch_size;
+                    obj.src.num_files_per_batch = 1;
+                    % what if batch_size is bigger than 100??
+                end
+
+                obj.src.startup(obj.pass_source{:});
+
+                if obj.use_progress
+                    obj.prog.start(obj.num_batches);
+                end
+                
+                obj.brake_bit = 0;
+                
+            catch ME
+                obj.log.error(ME.getReport)
+                rethrow(ME);
             end
-            
-            obj.frame_rate = NaN;
-            obj.sensor_temp = NaN;
-            
-            obj.src.startup('num_batches', input.num_batches, input.pass_source{:});
-            
-            if input.reset
-                obj.lightcurves.startup(input.num_batches.*input.batch_size, input.num_stars);
-            end
-            
-            obj.prog.start(input.num_batches);
             
         end
         
-        function finishup(obj, input)
+        function finishup(obj)
             
-            if nargin<2 || isempty(input)
-                input = obj.latest_input;
+            if obj.use_progress
+                obj.prog.finish;
             end
-            
-            obj.prog.finish;
             
             obj.src.finishup;
             
@@ -637,9 +924,9 @@ classdef Acquisition < file.AstroData
                 end
             end
             
-            if obj.debug_bit, disp(['Finished run "' input.run_name '" with ' num2str(obj.batch_counter) ' batches.']); end
+            if obj.debug_bit, disp(['Finished run "' obj.run_name '" with ' num2str(obj.batch_counter) ' batches.']); end
             
-            if input.use_audio
+            if obj.use_audio
                 try
                     obj.audio.playShowsOver;
                 catch ME
@@ -651,11 +938,7 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function batch(obj, input)
-            
-            if nargin<2 || isempty(input)
-                input = obj.latest_input;
-            end
+        function batch(obj)
             
             if obj.src.is_finished
                 obj.brake_bit = 1;
@@ -679,7 +962,7 @@ classdef Acquisition < file.AstroData
             
             obj.copyFrom(obj.src); % get the data into this object
             
-            if obj.use_roi % need to implement new ROI interface
+            if obj.use_roi % need to implement new ROI interface (particularly get ROI from source and pass it to calibration)
                 
                 S = size(obj.images);
                 
@@ -711,28 +994,24 @@ classdef Acquisition < file.AstroData
                 obj.cal.use_roi = 0;
             end
             
-            obj.calcStack(input);
+            obj.calcStack;
             
-            if input.use_cutouts
-                obj.calcCutouts(input);
-                obj.calcLightcurves(input);
-                obj.calcTrigger(input);
+            if obj.use_cutouts
+                obj.calcCutouts;
+                obj.calcLightcurves;
+                obj.calcTrigger;
             end
             
             obj.positions = obj.clip.positions;
             obj.positions_bg = obj.clip_bg.positions;
             
-            if input.use_save
+            if obj.use_save
                 obj.buf.input(obj);
-                obj.buf.clearImages;
+                obj.buf.clearImages; % do we need this if we have set use_save_raw_images=0 in the buffers?
                 obj.buf.save;
                 obj.buf.nextBuffer;
                 % check triggering then call the camera save mode
                 
-            end
-            
-            if ismethod(obj.src, 'getTemperature')
-                obj.sensor_temp = obj.src.getTemperature;
             end
             
             if ismethod(obj.src, 'next')
@@ -741,11 +1020,9 @@ classdef Acquisition < file.AstroData
             
             obj.batch_counter = obj.batch_counter + 1;
             
-            if input.use_index
-                obj.batch_index = obj.batch_index + 1;
-            end
+            obj.start_index = obj.start_index + 1;
             
-            if input.use_show
+            if obj.use_show
                 obj.show;
             end
             
@@ -755,38 +1032,31 @@ classdef Acquisition < file.AstroData
             
             drawnow;
             
-            obj.runtime_buffer.input([toc(t), size(obj.images,3)]);
+            obj.runtime_buffer.input([size(obj.images,3), toc(t)]);
             
-            T = sum(obj.runtime_buffer.data(:,1));
-            N = sum(obj.runtime_buffer.data(:,2));
+            N = sum(obj.runtime_buffer.data(:,1));
+            T = sum(obj.runtime_buffer.data(:,2));
             
-            obj.frame_rate = N./T;
-            
-        end
-        
-        function single(obj, input)
-            
-            input.use_audio = 0;
-            input.num_batches = 1;
-%             input.batch_size = 1;
-            input.use_save = 0;
-            input.start_index = 1;
-            
-            obj.latest_input = input;
-            
-            cleanup = onCleanup(@() obj.finishup(input));
-            obj.startup(input);
-            
-            obj.batch(input);
+            obj.frame_rate_average = N./T;
             
         end
         
-        function calcStack(obj, input)
+        function single(obj)
             
-            if nargin<2 || isempty(input)
-                input = obj.latest_input;
+            cleanup = onCleanup(@obj.finishup);
+            obj.startup('num_batches', 1, 'start_index', 1, 'use_save', 0, 'use_audio', 0, 'use_progress', 0);
+            
+            try 
+                obj.batch;
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
             end
-                        
+            
+        end
+        
+        function calcStack(obj)
+            
             % make the basic, calibrated stack image
             obj.num_sum = size(obj.images,3);
             obj.stack = obj.cal.input(sum(obj.images,3), 'sum', obj.num_sum);
@@ -799,7 +1069,7 @@ classdef Acquisition < file.AstroData
             
             obj.stack_cutouts_bg = obj.clip_bg.input(obj.stack); % dim 1&2 are y&x, dim 3 is scalar, dim 4 is star number.
 
-            if input.use_background
+            if obj.use_background
             
                 obj.back.input(obj.stack_cutouts_bg, obj.clip_bg.positions);
                 % should also get variance from background object...
@@ -817,7 +1087,7 @@ classdef Acquisition < file.AstroData
             
             obj.stack_cutouts = obj.clip.input(obj.stack); % if no positions are known, it will call "findStars"
             
-            if input.use_background % if we already used background subtraction on all pixels, why not just cutout from stack_sub??
+            if obj.use_background % if we already used background subtraction on all pixels, why not just cutout from stack_sub??
                 BC = obj.back.getPoints(obj.clip.positions);
                 BC = permute(BC, [4,3,2,1]); % turn the column vector into a 4D vector
                 obj.stack_cutouts_sub = obj.stack_cutouts - BC; 
@@ -827,7 +1097,7 @@ classdef Acquisition < file.AstroData
             
             obj.phot_stack.input(obj.stack_cutouts_sub, 'positions', obj.positions); % run photometry on the stack to verify flux and adjust positions
             
-            obj.checkRealign(input);
+            obj.checkRealign;
             
             % store the latest fluxes from the stack cutouts
             obj.flux_buf.input(obj.phot_stack.fluxes);
@@ -847,11 +1117,7 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function findStars(obj, input)
-            
-            if nargin<2 || isempty(input)
-                input = obj.latest_input;
-            end
+        function findStars(obj)
             
             S = obj.stack_sub;
             
@@ -863,9 +1129,9 @@ classdef Acquisition < file.AstroData
             
             % do we want to save the saturation-removed stack image somewhere??
             
-            if input.use_arbitrary_pos
+            if obj.use_arbitrary_pos
                 obj.clip.arbitraryPositions; % maybe add some input parameters?
-            elseif input.use_mextractor
+            elseif obj.use_mextractor
                 % add the code for mextractor+astrometry here
             else
                 obj.clip.findStars(S);                
@@ -876,11 +1142,7 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function checkRealign(obj, input)
-            
-            if nargin<2 || isempty(input)
-                input = obj.latest_input;
-            end
+        function checkRealign(obj)
             
             if ~is_empty(obj.flux_buf) % check that stars are still aligned properly... 
                 
@@ -903,7 +1165,7 @@ classdef Acquisition < file.AstroData
 
                     obj.stack_cutouts = obj.clip.input(obj.stack);
 
-                    if input.use_background
+                    if obj.use_background
                         BC = obj.back.getPoints(obj.clip.positions);
                         BC = permute(BC, [4,3,2,1]); % turn the column vector into a 4D vector
                         % should also get variance from background object...
@@ -923,11 +1185,7 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function calcCutouts(obj, input)
-            
-            if nargin<2 || isempty(input)
-                input = obj.latest_input;
-            end
+        function calcCutouts(obj)
             
             obj.cutouts = obj.clip.input(obj.images);
             
@@ -951,11 +1209,7 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function calcLightcurves(obj, input)
-            
-            if nargin<2 || isempty(input)
-                input = obj.latest_input;
-            end
+        function calcLightcurves(obj)
             
             obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps, 'positions', obj.positions); % add variance input? 
             
@@ -970,16 +1224,13 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function calcTrigger(obj, input)
-            
-            if nargin<2 || isempty(input)
-                input = obj.latest_input;
-            end
+        function calcTrigger(obj)
             
             % to be implemented!
+            
         end
         
-        function roi(obj, position)
+        function roi(obj, position) % this is cool but do we need this??
             
             import util.text.cs;
             
@@ -1213,35 +1464,35 @@ classdef Acquisition < file.AstroData
             
             try
             
-            input = util.text.InputVars;
-            input.input_var('ax', [], 'axes', 'axis');
-            input.scan_vars(varargin{:});
-            
-            if isempty(input.ax)
-                if ~isempty(obj.gui) && obj.gui.check
-                    input.ax = obj.gui.axes_image;
-                else
-                    input.ax = gca;
+                input = util.text.InputVars;
+                input.input_var('ax', [], 'axes', 'axis');
+                input.scan_vars(varargin{:});
+
+                if isempty(input.ax)
+                    if ~isempty(obj.gui) && obj.gui.check
+                        input.ax = obj.gui.axes_image;
+                    else
+                        input.ax = gca;
+                    end
                 end
-            end
-            
-            if cs(obj.show_what, 'images')
-                I = obj.images(:,:,end);
-            elseif cs(obj.show_what, 'stack')
-                I = obj.stack_sub;
-            else
-                error('Unknown option for "display_what". Use "images", "raw", or "stack"');
-            end
-            
-            if obj.use_flip
-                I = rot90(I,2);
-            end
-            
-            util.plot.setImage(I, input.ax);
-            
-            obj.clip.showRectangles('num', obj.num_rect_stars, 'color', 'black', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 1);
-            obj.clip_bg.showRectangles('num', obj.num_rect_bg, 'color', 'red', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 0, 'text', 0);
-            
+
+                if cs(obj.show_what, 'images')
+                    I = obj.images(:,:,end);
+                elseif cs(obj.show_what, 'stack')
+                    I = obj.stack_sub;
+                else
+                    error('Unknown option for "display_what". Use "images", "raw", or "stack"');
+                end
+
+                if obj.use_flip
+                    I = rot90(I,2);
+                end
+
+                util.plot.setImage(I, input.ax);
+
+                obj.clip.showRectangles('num', obj.num_display_stars, 'color', 'black', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 1);
+                obj.clip_bg.showRectangles('num', obj.num_display_bg, 'color', 'red', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 0, 'text', 0);
+
             catch ME
                 warning(ME.getReport);
             end
@@ -1250,7 +1501,7 @@ classdef Acquisition < file.AstroData
         
     end    
     
-    methods(Access=protected) % bullshit functions to override setter/getter in AstroData
+    methods(Access=protected) % bullshit functions to override setter/getter in AstroData (is this not cancelled??)
         
         function val = getPositions(obj)
             

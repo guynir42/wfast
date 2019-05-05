@@ -100,7 +100,7 @@ classdef Andor < file.AstroData
         
         audio@util.sys.AudioControl;
         prog@util.sys.ProgressBar;
-        time_buffer@util.vec.CircularBuffer; % keeps track of the last few batches' runtime and number of frames, to calculate frame_rate_measured
+        runtime_buffer@util.vec.CircularBuffer; % keeps track of the last few batches' runtime and number of frames, to calculate frame_rate_measured
         
     end
     
@@ -372,7 +372,8 @@ classdef Andor < file.AstroData
         
         function setupTimeBuffer(obj) % make a circular buffer for number of frames and runtime
             
-            obj.time_buffer = util.vec.CircularBuffer;
+            obj.runtime_buffer = util.vec.CircularBuffer;
+            obj.runtime_buffer.titles = {'num_frames', 'time'};
             
         end
         
@@ -385,7 +386,7 @@ classdef Andor < file.AstroData
             obj.buffers.reset; 
             util.vec.mex_change(obj.mex_flag, 4, 0); % reset the counter on the mex_flag
             
-            obj.time_buffer.reset;
+            obj.runtime_buffer.reset;
             
             obj.frame_rate_camera = [];
             obj.frame_rate_measured = [];
@@ -754,20 +755,15 @@ classdef Andor < file.AstroData
         
         function startup(obj, varargin)
             
-            try
-                input = obj.makeInputVars(varargin{:});
-            catch ME
-                obj.log.error(ME.getReport);
-                rethrow(ME);
-            end
-            
-            if input.log_level
-                obj.log.input(sprintf('Starting a new run with %d batches of %d images each. expT= %f, async= %d, save= %d, ROI= %s',...
-                    input.num_batches, input.batch_size, input.expT, input.use_async, input.use_save, obj.getZoomStr(input.im_size, input.center_region))); 
-            end
-            
             try 
-            
+                
+                input = obj.makeInputVars(varargin{:});
+                
+                if input.log_level
+                    obj.log.input(sprintf('Starting a new run with %d batches of %d images each. expT= %f, async= %d, save= %d, ROI= %s',...
+                        input.num_batches, input.batch_size, input.expT, input.use_async, input.use_save, obj.getZoomStr(input.im_size, input.center_region))); 
+                end
+
                 obj.stash_parameters(input); % put the user-defined parameters into hidden "stashed" parameters to be loaded at end of run
             
                 obj.reset;
@@ -780,7 +776,7 @@ classdef Andor < file.AstroData
                     obj.setupProgressBar;
                 end
 
-                if isempty(obj.time_buffer)
+                if isempty(obj.runtime_buffer)
                     obj.setupTimeBuffer;
                 end
                 
@@ -879,6 +875,7 @@ classdef Andor < file.AstroData
         
         function finishup(obj) % called at end of each run. Shuts down everything (when use_save=1 will also add a finish readme file)
             
+            try 
             if obj.use_async
                 
                 obj.stop;
@@ -916,6 +913,10 @@ classdef Andor < file.AstroData
                 obj.gui.update;
             end
             
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
         end
         
         function batch(obj)
@@ -940,9 +941,9 @@ classdef Andor < file.AstroData
                 dt = seconds(time - obj.pars.ephem.time); % how much time passed since last update
                 obj.pars.ephem.time = time; % update the "pars" object with current start time
                 
-                obj.time_buffer.input([size(obj.images,3), dt]); % how many images, how much time passed (total)
+                obj.runtime_buffer.input([size(obj.images,3), dt]); % how many images, how much time passed (total)
                 
-                obj.frame_rate_measured = sum(obj.time_buffer.data(:,1))./sum(obj.time_buffer.data(:,2)); % average over the last few (10) batches
+                obj.frame_rate_measured = sum(obj.runtime_buffer.data(:,1))./sum(obj.runtime_buffer.data(:,2)); % average over the last few (10) batches
                 
             end
             
