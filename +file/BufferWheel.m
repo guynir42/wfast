@@ -88,7 +88,7 @@ classdef BufferWheel < file.AstroData
     properties % switches
         
         index = 1; % which "buf" is now active for reading/saving 
-        product_type = 'Raw'; % can be Raw, ROI, Cutouts (including stacks), dark (always raw), flat (always raw). Can append additional strings like "Sim" or "Cal" or "Proc"
+        product_type = 'Raw'; % can be Raw, ROI, Cutouts (including stacks), Dark (always raw), Dlat (always raw). Can append additional strings like "Sim" or "Cal" or "Proc"
         dir_extension = ''; % overrides any automatic directory extensions... 
         use_dir_types = 0; % automatically add a dir_extension equal to "type"
         

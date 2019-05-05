@@ -203,9 +203,7 @@ classdef AndorGUI < handle
             
             obj.panel_controls.button_mode.String = obj.owner.mode;
             
-            % choose a color for control button or for image panel (this
-            % uses the "latest_input" so that overrides to "run" function
-            % will still show up in the color of the background
+            % choose a color for control button
             if util.text.cs(obj.owner.mode, 'science')
                 obj.panel_controls.button_mode.BackgroundColor = util.plot.GraphicButton.defaultColor;
             elseif util.text.cs(obj.owner.mode, 'dark')
@@ -217,12 +215,12 @@ classdef AndorGUI < handle
             end
             
             % set image panel background color when recording...
-            if obj.owner.brake_bit==0 && obj.owner.latest_input.save % when recording! 
-                if util.text.cs(obj.owner.latest_input.mode, 'science')
+            if obj.owner.brake_bit==0 && obj.owner.use_save % when recording! 
+                if util.text.cs(obj.owner.mode, 'science')
                     chosen_color = 'red';
-                elseif util.text.cs(obj.owner.latest_input.mode, 'dark')
+                elseif util.text.cs(obj.owner.mode, 'dark')
                     chosen_color = [0.3 0.7 0.95]; % custom light blue
-                elseif util.text.cs(obj.owner.latest_input.mode, 'flat')
+                elseif util.text.cs(obj.owner.mode, 'flat')
                     chosen_color = 'green';
                 else
                     chosen_color = util.plot.GraphicButton.defaultColor;

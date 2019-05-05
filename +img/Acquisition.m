@@ -13,7 +13,8 @@ classdef Acquisition < file.AstroData
         pars@head.Parameters;
         
         % input objects
-        cam@obs.cam.CameraControl;
+%         cam@obs.cam.CameraControl;
+        cam; % can be obs.cam.CameraControl or obs.cam.Andor
         reader@file.Reader;
         sim; % later add the class for the simulator        
         src; % can be camera, reader or simulator
@@ -61,9 +62,6 @@ classdef Acquisition < file.AstroData
         
         adjust_pos; % latest adjustment to x and y
         average_width; % of all stars in the stack
-        
-%         focus_curve_pos;
-%         focus_curve_width;
         
         batch_counter = 0;
         batch_index = 1;
@@ -332,38 +330,55 @@ classdef Acquisition < file.AstroData
         
         function input = makeInputVars(obj, varargin)
             
-            input = util.text.InputVars;
-            input.input_var('run_name', 'test_run', 'name');
-            input.input_var('reset', 0, 'use_reset'); 
-            input.input_var('expT', [], 'T', 'exposure time');
-            input.input_var('num_batches', [], 'Nbatches');
-            input.input_var('use_cutouts', 1);
-            input.input_var('batch_size', [], 'frames');
-            input.input_var('num_stars', [], 'Nstars');
-            input.input_var('cut_size', []);
-            input.input_var('num_backgrounds', [], 'Nbackgrounds');
-            input.input_var('cut_size_bg', []);
-            input.input_var('use_background', []);
-            input.input_var('use_refine_bg', []);
-            input.input_var('use_adjust_cutouts', []);
-            input.input_var('use_mextractor', []);
-            input.input_var('use_arbitrary_pos', []);
-            input.input_var('use_autofocus', []);
-            input.input_var('use_rough_focus', []);
-            input.input_var('use_save', [], 'save');
-            input.input_var('use_trigger_save', []);
-            input.input_var('use_show', [], 'show');
-            input.input_var('use_audio', []);
-            input.input_var('axes', [], 'axis');
-            input.input_var('use_index', 1);
-            input.input_var('debug_bit', []);
+            idx = util.text.InputVars.isInputVars(varargin);
             
-            input.scan_obj(obj);
+            if ~isempty(varargin) && any(idx) % was given an InputVars object
+            
+                idx = find(idx, 1, 'first');
+                input = varargin{idx}; 
+                varargin(find(idx, 1, 'first')) = []; % remove the one cell with InputVars in it
+            
+            else % use default values (load them from Acquisition object)
+            
+                input = util.text.InputVars;
+                input.input_var('run_name', 'test_run', 'name');
+                input.input_var('reset', 0, 'use_reset'); 
+                input.input_var('expT', [], 'T', 'exposure time');
+                input.input_var('num_batches', [], 'Nbatches');
+                input.input_var('use_cutouts', 1);
+                input.input_var('batch_size', [], 'frames');
+                input.input_var('num_stars', [], 'Nstars');
+                input.input_var('cut_size', []);
+                input.input_var('num_backgrounds', [], 'Nbackgrounds');
+                input.input_var('cut_size_bg', []);
+                input.input_var('use_background', []);
+                input.input_var('use_refine_bg', []);
+                input.input_var('use_adjust_cutouts', []);
+                input.input_var('use_mextractor', []);
+                input.input_var('use_arbitrary_pos', []);
+                input.input_var('use_autofocus', []);
+                input.input_var('use_rough_focus', []);
+                input.input_var('use_save', [], 'save');
+                input.input_var('use_trigger_save', []);
+                input.input_var('use_show', [], 'show');
+                input.input_var('use_audio', []);
+                input.input_var('axes', [], 'axis');
+                input.input_var('start_index', []);
+                input.input_var('debug_bit', []);
+                input.input_var('pass_source', {}, 6); % cell array to pass to camera/reader/simulator
+                input.input_var('pass_cal', {}, 6); % cell array to pass to calibration object
+                input.input_var('pass_back', {}, 6); % cell array to pass to background object
+                input.input_var('pass_phot', {}, 6); % cell array to pass to photometry object
+
+                input.scan_obj(obj); % overwrite defaults using values in Acquisition object
+
+            end
+            
             input.scan_vars(varargin{:});
             
         end
         
-        function parseInput(obj, input)
+        function parseInput(obj, input) % to be depricated! 
             
             list = properties(input);
             
@@ -397,14 +412,15 @@ classdef Acquisition < file.AstroData
                 if cs(source, 'Zyla')
                     
                     if isempty(obj.cam) || ~isa(obj.cam.cam, 'obs.cam.ZylaControl')
-                        obj.cam = obs.cam.CameraControl('zyla');
+%                         obj.cam = obs.cam.CameraControl('zyla');
+                        obj.cam = obs.cam.Andor;
                         obj.cam.pars = obj.pars;
                     end
                     
                     obj.src = obj.cam;
                     
                 elseif cs(source, 'Dhyana')
-                    
+                    error('This camera is no longer supported...');
                     if isempty(obj.cam) || ~isa(obj.cam.cam, 'obs.DhyanaControl')
                         obj.cam = obs.CameraControl('dhyana');
                         obj.cam.pars = obj.pars;
@@ -413,7 +429,7 @@ classdef Acquisition < file.AstroData
                     obj.src = obj.cam;
                     
                 elseif cs(source, 'simcamera')
-                    
+                    error('This camera is no longer supported...');
                     if isempty(obj.cam) || ~isa(obj.cam.cam, 'obs.cam.SimCamera')
                         obj.cam = obs.cam.CameraControl('sim');
                         obj.cam.pars = obj.pars;
@@ -441,7 +457,8 @@ classdef Acquisition < file.AstroData
                     
                 elseif cs(source, 'camera')
                     if isempty(obj.cam)
-                        obj.cam = obs.cam.CameraControl;
+%                         obj.cam = obs.cam.CameraControl;
+                        obj.cam = obs.cam.Andor;
                         obj.cam.pars = obj.pars;
                     end
                     
@@ -450,7 +467,7 @@ classdef Acquisition < file.AstroData
                     warning('unknown source "%s"', source);
                 end
             else
-                if isa(source, 'obs.cam.CameraControl') || isa(source, 'file.Reader') % add simulator check, too
+                if isa(source, 'obs.cam.CameraControl') || isa(source, 'obs.cam.Andor') || isa(source, 'file.Reader') % add simulator check, too
                     obj.src = source;
                     obj.src.pars = obj.pars;
                 else
@@ -504,13 +521,8 @@ classdef Acquisition < file.AstroData
         
         function run(obj, varargin)
             
-            if ~isempty(varargin) && isa(varargin{1}, 'util.text.InputVars')
-                input = varargin{1};
-                input.scan_vars(varargin{2:end});
-            else
-                input = obj.makeInputVars(varargin{:});
-            end
-            
+            input = obj.makeInputVars(varargin{:});
+           
             obj.latest_input = input;
             
             if input.reset
@@ -556,9 +568,7 @@ classdef Acquisition < file.AstroData
                 error('Cannot start a new run without loading darks into calibration object!');
             end
             
-            if nargin<2 || isempty(input)
-                input = obj.latest_input;
-            end
+            obj.latest_input = input;
             
             obj.brake_bit = 0;
             
@@ -598,7 +608,7 @@ classdef Acquisition < file.AstroData
             obj.frame_rate = NaN;
             obj.sensor_temp = NaN;
             
-            obj.src.startup(input.num_batches);
+            obj.src.startup('num_batches', input.num_batches, input.pass_source{:});
             
             if input.reset
                 obj.lightcurves.startup(input.num_batches.*input.batch_size, input.num_stars);
@@ -756,15 +766,13 @@ classdef Acquisition < file.AstroData
         
         function single(obj, input)
             
-            if nargin<2 || isempty(input)
-                input = obj.latest_input;
-            end
-            
-            input = util.oop.full_copy(input);
             input.use_audio = 0;
             input.num_batches = 1;
-            input.batch_size = 1;
+%             input.batch_size = 1;
+            input.use_save = 0;
+            input.start_index = 1;
             
+            obj.latest_input = input;
             
             cleanup = onCleanup(@() obj.finishup(input));
             obj.startup(input);
@@ -1017,7 +1025,7 @@ classdef Acquisition < file.AstroData
     
     methods % optional run commands
         
-        function runPreview(obj, varargin)
+        function runPreview(obj, varargin) % I'm not sure we need this... 
             
             if ~isempty(varargin) && isa(varargin{1}, 'util.text.InputVars')
                 input = varargin{1};
@@ -1031,7 +1039,7 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function runLive(obj, varargin)
+        function runLive(obj, varargin) % I'm not sure we need this... 
             
             if ~isempty(varargin) && isa(varargin{1}, 'util.text.InputVars')
                 input = varargin{1};
@@ -1047,20 +1055,15 @@ classdef Acquisition < file.AstroData
         
         function runFocus(obj, varargin)
             
-            if ~isempty(varargin) && isa(varargin{1}, 'util.text.InputVars')
-                input = varargin{1};
-                input.scan_vars(varargin{2:end});
-            else
-                input = obj.makeInputVars('reset', 1, 'batch_size', 100, 'expT', 0.025, ...
-                    'num_stars', 25, 'cut_size', 20, 'use audio', 0, 'use_save', 0, varargin{:});
-            end
+            input = obj.makeInputVars('reset', 1, 'batch_size', 100, 'expT', 0.025, ...
+                'num_stars', 25, 'cut_size', 20, 'use audio', 0, 'use_save', 0, varargin{:});
             
             if isempty(obj.cam) || isempty(obj.cam.focuser)
                 error('must be connected to camera and focuser!');
             end
             
             obj.reset;
-            obj.single(input);
+            obj.single(util.oop.full_copy(input)); % make a copy so the input doesn't get affected by "single" command's specific parameters
             obj.findStarsFocus(input);
             
             obj.af.startup(obj.cam.focuser.pos, obj.clip.positions, input.num_stars);
@@ -1104,10 +1107,12 @@ classdef Acquisition < file.AstroData
                 fprintf('FOCUSER RESULTS: pos= %f | tip= %f | tilt= %f\n', obj.af.found_pos, obj.af.found_tip, obj.af.found_tilt);
             
             catch ME
+                
                 disp(['Focus has failed, returning focuser to previous position= ' num2str(old_pos)]); 
                 obj.cam.focuser.pos = old_pos; 
                 obj.clip.reset; % don't save these star positions! 
                 rethrow(ME);
+                
             end
                 
             obj.cam.focuser.pos = obj.af.found_pos;
@@ -1133,6 +1138,13 @@ classdef Acquisition < file.AstroData
             C = input.cut_size;
             
             I = util.img.maskBadPixels(I);
+            
+            if obj.use_remove_saturated
+                mu = median(squeeze(util.stat.corner_mean(util.img.jigsaw(I))));
+                sig = median(squeeze(util.stat.corner_std(util.img.jigsaw(I))));
+                I = util.img.remove_saturated(I, 'saturation', 4.5e4, 'threshold', mu+5*sig, 'dilate', 4);
+            end
+            
             I = conv2(I, util.img.gaussian2(2), 'same'); % smoothing filter
             
             markers = round(S'.*[1/3 2/3]); % divide the sensor to 1/3rds 
@@ -1169,7 +1181,6 @@ classdef Acquisition < file.AstroData
                     end
                     
                 end
-                
                 
             end
             

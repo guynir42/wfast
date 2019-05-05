@@ -69,6 +69,8 @@ classdef Reader < file.AstroData
         
         gui@file.gui.ReaderGUI;
     
+        latest_input@util.text.InputVars;
+        
     end
     
     properties % object
@@ -191,7 +193,7 @@ classdef Reader < file.AstroData
         
     end
     
-    properties (Hidden=true, Transient=true) % temporary controls (for custom runs like quick scan
+    properties (Hidden=true, Transient=true) % temporary controls (for custom runs like quick scan) we should move all of these to "latest_input"
         
         % temporary parameters (used for e.g. quick-scan)
         use_temp_limits = 0;
@@ -407,7 +409,7 @@ classdef Reader < file.AstroData
         function val = getNumBatches(obj) % an estimate of the number of batches to be loaded in this run
             
             Nfiles1 = length(obj.filenames);
-            Nfiles2 = obj.temp_num_batches*obj.temp_num_files_per_batch;
+            Nfiles2 = obj.latest_input.num_batches*obj.temp_num_files_per_batch;
             Nfiles3 = obj.temp_file_index_finish-obj.temp_file_index_start;
             
             Nfiles = min([Nfiles1,Nfiles2,Nfiles3]); % which ever finishes first...
@@ -998,11 +1000,9 @@ classdef Reader < file.AstroData
             
         end
         
-        function startup(obj, Nbatches) % begin a new run (or continue the same run)
+        function startup(obj, varargin) % begin a new run (or continue the same run)
             
-            if nargin>1 && ~isempty(Nbatches)
-                obj.num_batches = Nbatches;
-            end
+            obj.latest_input = obj.makeInputVars(varargin{:});
             
 %             obj.reset;
             obj.brake_bit = 0;
@@ -1134,7 +1134,7 @@ classdef Reader < file.AstroData
         
         function val = is_finished(obj)
                         
-            if obj.counter_batches >= obj.temp_num_batches
+            if obj.counter_batches >= obj.latest_input.num_batches
                 val = 1;
             elseif obj.temp_use_wrap_around==0
                 if obj.this_file_index>length(obj.filenames) || (~isempty(obj.temp_file_index_finish) && obj.this_file_index>obj.temp_file_index_finish)
@@ -1145,6 +1145,25 @@ classdef Reader < file.AstroData
             else
                 val = 0;
             end
+            
+        end
+        
+        function input = makeInputVars(obj, varargin)
+            
+            idx = util.text.InputVars.isInputVars(varargin);
+            
+            if ~isempty(varargin) && any(idx)
+                idx = find(idx, 1, 'first');
+                input = varargin{idx}; 
+                varargin(find(idx, 1, 'first')) = []; % remove the one cell with InputVars in it
+            else
+                input = util.text.InputVars;
+                input.use_ordered_numeric = 1;
+                input.input_var('num_batches', obj.num_batches, 'Nbatches');
+                % add other options??
+            end
+            
+            input.scan_vars(varargin{:});
             
         end
         

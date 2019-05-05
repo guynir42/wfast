@@ -142,7 +142,7 @@ classdef InputVars < dynamicprops
             
         end
         
-        function scan_obj(obj, other)
+        function scan_obj(obj, other) % take any fields/properties from "other" that match variables in "obj" and use them as defaults
             
             if ~isobject(other) && ~isstruct(other)
                 error('Cannot scan a %s type object. Must supply an object or struct', class(other));
@@ -225,6 +225,7 @@ classdef InputVars < dynamicprops
             
         end
         
+        
     end
     
     methods % default setups
@@ -246,6 +247,23 @@ classdef InputVars < dynamicprops
             obj.number_dictionary('positions_bg') = 10;            
             obj.number_dictionary('t_end') = 6;
             obj.number_dictionary('t_end_stamp') = 6;
+            
+        end
+        
+    end
+    
+    methods(Static=true)
+        
+        function idx = isInputVars(array) % returns a logical vector the length of "array", with 1s where there is an object of this type
+            
+            if isempty(array)
+                idx = [];
+            elseif iscell(array)
+                func = @(c) isa(c, 'util.text.InputVars');
+                idx = cellfun(func, array);
+            else
+                idx = isa(array, 'util.text.InputVars');
+            end
             
         end
         
