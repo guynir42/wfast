@@ -140,6 +140,14 @@ classdef StatusChecker < handle
             
         end
         
+        function delete(obj) % destructor
+            
+            delete(obj.t3);
+            delete(obj.t2);
+            delete(obj.t1);
+            
+        end
+        
         function defineCrititcalDevices(obj) % define who is needed for continued operations
             
             obj.critical_devices = containers.Map;

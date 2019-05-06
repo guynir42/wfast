@@ -27,9 +27,12 @@ classdef AstroHaven < handle
         status = 0;
         id = 'dome';
         
-        port_name = 'COM13'; % change this later
+        port_name = 'COM14'; % change this later
         
         use_accelerometers = 0;
+        
+        max_fail_reply = 3;
+        max_fail_connect = 3;
         
         reply = '';
         
@@ -48,11 +51,6 @@ classdef AstroHaven < handle
     end
     
     properties (Hidden = true)
-        
-        fail_reply_counter = 0;
-        max_fail_reply = 3;
-        fail_connect_counter = 0;
-        max_fail_connect = 3;
         
         acc_name = 'HC-06';
         acc_id1 = '';
@@ -109,9 +107,6 @@ classdef AstroHaven < handle
     methods % resetters
         
         function reset(obj)
-            
-            obj.fail_reply_counter = 0;
-            obj.fail_reply_counter = 0;
             
         end
         
@@ -205,66 +200,54 @@ classdef AstroHaven < handle
             
                 obj.update;
                 
-                for ii = 1:number
-
-                    t = tic;
-
-                    % obj.counter = 0;
-                    
-                    obj.send('a');
-                    
-                    pause(0.1); 
-                    
-                    obj.send('b');
-
-                    pause(0.1);
-
+                t = tic;
+                
+                reply = obj.command('ab', number); % can add a "max_duration" argument to allow the loop to stop after so long
+                
+                if isempty(reply)
+                    % what to do if a command didn't succeed? should this be an error?
+                else
                     obj.open_time1 = obj.open_time1 + toc(t);
                     obj.open_time2 = obj.open_time2 + toc(t);
-
                 end
                 
                 obj.update;
 
             catch ME
                 obj.log.error(ME.getReport);
-                warning(ME.getReport);
+                rethrow(ME);
             end
             
         end
         
         function closeBoth(obj, number)
             
-            obj.log.input(['Close both. N= ' num2str(number)]);
-            
             if nargin<2 || isempty(number)
                 number = 1;
             end
             
+            obj.log.input(['Close both. N= ' num2str(number)]);
+            
             try
-                
+            
                 obj.update;
                 
-                for ii = 1:number
-
-                    t = tic;
-                    
-                    % obj.counter = 0;
-                    obj.send('A');
-                    obj.send('B');
-
-                    pause(0.2);
-
+                t = tic;
+                
+                reply = obj.command('AB', number); % can add a "max_duration" argument to allow the loop to stop after so long
+                
+                if isempty(reply)
+                    % what to do if a command didn't succeed? should this be an error?
+                else
                     obj.close_time1 = obj.close_time1 + toc(t);
                     obj.close_time2 = obj.close_time2 + toc(t);
-
                 end
                 
                 obj.update;
-                
+
             catch ME
                 obj.log.error(ME.getReport);
-                warning(ME.getReport);
+                rethrow(ME);
             end
             
         end
@@ -275,68 +258,59 @@ classdef AstroHaven < handle
                 number = 1;
             end
             
-            obj.log.input(['Open shutter 1. N= ' num2str(number)]);
+            obj.log.input(['Open shutter1. N= ' num2str(number)]);
             
             try
-
-                command = 'a';
-
+            
                 obj.update;
                 
-                for ii = 1:number
-
-                    t = tic;
-
-                    % obj.counter = 0; % this prevents an infinite loop of send calling itself...
-                    obj.send(command);
-                    
-                    pause(0.2);
-                    
+                t = tic;
+                
+                reply = obj.command('a', number); % can add a "max_duration" argument to allow the loop to stop after so long
+                
+                if isempty(reply)
+                    % what to do if a command didn't succeed? should this be an error?
+                else
                     obj.open_time1 = obj.open_time1 + toc(t);
-
                 end
-
+                
                 obj.update;
-                    
+
             catch ME
                 obj.log.error(ME.getReport);
-                warning(ME.getReport);
+                rethrow(ME);
             end
             
         end
         
         function open2(obj, number)
             
+            
             if nargin<2 || isempty(number)
                 number = 1;
             end
             
-            obj.log.input(['Open shutter 2. N= ' num2str(number)]);
-
+            obj.log.input(['Open shutter2. N= ' num2str(number)]);
+            
             try
-                
-                command = 'b';
-
+            
                 obj.update;
                 
-                for ii = 1:number
-
-                    t = tic;
-
-                    % obj.counter = 0; % this prevents an infinite loop of send calling itself...
-                    obj.send(command);
-
-                    pause(0.2);
-                    
+                t = tic;
+                
+                reply = obj.command('b', number); % can add a "max_duration" argument to allow the loop to stop after so long
+                
+                if isempty(reply)
+                    % what to do if a command didn't succeed? should this be an error?
+                else
                     obj.open_time2 = obj.open_time2 + toc(t);
-
                 end
                 
                 obj.update;
-                
+
             catch ME
                 obj.log.error(ME.getReport);
-                warning(ME.getReport);
+                rethrow(ME);
             end
             
         end
@@ -347,86 +321,82 @@ classdef AstroHaven < handle
                 number = 1;
             end
             
-            obj.log.input(['Close shutter 1. N= ' num2str(number)]);
+            obj.log.input(['Close shutter1. N= ' num2str(number)]);
             
             try
-                
+            
                 obj.update;
                 
-                command = 'A';
-
-                for ii = 1:number
-
-                    t = tic;
-
-                    % obj.counter = 0; % this prevents an infinite loop of send calling itself...
-                    obj.send(command);
-    %                 fprintf(obj.hndl, command);
-
-                    pause(0.2);
-
-                    obj.close_time1 = obj.close_time1 + toc(t);
-
-                end
+                t = tic;
                 
+                reply = obj.command('A', number); % can add a "max_duration" argument to allow the loop to stop after so long
+                
+                if isempty(reply)
+                    % what to do if a command didn't succeed? should this be an error?
+                else
+                    obj.close_time1 = obj.close_time1 + toc(t);
+                end
                 obj.update;
 
             catch ME
                 obj.log.error(ME.getReport);
-                warning(ME.getReport);
+                rethrow(ME);
             end
             
         end
         
         function close2(obj, number)
-                      
+             
             if nargin<2 || isempty(number)
                 number = 1;
             end
             
-            obj.log.input(['Close shutter 2. N= ' num2str(number)]);
-
+            obj.log.input(['Close shutter2. N= ' num2str(number)]);
+            
             try
-
-                command = 'B';
-
+            
                 obj.update;
                 
-                for ii = 1:number
-
-                    t = tic;
-
-                    % obj.counter = 0; % this prevents an infinite loop of send calling itself...
-                    obj.send(command);
-
-                    pause(0.2);
-
+                t = tic;
+                
+                reply = obj.command('B', number); % can add a "max_duration" argument to allow the loop to stop after so long
+                
+                if isempty(reply)
+                    % what to do if a command didn't succeed? should this be an error?
+                else
                     obj.close_time2 = obj.close_time2 + toc(t);
-
                 end
                 
                 obj.update;
 
             catch ME
                 obj.log.error(ME.getReport);
-                warning(ME.getReport);
+                rethrow(ME);
             end
             
         end
         
         function open1Full(obj)
             
+            obj.open1(1000);
+            
         end
         
         function close1Full(obj)
+            
+            obj.close1(1000);
             
         end
         
         function open2Full(obj)
             
+            obj.open2(1000);
+            
         end
         
         function close2Full(obj)
+            
+            obj.close2(1000);
             
         end
         
@@ -436,81 +406,70 @@ classdef AstroHaven < handle
         
         function connect(obj)
             
-            str = sprintf('connecting to dome! attempt %d', obj.fail_connect_counter);
-            
-            if obj.debug_bit>1, disp(str); end
-            
-            obj.log.input(str);
-            
-            if obj.fail_connect_counter>=3
-                disp(['Cannot connect to dome, giving up after ' num2str(obj.fail_connect_counter) ' tries']);
-                obj.hndl = [];
-                err_msg = sprintf('Cannot attempt additional connections to dome (limited to %d attempts)', obj.max_fail_connect);
-                obj.log.error(err_msg);
-                error(err_msg);
-            end
-            
             try
-                
-                if ~isempty(obj.hndl) && isvalid(obj.hndl)
-                    obj.disconnect;
-                end
-                
-                pause(0.1);
-                
-                obj.hndl = serial(obj.port_name);
+            
+                for ii = 1:obj.max_fail_connect
 
-                obj.hndl.Terminator = '';
+                    str = sprintf('connecting to dome! attempt %d', ii);
 
-                for ii = 1:3
-                
-                    if strcmp(obj.hndl.Status, 'open'), break; end
-                    
+                    if obj.debug_bit>1, disp(str); end
+
+                    obj.log.input(str);
+
+                    if ~isempty(obj.hndl) && isvalid(obj.hndl)
+                        obj.disconnect;
+                    end
+
+                    pause(0.1);
+
+                    obj.hndl = serial(obj.port_name);
+
+                    obj.hndl.Terminator = '';
+
                     try 
                         fopen(obj.hndl);
                     catch ME
-                        
-                        if strcmp(ME.identifier, 'MATLAB:serial:fopen:opfailed')
-                            if obj.debug_bit>1, fprintf('failed to open serial port, attempt %d\n', ii); end 
+
+                        if strcmp(ME.identifier, 'MATLAB:serial:fopen:opfailed') % if this is the regular connection error, just report it and try again
+                            str = sprintf('failed to open serial port, attempt %d\n', ii); 
+                            if obj.debug_bit>1, disp(str); end 
+                            obj.log.input(str);
                         else 
-                            rethrow(ME);
+                            rethrow(ME); % if this is some other error, throw it up the line
                         end
-                        
+
                     end
-                    
-                    pause(0.1);
-                    
-                end % loop over trying to connect
-                   
-                if ~strcmp(obj.hndl.Status, 'open')
-                    
-                    if obj.debug_bit>1, disp('Giving up on opening serial port...'); end
-                    
-                    obj.fail_connect_counter = obj.fail_connect_counter + 1;
-                    if ~isempty(obj.hndl)
-                        delete(obj.hndl);
-                        obj.hndl = [];
-                    end
-                    
-                else
-                    
+
+                    if strcmp(obj.hndl.Status, 'open'), break; end % if we succeed, no need to continue with the loop
+
+                end
+
+                if strcmp(obj.hndl.Status, 'open') % if the loop ended with success
+
                     if obj.debug_bit>1, disp('Successful reconnect!'); end
-                    
-                    obj.fail_connect_counter = 0;
-                    
-                end
-                    
-                obj.update;
 
-                if obj.use_accelerometers
-                    obj.connectAccelerometers;
-                end
+                    obj.update;
 
+                    if obj.use_accelerometers
+                        obj.connectAccelerometers;
+                    end
+
+                else % failed to connect after so many tries
+
+                    if obj.debug_bit>1, disp('Giving up on opening serial port...'); end
+                    obj.log.input('Failed to connect to serial port :(');
+
+                    if ~isempty(obj.hndl)
+                        obj.disconnect
+                    end
+
+                end
+                
             catch ME
                 obj.log.error(ME.getReport);
-                warning(ME.getReport);
+                rethrow(ME);
             end
-            
+
         end
         
         function disconnect(obj)
@@ -527,7 +486,7 @@ classdef AstroHaven < handle
                 obj.hndl = [];
             catch ME
                 obj.log.error(ME.getReport);
-                warning(ME.getReport);
+                rethrow(ME);
             end
             
         end
@@ -562,36 +521,94 @@ classdef AstroHaven < handle
             
         end
 
-        function send(obj, command)
+        function reply = command(obj, command_vector, number)
             
-            if obj.debug_bit>1, disp(['sending command ' command]); end
-            
-            for ii = 1:3
-                
-                try 
-                    if ~isempty(obj.hndl)
-                        fprintf(obj.hndl, command);
-                    end
-                    return;
-                catch ME
-
-                    if strcmp(ME.identifier, 'MATLAB:serial:fprintf:opfailed')
-                        if obj.debug_bit>1, disp('Failed to send command, trying again...'); end
-                    else
-                        rethrow(ME);
-                    end
-
-                end
-                
-                pause(0.05);
-
+            if nargin<3 || isempty(number)
+                number = 1;
             end
             
-            if obj.debug_bit>1, disp('Gave up on sending this command... trying to reconnect!'); end
+            if isempty(obj.hndl) || ~isvalid(obj.hndl) || ~strcmp(obj.hndl.Status, 'open')
+                obj.connect;
+            end
             
-            pause(0.1);
-            obj.connect;
+            obj.log.input(['Sending commands ' command_vector ' for ' num2str(number) ' times.']);
             
+            try 
+
+                for ii = 1:number
+                    
+                    list_replies = '';
+                    
+                    for jj = 1:length(command_vector)
+
+                        for kk = 1:obj.max_fail_reply
+                            
+                            reply = obj.send(command_vector(jj)); 
+                            
+                            
+                            pause(0.05); 
+                            
+                            if ~isempty(obj.reply)
+                                list_replies = [list_replies reply]; % keep track of what the dome returned
+                                break;
+                            end
+                        
+                        end % for kk (attempts to send)
+                        
+                        if isempty(reply)
+                            error('Failed to send command %s after %d attempts!', command_vector(jj), kk);
+                        end
+                        
+                    end % for jj (command list)
+                    
+                    % NOTE: when e.g., closing shutter 1, the command is A.
+                    %       The reply when it is successfully closed is X, 
+                    %       which is 23 bigger (in ASCII) than A. 
+                    %       Thus we can identify when a command can be removed.
+                    idx = list_replies-23==command_vector; % which command has gotten confirmation that dome is closed/open
+                    
+                    command_vector(idx) = [];
+                    
+                    if isempty(command_vector)
+                        return;
+                    end
+                    
+                end % for ii (number)
+
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
+            
+        end
+        
+        function reply = send(obj, command)
+            
+            reply = ''; % empty reply means failed to send
+            
+            try 
+                if ~isempty(obj.hndl)
+                    
+                    flushinput(obj.hndl);
+                    fprintf(obj.hndl, command);
+                    reply = obj.getReply;
+                    if obj.debug_bit>4, fprintf('sent: %s | reply: %s\n', command, reply); end
+                end
+                
+            catch ME
+
+                if strcmp(ME.identifier, 'MATLAB:serial:fprintf:opfailed')
+                    if obj.debug_bit>1, disp('Failed to send command...'); end
+                    reply = '';
+                elseif strcmp(ME.identifier, 'MATLAB:serial:flushinput:opfailed')
+                    if obj.debug_bit>1, disp('Failed to flush input...'); end
+                    reply = '';
+                else
+                    rethrow(ME); % any other error is reported up the line
+                end
+
+            end
+
         end
         
         function update(obj)
@@ -615,31 +632,31 @@ classdef AstroHaven < handle
 
         end
         
-        function getReply(obj, ~, ~)
+        function reply = getReply(obj, ~, ~)
+            
+            warning('off', 'MATLAB:serial:fread:unsuccessfulRead');
             
             num=0;
+            reply = '';
             
             try
-                [obj.reply, num] = fread(obj.hndl, 1);
-                obj.reply = char(obj.reply);
+                [reply, num] = fread(obj.hndl, 1);
+                reply = char(reply);
             catch ME
-                disp('--read failed--');
-                obj.reply = '';
-                
+                if strcmp(ME.identifier, 'MATLAB:serial:fread:opfailed')
+                    if obj.debug_bit>1, disp('Failed to read command...'); end
+                    obj.reply = '';
+                else
+                    rethrow(ME); % any other error is reported up the line
+                end    
             end
             
-            if num==0 || isempty(obj.reply)
-                if obj.debug_bit>1, disp(['Couldnt read reply from serial port... reconnecting (fail_reply_counter= ' num2str(obj.fail_reply_counter) ')']); end
-                warning('off', 'MATLAB:serial:fread:unsuccessfulRead');
-
-                if obj.fail_reply_counter>obj.max_fail_reply % too many attempts to reconnect
-                    error('Could not get reply from dome...');
-                else
-                    obj.fail_reply_counter = obj.fail_reply_counter + 1;
-                end
-                
-                obj.connect;
-                
+            if num==0 || isempty(reply)
+                obj.reply = '';
+                if obj.debug_bit>1, disp('Failed to read command...'); end
+                return;
+            else
+                obj.reply = reply;
             end
             
             if strcmp(obj.reply, '0') % reset all time estimates when closed
@@ -648,10 +665,6 @@ classdef AstroHaven < handle
                 obj.open_time2 = 0;
                 obj.close_time2 = 0; 
             end
-            
-            obj.fail_reply_counter = 0; % after successful reply we can reset the counter
-            
-            if obj.debug_bit>1, fprintf('                reply: %s\n', obj.reply); end
             
         end
         
