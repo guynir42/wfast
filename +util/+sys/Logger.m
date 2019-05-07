@@ -68,7 +68,7 @@ classdef Logger < handle
     
     properties(Hidden=true)
        
-        version = 1.01;
+        version = 1.02;
         
     end
     
@@ -118,6 +118,7 @@ classdef Logger < handle
         function reset(obj)
             
             obj.time = datetime.empty;
+            obj.filename = '';
             
             try 
                 
@@ -202,6 +203,12 @@ classdef Logger < handle
             
             % if we passed noon UTC we should generate new log files
             if ~isempty(obj.time) && new_time.Day>=obj.time.Day && new_time.Hour>=12 && obj.time.Hour<12
+                obj.reset;
+            end
+            
+            old_time = datetime(obj.filename(1:10), 'TimeZone', 'UTC');
+            
+            if hours(new_time-old_time)>24 || (new_time.Day==old_time.Day && new_time.Hour>=12 && old_time.Hour<12)
                 obj.reset;
             end
             

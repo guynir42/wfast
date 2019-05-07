@@ -26,6 +26,8 @@ Parser parser("scope", "ScopeAssistant v1.01");
 // define the accelerometer 
 // pinout MEGA2560: SCL->SCL and SDA->SDA and VCC to 3.3v and GND->GND)
 // pinout NANO328:  SCL->A5 and SDA->A4 and VCC to 3.3v and GND->GND)
+VoltagePin accVCC(19);
+GroundPin accGND(18);
 ADXL345 adxl = ADXL345();             // USE FOR I2C COMMUNICATION
 int x, y, z; // acceleration values
 
