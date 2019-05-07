@@ -305,7 +305,7 @@ classdef Acquisition < file.AstroData
             if isprop(obj.src, 'expT')
                 val = obj.src.expT;
             elseif ~isempty(obj.pars)
-                obj.pars.expT;
+                val = obj.pars.expT;
             else
                 val = [];
             end 
@@ -317,7 +317,7 @@ classdef Acquisition < file.AstroData
             if isprop(obj.src, 'frame_rate')
                 val = obj.src.frame_rate;
             elseif ~isempty(obj.pars)
-                obj.pars.frame_rate;
+                val = obj.pars.frame_rate;
             else
                 val = [];
             end 
@@ -402,6 +402,8 @@ classdef Acquisition < file.AstroData
             
             if isa(obj.src, 'obs.cam.Andor')
                 val = obj.src.frame_rate_measured;
+            else
+                val = [];
             end
             
         end
@@ -410,6 +412,8 @@ classdef Acquisition < file.AstroData
             
             if isa(obj.src, 'obs.cam.Andor')
                 val = obj.src.getTemperatureHW;
+            else
+                val = [];
             end
             
         end

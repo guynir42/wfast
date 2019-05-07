@@ -173,8 +173,8 @@ classdef AcqGUI < handle
             %%%%%%%%%%% panel info %%%%%%%%%%%%%%%%%%
             
             obj.panel_info = GraphicPanel(obj.owner, [0.2 0.9 0.6 0.1], 'info', 0);
-            obj.panel_info.addButton('button_frame_rate', 'frame_rate', 'info', 'f= '); 
-            obj.panel_info.addButton('button_temperature', 'sensor_temp', 'info', 's.temp= '); 
+            obj.panel_info.addButton('button_frame_rate', 'frame_rate_average', 'info', 'f= '); 
+            obj.panel_info.addButton('button_temperature', 'sensor_temperature', 'info', 's.temp= '); 
             obj.panel_info.make;
             
             %%%%%%%%%%% panel image %%%%%%%%%%%%%%%%%%
@@ -235,7 +235,7 @@ classdef AcqGUI < handle
             end
             
             if obj.owner.brake_bit
-                if obj.owner.batch_index>1
+                if obj.owner.start_index>1
                     obj.button_run.String = 'CONTINUE';
                 else
                     obj.button_run.String = 'RUN';
