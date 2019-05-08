@@ -265,7 +265,6 @@ classdef AcqGUI < handle
     methods % callbacks
         
         function callback_run(obj, ~, ~)
-           
             
             if obj.owner.brake_bit
                 if obj.debug_bit, disp('callback: run'); end            

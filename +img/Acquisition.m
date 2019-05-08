@@ -40,6 +40,8 @@ classdef Acquisition < file.AstroData
         
         deflator@file.Deflator;
         
+        log@util.sys.Logger;
+        
     end
     
     properties % inputs/outputs
@@ -156,6 +158,39 @@ classdef Acquisition < file.AstroData
         default_num_backgrounds;
         default_cut_size_bg;
         
+        start_index_;
+        use_background_;
+        use_refine_bg_;
+        use_remove_saturated_;
+        saturation_value_;
+        use_mextractor_;
+        use_arbitrary_pos_;
+        use_cutouts_;
+        use_adjust_cutouts_;
+        use_save_;
+        use_triggered_save_;
+        use_show_;
+        use_audio_;
+        use_progress_;
+        pass_source_;
+        pass_cal_;
+        pass_back_;
+        pass_phot_;
+        pass_show_;
+        debug_bit_;
+        log_level_;
+
+        run_name_;
+        batch_size_;
+        num_batches_;
+        frame_rate_;
+        expT_;
+
+        use_roi_;
+        roi_size_;
+        roi_center_;
+
+        
         show_what_list = {'images', 'stack'};
         
         version = 1.03;
@@ -170,7 +205,10 @@ classdef Acquisition < file.AstroData
                 if obj.debug_bit, fprintf('Acquisition copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
+                
                 if obj.debug_bit, fprintf('Acquisition constructor v%4.2f\n', obj.version); end
+                
+                obj.log = util.sys.Logger('Acquisition');
                 
                 obj.reader = file.Reader;
                 obj.sim; % fill this when we have a simulator
@@ -381,7 +419,7 @@ classdef Acquisition < file.AstroData
         function val = get.num_backgrounds(obj)
             
             if ~isempty(obj.clip_bg)
-                val = obj.clip.num_stars;
+                val = obj.clip_bg.num_stars;
             else
                 val = [];
             end
@@ -391,7 +429,7 @@ classdef Acquisition < file.AstroData
         function val = get.cut_size_bg(obj)
             
             if ~isempty(obj.clip_bg)
-                val = obj.clip.cut_size;
+                val = obj.clip_bg.cut_size;
             else
                 val = [];
             end
@@ -521,7 +559,7 @@ classdef Acquisition < file.AstroData
         function set.num_backgrounds(obj, val)
             
             if ~isempty(obj.clip_bg)
-                obj.clip.num_stars = val;
+                obj.clip_bg.num_stars = val;
             end
             
         end
@@ -529,7 +567,7 @@ classdef Acquisition < file.AstroData
         function set.cut_size_bg(obj, val)
             
             if ~isempty(obj.clip_bg)
-                obj.clip.cut_size = val;
+                obj.clip_bg.cut_size = val;
             end
             
         end
@@ -606,7 +644,7 @@ classdef Acquisition < file.AstroData
             
             obj.start_index_ = obj.start_index;
             obj.use_background_ = obj.use_background;
-            obj.use_refine_bg_ = obj.use_refine_background;
+            obj.use_refine_bg_ = obj.use_refine_bg;
             obj.use_remove_saturated_ = obj.use_remove_saturated;
             obj.saturation_value_ = obj.saturation_value;
             obj.use_mextractor_ = obj.use_mextractor;
@@ -618,7 +656,6 @@ classdef Acquisition < file.AstroData
             obj.use_show_ = obj.use_show;
             obj.use_audio_ = obj.use_audio;
             obj.use_progress_ = obj.use_progress;
-            obj.use_show_ = obj.use_show;
             obj.pass_source_ = obj.pass_source;
             obj.pass_cal_ = obj.pass_cal;
             obj.pass_back_ = obj.pass_back;
@@ -635,7 +672,7 @@ classdef Acquisition < file.AstroData
             
             obj.use_roi_ = obj.use_roi;
             obj.roi_size_ = obj.roi_size;
-            obj.roi_center_ = obj.doi_center;
+            obj.roi_center_ = obj.roi_center;
             
             if nargin>1 && ~isempty(input) && isa(input, 'util.text.InputVars')
                 list = properties(input);
@@ -652,7 +689,7 @@ classdef Acquisition < file.AstroData
             
             obj.start_index = obj.start_index_;
             obj.use_background = obj.use_background_;
-            obj.use_refine_bg = obj.use_refine_background_;
+            obj.use_refine_bg = obj.use_refine_bg_;
             obj.use_remove_saturated = obj.use_remove_saturated_;
             obj.saturation_value = obj.saturation_value_;
             obj.use_mextractor = obj.use_mextractor_;
@@ -664,7 +701,6 @@ classdef Acquisition < file.AstroData
             obj.use_show = obj.use_show_;
             obj.use_audio = obj.use_audio_;
             obj.use_progress = obj.use_progress_;
-            obj.use_show = obj.use_show_;
             obj.pass_source = obj.pass_source_;
             obj.pass_cal = obj.pass_cal_;
             obj.pass_back = obj.pass_back_;
@@ -681,7 +717,7 @@ classdef Acquisition < file.AstroData
             
             obj.use_roi = obj.use_roi_;
             obj.roi_size = obj.roi_size_;
-            obj.roi_center = obj.doi_center_;
+            obj.roi_center = obj.roi_center_;
             
         end
         
@@ -826,13 +862,13 @@ classdef Acquisition < file.AstroData
                     idx = 1;
                 end
 
-                for ii = idx:input.num_batches
+                for ii = idx:obj.num_batches
 
                     if obj.brake_bit
                         return;
                     end
 
-                    obj.batch(input);
+                    obj.batch;
 
                     obj.prog.showif(obj.batch_counter);
 
@@ -866,7 +902,7 @@ classdef Acquisition < file.AstroData
 
                 obj.stash_parameters(input);
                 
-                if input.reset % this parameter is not saved in the object because we only use it here... 
+                if input.use_reset % this parameter is not saved in the object because we only use it here... 
 
                     obj.reset;
                     obj.lightcurves.startup(obj.num_batches.*obj.batch_size, obj.num_stars);
@@ -1086,7 +1122,7 @@ classdef Acquisition < file.AstroData
             end
             
             if obj.batch_counter==0
-                obj.findStars(input); % this replaces the clipper findStars with somethinig better, or just runs it explicitely... 
+                obj.findStars; % this replaces the clipper findStars with somethinig better, or just runs it explicitely... 
             end
             
             obj.stack_cutouts = obj.clip.input(obj.stack); % if no positions are known, it will call "findStars"
