@@ -804,7 +804,7 @@ classdef BufferWheel < file.AstroData
             end
             
             if nargin<3 || isempty(timeout)
-                timeout = 10; % seconds
+                timeout = 15; % seconds
             end
             
             res = 0.001; % time resolution

@@ -119,6 +119,7 @@ classdef AndorGUI < handle
             obj.panel_objects.number = 5;
             obj.panel_objects.addButton('button_buffers', 'buffers', 'push', 'Buffers');
             obj.panel_objects.addButton('button_pars', 'pars', 'push', 'Parameters');
+            obj.panel_objects.addButton('button_focuser', 'focuser', 'push', 'Focuser');
             
             obj.panel_objects.make;
             

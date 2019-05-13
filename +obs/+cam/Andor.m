@@ -765,7 +765,7 @@ classdef Andor < file.AstroData
                 end
 
                 obj.stash_parameters(input); % put the user-defined parameters into hidden "stashed" parameters to be loaded at end of run
-            
+                
                 obj.reset;
                 
                 if isempty(obj.audio)
@@ -989,9 +989,9 @@ classdef Andor < file.AstroData
                 input.input_var('center_region', obj.center_region, 'center', 'center_ROI'); % set the center of the ROI (set to center of field if empty)
                 input.input_var('use_async', obj.use_async, 'async', 5); % use mex-async code or simple batch-by-batch interface
                 input.input_var('use_show', obj.use_show, 'show', 5); % if you want to show each batch's images/stack
-                input.input_var('use_save', true, 'save', 5); % if you want to save each batch 
-                input.input_var('use_audio', false, 'audio', 5); % turn on/off audio signals
-                input.input_var('use_progress', true, 'progress', 5); % display a progress bar on screen
+                input.input_var('use_save', obj.use_save, 'save', 5); % if you want to save each batch 
+                input.input_var('use_audio', obj.use_audio, 'audio', 5); % turn on/off audio signals
+                input.input_var('use_progress', obj.use_progress, 'progress', 5); % display a progress bar on screen
                 input.input_var('log_level', obj.log_level); % choose if and how much logging you want for this run (1 is only start of run). Errors are always logged. 
                 input.input_var('debug_bit', obj.debug_bit, 'debug');
                 input.input_var('pass_show', obj.pass_show, 6); % parameters to pass to "show" function

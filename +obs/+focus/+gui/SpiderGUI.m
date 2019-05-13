@@ -44,7 +44,7 @@ classdef SpiderGUI < handle
         function obj = SpiderGUI(owner)
             
             % later add other options like copy constructor
-            if isa(owner, 'obs.focus.FocuseSpider')
+            if isa(owner, 'obs.focus.FocusSpider')
                 
                 if obj.debug_bit, fprintf('SpiderGUI constructor v%4.2f\n', obj.version); end
                 
@@ -97,7 +97,7 @@ classdef SpiderGUI < handle
             obj.panel_tip = GraphicPanel(obj.owner, [1/3 1/6 1/3 4/6], 'position');
             obj.panel_tip.addButton('value', 'tip', 'input', ' ');
             obj.panel_tip.addButton('up', 'tip_up', 'push', 'UP');
-            obj.panel_tip.addButton('step', 'tip_step', 'input', ' ');
+            obj.panel_tip.addButton('step', 'step_tip', 'input', ' ');
             obj.panel_tip.addButton('down', 'tip_down', 'push', 'DOWN');
             obj.panel_tip.make;
             
@@ -106,7 +106,7 @@ classdef SpiderGUI < handle
             obj.panel_tilt = GraphicPanel(obj.owner, [2/3 1/6 1/3 4/6], 'position');
             obj.panel_tilt.addButton('value', 'tilt', 'input', ' ');
             obj.panel_tilt.addButton('up', 'tilt_up', 'push', 'UP');
-            obj.panel_tilt.addButton('step', 'tilt_step', 'input', ' ');
+            obj.panel_tilt.addButton('step', 'step_tilt', 'input', ' ');
             obj.panel_tilt.addButton('down', 'tilt_down', 'push', 'DOWN');
             obj.panel_tilt.make;
             

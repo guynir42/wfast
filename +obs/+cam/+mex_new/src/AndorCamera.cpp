@@ -494,8 +494,8 @@ double AndorCamera::getPosixTime(){ // get time from computer's clock
 unsigned int AndorCamera::getTimeout(){ // in milliseconds
 	
 	// printf("timeout= %d | expT= %f\n", timeout, expT);
-	if (timeout>expT*5000) return timeout;
-	else return (unsigned int) expT*5000;
+	if (timeout>expT*10000) return timeout;
+	else return (unsigned int) expT*10000;
 
 }
 

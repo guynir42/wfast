@@ -231,7 +231,7 @@ classdef AcqGUI < handle
                 obj.panel_controls.button_source_choose.String = 'src: Reader';
             elseif isa(obj.owner.src, 'img.Simulator')
                 obj.panel_controls.button_source_choose.String = 'src: Simulator';
-            elseif isa(obj.owner.src, 'obs.cam.CameraControl')
+            elseif isa(obj.owner.src, 'obs.cam.CameraControl') || isa(obj.owner.src, 'obs.cam.Andor')
                 obj.panel_controls.button_source_choose.String = 'src: Camera';
             end
             

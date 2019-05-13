@@ -926,7 +926,7 @@ classdef Acquisition < file.AstroData
                 if input.use_reset % this parameter is not saved in the object because we only use it here... 
 
                     obj.reset;
-                    obj.lightcurves.startup(obj.num_batches.*obj.batch_size, obj.num_stars);
+%                     obj.lightcurves.startup(obj.num_batches.*obj.batch_size, obj.num_stars);
 
                     if obj.debug_bit, disp(['Starting run "' input.run_name '" for ' num2str(input.num_batches) ' batches.']); end
 
@@ -1158,7 +1158,7 @@ classdef Acquisition < file.AstroData
                 obj.stack_cutouts_sub = obj.stack_cutouts;
             end
             
-            obj.phot_stack.input(obj.stack_cutouts_sub, 'positions', obj.positions); % run photometry on the stack to verify flux and adjust positions
+            obj.phot_stack.input(obj.stack_cutouts_sub, 'positions', obj.clip.positions); % run photometry on the stack to verify flux and adjust positions
             
             obj.checkRealign;
             
@@ -1166,8 +1166,17 @@ classdef Acquisition < file.AstroData
             obj.flux_buf.input(obj.phot_stack.fluxes);
             
             % get the average width and offsets (weighted by the flux of each star...)
-            M = mean(obj.phot_stack.fluxes);
-            obj.adjust_pos = [median(obj.phot_stack.fluxes./M.*obj.phot_stack.offsets_x, 'omitnan'), median(obj.phot_stack.fluxes./M.*obj.phot_stack.offsets_y, 'omitnan')];
+            F = obj.phot_stack.fluxes;
+            idx = F>max(F)./2 & ~isnan(F); 
+            
+            F = obj.phot_stack.fluxes(idx);
+            DX = obj.phot_stack.offsets_x(idx);
+            DY = obj.phot_stack.offsets_y(idx);
+            
+            M = mean(F, 'omitnan');
+            
+            
+            obj.adjust_pos = [median(F./M.*DX, 'omitnan'), median(F./M.*DY, 'omitnan')];
             obj.adjust_pos(isnan(obj.adjust_pos)) = 0;
             
             obj.average_width = median(obj.phot_stack.fluxes./M.*obj.phot_stack.widths, 'omitnan'); % maybe find the average width of each image and not the stack??
@@ -1370,30 +1379,30 @@ classdef Acquisition < file.AstroData
         function runFocus(obj, varargin)
             
             input = obj.makeInputVars('reset', 1, 'batch_size', 100, 'expT', 0.025, ...
-                'num_stars', 25, 'cut_size', 20, 'use audio', 0, 'use_save', 0, varargin{:});
+                'num_stars', 25, 'cut_size', 20, 'use audio', 0, 'use_save', 0, 'use_reset', 0, varargin{:});
             
             if isempty(obj.cam) || isempty(obj.cam.focuser)
                 error('must be connected to camera and focuser!');
             end
             
             obj.reset;
-            obj.single(util.oop.full_copy(input)); % make a copy so the input doesn't get affected by "single" command's specific parameters
-            obj.findStarsFocus(input);
-            
-            obj.af.startup(obj.cam.focuser.pos, obj.clip.positions, input.num_stars);
-            
-            input.num_batches = length(obj.af.pos);
+            obj.single;
+            obj.findStarsFocus;
             
             old_pos = obj.cam.focuser.pos; % keep this in case of error/failure
             
             try
             
-                obj.cam.focuser.pos = obj.af.pos(1);
+                obj.cam.focuser.pos = obj.cam.focuser.pos - obj.af.range; % starting point for scan... 
                 pause(0.1);
 
                 obj.startup(input);
-                cleanup = onCleanup(@() obj.finishup(input));
+                cleanup = onCleanup(@obj.finishup);
 
+                obj.af.startup(old_pos, obj.positions, input.num_stars);
+            
+                input.num_batches = length(obj.af.pos);
+            
                 for ii = 1:input.num_batches
 
                     if obj.brake_bit
@@ -1406,7 +1415,7 @@ classdef Acquisition < file.AstroData
                         warning(ME.getReport);
                     end
 
-                    obj.batch(input);
+                    obj.batch;
                     
                     obj.af.input(ii, obj.cam.focuser.pos, obj.phot_stack.widths, obj.phot_stack.fluxes);
                     
@@ -1428,8 +1437,13 @@ classdef Acquisition < file.AstroData
                 rethrow(ME);
                 
             end
-                
-            obj.cam.focuser.pos = obj.af.found_pos;
+            
+            if ~isnan(obj.af.found_pos)
+                obj.cam.focuser.pos = obj.af.found_pos;
+            else
+                disp('The location of new position is NaN. Choosing original position');
+                obj.cam.focuser.pos = old_pos;
+            end
             
             if isprop(obj.cam.focuser, 'tip') && ~isempty(obj.af.found_tip)
                 obj.cam.focuser.tip = obj.cam.focuser.tip + obj.af.found_tip;
@@ -1445,11 +1459,11 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function findStarsFocus(obj, input) % find stars in order in five locations around the sensor
+        function findStarsFocus(obj) % find stars in order in five locations around the sensor
             
             I = obj.stack;
             S = size(I);
-            C = input.cut_size;
+            C = obj.cut_size;
             
             I = util.img.maskBadPixels(I);
             
@@ -1478,9 +1492,9 @@ classdef Acquisition < file.AstroData
             mask{5} = false(S);
             mask{5}(markers(1,2):end-C+1, markers(2,2):end-C+1) = 1; % lower right corner
             
-            pos = zeros(input.num_stars, 2);
+            pos = zeros(obj.num_stars, 2);
             
-            for ii = 1:input.num_stars
+            for ii = 1:obj.num_stars
                 
                 for jj = 1:100
                 
@@ -1499,7 +1513,7 @@ classdef Acquisition < file.AstroData
             end
             
             obj.clip.positions = pos;
-            obj.clip.positions = pos;
+            obj.positions = pos;
             
             if obj.gui.check
                 obj.show;

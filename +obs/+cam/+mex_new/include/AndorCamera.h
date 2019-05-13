@@ -80,7 +80,7 @@ class AndorCamera {
 	
 	double *index_rec_vector;
 	
-	int timeout=1000; // single frame timeout in milliseconds
+	int timeout=2000; // single frame timeout in milliseconds
 	
 	int use_async;
 	int debug_bit;

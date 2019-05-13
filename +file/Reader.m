@@ -409,7 +409,7 @@ classdef Reader < file.AstroData
         function val = getNumBatches(obj) % an estimate of the number of batches to be loaded in this run
             
             Nfiles1 = length(obj.filenames);
-            Nfiles2 = obj.latest_input.num_batches*obj.temp_num_files_per_batch;
+            Nfiles2 = obj.num_batches*obj.temp_num_files_per_batch;
             Nfiles3 = obj.temp_file_index_finish-obj.temp_file_index_start;
             
             Nfiles = min([Nfiles1,Nfiles2,Nfiles3]); % which ever finishes first...
@@ -1134,7 +1134,7 @@ classdef Reader < file.AstroData
         
         function val = is_finished(obj)
                         
-            if obj.counter_batches >= obj.latest_input.num_batches
+            if obj.counter_batches >= obj.num_batches
                 val = 1;
             elseif obj.temp_use_wrap_around==0
                 if obj.this_file_index>length(obj.filenames) || (~isempty(obj.temp_file_index_finish) && obj.this_file_index>obj.temp_file_index_finish)
