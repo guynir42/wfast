@@ -10,6 +10,12 @@ classdef Logger < handle
 % timestamp and also a header showing the error. It will optionally also be
 % saved to a separate error file. 
 %
+% Use obj.heartbeat(time_sec, owner) to make the logger check if its owner 
+% is still working, and add a line in the logfile to that effect. 
+% For checking to work, "owner" must implement "update" method and "status"
+% property. Without this (or with empty "owner") logger will just input a 
+% line with "heartbeat" and nothing more. 
+%
 % Will generate a new file every day (day starts at 12:00 UTC). 
 %
 % Filename will be <base_dir>/YYYY-MM-DD_<name> where properties are:
@@ -33,10 +39,13 @@ classdef Logger < handle
     
     properties(Transient=true)
         
+        timer;
+        
     end
     
     properties % objects
         
+        owner; % object that holds this logger
         hndl; % file handle (using fopen)
         hndl_err; % secondary handle to additional log file (errors only)
         time; % datetime object
@@ -54,6 +63,7 @@ classdef Logger < handle
         dev_name = 'log'; % name of device/sensor generating the log (e.g., "mount")
         base_dir = ''; % default is fullfile(getenv('DATA'), 'WFAST/logfiles')
         filename = ''; % file name of log file (e.g., 2019-04-29_mount_ASA.txt)
+        use_date_dir = true; % if true (default) will put logfile in folder with YYYY-MM-DD format. 
         use_error_file = 0; % to keep an extra file for errors only
         
         debug_bit = 1;
@@ -82,11 +92,30 @@ classdef Logger < handle
                 end
                 obj = util.oop.full_copy(varargin{1});
                 
-            elseif ~isempty(varargin) && ischar(varargin{1})
+            elseif ~isempty(varargin) 
                 
-                obj.dev_name = varargin{1};
-                if obj.debug_bit
-                    fprintf('Logger constructor v%4.2f | name: %s\n', obj.version, obj.dev_name);
+                for ii = 1:length(varargin)
+                
+                    if ischar(varargin{ii})
+                        obj.dev_name = varargin{ii};
+                    elseif isobject(varargin{ii})
+                        obj.owner = varargin{ii};
+                    end
+
+                    if isempty(obj.dev_name) && ~isempty(obj.owner) && isobject(obj.owner)
+                        obj.dev_name = class(obj.owner);
+                    end
+                    
+                    if obj.debug_bit
+                        if isempty(obj.owner) && ~isempty(obj.dev_name)
+                            fprintf('Logger constructor v%4.2f | name: %s\n', obj.version, obj.dev_name);
+                        elseif ~isempty(obj.owner) && isempty(obj.dev_name)
+                            fprintf('Logger constructor v%4.2f | owner: %s\n', obj.version, class(obj.owner));
+                        else
+                            fprintf('Logger constructor v%4.2f | name: %s | owner: %s\n', obj.version, obj.dev_name, class(obj.owner));
+                        end
+                    end
+
                 end
                 
             else
@@ -255,6 +284,10 @@ classdef Logger < handle
             
             dir = obj.base_dir;
             
+            if obj.use_date_dir
+                dir = [dir '/' util.sys.date_dir(obj.time)];
+            end
+            
             if ~exist(dir, 'dir')
                 mkdir(dir)
             end
@@ -278,6 +311,10 @@ classdef Logger < handle
             
             dir = obj.base_dir;
             
+            if obj.use_date_dir
+                dir = [dir '/' util.sys.date_dir(obj.time)];
+            end
+            
             if ~exist(dir, 'dir')
                 mkdir(dir)
             end
@@ -297,6 +334,46 @@ classdef Logger < handle
             
         end
         
+        function heartbeat(obj, time_sec, owner)
+            
+            if nargin<2 || isempty(time_sec)
+                time_sec = 300; % five minutes default interval
+            end
+            
+            if nargin>2 && ~isempty(owner) && isobject(owner)
+                obj.owner = owner;
+            end
+            
+            if ~isempty(obj.timer) && isa(obj.timer, 'timer') && isvalid(obj.timer)
+                stop(obj.timer);
+                delete(obj.timer);
+                obj.timer = [];
+            end
+            
+            obj.timer = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', ['timer-' obj.dev_name], ...
+                'Period', time_sec, 'StartDelay', 0, 'TimerFcn', @obj.timer_callback, 'ErrorFcn', ''); % maybe add a restart when calling ErrorFcn
+            
+            start(obj.timer);
+            
+        end
+        
+        function timer_callback(obj, ~, ~)
+            
+            if ~isempty(obj.owner) && ...
+                ( ismethod(obj.owner, 'update') || ismethod(obj.owner, 'Update') ) && ...
+                ( isprop(obj.owner, 'status') || isprop(obj.owner, 'Status') )
+                
+                obj.owner.update;
+                obj.input(['Heartbeat: status= ' num2str(obj.owner.status)]);
+                
+            else
+                
+                obj.input('Heartbeat...');
+                
+            end
+            
+        end
+            
     end
     
 end
