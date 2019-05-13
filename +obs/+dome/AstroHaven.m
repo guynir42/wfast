@@ -87,12 +87,13 @@ classdef AstroHaven < handle
             
                 if obj.debug_bit, fprintf('Boltwood default constructor v%4.2f\n', obj.version); end
                 
-                obj.log = util.sys.Logger('AstroHaven_dome');
+                obj.log = util.sys.Logger('AstroHaven_dome', obj);
                 
             end
             
             
             obj.connect;
+            obj.log.hearbeat(600);
             
         end
         

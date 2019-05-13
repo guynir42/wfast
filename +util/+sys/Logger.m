@@ -350,6 +350,16 @@ classdef Logger < handle
                 obj.timer = [];
             end
             
+            % use time_sec='off' to stop heartbeat timer
+            if ischar(time_sec) && util.text.cs(time_sec, 'off')
+                return;
+            end
+            
+            % use time_sec<=0 to stop timer
+            if isnumeric(time_sec) && time_sec<=0
+                return;
+            end
+            
             obj.timer = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', ['timer-' obj.dev_name], ...
                 'Period', time_sec, 'StartDelay', 0, 'TimerFcn', @obj.timer_callback, 'ErrorFcn', ''); % maybe add a restart when calling ErrorFcn
             

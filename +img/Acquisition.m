@@ -208,7 +208,8 @@ classdef Acquisition < file.AstroData
                 
                 if obj.debug_bit, fprintf('Acquisition constructor v%4.2f\n', obj.version); end
                 
-                obj.log = util.sys.Logger('Acquisition');
+                obj.log = util.sys.Logger('Acquisition', obj);
+                obj.log.heartbeat(600);
                 
                 obj.reader = file.Reader;
                 obj.sim; % fill this when we have a simulator
