@@ -139,7 +139,7 @@ classdef AcqGUI < handle
             %%%%%%%%%%% panel objects %%%%%%%%%%%%%%%%
             
             pos = N_right;
-            N = 8;
+            N = 9;
             pos = pos - N;
             obj.panel_objects = GraphicPanel(obj.owner, [0.8 pos/N_right 0.2 N/N_right], 'objects');
             obj.panel_objects.number = N;
@@ -150,6 +150,7 @@ classdef AcqGUI < handle
             obj.panel_objects.addButton('button_background', 'back', 'push', 'Background GUI');
             obj.panel_objects.addButton('button_clipper', 'clip', 'push', 'Clipper GUI');
             obj.panel_objects.addButton('button_clipper_bg', 'clip_bg', 'push', 'Clipper BG GUI');
+            obj.panel_objects.addButton('button_lightcurves', 'lightcurves', 'push', 'Lightcurves GUI');
             obj.panel_objects.addButton('button_deflator', 'deflator', 'push', 'Deflator GUI');
             obj.panel_objects.make;
             

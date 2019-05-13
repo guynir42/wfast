@@ -1246,7 +1246,7 @@ classdef Calibration < handle
             fullname = '';
             
             if ~isempty(directory)
-                fullname = util.text.sa(directory, filename);                
+                fullname = util.text.sa(directory, filename);             
             else
                 if isempty(fullname) && ~isempty(obj.reader_flat)
                     f_temp = sa(obj.reader_flat.dir.pwd, filename);
@@ -1269,7 +1269,7 @@ classdef Calibration < handle
             else
                 if obj.debug_bit, disp(['Loading calibration from ' fullname]); end
 %                 util.oop.copy_props(obj, util.oop.load(f_temp, 'classname', 'img.Calibration', 'name', 'cal'),1);
-                temp = util.oop.load(f_temp, 'classname', 'img.Calibration', 'name', 'cal');
+                temp = util.oop.load(fullname, 'classname', 'img.Calibration', 'name', 'cal');
                 
                 % copy the outputs
                 obj.num_darks = temp.num_darks;

@@ -251,6 +251,8 @@ classdef Acquisition < file.AstroData
                 
                 obj.deflator = file.Deflator;
                 
+                obj.setupDefaults;
+                
                 obj.pars = head.Parameters; % this also gives "pars" to all sub-objects
                 
                 util.oop.save_defaults(obj); % make sure each default_XXX property is updated with the current XXX property value. 
@@ -258,7 +260,20 @@ classdef Acquisition < file.AstroData
             end
             
         end
-        
+
+        function setupDefaults(obj)
+
+            obj.num_batches = 2;
+            obj.batch_size = 100;
+            
+            obj.num_stars = 250;
+            obj.cut_size = 20;
+            
+            obj.num_backgrounds = 50;
+            obj.cut_size_bg = 32;
+
+        end
+
     end
     
     methods % reset/clear
@@ -322,7 +337,7 @@ classdef Acquisition < file.AstroData
             
             if isprop(obj.src, 'num_batches')
                 val = obj.src.num_batches;
-            else
+             else
                 val = [];
             end 
             
@@ -332,6 +347,8 @@ classdef Acquisition < file.AstroData
             
             if isprop(obj.src, 'batch_size')
                 val = obj.src.batch_size;
+            elseif isprop(obj.src, 'num_frames_per_batch')
+                val = obj.src.num_frames_per_batch;
             else
                 val = [];
             end 
@@ -496,6 +513,8 @@ classdef Acquisition < file.AstroData
             
             if isprop(obj.src, 'batch_size')
                 obj.src.batch_size = val;
+            elseif isprop(obj.src, 'num_frames_per_batch')
+                obj.src.num_frames_per_batch = val;
             end 
             
         end
@@ -674,6 +693,7 @@ classdef Acquisition < file.AstroData
             obj.roi_size_ = obj.roi_size;
             obj.roi_center_ = obj.roi_center;
             
+            % optionally, give the "input" object properties into the public properties of "obj"
             if nargin>1 && ~isempty(input) && isa(input, 'util.text.InputVars')
                 list = properties(input);
                 for ii = 1:length(list)
@@ -914,7 +934,7 @@ classdef Acquisition < file.AstroData
                 obj.update; % not sure if this does anything other than update the "pars" object...
 
                 if obj.use_save
-                    try    
+                    try
                         filename = obj.buf.getReadmeFilename;
                         util.oop.save(obj, filename, 'name', 'acquisition'); 
                     catch ME
@@ -926,6 +946,8 @@ classdef Acquisition < file.AstroData
                     try obj.audio.playTakeForever; catch ME, warning(ME.getReport); end
                 end
 
+                obj.src.num_batches = obj.num_batches;
+                
                 if isa(obj.src, 'file.Reader') % we need to change the reader interface to be more inline with the camera...
                     obj.src.num_frames_per_batch = obj.batch_size;
                     obj.src.num_files_per_batch = 1;
