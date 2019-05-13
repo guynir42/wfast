@@ -238,14 +238,21 @@ classdef Boltwood < handle
         
         function update(obj) % Read weather parameters
             
+            obj.status = 0;
+            
             % if status is ok than set the time of the last query
-            if (obj.hndl.DataReady)
-               % Update status
-               obj.clear;
-               obj.status = 1;
-            else
-               obj.status = 0;
-               return;
+            for ii = 1:100
+                if obj.hndl.DataReady
+                    obj.status = 1;
+                    break;
+                end
+                
+                pause(0.05);
+                
+            end
+            
+            if obj.status==0
+                return;
             end
             
             % If the weather application is down then reinitiate it
@@ -263,7 +270,7 @@ classdef Boltwood < handle
                 
             catch
 
-                pause(5)
+                pause(2)
                 obj.status = 0;
                 obj.disconnect;
                 obj.connect;

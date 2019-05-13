@@ -194,7 +194,7 @@ classdef Logger < handle
         
         function val = get.fullname(obj) % combine <basedir>/<filename>
             
-            val = fullfile(obj.base_dir, obj.filename);
+            val = fullfile(obj.base_dir, util.sys.date_dir(obj.time), obj.filename);
             
         end
         
@@ -208,7 +208,7 @@ classdef Logger < handle
         
         function val = err_fullname(obj) % combine <basedir>/<filename>
             
-            val = fullfile(obj.base_dir, obj.err_filename);
+            val = fullfile(obj.base_dir, util.sys.date_dir(obj.time), obj.err_filename);
             
         end
         
