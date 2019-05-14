@@ -24,31 +24,37 @@ classdef StatusChecker < handle
     properties % inputs/outputs
         
         light_now;
+        light_ids;
         light_str;
         light_all;
         light_jul;
         
         clouds_now;
+        clouds_ids;
         clouds_str;
         clouds_all;
         clouds_jul;
         
         temp_now;
+        temp_ids;
         temp_str;
         temp_all;
         temp_jul;
         
         wind_now;
+        wind_ids;
         wind_str;
         wind_all;
         wind_jul;
         
         wind_az_now;
+        wind_az_ids;
         wind_az_str;
         wind_az_all;
         wind_az_jul;
         
         humid_now;
+        humid_ids;
         humid_str;
         humid_all;
         humid_jul;
@@ -84,6 +90,8 @@ classdef StatusChecker < handle
         
         max_humid = 60;
         min_humid = -Inf;
+        
+        show_day_frac = 0.2; % what fraction of a day to plot back
         
         debug_bit = 1;
         
@@ -476,6 +484,7 @@ classdef StatusChecker < handle
             
             val = [];
             str = '';
+            obj.light_ids = {};
             
             for ii = 1:length(obj.sensors)
                 
@@ -505,7 +514,7 @@ classdef StatusChecker < handle
                     new_str = sprintf('%s=%4.2f ', obj.getInstrID(sens), new_val);
                     
                     str = [str new_str];
-                    
+                    obj.light_ids{end+1} = obj.getInstrID(sens);
                 end
                 
             end
@@ -531,6 +540,7 @@ classdef StatusChecker < handle
             
             val = [];
             str = '';
+            obj.clouds_ids = {};
             
             for ii = 1:length(obj.sensors)
                 
@@ -576,6 +586,7 @@ classdef StatusChecker < handle
                 obj.reset_clouds;
                 obj.clouds_all = val;
                 obj.clouds_jul = j;
+                obj.clouds_ids{end+1} = obj.getInstrID(sens);
             end
             
         end
@@ -584,6 +595,7 @@ classdef StatusChecker < handle
             
             val = [];
             str = '';
+            obj.temp_ids = {};
             
             for ii = 1:length(obj.sensors)
                 
@@ -615,6 +627,8 @@ classdef StatusChecker < handle
                     
                     str = [str new_str];
                     
+                    obj.temp_ids{end+1} = obj.getInstrID(sens);
+                    
                 end
                 
             end
@@ -640,6 +654,7 @@ classdef StatusChecker < handle
             
             val = [];
             str = '';
+            obj.wind_ids = {};
             
             for ii = 1:length(obj.sensors)
                 
@@ -669,6 +684,8 @@ classdef StatusChecker < handle
                     
                     str = [str new_str];
                     
+                    obj.wind_ids{end+1} = obj.getInstrID(sens);
+                    
                 end
                 
             end
@@ -694,6 +711,7 @@ classdef StatusChecker < handle
             
             val = [];
             str = '';
+            obj.wind_ax_ids = {};
             
             for ii = 1:length(obj.sensors)
                 
@@ -724,6 +742,8 @@ classdef StatusChecker < handle
                     
                     str = [str new_str];
                     
+                    obj.wind_az_ids{end+1} = obj.getInstrID(sens);
+                
                 end
                 
             end
@@ -749,6 +769,7 @@ classdef StatusChecker < handle
             
             val = [];
             str = '';
+            obj.humid_ids = {};
             
             for ii = 1:length(obj.sensors)
                 
@@ -779,6 +800,8 @@ classdef StatusChecker < handle
                     new_str = sprintf('%s=%4.2f ', obj.getInstrID(sens), new_val);
                     
                     str = [str new_str];
+                    
+                    obj.humid_ids{end+1} = obj.getInstrID(sens);
                     
                 end
                 
@@ -1005,6 +1028,68 @@ classdef StatusChecker < handle
     end
     
     methods % plotting tools / GUI
+        
+        function plotWeather(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('ax', [], 'axes', 'axis');
+            input.input_var('day_frac', obj.show_day_frac);
+            input.scan_vars(varargin{:});
+            
+            if isempty(input.ax)
+                input.ax = gca;
+            end
+            
+            hold(input.ax, 'off');
+            
+            h_list = [];
+            
+            % get temperatures
+            [v,t] = obj.getWeatherTimeData(obj.temp_all, obj.temp_jul, input.day_frac);
+            h = plot(input.ax, t, v, '-');
+            for ii = 1:length(h), h(ii).DisplayName = ['temperature (C) ' obj.temp_ids{ii}]; end 
+            h_list = [h_list; h];
+            hold(input.ax, 'on');
+            
+            % get wind data
+            [v,t] = obj.getWeatherTimeData(obj.wind_all, obj.wind_jul, input.day_frac);
+            h = plot(input.ax, t, v, '-o');
+            for ii = 1:length(h), h(ii).DisplayName = ['wind (km/h) ' obj.wind_ids{ii}]; end
+            h_list = [h_list; h];
+            hold(input.ax, 'on');
+            
+            % get humidity data
+            [v,t] = obj.getWeatherTimeData(obj.humid_all, obj.humid_jul, input.day_frac);
+            h = plot(input.ax, t, v, '-+');
+            for ii = 1:length(h), h(ii).DisplayName = ['Humidity (%) ' obj.humid_ids{ii}]; end
+            h_list = [h_list; h];
+            hold(input.ax, 'on');
+            
+            % get light data
+            [v,t] = obj.getWeatherTimeData(obj.light_all, obj.light_jul, input.day_frac);
+            h = plot(input.ax, t, v/20, '-*');
+            for ii = 1:length(h), h(ii).DisplayName = ['daylight /20 ' obj.light_ids{ii}]; end
+            h_list = [h_list; h];
+            hold(input.ax, 'on');
+            
+            hold(input.ax, 'off');
+            input.ax.YLim = [-10, 50];
+            
+            legend(input.ax, h_list, 'Location', 'SouthWest');
+            
+        end
+        
+        function [v,t] = getWeatherTimeData(obj, v, t, frac_day)
+            
+            idx = find(t>t(end)-frac_day, 1, 'first'); 
+            if ~isempty(idx) && idx>0
+                v = v(idx:end);
+                t = t(idx:end);
+            end
+            
+            t = datetime(t, 'ConvertFrom', 'juliandate');
+            
+        end
         
     end    
     

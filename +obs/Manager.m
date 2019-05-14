@@ -177,6 +177,12 @@ classdef Manager < handle
     
     methods % getters
         
+        function val = report_string(obj)
+            
+            val = obj.checker.report;
+            
+        end
+        
     end
     
     methods % setters
@@ -188,6 +194,16 @@ classdef Manager < handle
     end
     
     methods % plotting tools / GUI
+        
+        function makeGUI(obj)
+            
+            if isempty(obj.gui)
+                obj.gui = obs.gui.ManagerGUI(obj);
+            end
+            
+            obj.gui.make;
+            
+        end
         
     end    
     
