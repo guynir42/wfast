@@ -6,7 +6,7 @@ function I = ellipse(varargin)
 %   -a (or R): semi-major axis of the ellipse (or radius of a circle)
 %   -x_shift: move the center of the Gaussian in the x direction.
 %   -y_shift: move the center of the Gaussian in the y direction.
-%   -e: eccentricity of the ellipse (default=0 for circle, max is 0).
+%   -e: eccentricity of the ellipse (default=0 for circle, max is 1).
 %       NOTE: the semi-minor axis is b = a*sqrt(1-e^2).
 %   -rot_frac: rotation angle in units of 0 to 1 (=90 degrees). 
 %   -hole: create a circular hole to make it an annulus (default is 0). 

@@ -2,13 +2,11 @@ function [width, lines, pix_length, direction] = profile(M, varargin)
 
     import util.text.cs;
     import util.text.parse_bool;
-    import util.text.f2s;
     import util.plot.show;
     import util.plot.profile;
     import util.stat.max2;
     import util.stat.min2;
     import util.img.maskBadPixels;
-    import util.vec.tocell;   
 
     if nargin<1
         disp('PROFILE will display the cross section profile from a 2D matrix');
@@ -153,8 +151,10 @@ function [width, lines, pix_length, direction] = profile(M, varargin)
             direction = num2cell(direction);
         else
         
-            direction = tocell(direction);
-
+            if ~iscell(direction)
+                direction = {direction};
+            end
+            
             if cs(direction{1}, 'min')
                 a = 0:179;
                 w = profile(M, varargin{:}, 'dir', a, 'plot', 'off');
@@ -436,7 +436,7 @@ function [width, lines, pix_length, direction] = profile(M, varargin)
                 
                 leg_str = {};
                 for ii = 1:length(lines)
-                    leg_str{ii} = [sprintf('% 3d', direction(ii)) '\circ: ' f2s(width(ii)) wid_units];
+                    leg_str{ii} = [sprintf('% 3d', direction(ii)) '\circ: ' num2str(width(ii)) wid_units];
                 end
                                 
                 h = legend(ax, leg_str, 'Location', 'NorthEast', 'Units', 'Normalized', 'FontSize', font_size); 

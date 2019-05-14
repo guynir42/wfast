@@ -575,7 +575,7 @@ classdef Parameters < dynamicprops
             
             % add varargin overrides to internal properties
             
-            val = obj.filter.getCount(obj.magnitude, obj.aperture_area, obj.T);
+            val = obj.filter.getCount(obj.magnitude, obj.aperture_area, obj.expT);
             
         end
         
@@ -612,7 +612,7 @@ classdef Parameters < dynamicprops
         
         function set.plate_scale(obj, val)
            
-            obj.pixel_size = util.units.arcsec2rad(val).*1.e4.*obj.focal_length;
+            obj.pixel_size = 2*pi/360/3600*(val).*1.e4.*obj.focal_length;
             
         end
         
