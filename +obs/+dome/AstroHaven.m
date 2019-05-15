@@ -11,6 +11,12 @@
 
 classdef AstroHaven < handle
     
+    properties(Transient=true)
+        
+        gui;
+        
+    end
+    
     properties % objects
         
         hndl; % serial port object
@@ -36,6 +42,11 @@ classdef AstroHaven < handle
         
         reply = '';
         
+        number1 = 20; 
+        number2 = 20;
+        number_both = 20;
+        
+        brake_bit = 1;
         debug_bit = 1;
         
     end
@@ -75,7 +86,11 @@ classdef AstroHaven < handle
         timeout = 10; % how many seconds to wait before returning the control 
         loop_res = 10; % how many times to call "open" or "close" when in a loop
         
-        version = 1.00;
+        default_number1;
+        default_number2;
+        default_number_both;
+        
+        version = 1.01;
         
     end
     
@@ -89,8 +104,9 @@ classdef AstroHaven < handle
                 
                 obj.log = util.sys.Logger('AstroHaven_dome', obj);
                 
+                util.oop.save_defaults(obj);
+                
             end
-            
             
             obj.connect;
             obj.log.hearbeat(600);
@@ -192,7 +208,11 @@ classdef AstroHaven < handle
         function openBoth(obj, number)
             
             if nargin<2 || isempty(number)
-                number = 1;
+                if ~isempty(obj.number_both) && obj.number_both>0
+                    number = obj.number_both;
+                else
+                    number = 1;
+                end
             end
             
             obj.log.input(['Open both. N= ' num2str(number)]);
@@ -224,7 +244,11 @@ classdef AstroHaven < handle
         function closeBoth(obj, number)
             
             if nargin<2 || isempty(number)
-                number = 1;
+                if ~isempty(obj.number_both) && obj.number_both>0
+                    number = obj.number_both;
+                else
+                    number = 1;
+                end
             end
             
             obj.log.input(['Close both. N= ' num2str(number)]);
@@ -256,7 +280,11 @@ classdef AstroHaven < handle
         function open1(obj, number)
             
             if nargin<2 || isempty(number)
-                number = 1;
+                if ~isempty(obj.number1) && obj.number1>0
+                    number = obj.number1;
+                else
+                    number = 1;
+                end
             end
             
             obj.log.input(['Open shutter1. N= ' num2str(number)]);
@@ -286,9 +314,12 @@ classdef AstroHaven < handle
         
         function open2(obj, number)
             
-            
             if nargin<2 || isempty(number)
-                number = 1;
+                if ~isempty(obj.number2) && obj.number2>0
+                    number = obj.number2;
+                else
+                    number = 1;
+                end
             end
             
             obj.log.input(['Open shutter2. N= ' num2str(number)]);
@@ -319,7 +350,11 @@ classdef AstroHaven < handle
         function close1(obj, number)
             
             if nargin<2 || isempty(number)
-                number = 1;
+                if ~isempty(obj.number1) && obj.number1>0
+                    number = obj.number1;
+                else
+                    number = 1;
+                end
             end
             
             obj.log.input(['Close shutter1. N= ' num2str(number)]);
@@ -349,7 +384,11 @@ classdef AstroHaven < handle
         function close2(obj, number)
              
             if nargin<2 || isempty(number)
-                number = 1;
+                if ~isempty(obj.number2) && obj.number2>0
+                    number = obj.number2;
+                else
+                    number = 1;
+                end
             end
             
             obj.log.input(['Close shutter2. N= ' num2str(number)]);
@@ -398,6 +437,18 @@ classdef AstroHaven < handle
         function close2Full(obj)
             
             obj.close2(1000);
+            
+        end
+        
+        function openBothFull(obj)
+            
+            obj.openBoth(1000);
+            
+        end
+        
+        function closeBothFull(obj)
+            
+            obj.closeBoth(1000);
             
         end
         
@@ -536,6 +587,9 @@ classdef AstroHaven < handle
             
             try 
 
+                on_cleanup = onCleanup(@obj.stop);
+                obj.brake_bit = 0;
+                
                 for ii = 1:number
                     
                     list_replies = '';
@@ -544,8 +598,15 @@ classdef AstroHaven < handle
 
                         for kk = 1:obj.max_fail_reply
                             
-                            reply = obj.send(command_vector(jj)); 
+                            if obj.brake_bit
+                                return;
+                            end
+
+                            if ~isempty(obj.gui)
+                                obj.gui.update;
+                            end
                             
+                            reply = obj.send(command_vector(jj)); 
                             
                             pause(0.05); 
                             
@@ -576,7 +637,7 @@ classdef AstroHaven < handle
                     
                 end % for ii (number)
 
-            catch ME
+            catch ME                
                 obj.log.error(ME.getReport);
                 rethrow(ME);
             end
@@ -629,6 +690,10 @@ classdef AstroHaven < handle
                 obj.status = 0;
             else
                 obj.status = 1;
+            end
+            
+            if ~isempty(obj.gui)
+                obj.gui.update;
             end
 
         end
@@ -723,6 +788,29 @@ classdef AstroHaven < handle
                 
             end
             
+        end
+        
+        function stop(obj)
+            
+            obj.brake_bit = 1;
+            
+            if ~isempty(obj.gui)
+                obj.gui.update;
+            end
+            
+        end
+        
+    end
+   
+    methods % plotting / GUI
+        
+        function makeGUI(obj)
+            
+            if isempty(obj.gui)
+                obj.gui = obs.dome.gui.AstroHavenGUI(obj);
+            end
+            
+            obj.gui.make;
         end
         
     end

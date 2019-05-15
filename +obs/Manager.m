@@ -28,6 +28,7 @@ classdef Manager < handle
     
     properties % switches/controls
         
+        brake_bit = 1;
         debug_bit = 1;
         
     end
@@ -183,13 +184,65 @@ classdef Manager < handle
             
         end
         
+        function val = average_temp(obj)
+            
+            val = mean(obj.checker.temp_now, 'omitnan');
+            
+        end
+        
+        function val = average_clouds(obj)
+            
+            val = mean(obj.checker.clouds_now, 'omitnan');
+            
+        end
+        
+        function val = average_light(obj)
+            
+            val = mean(obj.checker.light_now, 'omitnan');
+            
+        end
+        
+        function val = average_wind(obj)
+            
+            val = mean(obj.checker.wind_now, 'omitnan');
+            
+        end
+        
+        function val = average_wind_az(obj)
+            
+            val = mean(obj.checker.wind_az_now, 'omitnan');
+            
+        end
+        
+        function val = average_humid(obj)
+            
+            val = mean(obj.checker.humid_now, 'omitnan');
+            
+        end
+        
     end
     
     methods % setters
         
     end
     
-    methods % calculations
+    methods % calculations / commands
+        
+        function stop(obj)
+            
+            obj.brake_bit = 1;
+            
+            list = properties(obj);
+            
+            for ii = 1:length(list)
+                
+                if isobject(obj.(list{ii})) && isprop(obj.(list{ii}), 'brake_bit')
+                    obj.(list{ii}).brake_bit = 1;
+                end
+                
+            end
+            
+        end
         
     end
     

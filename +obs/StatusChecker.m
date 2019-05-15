@@ -1005,6 +1005,10 @@ classdef StatusChecker < handle
             obj.decision_all;
             obj.status_log.input(obj.report);
             
+            if ~isempty(obj.owner.gui)
+                obj.owner.gui.update;
+            end
+            
         end
         
         function updateDevices(obj)
