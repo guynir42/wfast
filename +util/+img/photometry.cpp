@@ -1,0 +1,636 @@
+#include "mex.h"
+#include "matrix.h"
+#include <stdio.h>
+#include <math.h>
+#include <string.h>
+#include <vector>
+#include <cctype>
+
+// not sure if we actually need these... 
+enum ap_shape_types {SQUARE=0, CIRCLE, GAUSSIAN};
+enum bg_shape_types {CORNERS=0, ANNULUS};
+
+#define STRLN 64 // maximum string length (for copying)
+
+// global variables are used for all definitions (along with their defaults)
+float epsilon=0.1f; // minimal value for both dx and dy to change. If change is smaller than epsilon, further iterations are skipped... 
+mwSize *dims;
+mwSize ndims;
+int N=0; 
+int num_iter=1;
+int subtract=1;
+int debug_bit=1;
+mwSize out_dims[2]={0,0};
+int num_cutouts=0;
+
+// definitions of aperture/annulus types
+ap_shape_types ap;
+bg_shape_types bg;
+char aperture_string[STRLN] = "square";
+char background_string[STRLN] = "corners";
+double *ap_pars=0;
+int num_ap_pars=0;
+double *bg_pars=0;
+int num_bg_pars=0;
+
+// function pointers
+void (*ap_func)(float *array, float *x, float *y);
+void (*bg_func)(float *array, float *x, float *y);
+
+// these can be shared with all calculations
+float *X=0; // grid points not including shifts. 
+float *Y=0; // grid points not including shifts. 
+
+// output arrays are defined here (in C++)
+float *flux=0;
+float *weight=0;
+float *offset_x=0;
+float *offset_y=0;
+float *width=0;
+float *background=0;
+
+// output arrays are defined here (in matlab pointers)
+mxArray *flux_ptr=0;
+mxArray *weight_ptr=0;
+mxArray *offset_x_ptr=0;
+mxArray *offset_y_ptr=0;
+mxArray *width_ptr=0;
+mxArray *background_ptr=0;
+
+// function prototypes (implementation at the end)
+void calculate(const float *cutouts, int j);
+
+// these are various shapes that can be used to intersect the image/cutout
+void square_mask(float *array, float *x, float *y);
+void circle_mask(float *array, float *x, float *y);
+void gaussian_mask(float *array, float *x, float *y);
+void corners_mask(float *array, float *x, float *y);
+void annulus_mask(float *array, float *x, float *y);
+
+// utility to get number of pixesl from fractions / pixels
+float pixels(double input);
+
+// get rid of intermediate arrays at end of function
+void cleanupArrays();
+
+// the sum of the product of array1...
+float sumArrays(const float *array1);
+float sumArrays(const float *array1, const float *array2);
+float sumArrays(const float *array1, const float *array2, const float *array3);
+float sumArrays(const float *array1, const float *array2, const float *array3, const float *array4);
+
+// print on screen
+void printMatrix(const int *array, const char *name);
+void printMatrix(const float *array, const char *name);
+
+// utility functions to compare strings
+int cs(const char *keyword, const char *compare_str, int num_letters=3);
+int cs(const char *keyword, const char *str1, const char *str2, int num_letters=3);
+int cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters=3);
+
+void mexFunction( int nlhs, mxArray *plhs[],
+                  int nrhs, const mxArray *prhs[] ){
+
+	// check inputs!
+	if (nrhs==0){
+		mexPrintf("Usage: [flux, weight, offset_x, offset_y, width, background] = photometry(cutouts, varargin)\n"); 
+		mexPrintf("OPTIONAL ARGUMENTS:\n");
+		mexPrintf("-------------------\n");
+		mexPrintf("...\n");
+		return;
+	}
+	
+	// read the input data and parameters
+	if(mxIsEmpty(prhs[0])){ // no input, then just return with all empty outputs...
+		for(int i=0;i<6;i++) plhs[i]=mxCreateNumericArray(0,(const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
+		return;
+	}
+
+	if(mxIsClass(prhs[0], "single")==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotFloat", "Input 1 to photometry is not a single/float array...");
+	const float *cutouts=(float*) mxGetData(prhs[0]);
+	dims=(mwSize*)mxGetDimensions(prhs[0]);
+	ndims=mxGetNumberOfDimensions(prhs[0]);	
+	N=dims[0]*dims[1]; // dims[0] is the height while dims[1] is the width
+	
+	// size of non-empty output is [size(cutouts,3), size(cutouts,4)]
+	if(ndims>2) out_dims[0]=dims[2];
+	else out_dims[0]=1;
+	if(ndims>3) out_dims[1]=dims[3];
+	else out_dims[1]=1;
+	num_cutouts=out_dims[0]*out_dims[1]; // how many values in each of the above arrays... 
+	
+	for(int i=1;i<nrhs;i+=2){ // parse varargin
+		
+		char key[STRLN];
+		if(mxIsChar(prhs[i])==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotChar", "Input %d to photometry is not a string...", i+1);
+		mxGetString(prhs[i], key, STRLN); // copy the string data
+		
+		mxArray *val=0;
+		if(i+1<nrhs) val=(mxArray*) prhs[i+1]; // if the varargin is odd numbered, leave val=0 as default
+		
+		if(cs(key, "square")){
+			
+			ap_func=square_mask; 
+			ap=SQUARE; 
+			snprintf(aperture_string, STRLN, "SQUARE");
+			
+			if(val && mxIsEmpty(val)==0){ // check if there are any numerical parameters passed to "square" function
+				if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
+				ap_pars=(double*) mxGetData(val);
+				num_ap_pars=mxGetNumberOfElements(val);
+			} 
+			
+		}
+		else if(cs(key, "circle", "aperture")){
+			
+			ap_func=circle_mask; 
+			ap=CIRCLE; 
+			snprintf(aperture_string, STRLN, "CIRCLE");
+			
+			if(val && mxIsEmpty(val)==0){ // check if there are any numerical parameters passed to "circle" function
+				if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
+				ap_pars=(double*) mxGetData(val);
+				num_ap_pars=mxGetNumberOfElements(val);
+			} 
+			
+			
+		}		
+		else if(cs(key, "gaussian", "psf")){
+			
+			ap_func=gaussian_mask; 
+			ap=GAUSSIAN; 
+			snprintf(aperture_string, STRLN, "GAUSSIAN");
+			
+			if(val && mxIsEmpty(val)==0){ // check if there are any numerical parameters passed to "gaussian" function
+				if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
+				ap_pars=(double*) mxGetData(val);
+				num_ap_pars=mxGetNumberOfElements(val);
+			} 
+			
+			
+		}
+		else if(cs(key, "corners")){
+			
+			bg_func=corners_mask; 
+			bg=CORNERS; 
+			snprintf(background_string, STRLN, "CORNERS");
+			
+			if(val && mxIsEmpty(val)==0){ // check if there are any numerical parameters passed to "corners" function
+				if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
+				bg_pars=(double*) mxGetData(val);
+				num_bg_pars=mxGetNumberOfElements(val);
+			} 
+			
+			
+		}
+		else if(cs(key, "annulus")){
+			
+			bg_func=annulus_mask; 
+			bg=ANNULUS; 
+			snprintf(background_string, STRLN, "ANNULUS");
+			
+			if(val && mxIsEmpty(val)==0){ // check if there are any numerical parameters passed to "annulus" function
+				if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
+				bg_pars=(double*) mxGetData(val);
+				num_bg_pars=mxGetNumberOfElements(val);
+			} 
+			
+		}
+		else if(cs(key, "fluxes")){
+			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
+			
+			flux_ptr=mxDuplicateArray(val);
+			
+		}
+		else if(cs(key, "weights")){
+			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
+			
+			weight_ptr=mxDuplicateArray(val);
+			
+		}
+		else if(cs(key, "dx") || cs(key, "offset_x", 8) || cs(key, "offsets_x", 9)){
+			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
+			
+			offset_x_ptr=mxDuplicateArray(val);
+			
+		}
+		else if(cs(key, "dy") || cs(key, "offset_y", 8) || cs(key, "offsets_y", 9)){
+			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
+			
+			offset_y_ptr=mxDuplicateArray(val);
+			
+		}
+		else if(cs(key, "widths")){
+			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
+			
+			width_ptr=mxDuplicateArray(val);
+			
+		}
+		else if(cs(key, "backgrounds")){
+			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
+			
+			background_ptr=mxDuplicateArray(val);
+			
+		}
+		else if(cs(key, "subtract")){
+			if(val==0 || mxIsEmpty(val)) subtract=1; // if no input, assume positive
+			else{
+				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
+				subtract=mxGetScalar(val);
+			}
+			
+		}
+		else if(cs(key, "iterations", "num_iterations", "number_iterations")){
+			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			else{
+				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
+				num_iter=mxGetScalar(val);
+			}
+			
+		}
+		else if(cs(key, "epsilon")){
+			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			else{
+				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
+				epsilon=mxGetScalar(val);
+			}
+			
+			
+		}
+		else if(cs(key, "debug_bit")){
+			if(val==0 || mxIsEmpty(val)) debug_bit=1; // if no input, assume positive
+			else{
+				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
+				debug_bit=mxGetScalar(val);
+			}
+			
+			
+		}
+		
+	}
+	
+	if(debug_bit){ // check that all inputs have been received! 
+		mexPrintf("cutouts: [");
+		for(int i=0;i<ndims;i++){if(i>0) mexPrintf("x"); mexPrintf("%d", dims[i]); }
+		mexPrintf("] (%s) ", mxGetClassName(prhs[0]));
+		mexPrintf("| aperture: %s (%d) pars= ", aperture_string, ap);
+		for(int i=0;i<num_ap_pars;i++) mexPrintf("%4.2f ", ap_pars[i]);
+		mexPrintf("| background: %s (%d) | pars= ", background_string, bg);
+		for(int i=0;i<num_bg_pars;i++) mexPrintf("%4.2f ", bg_pars[i]);
+		mexPrintf("| iter= %d | debug_bit= %d | N= %d\n", num_iter, debug_bit, N);
+	}
+	
+	// setup outputs (using new arrays or recycling the old ones)
+	if(flux_ptr==0) flux_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
+	plhs[0]=flux_ptr; flux=(float*) mxGetData(plhs[0]);
+	if(weight_ptr==0) weight_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
+	plhs[1]=weight_ptr; weight=(float*) mxGetData(plhs[1]);
+	if(offset_x_ptr==0) offset_x_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
+	plhs[2]=offset_x_ptr; offset_x=(float*) mxGetData(plhs[2]);
+	if(offset_y_ptr==0) offset_y_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
+	plhs[3]=offset_y_ptr; offset_y=(float*) mxGetData(plhs[3]);
+	if(width_ptr==0) width_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
+	plhs[4]=width_ptr; width=(float*) mxGetData(plhs[4]);
+	if(background_ptr==0) background_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
+	plhs[5]=background_ptr; background=(float*) mxGetData(plhs[5]);
+	
+	// intermediate arrays
+	X=(float *) mxCalloc(N, sizeof(float));
+	Y=(float *) mxCalloc(N, sizeof(float)); 
+	
+	for(int i=0;i<N;i++){ // meshgrid
+		
+		X[i]=(float)(i/dims[0])-dims[1]/2;
+		Y[i]=(float)(i%dims[0])-dims[0]/2;
+		
+	}
+	
+	if(debug_bit>2){ // check that meshgrid returned what we expect
+		printMatrix(X, "X");
+		printMatrix(Y, "Y");
+	}
+	
+	for(int j=0;j<num_cutouts;j++){ // number of cutouts
+		
+		calculate(cutouts, j);
+		
+	} // for j
+	
+	if(debug_bit>2) printMatrix(cutouts, "cutouts");
+	
+	cleanupArrays(); // make sure intermediate arrays are cleared when exiting mex-function
+				  
+}
+
+
+void calculate(const float *cutouts, int j){
+	
+	float *x=(float *)mxCalloc(N, sizeof(float));; // grid with shift added using offset_x
+	float *y=(float *)mxCalloc(N, sizeof(float)); // grid with shift added using offset_y
+	float *x2=(float *)mxCalloc(N, sizeof(float)); // grid with shift added using found moment
+	float *y2=(float *)mxCalloc(N, sizeof(float)); // grid with shift added using found moment
+	float *ap_array=(float *)mxCalloc(N, sizeof(float)); // grid with the aperture shape
+	float *bg_array=(float *)mxCalloc(N, sizeof(float)); // grid with the background shape
+	float *image=(float *)mxCalloc(N, sizeof(float));
+	memcpy(image, &cutouts[j*N], N*sizeof(float)); // grab a copy of the current cutout!
+	
+	for(int k=0;k<num_iter;k++){ // number of iterations 
+		
+		float dx=offset_x[j];
+		if(isnan(dx)) dx=0;
+		float dy=offset_y[j];
+		if(isnan(dy)) dy=0;
+	
+		for(int i=0;i<N;i++){ // x,y grid with offsets
+			x[i]=X[i]-dx;
+			y[i]=Y[i]-dy;
+		}
+		
+		ap_func(ap_array, x,y); // make an offset aperture mask
+		bg_func(bg_array, x,y); // make an offset background mask
+		
+		weight[j]=sumArrays(ap_array); // number of pixels in this aperture
+
+		for(int i=0;i<N;i++) ap_array[i]/=weight[j]; // normalize aperture
+		
+		float sum_ap_square=sumArrays(ap_array, ap_array); // normaliztion by sum(ap^2)
+		
+		// first calculate the b/g so we can subtract it! 
+		background[j]=sumArrays(image, bg_array)/N; // average background value per pixels
+		
+		// printMatrix(image, "image"); // debug only! 
+		printMatrix(ap_array, "ap_array"); // debug only! 
+		printMatrix(bg_array, "bg_array"); // debug only! 
+		
+		// now make a background subtracted, aperture weighted image
+		if(subtract) for(int i=0;i<N;i++) image[i]-=background[j];
+		for(int i=0;i<N;i++) image[i]*=ap_array[i]/sum_ap_square; // weigh by the normalized aperture
+		
+		float m0=sumArrays(image); // flux after going through aperture, normalized by sum(ap^2)
+		
+		float m1x=sumArrays(image, X)/m0;
+		float m1y=sumArrays(image, Y)/m0;
+		
+		for(int i=0;i<N;i++){ // x,y grid with offsets using new moments
+			x2[i]=X[i]-m1x;
+			y2[i]=Y[i]-m1y;
+		}
+		
+		float m2x=sumArrays(image, x2, x2)/m0;
+		float m2y=sumArrays(image, y2, y2)/m0;
+		
+		flux[j]=m0;
+		
+		if(m0>0){ // values are reliable enough to fill the other parameters
+			offset_x[j]=m1x;
+			offset_y[j]=m1y;
+			width[j]=sqrt(m2x+m2y);
+		}
+		else{
+			offset_x[j]=NAN;
+			offset_y[j]=NAN;
+			width[j]=NAN;
+		}
+		
+		if(fabs(dx-m1x)<epsilon && fabs(dy-m1y)<epsilon) break; // if the iterations don't move the aperture by much, just stop iterating. 
+		
+	} // for k
+	
+	mxFree(x);
+	mxFree(y);
+	mxFree(x2);
+	mxFree(y2);
+	mxFree(ap_array);
+	mxFree(bg_array);
+	mxFree(image);
+	
+}
+
+void square_mask(float *array, float *x, float *y){
+	
+	for(int i=0;i<N;i++) array[i]=1;
+	
+	return; 
+	
+}
+
+void circle_mask(float *array, float *x, float *y){
+	
+	float radius=sqrt(N)/2; // default value
+	
+	if(num_ap_pars>0) radius=(float) pixels(ap_pars[0]);
+	mexPrintf("radius= %f\n", radius);
+	for(int i=0;i<N;i++){
+		
+		float r=(float) sqrt(x[i]*x[i]+y[i]*y[i]);
+		
+		array[i]=radius+0.5-r;
+		if(array[i]<0) array[i]=0;
+		if(array[i]>1) array[i]=1;
+		
+	}
+	
+}
+
+void gaussian_mask(float *array, float *x, float *y){
+	
+}
+
+void corners_mask(float *array, float *x, float *y){
+	
+	float corner_size=0.15f;
+	
+	if(num_bg_pars>0) corner_size=bg_pars[0];
+	
+	corner_size=round(pixels(corner_size));
+	
+	
+	
+}
+
+void annulus_mask(float *array, float *x, float *y){
+	
+	
+	float radius1=sqrt(N)/2-1;
+	float radius2=1e10; // inf
+
+	if(num_bg_pars>0) radius1=pixels(bg_pars[0]);
+	if(num_bg_pars>1) radius2=pixels(bg_pars[1]);
+	
+	for(int i=0;i<N;i++){
+		
+		float r=(float) sqrt(x[i]*x[i]+y[i]*y[i]);
+		
+		if (r>radius1 && r<radius2)	array[i]=1;
+		else array[i]=0; 
+		
+	}
+	
+}
+
+float pixels(double input){
+	
+	if(isnan(input)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNaN", "Input to pixels is NaN!", input);
+	if(input<=0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotPositive", "Input to pixels is %f<0", input);
+	if(input>1)	return input;
+	
+	// assume 0<input<1
+	// get minimum of dims[0] and dims[1]
+	int d=dims[0];
+	if(dims[1]<d) d=dims[1]; 
+	return d*input; // get fraction of smaller dimension of cutouts
+	
+}
+
+void cleanupArrays(){
+	
+	mxFree(X);
+	mxFree(Y);
+	
+	
+}
+
+float sumArrays(const float *array1){
+	
+	float S=0;
+	
+	for(int i=0;i<N;i++) S+=array1[i];
+	
+	return S;
+	
+}
+
+float sumArrays(const float *array1, const float *array2){
+	
+	float S=0;
+	
+	for(int i=0;i<N;i++) S+=array1[i]*array2[i];
+	
+	return S;
+	
+}
+
+float sumArrays(const float *array1, const int *array2){
+	
+	float S=0;
+	
+	for(int i=0;i<N;i++) S+=array1[i]*array2[i];
+	
+	return S;
+	
+}
+
+float sumArrays(const float *array1, const float *array2, const float *array3){
+	
+	float S=0;
+	
+	for(int i=0;i<N;i++) S+=array1[i]*array2[i]*array3[i];
+	
+	return S;
+	
+}
+
+float sumArrays(const float *array1, const float *array2, const float *array3, const float *array4){
+	
+	float S=0;
+	
+	for(int i=0;i<N;i++) S+=array1[i]*array2[i]*array3[i]*array4[i];
+	
+	return S;
+	
+}
+
+void printMatrix(const int *array, const char *name){
+	
+	mexPrintf("%s= \n", name);
+	for(int j=0;j<dims[0];j++){ 
+		for(int i=0;i<dims[1];i++) mexPrintf("%d ", array[i*dims[0]+j]);
+		mexPrintf("\n");
+	}
+	
+	mexPrintf("\n");
+	
+	
+}
+
+void printMatrix(const float *array, const char *name){
+	
+	mexPrintf("%s= \n", name);
+	for(int j=0;j<dims[0];j++){ 
+		for(int i=0;i<dims[1];i++) mexPrintf("%5.3f ", array[i*dims[0]+j]);
+		mexPrintf("\n");
+	}
+	
+	mexPrintf("\n");
+	
+}
+
+int cs(const char *keyword, const char *compare_str, int num_letters){
+	
+	char str1[STRLN]={0};
+	char str2[STRLN]={0};
+	
+	// clean up string 1 (keyword)
+	size_t N=STRLN;
+	if(strlen(keyword)<N) N=strlen(keyword);
+	
+	int j=0;
+	for(int i=0; i<N; i++){
+		
+		if(keyword[i]=='_' || keyword[i]==' ') continue;
+		
+		str1[j]=tolower(keyword[i]);
+		j++;
+		
+	}
+	
+	// clean up string 2 (compare_str)
+	N = STRLN;
+	if(strlen(compare_str)<N) N=strlen(compare_str);
+	
+	j=0;
+	for(int i=0; i<N; i++){
+		
+		if(compare_str[i]=='_' || compare_str[i]==' ') continue;
+		
+		str2[j]=tolower(compare_str[i]);
+		j++;
+		
+	}
+	
+	// compare the strings
+	int success=1;
+	
+	N=num_letters;
+	if(strlen(str1)>N) N=strlen(str1); // number of letters to compare (minimum 3, or length of keyword).
+	
+	for(int i=0;i<N;i++){
+		
+		if(str1[i]!=str2[i]){
+			success=0;
+			break;
+		}
+		
+	}
+	
+	return success;
+	
+}
+
+int cs(const char *keyword, const char *str1, const char *str2, int num_letters){
+
+	return cs(keyword, str1, num_letters) || cs(keyword, str2, num_letters);
+
+}
+
+int cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters){
+
+	return cs(keyword, str1, num_letters) || cs(keyword, str2, num_letters) || cs(keyword, str3, num_letters);
+
+}

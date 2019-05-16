@@ -349,7 +349,7 @@ classdef Photometry < handle
                         ap(isnan(I)) = nan; % aperture must have NaN values in the same places (for weight calculation)
                         
                         ann = make_bg_shape(dx,dy);
-                        ann(isnan(I)) = nan;
+                        ann(isnan(I)) = nan; 
                         
                         B = median2(I.*ann); % background per pixel...
                         
@@ -363,12 +363,12 @@ classdef Photometry < handle
                         m0 = sum2(I);
                         m1x = sum2(I.*obj.X)./m0;
                         m1y = sum2(I.*obj.Y)./m0;
-                        m2x = sum2(I.*(obj.Y-m1x).^2)./m0;
+                        m2x = sum2(I.*(obj.X-m1x).^2)./m0;
                         m2y = sum2(I.*(obj.Y-m1y).^2)./m0;
 %                         mxy = sum2(I.*(obj.X-m1x).*(obj.Y-m1y))./m0;
                         
                         % quality checks:
-                        if S==0
+                        if m0==0
                             m1x = 0;
                             m1y = 0;
                             m2x = NaN;
