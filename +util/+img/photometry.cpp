@@ -6,87 +6,97 @@
 #include <vector>
 #include <cctype>
 
-// not sure if we actually need these... 
-enum ap_shape_types {SQUARE=0, CIRCLE, GAUSSIAN};
-enum bg_shape_types {CORNERS=0, ANNULUS};
-
 #define STRLN 64 // maximum string length (for copying)
-
-// global variables are used for all definitions (along with their defaults)
-float epsilon=0.1f; // minimal value for both dx and dy to change. If change is smaller than epsilon, further iterations are skipped... 
-mwSize *dims;
-mwSize ndims;
-int N=0; 
-int num_iter=1;
-int subtract=1;
-int debug_bit=1;
-mwSize out_dims[2]={0,0};
-int num_cutouts=0;
-
-// definitions of aperture/annulus types
-ap_shape_types ap;
-bg_shape_types bg;
-char aperture_string[STRLN] = "square";
-char background_string[STRLN] = "corners";
-double *ap_pars=0;
-int num_ap_pars=0;
-double *bg_pars=0;
-int num_bg_pars=0;
-
-// function pointers
-void (*ap_func)(float *array, float *x, float *y);
-void (*bg_func)(float *array, float *x, float *y);
-
-// these can be shared with all calculations
-float *X=0; // grid points not including shifts. 
-float *Y=0; // grid points not including shifts. 
-
-// output arrays are defined here (in C++)
-float *flux=0;
-float *weight=0;
-float *offset_x=0;
-float *offset_y=0;
-float *width=0;
-float *background=0;
-
-// output arrays are defined here (in matlab pointers)
-mxArray *flux_ptr=0;
-mxArray *weight_ptr=0;
-mxArray *offset_x_ptr=0;
-mxArray *offset_y_ptr=0;
-mxArray *width_ptr=0;
-mxArray *background_ptr=0;
-
-// function prototypes (implementation at the end)
-void calculate(const float *cutouts, int j);
-
-// these are various shapes that can be used to intersect the image/cutout
-void square_mask(float *array, float *x, float *y);
-void circle_mask(float *array, float *x, float *y);
-void gaussian_mask(float *array, float *x, float *y);
-void corners_mask(float *array, float *x, float *y);
-void annulus_mask(float *array, float *x, float *y);
-
-// utility to get number of pixesl from fractions / pixels
-float pixels(double input);
-
-// get rid of intermediate arrays at end of function
-void cleanupArrays();
-
-// the sum of the product of array1...
-float sumArrays(const float *array1);
-float sumArrays(const float *array1, const float *array2);
-float sumArrays(const float *array1, const float *array2, const float *array3);
-float sumArrays(const float *array1, const float *array2, const float *array3, const float *array4);
-
-// print on screen
-void printMatrix(const int *array, const char *name);
-void printMatrix(const float *array, const char *name);
 
 // utility functions to compare strings
 int cs(const char *keyword, const char *compare_str, int num_letters=3);
 int cs(const char *keyword, const char *str1, const char *str2, int num_letters=3);
 int cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters=3);
+
+class Photometry{
+	
+	public:
+	
+	float *cutouts=0;
+	
+	float epsilon=0.1f; // minimal value for both dx and dy to change. If change is smaller than epsilon, further iterations are skipped... 
+	mwSize *dims=0;
+	mwSize ndims=0;
+	int N=0; 
+	int num_iter=1;
+	int subtract=1;
+	int debug_bit=1;
+	mwSize out_dims[2]={0,0};
+	int num_cutouts=0;
+
+	// definitions of aperture/annulus types
+	enum ap_enum {SQUARE=0, CIRCLE, GAUSSIAN};
+	enum bg_enum {CORNERS=0, ANNULUS};
+
+	char aperture_string[STRLN] = "square";
+	ap_enum ap_type=SQUARE;
+	double *ap_pars=0;
+	int num_ap_pars=0;
+	
+	char background_string[STRLN] = "corners";
+	bg_enum bg_type=CORNERS;
+	double *bg_pars=0;
+	int num_bg_pars=0;
+
+	// function pointers
+	// void (Photometry::*ap_func)(float *array, float *x, float *y);
+	// void (Photometry::*bg_func)(float *array, float *x, float *y);
+
+	// these can be shared with all calculations
+	float *X=0; // grid points not including shifts. 
+	float *Y=0; // grid points not including shifts. 
+
+	// output arrays are defined here (in C++)
+	float *flux=0;
+	float *weight=0;
+	float *offset_x=0;
+	float *offset_y=0;
+	float *width=0;
+	float *background=0;
+
+	// output arrays are defined here (in matlab pointers)
+	mxArray *flux_ptr=0;
+	mxArray *weight_ptr=0;
+	mxArray *offset_x_ptr=0;
+	mxArray *offset_y_ptr=0;
+	mxArray *width_ptr=0;
+	mxArray *background_ptr=0;
+	
+	// function prototypes (implementation at the end)
+	Photometry(int nrhs, const mxArray *prhs[]);
+	~Photometry();
+	void parseInputs(int nrhs, const mxArray *prhs[]);
+	void run();
+	void calculate(int j);
+
+	// these are various shapes that can be used to intersect the image/cutout
+	void main_mask(float *array, float *x, float *y);
+	void square_mask(float *array, float *x, float *y);
+	void circle_mask(float *array, float *x, float *y);
+	void gaussian_mask(float *array, float *x, float *y);
+	void secondary_mask(float *array, float *x, float *y);
+	void corners_mask(float *array, float *x, float *y);
+	void annulus_mask(float *array, float *x, float *y);
+
+	// utility to get number of pixesl from fractions / pixels
+	float pixels(double input);
+	
+	// the sum of the product of array1...
+	float sumArrays(const float *array1);
+	float sumArrays(const float *array1, const float *array2);
+	float sumArrays(const float *array1, const float *array2, const float *array3);
+	float sumArrays(const float *array1, const float *array2, const float *array3, const float *array4);
+
+	// print on screen
+	void printMatrix(const int *array, const char *name);
+	void printMatrix(const float *array, const char *name);
+
+};
 
 void mexFunction( int nlhs, mxArray *plhs[],
                   int nrhs, const mxArray *prhs[] ){
@@ -102,12 +112,58 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	
 	// read the input data and parameters
 	if(mxIsEmpty(prhs[0])){ // no input, then just return with all empty outputs...
-		for(int i=0;i<6;i++) plhs[i]=mxCreateNumericArray(0,(const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
+		const mwSize dims[]={0,0};
+		for(int i=0;i<6;i++) plhs[i]=mxCreateNumericArray(0,dims, mxSINGLE_CLASS, mxREAL); // return all empty arrays...
 		return;
 	}
 
+	Photometry phot(nrhs, prhs);
+	
+	phot.run();
+	
+	plhs[0]=phot.flux_ptr; 
+	plhs[1]=phot.weight_ptr; 
+	plhs[2]=phot.offset_x_ptr; 
+	plhs[3]=phot.offset_y_ptr; 
+	plhs[4]=phot.width_ptr; 
+	plhs[5]=phot.background_ptr; 
+	 
+}
+
+Photometry::Photometry(int nrhs, const mxArray *prhs[]){ // class constructor
+
+	parseInputs(nrhs, prhs);
+	
+	// allocate intermediate arrays
+	X=(float *) mxCalloc(N, sizeof(float));
+	Y=(float *) mxCalloc(N, sizeof(float)); 
+	
+	for(int i=0;i<N;i++){ // meshgrid
+		
+		X[i]=(float)(i/dims[0])-dims[1]/2;
+		Y[i]=(float)(i%dims[0])-dims[0]/2;
+		
+	}
+	
+	if(debug_bit>2){ // check that meshgrid returned what we expect
+		printMatrix(X, "X");
+		printMatrix(Y, "Y");
+	}
+	
+	
+}
+
+Photometry::~Photometry(){ // destructor cleans up intermidiate arrays
+	
+	mxFree(X);
+	mxFree(Y);
+	
+}
+
+void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){
+
 	if(mxIsClass(prhs[0], "single")==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotFloat", "Input 1 to photometry is not a single/float array...");
-	const float *cutouts=(float*) mxGetData(prhs[0]);
+	cutouts=(float*) mxGetData(prhs[0]);
 	dims=(mwSize*)mxGetDimensions(prhs[0]);
 	ndims=mxGetNumberOfDimensions(prhs[0]);	
 	N=dims[0]*dims[1]; // dims[0] is the height while dims[1] is the width
@@ -130,8 +186,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		
 		if(cs(key, "square")){
 			
-			ap_func=square_mask; 
-			ap=SQUARE; 
+			// ap_func=&Photometry::square_mask; 
+			ap_type=SQUARE;
 			snprintf(aperture_string, STRLN, "SQUARE");
 			
 			if(val && mxIsEmpty(val)==0){ // check if there are any numerical parameters passed to "square" function
@@ -143,8 +199,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		}
 		else if(cs(key, "circle", "aperture")){
 			
-			ap_func=circle_mask; 
-			ap=CIRCLE; 
+			// ap_func=&Photometry::circle_mask; 
+			ap_type=CIRCLE;
 			snprintf(aperture_string, STRLN, "CIRCLE");
 			
 			if(val && mxIsEmpty(val)==0){ // check if there are any numerical parameters passed to "circle" function
@@ -157,8 +213,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		}		
 		else if(cs(key, "gaussian", "psf")){
 			
-			ap_func=gaussian_mask; 
-			ap=GAUSSIAN; 
+			// ap_func=&Photometry::gaussian_mask; 
+			ap_type=GAUSSIAN;
 			snprintf(aperture_string, STRLN, "GAUSSIAN");
 			
 			if(val && mxIsEmpty(val)==0){ // check if there are any numerical parameters passed to "gaussian" function
@@ -171,8 +227,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		}
 		else if(cs(key, "corners")){
 			
-			bg_func=corners_mask; 
-			bg=CORNERS; 
+			// g_func=&Photometry::corners_mask; 
+			bg_type=CORNERS;
 			snprintf(background_string, STRLN, "CORNERS");
 			
 			if(val && mxIsEmpty(val)==0){ // check if there are any numerical parameters passed to "corners" function
@@ -185,8 +241,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		}
 		else if(cs(key, "annulus")){
 			
-			bg_func=annulus_mask; 
-			bg=ANNULUS; 
+			// bg_func=&Photometry::annulus_mask; 
+			bg_type=ANNULUS;
 			snprintf(background_string, STRLN, "ANNULUS");
 			
 			if(val && mxIsEmpty(val)==0){ // check if there are any numerical parameters passed to "annulus" function
@@ -275,61 +331,50 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		
 	}
 	
+	if(flux_ptr==0) flux_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
+	flux=(float*) mxGetData(flux_ptr);
+	if(weight_ptr==0) weight_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
+	weight=(float*) mxGetData(weight_ptr);
+	if(offset_x_ptr==0) offset_x_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
+	offset_x=(float*) mxGetData(offset_x_ptr);
+	if(offset_y_ptr==0) offset_y_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
+	offset_y=(float*) mxGetData(offset_y_ptr);
+	if(width_ptr==0) width_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
+	width=(float*) mxGetData(width_ptr);
+	if(background_ptr==0) background_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
+	background=(float*) mxGetData(background_ptr);
+	
+	
 	if(debug_bit){ // check that all inputs have been received! 
 		mexPrintf("cutouts: [");
 		for(int i=0;i<ndims;i++){if(i>0) mexPrintf("x"); mexPrintf("%d", dims[i]); }
 		mexPrintf("] (%s) ", mxGetClassName(prhs[0]));
-		mexPrintf("| aperture: %s (%d) pars= ", aperture_string, ap);
+		mexPrintf("| aperture: %s (%d) | pars= ", aperture_string, ap_type);
 		for(int i=0;i<num_ap_pars;i++) mexPrintf("%4.2f ", ap_pars[i]);
-		mexPrintf("| background: %s (%d) | pars= ", background_string, bg);
+		mexPrintf("| background: %s (%d) | pars= ", background_string, bg_type);
 		for(int i=0;i<num_bg_pars;i++) mexPrintf("%4.2f ", bg_pars[i]);
 		mexPrintf("| iter= %d | debug_bit= %d | N= %d\n", num_iter, debug_bit, N);
 	}
 	
-	// setup outputs (using new arrays or recycling the old ones)
-	if(flux_ptr==0) flux_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
-	plhs[0]=flux_ptr; flux=(float*) mxGetData(plhs[0]);
-	if(weight_ptr==0) weight_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
-	plhs[1]=weight_ptr; weight=(float*) mxGetData(plhs[1]);
-	if(offset_x_ptr==0) offset_x_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
-	plhs[2]=offset_x_ptr; offset_x=(float*) mxGetData(plhs[2]);
-	if(offset_y_ptr==0) offset_y_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
-	plhs[3]=offset_y_ptr; offset_y=(float*) mxGetData(plhs[3]);
-	if(width_ptr==0) width_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
-	plhs[4]=width_ptr; width=(float*) mxGetData(plhs[4]);
-	if(background_ptr==0) background_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
-	plhs[5]=background_ptr; background=(float*) mxGetData(plhs[5]);
-	
-	// intermediate arrays
-	X=(float *) mxCalloc(N, sizeof(float));
-	Y=(float *) mxCalloc(N, sizeof(float)); 
-	
-	for(int i=0;i<N;i++){ // meshgrid
-		
-		X[i]=(float)(i/dims[0])-dims[1]/2;
-		Y[i]=(float)(i%dims[0])-dims[0]/2;
-		
-	}
-	
-	if(debug_bit>2){ // check that meshgrid returned what we expect
-		printMatrix(X, "X");
-		printMatrix(Y, "Y");
-	}
-	
+}
+
+void Photometry::run(){
+
+	// mexPrintf("num_cutouts= %d\n", num_cutouts);
+
 	for(int j=0;j<num_cutouts;j++){ // number of cutouts
 		
-		calculate(cutouts, j);
+		calculate(j);
 		
 	} // for j
 	
 	if(debug_bit>2) printMatrix(cutouts, "cutouts");
 	
-	cleanupArrays(); // make sure intermediate arrays are cleared when exiting mex-function
-				  
 }
 
-
-void calculate(const float *cutouts, int j){
+void Photometry::calculate(int j){
+	
+	// mexPrintf("N= %d | iter= %d\n", N, num_iter);
 	
 	float *x=(float *)mxCalloc(N, sizeof(float));; // grid with shift added using offset_x
 	float *y=(float *)mxCalloc(N, sizeof(float)); // grid with shift added using offset_y
@@ -352,21 +397,25 @@ void calculate(const float *cutouts, int j){
 			y[i]=Y[i]-dy;
 		}
 		
-		ap_func(ap_array, x,y); // make an offset aperture mask
-		bg_func(bg_array, x,y); // make an offset background mask
+		// this is the ugliest syntax I've ever seen
+		//(this->*bg_func)(bg_array, x,y); // make an offset background mask
+		//(this->*ap_func)(ap_array, x,y); // make an offset aperture mask
+		
+		main_mask(ap_array, x, y);
+		secondary_mask(bg_array, x, y);
+		
+		// printMatrix(image, "image"); // debug only! 
+		// printMatrix(ap_array, "ap_array"); // debug only! 
+		// printMatrix(bg_array, "bg_array"); // debug only! 
 		
 		weight[j]=sumArrays(ap_array); // number of pixels in this aperture
-
+		
 		for(int i=0;i<N;i++) ap_array[i]/=weight[j]; // normalize aperture
 		
 		float sum_ap_square=sumArrays(ap_array, ap_array); // normaliztion by sum(ap^2)
 		
 		// first calculate the b/g so we can subtract it! 
 		background[j]=sumArrays(image, bg_array)/N; // average background value per pixels
-		
-		// printMatrix(image, "image"); // debug only! 
-		printMatrix(ap_array, "ap_array"); // debug only! 
-		printMatrix(bg_array, "bg_array"); // debug only! 
 		
 		// now make a background subtracted, aperture weighted image
 		if(subtract) for(int i=0;i<N;i++) image[i]-=background[j];
@@ -412,7 +461,15 @@ void calculate(const float *cutouts, int j){
 	
 }
 
-void square_mask(float *array, float *x, float *y){
+void Photometry::main_mask(float *array, float *x, float *y){
+
+	if(ap_type==SQUARE) square_mask(array, x, y);
+	else if(ap_type==CIRCLE) circle_mask(array, x, y);
+	else if(ap_type==GAUSSIAN) gaussian_mask(array, x, y);
+
+}
+
+void Photometry::square_mask(float *array, float *x, float *y){
 	
 	for(int i=0;i<N;i++) array[i]=1;
 	
@@ -420,12 +477,12 @@ void square_mask(float *array, float *x, float *y){
 	
 }
 
-void circle_mask(float *array, float *x, float *y){
+void Photometry::circle_mask(float *array, float *x, float *y){
 	
 	float radius=sqrt(N)/2; // default value
 	
 	if(num_ap_pars>0) radius=(float) pixels(ap_pars[0]);
-	mexPrintf("radius= %f\n", radius);
+	// mexPrintf("radius= %f\n", radius);
 	for(int i=0;i<N;i++){
 		
 		float r=(float) sqrt(x[i]*x[i]+y[i]*y[i]);
@@ -438,11 +495,18 @@ void circle_mask(float *array, float *x, float *y){
 	
 }
 
-void gaussian_mask(float *array, float *x, float *y){
+void Photometry::gaussian_mask(float *array, float *x, float *y){
 	
 }
 
-void corners_mask(float *array, float *x, float *y){
+void Photometry::secondary_mask(float *array, float *x, float *y){
+
+	if(bg_type==CORNERS) corners_mask(array, x, y);
+	else if(bg_type==ANNULUS) annulus_mask(array, x, y);
+	
+}
+
+void Photometry::corners_mask(float *array, float *x, float *y){
 	
 	float corner_size=0.15f;
 	
@@ -454,7 +518,7 @@ void corners_mask(float *array, float *x, float *y){
 	
 }
 
-void annulus_mask(float *array, float *x, float *y){
+void Photometry::annulus_mask(float *array, float *x, float *y){
 	
 	
 	float radius1=sqrt(N)/2-1;
@@ -474,7 +538,7 @@ void annulus_mask(float *array, float *x, float *y){
 	
 }
 
-float pixels(double input){
+float Photometry::pixels(double input){
 	
 	if(isnan(input)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNaN", "Input to pixels is NaN!", input);
 	if(input<=0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotPositive", "Input to pixels is %f<0", input);
@@ -488,15 +552,7 @@ float pixels(double input){
 	
 }
 
-void cleanupArrays(){
-	
-	mxFree(X);
-	mxFree(Y);
-	
-	
-}
-
-float sumArrays(const float *array1){
+float Photometry::sumArrays(const float *array1){
 	
 	float S=0;
 	
@@ -506,7 +562,7 @@ float sumArrays(const float *array1){
 	
 }
 
-float sumArrays(const float *array1, const float *array2){
+float Photometry::sumArrays(const float *array1, const float *array2){
 	
 	float S=0;
 	
@@ -516,17 +572,7 @@ float sumArrays(const float *array1, const float *array2){
 	
 }
 
-float sumArrays(const float *array1, const int *array2){
-	
-	float S=0;
-	
-	for(int i=0;i<N;i++) S+=array1[i]*array2[i];
-	
-	return S;
-	
-}
-
-float sumArrays(const float *array1, const float *array2, const float *array3){
+float Photometry::sumArrays(const float *array1, const float *array2, const float *array3){
 	
 	float S=0;
 	
@@ -536,7 +582,7 @@ float sumArrays(const float *array1, const float *array2, const float *array3){
 	
 }
 
-float sumArrays(const float *array1, const float *array2, const float *array3, const float *array4){
+float Photometry::sumArrays(const float *array1, const float *array2, const float *array3, const float *array4){
 	
 	float S=0;
 	
@@ -546,7 +592,7 @@ float sumArrays(const float *array1, const float *array2, const float *array3, c
 	
 }
 
-void printMatrix(const int *array, const char *name){
+void Photometry::printMatrix(const int *array, const char *name){
 	
 	mexPrintf("%s= \n", name);
 	for(int j=0;j<dims[0];j++){ 
@@ -559,7 +605,7 @@ void printMatrix(const int *array, const char *name){
 	
 }
 
-void printMatrix(const float *array, const char *name){
+void Photometry::printMatrix(const float *array, const char *name){
 	
 	mexPrintf("%s= \n", name);
 	for(int j=0;j<dims[0];j++){ 
