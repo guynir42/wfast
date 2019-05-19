@@ -42,7 +42,7 @@ classdef Photometry < handle
     
     properties % switches/controls
         
-        use_mex = 0; % use the new mex function for faster processing
+        use_mex = 1; % use the new mex function for faster processing
         use_backgrounds = 0; % remove background from individual cutout
         corner_size = 0.15; % fraction of the cut_size or pixel value (must be smaller than cut_size!)
         
@@ -52,7 +52,7 @@ classdef Photometry < handle
         annulus_outer = []; % empty means take the rest of the cutout
         iterations = 3; % 
         
-        use_gaussian = 1;
+        use_gaussian = 0;
         gauss_sigma = 2;
         gauss_thresh = 1e-6;
         

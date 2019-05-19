@@ -449,7 +449,9 @@ void Photometry::calculate(int j){
 		
 		// first calculate the b/g so we can subtract it! 
 		float bg_weight=sumArrays(bg_array);
-		background[j]=sumArrays(image_raw, bg_array)/bg_weight; // average background value per pixels
+
+		if(bg_weight>0)	background[j]=sumArrays(image_raw, bg_array)/bg_weight; // average background value per pixels
+		else background[j]=0;
 		
 		// now make a background subtracted image
 		for(int i=0;i<N;i++) image_sub[i]=image_raw[i]-background[j];
@@ -461,7 +463,7 @@ void Photometry::calculate(int j){
 		for(int i=0;i<N;i++) image[i]*=ap_array[i]/sum_ap_square; // weigh by the normalized aperture
 		
 		float m0=sumArrays(image); // flux after going through aperture, normalized by sum(ap^2)
-		
+
 		float m1x=sumArrays(image, X)/m0;
 		float m1y=sumArrays(image, Y)/m0;
 		
@@ -507,13 +509,13 @@ void Photometry::main_mask(float *array, float *x, float *y){
 	else if(ap_type==CIRCLE) circle_mask(array, x, y);
 	else if(ap_type==GAUSSIAN) gaussian_mask(array, x, y);
 
+	// printMatrix(array, "main mask");
+	
 }
 
 void Photometry::square_mask(float *array, float *x, float *y){
 	
 	for(int i=0;i<N;i++) array[i]=1;
-	
-	return; 
 	
 }
 
@@ -551,6 +553,7 @@ void Photometry::secondary_mask(float *array, float *x, float *y){
 
 	if(bg_type==CORNERS) corners_mask(array, x, y);
 	else if(bg_type==ANNULUS) annulus_mask(array, x, y);
+	// printMatrix(array, "secondary mask");
 	
 }
 
@@ -562,7 +565,13 @@ void Photometry::corners_mask(float *array, float *x, float *y){
 	
 	corner_size=round(pixels(corner_size));
 	
-	
+	for(int i=0;i<N;i++){
+		if(i/dims[0]<corner_size && i%dims[0]<corner_size) array[i]=1;
+		else if(i/dims[0]<corner_size && i%dims[0]>=dims[1]-corner_size) array[i]=1;
+		else if(i/dims[0]>=dims[0]-corner_size && i%dims[0]<corner_size) array[i]=1;
+		else if(i/dims[0]>=dims[0]-corner_size && i%dims[0]>=dims[1]-corner_size) array[i]=1;
+		else array[i]=0;
+	}
 	
 }
 
@@ -616,7 +625,7 @@ float Photometry::sumArrays(const float *array1){
 	
 	float S=0;
 	
-	for(int i=0;i<N;i++) S+=array1[i];
+	for(int i=0;i<N;i++) if(isnan(array1[i])==0) S+=array1[i];
 	
 	return S;
 	
@@ -626,7 +635,7 @@ float Photometry::sumArrays(const float *array1, const float *array2){
 	
 	float S=0;
 	
-	for(int i=0;i<N;i++) S+=array1[i]*array2[i];
+	for(int i=0;i<N;i++) if(isnan(array1[i])==0 && isnan(array2[i])==0) S+=array1[i]*array2[i];
 	
 	return S;
 	
@@ -636,7 +645,9 @@ float Photometry::sumArrays(const float *array1, const float *array2, const floa
 	
 	float S=0;
 	
-	for(int i=0;i<N;i++) S+=array1[i]*array2[i]*array3[i];
+	for(int i=0;i<N;i++) 
+		if(isnan(array1[i])==0 && isnan(array2[i])==0 && isnan(array3[i])==0) 
+			S+=array1[i]*array2[i]*array3[i];
 	
 	return S;
 	
@@ -646,7 +657,9 @@ float Photometry::sumArrays(const float *array1, const float *array2, const floa
 	
 	float S=0;
 	
-	for(int i=0;i<N;i++) S+=array1[i]*array2[i]*array3[i]*array4[i];
+	for(int i=0;i<N;i++) 
+		if(isnan(array1[i])==0 && isnan(array2[i])==0 && isnan(array3[i])==0 && isnan(array4[i])==0) 
+			S+=array1[i]*array2[i]*array3[i]*array4[i];
 	
 	return S;
 	

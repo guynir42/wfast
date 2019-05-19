@@ -222,12 +222,12 @@ classdef Acquisition < file.AstroData
                 obj.clip_bg.use_adjust = 0;
                 
                 obj.phot_stack = img.Photometry;
-                obj.phot_stack.use_aperture = 0;
+                obj.phot_stack.use_aperture = 1;
                 obj.phot_stack.use_gaussian = 0;
                 obj.flux_buf = util.vec.CircularBuffer;
                 
                 obj.phot = img.Photometry;
-                obj.phot.use_aperture = 0;
+                obj.phot.use_aperture = 1;
                 obj.phot.use_gaussian = 0;
                 obj.lightcurves = img.Lightcurves;
                 
@@ -1175,14 +1175,13 @@ classdef Acquisition < file.AstroData
             
             M = mean(F, 'omitnan');
             
-            
             obj.adjust_pos = [median(F./M.*DX, 'omitnan'), median(F./M.*DY, 'omitnan')];
             obj.adjust_pos(isnan(obj.adjust_pos)) = 0;
             
             obj.average_width = median(obj.phot_stack.fluxes./M.*obj.phot_stack.widths, 'omitnan'); % maybe find the average width of each image and not the stack??
             
             if obj.use_adjust_cutouts
-                obj.clip.positions = obj.clip.positions + obj.adjust_pos;
+                obj.clip.positions = double(obj.clip.positions + obj.adjust_pos);
             else
                 % must send the average adjustment back to mount controller
             end
@@ -1231,7 +1230,7 @@ classdef Acquisition < file.AstroData
                     disp('Lost star positions, using quick_align');
                     
                     [~,shift] = util.img.quick_align(obj.stack_sub, obj.ref_stack);
-                    obj.clip.positions = obj.ref_positions + flip(shift);
+                    obj.clip.positions = double(obj.ref_positions + flip(shift));
                     
                     % this shift should also be reported back to mount controller? 
 
@@ -1514,7 +1513,7 @@ classdef Acquisition < file.AstroData
             end
             
             obj.clip.positions = pos;
-            obj.positions = pos;
+            obj.positions = double(pos);
             
             if obj.gui.check
                 obj.show;

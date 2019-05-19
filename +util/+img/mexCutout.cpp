@@ -29,7 +29,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	if( mxGetN(prhs[0])<2 || mxGetM(prhs[0])<2 || mxGetNumberOfDimensions(prhs[0])>3 ) mexErrMsgIdAndTxt("MATLAB:util:img:mexCutout:inputNotMatrix", "Must input a (2D or 3D) matrix to mexCutout!");
 
 	// check argument 1
-	if(mxIsNumeric(prhs[1])==0) mexErrMsgIdAndTxt("MATLAB:util:img:mexCutout:inputNotNumeric", "Input 2 to mexCutout is not numeric...");
+	if(mxIsNumeric(prhs[1])==0 || mxIsDouble(prhs[1])==0) mexErrMsgIdAndTxt("MATLAB:util:img:mexCutout:inputNotNumeric", "Input 2 to mexCutout is not numeric double precision...");
 	if( mxGetN(prhs[1])!=2) mexErrMsgIdAndTxt("MATLAB:util:img:mexCutout:inputWrongSize", "Second input must be a Nx2 matrix of x and y center positions");
 	
 	// check argument 2

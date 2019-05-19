@@ -929,7 +929,7 @@ classdef Andor < file.AstroData
             
             obj.batch_counter = obj.batch_counter + 1;
             
-            if obj.use_show
+            if obj.use_show && ~isempty(obj.gui) && obj.gui.check
                 obj.show(obj.pass_show{:});
             end
 

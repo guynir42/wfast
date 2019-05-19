@@ -173,6 +173,38 @@ classdef Lightcurves < handle
             
         end
         
+        function val = get.backgrounds(obj)
+            
+            val = obj.backgrounds_full;
+            
+            if isempty(val)
+                return;
+            end
+            
+            val = val(1:obj.frame_index-1,:);
+            
+            if all(isnan(val))
+                val = [];
+            end
+            
+        end
+        
+        function val = get.variances(obj)
+            
+            val = obj.variances_full;
+            
+            if isempty(val)
+                return;
+            end
+            
+            val = val(1:obj.frame_index-1,:);
+            
+            if all(isnan(val))
+                val = [];
+            end
+            
+        end
+        
         function val = get.offsets_x(obj)
             
             val = obj.offsets_x_full;
@@ -240,22 +272,6 @@ classdef Lightcurves < handle
         function val = get.widths(obj)
             
             val = obj.widths_full;
-            
-            if isempty(val)
-                return;
-            end
-            
-            val = val(1:obj.frame_index-1,:);
-            
-            if all(isnan(val))
-                val = [];
-            end
-            
-        end
-        
-        function val = get.backgrounds(obj)
-            
-            val = obj.backgrounds_full;
             
             if isempty(val)
                 return;
