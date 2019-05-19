@@ -13,21 +13,25 @@ int cs(const char *keyword, const char *compare_str, int num_letters=3);
 int cs(const char *keyword, const char *str1, const char *str2, int num_letters=3);
 int cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters=3);
 
+// Usage: [flux, weight, background, variance, offset_x, offset_y, width] = photometry(cutouts, varargin)
+
 class Photometry{
 	
 	public:
 	
 	float *cutouts=0;
 	
-	float epsilon=0.1f; // minimal value for both dx and dy to change. If change is smaller than epsilon, further iterations are skipped... 
+	float epsilon=0.1f; // minimal value for both dx, dy to change. If change is smaller than epsilon, further iterations are skipped... 
 	mwSize *dims=0;
 	mwSize ndims=0;
 	int N=0; 
 	int num_iter=1;
 	int subtract=1;
-	int debug_bit=1;
+	int debug_bit=0;
 	mwSize out_dims[2]={0,0};
 	int num_cutouts=0;
+	float multiplier=3.5; // default radius of aperture is previous width time this multiplier
+	float seeing=2; // default gauss width is seeing*2.355
 
 	// definitions of aperture/annulus types
 	enum ap_enum {SQUARE=0, CIRCLE, GAUSSIAN};
@@ -54,18 +58,20 @@ class Photometry{
 	// output arrays are defined here (in C++)
 	float *flux=0;
 	float *weight=0;
+	float *background=0;
+	float *variance=0;
 	float *offset_x=0;
 	float *offset_y=0;
 	float *width=0;
-	float *background=0;
 
 	// output arrays are defined here (in matlab pointers)
 	mxArray *flux_ptr=0;
 	mxArray *weight_ptr=0;
+	mxArray *background_ptr=0;
+	mxArray *variance_ptr=0;
 	mxArray *offset_x_ptr=0;
 	mxArray *offset_y_ptr=0;
 	mxArray *width_ptr=0;
-	mxArray *background_ptr=0;
 	
 	// function prototypes (implementation at the end)
 	Photometry(int nrhs, const mxArray *prhs[]);
@@ -85,6 +91,7 @@ class Photometry{
 
 	// utility to get number of pixesl from fractions / pixels
 	float pixels(double input);
+	float getAverageWidth();
 	
 	// the sum of the product of array1...
 	float sumArrays(const float *array1);
@@ -103,7 +110,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 
 	// check inputs!
 	if (nrhs==0){
-		mexPrintf("Usage: [flux, weight, offset_x, offset_y, width, background] = photometry(cutouts, varargin)\n"); 
+		mexPrintf("Usage: [flux, weight, background, variance, offset_x, offset_y, width] = photometry(cutouts, varargin)\n"); 
 		mexPrintf("OPTIONAL ARGUMENTS:\n");
 		mexPrintf("-------------------\n");
 		mexPrintf("...\n");
@@ -113,21 +120,21 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	// read the input data and parameters
 	if(mxIsEmpty(prhs[0])){ // no input, then just return with all empty outputs...
 		const mwSize dims[]={0,0};
-		for(int i=0;i<6;i++) plhs[i]=mxCreateNumericArray(0,dims, mxSINGLE_CLASS, mxREAL); // return all empty arrays...
+		for(int i=0;i<7;i++) plhs[i]=mxCreateNumericArray(0,dims, mxSINGLE_CLASS, mxREAL); // return all empty arrays...
 		return;
 	}
 
 	Photometry phot(nrhs, prhs);
 	
 	phot.run();
-	
 	plhs[0]=phot.flux_ptr; 
 	plhs[1]=phot.weight_ptr; 
-	plhs[2]=phot.offset_x_ptr; 
-	plhs[3]=phot.offset_y_ptr; 
-	plhs[4]=phot.width_ptr; 
-	plhs[5]=phot.background_ptr; 
-	 
+	plhs[2]=phot.background_ptr; 
+	plhs[3]=phot.variance_ptr;
+	plhs[4]=phot.offset_x_ptr; 
+	plhs[5]=phot.offset_y_ptr; 
+	plhs[6]=phot.width_ptr; 
+	
 }
 
 Photometry::Photometry(int nrhs, const mxArray *prhs[]){ // class constructor
@@ -149,7 +156,6 @@ Photometry::Photometry(int nrhs, const mxArray *prhs[]){ // class constructor
 		printMatrix(X, "X");
 		printMatrix(Y, "Y");
 	}
-	
 	
 }
 
@@ -253,45 +259,59 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){
 			
 		}
 		else if(cs(key, "fluxes")){
-			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
-			if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
+			if(val==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			if(mxIsEmpty(val)) continue;
+			if(mxIsNumeric(val)==0 || mxIsSingle(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericSingle", "Input %d to photometry is not a numeric single precision float...", i+2);
 			
 			flux_ptr=mxDuplicateArray(val);
 			
 		}
 		else if(cs(key, "weights")){
-			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
-			if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
+			if(val==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			if(mxIsEmpty(val)) continue;
+			if(mxIsNumeric(val)==0 || mxIsSingle(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not a numeric single precision float...", i+2);
 			
 			weight_ptr=mxDuplicateArray(val);
 			
 		}
+		else if(cs(key, "backgrounds")){
+			if(val==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			if(mxIsEmpty(val)) continue;
+			if(mxIsNumeric(val)==0 || mxIsSingle(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not a numeric single precision float...", i+2);
+			
+			background_ptr=mxDuplicateArray(val);
+			
+		}
+		else if(cs(key, "variances")){
+			if(val==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			if(mxIsEmpty(val)) continue;
+			if(mxIsNumeric(val)==0 || mxIsSingle(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not a numeric single precision float...", i+2);
+			
+			variance_ptr=mxDuplicateArray(val);
+			
+		}
 		else if(cs(key, "dx") || cs(key, "offset_x", 8) || cs(key, "offsets_x", 9)){
-			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
-			if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
+			if(val==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			if(mxIsEmpty(val)) continue;
+			if(mxIsNumeric(val)==0 || mxIsSingle(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not a numeric single precision float...", i+2);
 			
 			offset_x_ptr=mxDuplicateArray(val);
 			
 		}
 		else if(cs(key, "dy") || cs(key, "offset_y", 8) || cs(key, "offsets_y", 9)){
-			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
-			if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
+			if(val==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			if(mxIsEmpty(val)) continue;
+			if(mxIsNumeric(val)==0 || mxIsSingle(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not a numeric single precision float...", i+2);
 			
 			offset_y_ptr=mxDuplicateArray(val);
 			
 		}
 		else if(cs(key, "widths")){
-			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
-			if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
+			if(val==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			if(mxIsEmpty(val)) continue;
+			if(mxIsNumeric(val)==0 || mxIsSingle(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not a numeric single precision float...", i+2);
 			
 			width_ptr=mxDuplicateArray(val);
-			
-		}
-		else if(cs(key, "backgrounds")){
-			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
-			if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
-			
-			background_ptr=mxDuplicateArray(val);
 			
 		}
 		else if(cs(key, "subtract")){
@@ -316,8 +336,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){
 				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
 				epsilon=mxGetScalar(val);
 			}
-			
-			
+				
 		}
 		else if(cs(key, "debug_bit")){
 			if(val==0 || mxIsEmpty(val)) debug_bit=1; // if no input, assume positive
@@ -326,6 +345,21 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){
 				debug_bit=mxGetScalar(val);
 			}
 			
+		}
+		else if(cs(key, "multiplier")){
+			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			else{
+				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
+				multiplier=mxGetScalar(val);
+			}
+			
+		}
+		else if(cs(key, "seeing")){
+			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			else{
+				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
+				seeing=mxGetScalar(val);
+			}
 			
 		}
 		
@@ -335,15 +369,16 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){
 	flux=(float*) mxGetData(flux_ptr);
 	if(weight_ptr==0) weight_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
 	weight=(float*) mxGetData(weight_ptr);
+	if(background_ptr==0) background_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
+	background=(float*) mxGetData(background_ptr);
+	if(variance_ptr==0) variance_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
+	variance=(float*) mxGetData(variance_ptr);
 	if(offset_x_ptr==0) offset_x_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
 	offset_x=(float*) mxGetData(offset_x_ptr);
 	if(offset_y_ptr==0) offset_y_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
 	offset_y=(float*) mxGetData(offset_y_ptr);
 	if(width_ptr==0) width_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
 	width=(float*) mxGetData(width_ptr);
-	if(background_ptr==0) background_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
-	background=(float*) mxGetData(background_ptr);
-	
 	
 	if(debug_bit){ // check that all inputs have been received! 
 		mexPrintf("cutouts: [");
@@ -353,7 +388,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){
 		for(int i=0;i<num_ap_pars;i++) mexPrintf("%4.2f ", ap_pars[i]);
 		mexPrintf("| background: %s (%d) | pars= ", background_string, bg_type);
 		for(int i=0;i<num_bg_pars;i++) mexPrintf("%4.2f ", bg_pars[i]);
-		mexPrintf("| iter= %d | debug_bit= %d | N= %d\n", num_iter, debug_bit, N);
+		mexPrintf("| iter= %d | debug_bit= %d | subtract= %d | N= %d\n", num_iter, debug_bit, subtract, N);
 	}
 	
 }
@@ -382,8 +417,10 @@ void Photometry::calculate(int j){
 	float *y2=(float *)mxCalloc(N, sizeof(float)); // grid with shift added using found moment
 	float *ap_array=(float *)mxCalloc(N, sizeof(float)); // grid with the aperture shape
 	float *bg_array=(float *)mxCalloc(N, sizeof(float)); // grid with the background shape
-	float *image=(float *)mxCalloc(N, sizeof(float));
-	memcpy(image, &cutouts[j*N], N*sizeof(float)); // grab a copy of the current cutout!
+	float *image_raw=(float *)mxCalloc(N, sizeof(float));
+	float *image_sub=(float *)mxCalloc(N, sizeof(float));
+	float *image=0; // can be image_raw or image_sub depending on value of "subtract" option
+	memcpy(image_raw, &cutouts[j*N], N*sizeof(float)); // grab a copy of the current cutout!
 	
 	for(int k=0;k<num_iter;k++){ // number of iterations 
 		
@@ -404,10 +441,6 @@ void Photometry::calculate(int j){
 		main_mask(ap_array, x, y);
 		secondary_mask(bg_array, x, y);
 		
-		// printMatrix(image, "image"); // debug only! 
-		// printMatrix(ap_array, "ap_array"); // debug only! 
-		// printMatrix(bg_array, "bg_array"); // debug only! 
-		
 		weight[j]=sumArrays(ap_array); // number of pixels in this aperture
 		
 		for(int i=0;i<N;i++) ap_array[i]/=weight[j]; // normalize aperture
@@ -415,10 +448,16 @@ void Photometry::calculate(int j){
 		float sum_ap_square=sumArrays(ap_array, ap_array); // normaliztion by sum(ap^2)
 		
 		// first calculate the b/g so we can subtract it! 
-		background[j]=sumArrays(image, bg_array)/N; // average background value per pixels
+		float bg_weight=sumArrays(bg_array);
+		background[j]=sumArrays(image_raw, bg_array)/bg_weight; // average background value per pixels
 		
-		// now make a background subtracted, aperture weighted image
-		if(subtract) for(int i=0;i<N;i++) image[i]-=background[j];
+		// now make a background subtracted image
+		for(int i=0;i<N;i++) image_sub[i]=image_raw[i]-background[j];
+		if(subtract) image=image_sub;
+		else image=image_raw;
+		
+		variance[j]=sumArrays(image_sub, image_sub, bg_array)/bg_weight; // variance of the background area
+		
 		for(int i=0;i<N;i++) image[i]*=ap_array[i]/sum_ap_square; // weigh by the normalized aperture
 		
 		float m0=sumArrays(image); // flux after going through aperture, normalized by sum(ap^2)
@@ -439,7 +478,7 @@ void Photometry::calculate(int j){
 		if(m0>0){ // values are reliable enough to fill the other parameters
 			offset_x[j]=m1x;
 			offset_y[j]=m1y;
-			width[j]=sqrt(m2x+m2y);
+			width[j]=sqrt((m2x+m2y)/2);
 		}
 		else{
 			offset_x[j]=NAN;
@@ -457,7 +496,8 @@ void Photometry::calculate(int j){
 	mxFree(y2);
 	mxFree(ap_array);
 	mxFree(bg_array);
-	mxFree(image);
+	mxFree(image_raw);
+	mxFree(image_sub);
 	
 }
 
@@ -481,14 +521,22 @@ void Photometry::circle_mask(float *array, float *x, float *y){
 	
 	float radius=sqrt(N)/2; // default value
 	
-	if(num_ap_pars>0) radius=(float) pixels(ap_pars[0]);
+	if(num_ap_pars>0){ // got an override to default radius
+		if(isnan(ap_pars[0])){ // NaN override means get the width from last time
+			float w=getAverageWidth();
+			if(w>0) radius=w*multiplier;
+		}
+		else radius=(float) pixels(ap_pars[0]);
+	}
+	
 	// mexPrintf("radius= %f\n", radius);
 	for(int i=0;i<N;i++){
 		
 		float r=(float) sqrt(x[i]*x[i]+y[i]*y[i]);
 		
 		array[i]=radius+0.5-r;
-		if(array[i]<0) array[i]=0;
+		//if(array[i]<0) array[i]=0;
+		if(array[i]<1) array[i]=0;
 		if(array[i]>1) array[i]=1;
 		
 	}
@@ -550,6 +598,18 @@ float Photometry::pixels(double input){
 	if(dims[1]<d) d=dims[1]; 
 	return d*input; // get fraction of smaller dimension of cutouts
 	
+}
+
+float Photometry::getAverageWidth(){
+
+	if(width_ptr){
+		float S=0;
+		int counter=0;
+		for(int j=0;j<num_cutouts;j++) if(isnan(width[j])==0) { S+=width[j]; counter++; }
+		return S/counter; // mean of the widths, excluding NaNs
+	}
+	else return 0;
+
 }
 
 float Photometry::sumArrays(const float *array1){

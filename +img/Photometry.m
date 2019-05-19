@@ -30,17 +30,19 @@ classdef Photometry < handle
         % outputs
         fluxes;
         weights;
+        backgrounds;
+        variances;
         centroids_x;
         centroids_y;
         offsets_x;
         offsets_y;
         widths;
-        backgrounds;
         
     end
     
     properties % switches/controls
         
+        use_mex = 0; % use the new mex function for faster processing
         use_backgrounds = 0; % remove background from individual cutout
         corner_size = 0.15; % fraction of the cut_size or pixel value (must be smaller than cut_size!)
         
@@ -84,43 +86,53 @@ classdef Photometry < handle
         
         fluxes_basic;
         weights_basic;
+        backgrounds_basic;
+        variances_basic;
         offsets_x_basic;
         offsets_y_basic;
         centroids_x_basic;
         centroids_y_basic;
         widths_basic;
-        backgrounds_basic;
         
         fluxes_ap;
         weights_ap;
+        backgrounds_ap;
+        variances_ap;
         offsets_x_ap;
         offsets_y_ap;
         centroids_x_ap;
         centroids_y_ap;
         widths_ap;
-        backgrounds_ap;
         
         fluxes_psf;
         weights_psf;
+        backgrounds_psf;
+        variances_psf;
         offsets_x_psf;
         offsets_y_psf;
         centroids_x_psf;
         centroids_y_psf;
         widths_psf;
-        backgrounds_psf;
         
         fluxes_fit;
         weights_fit;
+        backgrounds_fit;
+        variances_fit;
         offsets_x_fit;
         offsets_y_fit;
         centroids_x_fit;
         centroids_y_fit;
         widths_fit;
-        backgrounds_fit;
         
-        default_ap_size = 3;
+        default_iterations;
+        default_aperture;
+        default_annulus;
+        default_gauss_sigma;
         
-        version = 1.02;
+        default_seeing = 1;
+        default_ap_multiplier = 3.5;
+        
+        version = 1.03;
         
     end
     
@@ -133,7 +145,7 @@ classdef Photometry < handle
                 obj = util.oop.full_copy(varargin{1});
             else
                 if obj.debug_bit, fprintf('Photometry constructor v%4.2f\n', obj.version); end
-                                
+                util.oop.save_defaults(obj);
             end
             
         end
@@ -259,10 +271,11 @@ classdef Photometry < handle
             
         end
         
-        function [flux, weight, offset_x, offset_y, width, background] = calculate(obj, shape, bg_shape, iterations)
+        function [flux, weight, background, variance, offset_x, offset_y, width] = calculate(obj, shape, bg_shape, iterations)
 
             import util.stat.sum2;
             import util.stat.median2;
+            import util.stat.var2;
             import util.text.cs;
             
             if nargin<2 || isempty(shape)
@@ -306,6 +319,18 @@ classdef Photometry < handle
                 weight = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
             end
             
+            if ~isempty(obj.backgrounds)
+                background = obj.backgrounds;
+            else
+                background = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
+            end
+            
+            if ~isempty(obj.variances)
+                variance = obj.variances;
+            else
+                variance = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
+            end
+            
             if ~isempty(obj.offsets_x)
                 offset_x = obj.offsets_x;
             else
@@ -322,12 +347,6 @@ classdef Photometry < handle
                 width = obj.widths;
             else
                 width = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
-            end
-            
-            if ~isempty(obj.backgrounds)
-                background = obj.backgrounds;
-            else
-                background = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
             end
             
             % go over each cutout and shift it to the center
@@ -352,6 +371,7 @@ classdef Photometry < handle
                         ann(isnan(I)) = nan; 
                         
                         B = median2(I.*ann); % background per pixel...
+                        V = var2(I.*ann); 
                         
                         if obj.use_backgrounds
                             I = I - B;
@@ -369,6 +389,7 @@ classdef Photometry < handle
                         
                         % quality checks:
                         if m0==0
+                            if obj.debug_bit>3, disp('m0 is zero!'); end
                             m1x = 0;
                             m1y = 0;
                             m2x = NaN;
@@ -376,8 +397,8 @@ classdef Photometry < handle
 %                             mxy = NaN;
                         end
                         
-                        if m2x<0, m2x = NaN; end
-                        if m2y<0, m2y = NaN; end
+                        if m2x<0, m2x = NaN; if obj.debug_bit>3, disp('m2x is negative!'); end, end
+                        if m2y<0, m2y = NaN; if obj.debug_bit>3, disp('m2y is negative!'); end, end
                         
                         dx = m1x;
                         dy = m1y;
@@ -388,11 +409,11 @@ classdef Photometry < handle
 
                     flux(jj,ii) = m0;
                     weight(jj,ii) = S;
+                    background(jj,ii) = B;
+                    variance(jj,ii) = V;
                     offset_x(jj,ii) = dx;
                     offset_y(jj,ii) = dy;
                     width(jj,ii) = W;
-                    background(jj,ii) = B;
-                    
                     % add break point if dx and dy don't change much...
                     
                 end
@@ -432,12 +453,31 @@ classdef Photometry < handle
         
         function val = makeCircle(obj, dx, dy)
             
+            if nargin<2 || isempty(dx)
+                dx = 0;
+            end
+            
+            if nargin<3 || isempty(dy)
+                dy = 0;
+            end
+            
             R = obj.aperture;
+            
+            if isnan(R) % use NaN to indicate automatically choose radius
+                if ~isempty(obj.widths)
+                    R = obj.default_ap_multiplier*util.stat.median2(obj.widths);
+                elseif ~isempty(obj.default_aperture) && ~isnan(obj.default_aperture)
+                    R = obj.default_aperture;
+                else
+                    R = obj.default_seeing.*obj.default_ap_multiplier;
+                end
+            end
             
             r = sqrt((obj.X-dx).^2+(obj.Y-dy).^2);
             val = R+0.5-r;
             val(val>1) = 1;
-            val(val<0) = 0;
+%             val(val<0) = 0;
+            val(val<1) = 0;
             
             if isa(obj.cutouts, 'single')
                 val = single(val);
@@ -449,6 +489,14 @@ classdef Photometry < handle
         
         function val = makeAnnulus(obj, dx, dy)
            
+            if nargin<2 || isempty(dx)
+                dx = 0;
+            end
+            
+            if nargin<3 || isempty(dy)
+                dy = 0;
+            end
+            
             R1 = obj.annulus;
             
             if isempty(obj.annulus_outer)
@@ -472,8 +520,26 @@ classdef Photometry < handle
         end
         
         function val = makeGaussian(obj, dx, dy)
-        
+            
+            if nargin<2 || isempty(dx)
+                dx = 0;
+            end
+            
+            if nargin<3 || isempty(dy)
+                dy = 0;
+            end
+            
             sig = obj.gauss_sigma;
+            
+            if isnan(sig) %use NaN to indicate automatically choose sigma
+                if ~isempty(obj.widths)
+                    sig = mean(obj.widths, 1, 'omitnan');
+                elseif ~isempty(obj.default_gauss_sigma) && ~isnan(obj.default_gauss_sigma)
+                    sig = obj.default_gauss_sigma;
+                else
+                    sig = obj.default_seeing*2.355;
+                end
+            end
             
             r = sqrt((obj.X-dx).^2+(obj.Y-dy).^2);
             
@@ -491,88 +557,121 @@ classdef Photometry < handle
             
             import util.stat.sum2;
             
-            [f,w,x,y,W,b] = obj.calculate('none', 'corner', 1);
+            if obj.use_mex
+                [f,w,b,v,x,y,W] = util.img.photometry(single(obj.cutouts), 'square', [], 'corners', obj.corner_size, 'widths', obj.widths);
+            else
+                [f,w,b,v,x,y,W] = obj.calculate('none', 'corner', 1);
+            end
             
             obj.fluxes_basic = f;
             obj.weights_basic = w;
+            obj.backgrounds_basic = b;
+            obj.variances_basic = v;
+            
             obj.offsets_x_basic = x;
             obj.offsets_y_basic = y;
+            
             if ~isempty(obj.positions)
                 obj.centroids_x_basic = x + obj.positions(:,1)';
                 obj.centroids_y_basic = y + obj.positions(:,2)';
             end
-            obj.widths_basic = W; 
-            obj.backgrounds_basic = b;
+            
+            obj.widths_basic = W;
             
             % update the newest values
             obj.fluxes = obj.fluxes_basic;
             obj.weights = obj.weights_basic;
+            obj.backgrounds = obj.backgrounds_basic;
+            obj.variances = obj.variances_basic;
+            
             obj.offsets_x = obj.offsets_x_basic;
             obj.offsets_y = obj.offsets_y_basic;
+            
             if ~isempty(obj.positions)
                 obj.centroids_x = obj.centroids_x_basic;
                 obj.centroids_y = obj.centroids_y_basic;
             end
+            
             obj.widths = obj.widths_basic;
-            obj.backgrounds = obj.backgrounds_basic;
             
         end
         
         function calcAperture(obj)
             
-            [f,w,x,y,W,b] = obj.calculate('circle', 'annulus', obj.iterations);
+            if obj.use_mex
+                [f,w,b,v,x,y,W] = util.img.photometry(single(obj.cutouts), 'circle', obj.aperture, 'annulus', obj.annulus, 'iterations', obj.iterations,...
+                    'widths', obj.widths);
+            else
+                [f,w,b,v,x,y,W] = obj.calculate('circle', 'annulus', obj.iterations);
+            end
             
             obj.fluxes_ap = f;
             obj.weights_ap = w;
+            obj.backgrounds_ap = b;
+            obj.variances_ap = v;
+            
             obj.offsets_x_ap = x;
             obj.offsets_y_ap = y;
+            
             if ~isempty(obj.positions)
                 obj.centroids_x_ap = x + obj.positions(:,1)';
                 obj.centroids_y_ap = y + obj.positions(:,2)';
             end
-            obj.widths_ap = W; 
-            obj.backgrounds_ap = b;
+            
+            obj.widths_ap = W;
             
             % update the newest values
             obj.fluxes = obj.fluxes_ap;
             obj.weights = obj.weights_ap;
+            obj.backgrounds = obj.backgrounds_ap;
+            obj.variances = obj.variances_ap;
+            
             obj.offsets_x = obj.offsets_x_ap;
             obj.offsets_y = obj.offsets_y_ap;
+            
             if ~isempty(obj.positions)
                 obj.centroids_x = obj.centroids_x_ap;
                 obj.centroids_y = obj.centroids_y_ap;
             end
+            
             obj.widths = obj.widths_ap;
-            obj.backgrounds = obj.backgrounds_ap;
 
         end
         
         function calcGaussian(obj)
            
-            [f,w,x,y,W,b] = obj.calculate('gaussian', 'annulus', obj.iterations);
+            [f,w,b,v,x,y,W] = obj.calculate('gaussian', 'annulus', obj.iterations);
             
             obj.fluxes_psf = f;
             obj.weights_psf = w;
+            obj.backgrounds_psf = b;
+            obj.variances_psf = v;
+            
             obj.offsets_x_psf = x;
             obj.offsets_y_psf = y;
+            
             if ~isempty(obj.positions)
                 obj.centroids_x_psf = x + obj.positions(:,1)';
                 obj.centroids_y_psf = y + obj.positions(:,2)';
             end
-            obj.widths_psf = W;
-            obj.backgrounds_psf =b;
+            
+            obj.widths_psf = W*sqrt(2); % correction given because weighing by PSF makes the second moment smaller
             
             % update the newest values
             obj.fluxes = obj.fluxes_psf;
             obj.weights = obj.weights_psf;
+            obj.backgrounds = obj.backgrounds_psf;
+            obj.variances = obj.variances_psf;
+            
             obj.offsets_x = obj.offsets_x_psf;
             obj.offsets_y = obj.offsets_y_psf;
+            
             if ~isempty(obj.positions)
                 obj.centroids_x = obj.centroids_x_psf;
                 obj.centroids_y = obj.centroids_y_psf;
             end
+            
             obj.widths = obj.widths_psf;
-            obj.backgrounds = obj.backgrounds_psf;
             
         end
         
