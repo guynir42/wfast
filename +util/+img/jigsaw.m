@@ -1,4 +1,21 @@
 function [cutouts, positions] = jigsaw(Im, varargin)
+% Usage: [cutouts, positions] = jigsaw(Im, varargin)
+% Cuts an image up into squares (blocks or tiles). 
+% Can be useful for making statistical tests on small regions of the image.
+% OPTIONAL ARGUMENTS
+%   *tile: height and width of tiles (Default 128).
+%   *pad_value: how to pad the last tiles in a row/column (Default 0)
+%   *overlap: allow N pixels of overlap between tiles (Default no overlap)
+%   *squeeze: The cutouts convention is that 3rd dimension is for frames in
+%             the batch, e.g., a 3D input matrix of 2048x2048x100 will give
+%             an output cutouts of 128x128x100x256 where 4th dimension is
+%             the index of the cutout. For a single image this will give a
+%             singlton 3rd dimension. So using "squeeze" this dimension is
+%             removed. Default is true for convenience. If you expect to
+%             get 2D and 3D inputs, use squeeze=0 to get consistent output.
+% 
+
+    if nargin==0, help('util.img.jigsaw'); return; end
 
     input = util.text.InputVars;
     input.input_var('tile', 128, 'tile_size', 'size');

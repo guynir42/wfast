@@ -1054,7 +1054,9 @@ classdef Clipper < handle
             end
             
             if ~isempty(num) && num<obj.N
-                text(0.05*S(2),0.95*S(1), sprintf('showing %d/%d cutouts!', num, obj.N), 'FontSize', 16, 'Parent', ax);
+                if use_text 
+                    text(0.05*S(2),0.95*S(1), sprintf('showing %d/%d cutouts!', num, obj.N), 'FontSize', 16, 'Parent', ax);
+                end
             else 
                 num = obj.N;
             end
