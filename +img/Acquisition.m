@@ -58,8 +58,11 @@ classdef Acquisition < file.AstroData
         ref_stack;
         ref_positions;
         
-        adjust_pos; % latest adjustment to x and y
+        average_offsets; % latest adjustment to x and y
         average_width; % of all stars in the stack
+        average_background; % use this to get an indication of sky brightness
+        average_variance; % use this to get an indication of noise in the image
+        average_flux; % average flux of all stars, indicative of the sky transparency
         
         frame_rate_average; % calculated from this object's timing data
         
@@ -1172,19 +1175,21 @@ classdef Acquisition < file.AstroData
             F = obj.phot_stack.fluxes(idx);
             DX = obj.phot_stack.offsets_x(idx);
             DY = obj.phot_stack.offsets_y(idx);
-            
             M = mean(F, 'omitnan');
             
+            obj.average_flux = M; 
+            obj.average_background = mean(obj.phot_stack.backgrounds, 'omitnan');
+            obj.average_variance = mean(obj.phot_stack.variances, 'omitnan');
             
-            obj.adjust_pos = [median(F./M.*DX, 'omitnan'), median(F./M.*DY, 'omitnan')];
-            obj.adjust_pos(isnan(obj.adjust_pos)) = 0;
+            obj.average_offsets = [median(F./M.*DX, 'omitnan'), median(F./M.*DY, 'omitnan')];
+            obj.average_offsets(isnan(obj.average_offsets)) = 0;
             
             obj.average_width = median(obj.phot_stack.fluxes./M.*obj.phot_stack.widths, 'omitnan'); % maybe find the average width of each image and not the stack??
             
             if obj.use_adjust_cutouts
-                obj.clip.positions = obj.clip.positions + obj.adjust_pos;
+                obj.clip.positions = double(obj.clip.positions + obj.average_offsets);
             else
-                % must send the average adjustment back to mount controller
+                % must send the average adjustment back to mount controller (should we still adjust the cutouts though??)
             end
             
         end

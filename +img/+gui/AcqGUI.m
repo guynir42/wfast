@@ -174,8 +174,12 @@ classdef AcqGUI < handle
             %%%%%%%%%%% panel info %%%%%%%%%%%%%%%%%%
             
             obj.panel_info = GraphicPanel(obj.owner, [0.2 0.9 0.6 0.1], 'info', 0);
-            obj.panel_info.addButton('button_frame_rate', 'frame_rate_average', 'info', 'f= '); 
+            obj.panel_info.addButton('button_frame_rate', 'frame_rate_average', 'info', 'f= ', ' Hz'); 
+            obj.panel_info.addButton('button_width', 'average_width', 'info', 'width= ');
+            obj.panel_info.addButton('button_offsets', 'average_offsets', 'info', 'dx,dy= ');
+            obj.panel_info.addButton('button_flux', 'average_flux', 'info', 'flux= ');
             obj.panel_info.addButton('button_temperature', 'sensor_temperature', 'info', 's.temp= '); 
+            
             obj.panel_info.make;
             
             %%%%%%%%%%% panel image %%%%%%%%%%%%%%%%%%
