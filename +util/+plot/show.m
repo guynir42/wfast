@@ -285,7 +285,9 @@ function hndl = show(M, varargin)
     if size(M,3)==1
         
         h = image(xval, yval, M, 'CDataMapping','scaled', 'Parent', ax, 'Visible', 'off');
-        caxis(ax, [bias_level, dynamic_range]);
+        try
+            caxis(ax, [bias_level, dynamic_range]);
+        end
         ax.Visible = 'on';
         h.Visible = 'on';
         axis(ax, 'image');

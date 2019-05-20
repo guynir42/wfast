@@ -190,7 +190,7 @@ classdef AutoFocus < handle
         
         function val = checkFit(obj, x, y, fr)
             
-            if fr.p1>0 % no minimum
+            if fr.p1<0 % no minimum
                 val = 0;
                 return;
             end
@@ -232,8 +232,8 @@ classdef AutoFocus < handle
         function findPosTipTilt(obj)
             
             obj.found_pos = obj.surface_coeffs(1);
-            obj.found_pos = mean(obj.min_positions);
-            if obj.debug_bit, fprintf('BEST POS: mean= %f | surface piston term= %f\n', obj.found_pos, mean(obj.min_positions)); end
+            obj.found_pos = mean(obj.min_positions, 'omitnan');
+            if obj.debug_bit, fprintf('BEST POS: mean= %f | surface piston term= %f\n', mean(obj.min_positions, 'omitnan'), obj.surface_coeffs(1)); end
             
             obj.found_tilt = obj.surface_coeffs(2).*obj.spider_diameter.*1e4./obj.pixel_size;
             obj.found_tip = obj.surface_coeffs(3).*obj.spider_diameter.*1e4./obj.pixel_size;
