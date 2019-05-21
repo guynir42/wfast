@@ -175,9 +175,12 @@ classdef AcqGUI < handle
             
             obj.panel_info = GraphicPanel(obj.owner, [0.2 0.9 0.6 0.1], 'info', 0);
             obj.panel_info.addButton('button_frame_rate', 'frame_rate_average', 'info', 'f= ', ' Hz'); 
-            obj.panel_info.addButton('button_width', 'average_width', 'info', 'width= ');
-            obj.panel_info.addButton('button_offsets', 'average_offsets', 'info', 'dx,dy= ');
-            obj.panel_info.addButton('button_flux', 'average_flux', 'info', 'flux= ');
+            obj.panel_info.addButton('button_width', 'average_width', 'info', 'width= ', ' px', 'small', 0.5);
+            obj.panel_info.addButton('button_seeing', 'average_width', 'custom', 'seeing= ', '"', 'small', 0.5);
+            obj.panel_info.addButton('button_offset_y', 'average_offsets', 'custom', 'dy= ', '', 'small', 0.5);
+            obj.panel_info.addButton('button_offset_x', 'average_offsets', 'custom', 'dx= ', '', 'small', 0.5);
+            obj.panel_info.addButton('button_flux', 'average_flux', 'info', 'flux= ', '', 'small', 0.5);
+            obj.panel_info.addButton('button_bg', 'average_background', 'info', 'b/g= ', '', 'small', 0.5);
             obj.panel_info.addButton('button_temperature', 'sensor_temperature', 'info', 's.temp= '); 
             
             obj.panel_info.make;
@@ -237,6 +240,17 @@ classdef AcqGUI < handle
                 obj.panel_controls.button_source_choose.String = 'src: Simulator';
             elseif isa(obj.owner.src, 'obs.cam.CameraControl') || isa(obj.owner.src, 'obs.cam.Andor')
                 obj.panel_controls.button_source_choose.String = 'src: Camera';
+            end
+            
+            obj.panel_info.button_seeing.String = sprintf('seeing= %4.2f', obj.owner.average_width.*obj.owner.pars.plate_scale.*2.355);
+            
+%             obj.panel_info.button_offsets.String = sprintf('dx,dy= %4.2f,%4.2f', obj.owner.average_offsets(2), obj.owner.average_offsets(1));
+            if length(obj.owner.average_offsets)==2
+                obj.panel_info.button_offset_x.String = sprintf('dx= %4.2f', obj.owner.average_offsets(2));
+                obj.panel_info.button_offset_y.String = sprintf('dy= %4.2f', obj.owner.average_offsets(1));
+            else
+                obj.panel_info.button_offset_x.String = 'dx= ';
+                obj.panel_info.button_offset_y.String = 'dy= ';
             end
             
             if obj.owner.brake_bit

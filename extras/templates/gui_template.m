@@ -18,6 +18,8 @@ classdef objGUI < handle
     
     properties % gui stuff
         
+        panel_controls;
+        
         panel_contrast;
     
         panel_close;
@@ -75,9 +77,36 @@ classdef objGUI < handle
             obj.fig.width = 25;
             movegui(obj.fig.fig, 'center');
             
+            N = 10; % number of buttons on each side
+            
+            %%%%%%%%%%%%%%%%%%% LEFT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            pos = N;
+            
+            %%%%%%%%%%% panel controls %%%%%%%%%%%%%%%
+            
+            % Add buttons using obj.addButton(button_name, var_name='', type='', str1='', str2='', font_size='', split=1, color_on=[], color_off=[])
+            
+            num_buttons = 5;
+            pos = pos-num_buttons;
+            obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N 0.2 num_buttons/N], 'controls', 1); % last input is for vertical (default)
+            obj.panel_controls.number = num_buttons;
+            
+            obj.panel_controls.make;
+            
+            %%%%%%%%%%% panel contrast %%%%%%%%%%%%%%%
+            
+            obj.panel_contrast = util.plot.ContrastLimits(obj.axes_image, obj.fig.fig, [0 pos/N 0.2 5/N], 1); % last input is for vertical (default)
+            
+            %%%%%%%%%%%%%%%%%%% RIGHT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            pos = N;
+            
+            %%%%%%%%%%%%%%%%%%%%%% MIDDLE %%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
             %%%%%%%%%%% panel image %%%%%%%%%%%%%%%%%%
             
-            obj.panel_image = uipanel('Title', '', 'Position', [0.2 0.1 0.6 0.8]);
+            obj.panel_image = uipanel('Title', '', 'Position', [0.2 1/N 0.6 (N-2)/N]);
                         
             obj.makeAxes;
             
@@ -86,7 +115,7 @@ classdef objGUI < handle
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
                         
-            obj.panel_close = uipanel('Position', [0 0 1 0.1]);
+            obj.panel_close = uipanel('Position', [0 0 0.2 1/N]);
             obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE');
             obj.button_close.Callback = @obj.callback_close;
             

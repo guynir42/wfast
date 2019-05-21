@@ -47,6 +47,7 @@ classdef Lightcurves < handle
         offsets_x;
         offsets_y;
         widths;
+        bad_pixels;
         
     end
     
@@ -62,11 +63,12 @@ classdef Lightcurves < handle
         offsets_x_full;
         offsets_y_full;
         widths_full;
+        bad_pixels_full;
         
-        show_what_list = {'fluxes', 'weights', 'backgrounds', 'variances', 'centroids', 'offsets', 'widths'};
+        show_what_list = {'fluxes', 'weights', 'backgrounds', 'variances', 'centroids', 'offsets', 'widths', 'bad_pixels'};
         show_cal_list = {'raw', 'cal', 'both'};
         
-        version = 1.02;
+        version = 1.03;
         
     end
     
@@ -93,10 +95,12 @@ classdef Lightcurves < handle
             obj.fluxes_full = [];
             obj.timestamps_full = [];
             obj.weights_full = [];
+            obj.backgrounds_full = [];
+            obj.variances_full = [];
             obj.offsets_x_full = [];
             obj.offsets_y_full = [];
             obj.widths_full = [];
-            obj.backgrounds_full = [];
+            obj.bad_pixels_full = [];
             
             obj.frame_index = 1;
             
@@ -285,6 +289,22 @@ classdef Lightcurves < handle
             
         end
         
+        function val = get.bad_pixels(obj)
+            
+            val = obj.bad_pixels_full;
+            
+            if isempty(val)
+                return;
+            end
+            
+            val = val(1:obj.frame_index-1,:);
+            
+            if all(isnan(val))
+                val = [];
+            end
+            
+        end
+        
     end
     
     methods % setters
@@ -320,6 +340,7 @@ classdef Lightcurves < handle
                 input.input_var('offsets_x', []);
                 input.input_var('offsets_y', []);
                 input.input_var('widths', []);
+                input.input_var('bad_pixels', []);
                 input.scan_vars(varargin{:});
             end
             
@@ -335,7 +356,7 @@ classdef Lightcurves < handle
             obj.offsets_x_full = insert_matrix(obj.offsets_x_full, input.offsets_x, [obj.frame_index,1], NaN, obj.use_double_up);
             obj.offsets_y_full = insert_matrix(obj.offsets_y, input.offsets_y, [obj.frame_index,1], NaN, obj.use_double_up);
             obj.widths_full = insert_matrix(obj.widths_full, input.widths, [obj.frame_index,1], NaN, obj.use_double_up);
-            
+            obj.bad_pixels_full = insert_matrix(obj.bad_pixels_full, input.bad_pixels, [obj.frame_index,1], NaN, obj.use_double_up);
             obj.frame_index = obj.frame_index + N;
             
         end
@@ -346,7 +367,7 @@ classdef Lightcurves < handle
                 type = '';
             end
             
-            list = {'fluxes', 'weights', 'backgrounds', 'variances', 'offsets_x', 'offsets_y', 'centroids_x', 'centroids_y', 'widths'};
+            list = {'fluxes', 'weights', 'backgrounds', 'variances', 'offsets_x', 'offsets_y', 'centroids_x', 'centroids_y', 'widths', 'bad_pixels'};
             
             if ~isempty(type)
                 list2 = strcat(list, ['_' type]);
@@ -366,16 +387,19 @@ classdef Lightcurves < handle
             
         end
         
-        function diskDump(obj, filename)
+        function saveAsMAT(obj, filename)
             
             timestamps = obj.timestamps;
             fluxes = obj.fluxes;
-            widths = obj.widths;
+            backgrounds = obj.backgrounds;
+            variances = obj.variances;
             weights = obj.weights;
             centroids_x = obj.centroids_x;
             centroids_y = obj.centroids_y;
+            widths = obj.widths;
+            bad_pixels = obj.bad_pixels;
             
-            save(filename, 'timestamps', 'fluxes', 'widths', 'weights', 'centroids_x', 'centroids_y');
+            save(filename, 'timestamps', 'fluxes', 'weights', 'backgrounds', 'variances', 'centroids_x', 'centroids_y', 'widths', 'bad_pixels');
             
         end
         

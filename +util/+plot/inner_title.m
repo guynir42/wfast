@@ -1,7 +1,23 @@
 function h_out = inner_title(varargin)
+% Usage: h_out = inner_title(text, varargin)
+% Usage: h_out = inner_title(ax, text, varargin)
+%
+% Put a title text inside the axes. 
+%
+% OPTIONAL ARGUMENTS (as key-value pairs):
+%   *position: Choose top/bottom/left/right or compass directions (e.g. SouthWest). 
+%              Choose "corner" to put it in NorthWest corner. 
+%   *margin: Pass "HorizontalAlignment" to text() function. 
+%   *axes: Draw on which axes. Also can give them as first argument. Default is gca. 
+%
+% Additional inputs pairs: 'Units', 'HorizontalAlignment', 'FontSize', 'FontWeight', 
+%                          'FontName', 'Color', 'Interpreter' are passed on to text(). 
+%                          
 
     import util.text.cs;
 
+    if nargin==0, help('util.plot.inner_title'); return; end
+    
     str = '';
     ax = [];
     

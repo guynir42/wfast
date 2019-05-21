@@ -58,12 +58,6 @@ classdef Acquisition < file.AstroData
         ref_stack;
         ref_positions;
         
-        average_offsets; % latest adjustment to x and y
-        average_width; % of all stars in the stack
-        average_background; % use this to get an indication of sky brightness
-        average_variance; % use this to get an indication of noise in the image
-        average_flux; % average flux of all stars, indicative of the sky transparency
-        
         frame_rate_average; % calculated from this object's timing data
         
         batch_counter = 0;
@@ -138,6 +132,11 @@ classdef Acquisition < file.AstroData
         num_backgrounds;
         cut_size_bg;
         
+        average_offsets; % latest adjustment to x and y
+        average_width; % of all stars in the stack
+        average_background; % use this to get an indication of sky brightness
+        average_variance; % use this to get an indication of noise in the image
+        average_flux; % average flux of all stars, indicative of the sky transparency
         
     end
     
@@ -474,6 +473,36 @@ classdef Acquisition < file.AstroData
             else
                 val = [];
             end
+            
+        end
+        
+        function val = get.average_flux(obj)
+            
+            val = obj.phot_stack.average_flux;
+            
+        end
+        
+        function val = get.average_background(obj)
+            
+            val = obj.phot_stack.average_background;
+            
+        end
+        
+        function val = get.average_variance(obj)
+            
+            val = obj.phot_stack.average_variance;
+            
+        end
+        
+        function val = get.average_offsets(obj)
+            
+            val = [obj.phot_stack.average_offset_x obj.phot_stack.average_offset_y];
+            
+        end
+        
+        function val = get.average_width(obj)
+            
+            val = obj.phot_stack.average_width;
             
         end
         
@@ -1169,23 +1198,6 @@ classdef Acquisition < file.AstroData
             obj.flux_buf.input(obj.phot_stack.fluxes);
             
             % get the average width and offsets (weighted by the flux of each star...)
-            F = obj.phot_stack.fluxes;
-            idx = F>max(F)./2 & ~isnan(F); 
-            
-            F = obj.phot_stack.fluxes(idx);
-            DX = obj.phot_stack.offsets_x(idx);
-            DY = obj.phot_stack.offsets_y(idx);
-            M = mean(F, 'omitnan');
-
-            obj.average_flux = M; 
-            obj.average_background = mean(obj.phot_stack.backgrounds, 'omitnan');
-            obj.average_variance = mean(obj.phot_stack.variances, 'omitnan');
-            
-            obj.average_offsets = [median(F./M.*DX, 'omitnan'), median(F./M.*DY, 'omitnan')];
-            obj.average_offsets(isnan(obj.average_offsets)) = 0;
-
-            
-            obj.average_width = median(obj.phot_stack.fluxes./M.*obj.phot_stack.widths, 'omitnan'); % maybe find the average width of each image and not the stack??
             
             if obj.use_adjust_cutouts
                 obj.clip.positions = double(obj.clip.positions + obj.average_offsets);
@@ -1295,7 +1307,7 @@ classdef Acquisition < file.AstroData
             obj.lightcurves.input(obj.phot.fluxes, obj.timestamps, obj.phot.weights, ...
                 obj.phot.backgrounds, obj.phot.variances, ...
                 obj.phot.offsets_x, obj.phot.offsets_y, obj.phot.centroids_x, obj.phot.centroids_y, ...
-                obj.phot.widths); % store the full lightcurves...
+                obj.phot.widths, obj.phot.bad_pixels); % store the full lightcurves...
             
             if obj.lightcurves.gui.check
                 obj.lightcurves.gui.update;
