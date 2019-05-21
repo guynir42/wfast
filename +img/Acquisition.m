@@ -127,6 +127,7 @@ classdef Acquisition < file.AstroData
         % get these from Clipper
         num_stars;
         cut_size;
+        avoid_edges;
         
         % get these from background Clipper
         num_backgrounds;
@@ -336,6 +337,16 @@ classdef Acquisition < file.AstroData
             
         end
         
+        function val = num_files(obj)
+            
+            if isa(obj.src, 'file.Reader')
+                val = obj.src.num_files;
+            else
+                val = Inf;
+            end
+            
+        end
+        
         function val = get.num_batches(obj)
             
             if isprop(obj.src, 'num_batches')
@@ -430,6 +441,16 @@ classdef Acquisition < file.AstroData
             
             if ~isempty(obj.clip)
                 val = obj.clip.cut_size;
+            else
+                val = [];
+            end
+            
+        end
+        
+        function val = get.avoid_edges(obj)
+            
+            if ~isempty(obj.clip)
+                val = obj.clip.avoid_edges;
             else
                 val = [];
             end
@@ -604,6 +625,14 @@ classdef Acquisition < file.AstroData
             
             if ~isempty(obj.clip)
                 obj.clip.cut_size = val;
+            end
+            
+        end
+        
+        function set.avoid_edges(obj, val)
+            
+            if ~isempty(obj.clip)
+                obj.clip.avoid_edges = val;
             end
             
         end
@@ -1206,6 +1235,10 @@ classdef Acquisition < file.AstroData
                 % must send the average adjustment back to mount controller (should we still adjust the cutouts though??)
             end
             
+        end
+        
+        function autoNumStars(obj)
+            % need to implement this...
         end
         
         function findStars(obj)
