@@ -407,7 +407,7 @@ classdef Photometry < handle
                         ap = make_shape(dx,dy); % should we also let radius/psf_sigma change with the width?? 
                         
                         bad_mask = ap .* isnan(I); % how many (fractional) bad pixels are in the aperture
-                        if jj==3, disp(sum2(isnan(I))); end
+                        
                         ap(isnan(I)) = nan; % aperture must have NaN values in the same places (for weight calculation)
                         
                         ann = make_bg_shape(dx,dy);
@@ -922,56 +922,68 @@ classdef Photometry < handle
             if Nf>size(obj.fluxes,1), Nf = size(obj.fluxes,1); end
             
             ax1 = axes('Parent', parent, 'Position', [0.15 0.52 0.83 0.4]);
+            
             h = plot(ax1, 1:Ns, obj.fluxes(1:Nf, 1:Ns), '*');
-             for ii = 1:length(h)
+            for ii = 1:length(h)
                 h(ii).UserData = ['flux= %4.2f, frame= ' num2str(ii)];
                 h(ii).ButtonDownFcn = @obj.callback_touch_point;
             end
-            ax1.XTick = [];
-            util.plot.inner_title(ax1, 'Flux', 'position', 'right');
             
+            ax1.XTick = [];
+            ax1.XLim = [0.5,Ns+0.5];
+            
+%             util.plot.inner_title(ax1, 'Flux', 'position', 'right');
+            
+            ylabel(ax1, 'flux (counts)');
+
             ax2 = axes('Parent', parent, 'Position', [0.15 0.27 0.83 0.22]);
 %             plot(ax2, 1:Ns, obj.backgrounds(1:Nf, 1:Ns), 'o', 1:Ns, obj.variances(1:Nf, 1:Ns), 'x');
+            
             h = plot(ax2, 1:Ns, obj.backgrounds(1:Nf, 1:Ns), 'o');
             for ii = 1:length(h)
                 h(ii).UserData = ['background= %4.2f, frame= ' num2str(ii)];
                 h(ii).ButtonDownFcn = @obj.callback_touch_point;
             end
-            ax2.XTick = [];
-            util.plot.inner_title(ax2, 'b/g', 'position', 'right');
             
+            ax2.XTick = [];
+            ax2.XLim = [0.5,Ns+0.5];
+            
+%             util.plot.inner_title(ax2, 'b/g', 'position', 'right');
+            
+            ylabel(ax2, 'b/g (counts)');
+
             ax3 = axes('Parent', parent, 'Position', [0.15 0.02 0.83 0.22]);
             ax3.NextPlot = 'add';
             
             h = plot(ax3, 1:Ns, obj.offsets_x(1:Nf, 1:Ns), 'x'); 
             
             for ii = 1:length(h)
-                h(ii).UserData = ['offset_x= %4.f, frame= ' num2str(ii)];
+                h(ii).UserData = ['offset_x= %4.2f, frame= ' num2str(ii)];
                 h(ii).ButtonDownFcn = @obj.callback_touch_point;
             end
             
             h = plot(1:Ns, obj.offsets_y(1:Nf, 1:Ns), '+');
             
             for ii = 1:length(h)
-                h(ii).UserData = ['offset_y= %4.f, frame= ' num2str(ii)];
+                h(ii).UserData = ['offset_y= %4.2f, frame= ' num2str(ii)];
                 h(ii).ButtonDownFcn = @obj.callback_touch_point;
             end
             
             h = plot(1:Ns, obj.widths(1:Nf, 1:Ns), 'o');
             
             for ii = 1:length(h)
-                h(ii).UserData = ['width= %4.f, frame= ' num2str(ii)];
+                h(ii).UserData = ['width= %4.2f, frame= ' num2str(ii)];
                 h(ii).ButtonDownFcn = @obj.callback_touch_point;
             end
             
-            size(h)
             ax3.XTick = [];
-            util.plot.inner_title(ax3, 'Offsets (x,+)', 'position', 'right');
-            util.plot.inner_title(ax3, 'Widths (o)', 'position', 'left');
+            ax3.XLim = [0.5,Ns+0.5];
             
+%             util.plot.inner_title(ax3, 'Offsets (x,+)', 'position', 'right');
+%             util.plot.inner_title(ax3, 'Widths (o)', 'position', 'left');
             
-            
-            
+            ylabel(ax3, 'offset/width');
+
         end
         
         function makeGUI(obj)

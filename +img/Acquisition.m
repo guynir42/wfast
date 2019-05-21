@@ -1191,6 +1191,7 @@ classdef Acquisition < file.AstroData
             end
             
             obj.phot_stack.input(obj.stack_cutouts_sub, 'positions', obj.clip.positions); % run photometry on the stack to verify flux and adjust positions
+            if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
             
             obj.checkRealign;
             
@@ -1266,7 +1267,7 @@ classdef Acquisition < file.AstroData
                     end
 
                     obj.phot_stack.input(obj.stack_cutouts_sub, 'positions', obj.positions); % run photometry on the stack to verify flux and adjust positions
-
+                    if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
                 end
 
                 % add second test and maybe quit the run if it fails...
@@ -1302,6 +1303,7 @@ classdef Acquisition < file.AstroData
         function calcLightcurves(obj)
             
             obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps, 'positions', obj.positions); % add variance input? 
+            if ~isempty(obj.phot.gui) && obj.phot.gui.check, obj.phot.gui.update; end
             
             obj.fluxes = obj.phot.fluxes;
             obj.lightcurves.input(obj.phot.fluxes, obj.timestamps, obj.phot.weights, ...

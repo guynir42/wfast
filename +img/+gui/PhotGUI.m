@@ -115,7 +115,7 @@ classdef PhotGUI < handle
             
             %%%%%%%%%%%%%%%%%%%%%% MIDDLE %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
-            obj.panel_info = GraphicPanel(obj.owner, [0.2 (N-1)/N 0.6 1/N], 'info', 0);
+            obj.panel_info = GraphicPanel(obj.owner, [0.2 (N-1)/N 0.8 1/N], 'info', 0);
             obj.panel_info.number = 6;
             obj.panel_info.addButton('button_flux', 'average_flux', 'info', 'F= ', '', 'small');
             obj.panel_info.addButton('button_bg', 'average_background', 'info', 'B= ', '', 'small');
@@ -127,11 +127,11 @@ classdef PhotGUI < handle
             
             %%%%%%%%%%% panel image %%%%%%%%%%%%%%%%%%
             
-            obj.panel_image = uipanel('Title', '', 'Position', [0.2 1/N 0.6 (N-2)/N]);
+            obj.panel_image = uipanel('Title', '', 'Position', [0.2 1/N 0.8 (N-2)/N]);
             
             %%%%%%%%%%% panel show %%%%%%%%%%%%%%%%%%%
             
-            obj.panel_show = GraphicPanel(obj.owner, [0.2 0 0.6 1/N], '', 1);
+            obj.panel_show = GraphicPanel(obj.owner, [0.2 0 0.8 1/N], '', 1);
             obj.panel_show.number = 1;
             obj.panel_show.addButton('button_num_stars', 'show_num_stars', 'input', 'stars= ', '', '', 0.2);
             obj.panel_show.addButton('button_num_frames', 'show_num_frames', 'input', 'frames= ', '', '', 0.2);

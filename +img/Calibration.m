@@ -999,6 +999,8 @@ classdef Calibration < handle
                 
             end
             
+            DM = repmat(DM, [1,1,size(I,3),1]);
+            
             if input.num_sum>1
                 D = D*input.num_sum; % if we need to subtract multiple darks from a summed image...
                 I = sum(I,3); % just making sure the input images are summed 
