@@ -63,6 +63,7 @@ class Photometry{
 	float *offset_x=0;
 	float *offset_y=0;
 	float *width=0;
+	float *bad_pixel=0;
 
 	// output arrays are defined here (in matlab pointers)
 	mxArray *flux_ptr=0;
@@ -72,6 +73,7 @@ class Photometry{
 	mxArray *offset_x_ptr=0;
 	mxArray *offset_y_ptr=0;
 	mxArray *width_ptr=0;
+	mxArray *bad_pixel_ptr=0;
 	
 	// function prototypes (implementation at the end)
 	Photometry(int nrhs, const mxArray *prhs[]);
@@ -134,6 +136,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	plhs[4]=phot.offset_x_ptr; 
 	plhs[5]=phot.offset_y_ptr; 
 	plhs[6]=phot.width_ptr; 
+	plhs[7]=phot.bad_pixel_ptr;
 	
 }
 
@@ -314,6 +317,14 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){
 			width_ptr=mxDuplicateArray(val);
 			
 		}
+		else if(cs(key, "bad_pixels")){
+			if(val==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			if(mxIsEmpty(val)) continue;
+			if(mxIsNumeric(val)==0 || mxIsSingle(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not a numeric single precision float...", i+2);
+			
+			bad_pixel_ptr=mxDuplicateArray(val);
+			
+		}
 		else if(cs(key, "subtract")){
 			if(val==0 || mxIsEmpty(val)) subtract=1; // if no input, assume positive
 			else{
@@ -379,6 +390,8 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){
 	offset_y=(float*) mxGetData(offset_y_ptr);
 	if(width_ptr==0) width_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
 	width=(float*) mxGetData(width_ptr);
+	if(bad_pixel_ptr==0) bad_pixel_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
+	bad_pixel=(float*) mxGetData(bad_pixel_ptr);
 	
 	if(debug_bit){ // check that all inputs have been received! 
 		mexPrintf("cutouts: [");
@@ -417,6 +430,7 @@ void Photometry::calculate(int j){
 	float *y2=(float *)mxCalloc(N, sizeof(float)); // grid with shift added using found moment
 	float *ap_array=(float *)mxCalloc(N, sizeof(float)); // grid with the aperture shape
 	float *bg_array=(float *)mxCalloc(N, sizeof(float)); // grid with the background shape
+	float *bad_array=(float *)mxCalloc(N, sizeof(float)); // grid with the bad pixels marked
 	float *image_raw=(float *)mxCalloc(N, sizeof(float));
 	float *image_sub=(float *)mxCalloc(N, sizeof(float));
 	float *image=0; // can be image_raw or image_sub depending on value of "subtract" option
@@ -438,13 +452,18 @@ void Photometry::calculate(int j){
 		//(this->*bg_func)(bg_array, x,y); // make an offset background mask
 		//(this->*ap_func)(ap_array, x,y); // make an offset aperture mask
 		
+		
+		// find the number of bad pixels
+		for(int i=0;i<N;i++) if(isnan(image_raw[i])) bad_array[i]=1; // find all the bad pixels in the image
+		bad_pixel[j]=sumArrays(bad_array);
+		
 		main_mask(ap_array, x, y);
 		secondary_mask(bg_array, x, y);
 		
+		for(int i=0;i<N;i++) if(bad_array[i]){ ap_array[i]=NAN; bg_array[i]=NAN; } // make sure the ap/bg arrays have NaNs everywhere the original image has NaNs
+		
 		weight[j]=sumArrays(ap_array); // number of pixels in this aperture
-		
 		for(int i=0;i<N;i++) ap_array[i]/=weight[j]; // normalize aperture
-		
 		float sum_ap_square=sumArrays(ap_array, ap_array); // normaliztion by sum(ap^2)
 		
 		// first calculate the b/g so we can subtract it! 
@@ -498,6 +517,7 @@ void Photometry::calculate(int j){
 	mxFree(y2);
 	mxFree(ap_array);
 	mxFree(bg_array);
+	mxFree(bad_array);
 	mxFree(image_raw);
 	mxFree(image_sub);
 	

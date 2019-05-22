@@ -10,23 +10,32 @@ function [dynamic_range_vector, image_reduced] = autodyn(image, filler)
 % (filler default is image median, sigma is 3).
 
     import util.img.maskBadPixels;
-    import util.stat.max2;
-    import util.stat.min2;
+    import util.stat.median2;
+    import util.stat.std2;
 
     if nargin==0, help('util.img.autodyn'); return; end
     
     if nargin<2 || isempty(filler)
         filler = [];
     end
-
-    image_reduced = maskBadPixels(image, filler);
-
-    ker = ones(3)./8;
-    ker(2,2) = 0;
     
-    image_reduced = conv2(double(image_reduced), ker, 'valid');
+    image_reduced = image;
     
-    dynamic_range_vector(1) = min2(image_reduced);
-    dynamic_range_vector(2) = max2(image_reduced);
+%     image_reduced = maskBadPixels(image, filler);
+
+%     ker = ones(3)./8;
+%     ker(2,2) = 0;
+%     
+%     image_reduced = conv2(double(image_reduced), ker, 'valid');
+    
+    % dynamic_range_vector(1) = min2(image_reduced);
+    % dynamic_range_vector(2) = max2(image_reduced);
+    
+    M = median2(image_reduced);
+    S = std2(image_reduced);
+    
+    
+    dynamic_range_vector(1) = double(M-S);
+    dynamic_range_vector(2) = double(M+10*S);
     
 end

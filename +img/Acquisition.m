@@ -51,9 +51,8 @@ classdef Acquisition < file.AstroData
         cutouts_bg_proc;
         
         stack_cutouts; 
-        stack_cutouts_sub;
         stack_cutouts_bg;
-        stack_sub;
+        stack_proc;
         prev_stack;        
         ref_stack;
         ref_positions;
@@ -194,9 +193,9 @@ classdef Acquisition < file.AstroData
         roi_center_;
 
         
-        show_what_list = {'images', 'stack'};
+        show_what_list = {'images', 'stack', 'stack_proc'};
         
-        version = 1.03;
+        version = 1.04;
         
     end
     
@@ -1071,7 +1070,7 @@ classdef Acquisition < file.AstroData
             
             t = tic;
             
-            obj.prev_stack = obj.stack_sub; % keep one stack from last batch
+            obj.prev_stack = obj.stack_proc; % keep one stack from last batch
             obj.clear;
             
             obj.src.batch; % produce the data (from camera, file, or simulator)
@@ -1086,33 +1085,12 @@ classdef Acquisition < file.AstroData
             
             obj.copyFrom(obj.src); % get the data into this object
             
-            if obj.use_roi % need to implement new ROI interface (particularly get ROI from source and pass it to calibration)
-                
-                S = size(obj.images);
-                
-                x1 = obj.roi_x1;
-                if x1<1, x1 = 1; end
-                if x1>S(2), x1 = S(2)-1; end
-                
-                x2 = obj.roi_x2;
-                if x2<x1, x2 = x1+1; end
-                if x2>S(2), x2 = S(2); end
-                
-                y1 = obj.roi_y1;
-                if y1<1, y1 = 1; end
-                if y1>S(1), y1 = S(1)-1; end
-                
-                y2 = obj.roi_y2;
-                if y2<y1, y2 = y1+1; end
-                if y2>S(1), y2 = S(1); end
-                
-                obj.images = obj.images(y1:y2, x1:x2,:);
+            % if src is using ROI, must update the calibration object to do the same
+            if isprop(obj.src, 'use_roi') && obj.src.use_roi 
                 
                 obj.cal.use_roi = 1;
-                obj.cal.roi_x1 = x1;
-                obj.cal.roi_x2 = x2;
-                obj.cal.roi_y1 = y1;
-                obj.cal.roi_y2 = y2;
+                
+                obj.cal.ROI = obj.src.ROI;
                 
             else
                 obj.cal.use_roi = 0;
@@ -1181,53 +1159,42 @@ classdef Acquisition < file.AstroData
         
         function calcStack(obj)
             
-            % make the basic, calibrated stack image
+            % make the basic stack image
             obj.num_sum = size(obj.images,3);
-            obj.stack = obj.cal.input(sum(obj.images,3), 'sum', obj.num_sum);
+            obj.stack = util.stat.sum_single(obj.images); % sum along the 3rd dimension directly into single precision
+            
+            obj.stack_proc = obj.cal.input(obj.stack, 'sum', obj.num_sum); % stack after calibration
             
             % make the background cutouts of the stack 
-            
             if isempty(obj.clip_bg.positions) % only if we didn't already assign positions to the bg_cutouts
                 obj.clip_bg.arbitraryPositions('im_size', size(obj.stack));
             end
             
-            obj.stack_cutouts_bg = obj.clip_bg.input(obj.stack); % dim 1&2 are y&x, dim 3 is scalar, dim 4 is star number.
+            obj.stack_cutouts_bg = obj.clip_bg.input(obj.stack_proc); % dim 1&2 are y&x, dim 3 is scalar, dim 4 is star number.
 
             if obj.use_background
             
                 obj.back.input(obj.stack_cutouts_bg, obj.clip_bg.positions);
                 % should also get variance from background object...
                 
-                B = obj.back.getImage(size(obj.stack));
-                obj.stack_sub = obj.stack - B;
+                B = obj.back.getImage(size(obj.stack_proc));
+                obj.stack_proc = obj.stack_proc - B;
 
-            else
-                obj.stack_sub = obj.stack;
             end
             
             if obj.batch_counter==0
                 obj.findStars; % this replaces the clipper findStars with somethinig better, or just runs it explicitely... 
             end
             
-            obj.stack_cutouts = obj.clip.input(obj.stack); % if no positions are known, it will call "findStars"
+            obj.stack_cutouts = obj.clip.input(obj.stack_proc); % if no positions are known, it will call "findStars"
             
-            if obj.use_background % if we already used background subtraction on all pixels, why not just cutout from stack_sub??
-                BC = obj.back.getPoints(obj.clip.positions);
-                BC = permute(BC, [4,3,2,1]); % turn the column vector into a 4D vector
-                obj.stack_cutouts_sub = obj.stack_cutouts - BC; 
-            else
-                obj.stack_cutouts_sub = obj.stack_cutouts;
-            end
-            
-            obj.phot_stack.input(obj.stack_cutouts_sub, 'positions', obj.clip.positions); % run photometry on the stack to verify flux and adjust positions
+            obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.clip.positions); % run photometry on the stack to verify flux and adjust positions
             if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
             
             obj.checkRealign;
             
             % store the latest fluxes from the stack cutouts
             obj.flux_buf.input(obj.phot_stack.fluxes);
-            
-            % get the average width and offsets (weighted by the flux of each star...)
             
             if obj.use_adjust_cutouts
                 obj.clip.positions = double(obj.clip.positions + obj.average_offsets);
@@ -1243,25 +1210,21 @@ classdef Acquisition < file.AstroData
         
         function findStars(obj)
             
-            S = obj.stack_sub;
-            
             if obj.use_remove_saturated
-                mu = median(squeeze(util.stat.corner_mean(util.img.jigsaw(S))));
-                sig = median(squeeze(util.stat.corner_std(util.img.jigsaw(S))));
-                S = util.img.remove_saturated(S, 'saturation', 4.5e4, 'threshold', mu+5*sig, 'dilate', 4);
+                mu = median(squeeze(util.stat.corner_mean(util.img.jigsaw(obj.stack_proc))));
+                sig = median(squeeze(util.stat.corner_std(util.img.jigsaw(obj.stack_proc))));
+                obj.stack_proc = util.img.remove_saturated(obj.stack_proc, 'saturation', 4.5e6, 'threshold', mu+5*sig, 'dilate', 4); % note the saturation value is X100 because we are looking at the stack
             end
-            
-            % do we want to save the saturation-removed stack image somewhere??
             
             if obj.use_arbitrary_pos
                 obj.clip.arbitraryPositions; % maybe add some input parameters?
             elseif obj.use_mextractor
                 % add the code for mextractor+astrometry here
             else
-                obj.clip.findStars(S);                
+                obj.clip.findStars(obj.stack_proc);                
             end
             
-            obj.ref_stack = obj.stack_sub;
+            obj.ref_stack = obj.stack_proc;
             obj.ref_positions = obj.clip.positions;
             
         end
@@ -1282,24 +1245,14 @@ classdef Acquisition < file.AstroData
 
                     disp('Lost star positions, using quick_align');
                     
-                    [~,shift] = util.img.quick_align(obj.stack_sub, obj.ref_stack);
+                    [~,shift] = util.img.quick_align(obj.stack_proc, obj.ref_stack);
                     obj.clip.positions = double(obj.ref_positions + flip(shift));
                     
                     % this shift should also be reported back to mount controller? 
 
-                    obj.stack_cutouts = obj.clip.input(obj.stack);
+                    obj.stack_cutouts = obj.clip.input(obj.stack_proc);
 
-                    if obj.use_background
-                        BC = obj.back.getPoints(obj.clip.positions);
-                        BC = permute(BC, [4,3,2,1]); % turn the column vector into a 4D vector
-                        % should also get variance from background object...
-
-                        obj.stack_cutouts_sub = obj.stack_cutouts - BC;
-                    else
-                        obj.stack_cutouts_sub = obj.stack_cutouts;
-                    end
-
-                    obj.phot_stack.input(obj.stack_cutouts_sub, 'positions', obj.positions); % run photometry on the stack to verify flux and adjust positions
+                    obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.positions); % run photometry on the stack to verify flux and adjust positions
                     if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
                 end
 
@@ -1610,7 +1563,9 @@ classdef Acquisition < file.AstroData
                 if cs(obj.show_what, 'images')
                     I = obj.images(:,:,end);
                 elseif cs(obj.show_what, 'stack')
-                    I = obj.stack_sub;
+                    I = obj.stack;
+                elseif cs(obj.show_what, 'stack_proc')
+                    I = obj.stack_proc;
                 else
                     error('Unknown option for "display_what". Use "images", "raw", or "stack"');
                 end

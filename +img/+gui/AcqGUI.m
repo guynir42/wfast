@@ -127,6 +127,7 @@ classdef AcqGUI < handle
             obj.panel_controls.addButton('button_preview', 'preview', 'push', 'PREVIEW', '', '', 0.5);
             obj.panel_controls.addButton('button_live', 'live', 'push', 'LIVE', '', '', 0.5);
             obj.panel_controls.make;
+            obj.panel_controls.button_num_files.Callback = @obj.callback_num_files;
             
             %%%%%%%%%%% panel contrast %%%%%%%%%%%%%%%
             
@@ -201,7 +202,7 @@ classdef AcqGUI < handle
             
             obj.button_batch_num = GraphicButton(obj.panel_image, [0 0.95 0.1 0.05], obj.owner, 'batch_counter', 'info', 'N= ', '', 'small');
             
-            obj.button_show_what = GraphicButton(obj.panel_image, [0 0.00 0.1 0.05], obj.owner, 'show_what', 'picker', 'full', '', 'small');
+            obj.button_show_what = GraphicButton(obj.panel_image, [0 0.00 0.15 0.05], obj.owner, 'show_what', 'picker', 'full', '', 'small');
             obj.button_show_what.Callback = @obj.callback_show_what;
             obj.button_show_what.String = obj.owner.show_what_list;
             
@@ -276,6 +277,7 @@ classdef AcqGUI < handle
             for ii = 1:length(obj.button_show_what.String)
                 if util.text.cs(obj.owner.show_what, obj.button_show_what.String{ii})
                     obj.button_show_what.Value = ii;
+                    break;
                 end
             end
             
@@ -305,6 +307,19 @@ classdef AcqGUI < handle
             
         end
         
+        function callback_num_files(obj, ~, ~)
+            
+            
+            if obj.debug_bit, disp('callback: num_files'); end
+            
+            if ~isinf(obj.owner.num_files)
+                obj.owner.num_batches = obj.owner.num_files;
+            end
+            
+            obj.update;
+        
+        end
+        
         function callback_show_what(obj, hndl, ~)
             
             if obj.debug_bit, disp('callback: show_what'); end
@@ -315,6 +330,7 @@ classdef AcqGUI < handle
             obj.owner.show_what = hndl.String{hndl.Value};
 
             obj.owner.show;
+            obj.panel_contrast.autodyn;
             
             obj.update;
             
