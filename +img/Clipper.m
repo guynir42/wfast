@@ -52,7 +52,7 @@ classdef Clipper < handle
         use_lock_adjust = 1; % force adjustment of all cutouts together (e.g., telescope drift)
         use_mex = 1; % use util.img.mexCutout (this is about x10 faster)
         use_moments = 1;
-        pad_value = 0; % when clipping outside the edges of the frame...
+        pad_value = NaN; % when clipping outside the edges of the frame...
         use_padding_warning = 0;
         use_find_stars_for_realign = 0; % if you want to refind all stars when realign is called. (we need to cancel this option...)
         

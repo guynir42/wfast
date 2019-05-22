@@ -1213,7 +1213,7 @@ classdef Acquisition < file.AstroData
             if obj.use_remove_saturated
                 mu = median(squeeze(util.stat.corner_mean(util.img.jigsaw(obj.stack_proc))));
                 sig = median(squeeze(util.stat.corner_std(util.img.jigsaw(obj.stack_proc))));
-                obj.stack_proc = util.img.remove_saturated(obj.stack_proc, 'saturation', 4.5e6, 'threshold', mu+5*sig, 'dilate', 4); % note the saturation value is X100 because we are looking at the stack
+                obj.stack_proc = util.img.remove_saturated(obj.stack_proc, 'saturation', 4.5e4*obj.num_sum, 'threshold', mu+5*sig, 'dilate', 4); % note the saturation value is X100 because we are looking at the stack
             end
             
             if obj.use_arbitrary_pos

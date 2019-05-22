@@ -541,7 +541,7 @@ void Photometry::square_mask(float *array, float *x, float *y){
 
 void Photometry::circle_mask(float *array, float *x, float *y){
 	
-	float radius=sqrt(N)/2; // default value
+	float radius=sqrt(N)/2; // default radius of aperture
 	
 	if(num_ap_pars>0){ // got an override to default radius
 		if(isnan(ap_pars[0])){ // NaN override means get the width from last time
@@ -550,6 +550,8 @@ void Photometry::circle_mask(float *array, float *x, float *y){
 		}
 		else radius=(float) pixels(ap_pars[0]);
 	}
+	
+	
 	
 	// mexPrintf("radius= %f\n", radius);
 	for(int i=0;i<N;i++){
@@ -562,10 +564,32 @@ void Photometry::circle_mask(float *array, float *x, float *y){
 		if(array[i]>1) array[i]=1;
 		
 	}
-	
 }
 
 void Photometry::gaussian_mask(float *array, float *x, float *y){
+	
+	
+	float sigma=sqrt(N)/2; // default gaussian width parameter
+	float threshold=1e-6; // under this value is replaced with NaN (do we need this?)
+
+	if(num_ap_pars>0){ // got an override to default sigma
+		if(isnan(ap_pars[0])){ // NaN override means get the width from last time
+			float w=getAverageWidth();
+			if(w>0) sigma=w*multiplier;
+		}
+		else sigma=(float) pixels(ap_pars[0]);
+	}
+	
+	for(int i=0;i<N;i++){
+		
+		float r=(float) sqrt(x[i]*x[i]+y[i]*y[i]);
+		
+		array[i]=exp(-0.5*r*r/sigma/sigma);
+		
+		// if(array[i]<threshold) array[i]=NAN;
+		
+	}
+	
 	
 }
 

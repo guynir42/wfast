@@ -60,7 +60,22 @@ classdef Calibration < handle
     properties(Transient=true)
        
         gui@img.gui.CalGUI;
+        
         audio@util.sys.AudioControl; % sounds an alert when starting/finishing making dark/flat
+        
+        prog@util.sys.ProgressBar; % prints how much time is left to make dark/flat
+        
+        dark_mean_transformed;
+        dark_var_transformed;
+        dark_mask_transformed;
+        
+        flat_field_transformed;
+        flat_var_transformed;
+        flat_mean_transformed;
+        
+        dark_mean_cut; % a 4D matrix with the cutouts of dark_mean (same positions as the data)
+        dark_mask_cut; % a 4D matrix with the cutouts of dark_mask (same positions as the data)
+        flat_field_cut; % a 4D matrix with the cutouts of flat_field (same positions as the data)
         
     end
     
@@ -70,29 +85,22 @@ classdef Calibration < handle
         reader_dark@file.Reader; % reads the dark images to generate the dark frame
         reader_flat@file.Reader; % reads the flat images to generate the flat frame
         
-        prog@util.sys.ProgressBar; % prints how much time is left to make dark/flat
-        
-    end
-    
-    properties % cut out of darks and flats...
-       
-        dark_mean_cut; % a 4D matrix with the cutouts of dark_mean (same positions as the data)
-        dark_mask_cut; % a 4D matrix with the cutouts of dark_mask (same positions as the data)
-        flat_field_cut; % a 4D matrix with the cutouts of flat_field (same positions as the data)
-        
     end
     
     properties % outputs
+        
         
         num_darks = 0; % how many dark frames were summed
         dark_mean; % mean of all darks
         dark_var; % variance of all darks
         dark_mask; % mask containing the location of bad pixels
+        date_dark = '';
         
         num_flats = 0; % how many flat frames were summed
         flat_field; % normalized flat field (relative intensities)
         flat_mean; % the mean of the flats (used for calculating gain, etc.)
         flat_var; % variance of the flats (used for calculating gain, etc.)
+        date_flat = '';
         
         flat_pixel_mean; % used for calculating gain
         flat_pixel_var; % used for calculating gain
@@ -126,7 +134,8 @@ classdef Calibration < handle
         replace_value = NaN;
         
         dark_mask_sigma = 5; % how hot a pixel must be (relative to dark noise) to be considered a "bad pixel"
-        dark_mask_var_ratio = 0.99; % what fraction of pixel variance is considered "bad pixels" 
+        dark_mask_var_sigma = 100;
+        dark_mask_var_ratio = 0.99; % what fraction of pixel variance is considered "bad pixels" (to be depricated)
         
         % switches for making darks/flats (can we get rid of this??)
         use_calc_gain = 0;
@@ -151,17 +160,10 @@ classdef Calibration < handle
     properties (Hidden=true)
     
         default_dark_mask_sigma;
-        default_dark_mask_var_ratio;
+        default_dark_mask_var_sigma;
+        default_dark_mask_var_ratio; % we're not using this anymore...
         
-        dark_mean_transformed;
-        dark_var_transformed;
-        dark_mask_transformed;
-        
-        flat_field_transformed;
-        flat_var_transformed;
-        flat_mean_transformed;
-        
-        version = 1.05;
+        version = 1.06;
         
     end
     
@@ -282,19 +284,7 @@ classdef Calibration < handle
             
             if isempty(obj.dark_mask)
                 
-                % kill pixels with mean above/below the average dark_mean value
-                pix = bsxfun(@rdivide, bsxfun(@minus, obj.dark_mean, mean2(obj.dark_mean)), sqrt(mean2(obj.dark_var)))./obj.dark_mask_sigma;
-                pix(isnan(pix)) = 1;
-                M = logical(floor(abs(pix))); % if there are pixels whose means are over Xsigma from the norm
-
-                % kill pixels with the highest variance
-                V = obj.dark_var(:);
-                V = sort(V);
-                index = ceil(obj.dark_mask_var_ratio*length(V)); 
-                V_thresh = V(index);
-                M(obj.dark_var>=V_thresh) = 1;
-                
-                obj.dark_mask = M;
+                obj.calcDarkMask;
 
             end
             
@@ -491,6 +481,14 @@ classdef Calibration < handle
         function set.dark_mask_sigma(obj, sigma)
            
             obj.dark_mask_sigma = sigma;
+            obj.dark_mask = [];
+            obj.dark_mask_cut = [];
+            
+        end
+        
+        function set.dark_mask_var_sigma(obj, sigma)
+           
+            obj.dark_mask_var_sigma = sigma;
             obj.dark_mask = [];
             obj.dark_mask_cut = [];
             
@@ -796,8 +794,10 @@ classdef Calibration < handle
 
                     if cs(obj.mode, 'dark')
                         obj.addDark(reader.images);
+                        obj.date_dark = reader.t_start(1:10);
                     elseif cs(obj.mode, 'flat')
                         obj.addFlat(reader.images);
+                        obj.date_flat = reader.t_start(1:10);
                     else
                         error(['unknown calibration mode: ' obj.mode]);
                     end
@@ -898,7 +898,47 @@ classdef Calibration < handle
             obj.loop; 
             
         end
-                
+        
+        function calcDarkMask(obj)
+            
+            % kill pixels with mean above/below the average dark_mean value
+%             pix = bsxfun(@rdivide, bsxfun(@minus, obj.dark_mean, mean2(obj.dark_mean)), sqrt(mean2(obj.dark_var)))./obj.dark_mask_sigma;
+%             pix(isnan(pix)) = 1;
+%             M = logical(floor(abs(pix))); % if there are pixels whose means are over Xsigma from the norm
+% 
+%             % kill pixels with the highest variance
+%             V = obj.dark_var(:);
+%             V = sort(V);
+%             index = ceil(obj.dark_mask_var_ratio*length(V)); 
+%             V_thresh = V(index);
+%             M(obj.dark_var>=V_thresh) = 1;
+
+            if obj.debug_bit>1, disp('making dark mask'); end
+
+            M = false(size(obj.dark_mean)); % start with an empty mask
+
+            % find the pixels with unusual mean values
+            m = obj.dark_mean(:);
+            [mu,sig] = util.stat.sigma_clipping(m, 'dist', 'gauss', 'iterations', 5);
+            
+            idx = abs(m - mu)>sig*obj.dark_mask_sigma;
+            M(idx) = true;
+            
+            if obj.debug_bit>2, fprintf('dark_mean stats: mu= %4.2f | sig= %4.2f | num_pix= %d | frac= %g\n', mu, sig, nnz(idx), nnz(idx)/numel(idx)); end
+            
+            % find the pixels with unusual variance values
+            v = obj.dark_var(:);
+            [mu,sig] = util.stat.sigma_clipping(v, 'dist', 'weibul', 'iterations', 5);
+            
+            idx = abs(v - mu)>sig*obj.dark_mask_var_sigma;
+            M(idx) = true;
+            
+            if obj.debug_bit>2, fprintf('dark_mean stats: mu= %4.2f | sig= %4.2f | num_pix= %d | frac= %g\n', mu, sig, nnz(idx), nnz(idx)/numel(idx)); end
+            
+            obj.dark_mask = M;  
+            
+        end
+        
         function updateCutouts(obj, clipper, cut_size) % check if we need to adjust the dark_mean_cut etc. 
             
             if nargin<3 || isempty(cut_size)
@@ -1187,7 +1227,8 @@ classdef Calibration < handle
             % don't need to save the loaded dark/flat files
             obj.reader_dark.clear;
             obj.reader_flat.clear;
-            deflate = 0;
+            obj.clip.clear;
+            deflate = 1;
             
             if isempty(directory)
                 if isempty(obj.reader_dark) && isempty(obj.reader_flat)
@@ -1319,6 +1360,14 @@ classdef Calibration < handle
                 obj.load(filename, directory);
             end
            
+            if isempty(obj.audio)
+                obj.audio = util.sys.AudioControl;
+            end
+            
+            if isempty(obj.prog)
+                obj.prog = util.sys.ProgressBar;
+            end
+            
         end
         
     end
@@ -1377,7 +1426,7 @@ classdef Calibration < handle
                 obj.gui.axes_mask = ax;
             end
                         
-            if ~isempty(obj.dark_mask)
+            if obj.brake_bit==1 && ~isempty(obj.dark_mask)
                 show(obj.dark_mask, 'fancy', 0, 'ax', ax, varargin{:});
                 inner_title(ax, 'dark mask', 'color', 'red');
                 inner_title(ax, ['fraction= ' num2str(mean2(obj.dark_mask))], 'Position', 'bottom', 'Color', 'red');
