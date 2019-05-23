@@ -10,6 +10,8 @@ classdef ASA < handle
         
         target@head.Ephemeris;
         
+        log@util.sys.Logger;
+        
     end
     
     properties % inputs/outputs
@@ -18,7 +20,9 @@ classdef ASA < handle
     
     properties % switches/controls
         
-        step = 1; % degree... 
+        step_arcsec = 5;
+        
+        brake_bit = 1; 
         
         debug_bit = 1;
         
@@ -29,8 +33,8 @@ classdef ASA < handle
         RA_target; % in degrees        
         DE_target; % in degrees
         
-        RA_target_str;
-        DE_target_str;
+        RA_target_hex;
+        DE_target_hex;
         
         HA_target;
         ALT_target;
@@ -132,13 +136,13 @@ classdef ASA < handle
             
         end
         
-        function val = get.RA_target_str(obj)
+        function val = get.RA_target_hex(obj)
             
             val = obj.target.RA; 
             
         end
         
-        function val = get.DE_target_str(obj)
+        function val = get.DE_target_hex(obj)
             
             val = obj.target.DE;
             
@@ -254,7 +258,7 @@ classdef ASA < handle
     
     methods % calculations
         
-        function input(obj, varargin)
+        function inputTarget(obj, varargin)
             
             if ~isempty(which('celestial.coo.coo_resolver', 'function'))
                 [obj.RA_target, obj.DE_target] = celestial.coo.coo_resolver(varargin{:}, 'OutUnits', 'deg');
@@ -264,9 +268,31 @@ classdef ASA < handle
             
         end
         
-        function goto(obj, varargin)
+        function slew(obj, varargin)
             
             error('Not yet implemented!');
+            
+        end
+        
+        function adjustPosition(obj, RA_deg, DE_deg)
+            
+            
+            
+        end
+        
+        function engineeringSlew(obj,Alt,Az)
+            
+        end
+        
+        function park(obj)
+            
+        end
+        
+        function zenith_west(obj)
+            
+        end
+        
+        function zenith_east(obj)
             
         end
         
@@ -274,6 +300,27 @@ classdef ASA < handle
             
             obj.target.update;
             
+        end
+        
+        function check(obj) % make all possible checks to see if we need to abort the slew
+            
+            
+            
+        end
+        
+        function stop(obj)
+            
+            obj.log.input('stopping telescope');
+            
+            try 
+                obj.brake_bit = 1;
+            
+                obj.hndl.AbortSlew;
+                
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
         end
         
     end

@@ -92,23 +92,35 @@ classdef Ephemeris < handle
             
         end
         
-        function rad = RA_rad(obj)
+        function val = RA_rad(obj)
            
             if ischar(obj.RA)
-                rad = obj.ra2rad(obj.RA);
+                val = obj.ra2rad(obj.RA);
             else
-                rad = obj.RA;
+                val = obj.RA;
             end
             
         end
         
-        function rad = DE_rad(obj)
+        function val = DE_rad(obj)
            
             if ischar(obj.DE)
-                rad = obj.dec2rad(obj.DE);
+                val = obj.dec2rad(obj.DE);
             else
-                rad = obj.DE;
+                val = obj.DE;
             end
+            
+        end
+        
+        function val = RA_deg(obj)
+           
+            val = 360/2/pi*obj.RA_rad;
+            
+        end
+        
+        function val = DE_deg(obj)
+           
+            val = 360/2/pi*obj.DE_rad;
             
         end
         
@@ -130,8 +142,16 @@ classdef Ephemeris < handle
             
         end
         
-        function ha = HA_rad(obj)
-            ha = obj.getHAandLST;
+        function val = HA_rad(obj)
+            
+            val = obj.getHAandLST;
+            
+        end
+        
+        function val = HA_deg(obj)
+            
+            val = 360/2/pi*obj.HA_rad;
+            
         end
         
         function ha = get.HA(obj)
@@ -140,9 +160,15 @@ classdef Ephemeris < handle
             
         end
         
-        function lst = LST_rad(obj)
+        function val = LST_rad(obj)
             
-            [~, lst] = obj.getHAandLST;
+            [~, val] = obj.getHAandLST;
+            
+        end
+        
+        function val = LST_deg(obj)
+            
+            val = 360/2/pi*obj.LST_rad;
             
         end
         
