@@ -16,9 +16,16 @@ classdef ASA < handle
     
     properties % inputs/outputs
         
+        status = 0;
+        
     end
     
     properties % switches/controls
+        
+        limit_alt = 15; % degrees
+        
+        use_accelerometer = 0;
+        use_ultrasonic = 0;
         
         step_arcsec = 5;
         
@@ -43,15 +50,15 @@ classdef ASA < handle
         RA;
         DE;        
         
-        RA_str;
-        DE_str;
+        RA_hex;
+        DE_hex;
         
         HA;
         ALT;
         AZ;
         
         LST;
-        LST_str;
+        LST_hex;
         
         % can we get motor status from hndl??
         tracking;
@@ -78,17 +85,35 @@ classdef ASA < handle
             
             end
             
-            obj.target = head.Ephemeris;
+            obj.log = util.sys.Logger('ASA_mount', obj);
             
-            obj.connect;
+            try
             
-            obj.update;
+                obj.target = head.Ephemeris;
+
+                obj.connect;
+
+                obj.update;
+
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
             
         end
         
         function connect(obj)
             
+            obj.log.input('Connecting to mount');
+            
             try 
+                
+                if ~isempty(obj.hndl)
+                    obj.disconnect;
+                    pause(0.1);
+                end
+                
+                obj.loadServer;
                 
                 obj.hndl = actxserver('AstrooptikServer.Telescope');
             
@@ -98,15 +123,67 @@ classdef ASA < handle
                 obj.hndl.Connected = 1;
             
                 obj.hndl.MotorOn;
-               
+                
             catch ME
-                % should we do anything else?
-                warning(ME.getReport);
+                obj.log.error(ME.getReport);
+                rethrow(ME);
             end
             
         end
         
+        function loadServer(obj)
+            
+%             system('C:\Program Files (x86)\Autoslew\AstroOptikServer.exe &'); % call the system command to load the server outside of matlab 
+            system('D:\matlab\wfast\+obs\+mount\launch_server.bat &'); % call the batch file to load the server then exit the cmd
+            
+            tic;
+            
+            for ii = 1:100
+                
+                [~, str] = system('tasklist /fi "imagename eq AstroOptikServer.exe"'); % check 
+                
+                str = strip(str);
+                idx = strfind(str, 'AstroOptikServer.exe');
+                
+                if isempty(idx)
+                    continue; % can't find the server on the tasklist
+                else
+                    num = util.text.extract_numbers(str(idx:end)); % found the server, now check the memory usage
+                    if num{1}(3)>30
+                        return; % server has loaded and is connected to telescope
+                    end
+                    % if this last condition fails, repeatedly, it means
+                    % the server is stuck on a dialog... 
+                end
+                
+                pause(0.05);
+            
+            end
+            
+            obj.killServer;
+            error('Timeout while waiting for AstroOptikServer.exe to load for %f seconds!', toc); 
+            
+        end
+        
         function disconnect(obj)
+            
+            obj.log.input('Disconnecting from mount');
+            
+            try
+                obj.killServer;
+                delete(obj.hndl);
+                obj.hndl = [];
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
+            
+            
+        end
+        
+        function killServer(obj)
+            
+            [ret, str] = system('taskkill /fi "imagename eq AstroOptikServer.exe" /f'); % force killing of the server.
             
         end
         
@@ -178,13 +255,13 @@ classdef ASA < handle
             
         end
         
-        function val = get.RA_str(obj)
+        function val = get.RA_hex(obj)
             
             val = head.Ephemeris.rad2ra(deg2rad(obj.RA));
             
         end
         
-        function val = get.DE_str(obj)
+        function val = get.DE_hex(obj)
             
             val = head.Ephemeris.rad2dec(deg2rad(obj.DE));
             
@@ -214,7 +291,7 @@ classdef ASA < handle
             
         end
         
-        function val = get.LST_str(obj)
+        function val = get.LST_hex(obj)
             
             val = head.Ephemeris.rad2ra(deg2rad(obj.LST));
             
@@ -300,11 +377,48 @@ classdef ASA < handle
             
             obj.target.update;
             
+            try
+                obj.hndl.Connected;
+            catch 
+                obj.status = 0; 
+                return;
+            end
+            
+            % check server is running
+            [~, str] = system('tasklist /fi "imagename eq AstroOptikServer.exe"'); % check 
+                
+            str = strip(str);
+            idx = strfind(str, 'AstroOptikServer.exe');
+            
+            if isempty(idx)
+                obj.status = 0;
+                return;
+            end
+            
+            if obj.ALT<0
+                obj.status = 0;
+                return;
+            end
+            
+            % add additional tests?
+            
+            obj.status = 1;
+            
         end
         
-        function check(obj) % make all possible checks to see if we need to abort the slew
+        function val = check(obj) % make all possible checks to see if we need to abort the slew
             
+            val = 0;
             
+            if obj.ALT<obj.limit_alt
+                return;
+            end
+            
+            if obj.use_accelerometer || obj.use_ultrasonic
+                
+            end
+            
+            val = 1;
             
         end
         

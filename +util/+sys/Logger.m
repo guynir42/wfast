@@ -105,17 +105,17 @@ classdef Logger < handle
                     if isempty(obj.dev_name) && ~isempty(obj.owner) && isobject(obj.owner)
                         obj.dev_name = class(obj.owner);
                     end
-                    
-                    if obj.debug_bit
-                        if isempty(obj.owner) && ~isempty(obj.dev_name)
-                            fprintf('Logger constructor v%4.2f | name: %s\n', obj.version, obj.dev_name);
-                        elseif ~isempty(obj.owner) && isempty(obj.dev_name)
-                            fprintf('Logger constructor v%4.2f | owner: %s\n', obj.version, class(obj.owner));
-                        else
-                            fprintf('Logger constructor v%4.2f | name: %s | owner: %s\n', obj.version, obj.dev_name, class(obj.owner));
-                        end
+                
+                end
+                
+                if obj.debug_bit
+                    if isempty(obj.owner) && ~isempty(obj.dev_name)
+                        fprintf('Logger constructor v%4.2f | name: %s\n', obj.version, obj.dev_name);
+                    elseif ~isempty(obj.owner) && isempty(obj.dev_name)
+                        fprintf('Logger constructor v%4.2f | owner: %s\n', obj.version, class(obj.owner));
+                    else
+                        fprintf('Logger constructor v%4.2f | name: %s | owner: %s\n', obj.version, obj.dev_name, class(obj.owner));
                     end
-
                 end
                 
             else
