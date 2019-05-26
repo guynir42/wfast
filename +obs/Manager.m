@@ -68,7 +68,7 @@ classdef Manager < handle
         function connect(obj)
             
             obj.connectDome;
-%             obj.connectMount;
+            obj.connectMount;
             obj.connectBoltwood;
             obj.connectWindETH;
             

@@ -1087,7 +1087,7 @@ classdef StatusChecker < handle
             
             idx = find(t>t(end)-frac_day, 1, 'first'); 
             if ~isempty(idx) && idx>0
-                v = v(idx:end);
+                v = v(idx:end,:);
                 t = t(idx:end);
             end
             

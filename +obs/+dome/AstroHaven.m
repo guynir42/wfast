@@ -109,7 +109,7 @@ classdef AstroHaven < handle
             end
             
             obj.connect;
-            obj.log.hearbeat(600);
+            obj.log.heartbeat(600);
             
         end
         
