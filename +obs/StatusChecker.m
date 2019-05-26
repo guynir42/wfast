@@ -1085,6 +1085,12 @@ classdef StatusChecker < handle
         
         function [v,t] = getWeatherTimeData(obj, v, t, frac_day)
             
+            if isempty(t) || isempty(v)
+                v = [];
+                t = [];
+                return;
+            end
+            
             idx = find(t>t(end)-frac_day, 1, 'first'); 
             if ~isempty(idx) && idx>0
                 v = v(idx:end,:);

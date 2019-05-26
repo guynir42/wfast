@@ -333,7 +333,7 @@ classdef ASA < handle
         
     end
     
-    methods % calculations
+    methods % calculations / commands
         
         function inputTarget(obj, varargin)
             
@@ -345,6 +345,18 @@ classdef ASA < handle
             
         end
         
+        function val = prechecks(obj)
+            
+            val = 1;
+            
+        end
+        
+        function val = checks(obj)
+            
+            val = 1;
+            
+        end
+        
         function slew(obj, varargin)
             
             error('Not yet implemented!');
@@ -353,8 +365,51 @@ classdef ASA < handle
         
         function adjustPosition(obj, RA_deg, DE_deg)
             
+            obj.log.input(sprintf('Adjusting position by RA: %f deg | DE: %f deg', RA_deg, DE_deg));
             
+            try
+
+                total_time = 1;
+                time_res = 0.1;
+                N = ceil(total_time./time_res);
+                total_time = N.*time_res; % if the division was not integer
+
+                if obj.prechecks==0
+                    obj.stop;
+                    return;
+                end
+
+                obj.brake_bit = 0;
+                on_cleanup = onCleanup(@obj.stop);
             
+                % convert the total adjustment to the rate in arcsec/sec
+                obj.hndl.RightAscensionRate = DE_deg.*3600/total_time;
+                obj.hndl.DeclinationRate = DE_deg.*3600/total_time;
+            
+                t = tic;
+                
+                for ii = 1:N
+                
+                    if obj.brake_bit || obj.checks==0
+                        obj.emergency_stop;
+                        return;
+                    end
+                    
+                    if toc(t)>total_time
+                        obj.stop;
+                        return;
+                    end
+                    
+                    pause(time_res);
+                    
+                end
+            
+            catch ME
+                obj.stop;
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
+                
         end
         
         function engineeringSlew(obj,Alt,Az)
@@ -424,6 +479,22 @@ classdef ASA < handle
         
         function stop(obj)
             
+%             obj.log.input('stopping telescope');
+            
+            try 
+                obj.brake_bit = 1;
+            
+                obj.hndl.AbortSlew;
+                
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
+            
+        end
+        
+        function emergency_stop(obj)
+            
             obj.log.input('stopping telescope');
             
             try 
@@ -435,6 +506,7 @@ classdef ASA < handle
                 obj.log.error(ME.getReport);
                 rethrow(ME);
             end
+            
         end
         
     end
