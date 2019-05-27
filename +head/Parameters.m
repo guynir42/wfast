@@ -115,7 +115,7 @@ classdef Parameters < dynamicprops
         
         default_aperture;
         default_f_number;
-        default_filter_name = 'clear';
+        default_filter_name = 'luminance';
         default_im_size = [2560 2160];
         
         datapath;
@@ -169,7 +169,7 @@ classdef Parameters < dynamicprops
                     obj.datapath = pwd;
                 end
                 
-                obj.filter = head.Filter('clear');
+                obj.filter = head.Filter('luminance');
                 obj.ephem = head.Ephemeris(obj);
                 
                 util.oop.save_defaults(obj);
