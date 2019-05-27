@@ -77,6 +77,10 @@ classdef Filter < handle
                 obj.wavelength = 2190;
                 obj.bandwidth = 390;
                 obj.name = 'K';
+            elseif cs(filter_type, 'luminance')
+                obj.wavelength = 550;
+                obj.bandwidth = 300;
+                obj.name = 'luminance';
                 % add more filters! 
             else
                 error(['Unknown filter: ' filter_type ' try U,B,V, etc.']);

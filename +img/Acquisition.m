@@ -1468,7 +1468,7 @@ classdef Acquisition < file.AstroData
         
         function findStarsFocus(obj) % find stars in order in five locations around the sensor
             
-            I = obj.stack;
+            I = obj.stack_proc;
             S = size(I);
             C = obj.cut_size;
             
@@ -1506,9 +1506,12 @@ classdef Acquisition < file.AstroData
                 for jj = 1:100
                 
                     [mx,idx] = util.stat.max2(I.*mask{mod(ii-1,5)+1}); % find the maximum in each masked area
+                    
+                    if any(idx-floor(C/2)<1), break; end
+                    
                     I(idx(1)-floor(C/2):idx(1)+floor(C/2)+1, idx(2)-floor(C/2):idx(2)+floor(C/2)+1) = NaN; % remove found stars
                 
-                    if mx<obj.saturation_value % found a good star
+                    if mx<obj.saturation_value*obj.num_sum % found a good star
                         pos(ii,:) = flip(idx); % x then y!
                         break; % pick this star and keep going
                     else % continue to look for stars in this quadrant

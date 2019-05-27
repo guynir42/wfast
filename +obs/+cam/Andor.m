@@ -269,6 +269,11 @@ classdef Andor < file.AstroData
                     obj.setupTimeBuffer;
                     
                     obj.update;
+                    
+                    % from our focus test on 26/5/19
+                    obj.focuser.pos = 4.69;
+                    obj.focuser.tip = 3.25;
+                    obj.focuser.tilt = 1.05;
 
                 catch ME
                     obj.log.error(ME.getReport);
