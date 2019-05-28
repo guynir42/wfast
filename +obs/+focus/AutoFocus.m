@@ -209,6 +209,9 @@ classdef AutoFocus < handle
         
         function fitSurface(obj)
             
+            % add check that there is anything to fit (maybe before the
+            % call to this function?)
+            
             m = size(obj.xy_pos_reduced,1); % number of measurements
             
             B = obj.min_positions_reduced; % measured best position for each location

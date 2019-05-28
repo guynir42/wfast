@@ -229,7 +229,7 @@ classdef Acquisition < file.AstroData
                 obj.flux_buf = util.vec.CircularBuffer;
                 
                 obj.phot = img.Photometry;
-                obj.phot.use_aperture = 1;
+                obj.phot.use_aperture = 0;
                 obj.phot.use_gaussian = 0;
                 obj.lightcurves = img.Lightcurves;
                 
@@ -1385,31 +1385,34 @@ classdef Acquisition < file.AstroData
         
         function runFocus(obj, varargin)
             
-            input = obj.makeInputVars('reset', 1, 'batch_size', 100, 'expT', 0.025, ...
-                'num_stars', 25, 'cut_size', 20, 'use audio', 0, 'use_save', 0, 'use_reset', 0, varargin{:});
-            
-            if isempty(obj.cam) || isempty(obj.cam.focuser)
-                error('must be connected to camera and focuser!');
-            end
-            
-            obj.reset;
-            obj.single;
-            obj.findStarsFocus;
-            
-            old_pos = obj.cam.focuser.pos; % keep this in case of error/failure
+            obj.log.input('Running autofocus');
             
             try
-            
+                
+                if isempty(obj.cam) || isempty(obj.cam.focuser)
+                    error('must be connected to camera and focuser!');
+                end
+
+                input = obj.makeInputVars('reset', 1, 'batch_size', 100, 'expT', 0.025, ...
+                    'num_stars', 25, 'cut_size', 20, 'use audio', 0, 'use_save', 0, 'use_reset', 0, varargin{:});
+
+                obj.reset;
+                obj.single;
+                obj.findStarsFocus;
+                
+                old_pos = obj.cam.focuser.pos; % keep this in case of error/failure
+                
                 obj.cam.focuser.pos = obj.cam.focuser.pos - obj.af.range; % starting point for scan... 
-                pause(0.1);
-
-                obj.startup(input);
-                cleanup = onCleanup(@obj.finishup);
-
+            
                 obj.af.startup(old_pos, obj.positions, input.num_stars);
+            
+                pause(0.1);
             
                 input.num_batches = length(obj.af.pos);
             
+                obj.startup(input);
+                cleanup = onCleanup(@obj.finishup);
+
                 for ii = 1:input.num_batches
 
                     if obj.brake_bit
