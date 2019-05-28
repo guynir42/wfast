@@ -897,6 +897,10 @@ classdef Photometry < handle
         
         function plot(obj, parent, varargin)
             
+            if isempty(obj.fluxes)
+                return;
+            end
+            
             if nargin<2 || isempty(parent) || ~isgraphics(parent)
                 if ~isempty(obj.gui) && obj.gui.check
                     parent = obj.gui.panel_image;

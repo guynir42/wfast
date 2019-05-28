@@ -81,7 +81,8 @@ classdef Parameters < dynamicprops
         star_x; % in pixels, relative to frame size (final position)
         star_y; % in pixels, relative to frame size (final position)
         
-        % ephemeris: time & coordinates        
+        % ephemeris: time & coordinates
+        EXPTIME; % alias for expT
         RA = ''; % for the center of the image
         DE = '';% for the center of the image
         
@@ -96,7 +97,7 @@ classdef Parameters < dynamicprops
         
         run_start_datestr;
         night_start_datestr;
-        juldate;
+        JD;
         
     end
        
@@ -350,7 +351,13 @@ classdef Parameters < dynamicprops
             end
             
         end
-         
+        
+        function val = get.EXPTIME(obj)
+            
+            val = obj.expT;
+            
+        end
+        
         % ephemeris
         function name = folder_name(obj)
             
@@ -429,9 +436,9 @@ classdef Parameters < dynamicprops
             
         end
         
-        function val = get.juldate(obj)
+        function val = get.JD(obj)
             
-            val = obj.ephem.juldate;
+            val = obj.ephem.JD;
             
         end
         
@@ -643,6 +650,12 @@ classdef Parameters < dynamicprops
             
         end
 
+        function set.EXPTIME(obj, val)
+            
+            obj.expT = val;
+            
+        end
+        
         % ephemeris
         function set.RA(obj, val)
             
@@ -778,7 +791,7 @@ classdef Parameters < dynamicprops
             if ~isempty(obj.HA), matlab.io.fits.writeKey(file_ptr, 'OBJCTHA', head.Ephemeris.ra2rad(obj.HA)/2/pi*24, 'hours'); end
             if ~isempty(obj.latitude), matlab.io.fits.writeKey(file_ptr, 'SITELAT', obj.latitude, 'degrees'); end
             if ~isempty(obj.longitude), matlab.io.fits.writeKey(file_ptr, 'SITELONG', obj.longitude, 'degrees'); end
-            if ~isempty(obj.juldate), matlab.io.fits.writeKey(file_ptr, 'JD', obj.juldate); end
+            if ~isempty(obj.JD), matlab.io.fits.writeKey(file_ptr, 'JD', obj.JD); end
             if ~isempty(obj.airmass), matlab.io.fits.writeKey(file_ptr, 'AIRMASS', obj.airmass); end
             if ~isempty(obj.instrument), matlab.io.fits.writeKey(file_ptr, 'INSTRUME', obj.instrument); end
             matlab.io.fits.writeKey(file_ptr, 'INPUTFMT', 'FITS');
