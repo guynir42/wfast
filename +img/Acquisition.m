@@ -1292,10 +1292,13 @@ classdef Acquisition < file.AstroData
             if ~isempty(obj.phot.gui) && obj.phot.gui.check, obj.phot.gui.update; end
             
             obj.fluxes = obj.phot.fluxes;
+            
+            if 0
             obj.lightcurves.input(obj.phot.fluxes, obj.timestamps, obj.phot.weights, ...
                 obj.phot.backgrounds, obj.phot.variances, ...
                 obj.phot.offsets_x, obj.phot.offsets_y, obj.phot.centroids_x, obj.phot.centroids_y, ...
                 obj.phot.widths, obj.phot.bad_pixels); % store the full lightcurves...
+            end
             
             if obj.lightcurves.gui.check
                 obj.lightcurves.gui.update;
@@ -1388,6 +1391,8 @@ classdef Acquisition < file.AstroData
             obj.log.input('Running autofocus');
             
             try
+               
+                old_pos = [];
                 
                 if isempty(obj.cam) || isempty(obj.cam.focuser)
                     error('must be connected to camera and focuser!');
@@ -1442,7 +1447,9 @@ classdef Acquisition < file.AstroData
             catch ME
                 
                 disp(['Focus has failed, returning focuser to previous position= ' num2str(old_pos)]); 
-                obj.cam.focuser.pos = old_pos; 
+                try 
+                    obj.cam.focuser.pos = old_pos; 
+                end
                 obj.clip.reset; % don't save these star positions! 
                 rethrow(ME);
                 
@@ -1582,7 +1589,7 @@ classdef Acquisition < file.AstroData
 
                 util.plot.setImage(I, input.ax);
 
-                obj.clip.showRectangles('num', obj.num_display_stars, 'color', 'black', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 1);
+                obj.clip.showRectangles('num', obj.num_display_stars, 'color', 'black', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 1, 'text', 0);
                 obj.clip_bg.showRectangles('num', obj.num_display_bg, 'color', 'red', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 0, 'text', 0);
 
             catch ME

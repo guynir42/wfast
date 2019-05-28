@@ -134,7 +134,7 @@ classdef Andor < file.AstroData
         
         expT = 0.025; % exposure time (seconds)
         expT_deep = 1; % for previews (this is never stashed or updated from InputVars)
-        frame_rate = 28; % frame rate (Hz) used for general capures. Use NaN to let camera take images as soon as it can, regardless of timing. 
+        frame_rate = 25; % frame rate (Hz) used for general capures. Use NaN to let camera take images as soon as it can, regardless of timing. 
         frame_rate_live = 6; % use this frame rate as the default for "live". 
         
         use_async = true; % use the new C++/mex interface for multithreaded capture
@@ -270,9 +270,8 @@ classdef Andor < file.AstroData
                     
                     obj.update;
                     
-                    % from our focus test on 26/5/19
                     try 
-                        pause(0.5);
+                        pause(5);
                         obj.setupDefaultFocusPosition;
                     catch ME
                         warning(ME.getReport);
@@ -366,9 +365,12 @@ classdef Andor < file.AstroData
         
         function setupDefaultFocusPosition(obj)
             
-            obj.focuser.pos = 4.69;
-            obj.focuser.tip = 3.25;
-            obj.focuser.tilt = 1.05;
+%             obj.focuser.pos = 4.69; % from our focus test on 26/5/19
+            obj.focuser.pos = 4.5857; % updated at 28/5/19
+%             obj.focuser.tip = 3.25;
+            obj.focuser.tip = 0;
+%             obj.focuser.tilt = 1.05;
+            obj.focuser.tilt = 0;
             
         end
         
