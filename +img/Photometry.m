@@ -294,6 +294,10 @@ classdef Photometry < handle
             
             obj.updateAverages;
             
+            if ~isempty(obj.gui) && obj.gui.check
+                obj.gui.update;
+            end
+            
         end
         
         function preprocess(obj)

@@ -134,7 +134,7 @@ classdef Andor < file.AstroData
         
         expT = 0.025; % exposure time (seconds)
         expT_deep = 1; % for previews (this is never stashed or updated from InputVars)
-        frame_rate = 28; % frame rate (Hz) used for general capures. Use NaN to let camera take images as soon as it can, regardless of timing. 
+        frame_rate = 25; % frame rate (Hz) used for general capures. Use NaN to let camera take images as soon as it can, regardless of timing. 
         frame_rate_live = 6; % use this frame rate as the default for "live". 
         
         use_async = true; % use the new C++/mex interface for multithreaded capture
@@ -269,6 +269,13 @@ classdef Andor < file.AstroData
                     obj.setupTimeBuffer;
                     
                     obj.update;
+                    
+                    try 
+                        pause(5);
+                        obj.setupDefaultFocusPosition;
+                    catch ME
+                        warning(ME.getReport);
+                    end
 
                 catch ME
                     obj.log.error(ME.getReport);
@@ -321,7 +328,7 @@ classdef Andor < file.AstroData
             obj.log.input('Disconnecting Andor camera...');
             
             try 
-                obj.hndl = obs.cam.mex_new.disconnect;
+                obs.cam.mex_new.disconnect(obj.hndl);
             catch ME
                 obj.log.error(ME.getReport);
                 rethrow(ME);
@@ -354,6 +361,17 @@ classdef Andor < file.AstroData
                 obj.focuser = obs.focus.Simulator;
             end
  
+        end
+        
+        function setupDefaultFocusPosition(obj)
+            
+%             obj.focuser.pos = 4.69; % from our focus test on 26/5/19
+            obj.focuser.pos = 4.5857; % updated at 28/5/19
+%             obj.focuser.tip = 3.25;
+            obj.focuser.tip = 0;
+%             obj.focuser.tilt = 1.05;
+            obj.focuser.tilt = 0;
+            
         end
         
         function setupAudio(obj) % try to load the audio player
@@ -1140,7 +1158,8 @@ classdef Andor < file.AstroData
             obj.copyFrom(obj.buffers); % copies the pointers to the data in "buf"
             
             if obj.debug_bit>5
-                disp(['reading out batch ' num2str(obj.batch_counter) ' from buffer ' num2str(buf.index) ' | read_flag: ' util.text.print_vec(buf.this_buf.mex_flag_read)]);
+                disp(['reading out batch ' num2str(obj.batch_counter) ' from buffer '...
+                    num2str(obj.buffers.index) ' | read_flag: ' util.text.print_vec(obj.buffers.this_buf.mex_flag_read)]);
             end
             
         end

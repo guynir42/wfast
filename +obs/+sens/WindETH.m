@@ -76,11 +76,11 @@ classdef WindETH < handle
         
         function connect(obj, ip, port)
             
-            if nargin>=1 && ~isempty(ip)
+            if nargin>1 && ~isempty(ip)
                 obj.ip = ip;
             end
             
-            if nargin>=2 && ~isempty(port)
+            if nargin>2 && ~isempty(port)
                 obj.port = port;
             end
             

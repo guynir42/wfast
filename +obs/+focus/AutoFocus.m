@@ -38,6 +38,8 @@ classdef AutoFocus < handle
     
     properties % switches/controls
         
+        use_fit_tip_tilt = 0;
+       
         step = 0.01;
         range = 0.1;
         
@@ -139,9 +141,12 @@ classdef AutoFocus < handle
         function calculate(obj)
             
             obj.fitCurves;
-            obj.fitSurface;
-            obj.findPosTipTilt;
-%             obj.findPosOnly;
+            if obj.use_fit_tip_tilt
+                obj.fitSurface;
+                obj.findPosTipTilt;
+            else
+                obj.findPosOnly;
+            end
             
         end
         
@@ -149,7 +154,7 @@ classdef AutoFocus < handle
             
             obj.fit_results = {};
             
-            for ii = 1:size(obj.widths, 2) % number of stars
+            for ii = 1:size(obj.widths, 1) % number of stars
                 
                 x = obj.pos';
                 y = obj.widths(ii,:)';
@@ -209,6 +214,9 @@ classdef AutoFocus < handle
         
         function fitSurface(obj)
             
+            % add check that there is anything to fit (maybe before the
+            % call to this function?)
+            
             m = size(obj.xy_pos_reduced,1); % number of measurements
             
             B = obj.min_positions_reduced; % measured best position for each location
@@ -225,7 +233,7 @@ classdef AutoFocus < handle
         
         function findPosOnly(obj)
             
-            obj.found_pos = mean(obj.min_positions);
+            obj.found_pos = mean(obj.min_positions, 'omitnan');
         
         end
         

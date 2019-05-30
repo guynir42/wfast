@@ -21,8 +21,9 @@ classdef ScopeAssistant < handle
         period; % what interval we use for getting feedback from the sensor (zero for no automatic updates)
         
         % acc_vec = acc_vec_data/gain + bias
-        gain; % x,y,z
-        bias; % x,y,z
+        gain = [256 256 256]; % x,y,z 
+        bias = [0 0 0]; % x,y,z
+        down = [0 0 -1]; % define what is the down direction
         
         calibration_data;
         
@@ -45,6 +46,7 @@ classdef ScopeAssistant < handle
     properties(Dependent=true)
         
         acc_vec;
+        angle;
         
     end
     
@@ -156,6 +158,16 @@ classdef ScopeAssistant < handle
         function val = distance_mean(obj)
             
             val = mean(obj.data.data(:,5));
+            
+        end
+        
+        function val = get.angle(obj)
+            
+            if isempty(obj.acc_vec) || isempty(obj.down)
+                val = [];
+            else
+                val = acosd(sum(obj.down.*obj.acc_vec)./sqrt(sum(obj.down.^2).*sum(obj.acc_vec.^2)));
+            end
             
         end
         

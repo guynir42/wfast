@@ -229,7 +229,7 @@ classdef Acquisition < file.AstroData
                 obj.flux_buf = util.vec.CircularBuffer;
                 
                 obj.phot = img.Photometry;
-                obj.phot.use_aperture = 1;
+                obj.phot.use_aperture = 0;
                 obj.phot.use_gaussian = 0;
                 obj.lightcurves = img.Lightcurves;
                 
@@ -1015,7 +1015,7 @@ classdef Acquisition < file.AstroData
                     % what if batch_size is bigger than 100??
                 end
 
-                obj.src.startup(obj.pass_source{:});
+                obj.src.startup('use_save', 0, obj.pass_source{:});
 
                 if obj.use_progress
                     obj.prog.start(obj.num_batches);
@@ -1292,10 +1292,13 @@ classdef Acquisition < file.AstroData
             if ~isempty(obj.phot.gui) && obj.phot.gui.check, obj.phot.gui.update; end
             
             obj.fluxes = obj.phot.fluxes;
+            
+            if 0
             obj.lightcurves.input(obj.phot.fluxes, obj.timestamps, obj.phot.weights, ...
                 obj.phot.backgrounds, obj.phot.variances, ...
                 obj.phot.offsets_x, obj.phot.offsets_y, obj.phot.centroids_x, obj.phot.centroids_y, ...
                 obj.phot.widths, obj.phot.bad_pixels); % store the full lightcurves...
+            end
             
             if obj.lightcurves.gui.check
                 obj.lightcurves.gui.update;
@@ -1385,31 +1388,36 @@ classdef Acquisition < file.AstroData
         
         function runFocus(obj, varargin)
             
-            input = obj.makeInputVars('reset', 1, 'batch_size', 100, 'expT', 0.025, ...
-                'num_stars', 25, 'cut_size', 20, 'use audio', 0, 'use_save', 0, 'use_reset', 0, varargin{:});
-            
-            if isempty(obj.cam) || isempty(obj.cam.focuser)
-                error('must be connected to camera and focuser!');
-            end
-            
-            obj.reset;
-            obj.single;
-            obj.findStarsFocus;
-            
-            old_pos = obj.cam.focuser.pos; % keep this in case of error/failure
+            obj.log.input('Running autofocus');
             
             try
-            
+               
+                old_pos = [];
+                
+                if isempty(obj.cam) || isempty(obj.cam.focuser)
+                    error('must be connected to camera and focuser!');
+                end
+
+                input = obj.makeInputVars('reset', 1, 'batch_size', 100, 'expT', 0.025, ...
+                    'num_stars', 25, 'cut_size', 20, 'use audio', 0, 'use_save', 0, 'use_reset', 0, varargin{:});
+
+                obj.reset;
+                obj.single;
+                obj.findStarsFocus;
+                
+                old_pos = obj.cam.focuser.pos; % keep this in case of error/failure
+                
                 obj.cam.focuser.pos = obj.cam.focuser.pos - obj.af.range; % starting point for scan... 
-                pause(0.1);
-
-                obj.startup(input);
-                cleanup = onCleanup(@obj.finishup);
-
+            
                 obj.af.startup(old_pos, obj.positions, input.num_stars);
+            
+                pause(0.1);
             
                 input.num_batches = length(obj.af.pos);
             
+                obj.startup(input);
+                cleanup = onCleanup(@obj.finishup);
+
                 for ii = 1:input.num_batches
 
                     if obj.brake_bit
@@ -1439,7 +1447,9 @@ classdef Acquisition < file.AstroData
             catch ME
                 
                 disp(['Focus has failed, returning focuser to previous position= ' num2str(old_pos)]); 
-                obj.cam.focuser.pos = old_pos; 
+                try 
+                    obj.cam.focuser.pos = old_pos; 
+                end
                 obj.clip.reset; % don't save these star positions! 
                 rethrow(ME);
                 
@@ -1468,7 +1478,7 @@ classdef Acquisition < file.AstroData
         
         function findStarsFocus(obj) % find stars in order in five locations around the sensor
             
-            I = obj.stack;
+            I = obj.stack_proc;
             S = size(I);
             C = obj.cut_size;
             
@@ -1506,9 +1516,12 @@ classdef Acquisition < file.AstroData
                 for jj = 1:100
                 
                     [mx,idx] = util.stat.max2(I.*mask{mod(ii-1,5)+1}); % find the maximum in each masked area
+                    
+                    if any(idx-floor(C/2)<1), break; end
+                    
                     I(idx(1)-floor(C/2):idx(1)+floor(C/2)+1, idx(2)-floor(C/2):idx(2)+floor(C/2)+1) = NaN; % remove found stars
                 
-                    if mx<obj.saturation_value % found a good star
+                    if mx<obj.saturation_value*obj.num_sum % found a good star
                         pos(ii,:) = flip(idx); % x then y!
                         break; % pick this star and keep going
                     else % continue to look for stars in this quadrant
@@ -1576,7 +1589,7 @@ classdef Acquisition < file.AstroData
 
                 util.plot.setImage(I, input.ax);
 
-                obj.clip.showRectangles('num', obj.num_display_stars, 'color', 'black', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 1);
+                obj.clip.showRectangles('num', obj.num_display_stars, 'color', 'black', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 1, 'text', 0);
                 obj.clip_bg.showRectangles('num', obj.num_display_bg, 'color', 'red', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 0, 'text', 0);
 
             catch ME

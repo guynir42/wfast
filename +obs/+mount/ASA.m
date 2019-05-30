@@ -102,6 +102,12 @@ classdef ASA < handle
             
         end
         
+        function delete(obj)
+           
+            obj.disconnect;
+            
+        end
+        
         function connect(obj)
             
             obj.log.input('Connecting to mount');
@@ -333,7 +339,7 @@ classdef ASA < handle
         
     end
     
-    methods % calculations
+    methods % calculations / commands
         
         function inputTarget(obj, varargin)
             
@@ -345,16 +351,120 @@ classdef ASA < handle
             
         end
         
+        function val = checks_before_slew(obj)
+            
+            val = 1;
+            
+        end
+        
+        function val = check_while_moving(obj)
+            
+            val = 0;
+            
+            if obj.ALT<20
+                return;
+            end
+            
+            val = 1;
+            
+        end
+        
         function slew(obj, varargin)
             
-            error('Not yet implemented!');
+            if isempty(obj.target.RA) || isempty(obj.target.DE) 
+                error('Please provide a target with viable RA/DE');
+            end
+            
+            obj.log.input(sprintf('Slewing to target. RA= %s | DE= %s | ALT= %4.2f', obj.target.RA, obj.target.DE, obj.target.ALT_deg));
+            
+            try 
+                
+                obj.target.update;
+                
+                if ~obj.checks_before_slew
+                    error('Prechecks failed, aborting slew');
+                end
+                
+                obj.brake_bit = 0;
+                
+                obj.hndl.SlewToCoordinatesAsync(obj.target.RA_deg/15, obj.target.DE_deg);
+                
+                for ii = 1:10000
+                    
+                    pause(0.01);
+                    
+                    if obj.brake_bit
+                        obj.stop;
+                        break;
+                    end
+                    
+                    if ~obj.check_while_moving
+                        obj.emergency_stop;
+                        break;
+                    end
+                    
+                    if obj.hndl.Slewing==0
+                        break;
+                    end
+                    
+                end
+            
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
             
         end
         
         function adjustPosition(obj, RA_deg, DE_deg)
             
+            error('This doesnt work, dont use it');
             
+            obj.log.input(sprintf('Adjusting position by RA: %f deg | DE: %f deg', RA_deg, DE_deg));
             
+            try
+
+                total_time = 1;
+                time_res = 0.1;
+                N = ceil(total_time./time_res);
+                total_time = N.*time_res; % if the division was not integer
+
+                if obj.prechecks==0
+                    obj.stop;
+                    return;
+                end
+
+                obj.brake_bit = 0;
+                on_cleanup = onCleanup(@obj.stop);
+            
+                % convert the total adjustment to the rate in arcsec/sec
+                obj.hndl.RightAscensionRate = DE_deg.*3600/total_time;
+                obj.hndl.DeclinationRate = DE_deg.*3600/total_time;
+            
+                t = tic;
+                
+                for ii = 1:N
+                
+                    if obj.brake_bit || obj.checks==0
+                        obj.emergency_stop;
+                        return;
+                    end
+                    
+                    if toc(t)>total_time
+                        obj.stop;
+                        return;
+                    end
+                    
+                    pause(time_res);
+                    
+                end
+            
+            catch ME
+                obj.stop;
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
+                
         end
         
         function engineeringSlew(obj,Alt,Az)
@@ -424,6 +534,22 @@ classdef ASA < handle
         
         function stop(obj)
             
+%             obj.log.input('stopping telescope');
+            
+            try 
+                obj.brake_bit = 1;
+            
+                obj.hndl.AbortSlew;
+                
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
+            
+        end
+        
+        function emergency_stop(obj)
+            
             obj.log.input('stopping telescope');
             
             try 
@@ -435,6 +561,7 @@ classdef ASA < handle
                 obj.log.error(ME.getReport);
                 rethrow(ME);
             end
+            
         end
         
     end
