@@ -1059,6 +1059,8 @@ classdef Acquisition < file.AstroData
             
             obj.brake_bit = 1;
             
+            obj.unstash_parameters;
+            
         end
         
         function batch(obj)

@@ -77,6 +77,11 @@ classdef Filter < handle
                 obj.wavelength = 2190;
                 obj.bandwidth = 390;
                 obj.name = 'K';
+            elseif cs(filter_type, 'F505W', 'luminance')
+                obj.wavelength = 550;
+                obj.bandwidth = 300;
+                obj.name = 'F505W';
+                % add more filters! 
             elseif cs(filter_type, 'F510W', 'luminance')
                 obj.wavelength = 550;
                 obj.bandwidth = 300;
