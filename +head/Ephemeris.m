@@ -184,6 +184,12 @@ classdef Ephemeris < handle
             
         end
         
+        function val = ALT_deg(obj)
+            
+            val = 360/2/pi.*obj.ALT;
+            
+        end
+        
         function val = get.AZ(obj)
             
             val = obj.ha2az(obj.HA_rad, obj.DE_rad, deg2rad(obj.latitude));

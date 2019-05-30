@@ -102,6 +102,12 @@ classdef ASA < handle
             
         end
         
+        function delete(obj)
+           
+            obj.disconnect;
+            
+        end
+        
         function connect(obj)
             
             obj.log.input('Connecting to mount');
@@ -345,13 +351,19 @@ classdef ASA < handle
             
         end
         
-        function val = prechecks(obj)
+        function val = checks_before_slew(obj)
             
             val = 1;
             
         end
         
-        function val = checks(obj)
+        function val = check_while_moving(obj)
+            
+            val = 0;
+            
+            if obj.ALT<20
+                return;
+            end
             
             val = 1;
             
@@ -359,11 +371,54 @@ classdef ASA < handle
         
         function slew(obj, varargin)
             
-            error('Not yet implemented!');
+            if isempty(obj.target.RA) || isempty(obj.target.DE) 
+                error('Please provide a target with viable RA/DE');
+            end
+            
+            obj.log.input(sprintf('Slewing to target. RA= %s | DE= %s | ALT= %4.2f', obj.target.RA, obj.target.DE, obj.target.ALT_deg));
+            
+            try 
+                
+                obj.target.update;
+                
+                if ~obj.checks_before_slew
+                    error('Prechecks failed, aborting slew');
+                end
+                
+                obj.brake_bit = 0;
+                
+                obj.hndl.SlewToCoordinatesAsync(obj.target.RA_deg/15, obj.target.DE_deg);
+                
+                for ii = 1:10000
+                    
+                    pause(0.01);
+                    
+                    if obj.brake_bit
+                        obj.stop;
+                        break;
+                    end
+                    
+                    if ~obj.check_while_moving
+                        obj.emergency_stop;
+                        break;
+                    end
+                    
+                    if obj.hndl.Slewing==0
+                        break;
+                    end
+                    
+                end
+            
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
             
         end
         
         function adjustPosition(obj, RA_deg, DE_deg)
+            
+            error('This doesnt work, dont use it');
             
             obj.log.input(sprintf('Adjusting position by RA: %f deg | DE: %f deg', RA_deg, DE_deg));
             
