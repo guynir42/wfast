@@ -165,12 +165,13 @@ function obj = loadHDF5(filename, input)
                 
                 value = loadAttHDF5(gid, att_names{ii});
 
-                if length(value)>3 && cs(value(1:3), '-->') % loading an object
+                if ~isempty(value) && ischar(value) && contains(value, class(obj.(att_names{ii}))) && contains(value, '(link: /')
                     if ~input.recursive
                         continue;
                     end
                     
-                    sublocation = strip(value(4:end)); % load object from sublocation pointed to by string value
+                    idx = strfind(value, '(link: /');
+                    sublocation = strip(value(idx+6:end-1)); % load object from sublocation pointed to by string value
                     
                     val = checkList(input.handle_list, sublocation); % try to get a pre-loaded object from handle_list
                     

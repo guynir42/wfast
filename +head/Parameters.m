@@ -170,6 +170,7 @@ classdef Parameters < dynamicprops
                 end
                 
                 obj.filter = head.Filter('F510W');
+%                 obj.filter = head.Filter('clear');
                 obj.ephem = head.Ephemeris(obj);
                 
                 util.oop.save_defaults(obj);
