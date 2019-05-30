@@ -39,7 +39,7 @@ classdef AutoFocus < handle
     properties % switches/controls
         
         use_fit_tip_tilt = 0;
-        
+       
         step = 0.01;
         range = 0.1;
         

@@ -393,6 +393,8 @@ classdef Analysis < file.AstroData
             obj.light_gauss.getData(obj.phot, 'gauss');
             if obj.light_gauss.gui.check, obj.light_gauss.gui.update; end
             
+            drawnow;
+            
         end
         
     end

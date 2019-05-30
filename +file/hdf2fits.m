@@ -68,6 +68,7 @@ function hdf2fits(filenames, varargin)
         end
         
         ext = '.fits';
+        d_name = strrep(d_name, ' (Weizmann Institute)', '');
         
         for jj = 1:size(I,3)
             

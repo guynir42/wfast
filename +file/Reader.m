@@ -1183,13 +1183,22 @@ classdef Reader < file.AstroData
         
         function show(obj, varargin)
             
-            if ~isempty(obj.images)
+            if ~isempty(obj.images) || ~isempty(obj.stack)
                 if obj.gui.check
+                    
+                    if ~isempty(obj.images)
+                        I = obj.images(:,:,1);
+                    elseif ~isempty(obj.stack)
+                        I = obj.stack;
+                    end
+                    
                     im = findobj(obj.gui.axes_image, 'type', 'Image');
                     if isempty(im)
-                        imagesc(obj.gui.axes_image, obj.images(:,:,1));
+                        imagesc(obj.gui.axes_image, I);
+                        axis(obj.gui.axes_image, 'image');
+                        colorbar(obj.gui.axes_image, 'on');
                     else
-                        im.CData = obj.images(:,:,1);
+                        im.CData = I;
                     end
                     
                     obj.gui.update;

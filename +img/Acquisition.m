@@ -1015,7 +1015,7 @@ classdef Acquisition < file.AstroData
                     % what if batch_size is bigger than 100??
                 end
 
-                obj.src.startup(obj.pass_source{:});
+                obj.src.startup('use_save', 0, obj.pass_source{:});
 
                 if obj.use_progress
                     obj.prog.start(obj.num_batches);
