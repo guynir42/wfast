@@ -1,7 +1,8 @@
 function M_out = pad2size(M_in, size_needed, pad_value)
-% usage: pad2size(M_in, size_needed)
+% usage: pad2size(M_in, size_needed, pad_value=0)
 % pads the given array M_in to size size_needed, putting it in the middle. 
 % Won't shrink the array... can handle 3D or 4D matrices (expands only first 2 dims)
+% 
     
     if nargin==0, help('util.img.pad2size'); return; end
 
