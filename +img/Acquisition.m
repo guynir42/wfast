@@ -47,7 +47,6 @@ classdef Acquisition < file.AstroData
     properties % inputs/outputs
         
         cutouts_proc;
-        cutouts_sub;
         cutouts_bg_proc;
         
         stack_cutouts; 
@@ -78,6 +77,7 @@ classdef Acquisition < file.AstroData
         
         use_cutouts = true;
         use_adjust_cutouts = 1; % use adjustments in software (not by moving the mount)
+        use_simple_photometry = 1; % use only sums on the cutouts instead of Photometry object for full cutouts
         
         use_save = false; % must change this when we are ready to really start
         use_triggered_save = false;
@@ -1298,22 +1298,31 @@ classdef Acquisition < file.AstroData
                 % object (based on the stack). 
             end
             
-            obj.cutouts_sub = obj.cutouts_proc - B/obj.num_sum;
+            obj.cutouts_proc = obj.cutouts_proc - B/obj.num_sum;
             
         end
         
         function calcLightcurves(obj)
             
-            obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps, 'positions', obj.positions); % add variance input? 
-            if ~isempty(obj.phot.gui) && obj.phot.gui.check, obj.phot.gui.update; end
+            if obj.use_simple_photometry
+                
+                obj.fluxes = util.stat.sum2(obj.cutouts_proc); 
+                bad_pixels = util.stat.sum2(isnan(obj.cutouts_proc));
+                
+                obj.lightcurves.input(obj.fluxes, 'bad_pixels', bad_pixels);
+                
+            else % use extensive photometry method
             
-            obj.fluxes = obj.phot.fluxes;
-            
-            if 0
-            obj.lightcurves.input(obj.phot.fluxes, obj.timestamps, obj.phot.weights, ...
-                obj.phot.backgrounds, obj.phot.variances, ...
-                obj.phot.offsets_x, obj.phot.offsets_y, obj.phot.centroids_x, obj.phot.centroids_y, ...
-                obj.phot.widths, obj.phot.bad_pixels); % store the full lightcurves...
+                obj.phot.input('images', obj.cutouts_proc, 'timestamps', obj.timestamps, 'positions', obj.positions); % add variance input? 
+                if ~isempty(obj.phot.gui) && obj.phot.gui.check, obj.phot.gui.update; end
+
+                obj.fluxes = obj.phot.fluxes;
+
+                obj.lightcurves.input(obj.phot.fluxes, obj.timestamps, obj.phot.weights, ...
+                    obj.phot.backgrounds, obj.phot.variances, ...
+                    obj.phot.offsets_x, obj.phot.offsets_y, obj.phot.centroids_x, obj.phot.centroids_y, ...
+                    obj.phot.widths, obj.phot.bad_pixels); % store the full lightcurves...
+                
             end
             
             if obj.lightcurves.gui.check
