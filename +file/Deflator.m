@@ -1,5 +1,11 @@
 classdef Deflator < file.AstroData
    
+    properties (Transient=true)
+        
+        gui@file.gui.DeflatorGUI;
+        
+    end
+    
     properties % objects and resources
         
         pars@head.Parameters;
@@ -15,8 +21,6 @@ classdef Deflator < file.AstroData
         reader@file.Reader;
         buffers@file.BufferWheel;
         
-        gui@file.gui.DeflatorGUI;
-
     end
     
     properties(Dependent=true)
@@ -37,7 +41,7 @@ classdef Deflator < file.AstroData
     
     properties(Hidden=true)
         
-        stop_switch = 1;
+        brake_bit = 1;
         
         version = 1.02;
                 
@@ -159,11 +163,38 @@ classdef Deflator < file.AstroData
     
     methods % API
         
-        function run(obj)
+        function run(obj, varargin)
             
             import util.text.sa;
             
-            obj.stop_switch = 0;
+            input = util.text.InputVars;
+            input.input_var('out_dir', '', 'output_directory');
+            input.input_var('src_dir', '', 'source_directory')
+            input.scan_vars(varargin{:});
+            
+            if ~isempty(input.src_dir)
+                
+                if ~exist(input.src_dir, 'dir')
+                    error('Source directory %s does not exist!', input.src_dir);
+                end
+                
+                obj.src_dir.cd(pwd);
+                obj.src_dir.cd(input.src_dir);
+                
+            end
+            
+            if ~isempty(input.out_dir)
+                
+                if ~exist(input.out_dir, 'dir')
+                    mkdir(input.out_dir);
+                end
+                
+                obj.out_dir.cd(pwd);
+                obj.out_dir.cd(input.out_dir);
+                
+            end
+            
+            obj.brake_bit = 0;
             
             try
                 
@@ -198,7 +229,7 @@ classdef Deflator < file.AstroData
                     
                     disp(['going over directory: ' obj.src_subdir.pwd]);
                     
-                    if obj.stop_switch
+                    if obj.brake_bit
                         return;
                     end
 
@@ -223,7 +254,7 @@ classdef Deflator < file.AstroData
 
                     for ii = 1:100000
 
-                        if obj.stop_switch
+                        if obj.brake_bit
                             return;
                         end
 
@@ -291,11 +322,11 @@ classdef Deflator < file.AstroData
                 end % for jj
             
             catch ME
-                obj.stop_switch = 1;
+                obj.brake_bit = 1;
                 rethrow(ME);
             end
                 
-            obj.stop_switch = 1;
+            obj.brake_bit = 1;
                
             disp('done deflating files...');
             

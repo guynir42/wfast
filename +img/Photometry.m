@@ -970,14 +970,14 @@ classdef Photometry < handle
                 h(ii).ButtonDownFcn = @obj.callback_touch_point;
             end
             
-            h = plot(1:Ns, obj.offsets_y(1:Nf, 1:Ns), '+');
+            h = plot(ax3, 1:Ns, obj.offsets_y(1:Nf, 1:Ns), '+');
             
             for ii = 1:length(h)
                 h(ii).UserData = ['offset_y= %4.2f, frame= ' num2str(ii)];
                 h(ii).ButtonDownFcn = @obj.callback_touch_point;
             end
             
-            h = plot(1:Ns, obj.widths(1:Nf, 1:Ns), 'o');
+            h = plot(ax3, 1:Ns, obj.widths(1:Nf, 1:Ns), 'o');
             
             for ii = 1:length(h)
                 h(ii).UserData = ['width= %4.2f, frame= ' num2str(ii)];

@@ -77,7 +77,7 @@ function hdf2fits(filenames, varargin)
                 fitswrite(I(:,:,jj), new_filename);
                 pars.writeFITS(new_filename, t(jj)-t(1));
             else
-                new_filename = [d_name, f_name, ext];
+                new_filename = [d_name, '/', f_name, ext];
                 fitswrite(I, new_filename);
                 pars.writeFITS(new_filename);
             end
