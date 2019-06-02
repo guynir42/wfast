@@ -702,7 +702,9 @@ classdef Acquisition < file.AstroData
                 input.input_var('debug_bit', []);
                 input.input_var('log_level', []);
                 
-                input.input_var('run_name', 'test_run', 'name');
+                input.input_var('run_name', '', 'name', 'object', 'objname');
+                input.input_var('RA', [], 'right ascention', 'right ascension');
+                input.input_var('DE', [], 'declination');
                 input.input_var('expT', [], 'T', 'exposure time');
                 input.input_var('frame_rate', []); 
                 input.input_var('num_batches', [], 'Nbatches');
@@ -961,7 +963,19 @@ classdef Acquisition < file.AstroData
             end
         end
         
-        function update(obj) % do we need this??
+        function update(obj, input)
+            
+            if ~isempty(input.RA)
+                obj.pars.RA = input.RA;
+            end
+            
+            if ~isempty(input.DE)
+                obj.pars.DE = input.DE;
+            end
+            
+            if ~isempty(input.run_name)
+                obj.pars.target_name = input.run_name;
+            end
             
             obj.pars.update;
             
@@ -992,7 +1006,7 @@ classdef Acquisition < file.AstroData
 
                 end
 
-                obj.update; % not sure if this does anything other than update the "pars" object...
+                obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
 
                 if obj.use_save
                     try
