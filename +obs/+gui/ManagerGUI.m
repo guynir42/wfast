@@ -18,6 +18,7 @@ classdef ManagerGUI < handle
     
     properties % gui stuff
         
+        panel_hardware;
         panel_controls;
         
         panel_report;
@@ -80,12 +81,30 @@ classdef ManagerGUI < handle
             obj.fig.height = 25;
             obj.fig.width = 36;
             
+            
+            N_left = 10;
+            pos = N_left;
+            
+            %%%%%%%%%%% panel hardware %%%%%%%%%%%%%%%
+            
+            N = 4;
+            pos = pos - N;
+            obj.panel_hardware = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'hardware');
+            obj.panel_hardware.number = N;
+            obj.panel_hardware.addButton('button_RA', 'RA', 'info', 'RA: ', '', 'small', 0.5);
+            obj.panel_hardware.addButton('button_DE', 'DE', 'info', 'DE: ', '', 'small', 0.5);            
+            obj.panel_hardware.addButton('button_LST', 'LST', 'info', 'LST: ', '', 'small', 0.5);
+            obj.panel_hardware.addButton('button_ALT', 'ALT', 'info', 'ALT: ', ' deg', 'small', 0.5);
+            obj.panel_hardware.addButton('button_shutter_west', '', 'custom', 'West shutter: ', '', 'small', 0.5);
+            obj.panel_hardware.addButton('button_shutter_east', '', 'custom', 'East shutter: ', '', 'small', 0.5);
+            obj.panel_hardware.make;
+            
             %%%%%%%%%%% panel controls %%%%%%%%%%%%%%%
             
-            N = 10;
-            
-            obj.panel_controls = GraphicPanel(obj.owner, [0 (N-9)/N 0.2 9/N], 'controls');
-            obj.panel_controls.number = 9;
+            N = 5;
+            pos = pos - N;
+            obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'controls');
+            obj.panel_controls.number = N;
             obj.panel_controls.addButton('button_run_t1', '', 'custom', 'run t1', '', '', 0.5);
             obj.panel_controls.addButton('button_interval_t1', '', 'custom', ['P= ' num2str(obj.owner.checker.period1)], '', '', 0.5);
             obj.panel_controls.addButton('button_run_t2', '', 'custom', 'run t2', '', '', 0.5);
@@ -103,8 +122,14 @@ classdef ManagerGUI < handle
             
             %%%%%%%%%%% panel objects %%%%%%%%%%%%%%%%
             
-            obj.panel_objects = GraphicPanel(obj.owner, [0.8 (N-9)/N 0.2 9/N], 'objects');
-            obj.panel_objects.number = 9;
+            N_right = 10;
+            pos = N_right;
+            
+            N = 9;
+            pos = pos - N;
+            
+            obj.panel_objects = GraphicPanel(obj.owner, [0.8 pos/N_right 0.2 N/N_right], 'objects');
+            obj.panel_objects.number = N;
 %             obj.panel_objects.addButton('button_dome', 'dome', 'push', 'dome');
             obj.panel_objects.addButton('button_dome', 'dome', 'push', 'dome');
             obj.panel_objects.addButton('button_mount', 'mount', 'push', 'mount');
@@ -115,26 +140,38 @@ classdef ManagerGUI < handle
             
             %%%%%%%%%%% panel report %%%%%%%%%%%%%%%%%
             
-            obj.panel_report = GraphicPanel(obj.owner, [0.2, (N-1)/N, 0.6, 1/N], '');
+            N_middle = 10;
+            pos = N_middle;
+            
+            N = 1;
+            pos = pos - N;
+            
+            obj.panel_report = GraphicPanel(obj.owner, [0.2, pos/N_middle, 0.6, N/N_middle], 'report');
             obj.panel_report.addButton('button_report', 'report_string', 'info');
             obj.panel_report.make;
             
             %%%%%%%%%%% panel weather %%%%%%%%%%%%%%%%
             
-            obj.panel_weather = GraphicPanel(obj.owner, [0.2, (N-3)/N, 0.6, 2/N], 'weather');
+            N = 2;
+            pos = pos - N;
+            
+            obj.panel_weather = GraphicPanel(obj.owner, [0.2, pos/N_middle, 0.6, N/N_middle], 'weather');
             obj.panel_weather.addButton('button_temp', 'average_temp', 'info', 'T= ', 'C', '', 1/3);
             obj.panel_weather.addButton('button_clouds', 'average_clouds', 'info', 'dT= ', 'C', '', 1/3);
             obj.panel_weather.addButton('button_light', 'average_light', 'info', 'L= ', '', '', 1/3);
             obj.panel_weather.addButton('button_wind', 'average_wind', 'info', 'wind= ', 'km/h', '', 1/3);
             obj.panel_weather.addButton('button_wind_az', 'average_wind_az', 'info', 'az= ', 'deg', '', 1/3);
             obj.panel_weather.addButton('button_hummid', 'average_humid', 'info', 'h= ', '%', '', 1/3);
-            obj.panel_weather.number = 2;
+            obj.panel_weather.number = N;
             
             obj.panel_weather.make;
             
             %%%%%%%%%%% panel image %%%%%%%%%%%%%%%%%%
             
-            obj.panel_image = uipanel('Title', '', 'Position', [0.2 1/N 0.6 (N-4)/N]);
+            N = pos-1;
+            pos = pos - N;
+            
+            obj.panel_image = uipanel('Title', '', 'Position', [0.2 pos/N_middle 0.6 N/N_middle]);
             
             obj.makeAxes;
             
@@ -143,13 +180,13 @@ classdef ManagerGUI < handle
             
             %%%%%%%%%%% panel stop %%%%%%%%%%%%%%%%%%%
             
-            obj.panel_stop = GraphicPanel(obj.owner, [0.2 0 0.6 1/N]);
+            obj.panel_stop = GraphicPanel(obj.owner, [0.2 0 0.6 1/N_middle]);
             obj.panel_stop.addButton('button_stop', 'stop', 'push', 'STOP');
             obj.panel_stop.make;
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
             
-            obj.panel_close = uipanel('Position', [0 0 0.2 1/N]);
+            obj.panel_close = uipanel('Position', [0 0 0.2 1/N_left]);
             obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE');
             obj.button_close.Callback = @obj.callback_close;
             
@@ -174,6 +211,28 @@ classdef ManagerGUI < handle
            
             for ii = 1:length(obj.buttons)
                 obj.buttons{ii}.update;
+            end
+            
+            if obj.owner.dome.status==0
+                obj.panel_hardware.button_shutter_west.String = 'Shut.West: error';
+                obj.panel_hardware.button_shutter_east.String = 'Shut.East: error';
+            else
+                if obj.owner.dome.shutter1_deg==0
+                    obj.panel_hardware.button_shutter_west.String = sprintf('Shut.West: open');
+                elseif obj.owner.dome.shutter1_deg==90
+                    obj.panel_hardware.button_shutter_west.String = sprintf('Shut.West: closed');
+                else
+                    obj.panel_hardware.button_shutter_west.String = sprintf('Shut.West: %d deg', round(obj.owner.dome.shutter1_deg));
+                end
+                
+                if obj.owner.dome.shutter2_deg==0
+                    obj.panel_hardware.button_shutter_east.String = sprintf('Shut.East: open');
+                elseif obj.owner.dome.shutter2_deg==90
+                    obj.panel_hardware.button_shutter_east.String = sprintf('Shut.East: closed');
+                else
+                    obj.panel_hardware.button_shutter_east.String = sprintf('Shut.East: %d deg', round(obj.owner.dome.shutter2_deg));
+                end
+                
             end
             
             obj.panel_controls.button_interval_t1.String = ['P= ' num2str(obj.owner.checker.period1)];
