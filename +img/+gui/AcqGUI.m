@@ -107,7 +107,7 @@ classdef AcqGUI < handle
             obj.panel_controls.addButton('input_num_batches', 'num_batches', 'input', 'Nbatches= ', '', '', 1/3);
             obj.panel_controls.addButton('input_batch_size', 'batch_size', 'input', 'Nframes= ', '', '', 1/3);
             
-            obj.panel_controls.addButton('button_auto_num', 'autoNumStars', 'push', 'auto', '', '', 1/3);
+            obj.panel_controls.addButton('button_stars_found', 'num_stars_found', 'info', ' ', '', '', 1/3);
             obj.panel_controls.addButton('input_num_stars', 'num_stars', 'input', 'Nstars= ', '', '', 1/3);
             obj.panel_controls.addButton('input_cut_size', 'cut_size', 'input', 'size= ', '', '', 1/3);
             

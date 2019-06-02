@@ -46,6 +46,7 @@ classdef Acquisition < file.AstroData
     
     properties % inputs/outputs
         
+        num_stars_found;
         cutouts_proc;
         cutouts_bg_proc;
         
@@ -55,6 +56,8 @@ classdef Acquisition < file.AstroData
         prev_stack;        
         ref_stack;
         ref_positions;
+        
+        prev_fluxes; % fluxes measured in previous batch (for triggering)
         
         frame_rate_average; % calculated from this object's timing data
         
@@ -71,6 +74,7 @@ classdef Acquisition < file.AstroData
         
         % these swithces determine how stars are picked when run begins
         use_remove_saturated = true; % remove all stars with any pixels about saturation value
+        use_quick_find_stars = true;
         saturation_value = 50000; % consider any pixels above this to be saturated
         use_mextractor = false; % use mextractor to identify stars and find their WCS and catalog mag/temp
         use_arbitrary_pos = false; % don't look for stars (e.g., when testing with the dome closed)
@@ -293,12 +297,16 @@ classdef Acquisition < file.AstroData
                 
             end
             
+            obj.num_stars_found = [];
+            obj.prev_fluxes = [];
             obj.batch_counter = 0;
             obj.start_index = 1;
 
         end
         
         function clear(obj)
+            
+            obj.prev_fluxes = obj.fluxes; % keep one batch history
             
             list = properties(obj);
             
@@ -873,6 +881,8 @@ classdef Acquisition < file.AstroData
                         obj.cam = obs.cam.Andor;
                         obj.cam.pars = obj.pars;
                     end
+                    obj.default_expT = obj.cam.default_expT;
+                    obj.default_frame_rate = obj.cam.default_frame_rate;
                     
                     obj.src = obj.cam;
                 else
@@ -1220,10 +1230,6 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function autoNumStars(obj)
-            % need to implement this...
-        end
-        
         function findStars(obj)
             
             if obj.use_remove_saturated
@@ -1236,6 +1242,12 @@ classdef Acquisition < file.AstroData
                 obj.clip.arbitraryPositions; % maybe add some input parameters?
             elseif obj.use_mextractor
                 % add the code for mextractor+astrometry here
+            elseif obj.use_quick_find_stars
+                T = util.img.quick_find_stars(obj.stack_proc, 'psf', 1.6, 'number', obj.num_stars,...
+                    'dilate', obj.cut_size-5, 'saturation', obj.saturation_value.*obj.num_sum); 
+                obj.clip.positions = T.pos;
+                obj.num_stars_found = size(obj.clip.positions,1);
+                
             else
                 obj.clip.findStars(obj.stack_proc);                
             end
@@ -1306,9 +1318,9 @@ classdef Acquisition < file.AstroData
             
             if obj.use_simple_photometry
                 
-                obj.fluxes = util.stat.sum2(obj.cutouts_proc); 
-                bad_pixels = util.stat.sum2(isnan(obj.cutouts_proc));
+                obj.fluxes = permute(util.stat.sum2(obj.cutouts_proc), [3,4,2,1]); 
                 
+%                 bad_pixels = util.stat.sum2(isnan(obj.cutouts_proc));
 %                 obj.lightcurves.input(obj.fluxes, 'bad_pixels', bad_pixels);
                 
             else % use extensive photometry method

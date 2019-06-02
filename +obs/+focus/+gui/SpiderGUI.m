@@ -72,8 +72,9 @@ classdef SpiderGUI < handle
             
             obj.fig.bottom = 5;
             obj.fig.height = 16;
-            obj.fig.width = 25;
+            obj.fig.width = 10;
             movegui(obj.fig.fig, 'center');
+            obj.fig.left = 30;
             
             %%%%%%%%%%% panel connect %%%%%%%%%%%%%%%%%%
             
