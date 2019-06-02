@@ -436,6 +436,8 @@ void Photometry::calculate(int j){
 	float *image=0; // can be image_raw or image_sub depending on value of "subtract" option
 	memcpy(image_raw, &cutouts[j*N], N*sizeof(float)); // grab a copy of the current cutout!
 	
+	if(ap_type==0 && bg_type==0) num_iter=1; // if using the simplest aperture/background we have nothing to gain from running iterations...
+	
 	for(int k=0;k<num_iter;k++){ // number of iterations 
 		
 		float dx=offset_x[j];
