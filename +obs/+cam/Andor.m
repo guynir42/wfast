@@ -725,6 +725,13 @@ classdef Andor < file.AstroData
             
         end
         
+        function single(obj, varargin)
+            
+            obj.run('num_batches', 1, 'show', 1, 'save', 0, 'audio', 0, 'async', 0,...
+                'progress', 0, 'log_level', 0, varargin{:}); 
+            
+        end
+        
         function autofocus(obj, varargin) % not yet implemented
             
             error('This is not yet implemented!');

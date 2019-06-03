@@ -599,7 +599,11 @@ classdef Star < matlab.mixin.Copyable
                 str = sprintf('"%s"', obj.name);
             end
             
-            str = pipe_append(str, 'M= %5.2f', obj.mag);
+            if isempty(str)
+                str = sprintf('M= %5.2f', str, obj.mag);
+            else
+                str = sprintf('%s | M= %5.2f', str, obj.mag);
+            end
             
             if isempty(obj.primary_ref)
                 str = [str sprintf(' | (x,y)= (%d,%d)', round(obj.getFinalX('pixels')), round(obj.getFinalY('pixels')))];

@@ -124,8 +124,9 @@ classdef AcqGUI < handle
             obj.panel_controls.addButton('button_adjust', 'use_adjust_cutouts', 'toggle', 'adjust', 'adjust', '', 0.5, 'red');
             obj.panel_controls.addButton('button_background', 'use_background', 'toggle', 'b/g', 'b/g', '', 0.5, 'red');
             
-            obj.panel_controls.addButton('button_preview', 'preview', 'push', 'PREVIEW', '', '', 0.5);
-            obj.panel_controls.addButton('button_live', 'live', 'push', 'LIVE', '', '', 0.5);
+            obj.panel_controls.addButton('button_simple_phot', 'use_simple_photometry', 'toggle', 'simple phot', 'simple phot', '', 0.5, 'red');
+            obj.panel_controls.addButton('button_placeholder', '', 'custom', ' ', '', '', 0.5);
+            
             obj.panel_controls.make;
             obj.panel_controls.button_num_files.Callback = @obj.callback_num_files;
             
@@ -176,9 +177,14 @@ classdef AcqGUI < handle
             
             %%%%%%%%%%% panel run %%%%%%%%%%%%%%%%%%
             
-            obj.panel_run = uipanel('Title','', 'Position', [W_left, 0, 1-W_left-W_right, 0.1]);
-            obj.button_run = GraphicButton(obj.panel_run, [0 0 1 1], obj.owner, '', 'custom', 'RUN');
-            obj.button_run.Callback = @obj.callback_run;
+            % obj.panel_run = uipanel('Title','', 'Position', [W_left, 0, 1-W_left-W_right, 0.1]);
+            obj.panel_run = GraphicPanel(obj.owner, [W_left 0 (1-W_left-W_right) 0.1]);
+            
+            obj.panel_run.addButton('button_preview', 'runPreview', 'push', 'PREVIEW', '', '', 0.15);
+            obj.panel_run.addButton('button_run', '', 'custom', 'RUN', '', '', 0.7);
+            obj.panel_run.addButton('button_focus', 'runFocus', 'push', 'FOCUS', '', '', 0.15);
+            obj.panel_run.make;
+            obj.panel_run.button_run.Callback = @obj.callback_run;
             
             %%%%%%%%%%% panel info %%%%%%%%%%%%%%%%%%
             
@@ -264,13 +270,13 @@ classdef AcqGUI < handle
             
             if obj.owner.brake_bit
                 if obj.owner.start_index>1
-                    obj.button_run.String = 'CONTINUE';
+                    obj.panel_run.button_run.String = 'CONTINUE';
                 else
-                    obj.button_run.String = 'RUN';
+                    obj.panel_run.button_run.String = 'RUN';
                 end
 %                 obj.button_run.Enable = 'on';
             else
-                obj.button_run.String = 'STOP';
+                obj.panel_run.button_run.String = 'STOP';
 %                 obj.button_run.Enable = 'off';
             end
             

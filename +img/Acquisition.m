@@ -73,9 +73,10 @@ classdef Acquisition < file.AstroData
         use_refine_bg = 0;
         
         % these swithces determine how stars are picked when run begins
-        use_remove_saturated = true; % remove all stars with any pixels about saturation value
-        use_quick_find_stars = true;
+        use_remove_saturated = false; % remove all stars with any pixels about saturation value
         saturation_value = 50000; % consider any pixels above this to be saturated
+        
+        use_quick_find_stars = true; % use new method that runs faster
         use_mextractor = false; % use mextractor to identify stars and find their WCS and catalog mag/temp
         use_arbitrary_pos = false; % don't look for stars (e.g., when testing with the dome closed)
         
@@ -191,7 +192,11 @@ classdef Acquisition < file.AstroData
         num_batches_;
         frame_rate_;
         expT_;
-
+        num_stars_;
+        cut_size_;
+        num_backgrounds_;
+        cut_size_bg_;
+            
         use_roi_;
         roi_size_;
         roi_center_;
@@ -287,6 +292,8 @@ classdef Acquisition < file.AstroData
         
         function reset(obj)
             
+%             disp('resetting');
+             
             list = properties(obj);
             
             for ii = 1:length(list)
@@ -296,11 +303,14 @@ classdef Acquisition < file.AstroData
                 end
                 
             end
+
+            obj.clear;
             
             obj.num_stars_found = [];
             obj.prev_fluxes = [];
             obj.batch_counter = 0;
             obj.start_index = 1;
+            obj.positions = [];
 
         end
         
@@ -759,6 +769,10 @@ classdef Acquisition < file.AstroData
             obj.num_batches_ = obj.num_batches;
             obj.frame_rate_ = obj.frame_rate;
             obj.expT_ = obj.expT;
+            obj.num_stars_ = obj.num_stars;
+            obj.cut_size_ = obj.cut_size;
+            obj.num_backgrounds_ = obj.num_backgrounds;
+            obj.cut_size_bg_ = obj.cut_size_bg;
             
             obj.use_roi_ = obj.use_roi;
             obj.roi_size_ = obj.roi_size;
@@ -805,6 +819,10 @@ classdef Acquisition < file.AstroData
             obj.num_batches = obj.num_batches_;
             obj.frame_rate = obj.frame_rate_;
             obj.expT = obj.expT_;
+            obj.num_stars = obj.num_stars_;
+            obj.cut_size = obj.cut_size_;
+            obj.num_backgrounds = obj.num_backgrounds_;
+            obj.cut_size_bg = obj.cut_size_bg_;
             
             obj.use_roi = obj.use_roi_;
             obj.roi_size = obj.roi_size_;
@@ -942,7 +960,7 @@ classdef Acquisition < file.AstroData
     methods % commands/calculations
         
         function run(obj, varargin)
-            
+                        
             obj.startup(varargin);
             
             try 
@@ -971,6 +989,7 @@ classdef Acquisition < file.AstroData
                 obj.log.error(ME.getReport);
                 rethrow(ME);
             end
+            
         end
         
         function update(obj, input)
@@ -1008,14 +1027,19 @@ classdef Acquisition < file.AstroData
                 obj.stash_parameters(input);
                 
                 if input.use_reset % this parameter is not saved in the object because we only use it here... 
-
+                    
                     obj.reset;
-%                     obj.lightcurves.startup(obj.num_batches.*obj.batch_size, obj.num_stars);
-
+                    
                     if obj.debug_bit, disp(['Starting run "' input.run_name '" for ' num2str(input.num_batches) ' batches.']); end
 
                 end
-
+                
+                if isempty(obj.positions)
+                    if obj.debug_bit, disp('Positions field empty. Calling single then findStars'); end
+                    obj.single;
+                    obj.findStars;
+                end
+                
                 obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
 
                 if obj.use_save
@@ -1169,17 +1193,33 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function single(obj)
+        function single(obj) % get a single batch and calculate stack_proc from it... 
             
-            cleanup = onCleanup(@obj.finishup);
-            obj.startup('num_batches', 1, 'start_index', 1, 'use_save', 0, 'use_audio', 0, 'use_progress', 0);
+            obj.log.input('Getting single batch from source');
             
             try 
-                obj.batch;
+            obj.src.single; 
+            obj.images = obj.src.images;
+            obj.timestamps = obj.src.timestamps;
+            obj.stack = sum(obj.src.images,3);
+            obj.num_sum = size(obj.src.images,3);
+
+            obj.stack_proc = obj.cal.input(obj.stack, 'sum', obj.num_sum); % stack after calibration
+
             catch ME
                 obj.log.error(ME.getReport);
                 rethrow(ME);
             end
+            
+%             cleanup = onCleanup(@obj.finishup);
+%             obj.startup('num_batches', 1, 'start_index', 1, 'use_save', 0, 'use_audio', 0, 'use_progress', 0);
+%             
+%             try 
+%                 obj.batch;
+%             catch ME
+%                 obj.log.error(ME.getReport);
+%                 rethrow(ME);
+%             end
             
         end
         
@@ -1208,9 +1248,9 @@ classdef Acquisition < file.AstroData
 
             end
             
-            if obj.batch_counter==0
-                obj.findStars; % this replaces the clipper findStars with somethinig better, or just runs it explicitely... 
-            end
+%             if obj.batch_counter==0
+%                 obj.findStars; % this replaces the clipper findStars with somethinig better, or just runs it explicitely... 
+%             end
             
             obj.stack_cutouts = obj.clip.input(obj.stack_proc); % if no positions are known, it will call "findStars"
             
@@ -1232,6 +1272,8 @@ classdef Acquisition < file.AstroData
         
         function findStars(obj)
             
+%             disp('findStars');
+            
             if obj.use_remove_saturated
                 mu = median(squeeze(util.stat.corner_mean(util.img.jigsaw(obj.stack_proc))));
                 sig = median(squeeze(util.stat.corner_std(util.img.jigsaw(obj.stack_proc))));
@@ -1250,6 +1292,7 @@ classdef Acquisition < file.AstroData
                 end
                 
                 obj.clip.positions = T.pos;
+                obj.positions = T.pos;
                 obj.num_stars_found = size(obj.clip.positions,1);
                 
             else
@@ -1262,6 +1305,10 @@ classdef Acquisition < file.AstroData
         end
         
         function checkRealign(obj)
+            
+            if size(obj.flux_buf.data, 2)~=size(obj.phot_stack.fluxes,2)
+                obj.flux_buf.reset;
+            end
             
             if ~is_empty(obj.flux_buf) % check that stars are still aligned properly... 
                 
@@ -1401,15 +1448,19 @@ classdef Acquisition < file.AstroData
         
         function runPreview(obj, varargin) % I'm not sure we need this... 
             
-            if ~isempty(varargin) && isa(varargin{1}, 'util.text.InputVars')
-                input = varargin{1};
-                input.scan_vars(varargin{2:end});
-            else
-                input = obj.makeInputVars('num_batches', 1, 'batch_size', 1, 'expT', 1, 'num_stars', 0, ...
-                    'use_save', 0, 'use_audio', 0, varargin{:});
-            end
+            obj.single;
+            obj.findStars;
+            obj.show;
             
-            obj.run(input); % take the same run-loop but with different input parameters
+%             if ~isempty(varargin) && isa(varargin{1}, 'util.text.InputVars')
+%                 input = varargin{1};
+%                 input.scan_vars(varargin{2:end});
+%             else
+%                 input = obj.makeInputVars('num_batches', 1, 'batch_size', 1, 'expT', 1, 'num_stars', 0, ...
+%                     'use_save', 0, 'use_audio', 0, varargin{:});
+%             end
+%             
+%             obj.run(input); % take the same run-loop but with different input parameters
             
         end
         
@@ -1439,8 +1490,9 @@ classdef Acquisition < file.AstroData
                     error('must be connected to camera and focuser!');
                 end
 
-                input = obj.makeInputVars('reset', 1, 'batch_size', 100, 'expT', 0.025, ...
-                    'num_stars', 25, 'cut_size', 20, 'use audio', 0, 'use_save', 0, 'use_reset', 0, varargin{:});
+                input = obj.makeInputVars('reset', 0, 'batch_size', 100, 'expT', 0.025, ...
+                    'num_stars', 25, 'use audio', 0, 'use_save', 0, 'run name', 'focus', 'prog', 0, ...
+                    'pass_source', {'async', 0}, varargin{:});
 
                 obj.reset;
                 obj.single;
@@ -1456,8 +1508,8 @@ classdef Acquisition < file.AstroData
             
                 input.num_batches = length(obj.af.pos);
             
-                obj.startup(input);
                 cleanup = onCleanup(@obj.finishup);
+                obj.startup(input);
 
                 for ii = 1:input.num_batches
 
@@ -1488,10 +1540,13 @@ classdef Acquisition < file.AstroData
             catch ME
                 
                 disp(['Focus has failed, returning focuser to previous position= ' num2str(old_pos)]); 
+                
                 try 
                     obj.cam.focuser.pos = old_pos; 
                 end
+                
                 obj.clip.reset; % don't save these star positions! 
+                obj.positions = [];
                 rethrow(ME);
                 
             end
@@ -1514,10 +1569,62 @@ classdef Acquisition < file.AstroData
             obj.af.plot;
             
             obj.clip.reset; % don't save these star positions! 
+            obj.positions = [];
             
         end
         
-        function findStarsFocus(obj) % find stars in order in five locations around the sensor
+        function findStarsFocus(obj, varargin)
+            
+%             disp('findStarsFocus');
+            
+            I = obj.stack_proc;
+            S = size(I);
+            C = obj.cut_size;
+            
+            [M,V] = util.img.im_stats(I);
+            
+            T_all = table;
+            
+            markers = round(S'.*[1/3 2/3]); % divide the sensor to 1/3rds 
+            
+            unmask{1} = false(S);
+            unmask{1}(markers(1,1):markers(1,2), markers(2,1):markers(2,2)) = 1; % only the central part is unmasked
+            
+            unmask{2} = false(S);
+            unmask{2}(C:markers(1,1), C:markers(2,1)) = 1; % upper left corner
+            
+            unmask{3} = false(S);
+            unmask{3}(markers(1,2):end-C+1, C:markers(2,1)) = 1; % lower left corner
+            
+            unmask{4} = false(S);
+            unmask{4}(C:markers(1,1), markers(2,2):end-C+1) = 1; % upper right corner
+            
+            unmask{5} = false(S);
+            unmask{5}(markers(1,2):end-C+1, markers(2,2):end-C+1) = 1; % lower right corner
+            
+            for ii = 1:5
+            
+                I_masked = I;
+                I_masked(~unmask{ii}) = M;
+                
+                T = util.img.quick_find_stars(I_masked, 'mean', M, 'std', sqrt(V), 'number', 5, varargin{:});
+            
+                if ~isempty(T)
+                    T_all = vertcat(T_all, T);
+                end
+                
+            end
+            
+            obj.clip.positions = T_all.pos;
+            obj.positions = double(T_all.pos);
+            
+            if obj.gui.check
+                obj.show;
+            end
+            
+        end
+        
+        function findStarsFocusOld(obj) % find stars in order in five locations around the sensor
             
             I = obj.stack_proc;
             S = size(I);
