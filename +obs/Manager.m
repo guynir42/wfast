@@ -35,7 +35,10 @@ classdef Manager < handle
     
     properties(Dependent=true)
         
-        
+        RA;
+        DE;
+        LST;
+        ALT;
         
     end
     
@@ -177,6 +180,30 @@ classdef Manager < handle
     end
     
     methods % getters
+        
+        function val = get.RA(obj)
+            
+            val = obj.mount.RA_hex;
+            
+        end
+        
+        function val = get.DE(obj)
+            
+            val = obj.mount.DE_hex;
+            
+        end
+        
+        function val = get.LST(obj)
+            
+            val = obj.mount.LST_hex;
+            
+        end
+        
+        function val = get.ALT(obj)
+            
+            val = round(obj.mount.ALT);
+            
+        end
         
         function val = report_string(obj)
             
