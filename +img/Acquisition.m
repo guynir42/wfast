@@ -1245,6 +1245,10 @@ classdef Acquisition < file.AstroData
             elseif obj.use_quick_find_stars
                 T = util.img.quick_find_stars(obj.stack_proc, 'psf', 1.6, 'number', obj.num_stars,...
                     'dilate', obj.cut_size-5, 'saturation', obj.saturation_value.*obj.num_sum); 
+                if isempty(T)
+                    error('Could not find any stars using quick_find_stars!');
+                end
+                
                 obj.clip.positions = T.pos;
                 obj.num_stars_found = size(obj.clip.positions,1);
                 

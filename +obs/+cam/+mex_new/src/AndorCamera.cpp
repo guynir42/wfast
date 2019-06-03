@@ -85,10 +85,11 @@ void AndorCamera::loadFromBuffers(mxArray *buffers){ // load mex flags and data 
 			// assuming MATLAB uses memory aligned to 8-byte boundary...
 			if(debug_bit>2) mexPrintf("Allocating a new matrix...\n");
 
-			images_ptrs[b]=(unsigned short int*) mxCalloc((int) (height*width*batch_size), 2); // use 2 to initialize a uint16
+			//images_ptrs[b]=(unsigned short int*) mxCalloc((int) (height*width*batch_size), 2); // use 2 to initialize a uint16
 			mwSize dims[3] = {(mwSize) width, (mwSize) height, (mwSize) batch_size}; // width <-> height exchanged for C <-> matlab conversion
 			mxArray *array=mxCreateNumericArray(3, dims, mxUINT16_CLASS, mxREAL);
-			mxSetData(array, images_ptrs[b]);
+			//mxSetData(array, images_ptrs[b]);
+			images_ptrs[b]=(unsigned short int *) mxGetData(array);
 			mxSetField(buffers, b, "images", array);
 		}
 		else{ 
@@ -104,10 +105,11 @@ void AndorCamera::loadFromBuffers(mxArray *buffers){ // load mex flags and data 
 			if(waitForReading(b)) return; // just making sure we are not allocating over data that is getting read
 			if(waitForWriting(b)) return; // just making sure we are not allocating over data that is getting written
 			
-			timestamps_ptrs[b]=(double*) mxCalloc((int) batch_size, sizeof(double));
+			// timestamps_ptrs[b]=(double*) mxCalloc((int) batch_size, sizeof(double));
 			mwSize dims[2] = {(mwSize) batch_size, (mwSize) 1};
 			mxArray *array=mxCreateNumericArray(2, dims, mxDOUBLE_CLASS, mxREAL);
-			mxSetData(array, timestamps_ptrs[b]);
+			// mxSetData(array, timestamps_ptrs[b]);
+			timestamps_ptrs[b]=(double*) mxGetData(array);
 			mxSetField(buffers, b, "timestamps", array);
 		}
 		else{ 
@@ -123,10 +125,11 @@ void AndorCamera::loadFromBuffers(mxArray *buffers){ // load mex flags and data 
 			if(waitForReading(b)) return; // just making sure we are not allocating over data that is getting read
 			if(waitForWriting(b)) return; // just making sure we are not allocating over data that is getting written
 			
-			t_vec_ptrs[b]=(double*) mxCalloc(3, sizeof(double));
+			// t_vec_ptrs[b]=(double*) mxCalloc(3, sizeof(double));
 			mwSize dims[2] = {(mwSize) 1, (mwSize) 3};
 			mxArray *array=mxCreateNumericArray(2, dims, mxDOUBLE_CLASS, mxREAL);
-			mxSetData(array, t_vec_ptrs[b]);
+			// SetData(array, t_vec_ptrs[b]);
+			t_vec_ptrs[b]=(double*) mxGetData(array);
 			mxSetField(buffers, b, "t_vec", array);
 		}
 		else{ 
@@ -177,6 +180,7 @@ void AndorCamera::startup(){
 	for(int i=0;i<NTEMPBUF;i++){
 		
 		temp_buffers[i]=new unsigned char[image_size_bytes+8]; // add 8 for byte alignment
+		// temp_buffers[i]=(unsigned char *) mxCalloc(image_size_bytes+8,1);
 		ret=AT_QueueBuffer((AT_H) hndl, temp_buffers[i], image_size_bytes);
 		if(ret!=AT_SUCCESS){ report_error("startup>queue buffers", ret, mex_flag_cam); return; }
 		
@@ -208,6 +212,7 @@ void AndorCamera::finishup(){
 	
 	for(int i=0;i<NTEMPBUF;i++){ 
 		if(temp_buffers[i]) delete temp_buffers[i];
+		// if(temp_buffers[i]) mxFree(temp_buffers[i]);
 		temp_buffers[i]=0;
 	}
 	

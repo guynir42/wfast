@@ -182,7 +182,7 @@ classdef DeflatorGUI < handle
             
             %%%%%%%%%%%%%%%%%%%%%%%% run/stop panel %%%%%%%%%%%%%%%%%%%%%%%
             
-            if obj.def.stop_switch
+            if obj.def.brake_bit
                 obj.button_run_stop.String = 'RUN';
             else
                 obj.button_run_stop.String = 'STOP';
@@ -277,13 +277,13 @@ classdef DeflatorGUI < handle
              
               if obj.debug_bit, disp('callback: run/stop'); end
               
-              if obj.def.stop_switch
+              if obj.def.brake_bit
                   
                   obj.def.run;
                   
               else
                   
-                  obj.def.stop_switch = 1;
+                  obj.def.brake_bit = 1;
                   
               end
               

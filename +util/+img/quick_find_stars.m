@@ -132,11 +132,15 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     
     table_props = sortrows(table_props, 1, 'descend');
     
-    table_props.Properties.VariableNames{'WeightedCentroid'} = 'pos';
-    table_props = [table_props(:,'flux') table_props(:,'flag') table_props(:,'pos') table_props(:, 'PixelValues'), table_props(:, 'PixelIdxList')];
-    
-    if height(table_props)>input.number
-        table_props = table_props(1:input.number, :);
+    if ~isempty(table_props)
+
+        table_props.Properties.VariableNames{'WeightedCentroid'} = 'pos';
+        table_props = [table_props(:,'flux') table_props(:,'flag') table_props(:,'pos') table_props(:, 'PixelValues'), table_props(:, 'PixelIdxList')];
+
+        if height(table_props)>input.number
+            table_props = table_props(1:input.number, :);
+        end
+
     end
     
 end

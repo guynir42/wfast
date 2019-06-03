@@ -157,7 +157,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	
 	// C type arrays hold the data from the input and for the output:
 	unsigned char *in_array=(unsigned char*) mxGetData(prhs[0]);
-	unsigned char *out_array=(unsigned char*) mxCalloc(cut_size*cut_size*pages*num_cuts, num_bytes); 
+	// unsigned char *out_array=(unsigned char*) mxCalloc(cut_size*cut_size*pages*num_cuts, num_bytes); 
+	unsigned char *out_array=(unsigned char *) mxGetData(plhs[0]);
 	
 	// start by initializing everything to the pad value:
 	if(pad_value_bytes) for(int c=0; c<num_cuts; c++) for(int p=0; p<pages; p++) for(int j=0; j<cut_size; j++) for(int i=0; i<cut_size; i++) // use the one-by-one method for non-zero pad values
@@ -199,7 +200,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		
 	}
 
-	mxSetData(plhs[0], out_array);
+	// mxSetData(plhs[0], out_array);
 	
 	if(nlhs>1){ // replace the INPUT matrix values where the cutouts were with some filler (zero or NaN usually)
 		plhs[1]=mxDuplicateArray(prhs[0]); // make a deep copy and remove stars from that
