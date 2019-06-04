@@ -1,6 +1,6 @@
 classdef DeflatorGUI < handle
-
-    properties 
+    
+    properties
         
         def@file.Deflator; % link back to containg object
         fig@util.plot.FigHandler;
@@ -8,39 +8,43 @@ classdef DeflatorGUI < handle
         
         panel_filename;
         button_filename;
-                
+        button_progress;
+        
         panel_objects;
         button_reader;
         button_buffers;
         button_src_dir;
         button_out_dir;
         button_out_dir_backup;
-            
+        
         panel_controls;
         button_backup;
         button_auto_delete;
         button_num_files;
         
         panel_run_stop;
-        button_run_stop; 
-
-        image_panel;
-        image_axes; 
+        button_run_stop;
         
-        font_size = 18;        
+        image_panel;
+        image_axes;
+        
+        panel_close;
+        button_close;
+        
+        font_size = 18;
         
         debug_bit = 1;
         
     end
     
     properties (Hidden=true)
-       
+        
         version = 1.00;
         
     end
     
     methods % constructor
-       
+        
         function obj = DeflatorGUI(parent)
             
             % later add other options like copy constructor
@@ -58,12 +62,20 @@ classdef DeflatorGUI < handle
     methods % make/update gui
         
         function makeGUI(obj)
-           
+            
             obj.fig = util.plot.FigHandler('deflator gui');
+            obj.fig.width = 35;
+            obj.fig.height = 18;
             
             %%%%%%%%%%%%%%%%%%%%%%%% objects panel %%%%%%%%%%%%%%%%%%%%%%%%
             
-            obj.panel_objects = uipanel('Title', 'objects', 'Position', [0 0 0.4 0.5], 'Units','Normalized');
+            obj.panel_close = uipanel('Position', [0 0 0.4 0.1], 'Units', 'Normalized');
+            
+            obj.button_close = uicontrol(obj.panel_close, 'Style', 'pushbutton', 'String', 'CLOSE',...
+                'Units', 'Normalized', 'Position', [0 0 1 1], 'FontSize', obj.font_size,...
+                'Callback', @obj.callback_close);
+            
+            obj.panel_objects = uipanel('Title', 'objects', 'Position', [0 0.1 0.4 0.5], 'Units','Normalized');
             
             N = 5;
             
@@ -78,20 +90,20 @@ classdef DeflatorGUI < handle
             obj.button_src_dir = uicontrol(obj.panel_objects, 'Style', 'pushbutton', 'String', 'source dir',...
                 'Units', 'Normalized', 'Position', [0 2/N 1 1/N], 'FontSize', obj.font_size,...
                 'Callback', @obj.callback_src_dir);
-                        
+            
             obj.button_buffers = uicontrol(obj.panel_objects, 'Style', 'pushbutton', 'String', 'Buffers',...
                 'Units', 'Normalized', 'Position', [0 3/N 1 1/N], 'FontSize', obj.font_size,...
                 'Callback', @obj.callback_buffers);
-                        
+            
             obj.button_reader = uicontrol(obj.panel_objects, 'Style', 'pushbutton', 'String', 'Reader',...
                 'Units', 'Normalized', 'Position', [0 4/N 1 1/N], 'FontSize', obj.font_size,...
                 'Callback', @obj.callback_reader);
             
             %%%%%%%%%%%%%%%%%%%%%%%%%% controls panel %%%%%%%%%%%%%%%%%%%%%
-                        
-            obj.panel_controls = uipanel('Title', 'controls', 'Position', [0 0.5 0.4 0.5], 'Units','Normalized');
-                        
-            N = 5;
+            
+            obj.panel_controls = uipanel('Title', 'controls', 'Position', [0 0.6 0.4 0.4], 'Units','Normalized');
+            
+            N = 4;
             
             obj.button_backup = uicontrol(obj.panel_controls, 'Style', 'pushbutton', 'String', 'backup ON',...
                 'Units', 'Normalized', 'Position', [0 0/N 1 1/N], 'FontSize', obj.font_size,...
@@ -102,27 +114,30 @@ classdef DeflatorGUI < handle
                 'Callback', @obj.callback_auto_delete, 'Enable', 'off');
             
             obj.button_num_files = uicontrol(obj.panel_controls, 'Style', 'pushbutton', 'String', '',...
-                'Units', 'Normalized', 'Position', [0 4/N 1 1/N], 'FontSize', obj.font_size);
-                        
+                'Units', 'Normalized', 'Position', [0 3/N 1 1/N], 'FontSize', obj.font_size);
+            
             
             %%%%%%%%%%%%%%%%%%%%%%%% file display panel %%%%%%%%%%%%%%%%%%%
-                          
-            obj.panel_filename = uipanel('Title', 'current file', 'Position', [0.4 0.9 0.6 0.1], 'Units','Normalized');
-                      
+            
+            obj.panel_filename = uipanel('Title', 'current file', 'Position', [0.4 0.8 0.6 0.2], 'Units','Normalized');
+            
             obj.button_filename = uicontrol(obj.panel_filename, 'Style', 'pushbutton', 'String', 'no file loaded yet',...
-                'Units', 'Normalized', 'Position', [0 0 1 1], 'FontSize', obj.font_size);
+                'Units', 'Normalized', 'Position', [0 0.5 1 0.5], 'FontSize', obj.font_size);
+            
+            obj.button_progress = uicontrol(obj.panel_filename, 'Style', 'pushbutton', 'String', ' ',...
+                'Units', 'Normalized', 'Position', [0 0.0 1 0.5], 'FontSize', obj.font_size);
             
             %%%%%%%%%%%%%%%%%%%%%%%% run/stop panel %%%%%%%%%%%%%%%%%%%%%%%
             
             obj.panel_run_stop = uipanel('Title', '', 'Position', [0.4 0 0.6 0.1], 'Units','Normalized');
-                        
+            
             obj.button_run_stop = uicontrol(obj.panel_run_stop, 'Style', 'pushbutton', 'String', 'RUN',...
                 'Units', 'Normalized', 'Position', [0 0 1 1], 'FontSize', 26,...
-                'Callback', @obj.callback_run_stop);            
+                'Callback', @obj.callback_run_stop);
             
             %%%%%%%%%%%%%%%%%%%%%%%%% image panel %%%%%%%%%%%%%%%%%%%%%%%%%
             
-            obj.image_panel = uipanel('Title', 'image', 'Position', [0.4 0.1 0.6 0.8], 'Units', 'Normalized');
+            obj.image_panel = uipanel('Title', 'image', 'Position', [0.4 0.1 0.6 0.7], 'Units', 'Normalized');
             
             obj.image_axes = axes('Parent', obj.image_panel);
             
@@ -131,7 +146,7 @@ classdef DeflatorGUI < handle
         end
         
         function updateGUI(obj)
-           
+            
             if isempty(obj.fig) || ~obj.fig.isvalid || isempty(obj.image_panel) || ~isvalid(obj.image_panel)
                 return; % short circuit this function if there's no GUI
             end
@@ -142,7 +157,7 @@ classdef DeflatorGUI < handle
             obj.button_src_dir.String = ['src:' obj.def.src_dir.pwd];
             obj.button_out_dir.String = ['out:' obj.def.out_dir.pwd];
             obj.button_out_dir_backup.String = ['bkp:' obj.def.out_dir_backup.pwd];
-           
+            
             %%%%%%%%%%%%%%%%%%%%%%%%%% controls panel %%%%%%%%%%%%%%%%%%%%%
             
             if obj.def.use_auto_backup
@@ -150,11 +165,11 @@ classdef DeflatorGUI < handle
             else
                 obj.button_backup.String = 'backup OFF';
             end
-                        
+            
             if obj.def.use_auto_delete
                 obj.button_auto_delete.String = 'delete ON';
                 obj.button_auto_delete.BackgroundColor = 'red';
-            else            
+            else
                 obj.button_auto_delete.String = 'delete OFF';
                 obj.button_auto_delete.BackgroundColor = [0.7 0.7 0.7];
             end
@@ -180,6 +195,8 @@ classdef DeflatorGUI < handle
                 obj.button_filename.String = filename;
             end
             
+            obj.button_progress.String = obj.def.prog.show;
+            
             %%%%%%%%%%%%%%%%%%%%%%%% run/stop panel %%%%%%%%%%%%%%%%%%%%%%%
             
             if obj.def.brake_bit
@@ -191,7 +208,7 @@ classdef DeflatorGUI < handle
             %%%%%%%%%%%%%%%%%%%%%%%%% image panel %%%%%%%%%%%%%%%%%%%%%%%%%
             
             if isempty(obj.image_axes) || ~isvalid(obj.image_axes)
-                obj.image_axes = axes('Parent', obj.image_panel); 
+                obj.image_axes = axes('Parent', obj.image_panel);
             end
             
             if ~isempty(obj.def.reader.images)
@@ -202,97 +219,110 @@ classdef DeflatorGUI < handle
             
         end
         
+        function val = check(obj)
+            
+            val = ~isempty(obj) && ~isempty(obj.image_panel) && isvalid(obj.image_panel);
+            
+        end
+        
     end
     
     methods % callbacks
-    
-          %%%%%%%%%%%%%%%%%%%%%%%%%% objects panel %%%%%%%%%%%%%%%%%%%%%%%%
-          
-          function callback_reader(obj, ~, ~)
-              
-              obj.def.reader.makeGUI;
-              
-              obj.updateGUI;
-              
-          end
-          
-          function callback_buffers(obj, ~, ~)
-             
-%               if isempty(obj.def.buffers.gui)
-%                   obj.def.buffers.makeGUI;
-%                   obj.def.buffers.gui.debug_bit = 0;
-%               end
-              
-              obj.def.buffers.makeGUI;
-              
-              obj.updateGUI; 
-              
-          end
-          
-          function callback_src_dir(obj, ~, ~)
-             
-              obj.def.src_dir.browse;
-              
-              obj.updateGUI;
-                            
-          end
-          
-          function callback_out_dir(obj, ~, ~)
-             
-              obj.def.out_dir.browse;
-              
-              obj.updateGUI;
-                            
-          end
-          
-          function callback_out_dir_backup(obj, ~, ~)
-             
-              obj.def.out_dir_backup.browse;
-              
-              obj.updateGUI;
-                            
-          end
         
-          %%%%%%%%%%%%%%%%%%%%%%%%%%%% controls panel %%%%%%%%%%%%%%%%%%%%%
-          
-          function callback_backup(obj, ~, ~)
-             
-              obj.def.use_auto_backup = ~obj.def.use_auto_backup;
-              
-              obj.updateGUI;
-              
-          end
-          
-          function callback_auto_delete(obj, ~, ~)
-             
-              obj.def.use_auto_delete = ~obj.def.use_auto_delete;
-              
-              obj.updateGUI;
-              
-          end
+        %%%%%%%%%%%%%%%%%%%%%%%%%% objects panel %%%%%%%%%%%%%%%%%%%%%%%%
+        
+        function callback_reader(obj, ~, ~)
             
-          %%%%%%%%%%%%%%%%%%%%%%%%%% run/stop panel %%%%%%%%%%%%%%%%%%%%%%%
-          
-          function callback_run_stop(obj, ~, ~)
-             
-              if obj.debug_bit, disp('callback: run/stop'); end
-              
-              if obj.def.brake_bit
-                  
-                  obj.def.run;
-                  
-              else
-                  
-                  obj.def.brake_bit = 1;
-                  
-              end
-              
-              obj.updateGUI;
-              
-          end
-          
-          
-    end
+            obj.def.reader.makeGUI;
+            
+            obj.updateGUI;
+            
+        end
         
+        function callback_buffers(obj, ~, ~)
+            
+            %               if isempty(obj.def.buffers.gui)
+            %                   obj.def.buffers.makeGUI;
+            %                   obj.def.buffers.gui.debug_bit = 0;
+            %               end
+            
+            obj.def.buffers.makeGUI;
+            
+            obj.updateGUI;
+            
+        end
+        
+        function callback_src_dir(obj, ~, ~)
+            
+            obj.def.src_dir.browse;
+            
+            obj.updateGUI;
+            
+        end
+        
+        function callback_out_dir(obj, ~, ~)
+            
+            obj.def.out_dir.browse;
+            
+            obj.updateGUI;
+            
+        end
+        
+        function callback_out_dir_backup(obj, ~, ~)
+            
+            obj.def.out_dir_backup.browse;
+            
+            obj.updateGUI;
+            
+        end
+        
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%% controls panel %%%%%%%%%%%%%%%%%%%%%
+        
+        function callback_backup(obj, ~, ~)
+            
+            obj.def.use_auto_backup = ~obj.def.use_auto_backup;
+            
+            obj.updateGUI;
+            
+        end
+        
+        function callback_auto_delete(obj, ~, ~)
+            
+            obj.def.use_auto_delete = ~obj.def.use_auto_delete;
+            
+            obj.updateGUI;
+            
+        end
+        
+        %%%%%%%%%%%%%%%%%%%%%%%%%% run/stop panel %%%%%%%%%%%%%%%%%%%%%%%
+        
+        function callback_run_stop(obj, ~, ~)
+            
+            if obj.debug_bit, disp('callback: run/stop'); end
+            
+            if obj.def.brake_bit
+                
+                obj.def.run;
+                
+            else
+                
+                obj.def.brake_bit = 1;
+                
+            end
+            
+            obj.updateGUI;
+            
+        end
+        
+        
+        function callback_close(obj, ~, ~)
+            
+            if obj.debug_bit, disp('callback: close'); end
+            
+            delete(obj.fig.fig);
+            
+        end
+    end
+    
 end
 

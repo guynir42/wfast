@@ -4,6 +4,8 @@ classdef Deflator < file.AstroData
         
         gui@file.gui.DeflatorGUI;
         
+        prog@util.sys.ProgressBar;
+        
     end
     
     properties % objects and resources
@@ -58,6 +60,7 @@ classdef Deflator < file.AstroData
                 obj.setupBuffers;
                 obj.setupParameters;
                 obj.setupReader;
+                obj.setupProgressBar;
                 
             end
             
@@ -125,6 +128,12 @@ classdef Deflator < file.AstroData
             
         end
         
+        function setupProgressBar(obj)
+            
+            obj.prog = util.sys.ProgressBar;
+            
+        end
+        
     end
     
     methods % reset
@@ -137,8 +146,8 @@ classdef Deflator < file.AstroData
         
         function resetFilenames(obj)
             
-            obj.reader.reset;
             obj.reader.dir = util.sys.WorkingDirectory(obj.src_subdir);
+            obj.reader.reset;
             obj.reader.num_files_per_batch = 1;
             
         end
@@ -203,6 +212,15 @@ classdef Deflator < file.AstroData
                 d = obj.src_dir.dir;
                 d{end+1} = ''; % add the base dir itself to the list... 
                 
+                N = 0;
+                
+                for jj = 1:length(d) % estimate number of files
+                    obj.src_subdir.cd(sa(obj.src_dir.pwd, d{jj}));
+                    N = N + length(obj.src_subdir.match('*.h5'));
+                end
+                
+                obj.prog.start(N);
+                
                 for jj = 1:length(d)
 
                     obj.src_subdir.cd(sa(obj.src_dir.pwd, d{jj}));
@@ -261,7 +279,7 @@ classdef Deflator < file.AstroData
                         if obj.reader.is_finished
                             break;
                         end
-
+                        
                         [output_exists, output_filename] = obj.checkFileExists(obj.reader.this_filename, obj.out_subdir.pwd);
                         
                         if ~obj.use_auto_backup
@@ -313,13 +331,16 @@ classdef Deflator < file.AstroData
                             
                         end
 
-                        if ~isempty(obj.gui)
+                        obj.prog.advance;
+                        obj.prog.showif;
+                        
+                        if ~isempty(obj.gui) && obj.gui.check
                             obj.gui.updateGUI;
                         end
                         
-                    end % for ii
+                    end % for ii (files)
 
-                end % for jj
+                end % for jj (directories)
             
             catch ME
                 obj.brake_bit = 1;
@@ -327,7 +348,9 @@ classdef Deflator < file.AstroData
             end
                 
             obj.brake_bit = 1;
-               
+            
+            obj.prog.finishup;
+            
             disp('done deflating files...');
             
         end

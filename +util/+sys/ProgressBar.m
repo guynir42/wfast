@@ -123,6 +123,16 @@ classdef ProgressBar < handle
             
         end
         
+        function advance(obj, step)
+            
+            if nargin<2 || isempty(step)
+                step = 1;
+            end
+            
+            obj.current_number = obj.current_number + step;
+            
+        end
+        
     end
        
     methods % printing
@@ -197,22 +207,26 @@ classdef ProgressBar < handle
             
         end
         
-        function c = check(obj, number)
-            
-            c = number>0 && number~=obj.current_number && mod(number, obj.dividor)==0;
-            
-        end
-        
         function showif(obj, number)
-                        
+                  
+            if nargin>1 && ~isempty(number)
+                obj.current_number = number;
+            end
+                     
             if isempty(obj.total_number)
                 return;
             end
             
-            if obj.check(number)
+            if obj.check(obj.current_number)
 %                 obj.input(number);
-                obj.show(number);
+                obj.show(obj.current_number);
             end
+            
+        end
+        
+        function c = check(obj, number)
+            
+            c = number>0 && number~=obj.current_number && mod(number, obj.dividor)==0;
             
         end
         

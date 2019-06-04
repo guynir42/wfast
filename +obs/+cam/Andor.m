@@ -367,6 +367,7 @@ classdef Andor < file.AstroData
             
 %             obj.focuser.pos = 4.69; % from our focus test on 26/5/19
             obj.focuser.pos = 4.5857; % updated at 28/5/19
+            obj.focuser.pos = 4.658; % updated at 03/6/19
 %             obj.focuser.tip = 3.25;
             obj.focuser.tip = 0;
 %             obj.focuser.tilt = 1.05;
