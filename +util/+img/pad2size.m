@@ -18,6 +18,10 @@ function M_out = pad2size(M_in, size_needed, pad_value)
         return;
     end
     
+    if ndims(M_in)>4
+        error('This function treats up to 4D matrices. If you want more dimensions some coding is needed!'); 
+    end
+    
     S_in = size(M_in);
     S_in = S_in(1:2);
     
