@@ -314,18 +314,27 @@ classdef Ephemeris < handle
                 
                 sign = 1;
                 
-                for jj = 1:length(Dec_string{ii}) % pick up minus sign before first numeral if it is zero...
+%                 for jj = 1:length(Dec_string{ii}) % pick up minus sign before first numeral if it is zero...
+%                     
+%                     if Dec_string{ii}(jj)=='0' && jj>1
+%                         if strcmp(Dec_string{ii}(jj-1), '-')
+%                             sign = -1;
+%                             break;
+%                         end
+%                     end
+%                 end
+
+                for jj = 1:length(Dec_string{ii}) % pick up minus sign
                     
-                    if Dec_string{ii}(jj)=='0' && jj>1
-                        if strcmp(Dec_string{ii}(jj-1), '-')
-                            sign = -1;
-                            break;
-                        end
+                    if strcmp(Dec_string{ii}(jj), '-')
+                        sign = -1;
+                        break;
                     end
+                    
                 end
                 
                 for jj = 1:min([3 length(numbers{ii})])
-                    arcsecs(ii) = arcsecs(ii) + numbers{ii}(jj)*factors(jj);
+                    arcsecs(ii) = arcsecs(ii) + abs(numbers{ii}(jj))*factors(jj);
                 end
                 
                 arcsecs(ii) = arcsecs(ii)*sign;
