@@ -10,6 +10,8 @@ classdef ASA < handle
         
         target@head.Ephemeris;
         
+        ard@obs.sens.ScopeAssistant;
+        
         log@util.sys.Logger;
         
     end

@@ -28,6 +28,11 @@ classdef Manager < handle
     
     properties % switches/controls
         
+        use_dome = 1;
+        use_mount = 1;
+        use_weather = 1;
+        use_wind = 1;
+        
         brake_bit = 1;
         debug_bit = 1;
         
@@ -70,10 +75,21 @@ classdef Manager < handle
         
         function connect(obj)
             
-            obj.connectDome;
-            obj.connectMount;
-            obj.connectBoltwood;
-            obj.connectWindETH;
+            if obj.use_dome
+                obj.connectDome;
+            end
+            
+            if obj.use_mount
+                obj.connectMount;
+            end
+            
+            if obj.use_weather
+                obj.connectBoltwood;
+            end
+            
+            if obj.use_wind
+                obj.connectWindETH;
+            end
             
         end
         

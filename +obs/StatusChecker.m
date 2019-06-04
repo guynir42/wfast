@@ -107,8 +107,8 @@ classdef StatusChecker < handle
     properties(Hidden=true)
         
         % list all the classes that status checker is following
-        sensor_classes = {'obs.sens.Simulator', 'obs.sens.Boltwood', 'obs.sens.WindETH'}; 
-        device_classes = {'obs.dome.Simulator', 'obs.dome.AstroHaven', 'obs.mount.Simulator', 'obs.mount.ASA'};
+%         sensor_classes = {'obs.sens.Simulator', 'obs.sens.Boltwood', 'obs.sens.WindETH'}; 
+%         device_classes = {'obs.dome.Simulator', 'obs.dome.AstroHaven', 'obs.mount.Simulator', 'obs.mount.ASA'};
         critical_devices@containers.Map;
         ignore_devices@containers.Map;
         
@@ -267,6 +267,34 @@ classdef StatusChecker < handle
     end
     
     methods % getters
+        
+        function val = device_classes(obj)
+            
+            val = {};
+            
+            if obj.owner.use_dome
+                val{end+1} = 'obs.dome.AstroHaven';
+            end
+            
+            if obj.owner.use_mount
+                val{end+1} = 'obs.mount.ASA';
+            end
+            
+        end
+        
+        function val = sensor_classes(obj)
+            
+            val = {};
+            
+            if obj.owner.use_weather
+                val{end+1} = 'obs.sens.Boltwood';
+            end
+            
+            if obj.owner.use_wind
+                val{end+1} = 'obs.sens.WindETH';
+            end
+            
+        end
         
         function val = get.dev_all(obj)
             
@@ -949,6 +977,7 @@ classdef StatusChecker < handle
             if obj.decision_light==0
                 obj.status = 0;
                 obj.report = ['Light too bright! ' obj.light_str];
+%                 obj.owner.dome.closeBothFull; % can we put this somewhere better??
                 return;
             end
             
