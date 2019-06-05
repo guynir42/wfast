@@ -26,7 +26,7 @@ classdef ASA < handle
         
         limit_alt = 15; % degrees
         
-        use_accelerometer = 0;
+        use_accelerometer = 1;
         use_ultrasonic = 0;
         
         step_arcsec = 5;
@@ -132,12 +132,22 @@ classdef ASA < handle
             
                 obj.hndl.MotorOn;
                 
-                if isempty(obj.ard)
-                    obj.ard = obs.sens.ScopeAssistant;
-                    obj.ard.telescope = obj;
+                if obj.use_accelerometer
+                    
+                    if isempty(obj.ard) 
+                        try
+                            obj.ard = obs.sens.ScopeAssistant;
+                            obj.ard.telescope = obj;
+                        catch ME
+                            obj.use_accelerometer = 0;
+                            warning(ME.getReport);
+                        end
+                    end
                 end
                 
-                obj.ard.connect;
+                if obj.use_accelerometer
+                    obj.ard.connect;
+                end
                 
             catch ME
                 obj.log.error(ME.getReport);
@@ -521,12 +531,14 @@ classdef ASA < handle
             
             try
                
-                if isempty(obj.ard)
+                if isempty(obj.ard) && obj.use_accelerometer
                     obj.ard = obs.sens.ScopeAssistant;
                     obj.ard.telescope = obj;
                 end
                 
-                obj.ard.update;
+                if ~isempty(obj.ard) && obj.use_accelerometer
+                    obj.ard.update;
+                end
                 
             catch ME
                 warning(ME.getReport);

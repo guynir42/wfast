@@ -472,6 +472,8 @@ classdef AstroHaven < handle
                         obj.disconnect;
                     end
 
+                    delete(instrfind('Name', ['Serial-', obj.port_name])); % get rid of any leftover serial connections to this object's hndl
+                    
                     pause(0.1);
 
                     obj.hndl = serial(obj.port_name);
