@@ -156,6 +156,8 @@ classdef Filter < handle
                 error('Cannot filter without any kernels!');
             end
             
+            obj.clear;
+            
             obj.fluxes = fluxes;
             
             if nargin>2 && ~isempty(timestamps)

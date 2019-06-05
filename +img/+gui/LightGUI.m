@@ -18,6 +18,8 @@ classdef LightGUI < handle
     
     properties % gui stuff
         
+        panel_methods;
+        
         panel_control;
         
         panel_display;
@@ -79,16 +81,23 @@ classdef LightGUI < handle
             obj.fig.width = 25;
             movegui(obj.fig.fig, 'center');
             
+            %%%%%%%%%%% panel methods %%%%%%%%%%%%%%%
+            
+            obj.panel_methods = GraphicPanel(obj.owner, [0 0.9 0.2 0.1], 'methods'); 
+            obj.panel_methods.addButton('button_signal_method', 'signal_method', 'info', ' ', '', '', 0.5);
+            obj.panel_methods.addButton('button_background_method', 'background_method', 'info', ' ', '', '', 0.5);
+            obj.panel_methods.make;
+            
             %%%%%%%%%%% panel control %%%%%%%%%%%%%%%
             
-            obj.panel_control = GraphicPanel(obj.owner, [0 0.7 0.2 0.3], 'control'); 
+            obj.panel_control = GraphicPanel(obj.owner, [0 0.6 0.2 0.3], 'control'); 
             obj.panel_control.number = 4;
             obj.panel_control.addButton('button_double_up', 'use_double_up', 'toggle', 'double up', 'double up', '', [], 'red');
             obj.panel_control.make;
             
             %%%%%%%%%%% panel display %%%%%%%%%%%%%%%%
             
-            obj.panel_display = GraphicPanel(obj.owner, [0 0.4 0.2 0.3], 'display');
+            obj.panel_display = GraphicPanel(obj.owner, [0 0.3 0.2 0.3], 'display');
             obj.panel_display.number = 4;
             obj.panel_display.addButton('button_show_what', 'show_what', 'picker', 'flux'); 
             obj.panel_display.addButton('button_flux_cal', 'show_flux_cal', 'picker', 'raw'); 
@@ -106,8 +115,8 @@ classdef LightGUI < handle
             
             %%%%%%%%%%% panel process %%%%%%%%%%%%%%%%
             
-            obj.panel_process = GraphicPanel(obj.owner, [0 0.1 0.2 0.3], 'process');
-            obj.panel_process.number = 4;
+            obj.panel_process = GraphicPanel(obj.owner, [0 0.1 0.2 0.2], 'process');
+            obj.panel_process.number = 2;
             obj.panel_process.addButton('button_background', 'use_subtract_backgrounds', 'toggle', 'sub b/g', 'sub b/g', '', [], 'red');
             
             obj.panel_process.make;

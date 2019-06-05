@@ -16,6 +16,9 @@ classdef Lightcurves < handle
         num_frames = 0;
         total_frames;
         
+        signal_method = '';
+        background_method = '';
+        
     end
     
     properties % switches/controls

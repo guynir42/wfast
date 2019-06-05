@@ -42,7 +42,10 @@ classdef Analysis < file.AstroData
         stack_cutouts_sub;
         stack_cutouts_bg;
         stack_proc;
+        
         prev_stack;
+        prev_timestamps;
+        prev_fluxes;
         
         batch_counter = 0;
         
@@ -54,9 +57,9 @@ classdef Analysis < file.AstroData
         use_background_cutouts = 1; % subtract b/g from the cutouts (and stack cutouts!)
         use_refine_bg = 0; % need to figure out exactly how to do this
         
-        show_cutouts_cal = 0; % show calibrated cutouts
-        
         use_audio = 0;
+        
+        display_num_rect_stars = 30;
         
         brake_bit = 1;
         debug_bit = 1;
@@ -79,7 +82,7 @@ classdef Analysis < file.AstroData
         use_cutout_adjustment_floor = 0; % use floor of positions before (instead of) using round(). 
         
         num_batches_limit;
-        version = 1.00;
+        version = 1.01;
         
     end
     
@@ -102,10 +105,10 @@ classdef Analysis < file.AstroData
                 obj.clip_bg.use_adjust = 0; % this should be disabled and depricated!
                 obj.back = img.Background;
                 obj.phot = img.Photometry;
-                obj.light_original = img.Lightcurves;
-                obj.light_basic = img.Lightcurves;
-                obj.light_ap = img.Lightcurves;
-                obj.light_gauss = img.Lightcurves;
+                obj.light_original = img.Lightcurves; 
+                obj.light_basic = img.Lightcurves; obj.light_basic.signal_method = 'square'; obj.light_basic.background_method = 'corners';
+                obj.light_ap = img.Lightcurves; obj.light_ap.signal_method = 'aperture'; obj.light_ap.background_method = 'annulus';
+                obj.light_gauss = img.Lightcurves; obj.light_gauss.signal_method = 'gauss'; obj.light_gauss.background_method = 'annulus';
                 
                 obj.finder = trig.Finder;
                 obj.finder.setupKernels;
@@ -139,6 +142,10 @@ classdef Analysis < file.AstroData
             
             obj.batch_counter = 0;
 
+            obj.prev_stack = [];
+            obj.prev_timestamps = [];
+            obj.prev_fluxes = [];
+            
         end
         
         function clear(obj)
@@ -285,8 +292,6 @@ classdef Analysis < file.AstroData
                 
                 obj.prog.show(ii);
                 
-                obj.show;
-
                 if ~isempty(obj.gui) && obj.gui.check
                     obj.gui.update; 
                 end
@@ -398,7 +403,23 @@ classdef Analysis < file.AstroData
             obj.light_gauss.getData(obj.phot, 'gauss');
             if obj.light_gauss.gui.check, obj.light_gauss.gui.update; end
             
-            obj.finder.input(obj.phot.fluxes_ap, obj.timestamps);
+            f = obj.phot.fluxes_ap;
+            
+            if ~isempty(obj.prev_fluxes) && ~isempty(obj.prev_timestamps)
+            
+                obj.finder.input(vertcat(obj.prev_fluxes, f), vertcat(obj.prev_timestamps, obj.timestamps), ...
+                    obj.cutouts_proc, obj.positions, obj.stack_proc, ...
+                    obj.batch_counter+1, 'filename', obj.reader.this_filename, ...
+                    't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp);
+
+            end
+            
+            obj.prev_fluxes = f;
+            obj.prev_timestamps = obj.timestamps;
+            
+            if ~isempty(obj.gui) && obj.gui.check
+                obj.show('ax', obj.gui.axes_image);
+            end
             
             drawnow;
             
@@ -410,7 +431,18 @@ classdef Analysis < file.AstroData
         
         function show(obj, varargin)
             
+            input = util.text.InputVars;
+            input.input_var('ax', [], 'axes', 'axis');
+            input.scan_vars(varargin{:});
             
+            if isempty(input.ax)
+                input.ax = gca;
+            end
+            
+            util.plot.setImage(obj.stack_proc, input.ax);
+
+            obj.clip.showRectangles('color', 'black', 'ax', input.ax, 'delete', 1, 'text', 1, 'num', obj.display_num_rect_stars);
+            obj.clip_bg.showRectangles('color', 'red', 'ax', input.ax, 'delete', 0, 'text', 0);
             
         end
         

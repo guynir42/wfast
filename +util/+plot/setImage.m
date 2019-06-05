@@ -16,7 +16,7 @@ function setImage(I, ax)
     end
     
     im_handle = findobj(ax, 'Type', 'Image');
-    if isempty(im_handle)
+    if isempty(im_handle) || numel(im_handle)>1
         imagesc(ax, I);
 %         ax.PlotBoxAspectRatio = [1 1 1];
         axis(ax, 'image');
