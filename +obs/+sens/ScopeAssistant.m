@@ -6,8 +6,8 @@ classdef ScopeAssistant < handle
     
     properties % objects
         
-        hndl % serial object
-        
+        hndl; % serial object
+        telescope; % link back to telescope object (e.g., for sending stop signal)
         data@util.vec.CircularBuffer;
         
     end
@@ -31,13 +31,20 @@ classdef ScopeAssistant < handle
     
     properties % switches/controls
         
-        port_name = 'COM1';
+        port_name = 'COM20';
+        
+        use_check_alt = 1;
+        alt_limit = 20;
+        
+        default_period = 0.1;
         
         status = 0;
         time;
         jd;
         reply = '';
         acc_vec_raw;
+        
+        log_message_sent = 0;
         
         debug_bit = 1;
         
@@ -47,6 +54,7 @@ classdef ScopeAssistant < handle
         
         acc_vec;
         angle;
+        ALT;
         
     end
     
@@ -97,7 +105,7 @@ classdef ScopeAssistant < handle
             
             pause(0.1);
             
-            obj.update;
+            obj.setupTimer(obj.default_period);
             
         end
         
@@ -171,6 +179,12 @@ classdef ScopeAssistant < handle
             
         end
         
+        function val = get.ALT(obj)
+            
+            val = 90 - obj.angle;
+            
+        end
+        
     end
     
     methods % setters
@@ -224,6 +238,24 @@ classdef ScopeAssistant < handle
             obj.status = 1;
             
             obj.data.input([obj.jd obj.acc_vec obj.distance]);
+            
+            if obj.debug_bit>1
+                disp(['ALT= ' num2str(obj.ALT)]);
+            end
+            
+            if ~isempty(obj.telescope) && obj.use_check_alt && obj.ALT<obj.alt_limit
+                obj.telescope.stop;
+                
+                if obj.log_message_sent==0
+                    disp('Arduino sending stop signal to telescope!');
+                    obj.telescope.log.input(['Arduino stopped telescope at angle ALT: ' num2str(obj.ALT) ' degrees...']);
+                    obj.log_message_sent = 1;
+                end
+            end
+            
+            if obj.ALT>30
+                obj.log_message_sent = 0;
+            end
             
         end
         

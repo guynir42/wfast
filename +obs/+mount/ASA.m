@@ -132,6 +132,13 @@ classdef ASA < handle
             
                 obj.hndl.MotorOn;
                 
+                if isempty(obj.ard)
+                    obj.ard = obs.sens.ScopeAssistant;
+                    obj.ard.telescope = obj;
+                end
+                
+                obj.ard.connect;
+                
             catch ME
                 obj.log.error(ME.getReport);
                 rethrow(ME);
