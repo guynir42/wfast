@@ -10,7 +10,7 @@ classdef Finder < handle
         
         cal@trig.Calibrator;
         filt@trig.Filter;
-        ev@trig.Events;
+        ev@trig.Event;
         
     end
     
@@ -98,7 +98,8 @@ classdef Finder < handle
             obj.generator.b = 0;
             obj.generator.v = 5:5:30;
             
-            obj.filt.kernels = obj.generator.getLightCurves - 1;
+            obj.generator.getLightCurves;
+            obj.filt.kernels = obj.generator.lc.flux - 1;
             
         end
         
@@ -109,7 +110,7 @@ classdef Finder < handle
             
             for ii = 1:length(obj.filt.found_events)
                 obj.ev(end+1) = obj.filt.found_events(ii);
-                obj.ev(end).flux_raw_full = fluxes; 
+                obj.ev(end).flux_raw_all = fluxes; 
                 % any other info that needs to be saved along with the event object? 
             end
             

@@ -711,6 +711,8 @@ classdef CurveGenerator < handle
                     filename = fullfile(d, 'source.mat');
                 elseif exist('source.mat', 'file')
                     filename = 'source.mat';
+                elseif exist(fullfile(getenv('DATA'), 'occultations/source.mat'), 'file')
+                    filename = fullfile(getenv('DATA'), 'occultations/source.mat');
                 else
                     warning('cannot find the source matrix. Use loadSourceMatrix(filename) or makeSourceMatrix');
                 end
