@@ -56,7 +56,7 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     end
     
     I = regionfill(I, isnan(I));
-    I_reduced = I;
+    I_reduced = (I-input.mean)./input.std;
     
     if input.edges
         I_reduced = util.img.pad2size(util.img.crop2size(I_reduced, size(I)-input.edges.*2), size(I), NaN);
@@ -78,20 +78,22 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
         I2 = I_reduced;
         I2(isnan(I2)) = 0;
         
-        If = filter2(k, I_reduced)./sqrt(util.stat.sum2(k)); 
-        If_half = filter2(k_half, I_reduced)./sqrt(util.stat.sum2(k_half));
-        If_twice = filter2(k_twice, I_reduced)./sqrt(util.stat.sum2(k_twice));
+        If = filter2(k, I2); %./sqrt(util.stat.sum2(k)); 
+        If_half = filter2(k_half, I2); %./sqrt(util.stat.sum2(k_half));
+        If_twice = filter2(k_twice, I2); %./sqrt(util.stat.sum2(k_twice));
 
-        BW = (If-input.mean)./input.std>=thresholds(ii);
+        BW = If>=thresholds(ii);
 
         BW_dilated = imdilate(BW, ones(input.dilate));
 
         T = regionprops('table', BW, I, 'WeightedCentroid', 'PixelValues', 'PixelIdxList'); 
 
         if ~isempty(T) && ~iscell(T{:,'PixelValues'}) % this happens when all regions are single-pixel
-            T2 = T(:,1);
+            T2 = T(:,'WeightedCentroid');
             T2{:,2} = num2cell(T.PixelValues);
             T2{:,3} = num2cell(T.PixelIdxList);
+            T2.Properties.VariableNames{2} = 'PixelValues';
+            T2.Properties.VariableNames{3} = 'PixelIdxList';
             T = T2;
         end
         
