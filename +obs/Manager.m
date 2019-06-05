@@ -128,18 +128,7 @@ classdef Manager < handle
             catch ME
                 
                 obj.log.error(ME.getReport);
-                obj.log.input('Connecting to mount simulator.');
-                
-                warning(ME.getReport);
-                
-                disp('Cannot connect to ASA mount. Using simulator instead...');
-                
-                try 
-                    obj.mount = obs.mount.Simulator;
-                catch ME
-                    obj.log.error(ME.getReport);
-                    warning(ME.getReport);
-                end
+                rethrow(ME);
                 
             end
             
@@ -199,31 +188,51 @@ classdef Manager < handle
         
         function val = get.RA(obj)
             
-            val = obj.mount.RA_hex;
+            if ~isempty(obj.mount)
+                val = obj.mount.RA_hex;
+            else
+                val = [];
+            end
             
         end
         
         function val = get.DE(obj)
             
-            val = obj.mount.DE_hex;
+            if ~isempty(obj.mount)
+                val = obj.mount.DE_hex;
+            else
+                val = [];
+            end
             
         end
         
         function val = get.LST(obj)
             
-            val = obj.mount.LST_hex;
+            if ~isempty(obj.mount)
+                val = obj.mount.LST_hex;
+            else
+                val = [];
+            end
             
         end
         
         function val = get.ALT(obj)
             
-            val = round(obj.mount.ALT);
+            if ~isempty(obj.mount)
+                val = round(obj.mount.ALT);
+            else
+                val = [];
+            end
             
         end
         
         function val = report_string(obj)
             
-            val = obj.checker.report;
+            if ~isempty(obj.mount)
+                val = obj.checker.report;
+            else
+                val = [];
+            end
             
         end
         
