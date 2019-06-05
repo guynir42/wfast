@@ -407,6 +407,16 @@ classdef Analysis < file.AstroData
             
         end
         
+        function makeGUI(obj)
+            
+            if isempty(obj.gui)
+                obj.gui = img.gui.AnalysisGUI(obj);
+            end
+            
+            obj.gui.make;
+            
+        end
+        
     end    
     
 end

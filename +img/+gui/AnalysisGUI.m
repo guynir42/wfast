@@ -1,8 +1,8 @@
-classdef objGUI < handle
+classdef AnalysisGUI < handle
     
     properties 
         
-        owner@package.OBJ; % link back to containg object
+        owner@img.Analysis; % link back to containg object
 
         fig@util.plot.FigHandler;
              
@@ -22,6 +22,8 @@ classdef objGUI < handle
         
         panel_contrast;
     
+        panel_objects;
+        
         panel_close;
         button_close;
         
@@ -39,21 +41,17 @@ classdef objGUI < handle
             
     methods % constructor
        
-        function obj = objGUI(owner)
+        function obj = AnalysisGUI(owner)
             
             % later add other options like copy constructor
-            if isa(owner, 'package.OBJ')
+            if isa(owner, 'img.Analysis')
                 
-                if obj.debug_bit, fprintf('objGUI constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit, fprintf('AnalysisGUI constructor v%4.2f\n', obj.version); end
                 
                 obj.owner = owner;
                 
-            elseif isa(owner, '...')
-                
-                
-                
             else
-                error('Input an ... to constructor of ...!');
+                error('Input an img.Analysis to constructor of AnalysisGUI!');
             end
             
         end
@@ -70,38 +68,55 @@ classdef objGUI < handle
             
             obj.buttons = {};
             
-            obj.fig = util.plot.FigHandler('...');
+            obj.fig = util.plot.FigHandler('analysis');
             obj.fig.clear;
             obj.fig.bottom = 5;
             obj.fig.height = 16;
             obj.fig.width = 25;
             movegui(obj.fig.fig, 'center');
             
-            N_left = 10; % number of buttons on left side
-            
             %%%%%%%%%%%%%%%%%%% LEFT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
-            pos = N_left;
+            N_left = 10; pos = N_left;
             
             %%%%%%%%%%% panel controls %%%%%%%%%%%%%%%
             
             % Add buttons using obj.addButton(button_name, var_name='', type='', str1='', str2='', font_size='', split=1, color_on=[], color_off=[])
             
-            num_buttons = 5;
-            pos = pos-num_buttons;
-            obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left 0.2 num_buttons/N_left], 'controls', 1); % last input is for vertical (default)
-            obj.panel_controls.number = num_buttons;
+            N = 4; pos = pos - N;
+            
+            obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'controls', 1); % last input is for vertical (default)
+            obj.panel_controls.number = N;
             
             obj.panel_controls.make;
             
             %%%%%%%%%%% panel contrast %%%%%%%%%%%%%%%
+            
+            N = 5; pos = pos - N;
             
             obj.panel_contrast = util.plot.ContrastLimits(obj.axes_image, obj.fig.fig, [0 pos/N_left 0.2 5/N_left], 1); % last input is for vertical (default)
             
             %%%%%%%%%%%%%%%%%%% RIGHT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%
             
             N_right = 10; pos = N_right;
-                        
+            
+            %%%%%%%%%%% panel objects %%%%%%%%%%%%%%%%
+            
+            N = 8; pos = pos - N;
+            
+            obj.panel_objects = GraphicPanel(obj.owner, [0.8 pos/N_right 0.2 N/N_right], 'objects'); 
+            obj.panel_objects.number = N;
+            obj.panel_objects.addButton('button_parameters', 'pars', 'push', 'Parameters');
+            obj.panel_objects.addButton('button_reader', 'reader', 'push', 'Reader');
+            obj.panel_objects.addButton('button_calibration', 'cal', 'push', 'Calibration');
+            obj.panel_objects.addButton('button_clipper', 'clip', 'push', 'Clipper');
+            obj.panel_objects.addButton('button_background', 'back', 'push', 'Background');
+            obj.panel_objects.addButton('button_photometry', 'phot', 'push', 'Photometry');
+            obj.panel_objects.addButton('button_parameters', 'pars', 'push', 'Parameters');
+            obj.panel_objects.addButton('button_finder', 'finder', 'push', 'Finder');
+            
+            obj.panel_objects.make;
+            
             %%%%%%%%%%%%%%%%%%%%%% MIDDLE %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
             N_middle = 10; pos = N_middle;
@@ -109,6 +124,7 @@ classdef objGUI < handle
             %%%%%%%%%%% panel image %%%%%%%%%%%%%%%%%%
             
             N = 9; pos = pos - N;
+            
             obj.panel_image = uipanel('Title', '', 'Position', [0.2 pos/N_middle 0.6 N/N_middle]);
                         
             obj.makeAxes;
@@ -118,7 +134,8 @@ classdef objGUI < handle
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
             
-            N = 1; pos = pos - N;            
+            N = 1; pos = pos - N;
+            
             obj.panel_close = uipanel('Position', [0 pos 0.2 N/N_middle]);
             obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE');
             obj.button_close.Callback = @obj.callback_close;
