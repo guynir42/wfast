@@ -34,7 +34,7 @@ classdef ScopeAssistant < handle
         port_name = 'COM20';
         
         use_check_alt = 1;
-        alt_limit = 20;
+        alt_limit = 15;
         
         default_period = 0.1;
         
@@ -202,6 +202,8 @@ classdef ScopeAssistant < handle
             end
             
             obj.hndl.BytesAvailableFcn = @obj.read_data;
+            
+            obj.use_check_alt = 1;
             
             fprintf(obj.hndl, 'measure;');
             

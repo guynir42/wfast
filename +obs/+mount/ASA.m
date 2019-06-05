@@ -519,6 +519,19 @@ classdef ASA < handle
                 return;
             end
             
+            try
+               
+                if isempty(obj.ard)
+                    obj.ard = obs.sens.ScopeAssistant;
+                    obj.ard.telescope = obj;
+                end
+                
+                obj.ard.update;
+                
+            catch ME
+                warning(ME.getReport);
+            end
+            
             % add additional tests?
             
             obj.status = 1;
