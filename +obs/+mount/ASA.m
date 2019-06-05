@@ -132,6 +132,13 @@ classdef ASA < handle
             
                 obj.hndl.MotorOn;
                 
+                if isempty(obj.ard)
+                    obj.ard = obs.sens.ScopeAssistant;
+                    obj.ard.telescope = obj;
+                end
+                
+                obj.ard.connect;
+                
             catch ME
                 obj.log.error(ME.getReport);
                 rethrow(ME);
@@ -510,6 +517,19 @@ classdef ASA < handle
             if obj.ALT<0
                 obj.status = 0;
                 return;
+            end
+            
+            try
+               
+                if isempty(obj.ard)
+                    obj.ard = obs.sens.ScopeAssistant;
+                    obj.ard.telescope = obj;
+                end
+                
+                obj.ard.update;
+                
+            catch ME
+                warning(ME.getReport);
             end
             
             % add additional tests?

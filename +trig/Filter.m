@@ -190,7 +190,7 @@ classdef Filter < handle
             % if kernels is 5D we will need to make some changes in pad2size
             f = util.img.pad2size(obj.fluxes, [L Sf(2:end)]);
             obj.fluxes_fft = fft(f);
-            obj.fluxes_filtered = real(fftshift(ifft(obj.kernels_fft.*obj.fluxes_fft),1))./obj.k_factor./obj.stds;
+            obj.fluxes_filtered = real(fftshift(ifft(obj.kernels_fft.*obj.fluxes_fft),1))./obj.stds; % ./obj.k_factor;
             obj.fluxes_filtered = util.img.crop2size(obj.fluxes_filtered, [Sf(1), Sk(2), Sf(3:end)]); 
             
         end

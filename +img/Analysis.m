@@ -24,6 +24,8 @@ classdef Analysis < file.AstroData
 %         light_cosqrt@img.Lightcurves;
         % light_fit@img.Lightcurves;
         
+        finder@trig.Finder;
+        
         prog@util.sys.ProgressBar;
         
         func; % any function that takes first argument this object and runs custom analysis
@@ -104,6 +106,9 @@ classdef Analysis < file.AstroData
                 obj.light_basic = img.Lightcurves;
                 obj.light_ap = img.Lightcurves;
                 obj.light_gauss = img.Lightcurves;
+                
+                obj.finder = trig.Finder;
+                obj.finder.setupKernels;
                 
                 obj.prog = util.sys.ProgressBar;
                 obj.audio = util.sys.AudioControl;
@@ -392,6 +397,8 @@ classdef Analysis < file.AstroData
             
             obj.light_gauss.getData(obj.phot, 'gauss');
             if obj.light_gauss.gui.check, obj.light_gauss.gui.update; end
+            
+            obj.finder.input(obj.phot.fluxes_ap, obj.timestamps);
             
             drawnow;
             
