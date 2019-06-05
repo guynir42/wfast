@@ -349,7 +349,7 @@ classdef Deflator < file.AstroData
                 
             obj.brake_bit = 1;
             
-            obj.prog.finishup;
+            obj.prog.finish;
             
             disp('done deflating files...');
             
