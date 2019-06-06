@@ -81,6 +81,20 @@ classdef Finder < handle
             obj.cal.reset;
             obj.filt.reset;
             
+            obj.prev_fluxes = [];
+            obj.prev_backgrounds = [];
+            obj.prev_variances = [];
+            obj.prev_offsets_x = [];
+            obj.prev_offsets_y = [];
+            obj.prev_widths = [];
+            obj.prev_bad_pixels = [];
+            obj.prev_timestamps = [];
+            obj.prev_cutouts = [];
+            obj.prev_positions = [];
+            obj.prev_stack = [];
+            obj.prev_batch_index = [];
+            obj.prev_filename = [];
+            
             obj.clear;
             
         end
@@ -149,13 +163,13 @@ classdef Finder < handle
                 obj.cal.input(vertcat(obj.prev_fluxes, input.fluxes), vertcat(obj.prev_timestamps, input.timestamps)); 
                 obj.filt.input(obj.cal.fluxes_subtracted, obj.cal.timestamps); 
                 
-                obj.new_events = obj.new_events;
+                obj.new_events = obj.filt.found_events;
                 
                 for ii = 1:length(obj.new_events)
                     
                     this_ev = obj.new_events(ii);
                     this_ev.serial = length(obj.ev) + ii;
-                    this_ev.flux_raw_all = fluxes; 
+                    this_ev.flux_raw_all = vertcat(obj.prev_fluxes, input.fluxes); 
                     this_ev.cutouts_first = obj.prev_cutouts;
                     this_ev.cutouts_second = input.cutouts;
                     this_ev.positions_first = obj.prev_positions;
@@ -182,12 +196,12 @@ classdef Finder < handle
                     this_ev.variance_space_average = mean(v, 2, 'omitnan'); 
                     
                     dx = vertcat(obj.prev_offsets_x, input.offsets_x);
-                    this_ev.offset_x.at_peak = dx(this_ev.which_frame, this_ev.which_star);
+                    this_ev.offset_x_at_peak = dx(this_ev.which_frame, this_ev.which_star);
                     this_ev.offset_x_time_average = mean(dx, 1, 'omitnan'); 
                     this_ev.offset_x_space_average = mean(dx, 2, 'omitnan'); 
                     
                     dy = vertcat(obj.prev_offsets_y, input.offsets_y);
-                    this_ev.offset_y_at_peak = dy(obj.which_frame, obj.which_star);
+                    this_ev.offset_y_at_peak = dy(this_ev.which_frame, this_ev.which_star);
                     this_ev.offset_y_time_average = mean(dy, 1, 'omitnan'); 
                     this_ev.offset_y_space_average = mean(dy, 2, 'omitnan'); 
                     
@@ -256,8 +270,6 @@ classdef Finder < handle
                 obj.new_events(ii).self_check;
                 
             end
-            
-            obj.last_events = obj.new_events; % this would be added to the list of found events
             
         end
         

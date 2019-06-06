@@ -277,13 +277,16 @@ classdef Event < handle
                 input.parent = gcf;
             end
             
-            ax1 = axes('Parent', input.parent, 'Position', [0.15 0.1 0.35 0.8]);
+            delete(input.parent.Children);
             
+            ax1 = axes('Parent', input.parent, 'Position', [0.1 0.3 0.35 0.4]);
+            obj.showFlux('ax', ax1, 'font_size', 10);
             
-            ax2 = axes('Parent', input.parent, 'Position', [0.50 0.0 0.25 1.0]);
+            ax3 = axes('Parent', input.parent, 'Position', [0.7 0.3 0.25 0.4]);
+            obj.showStack('ax', ax3);
             
-            
-            ax3 = axes('Parent', input.parent, 'Position', [0.75 0.0 0.25 1.0]);
+            ax2 = axes('Parent', input.parent, 'Position', [0.45 0.3 0.20 0.4]);
+            obj.showCutouts('ax', ax2);
             
             
         end
@@ -335,59 +338,51 @@ classdef Event < handle
                 obj.which_star, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.stds(obj.which_star)),...
                 'ax', input.ax, 'Position', 'NorthWest', 'FontSize', input.font_size);
             
-            input.ax.YLim(1) = -input.ax.YLim(2);
-%             input.ax.YLim = input.ax.YLim*1.2;
+            input.ax.YLim(1) = -max(abs(input.ax.YLim));
+            input.ax.YLim(2) = max(abs(input.ax.YLim));
+
             input.ax.XLim = [obj.timestamps(1) obj.timestamps(end)];
 
             input.ax.NextPlot = 'replace';
             
         end
         
-        function showStack(obj, varargin)
-            
-            input = util.text.InputVars;
-            input.input_var('ax', [], 'axes', 'axis');
-            input.scan_vars(varargin{:});
-            
-            if isempty(input.ax), input.ax = gca; end
-            
-            if ~isempty(obj.stack)
-                
-                util.plot.show(obj.stack, 'fancy', 0, 'autodyn', 1, 'ax', input.ax); 
-                
-                if ~isempty(obj.cutouts) && ~isempty(obj.positions)
-                    
-                    S = size(obj.cutouts);
-                    S = S(1:2); 
-                    
-                    P = obj.positions(obj.which_star, :); 
-                    
-                    C = P - floor(S/2) - 0.5; % corner of the rectangle
-                    
-                    rectangle('Position', [C S], 'Parent', input.ax); 
-                    
-                end
-                
-            end
-            
-        end
-        
         function showCutouts(obj, varargin)
             
             input = util.text.InputVars;
+            input.input_var('parent', []); 
             input.input_var('ax', [], 'axes', 'axis');
+            input.input_var('position', []);
             input.input_var('number', 9);
+            input.input_var('bias', []);
+            input.input_var('dynamic_range', []);
             input.scan_vars(varargin{:});
-            
-            if isempty(input.ax) 
-                fig = gcf;
-                delete(fig.Children);
-                input.ax = axes('Parent', fig);
-            end
             
             cutouts = cat(3, obj.cutouts_first(:,:,:,obj.which_star), obj.cutouts_second(:,:,:,obj.which_star));
             
-            if ~isempty(obj.cutouts)
+            if ~isempty(cutouts)
+                
+                if isempty(input.parent) && isempty(input.ax)
+                    
+                    input.parent = gcf;
+%                     delete(input.parent.Children);
+                    if ~isempty(input.position)
+                        panel = util.plot.stretchy_panel('Parent', input.parent, 'Position', input.position);
+                    else
+                        panel = util.plot.stretchy_panel('Parent', input.parent);
+                    end
+                    
+                elseif isempty(input.parent) && ~isempty(input.ax)
+                    
+                    pos = input.ax.Position;
+                    
+                    parent = input.ax.Parent;
+                    
+                    panel = util.plot.stretchy_panel('Position', pos, 'Parent', parent);
+                    
+                    delete(input.ax);
+                    
+                end
                 
                 idx = obj.which_frame; 
                 if strcmp(obj.which_batch, 'second')
@@ -407,42 +402,83 @@ classdef Event < handle
                     idx_end = size(cutouts,3);
                 end
                 
+                Nrows = ceil(sqrt(input.number));
+                Ncols = Nrows;
+
+                for ii = 1:input.number
+
+                    x = mod(ii-1, Nrows);
+                    y = floor((ii-1)/Nrows);
+
+                    ax{ii} = axes('Position', [x/Ncols y/Nrows 1/Ncols 1/Nrows], 'Parent', panel);
+
+                    use_autodyn = isempty(input.bias) && isempty(input.dynamic_range);
+                    
+                    util.plot.show(cutouts(:,:,idx_start+ii-1), 'fancy', 0, ...
+                        'autodyn', use_autodyn, 'bias', input.bias, 'dyn', input.dynamic_range);
+
+                    if idx_start+ii-1==idx
+                        util.plot.inner_title([num2str(idx_start+ii-1) '*'], 'Position', 'NorthWest', 'Color', 'red');
+                    else
+                        util.plot.inner_title(num2str(idx_start+ii-1), 'Position', 'NorthWest');
+                    end
+
+                end
+                
+                clim = ax{idx-idx_start+1}.CLim;
+                for ii = 1:length(ax)
+                    ax{ii}.CLim = clim;
+                end
+
             end
             
-%             fprintf('idx= %d | idx_start= %d | idx_end= %d\n', idx, idx_start, idx_end);
+        end
+        
+        function showStack(obj, varargin)
             
-            input.ax.Units = 'pixels';
-            pos = input.ax.Position;
-            if pos(3)>pos(4)
-                pos(3) = pos(4);
-            elseif pos(4)>pos(3)
-                pos(4) = pos(3);
-            end
-            parent = input.ax.Parent;
-            panel = uipanel('Units', 'pixels', 'Position', pos, 'Parent', parent);
-            delete(input.ax);
+            input = util.text.InputVars;
+            input.input_var('ax', [], 'axes', 'axis');
+            input.scan_vars(varargin{:});
             
-            Nrows = ceil(sqrt(input.number));
-            Ncols = Nrows;
+            if isempty(input.ax), input.ax = gca; end
             
-            for ii = 1:input.number
+            if ~isempty(obj.stack)
                 
-                x = mod(ii-1, Nrows);
-                y = floor((ii-1)/Nrows);
+                util.plot.show(obj.stack, 'fancy', 1, 'autodyn', 1, 'ax', input.ax); 
+                title('');
                 
-                ax{ii} = axes('Position', [x/Ncols y/Nrows 1/Ncols 1/Nrows], 'Parent', panel);
-                
-                util.plot.show(cutouts(:,:,idx_start+ii-1), 'fancy', 0, 'autodyn', 0);
-                
-                if idx_start+ii-1==idx
-                    util.plot.inner_title([num2str(idx_start+ii-1) ' (peak)'], 'Position', 'NorthWest');
-                else
-                    util.plot.inner_title(num2str(idx_start+ii-1), 'Position', 'NorthWest');
+                if ~isempty(obj.cutouts) && ~isempty(obj.positions)
+                    
+                    S = size(obj.cutouts);
+                    S = S(1:2); 
+                    
+                    P = obj.positions(obj.which_star, :); 
+                    
+                    C = P - floor(S/2) - 0.5; % corner of the rectangle
+                    
+                    rectangle('Position', [C S], 'Parent', input.ax); 
+                    
+                    input.ax.XLim = [P(1)-250 P(1)+250];
+                    input.ax.YLim = [P(2)-250 P(2)+250];
+                    
+                    if input.ax.XLim(1)<1
+                        input.ax.XLim(1) = 1;
+                    elseif input.ax.XLim(2)>size(obj.stack,2)
+                        input.ax.XLim(2) = size(obj.stack,2);
+                    end
+                    
+                    if input.ax.YLim(1)<1
+                        input.ax.YLim(1) = 1;
+                    elseif input.ax.YLim(2)>size(obj.stack,1)
+                        input.ax.YLim(2) = size(obj.stack,1);
+                    end
+                    
                 end
                 
             end
-
+            
         end
+        
         
     end    
     
