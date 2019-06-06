@@ -207,7 +207,7 @@ classdef Filter < handle
             for ii = 1:height(obj.props)
                 
                 if obj.props{ii, 'MaxIntensity'}>=obj.num_sigma && obj.props{ii, 'BoundingBox'}(6)<=obj.num_stars
-                    new_event = trig.Event(obj.props(ii,:), ff, obj.timestamps, obj.kernels);
+                    new_event = trig.Event(obj.props(ii,:), ff, obj.timestamps, obj.kernels, obj.stds);
                     % add some more self tests on this new event
                     obj.found_events(end+1) = new_event;
                 end

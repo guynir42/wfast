@@ -27,7 +27,8 @@ classdef Event < handle
         flux_raw_all;
         stds;
         
-        which_frame = 'first'; % can be 1 or 2, depending on where is the peak
+        which_batch = 'first'; % can be "first" or "second", depending on where is the peak
+        which_frame = []; 
         
         
     end
@@ -104,31 +105,31 @@ classdef Event < handle
         
         function val = get.cutouts(obj)
             
-            val = obj.(['cutouts_' obj.which_frame]);
+            val = obj.(['cutouts_' obj.which_batch]);
             
         end
         
         function val = get.positions(obj)
             
-            val = obj.(['positions_' obj.which_frame]);
+            val = obj.(['positions_' obj.which_batch]);
             
         end
         
         function val = get.stack(obj)
             
-            val = obj.(['stack_' obj.which_frame]);
+            val = obj.(['stack_' obj.which_batch]);
             
         end
         
         function val = get.batch_index(obj)
             
-            val = obj.(['batch_index_' obj.which_frame]);
+            val = obj.(['batch_index_' obj.which_batch]);
             
         end
         
         function val = get.filename(obj)
             
-            val = obj.(['filename_' obj.which_frame]);
+            val = obj.(['filename_' obj.which_batch]);
             
         end
         
@@ -181,15 +182,18 @@ classdef Event < handle
             end
             
             if nargin>5 && ~isempty(stds)
-                obj.stds = stds;
+                obj.stds = squeeze(stds);
             end
             
             obj.star_idx = z;
             
             obj.flux_filtered = fluxes(:, x, z);
             
+            obj.which_batch = 'first';
+            obj.which_frame = y;
             if y>floor(size(fluxes,1)/2)
-                obj.which_frame = 'second'; % the peak is in the second half of the two-batch fluxes vector
+                obj.which_batch = 'second'; % the peak is in the second half of the two-batch fluxes vector
+                obj.which_frame = y - floor(size(fluxes,1)/2); 
             end
             
         end
@@ -220,8 +224,13 @@ classdef Event < handle
         
         function show(obj, varargin)
             
+        end
+        
+        function showFlux(obj, varargin)
+            
             input = util.text.InputVars;
             input.input_var('ax', [], 'axes', 'axis');
+            input.input_var('font_size', 14);
             input.scan_vars(varargin{:});
             
             if isempty(input.ax), input.ax = gca; end
@@ -236,7 +245,12 @@ classdef Event < handle
             h2.DisplayName = 'trigger region';
             f = obj.flux_raw_all(:,obj.star_idx);
             m = mean(f);
-            s = obj.stds(obj.star_idx);
+            if ~isempty(obj.stds)
+                s = obj.stds(obj.star_idx);
+            else
+                s = std(obj.flux_raw_all);
+                s = s(obj.star_idx);
+            end
             
             h3 = plot(input.ax, obj.timestamps, (f-m)./s, '-');
             h3.DisplayName = 'Raw LC';
@@ -246,10 +260,126 @@ classdef Event < handle
             
             xlabel(input.ax, 'timestamp (seconds)');
             ylabel(input.ax, 'flux S/N');   
-            legend(input.ax);
             
+            if strcmp(obj.which_batch, 'first')
+                lh = legend(input.ax, 'Location', 'NorthEast');
+            else
+                lh = legend(input.ax, 'Location', 'SouthWest');
+            end
             
+            lh.FontSize = input.font_size;
             
+            util.plot.inner_title(sprintf('star: %d | batches: %d-%d | S/N= %4.2f | \\sigma= %4.2f', ...
+                obj.star_idx, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.stds(obj.star_idx)),...
+                'ax', input.ax, 'Position', 'NorthWest', 'FontSize', input.font_size);
+            
+            input.ax.YLim(1) = -input.ax.YLim(2);
+%             input.ax.YLim = input.ax.YLim*1.2;
+            input.ax.XLim = [obj.timestamps(1) obj.timestamps(end)];
+
+            input.ax.NextPlot = 'replace';
+            
+        end
+        
+        function showStack(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('ax', [], 'axes', 'axis');
+            input.scan_vars(varargin{:});
+            
+            if isempty(input.ax), input.ax = gca; end
+            
+            if ~isempty(obj.stack)
+                
+                util.plot.show(obj.stack, 'fancy', 0, 'autodyn', 1, 'ax', input.ax); 
+                
+                if ~isempty(obj.cutouts) && ~isempty(obj.positions)
+                    
+                    S = size(obj.cutouts);
+                    S = S(1:2); 
+                    
+                    P = obj.positions(obj.star_idx, :); 
+                    
+                    C = P - floor(S/2) - 0.5; % corner of the rectangle
+                    
+                    rectangle('Position', [C S], 'Parent', input.ax); 
+                    
+                end
+                
+            end
+            
+        end
+        
+        function showCutouts(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('ax', [], 'axes', 'axis');
+            input.input_var('number', 9);
+            input.scan_vars(varargin{:});
+            
+            if isempty(input.ax) 
+                fig = gcf;
+                delete(fig.Children);
+                input.ax = axes('Parent', fig);
+            end
+            
+            cutouts = cat(3, obj.cutouts_first(:,:,:,obj.star_idx), obj.cutouts_second(:,:,:,obj.star_idx));
+            
+            if ~isempty(obj.cutouts)
+                
+                idx = obj.which_frame; 
+                if strcmp(obj.which_batch, 'second')
+                    idx = idx + size(obj.cutouts,3);
+                end
+                
+                idx_start = idx - floor(input.number/2); 
+                idx_end = idx + ceil(input.number/2) - 1;
+                
+                if idx_start<1
+                    idx_end = idx_end + 1 -idx_start;
+                    idx_start = 1;
+                end
+                
+                if idx_end>size(cutouts,3)
+                    idx_start = idx_start + size(cutouts,3) - idx_end;
+                    idx_end = size(cutouts,3);
+                end
+                
+            end
+            
+%             fprintf('idx= %d | idx_start= %d | idx_end= %d\n', idx, idx_start, idx_end);
+            
+            input.ax.Units = 'pixels';
+            pos = input.ax.Position;
+            if pos(3)>pos(4)
+                pos(3) = pos(4);
+            elseif pos(4)>pos(3)
+                pos(4) = pos(3);
+            end
+            parent = input.ax.Parent;
+            panel = uipanel('Units', 'pixels', 'Position', pos, 'Parent', parent);
+            delete(input.ax);
+            
+            Nrows = ceil(sqrt(input.number));
+            Ncols = Nrows;
+            
+            for ii = 1:input.number
+                
+                x = mod(ii-1, Nrows);
+                y = floor((ii-1)/Nrows);
+                
+                ax{ii} = axes('Position', [x/Ncols y/Nrows 1/Ncols 1/Nrows], 'Parent', panel);
+                
+                util.plot.show(cutouts(:,:,idx_start+ii-1), 'fancy', 0, 'autodyn', 0);
+                
+                if idx_start+ii-1==idx
+                    util.plot.inner_title([num2str(idx_start+ii-1) ' (peak)'], 'Position', 'NorthWest');
+                else
+                    util.plot.inner_title(num2str(idx_start+ii-1), 'Position', 'NorthWest');
+                end
+                
+            end
+
         end
         
     end    

@@ -171,8 +171,18 @@ classdef Finder < handle
             idx_keep = true(length(temp_events),1); 
             
             for ii = 1:length(temp_events)
-                if temp_events(ii).is_same(obj.last_events)
-                    idx_keep(ii) = false;
+                for jj = 1:length(obj.last_events)
+                    if temp_events(ii).is_same(obj.last_events(jj))
+                        
+                        if temp_events(ii).snr<obj.last_events(jj).snr % no need to keep new event, as it has lower S/N
+                            idx_keep(ii) = false;
+                        else % new event shows higher S/N than old event, so it must be replaced
+                            util.vec.swap(temp_events
+                        end
+                        
+                        break;
+                        
+                    end
                 end
             end
             
