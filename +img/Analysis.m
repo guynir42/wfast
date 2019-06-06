@@ -44,8 +44,6 @@ classdef Analysis < file.AstroData
         stack_proc;
         
         prev_stack;
-        prev_timestamps;
-        prev_fluxes;
         
         batch_counter = 0;
         
@@ -143,8 +141,6 @@ classdef Analysis < file.AstroData
             obj.batch_counter = 0;
 
             obj.prev_stack = [];
-            obj.prev_timestamps = [];
-            obj.prev_fluxes = [];
             
         end
         
@@ -403,19 +399,20 @@ classdef Analysis < file.AstroData
             obj.light_gauss.getData(obj.phot, 'gauss');
             if obj.light_gauss.gui.check, obj.light_gauss.gui.update; end
             
-            f = obj.phot.fluxes_ap;
+            f = obj.phot.fluxes;
+            b = obj.phot.backgrounds;
+            v = obj.phot.variances;
+            dx = obj.phot.offsets_x;
+            dy = obj.phot.offsets_y;
+            w = obj.phot.widths;
+            p = obj.phot.bad_pixels;
             
-            if ~isempty(obj.prev_fluxes) && ~isempty(obj.prev_timestamps)
-            
-                obj.finder.input(vertcat(obj.prev_fluxes, f), vertcat(obj.prev_timestamps, obj.timestamps), ...
-                    obj.cutouts_proc, obj.positions, obj.stack_proc, ...
-                    obj.batch_counter+1, 'filename', obj.reader.this_filename, ...
-                    't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp);
-
-            end
-            
-            obj.prev_fluxes = f;
-            obj.prev_timestamps = obj.timestamps;
+            tic
+            obj.finder.input(f, b, v, dx, dy, w, p, ...
+                obj.timestamps, obj.cutouts_proc, obj.positions, obj.stack_proc, ...
+                obj.batch_counter+1, 'filename', obj.reader.this_filename, ...
+                't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp);
+            toc
             
             if ~isempty(obj.gui) && obj.gui.check
                 obj.show('ax', obj.gui.axes_image);

@@ -11,17 +11,28 @@ classdef Finder < handle
         cal@trig.Calibrator;
         filt@trig.Filter;
         ev@trig.Event;
+        new_events@trig.Event;
         last_events@trig.Event;
+        
         
     end
     
     properties % inputs/outputs
         
+        prev_timestamps;
         prev_cutouts;
         prev_positions;
         prev_stack;
         prev_batch_index;
         prev_filename;
+        
+        prev_fluxes;
+        prev_backgrounds;
+        prev_variances;
+        prev_offsets_x;
+        prev_offsets_y;
+        prev_widths;
+        prev_bad_pixels;
         
     end
     
@@ -110,10 +121,17 @@ classdef Finder < handle
             
         end
         
-        function input(obj, fluxes, varargin)
+        function input(obj, varargin)
             
             input = util.text.InputVars;
             input.use_ordered_numeric = 1;
+            input.input_var('fluxes', []);
+            input.input_var('backgrounds', []);
+            input.input_var('variances', []);
+            input.input_var('offsets_x', [], 'offset_x', 'dx');
+            input.input_var('offsets_y', [], 'offset_y', 'dy');
+            input.input_var('widths', []);
+            input.input_var('bad_pixels', []);
             input.input_var('timestamps', []); 
             input.input_var('cutouts', []);
             input.input_var('positions', []);
@@ -126,36 +144,84 @@ classdef Finder < handle
             
             obj.clear;
             
-            obj.cal.input(fluxes, input.timestamps); 
-            obj.filt.input(obj.cal.fluxes_subtracted, input.timestamps); 
+            if ~isempty(obj.prev_fluxes) % skip first batch! 
             
-            obj.check_last_events; % make sure we aren't taking events that already exist
-            
-            for ii = 1:length(obj.last_events)
+                obj.cal.input(vertcat(obj.prev_fluxes, input.fluxes), vertcat(obj.prev_timestamps, input.timestamps)); 
+                obj.filt.input(obj.cal.fluxes_subtracted, obj.cal.timestamps); 
                 
-                obj.ev(end+1) = obj.last_events(ii);
-                obj.ev(end).flux_raw_all = fluxes; 
-                obj.ev(end).cutouts_first = obj.prev_cutouts;
-                obj.ev(end).cutouts_second = input.cutouts;
-                obj.ev(end).positions_first = obj.prev_positions;
-                obj.ev(end).positions_second = input.positions;
-                obj.ev(end).stack_first = obj.prev_stack;
-                obj.ev(end).stack_second = input.stack;
-                obj.ev(end).batch_index_first = obj.prev_batch_index;
-                obj.ev(end).batch_index_second = input.batch_index;
-                obj.ev(end).filename_first = obj.prev_filename;
-                obj.ev(end).filename_second = input.filename;
-                if ischar(input.t_end) && isnumeric(input.t_end_stamp)
-                    obj.ev(end).t_end = input.t_end;
-                    obj.ev(end).t_end_stamp = input.t_end_stamp;
+                obj.new_events = obj.new_events;
+                
+                for ii = 1:length(obj.new_events)
+                    
+                    this_ev = obj.new_events(ii);
+                    this_ev.serial = length(obj.ev) + ii;
+                    this_ev.flux_raw_all = fluxes; 
+                    this_ev.cutouts_first = obj.prev_cutouts;
+                    this_ev.cutouts_second = input.cutouts;
+                    this_ev.positions_first = obj.prev_positions;
+                    this_ev.positions_second = input.positions;
+                    this_ev.stack_first = obj.prev_stack;
+                    this_ev.stack_second = input.stack;
+                    this_ev.batch_index_first = obj.prev_batch_index;
+                    this_ev.batch_index_second = input.batch_index;
+                    this_ev.filename_first = obj.prev_filename;
+                    this_ev.filename_second = input.filename;
+                    if ischar(input.t_end) && isnumeric(input.t_end_stamp)
+                        this_ev.t_end = input.t_end;
+                        this_ev.t_end_stamp = input.t_end_stamp;
+                    end
+
+                    b = vertcat(obj.prev_backgrounds, input.backgrounds);
+                    this_ev.background_at_peak = b(this_ev.which_frame, this_ev.which_star);
+                    this_ev.background_time_average = mean(b, 1, 'omitnan'); 
+                    this_ev.background_space_average = mean(b, 2, 'omitnan'); 
+                    
+                    v = vertcat(obj.prev_variances, input.variances);
+                    this_ev.variance_at_peak = v(this_ev.which_frame, this_ev.which_star);
+                    this_ev.variance_time_average = mean(v, 1, 'omitnan'); 
+                    this_ev.variance_space_average = mean(v, 2, 'omitnan'); 
+                    
+                    dx = vertcat(obj.prev_offsets_x, input.offsets_x);
+                    this_ev.offset_x.at_peak = dx(this_ev.which_frame, this_ev.which_star);
+                    this_ev.offset_x_time_average = mean(dx, 1, 'omitnan'); 
+                    this_ev.offset_x_space_average = mean(dx, 2, 'omitnan'); 
+                    
+                    dy = vertcat(obj.prev_offsets_y, input.offsets_y);
+                    this_ev.offset_y_at_peak = dy(obj.which_frame, obj.which_star);
+                    this_ev.offset_y_time_average = mean(dy, 1, 'omitnan'); 
+                    this_ev.offset_y_space_average = mean(dy, 2, 'omitnan'); 
+                    
+                    w = vertcat(obj.prev_widths, input.widths);
+                    this_ev.width_at_peak = w(this_ev.which_frame, this_ev.which_star);
+                    this_ev.width_time_average = mean(w, 1, 'omitnan'); 
+                    this_ev.width_space_average = mean(w, 2, 'omitnan'); 
+                    
+                    p = vertcat(obj.prev_bad_pixels, input.bad_pixels);
+                    this_ev.bad_pixels_at_peak = p(this_ev.which_frame, this_ev.which_star); 
+                    this_ev.bad_pixels_time_average = mean(p, 1, 'omitnan'); 
+                    this_ev.bad_pixels_space_average = mean(p, 2, 'omitnan'); 
+                    
+                    % any other info that needs to be saved along with the event object? 
+                    % ...
+
                 end
                 
-                % any other info that needs to be saved along with the event object? 
-                % ...
+                obj.check_new_events; % make sure we aren't taking events that already exist
                 
+                obj.last_events = obj.new_events;
+                obj.ev = [obj.ev obj.new_events];
+            
             end
             
             % store these for next time
+            obj.prev_fluxes = input.fluxes;
+            obj.prev_backgrounds = input.backgrounds;
+            obj.prev_variances = input.variances;
+            obj.prev_offsets_x = input.offsets_x;
+            obj.prev_offsets_y = input.offsets_y;
+            obj.prev_widths = input.widths;
+            obj.prev_bad_pixels = input.bad_pixels;
+            obj.prev_timestamps = input.timestamps;
             obj.prev_cutouts = input.cutouts;
             obj.prev_positions = input.positions;
             obj.prev_stack = input.stack;
@@ -164,29 +230,34 @@ classdef Finder < handle
             
         end
         
-        function check_last_events(obj)
+        function check_new_events(obj)
             
-            temp_events = obj.filt.found_events;
-            
-            idx_keep = true(length(temp_events),1); 
-            
-            for ii = 1:length(temp_events)
+            % go over new events and check if they are duplicates
+            for ii = 1:length(obj.new_events)
+                
                 for jj = 1:length(obj.last_events)
-                    if temp_events(ii).is_same(obj.last_events(jj))
+                    
+                    if obj.new_events(ii).is_same(obj.last_events(jj))
                         
-                        if temp_events(ii).snr<obj.last_events(jj).snr % no need to keep new event, as it has lower S/N
-                            idx_keep(ii) = false;
-                        else % new event shows higher S/N than old event, so it must be replaced
-                            util.vec.swap(temp_events
+                        if obj.new_events(ii).snr<obj.last_events(jj).snr % old event is better, mark off the new one
+                            obj.new_events(ii).keep = 0;
+                            obj.new_events(ii).notes = [obj.new_events(ii).notes ', duplicated of ' num2str(obj.last_events(jj).serial)];
+                        else % new event is better, mark off the old one
+                            obj.last_events(ii).keep = 0;
+                            obj.last_events(ii).notes = [obj.last_events(ii).notes ', duplicated of ' num2str(obj.new_events(jj).serial)];
                         end
                         
                         break;
                         
                     end
+                    
                 end
+                
+                obj.new_events(ii).self_check;
+                
             end
             
-            obj.last_events = temp_events(idx_keep);
+            obj.last_events = obj.new_events; % this would be added to the list of found events
             
         end
         
