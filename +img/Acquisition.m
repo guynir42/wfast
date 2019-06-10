@@ -59,8 +59,6 @@ classdef Acquisition < file.AstroData
         
         prev_fluxes; % fluxes measured in previous batch (for triggering)
         
-        frame_rate_average; % calculated from this object's timing data
-        
         batch_counter = 0;
         
     end
@@ -114,6 +112,8 @@ classdef Acquisition < file.AstroData
         
         run_name; % the parameter "target_name" is used here to give a name to the whole run
         buf_full; % camera's buffers are used for full-frame dump on triggers
+        
+        frame_rate_average; % calculated from this object's timing data
         
         % these are read only camera info
         frame_rate_measured;
@@ -204,7 +204,7 @@ classdef Acquisition < file.AstroData
         
         show_what_list = {'images', 'stack', 'stack_proc'};
         
-        version = 1.04;
+        version = 1.05;
         
     end
     
@@ -391,6 +391,60 @@ classdef Acquisition < file.AstroData
             
         end
         
+        function val = getTimeLeft(obj)
+            
+            if ~isempty(obj.frame_rate_average)
+                val = (obj.num_batches-obj.batch_counter).*obj.batch_size./obj.frame_rate_average;
+            elseif ~isempty(obj.frame_rate) && ~isnan(obj.frame_rate)
+                val = (obj.num_batches-obj.batch_counter).*obj.batch_size./obj.frame_rate;
+            else
+                val = [];
+            end
+            
+        end
+        
+        function val = getTimeLeftHMS(obj)
+            
+            t = obj.getTimeLeft;
+            
+            if isempty(t)
+                val = '';
+            else
+                val = util.text.secs2hms(t);
+            end
+            
+        end
+        
+        function val = getGbPerBatch(obj)
+            
+            stack_size = obj.src.ROI(3).*obj.src.ROI(4).*4;
+            
+            if isempty(obj.num_stars_found)
+                cutout_size = obj.cut_size.^2.*obj.batch_size.*obj.num_stars*2;
+                pos_size = 2.*obj.num_stars.*4;
+                fluxes_size = obj.batch_size.*obj.num_stars.*4;
+            else
+                cutout_size = obj.cut_size.^2.*obj.batch_size.*obj.num_stars_found*2;
+                pos_size = 2.*obj.num_stars_found.*4;
+            fluxes_size = obj.batch_size.*obj.num_stars_found.*4;
+            end
+            
+            background_size = obj.cut_size_bg.^2.*obj.batch_size.*obj.num_backgrounds.*2;
+            pos_size_background = 2.*obj.num_backgrounds.*4;
+            
+            timestamps_size = obj.batch_size.*8;
+            
+            val = stack_size+cutout_size+pos_size+fluxes_size+background_size+pos_size_background+timestamps_size;
+            val = val./1024.^3;
+            
+        end
+        
+        function val = getGbLeft(obj)
+            
+            val = obj.getGbPerBatch.*(obj.num_batches-obj.batch_counter);
+            
+        end
+        
         function val = get.expT(obj)
             
             if isprop(obj.src, 'expT')
@@ -497,6 +551,17 @@ classdef Acquisition < file.AstroData
                 val = [];
             end
             
+        end
+        
+        function val = get.frame_rate_average(obj)
+            
+            if is_empty(obj.runtime_buffer)
+                val = [];
+            else
+                N = sum(obj.runtime_buffer.data(:,1));
+                T = sum(obj.runtime_buffer.data(:,2));
+                val = N/T;
+            end
         end
         
         function val = get.frame_rate_measured(obj)
@@ -1031,6 +1096,14 @@ classdef Acquisition < file.AstroData
 
                 obj.stash_parameters(input);
                 
+                if obj.getTimeLeft>3600*10
+                    error('Run scheduled to take %4.2f hours with these parameter... aborting!', obj.getTimeLeft/3600); 
+                end
+                
+                if obj.getGbLeft>util.sys.disk_space(obj.buf.directory)
+                    error('Run scheduled requires an estimated %5.2f Gb of storage. Only %5.2f Gb available on drive!', obj.getGbLeft, util.sys.disk_space(obj.buf.directory));
+                end
+                    
                 if input.use_reset % this parameter is not saved in the object because we only use it here... 
                     
                     obj.reset;
@@ -1077,7 +1150,8 @@ classdef Acquisition < file.AstroData
                 obj.brake_bit = 0;
                 
             catch ME
-                obj.log.error(ME.getReport)
+                obj.log.error(ME.getReport);
+                obj.unstash_parameters;
                 rethrow(ME);
             end
             
@@ -1194,11 +1268,6 @@ classdef Acquisition < file.AstroData
             drawnow;
             
             obj.runtime_buffer.input([size(obj.images,3), toc(t)]);
-            
-            N = sum(obj.runtime_buffer.data(:,1));
-            T = sum(obj.runtime_buffer.data(:,2));
-            
-            obj.frame_rate_average = N./T;
             
         end
         

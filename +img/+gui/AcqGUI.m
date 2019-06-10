@@ -33,6 +33,9 @@ classdef AcqGUI < handle
         panel_image;
         button_reset_axes;
         button_batch_num;
+        button_time_left;
+        button_gb_left; 
+        
         button_show_what;
         button_flip;
         axes_image;
@@ -206,7 +209,9 @@ classdef AcqGUI < handle
                         
             obj.makeAxes;
             
-            obj.button_batch_num = GraphicButton(obj.panel_image, [0 0.95 0.1 0.05], obj.owner, 'batch_counter', 'info', 'N= ', '', 'small');
+            obj.button_batch_num = GraphicButton(obj.panel_image, [0.00 0.95 0.1 0.05], obj.owner, 'batch_counter', 'info', 'N= ', '', 'small');
+            obj.button_time_left = GraphicButton(obj.panel_image, [0.25 0.95 0.35 0.05], obj.owner, 'getTimeLeftHMS', 'info', ' ', '', 'small');
+            obj.button_gb_left = GraphicButton(obj.panel_image, [0.60 0.95 0.15 0.05], obj.owner, 'getGbLeft', 'info', ' ', 'Gb', 'small');
             
             obj.button_show_what = GraphicButton(obj.panel_image, [0 0.00 0.15 0.05], obj.owner, 'show_what', 'picker', 'full', '', 'small');
             obj.button_show_what.Callback = @obj.callback_show_what;
