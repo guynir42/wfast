@@ -405,6 +405,11 @@ classdef Andor < file.AstroData
         
         function reset(obj) % get ready for a new run
 
+            if obj.brake_bit==0
+                warning('Cannot reset camera while it is running! (set brake_bit=1)'); 
+                return;
+            end
+            
             obj.buffers.reset; 
             util.vec.mex_change(obj.mex_flag, 4, 0); % reset the counter on the mex_flag
             
