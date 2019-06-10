@@ -1172,6 +1172,10 @@ classdef Acquisition < file.AstroData
             
             obj.batch_counter = obj.batch_counter + 1;
             
+            if obj.use_progress
+                obj.prog.showif(obj.batch_counter);
+            end
+            
             obj.start_index = obj.start_index + 1;
             
             if obj.use_show

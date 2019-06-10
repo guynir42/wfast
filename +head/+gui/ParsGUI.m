@@ -231,7 +231,7 @@ classdef ParsGUI < handle
         
         function callback_clear_stars(obj, ~, ~)
             
-            obj.owner.resetStars;
+            obj.owner.stars = head.Star.empty;
             obj.fillStarsPanel;
             obj.update;
             

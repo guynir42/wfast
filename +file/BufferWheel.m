@@ -272,6 +272,8 @@ classdef BufferWheel < file.AstroData
 %             obj.buf(idx).psfs = [];
 %             obj.buf(idx).psf_sampling = [];
 
+            obj.waitForRecording(obj.buf(idx));
+            
             list = properties(file.AstroData);
             for ii = 1:length(list)
                 obj.buf(idx).(list{ii}) = [];
