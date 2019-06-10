@@ -293,7 +293,12 @@ classdef Acquisition < file.AstroData
         function reset(obj)
             
 %             disp('resetting');
-             
+            
+            if obj.brake_bit==0
+                warning('Must stop acquisition before resetting!');
+                return;
+            end
+
             list = properties(obj);
             
             for ii = 1:length(list)

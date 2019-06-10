@@ -225,7 +225,12 @@ classdef BufferWheel < file.AstroData
         end
         
         function reset(obj) % prepare object for new run
-                 
+            
+            if ~isempty(obj.camera_mex_flag) && obj.camera_mex_flag(1)
+                warning('Cannot reset buffers while camera is running!');
+                return;
+            end
+            
             reset@file.AstroData(obj);
             
             for ii = 1:length(obj.buf)
@@ -723,6 +728,10 @@ classdef BufferWheel < file.AstroData
             
             if nargin<3 || isempty(timeout)
                 timeout = max([10, obj.pars.expT.*5*size(buf.images,3)]); % seconds
+            end
+            
+            if ~isempty(obj.camera_mex_flag) && obj.camera_mex_flag(1)==0
+                return;
             end
             
             if obj.debug_bit>1, fprintf('waitForRecording. record_flag= %d %d\n', buf.mex_flag_record(1), buf.mex_flag_record(2)); end
