@@ -407,12 +407,20 @@ classdef Analysis < file.AstroData
             w = obj.phot.widths;
             p = obj.phot.bad_pixels;
             
-            tic
-            obj.finder.input(f, b, v, dx, dy, w, p, ...
+            r = [];
+            g = [];
+            
+            if obj.phot.use_gaussian
+                g = obj.phot.gauss_sigma;
+            elseif obj.phot.use_aperture
+                
+                r = obj.phot.aperture;
+            end
+            
+            obj.finder.input(f, b, v, dx, dy, w, p, r, g, ...
                 obj.timestamps, obj.cutouts_proc, obj.positions, obj.stack_proc, ...
                 obj.batch_counter+1, 'filename', obj.reader.this_filename, ...
                 't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp);
-            toc
             
             if ~isempty(obj.gui) && obj.gui.check
                 obj.show('ax', obj.gui.axes_image);

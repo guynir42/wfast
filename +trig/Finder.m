@@ -146,6 +146,8 @@ classdef Finder < handle
             input.input_var('offsets_y', [], 'offset_y', 'dy');
             input.input_var('widths', []);
             input.input_var('bad_pixels', []);
+            input.input_var('aperture', [], 'radius');
+            input.input_var('gauss_sigma', [], 'sigma', 'gaussian_sigma');
             input.input_var('timestamps', []); 
             input.input_var('cutouts', []);
             input.input_var('positions', []);
@@ -160,9 +162,15 @@ classdef Finder < handle
             
             if ~isempty(obj.prev_fluxes) % skip first batch! 
             
+                tic; 
                 obj.cal.input(vertcat(obj.prev_fluxes, input.fluxes), vertcat(obj.prev_timestamps, input.timestamps)); 
-                obj.filt.input(obj.cal.fluxes_subtracted, obj.cal.timestamps); 
+                fprintf('Calibration time: %f seconds.\n', toc);
                 
+                tic
+                obj.filt.input(obj.cal.fluxes_subtracted, obj.cal.timestamps); 
+                fprintf('Filtering time: %f seconds.\n', toc);
+                
+                tic
                 obj.new_events = obj.filt.found_events;
                 
                 for ii = 1:length(obj.new_events)
@@ -186,34 +194,43 @@ classdef Finder < handle
                     end
 
                     b = vertcat(obj.prev_backgrounds, input.backgrounds);
-                    this_ev.background_at_peak = b(this_ev.which_frame, this_ev.which_star);
+                    this_ev.background_at_peak = b(this_ev.which_frame, :);
+                    this_ev.background_at_star = b(:, this_ev.which_star);
                     this_ev.background_time_average = mean(b, 1, 'omitnan'); 
-                    this_ev.background_space_average = mean(b, 2, 'omitnan'); 
+                    this_ev.background_star_average = mean(b, 2, 'omitnan'); 
                     
                     v = vertcat(obj.prev_variances, input.variances);
-                    this_ev.variance_at_peak = v(this_ev.which_frame, this_ev.which_star);
+                    this_ev.variance_at_peak = v(this_ev.which_frame, :);
+                    this_ev.variance_at_star = v(:, this_ev.which_star);
                     this_ev.variance_time_average = mean(v, 1, 'omitnan'); 
-                    this_ev.variance_space_average = mean(v, 2, 'omitnan'); 
+                    this_ev.variance_star_average = mean(v, 2, 'omitnan'); 
                     
                     dx = vertcat(obj.prev_offsets_x, input.offsets_x);
-                    this_ev.offset_x_at_peak = dx(this_ev.which_frame, this_ev.which_star);
+                    this_ev.offset_x_at_peak = dx(this_ev.which_frame, :);
+                    this_ev.offset_x_at_star = dx(:, this_ev.which_star);
                     this_ev.offset_x_time_average = mean(dx, 1, 'omitnan'); 
-                    this_ev.offset_x_space_average = mean(dx, 2, 'omitnan'); 
+                    this_ev.offset_x_star_average = mean(dx, 2, 'omitnan'); 
                     
                     dy = vertcat(obj.prev_offsets_y, input.offsets_y);
-                    this_ev.offset_y_at_peak = dy(this_ev.which_frame, this_ev.which_star);
+                    this_ev.offset_y_at_peak = dy(this_ev.which_frame, :);
+                    this_ev.offset_y_at_star = dy(:, this_ev.which_star);
                     this_ev.offset_y_time_average = mean(dy, 1, 'omitnan'); 
-                    this_ev.offset_y_space_average = mean(dy, 2, 'omitnan'); 
+                    this_ev.offset_y_star_average = mean(dy, 2, 'omitnan'); 
                     
                     w = vertcat(obj.prev_widths, input.widths);
-                    this_ev.width_at_peak = w(this_ev.which_frame, this_ev.which_star);
+                    this_ev.width_at_peak = w(this_ev.which_frame, :);
+                    this_ev.width_at_star = w(:, this_ev.which_star);
                     this_ev.width_time_average = mean(w, 1, 'omitnan'); 
-                    this_ev.width_space_average = mean(w, 2, 'omitnan'); 
+                    this_ev.width_star_average = mean(w, 2, 'omitnan'); 
                     
                     p = vertcat(obj.prev_bad_pixels, input.bad_pixels);
-                    this_ev.bad_pixels_at_peak = p(this_ev.which_frame, this_ev.which_star); 
+                    this_ev.bad_pixels_at_peak = p(this_ev.which_frame, :); 
+                    this_ev.bad_pixels_at_star = p(:, this_ev.which_star); 
                     this_ev.bad_pixels_time_average = mean(p, 1, 'omitnan'); 
-                    this_ev.bad_pixels_space_average = mean(p, 2, 'omitnan'); 
+                    this_ev.bad_pixels_star_average = mean(p, 2, 'omitnan'); 
+                    
+                    this_ev.aperture = input.aperture;
+                    this_ev.gauss_sigma = input.gauss_sigma;
                     
                     % any other info that needs to be saved along with the event object? 
                     % ...
@@ -242,6 +259,8 @@ classdef Finder < handle
             obj.prev_batch_index = input.batch_index;
             obj.prev_filename = input.filename;
             
+            fprintf('Housekeeping time: %f seconds.\n', toc);
+            
         end
         
         function check_new_events(obj)
@@ -257,8 +276,8 @@ classdef Finder < handle
                             obj.new_events(ii).keep = 0;
                             obj.new_events(ii).notes = [obj.new_events(ii).notes ', duplicated of ' num2str(obj.last_events(jj).serial)];
                         else % new event is better, mark off the old one
-                            obj.last_events(ii).keep = 0;
-                            obj.last_events(ii).notes = [obj.last_events(ii).notes ', duplicated of ' num2str(obj.new_events(jj).serial)];
+                            obj.last_events(jj).keep = 0;
+                            obj.last_events(jj).notes = [obj.last_events(jj).notes ', duplicated of ' num2str(obj.new_events(ii).serial)];
                         end
                         
                         break;

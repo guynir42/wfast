@@ -40,28 +40,37 @@ classdef Event < handle
         stds;
         
         background_at_peak;
+        background_at_star;
         background_time_average;
-        background_space_average;
+        background_star_average;
         
         variance_at_peak;
+        variance_at_star;
         variance_time_average;
-        variance_space_average;
+        variance_star_average;
         
         offset_x_at_peak;
+        offset_x_at_star;
         offset_x_time_average;
-        offset_x_space_average;
+        offset_x_star_average;
         
         offset_y_at_peak;
+        offset_y_at_star;
         offset_y_time_average;
-        offset_y_space_average;
+        offset_y_star_average;
         
         width_at_peak;
+        width_at_star;
         width_time_average;
-        width_space_average;
+        width_star_average;
         
         bad_pixels_at_peak;
+        bad_pixels_at_star;
         bad_pixels_time_average;
-        bad_pixels_space_average;
+        bad_pixels_star_average;
+        
+        aperture;
+        gauss_sigma;
         
         which_batch = 'first'; % can be "first" or "second", depending on where is the peak
         which_frame = []; 
@@ -280,14 +289,13 @@ classdef Event < handle
             delete(input.parent.Children);
             
             ax1 = axes('Parent', input.parent, 'Position', [0.1 0.3 0.35 0.4]);
-            obj.showFlux('ax', ax1, 'font_size', 10);
+            obj.showFlux('ax', ax1);
+            
+            ax2 = axes('Parent', input.parent, 'Position', [0.48 0.3 0.20 0.4]);
+            obj.showCutouts('ax', ax2);
             
             ax3 = axes('Parent', input.parent, 'Position', [0.7 0.3 0.25 0.4]);
             obj.showStack('ax', ax3);
-            
-            ax2 = axes('Parent', input.parent, 'Position', [0.45 0.3 0.20 0.4]);
-            obj.showCutouts('ax', ax2);
-            
             
         end
         
@@ -332,7 +340,7 @@ classdef Event < handle
                 lh = legend(input.ax, 'Location', 'SouthWest');
             end
             
-            lh.FontSize = input.font_size;
+            lh.FontSize = input.font_size-6;
             
             util.plot.inner_title(sprintf('star: %d | batches: %d-%d | S/N= %4.2f | \\sigma= %4.2f', ...
                 obj.which_star, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.stds(obj.which_star)),...
@@ -402,6 +410,25 @@ classdef Event < handle
                     idx_end = size(cutouts,3);
                 end
                 
+                rad = [];
+                if ~isempty(obj.offset_x_at_star) && ~isempty(obj.offset_x_at_star)
+
+                    cen = floor([size(cutouts,2), size(cutouts,1)]/2)+1;
+                    cen = cen + [obj.offset_x_at_star(idx_start:idx_end) obj.offset_y_at_star(idx_start:idx_end)];
+
+
+                    if ~isempty(obj.gauss_sigma)
+                        rad = obj.gauss_sigma;
+                        str = sprintf('sigma= %4.2f', rad); 
+                        col = 'magenta';
+                    elseif ~isempty(obj.aperture)
+                        rad = obj.aperture;
+                        str = sprintf('ap= %4.2f', rad); 
+                        col = 'green';
+                    end
+
+                end
+
                 Nrows = ceil(sqrt(input.number));
                 Ncols = Nrows;
 
@@ -422,14 +449,21 @@ classdef Event < handle
                     else
                         util.plot.inner_title(num2str(idx_start+ii-1), 'Position', 'NorthWest');
                     end
-
+                    
+                    if ~isempty(rad)
+                        viscircles(cen(ii,:), rad, 'EdgeColor', col);
+                        if idx_start+ii-1==idx
+                            util.plot.inner_title(str, 'Position', 'bottom', 'Color', col);
+                        end
+                    end
+                
                 end
                 
                 clim = ax{idx-idx_start+1}.CLim;
                 for ii = 1:length(ax)
                     ax{ii}.CLim = clim;
                 end
-
+                    
             end
             
         end
@@ -438,6 +472,7 @@ classdef Event < handle
             
             input = util.text.InputVars;
             input.input_var('ax', [], 'axes', 'axis');
+            input.input_var('range', 100);
             input.scan_vars(varargin{:});
             
             if isempty(input.ax), input.ax = gca; end
@@ -458,8 +493,8 @@ classdef Event < handle
                     
                     rectangle('Position', [C S], 'Parent', input.ax); 
                     
-                    input.ax.XLim = [P(1)-250 P(1)+250];
-                    input.ax.YLim = [P(2)-250 P(2)+250];
+                    input.ax.XLim = [P(1)-input.range P(1)+input.range];
+                    input.ax.YLim = [P(2)-input.range P(2)+input.range];
                     
                     if input.ax.XLim(1)<1
                         input.ax.XLim(1) = 1;
@@ -478,7 +513,6 @@ classdef Event < handle
             end
             
         end
-        
         
     end    
     
