@@ -24,6 +24,9 @@ classdef FocusActuator < handle
         min_value = 0;
         max_value = 30;
         
+        timeout = 5; % how many seconds to wait for it to reach the position
+        epsilon = 0.005; % max distance between real and expected position
+        
     end
     
     properties(Dependent=true) % info outputs
@@ -39,7 +42,7 @@ classdef FocusActuator < handle
         axis = '1'; % this is the actuator 1 out of 1 in the single controller (not to be confused with multiple controllers "id")
         controller_serial;
         debug_bit = 1;
-        version = 1.02;
+        version = 1.03;
         
     end
     
@@ -86,6 +89,28 @@ classdef FocusActuator < handle
             obj.hndl = obj.hndl.InitializeController();
             obj.hndl.SVO(obj.axis, 1); % turn on servo...
             obj.hndl.FNL(obj.axis); % measure the reference point
+            
+            res = 0.01;
+            N = ceil(obj.timeout/res);
+            
+            tic;
+            
+            for ii = 1:N
+                
+                if obj.isMoving==0
+                    if abs(obj.pos)<obj.epsilon
+                        return;
+                    else
+                        error('Actuator %d did not find home position (stuck at %f)!', obj.id, obj.pos);
+                    end
+                end
+                
+                pause(res);
+                
+            end
+            
+            error('Actuator %d timeout after %f seconds, trying to reach home position (stuck at %f)...', obj.id, toc, obj.pos); 
+            
             
         end
         
@@ -154,7 +179,7 @@ classdef FocusActuator < handle
         end
         
         function move(obj, position)
-           
+            
             if position>obj.max_value
                 warning(['cannot move actuator ' num2str(obj.id) ' above max_value= ' num2str(obj.max_value)]);
                 position = obj.max_value;
@@ -164,6 +189,27 @@ classdef FocusActuator < handle
             end
             
             obj.hndl.MOV(obj.axis, position);
+            
+            res = 0.01; % time resolution in seconds
+            N = ceil(obj.timeout/res);
+            
+            tic;
+            
+            for ii = 1:N
+                
+                if obj.isMoving==0
+                    if abs(position-obj.pos)<obj.epsilon
+                        return;
+                    else
+                        error('Actuator %d did not reach position %f (stuck at %f)!', obj.id, position, obj.pos);
+                    end
+                end
+                
+                pause(res);
+                
+            end
+            
+            error('Actuator %d timeout after %f seconds, trying to reach position %f (stuck at %f)...', obj.id, toc, position, obj.pos); 
             
         end
         

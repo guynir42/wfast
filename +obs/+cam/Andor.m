@@ -357,8 +357,11 @@ classdef Andor < file.AstroData
                 obj.focuser = obs.focus.FocusSpider;
             catch ME
                 disp('Cannot connect to focuser, using simulator instead');
+                warning(ME.getReport);
                 obj.log.input('Cannot connect to focuser, using simulator instead');
+                obj.log.input(ME.getReport);
                 obj.focuser = obs.focus.Simulator;
+                
             end
  
         end
