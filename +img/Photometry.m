@@ -54,6 +54,7 @@ classdef Photometry < handle
         use_backgrounds = 0; % remove background from individual cutout
         
         iterations = 3; % repeat the photometry and relocate the aperutre to the centroid
+        use_basic = 1;
         use_aperture = 1;
         use_gaussian = 0;
         
@@ -278,7 +279,9 @@ classdef Photometry < handle
             obj.cut_size_latest = size(input.cutouts);
             obj.cut_size_latest = obj.cut_size(1:2);
             
-            obj.calcBasic;
+            if obj.use_basic
+                obj.calcBasic;
+            end
             
             if obj.use_aperture
                 obj.calcAperture;
@@ -612,6 +615,10 @@ classdef Photometry < handle
                 [f,w,b,v,x,y,W,p] = obj.calculate('none', 'corner', 1);
             end
             
+            x(abs(x)>size(obj.cutouts,2)) = NaN;
+            y(abs(y)>size(obj.cutouts,1)) = NaN;
+            w(w<0 | w>size(obj.cutouts,1) | w>size(obj.cutouts,2)) = NaN;
+            
             obj.fluxes_basic = f;
             obj.weights_basic = w;
             obj.backgrounds_basic = b;
@@ -656,6 +663,10 @@ classdef Photometry < handle
                 [f,w,b,v,x,y,W,p] = obj.calculate('circle', 'annulus', obj.iterations);
             end
             
+            x(abs(x)>size(obj.cutouts,2)/2+obj.aperture) = NaN;
+            y(abs(y)>size(obj.cutouts,1)/2+obj.aperture) = NaN;
+            w(w<0 | w>size(obj.cutouts,1) | w>size(obj.cutouts,2)) = NaN;
+            
             obj.fluxes_ap = f;
             obj.weights_ap = w;
             obj.backgrounds_ap = b;
@@ -692,8 +703,17 @@ classdef Photometry < handle
         end
         
         function calcGaussian(obj)
-           
-            [f,w,b,v,x,y,W,p] = obj.calculate('gaussian', 'annulus', obj.iterations);
+            
+            if obj.use_mex
+                [f,w,b,v,x,y,W,p] = util.img.photometry(single(obj.cutouts), 'gauss', obj.gauss_sigma, 'annulus', obj.annulus,...
+                    'iterations', obj.iterations, 'widths', obj.widths);
+            else
+                [f,w,b,v,x,y,W,p] = obj.calculate('gaussian', 'annulus', obj.iterations);
+            end
+            
+            x(abs(x)>size(obj.cutouts,2)/2+obj.gauss_sigma*3) = NaN;
+            y(abs(y)>size(obj.cutouts,1)/2+obj.gauss_sigma*3) = NaN;
+            w(w<0 | w>size(obj.cutouts,1) | w>size(obj.cutouts,2)) = NaN;
             
             obj.fluxes_gauss = f;
             obj.weights_gauss = w;

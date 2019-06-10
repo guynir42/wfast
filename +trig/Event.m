@@ -22,6 +22,8 @@ classdef Event < handle
         is_global = 0;
         is_cosmic_ray = 0;
         is_artefact = 0;
+        is_bad_batch = 0;
+        is_bad_star = 0;
         % ...
         
         range_time_idx;
@@ -30,7 +32,7 @@ classdef Event < handle
         
         peak_timestamp;
         best_kernel;
-        which_star;
+        star_index;
         snr;
         
         timestamps;
@@ -39,30 +41,30 @@ classdef Event < handle
         flux_raw_all;
         stds;
         
-        background_at_peak;
-        background_at_star;
-        background_time_average;
-        background_star_average;
+        backgrounds_at_peak;
+        backgrounds_at_star;
+        backgrounds_time_average;
+        backgrounds_star_average;
         
-        variance_at_peak;
-        variance_at_star;
-        variance_time_average;
-        variance_star_average;
+        variances_at_peak;
+        variances_at_star;
+        variances_time_average;
+        variances_star_average;
         
-        offset_x_at_peak;
-        offset_x_at_star;
-        offset_x_time_average;
-        offset_x_star_average;
+        offsets_x_at_peak;
+        offsets_x_at_star;
+        offsets_x_time_average;
+        offsets_x_star_average;
         
-        offset_y_at_peak;
-        offset_y_at_star;
-        offset_y_time_average;
-        offset_y_star_average;
+        offsets_y_at_peak;
+        offsets_y_at_star;
+        offsets_y_time_average;
+        offsets_y_star_average;
         
-        width_at_peak;
-        width_at_star;
-        width_time_average;
-        width_star_average;
+        widths_at_peak;
+        widths_at_star;
+        widths_time_average;
+        widths_star_average;
         
         bad_pixels_at_peak;
         bad_pixels_at_star;
@@ -73,7 +75,7 @@ classdef Event < handle
         gauss_sigma;
         
         which_batch = 'first'; % can be "first" or "second", depending on where is the peak
-        which_frame = []; 
+        frame_index = []; 
         
     end
     
@@ -132,6 +134,17 @@ classdef Event < handle
     end
     
     methods % reset/clear
+        
+        function clearImages(obj)
+            
+            obj.cutouts_first = [];
+            obj.cutouts_second = [];
+            obj.positions_first = [];
+            obj.positions_second = [];
+            obj.stack_first = [];
+            obj.stack_second = [];
+            
+        end
         
     end
     
@@ -229,17 +242,13 @@ classdef Event < handle
                 obj.stds = squeeze(stds);
             end
             
-            obj.which_star = z;
+            obj.star_index = z;
             
             obj.flux_filtered = fluxes(:, x, z);
             
             obj.which_batch = 'first';
-            obj.which_frame = y;
-            if y>floor(size(fluxes,1)/2)
-                obj.which_batch = 'second'; % the peak is in the second half of the two-batch fluxes vector
-                obj.which_frame = y - floor(size(fluxes,1)/2); 
-            end
-            
+            obj.frame_index = y;
+                        
         end
         
         function val = is_same(obj, other)
@@ -248,7 +257,7 @@ classdef Event < handle
             
             for ii = 1:length(other)
                 
-                if obj.which_star==other(ii).which_star
+                if obj.star_index==other(ii).star_index
                     t_self = obj.timestamps(obj.range_time_idx);
                     t_other = other(ii).timestamps(other(ii).range_time_idx);
                     if ~isempty(intersect(t_self, t_other))
@@ -316,13 +325,13 @@ classdef Event < handle
             range = obj.range_time_idx;
             h2 = plot(input.ax, obj.timestamps(range), obj.flux_filtered(range));
             h2.DisplayName = 'trigger region';
-            f = obj.flux_raw_all(:,obj.which_star);
+            f = obj.flux_raw_all(:,obj.star_index);
             m = mean(f);
             if ~isempty(obj.stds)
-                s = obj.stds(obj.which_star);
+                s = obj.stds(obj.star_index);
             else
                 s = std(obj.flux_raw_all);
-                s = s(obj.which_star);
+                s = s(obj.star_index);
             end
             
             h3 = plot(input.ax, obj.timestamps, (f-m)./s, '-');
@@ -342,8 +351,8 @@ classdef Event < handle
             
             lh.FontSize = input.font_size-6;
             
-            util.plot.inner_title(sprintf('star: %d | batches: %d-%d | S/N= %4.2f | \\sigma= %4.2f', ...
-                obj.which_star, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.stds(obj.which_star)),...
+            util.plot.inner_title(sprintf('id: %d | star: %d | batches: %d-%d | S/N= %4.2f | \\sigma= %4.2f', ...
+                obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.stds(obj.star_index)),...
                 'ax', input.ax, 'Position', 'NorthWest', 'FontSize', input.font_size);
             
             input.ax.YLim(1) = -max(abs(input.ax.YLim));
@@ -366,7 +375,7 @@ classdef Event < handle
             input.input_var('dynamic_range', []);
             input.scan_vars(varargin{:});
             
-            cutouts = cat(3, obj.cutouts_first(:,:,:,obj.which_star), obj.cutouts_second(:,:,:,obj.which_star));
+            cutouts = cat(3, obj.cutouts_first(:,:,:,obj.star_index), obj.cutouts_second(:,:,:,obj.star_index));
             
             if ~isempty(cutouts)
                 
@@ -392,10 +401,7 @@ classdef Event < handle
                     
                 end
                 
-                idx = obj.which_frame; 
-                if strcmp(obj.which_batch, 'second')
-                    idx = idx + size(obj.cutouts,3);
-                end
+                idx = obj.frame_index; 
                 
                 idx_start = idx - floor(input.number/2); 
                 idx_end = idx + ceil(input.number/2) - 1;
@@ -411,12 +417,11 @@ classdef Event < handle
                 end
                 
                 rad = [];
-                if ~isempty(obj.offset_x_at_star) && ~isempty(obj.offset_x_at_star)
+                if ~isempty(obj.offsets_x_at_star) && ~isempty(obj.offsets_x_at_star)
 
                     cen = floor([size(cutouts,2), size(cutouts,1)]/2)+1;
-                    cen = cen + [obj.offset_x_at_star(idx_start:idx_end) obj.offset_y_at_star(idx_start:idx_end)];
-
-
+                    cen = cen + [obj.offsets_x_at_star(idx_start:idx_end) obj.offsets_y_at_star(idx_start:idx_end)];
+                    
                     if ~isempty(obj.gauss_sigma)
                         rad = obj.gauss_sigma;
                         str = sprintf('sigma= %4.2f', rad); 
@@ -487,7 +492,7 @@ classdef Event < handle
                     S = size(obj.cutouts);
                     S = S(1:2); 
                     
-                    P = obj.positions(obj.which_star, :); 
+                    P = obj.positions(obj.star_index, :); 
                     
                     C = P - floor(S/2) - 0.5; % corner of the rectangle
                     

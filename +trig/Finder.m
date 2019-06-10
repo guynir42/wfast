@@ -19,6 +19,9 @@ classdef Finder < handle
     
     properties % inputs/outputs
         
+        black_list_stars;
+        black_list_batches;
+        
         prev_timestamps;
         prev_cutouts;
         prev_positions;
@@ -37,6 +40,8 @@ classdef Finder < handle
     end
     
     properties % switches/controls
+        
+        use_conserve_memory = 0;
         
         debug_bit = 1;
         
@@ -78,6 +83,12 @@ classdef Finder < handle
         function reset(obj)
             
             obj.ev = trig.Event.empty;
+            obj.new_events = trig.Event.empty;
+            obj.last_events = trig.Event.empty;
+            
+            obj.black_list_stars = [];
+            obj.black_list_batches = [];
+            
             obj.cal.reset;
             obj.filt.reset;
             
@@ -136,7 +147,7 @@ classdef Finder < handle
         end
         
         function input(obj, varargin)
-            
+                
             input = util.text.InputVars;
             input.use_ordered_numeric = 1;
             input.input_var('fluxes', []);
@@ -162,15 +173,16 @@ classdef Finder < handle
             
             if ~isempty(obj.prev_fluxes) % skip first batch! 
             
-                tic; 
+                t = tic;
                 obj.cal.input(vertcat(obj.prev_fluxes, input.fluxes), vertcat(obj.prev_timestamps, input.timestamps)); 
-                fprintf('Calibration time: %f seconds.\n', toc);
+                fprintf('Calibration time: %f seconds.\n', toc(t));
                 
-                tic
+                t = tic;
                 obj.filt.input(obj.cal.fluxes_subtracted, obj.cal.timestamps); 
-                fprintf('Filtering time: %f seconds.\n', toc);
+                fprintf('Filtering time: %f seconds.\n', toc(t));
                 
-                tic
+                t = tic;
+            
                 obj.new_events = obj.filt.found_events;
                 
                 for ii = 1:length(obj.new_events)
@@ -194,38 +206,38 @@ classdef Finder < handle
                     end
 
                     b = vertcat(obj.prev_backgrounds, input.backgrounds);
-                    this_ev.background_at_peak = b(this_ev.which_frame, :);
-                    this_ev.background_at_star = b(:, this_ev.which_star);
-                    this_ev.background_time_average = mean(b, 1, 'omitnan'); 
-                    this_ev.background_star_average = mean(b, 2, 'omitnan'); 
+                    this_ev.backgrounds_at_peak = b(this_ev.frame_index, :);
+                    this_ev.backgrounds_at_star = b(:, this_ev.star_index);
+                    this_ev.backgrounds_time_average = mean(b, 1, 'omitnan'); 
+                    this_ev.backgrounds_star_average = mean(b, 2, 'omitnan'); 
                     
                     v = vertcat(obj.prev_variances, input.variances);
-                    this_ev.variance_at_peak = v(this_ev.which_frame, :);
-                    this_ev.variance_at_star = v(:, this_ev.which_star);
-                    this_ev.variance_time_average = mean(v, 1, 'omitnan'); 
-                    this_ev.variance_star_average = mean(v, 2, 'omitnan'); 
+                    this_ev.variances_at_peak = v(this_ev.frame_index, :);
+                    this_ev.variances_at_star = v(:, this_ev.star_index);
+                    this_ev.variances_time_average = mean(v, 1, 'omitnan'); 
+                    this_ev.variances_star_average = mean(v, 2, 'omitnan'); 
                     
                     dx = vertcat(obj.prev_offsets_x, input.offsets_x);
-                    this_ev.offset_x_at_peak = dx(this_ev.which_frame, :);
-                    this_ev.offset_x_at_star = dx(:, this_ev.which_star);
-                    this_ev.offset_x_time_average = mean(dx, 1, 'omitnan'); 
-                    this_ev.offset_x_star_average = mean(dx, 2, 'omitnan'); 
+                    this_ev.offsets_x_at_peak = dx(this_ev.frame_index, :);
+                    this_ev.offsets_x_at_star = dx(:, this_ev.star_index);
+                    this_ev.offsets_x_time_average = mean(dx, 1, 'omitnan'); 
+                    this_ev.offsets_x_star_average = mean(dx, 2, 'omitnan'); 
                     
                     dy = vertcat(obj.prev_offsets_y, input.offsets_y);
-                    this_ev.offset_y_at_peak = dy(this_ev.which_frame, :);
-                    this_ev.offset_y_at_star = dy(:, this_ev.which_star);
-                    this_ev.offset_y_time_average = mean(dy, 1, 'omitnan'); 
-                    this_ev.offset_y_star_average = mean(dy, 2, 'omitnan'); 
+                    this_ev.offsets_y_at_peak = dy(this_ev.frame_index, :);
+                    this_ev.offsets_y_at_star = dy(:, this_ev.star_index);
+                    this_ev.offsets_y_time_average = mean(dy, 1, 'omitnan'); 
+                    this_ev.offsets_y_star_average = mean(dy, 2, 'omitnan'); 
                     
                     w = vertcat(obj.prev_widths, input.widths);
-                    this_ev.width_at_peak = w(this_ev.which_frame, :);
-                    this_ev.width_at_star = w(:, this_ev.which_star);
-                    this_ev.width_time_average = mean(w, 1, 'omitnan'); 
-                    this_ev.width_star_average = mean(w, 2, 'omitnan'); 
+                    this_ev.widths_at_peak = w(this_ev.frame_index, :);
+                    this_ev.widths_at_star = w(:, this_ev.star_index);
+                    this_ev.widths_time_average = mean(w, 1, 'omitnan'); 
+                    this_ev.widths_star_average = mean(w, 2, 'omitnan'); 
                     
                     p = vertcat(obj.prev_bad_pixels, input.bad_pixels);
-                    this_ev.bad_pixels_at_peak = p(this_ev.which_frame, :); 
-                    this_ev.bad_pixels_at_star = p(:, this_ev.which_star); 
+                    this_ev.bad_pixels_at_peak = p(this_ev.frame_index, :); 
+                    this_ev.bad_pixels_at_star = p(:, this_ev.star_index); 
                     this_ev.bad_pixels_time_average = mean(p, 1, 'omitnan'); 
                     this_ev.bad_pixels_star_average = mean(p, 2, 'omitnan'); 
                     
@@ -241,6 +253,9 @@ classdef Finder < handle
                 
                 obj.last_events = obj.new_events;
                 obj.ev = [obj.ev obj.new_events];
+                obj.new_events = trig.Event.empty;
+            
+                fprintf('Housekeeping time: %f seconds.\n', toc(t));
             
             end
             
@@ -259,11 +274,11 @@ classdef Finder < handle
             obj.prev_batch_index = input.batch_index;
             obj.prev_filename = input.filename;
             
-            fprintf('Housekeeping time: %f seconds.\n', toc);
-            
         end
         
         function check_new_events(obj)
+            
+            t = tic;
             
             % go over new events and check if they are duplicates
             for ii = 1:length(obj.new_events)
@@ -274,10 +289,12 @@ classdef Finder < handle
                         
                         if obj.new_events(ii).snr<obj.last_events(jj).snr % old event is better, mark off the new one
                             obj.new_events(ii).keep = 0;
-                            obj.new_events(ii).notes = [obj.new_events(ii).notes ', duplicated of ' num2str(obj.last_events(jj).serial)];
+                            obj.new_events(ii).is_duplicate = 1;
+                            obj.new_events(ii).notes = [obj.new_events(ii).notes ', duplicate of ' num2str(obj.last_events(jj).serial)];
                         else % new event is better, mark off the old one
                             obj.last_events(jj).keep = 0;
-                            obj.last_events(jj).notes = [obj.last_events(jj).notes ', duplicated of ' num2str(obj.new_events(ii).serial)];
+                            obj.last_events(jj).is_duplicate = 1;
+                            obj.last_events(jj).notes = [obj.last_events(jj).notes ', duplicate of ' num2str(obj.new_events(ii).serial)];
                         end
                         
                         break;
@@ -289,6 +306,50 @@ classdef Finder < handle
                 obj.new_events(ii).self_check;
                 
             end
+            
+            if obj.debug_bit>1, fprintf('runtime "check_new_events": %f seconds\n', toc(t)); end
+            
+        end
+        
+        function finishup(obj) % remove black list events, clear images for unkept events
+            
+            t = tic;
+            
+            stars = [obj.ev.star_index];
+            [N,E] = histcounts(stars, 'BinWidth', 1, 'BinLimits', [1 max(stars)]);
+            obj.black_list_stars = [obj.black_list_stars E(N>5)];
+            
+            batches = [obj.ev.batch_index];
+            [N,E] = histcounts(batches, 'BinWidth', 1, 'BinLimits', [1 max(batches)]);
+            obj.black_list_batches = [obj.black_list_batches E(N>5)];
+            
+            for ii = 1:length(obj.ev)
+                
+                if ismember(obj.ev(ii).star_index, obj.black_list_stars)
+                    obj.ev(ii).keep = 0;
+                    obj.ev(ii).is_real = 0;
+                    obj.ev(ii).bad_star = 1;
+                    obj.ev(ii).notes = sprintf('%s, star %d is on black list', obj.ev(ii).notes, obj.ev(ii).star_index);
+                end
+                
+                if ismember(obj.ev(ii).batch_index, obj.black_list_stars)
+                    obj.ev(ii).keep = 0;
+                    obj.ev(ii).is_real = 0;
+                    obj.ev(ii).bad_batch = 1;
+                    obj.ev(ii).notes = sprintf('%s, batch %d is on black list', obj.ev(ii).notes, obj.ev(ii).batch_index);
+                end
+                
+            end
+            
+            if obj.use_conserve_memory
+                for ii = 1:length(obj.ev)
+                    if obj.ev(ii).keep==0
+                        obj.ev(ii).clearImages;
+                    end
+                end
+            end
+            
+            if obj.debug_bit>1, fprintf('runtime "finishup": %f seconds\n', toc(t)); end
             
         end
         

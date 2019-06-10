@@ -118,7 +118,7 @@ classdef CurveGenerator < handle
         
         function obj = CurveGenerator
                       
-            if obj.debug_bit, fprintf('CurveGenerator constructor v%4.2\n', obj.version); end
+            if obj.debug_bit, fprintf('CurveGenerator constructor v%4.2f\n', obj.version); end
             
             obj.lc = occult.LightCurve;
             

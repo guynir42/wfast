@@ -164,6 +164,8 @@ classdef Calibrator < handle
         
         function fit(obj)
             
+            tt = tic;
+            
             % some useful shorthands
             s = @(x) sum(x,1, 'omitnan');
             f = obj.fluxes_reduced;
@@ -175,9 +177,13 @@ classdef Calibrator < handle
             obj.b_pars = (s(f).*s(t.^2)-s(t).*s(t.*f))./denom;
             obj.a_pars = (n.*s(t.*f)-s(t).*s(f))./denom;
             
+            if obj.debug_bit>1, fprintf('runtime "fit": %f seconds\n', toc(tt)); end
+            
         end
         
         function outlier_removal(obj)
+            
+            t = tic;
             
             obj.fluxes_subtracted = obj.fluxes_reduced - obj.b_pars - obj.a_pars.*obj.timestamps;
             
@@ -193,9 +199,13 @@ classdef Calibrator < handle
             
             obj.fluxes_reduced(obj.idx_outliers) = NaN;
             
+            if obj.debug_bit>1, fprintf('runtime "outlier_removal": %f seconds\n', toc(t)); end
+            
         end
         
         function global_calibration(obj)
+            
+            t = tic;
             
             F = obj.fluxes_no_outliers;
             V = obj.out_var;
@@ -214,7 +224,9 @@ classdef Calibrator < handle
             
             obj.cal_mean = mean(obj.fluxes_cal_no_outliers, 1, 'omitnan');
             obj.cal_var = var(obj.fluxes_cal_no_outliers, [], 1, 'omitnan');
-            
+           
+            if obj.debug_bit>1, fprintf('runtime "global_calibration": %f seconds\n', toc(t)); end
+
         end
         
     end

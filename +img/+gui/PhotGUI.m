@@ -88,6 +88,7 @@ classdef PhotGUI < handle
             obj.panel_controls.number = num_buttons;
             obj.panel_controls.addButton('button_mex', 'use_mex', 'toggle', 'mex', 'mex', '', [], 'red');
             obj.panel_controls.addButton('button_bg', 'use_backgrounds', 'toggle', 'b/g', 'b/g', '', [], 'red');
+            obj.panel_controls.addButton('button_basic', 'use_basic', 'toggle', 'basic', 'basic', '', [], 'red');
             obj.panel_controls.addButton('button_ap', 'use_aperture', 'toggle', 'aperture', 'aperture', '', [], 'red');
             obj.panel_controls.addButton('button_gauss', 'use_gaussian', 'toggle', 'gaussian', 'gaussian', '', [], 'red');
             obj.panel_controls.addButton('input_iter', 'iterations', 'input', 'Niter= ');

@@ -177,6 +177,8 @@ classdef Filter < handle
         
         function convolution(obj)
             
+            t = tic;
+            
             obj.fluxes_fft = conj(fft(obj.fluxes));
             
             L = size(obj.kernels,1) + size(obj.fluxes,1) - 1;
@@ -195,9 +197,13 @@ classdef Filter < handle
             obj.fluxes_filtered = real(fftshift(ifft(obj.kernels_fft.*obj.fluxes_fft),1))./obj.stds; % ./obj.k_factor;
             obj.fluxes_filtered = util.img.crop2size(obj.fluxes_filtered, [Sf(1), Sk(2), Sf(3:end)]); 
             
+            if obj.debug_bit>1, fprintf('runtime "convolution": %f seconds\n', toc(t)); end
+            
         end
         
         function find_events(obj)
+            
+            t = tic;
             
             obj.found_events = trig.Event.empty;
             
@@ -213,6 +219,8 @@ classdef Filter < handle
                 end
                 
             end
+            
+            if obj.debug_bit>1, fprintf('runtime "find_events": %f seconds\n', toc(t)); end
             
         end
         

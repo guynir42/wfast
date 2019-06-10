@@ -5,6 +5,8 @@ classdef Analysis < file.AstroData
         gui;
         audio@util.sys.AudioControl;
         
+        aux_figure;
+        
     end
     
     properties % objects
@@ -103,6 +105,9 @@ classdef Analysis < file.AstroData
                 obj.clip_bg.use_adjust = 0; % this should be disabled and depricated!
                 obj.back = img.Background;
                 obj.phot = img.Photometry;
+                obj.phot.use_basic = 0;
+                obj.phot.use_aperture = 1;
+                obj.phot.use_gaussian = 0;
                 obj.light_original = img.Lightcurves; 
                 obj.light_basic = img.Lightcurves; obj.light_basic.signal_method = 'square'; obj.light_basic.background_method = 'corners';
                 obj.light_ap = img.Lightcurves; obj.light_ap.signal_method = 'aperture'; obj.light_ap.background_method = 'annulus';
@@ -250,6 +255,8 @@ classdef Analysis < file.AstroData
         function finishup(obj)
             
             obj.prog.finish;
+            
+            obj.finder.finishup;
             
             obj.brake_bit = 1;
             
@@ -426,6 +433,10 @@ classdef Analysis < file.AstroData
                 obj.show('ax', obj.gui.axes_image);
             end
             
+            if ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
+                obj.showNewEvents('parent', obj.aux_figure);
+            end
+            
             drawnow;
             
         end
@@ -448,6 +459,30 @@ classdef Analysis < file.AstroData
 
             obj.clip.showRectangles('color', 'black', 'ax', input.ax, 'delete', 1, 'text', 1, 'num', obj.display_num_rect_stars);
             obj.clip_bg.showRectangles('color', 'red', 'ax', input.ax, 'delete', 0, 'text', 0);
+            
+        end
+        
+        function showNewEvents(obj, varargin)
+            
+            if isempty(obj.finder.new_events)
+                return;
+            end
+            
+            input = util.text.InputVars;
+            input.input_var('parent', []);
+            input.scan_vars(varargin{:});
+            
+            if isempty(input.parent)
+                input.parent = gcf;
+            end
+            
+            for ii = 1:length(obj.finder.new_events)
+                
+                if ii>1, pause(2); end
+                
+                obj.finder.new_events(ii).show('parent', input.parent);
+                
+            end
             
         end
         
