@@ -165,7 +165,9 @@ classdef AcqGUI < handle
             obj.panel_objects.addButton('button_phot_stack', 'phot_stack', 'push', 'stack Phot GUI');
             obj.panel_objects.addButton('button_lightcurves', 'lightcurves', 'push', 'Lightcurves GUI');
             obj.panel_objects.addButton('button_deflator', 'deflator', 'push', 'Deflator GUI');
+            obj.panel_objects.addButton('button_focuser', '', 'custom', 'Focuser: '); 
             obj.panel_objects.make;
+            obj.panel_objects.button_focuser.Callback = @obj.callback_focuser;
             
             %%%%%%%%%%% panel save %%%%%%%%%%%%%%%%%%%
             
@@ -292,6 +294,8 @@ classdef AcqGUI < handle
                 end
             end
             
+            obj.panel_objects.button_focuser.String = sprintf('Focuser: %6.4f', obj.owner.cam.focuser.pos);
+            
         end
                         
         function c = check(obj)
@@ -342,6 +346,16 @@ classdef AcqGUI < handle
 
             obj.owner.show;
             obj.panel_contrast.autodyn;
+            
+            obj.update;
+            
+        end
+        
+        function callback_focuser(obj, ~, ~)
+           
+            if obj.debug_bit, disp('callback: focuser'); end
+        
+            obj.owner.cam.focuser.makeGUI;
             
             obj.update;
             

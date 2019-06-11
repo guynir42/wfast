@@ -41,7 +41,7 @@ classdef AutoFocus < handle
         use_fit_tip_tilt = 0;
        
         step = 0.01;
-        range = 0.1;
+        range = 0.15;
         
         angle = 0; % between tip axis and pixel y axis (degrees)
         spider_diameter = 100; % in cm
@@ -267,15 +267,18 @@ classdef AutoFocus < handle
             cla(obj.ax);
             hold(obj.ax, 'on');
             
-            N = min(size(obj.widths,2), 10); 
+            N = min(size(obj.widths,1), 10); 
             
             for ii = 1:N
-                
-                h(ii) = plot(obj.ax, obj.pos, obj.widths(ii,:));
-                
-                if length(obj.fit_results)>=ii
-                    plot(obj.ax, obj.pos, feval(obj.fit_results{ii}, obj.pos), ':', 'Color', h(ii).Color);
+                try
+                    h(ii) = plot(obj.ax, obj.pos, obj.widths(ii,:));
                 end
+                
+%                 try
+%                     if length(obj.fit_results)>=ii
+%                         plot(obj.ax, obj.pos, feval(obj.fit_results{ii}, obj.pos), ':', 'Color', h(ii).Color);
+%                     end
+%                 end
                 
             end
             

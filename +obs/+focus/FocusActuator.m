@@ -198,7 +198,7 @@ classdef FocusActuator < handle
             for ii = 1:N
                 
                 if obj.isMoving==0
-                    if abs(position-obj.pos)<obj.epsilon
+                    if obj.hndl.qONT % abs(position-obj.pos)<obj.epsilon
                         return;
                     else
                         error('Actuator %d did not reach position %f (stuck at %f)!', obj.id, position, obj.pos);

@@ -1250,7 +1250,7 @@ classdef Andor < file.AstroData
             [rc] = obs.cam.sdk.AT_Flush(obj.hndl); obs.cam.sdk.AT_CheckWarning(rc); % flush existing hardware buffers
             
             for X = 1:10 % setup new hardware buffers
-                [rc] = obs.cam.sdk.AT_QueueBuffer(obj.hndl, obj.imageSize); obs.cam.sdk.AT_CheckWarning(rc);
+                [rc] = obs.cam.sdk.AT_QueueBuffer(obj.hndl, obj.imageSizeBytes); obs.cam.sdk.AT_CheckWarning(rc);
             end
                         
             [rc] = obs.cam.sdk.AT_Command(obj.hndl, 'AcquisitionStart'); obs.cam.sdk.AT_CheckWarning(rc);

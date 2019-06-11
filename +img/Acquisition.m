@@ -1568,7 +1568,7 @@ classdef Acquisition < file.AstroData
                     error('must be connected to camera and focuser!');
                 end
 
-                input = obj.makeInputVars('reset', 0, 'batch_size', 100, 'expT', 0.025, ...
+                input = obj.makeInputVars('reset', 0, 'batch_size', 100, 'expT', 0.025, 'frame_rate', 10, 'batch_size', 10, ...
                     'num_stars', 25, 'use audio', 0, 'use_save', 0, 'run name', 'focus', 'prog', 0, ...
                     'pass_source', {'async', 0}, varargin{:});
 
@@ -1586,8 +1586,11 @@ classdef Acquisition < file.AstroData
             
                 input.num_batches = length(obj.af.pos);
             
+                obj.stash_parameters(input);
+%                 cleanup = onCleanup(@obj.unstash_parameters);
+                obj.brake_bit = 0;
                 cleanup = onCleanup(@obj.finishup);
-                obj.startup(input);
+%                 obj.startup(input);
 
                 for ii = 1:input.num_batches
 
@@ -1597,11 +1600,20 @@ classdef Acquisition < file.AstroData
 
                     try 
                         obj.cam.focuser.pos = obj.af.pos(ii);
+                        
+                        pause(0.1);
+            
                     catch ME
                         warning(ME.getReport);
                     end
-
-                    obj.batch;
+                    
+                    obj.single;
+                    obj.phot_stack.input(obj.clip.input(obj.stack_proc), 'positions', obj.clip.positions); 
+                    
+                    if ~isempty(obj.gui) && obj.gui.check
+                        obj.show;
+                        obj.gui.update;
+                    end
                     
                     obj.af.input(ii, obj.cam.focuser.pos, obj.phot_stack.widths, obj.phot_stack.fluxes);
                     
@@ -1612,7 +1624,8 @@ classdef Acquisition < file.AstroData
                 end
             
                 obj.af.calculate;
-            
+                obj.brake_bit = 1;
+                
                 fprintf('FOCUSER RESULTS: pos= %f | tip= %f | tilt= %f\n', obj.af.found_pos, obj.af.found_tip, obj.af.found_tilt);
             
             catch ME
