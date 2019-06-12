@@ -628,6 +628,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             obj.log.input('Shutting down observatory!');
             
+            disp('Shutting down observatory!');
+            
             try 
 
                 obj.stop; % stop any slews or shutter motion
