@@ -72,7 +72,7 @@ classdef SensorChecker < handle
         max_temp = 30; % night time temperature
         min_temp = 0; % in C obviously
         
-        max_wind = 40; % km/h
+        max_wind = 50; % km/h
         min_wind = -Inf;
         
         max_humid = 85; % percent
