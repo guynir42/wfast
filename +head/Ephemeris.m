@@ -3,13 +3,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     properties % objects
         
         time@datetime;
-        
-    end
-    
-    properties % inputs/outputs
-        
-        RA_deg;
-        DEC_deg;
+        moon; 
+        sun;
         
     end
     
@@ -19,10 +14,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
     end
     
+    properties % inputs/outputs
+        
+        RA_deg;
+        Dec_deg;
+        
+    end
+    
     properties(Dependent=true)
         
         RA;
-        DEC;
+        Dec;
         
         STARTTIME;
         JD;
@@ -34,9 +36,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         HA;
         HA_deg;
         
-        ALT_deg;
+        Alt_deg;
         
-        AZ_deg;
+        Az_deg;
         AIRMASS;
         
     end
@@ -102,7 +104,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
-        function val = get.DEC(obj)
+        function val = get.Dec(obj)
             
             val = obj.deg2sex(obj.DEC_deg);
             
@@ -122,6 +124,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 val = juliandate(obj.STARTTIME, 'yyyy-mm-ddThh:MM:ss');
             end
              
+        end
+        
+        function val = get.MJD(obj)
+            
+            if isempty(obj.STARTTIME)
+                val = [];
+            else
+                val = obj.JD - 2400000.5;
+            end
         end
         
         function [ha, l] = getHAandLST(obj) % do we need this anymore?
@@ -186,7 +197,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
-        function val = get.ALT_deg(obj)
+        function val = get.Alt_deg(obj)
             
 %             val = obj.ha2alt(obj.HA_deg, obj.DEC_deg, obj.latitude);
 
@@ -194,7 +205,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
-        function val = get.AZ_deg(obj)
+        function val = get.Az_deg(obj)
             
 %             val = obj.ha2az(obj.HA_deg, obj.DEC_deg, deg2rad(obj.latitude));
             
@@ -235,46 +246,29 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             elseif isnumeric(val) && isscalar(val)
                 obj.RA_deg = val*15;
             elseif isnumeric(val) && length(val)==3
-                obj.RA_deg = 0;
+                val = val*15;
+                obj.RA_deg = val(1) + val(2)/60 + val(3)/3600;
             elseif ischar(val)
                 obj.RA_deg = obj.hour2deg(val);
             else
-                error('Input a string RA in HH:MM:SS format!');
+                error('Input a string RA in HH:MM:SS format or a scalar hour or a 3-vector [H,M,S]!');
             end
-            
-%             if isnumeric(val) && isvector(val) && length(val)==3
-%                 obj.RA = sprintf('%02d:%02d:%05.2f', val(1), val(2), val(3));
-%             elseif isnumeric(val) && isscalar(val)
-%                 obj.RA = obj.deg2hour(val);
-%             elseif ischar(val)
-%                 obj.RA = val;
-%             else
-%                 error('Unknown format for RA');
-%             end
             
         end 
         
-        function set.DEC(obj, val)
+        function set.Dec(obj, val)
             
             if isempty(val)
                 obj.DEC_deg = [];
+            elseif isnumeric(val) && isscalar(val)
+                obj.DEC_deg = val;
+            elseif isnumeric(val) && length(val)==3
+                obj.DEC_deg = val(1) + val(2)/60 + val(3)/3600;
             elseif ischar(val)
                 obj.DEC_deg = obj.sex2deg(val);
             else
-                error('Input a string DEC in DD:MM:SS format!');
+                error('Input a string DEC in DD:MM:SS format or a scalar in degrees or a 3-vector [d,m,s]!');
             end
-            
-%             if isnumeric(val) && isvector(val) && length(val)==3
-%                 obj.DEC = sprintf('%+03d:%02d:%04.1f', val(1), val(2), val(3));
-%             elseif isnumeric(val) && isscalar(val)
-%                 obj.DEC = obj.deg2sex(val);
-%                 obj.DEC_deg = val;
-%             elseif ischar(val)
-%                 obj.DEC = val;
-%                 obj.DEC_deg = obj.hour2deg(val);
-%             else
-%                 error('Unknown format for DEC');
-%             end
             
         end
         
@@ -282,10 +276,25 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     
     methods % calculations
         
-        function input(obj, RA, DEC, time)
+        function input(obj, RA, DEC, time) % give RA/DEC or RA=<star name>, DEC=[] (optional 3rd argument is time, can use "now")
+            
+            if nargin<2
+                disp('Usage: input(RA,DEC,time)');
+            end
             
             if nargin<3
-                disp('Usage: input(RA,DEC,time)');
+                DEC = [];
+            end
+            
+            if ischar(RA) && isempty(DEC)
+
+                if ~isempty(which('celestial.coo.coo_resolver', 'function'))
+                    [RA, DEC] = celestial.coo.coo_resolver(RA, 'OutUnits', 'deg');
+                    RA = RA/15;
+                else
+                    error('no name resolver has been found... try adding MAAT to the path.');
+                end 
+                
             end
             
             obj.RA = RA;
@@ -310,6 +319,73 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         function update(obj)
             
             obj.time = datetime('now', 'timezone', 'UTC');
+            
+            obj.updateMoon;
+            obj.updateSun;
+            
+        end
+        
+        function updateMoon(obj)
+            
+            RAD = pi./180;
+            
+            if ~isempty(which('celestial.SolarSys.get_moon'))
+                obj.moon = celestial.SolarSys.get_moon(obj.JD, [obj.longitude, obj.latitude].*RAD);
+                obj.moon.RA = obj.moon.RA./RAD; % convert to degrees
+                obj.moon.Dec = obj.moon.Dec./RAD; % convert to degrees
+                obj.moon.Az = obj.moon.Az./RAD; % convert to degrees
+                obj.moon.Alt = obj.moon.Alt./RAD; % convert to degrees
+                obj.moon.Phase = obj.moon.Phase./pi; % convert to fraction
+                obj.moon.Dist = obj.getMoonDistance; 
+            else
+                obj.moon = [];
+            end
+            
+        end
+        
+        function val = getMoonDistance(obj)
+            % reference: https://en.wikipedia.org/wiki/Haversine_formula
+            
+            if isempty(obj.moon) || isempty(obj.RA_deg) || isempty(obj.DEC_deg)
+                val = [];
+            else
+                
+                havTheta = sind((obj.DEC_deg-obj.moon.Dec)/2).^2 + cosd(obj.DEC_deg).*cosd(obj.moon.Dec).*sind((obj.RA_deg-obj.moon.RA)/2).^2;
+                
+                havTheta(havTheta>1) = 1;
+                havTheta(havTheta<-1) = -1;
+                
+                val = 2.*asind(sqrt(havTheta)); 
+                
+            end
+            
+        end
+        
+        function updateSun(obj)
+            
+            RAD = pi./180;
+            
+            if ~isempty(which('celestial.SolarSys.get_sun'))
+                obj.sun = celestial.SolarSys.get_sun(obj.JD, [obj.longitude, obj.latitude].*pi./180);
+                obj.sun.RA = obj.sun.RA./RAD; % convert to degrees
+                obj.sun.Dec = obj.sun.Dec./RAD; % convert to degrees
+                obj.sun.Az = obj.sun.Az./RAD; % convert to degrees
+                obj.sun.Alt = obj.sun.Alt./RAD; % convert to degrees
+                obj.sun.dAzdt = obj.sun.dAzdt./RAD; % convert to degrees
+                obj.sun.dAltdt = obj.sun.dAltdt./RAD; % convert to degrees
+                
+            else
+                obj.sun = [];
+            end
+            
+        end
+        
+        function timeTravelHours(obj, H)
+            
+            obj.time = obj.time + hours(H);
+            
+            obj.updateMoon;
+            obj.updateSun;
             
         end
         

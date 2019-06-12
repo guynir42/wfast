@@ -20,12 +20,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
     
     properties 
         
-%         im_size;
-        NAXIS; 
-        NAXIS1;
-        NAXIS2;
-        NAXIS3;
-        NAXIS4;
+%         target_name = 'star1';
+        OBJECT = 'star1';
+%         type = '';
+        TYPE;
+        
+        COMMENT = '';
+        
+        PROJECT = 'WFAST';
+        INST = 'Zyla_5.5';
+        
+%         t_start; % most recent file (when it started filming)
+%         t_end; % most recent file (when it finished filming)
+        STARTTIME;
+        ENDTIME;
+        RUNSTART; 
         
 %         aperture = 57;
         TEL_APER = 57;
@@ -44,36 +53,28 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         
         FILTER = 'F505W'; 
         
-%         gain;
-        GAIN; 
-        READNOISE;
-        DARKCUR;
 %         batch_size;
+        
+%         im_size;
+        NAXIS; 
+        NAXIS1;
+        NAXIS2;
+        NAXIS3;
+        NAXIS4;
         
         BINX = 1;
         BINY = 1;
         ROI; 
         CCDSEC;
         
-%         t_start; % most recent file (when it started filming)
-%         t_end; % most recent file (when it finished filming)
-        STARTTIME;
-        ENDTIME;
-        RUNSTART; 
-        
-%         target_name = 'star1';
-        OBJECT = 'star1';
-%         type = '';
-        TYPE;
-        
-        COMMENT = '';
-        
-        PROJECT = 'WFAST';
-        INST = 'Zyla_5.5';
-        
 %         is_dark = 0;
 %         is_flat = 0;
 %         is_sim = 0;
+        
+%         gain;
+        GAIN; 
+        READNOISE;
+        DARKCUR;
         
         IS_DARK = 0;
         IS_FLAT = 0;
@@ -82,6 +83,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
 %         notes = '';
                
         FOCUS_POS;
+        FOCUS_TIP;
+        FOCUS_TILT;
          
         SEEING; % arcsec
 %         temperature; % celsius
@@ -121,9 +124,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         
         % ephemeris: time & coordinates
         RA = ''; % for the center of the image
-        DEC = '';% for the center of the image
+        Dec = '';% for the center of the image
         RA_DEG;
-        DEC_DEG;
+        Dec_DEG;
         
         TELRA;
         TELDEC; 
@@ -139,6 +142,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         MOONAZ;
         MOONALT;
         MOONILL;
+        MOONDIST;
 
         SUNAZ;
         SUNALT;
@@ -343,7 +347,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         % ephemeris
         function val = get.JD(obj)
             
-            val = obj.ephem.juldate;
+            val = obj.ephem.JD;
+            
+        end
+        
+        function val = get.MJD(obj)
+            
+            val = obj.ephem.MJD;
             
         end
         
@@ -353,7 +363,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
             
         end
         
-        function val = get.DEC(obj)
+        function val = get.Dec(obj)
             
             val = obj.ephem.DEC;
             
@@ -365,7 +375,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
             
         end
         
-        function val = get.DEC_DEG(obj)
+        function val = get.Dec_DEG(obj)
             
             val = obj.ephem.DEC_deg;
             
@@ -400,6 +410,66 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
             val = obj.ephem.airmass;
             
         end        
+        
+        function val = get.MOONAZ(obj)
+            
+            if isempty(obj.ephem) || isempty(obj.ephem.moon)
+                val = [];
+            else
+                val = obj.ephem.moon.Az;
+            end
+            
+        end
+        
+        function val = get.MOONALT(obj)
+            
+            if isempty(obj.ephem) || isempty(obj.ephem.moon)
+                val = [];
+            else
+                val = obj.ephem.moon.Alt;
+            end
+            
+        end
+        
+        function val = get.MOONILL(obj)
+            
+            if isempty(obj.ephem) || isempty(obj.ephem.moon)
+                val = [];
+            else
+                val = obj.ephem.moon.IllF;
+            end
+            
+        end
+        
+        function val = get.MOONDIST(obj)
+            
+            if isempty(obj.ephem) || isempty(obj.ephem.moon) || isempty(obj.ephem.moon.Dist)
+                val = [];
+            else
+                val = obj.ephem.moon.Dist;
+            end
+            
+        end
+        
+        function val = get.SUNAZ(obj)
+            
+            if isempty(obj.ephem) || isempty(obj.ephem.sun)
+                val = [];
+            else
+                val = obj.ephem.sun.Az;
+            end
+            
+        end
+        
+        function val = get.SUNALT(obj)
+            
+            if isempty(obj.ephem) || isempty(obj.ephem.sun)
+                val = [];
+            else
+                val = obj.ephem.sun.Alt;
+            end
+            
+        end
         
         % stars
         function val = magnitude(obj)
@@ -641,7 +711,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
             
         end 
         
-        function set.DEC(obj, val)
+        function set.Dec(obj, val)
             
             obj.ephem.DEC = val;
             
