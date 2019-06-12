@@ -362,15 +362,19 @@ classdef ASA < handle
         
         function inputTarget(obj, varargin)
             
-            if ~isempty(which('celestial.coo.coo_resolver', 'function'))
-                [obj.RA_target, obj.DE_target] = celestial.coo.coo_resolver(varargin{:}, 'OutUnits', 'deg');
-            else
-                error('no name resolver has been found... try adding MAAT to the path.');
-            end
+            obj.target.input(varargin{:}); % Ephemeris now uses Eran's name resolver
             
         end
         
-        function val = checks_before_slew(obj)
+        function val = check_before_slew(obj)
+            
+            val = 0;
+            
+            obj.target.update;
+            
+            if obj.target.Alt_deg<obj.limit_alt
+                return;
+            end
             
             val = 1;
             
@@ -380,7 +384,7 @@ classdef ASA < handle
             
             val = 0;
             
-            if obj.ALT<20
+            if obj.ALT<obj.limit_alt
                 return;
             end
             
@@ -398,17 +402,17 @@ classdef ASA < handle
             
             try 
                 
-                obj.target.update;
-                
-                if ~obj.checks_before_slew
+                if ~obj.check_before_slew
                     error('Prechecks failed, aborting slew');
                 end
                 
+                ra_hours_Jnow = obj.RA_deg_now./15; % convert to hours! 
+                dec_deg_Jnow = obj.target.Dec_deg_now;
+                
                 obj.brake_bit = 0;
+                obj.hndl.SlewToCoordinatesAsync(ra_hours_Jnow, dec_deg_Jnow);
                 
-                obj.hndl.SlewToCoordinatesAsync(obj.target.RA_deg/15, obj.target.DE_deg);
-                
-                for ii = 1:10000
+                for ii = 1:100000
                     
                     pause(0.01);
                     
@@ -428,6 +432,8 @@ classdef ASA < handle
                     
                 end
             
+                obj.tracking = 1;
+                
             catch ME
                 obj.log.error(ME.getReport);
                 rethrow(ME);
@@ -488,6 +494,43 @@ classdef ASA < handle
         
         function engineeringSlew(obj,Alt,Az)
             
+            try 
+
+                if Alt<obj.limit_alt
+                    error('Input altitude is below limit of %f degress', obj.limit_alt);
+                end
+                
+                obj.brake_bit = 0;
+                
+                obj.tracking = 0;
+                obj.hndl.SlewToAltAzAsync(Alt, Az);
+                
+                for ii = 1:100000
+                    
+                    pause(0.01);
+                    
+                    if obj.brake_bit
+                        obj.stop;
+                        break;
+                    end
+                    
+                    if ~obj.check_while_moving
+                        obj.emergency_stop;
+                        break;
+                    end
+                    
+                    if obj.hndl.Slewing==0
+                        break;
+                    end
+                    
+                end
+            
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
+            
+            
         end
         
         function park(obj)
@@ -524,7 +567,7 @@ classdef ASA < handle
                 return;
             end
             
-            if obj.ALT<0
+            if obj.ALT<-20 % this occurs when software is disconnected from mount (e.g., on power out)
                 obj.status = 0;
                 return;
             end
@@ -550,27 +593,12 @@ classdef ASA < handle
             
         end
         
-        function val = check(obj) % make all possible checks to see if we need to abort the slew
-            
-            val = 0;
-            
-            if obj.ALT<obj.limit_alt
-                return;
-            end
-            
-            if obj.use_accelerometer || obj.use_ultrasonic
-                
-            end
-            
-            val = 1;
-            
-        end
-        
         function stop(obj)
             
 %             obj.log.input('stopping telescope');
             
             try 
+                
                 obj.brake_bit = 1;
             
                 obj.hndl.AbortSlew;
@@ -587,6 +615,7 @@ classdef ASA < handle
             obj.log.input('stopping telescope');
             
             try 
+                
                 obj.brake_bit = 1;
             
                 obj.hndl.AbortSlew;

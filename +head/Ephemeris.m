@@ -39,11 +39,26 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         Alt_deg;
         
         Az_deg;
+        
         AIRMASS;
+        
+        ECL_LAMBDA;
+        ECL_BETA;
+        
+        GAL_Long;
+        GAL_Lat;
         
     end
     
     properties(Hidden=true)
+        
+        RA_deg_now;
+        Dec_deg_now;
+        
+        ecliptic_lambda;
+        ecliptic_beta;
+        galactic_longitude;
+        galactic_latitude;
         
         sidereal_time_type = 'mean'; % can also choose "apparent"
         
@@ -62,7 +77,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
 %         latitude = 31.907867; % of the observatory
 %         longitude = 34.811363; % of the observatory
                 
-        version = 1.02;
+        version = 1.03;
         
     end
     
@@ -106,7 +121,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         function val = get.Dec(obj)
             
-            val = obj.deg2sex(obj.DEC_deg);
+            val = obj.deg2sex(obj.Dec_deg);
             
         end
         
@@ -221,17 +236,54 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         function val = get.AIRMASS(obj)
            
-%             [~, val] = obj.ha2alt(obj.HA_deg, obj.DE_deg, obj.latitude);
-            if obj.ALT_deg>87 % unreliable values near the horizon
+            alt = obj.Alt_deg;
+            
+            if alt<3% unreliable values near the horizon
                 val = []; 
             else
                 
-                SecZ = 1./cosd(90-obj.ALT_deg);
+                SecZ = 1./cosd(90-obj.alt);
 
                 val = SecZ - 0.0018167.*(SecZ - 1) - 0.002875.*(SecZ - 1).*(SecZ - 1)...
                     - 0.0008083.*(SecZ - 1).*(SecZ - 1).*(SecZ - 1); % Hardie's polynomial formula
 
             end
+            
+        end
+        
+        function val = RA_now(obj)
+            
+            val = obj.deg2hour(obj.RA_deg_now);
+            
+        end
+        
+        function val = Dec_now(obj)
+            
+            val = obj.deg2sex(obj.Dec_deg_now);
+            
+        end
+        
+        function val = get.ECL_LAMBDA(obj)
+            
+            val = obj.ecliptic_lambda;
+            
+        end
+        
+        function val = get.ECL_BETA(obj)
+            
+            val = obj.ecliptic_beta;
+            
+        end
+        
+        function val = get.GAL_Long(obj)
+            
+            val = obj.galactic_longitude;
+            
+        end
+        
+        function val = get.GAL_Lat(obj)
+            
+            val = obj.galactic_latitude;
             
         end
         
@@ -322,6 +374,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             obj.updateMoon;
             obj.updateSun;
+            obj.updateEquatorialNow;
+            obj.updateEcliptic;
+            obj.updateGalactic;
+            
+        end
+        
+        function timeTravelHours(obj, H)
+            
+            obj.time = obj.time + hours(H);
+            
+            obj.updateMoon;
+            obj.updateSun;
+            obj.updateEquatorialNow;
+            obj.updateEcliptic;
+            obj.updateGalactic;
             
         end
         
@@ -380,12 +447,47 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
-        function timeTravelHours(obj, H)
+        function updateEquatorialNow(obj)
+           
+            if ~isempty(which('celestial.coo.coco')) && ~isempty(obj.RA_deg) && ~isempty(obj.Dec_deg)
+                
+                JY = convert.time(obj.JD,'JD','J');
+                CurrentEquinox = sprintf('J%8.3f',JY);
+                out_coord = celestial.coo.coco([obj.RA_deg, obj.Dec_deg], 'J2000', CurrentEquinox, 'd', 'd');
+
+                obj.RA_deg_now = out_coord(1);
+                obj.Dec_deg_now = out_coord(2);
+                
+            else
+                obj.RA_deg_now = [];
+                obj.Dec_deg_now = [];
+            end
             
-            obj.time = obj.time + hours(H);
+        end
+        
+        function updateEcliptic(obj)
             
-            obj.updateMoon;
-            obj.updateSun;
+            if ~isempty(which('celestial.coo.coco')) && ~isempty(obj.RA_deg) && ~isempty(obj.Dec_deg)
+                out_coord = celestial.coo.coco([obj.RA_deg, obj.Dec_deg], 'J2000', 'e', 'd', 'd');
+                obj.ecliptic_lambda = out_coord(1);
+                obj.ecliptic_beta = out_coord(2);
+            else
+                obj.ecliptic_lambda = [];
+                obj.ecliptic_beta = [];
+            end
+            
+        end
+        
+        function updateGalactic(obj)
+            
+            if ~isempty(which('celestial.coo.coco')) && ~isempty(obj.RA_deg) && ~isempty(obj.Dec_deg)
+                out_coord = celestial.coo.coco([obj.RA_deg, obj.Dec_deg], 'J2000', 'g', 'd', 'd');
+                obj.galactic_longitude = out_coord(1);
+                obj.galactic_latitude = out_coord(2);
+            else
+                obj.ecliptic_lambda = [];
+                obj.ecliptic_beta = [];
+            end
             
         end
         
