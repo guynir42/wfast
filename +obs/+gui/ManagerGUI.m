@@ -105,6 +105,8 @@ classdef ManagerGUI < handle
             pos = pos - N;
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'controls');
             obj.panel_controls.number = N;
+            obj.panel_controls.addButton('button_autoshutdown', 'use_shutdown', 'toggle', 'auto shut down disabled', 'auto shutdown enabled', ...
+                'small', 1, 'black', 'red'); 
             obj.panel_controls.addButton('button_run_t1', '', 'custom', 'run t1', '', '', 0.5);
             obj.panel_controls.addButton('button_interval_t1', '', 'custom', ['P= ' num2str(obj.owner.period1) 's'], '', '', 0.5);
             obj.panel_controls.addButton('button_run_t2', '', 'custom', 'run t2', '', '', 0.5);
@@ -222,7 +224,7 @@ classdef ManagerGUI < handle
                 elseif obj.owner.dome.shutter_west_deg==90
                     obj.panel_hardware.button_shutter_west.String = sprintf('Shut.West: closed');
                 else
-                    obj.panel_hardware.button_shutter_west.String = sprintf('Shut.West: %d deg', round(obj.owner.dome.shutter1_deg));
+                    obj.panel_hardware.button_shutter_west.String = sprintf('Shut.West: %d deg', round(obj.owner.dome.shutter_west_deg));
                 end
                 
                 if obj.owner.dome.shutter_east_deg==0
@@ -230,7 +232,7 @@ classdef ManagerGUI < handle
                 elseif obj.owner.dome.shutter_east_deg==90
                     obj.panel_hardware.button_shutter_east.String = sprintf('Shut.East: closed');
                 else
-                    obj.panel_hardware.button_shutter_east.String = sprintf('Shut.East: %d deg', round(obj.owner.dome.shutter2_deg));
+                    obj.panel_hardware.button_shutter_east.String = sprintf('Shut.East: %d deg', round(obj.owner.dome.shutter_east_deg));
                 end
                 
             end
@@ -277,12 +279,15 @@ classdef ManagerGUI < handle
             
             for ii = 1:3
                 button = obj.panel_controls.(['button_run_t' num2str(ii)]);
+                button2 = obj.panel_controls.(['button_interval_t' num2str(ii)]);
                 if timer_vec(ii)
-                    button.String = ['t' num2str(ii)];
+                    button.String = ['run t' num2str(ii)];
                     button.BackgroundColor = util.plot.GraphicButton.defaultColor;
+                    button2.BackgroundColor = util.plot.GraphicButton.defaultColor;
                 else
-                    button.String = ['t' num2str(ii) ' error'];
+                    button.String = ['t' num2str(ii) ' stopped'];
                     button.BackgroundColor = 'red';
+                    button2.BackgroundColor = 'red';
                 end
             end
             
