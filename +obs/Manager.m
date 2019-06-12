@@ -1,5 +1,21 @@
 classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
-
+% Top level class to control observatory. 
+% This class has 2 main roles: 
+% (1) To contain all hardware objects (e.g., dome, mount, weather station).
+% (2) To make various checks and shutdown the observatory if needed. 
+%
+% Main features:
+%   -dome, and mount are objects connected to hardware for main operations. 
+%    If one of these devices fails, the observatory must shut down (or make 
+%    a call to get help. 
+%   -weather, wind, etc: sensors that check the conditions are viable for 
+%    observation. 
+%   -checker: a SensorChecker object that collects all the weather sensor 
+%    information and makes a summary of the results for the manager. 
+% 
+% PLEASE READ THE COMMENTS ON PROPERTIES FOR MORE DETAIL!
+    
+    
     properties(Transient=true)
         
         t1; % quick timer (every minute or so) just to update sensors/devices
@@ -28,42 +44,44 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     
     properties % switches/controls
         
+        use_shutdown = 1; % when this is enabled, observatory shuts down on bad weather/device failure
+        
         % use these to override these devices/sensors
-        use_dome = 1;
-        use_mount = 1;
-        use_weather = 1;
-        use_wind = 1;
-        use_humidity = 0;
-        use_temperature = 0; 
+        use_dome = 1; % override AstroHaven dome
+        use_mount = 1; % ovrride ASA mount
+        use_weather = 1; % override Boltwood weather station
+        use_wind = 1; % override windETH
+        use_humidity = 0; % override humidity dog
+        use_temperature = 0; % override other temp sensors
         
         period1 = 60; % time between updates of all devices/sensors
         period2 = 300; % time for equipment/weather check and log file
         period3 = 1800; % time for verifying shorter timers are working (and other tests?)
         
-        brake_bit = 1;
+        brake_bit = 1; % also set the brake bit for mount/dome
         debug_bit = 1;
         
     end
     
     properties % inputs/outputs
                 
-        devices_ok = 1;
-        devices_report = 'OK';
+        devices_ok = 1; % no critical failures in mount/dome/etc
+        devices_report = 'OK'; % if failure happens, specify it here
         
     end
     
     properties(Dependent=true)
         
-        sensors_ok;
-        sensors_report;
-        report; 
+        sensors_ok; % all weather sensors give good results
+        sensors_report; % if bad weather, report it here
+        report; % general report: devices, sensors, shutdown state
         
-        RA;
-        DEC;
-        LST;
-        ALT;
+        RA;  % shortcut to mount telRA
+        DEC; % shortcut to mount telDEC
+        ALT; % shortcut to mount telALT
+        LST; % shortcut to mount LST
         
-        is_shutdown;
+        is_shutdown; % will be 1 when dome is closed and mount not tracking (add mount in parking at some point)
         
     end
     
@@ -85,24 +103,24 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 obj.log = util.sys.Logger('Top_level_manager'); % keep track of commands given and errors received... 
                 
-                obj.connect; % connect to all hardware
+                obj.connect; % connect to all hardware and objects
                 
             end
             
         end
         
-        function connect(obj)
+        function connect(obj) % connect to all hardware and objects
             
             if obj.use_dome
-                obj.connectDome;
+                obj.connectDome; % AstroHaven dome
             end
             
             if obj.use_mount
-                obj.connectMount;
+                obj.connectMount; % ASA mount
             end
             
             if obj.use_weather
-                obj.connectBoltwood;
+                obj.connectBoltwood; 
             end
             
             if obj.use_wind
@@ -112,16 +130,19 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             % add additional devices
             % ...
             
+            obj.connectSensorChecker; % create checker object that collects sensor data
             
-            obj.setup_t3;
-            obj.setup_t2;
-            obj.setup_t1;
+            % start the 3 layers of timers
+            obj.setup_t3; % check t2 is alive (half hour period)
+            obj.setup_t2; % check devices, collect weather, decide on closing dome, make log report (5 minute period)
+            obj.setup_t1; % get sensors to measure weather data for averaging (1 minute period)
                 
             
         end
         
         function delete(obj) % destructor
             
+            % make sure not to leave hanging timers
             delete(obj.t3);
             delete(obj.t2);
             delete(obj.t1);
@@ -233,6 +254,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function reset(obj)
             
+            % restart the timers
             obj.setup_t3;
             obj.setup_t2;
             obj.setup_t1;
@@ -243,7 +265,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     
     methods % getters
         
-        function val = get.sensors_ok(obj)
+        function val = get.sensors_ok(obj) % shortcut to checker, that is updated on t2
             
             if isempty(obj.checker)
                 val = [];
@@ -253,7 +275,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function val = get.sensors_report(obj)
+        function val = get.sensors_report(obj) % shortcut to checker, that is updated on t2
             
             if isempty(obj.checker)
                 val = '';
@@ -263,13 +285,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function val = get.report(obj)
+        function val = get.report(obj) % composite report: sensors, devices, shutdown state
             
             val = sprintf('Sensors: %s | Devices: %s | state: %s', obj.sensors_report, obj.devices_report, obj.observatory_state);
             
         end
         
-        function val = get.is_shutdown(obj)
+        function val = get.is_shutdown(obj) % true when dome is closed and mount is not tracking
             
             val = 0;
             
@@ -294,7 +316,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function val = observatory_state(obj)
+        function val = observatory_state(obj) % string: SHUT or OPEN
             
             if obj.is_shutdown
                 val = 'SHUT';
@@ -304,7 +326,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function val = get.RA(obj)
+        function val = get.RA(obj) % shortcut to telescope 
             
             if ~isempty(obj.mount)
                 val = obj.mount.telRA;
@@ -314,7 +336,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function val = get.DEC(obj)
+        function val = get.DEC(obj) % shortcut to telescope 
             
             if ~isempty(obj.mount)
                 val = obj.mount.telDEC;
@@ -324,17 +346,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function val = get.LST(obj)
-            
-            if ~isempty(obj.mount)
-                val = obj.mount.LST;
-            else
-                val = [];
-            end
-            
-        end
-        
-        function val = get.ALT(obj)
+        function val = get.ALT(obj) % shortcut to telescope 
             
             if ~isempty(obj.mount)
                 val = round(obj.mount.telALT);
@@ -344,43 +356,53 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function val = average_temp(obj)
+        function val = get.LST(obj) % shortcut to telescope 
+            
+            if ~isempty(obj.mount)
+                val = obj.mount.LST;
+            else
+                val = [];
+            end
+            
+        end
+        
+        function val = average_temp(obj) % average of all sensors that can measure this
             
             val = mean(obj.checker.temp_now, 'omitnan');
             
         end
         
-        function val = average_clouds(obj)
+        function val = average_clouds(obj) % average of all sensors that can measure this
             
             val = mean(obj.checker.clouds_now, 'omitnan');
             
         end
         
-        function val = average_light(obj)
+        function val = average_light(obj) % average of all sensors that can measure this
             
             val = mean(obj.checker.light_now, 'omitnan');
             
         end
         
-        function val = average_wind(obj)
+        function val = average_wind(obj) % average of all sensors that can measure this
             
             val = mean(obj.checker.wind_now, 'omitnan');
             
         end
         
-        function val = average_wind_az(obj)
+        function val = average_wind_az(obj) % average of all sensors that can measure this
             
             val = mean(obj.checker.wind_az_now, 'omitnan');
             
         end
         
-        function val = average_humid(obj)
+        function val = average_humid(obj) % average of all sensors that can measure this
             
             val = mean(obj.checker.humid_now, 'omitnan');
             
         end
         
-        function val = areTimersRunning(obj)
+        function val = areTimersRunning(obj) % quick way to verify timers are still on... 
             
             val(1) = strcmp(obj.t1.Running, 'on');
             val(2) = strcmp(obj.t2.Running, 'on');
@@ -412,7 +434,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function callback_t1(obj, ~, ~) % update sensors 
+        function callback_t1(obj, ~, ~) % update sensors and GUI
             
             try 
             
@@ -421,6 +443,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
                 
                 obj.checker.update; % go over all sensors and only tell them to collect data. It's reported back in t2
+                
+                if ~isempty(obj.gui) && obj.gui.check
+                    obj.gui.update;
+                end
                 
             catch ME
                 obj.log.error(ME.getReport);
@@ -464,7 +490,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     obj.setup_t1;
                 end
 
-                obj.update;
+                obj.update; % check devices are functioning
                 
             catch ME
                 obj.log.error(ME.getReport);
@@ -499,7 +525,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end 
         
-        function callback_t3(obj, ~, ~)
+        function callback_t3(obj, ~, ~) % make sure t2 is running (are there any other checks?)
             
             try
 
@@ -541,7 +567,37 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function updateDevices(obj)
+    end
+    
+    methods % calculations / commands
+        
+        function update(obj) % check devices and sensors and make a decision if to shut down the observatory
+
+            obj.updateDevices;
+
+            obj.checker.decision_all; % collect weather data and make a decision
+
+            obj.log.input(obj.report); % summary of observatory status
+
+            if obj.use_shutdown && obj.devices_ok==0 % critical device failure, must shut down
+                if obj.is_shutdown==0 % if already shut down, don't need to do it again
+                    obj.shutdown;
+                end
+            end
+
+            if obj.use_shutdown && obj.sensors_ok==0 % critical device failure, must shut down
+                if obj.is_shutdown==0 % if already shut down, don't need to do it again
+                    obj.shutdown;
+                end
+            end
+
+            if ~isempty(obj.gui) && obj.gui.check
+                obj.gui.update;
+            end
+            
+        end
+        
+        function updateDevices(obj) % run "update" for each device and see if the status is still good
         
             obj.devices_ok = 1;
             obj.devices_report = 'OK';
@@ -567,34 +623,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             % add maybe checks for boltwood if we think it is critical?
             
         end
-            
-    end
-    
-    methods % calculations / commands
         
-        function update(obj)
-
-            obj.updateDevices;
-
-            obj.checker.decision_all; % collect weather data and make a decision
-
-            obj.log.input(obj.report);
-
-            if obj.devices_ok==0
-                if obj.is_shutdown==0
-                    obj.shutdown;
-                end
-            end
-
-            if obj.sensors_ok==0
-                if obj.is_shutdown==0
-                    obj.shutdown;
-                end
-            end
-            
-        end
-        
-        function shutdown(obj)
+        function shutdown(obj) % command to shut down observatory (close dome, stop tracking)
             
             obj.log.input('Shutting down observatory!');
             
@@ -616,10 +646,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function stop(obj)
+        function stop(obj) % stop dome and mount motion
             
             obj.brake_bit = 1;
             
+            obj.dome.stop;
+            obj.mount.stop; 
+            
+            % verify other objects that may need a brake...
             list = properties(obj);
             
             for ii = 1:length(list)

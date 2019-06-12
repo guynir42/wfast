@@ -273,6 +273,19 @@ classdef ManagerGUI < handle
                 obj.panel_objects.button_wind.BackgroundColor = 'red';
             end
             
+            timer_vec = obj.owner.areTimersRunning;
+            
+            for ii = 1:3
+                button = obj.panel_controls.(['button_run_t' num2str(ii)]);
+                if timer_vec(ii)
+                    button.String = ['t' num2str(ii)];
+                    button.BackgroundColor = util.plot.GraphicButton.defaultColor;
+                else
+                    button.String = ['t' num2str(ii) ' error'];
+                    button.BackgroundColor = 'red';
+                end
+            end
+            
             obj.owner.checker.plotWeather('ax', obj.axes_image);
             
         end

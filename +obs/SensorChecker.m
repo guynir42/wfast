@@ -1,5 +1,7 @@
 classdef SensorChecker < handle
-
+% 
+%
+%
     properties(Transient=true)
         
     end
@@ -61,22 +63,22 @@ classdef SensorChecker < handle
     properties % switches/controls
         
         % light and clouds may be just binary, so we can skip plotting and thresholding them...?
-        max_light = 300; % units??
+        max_light = 250; % units??
         min_light = -Inf;
         
-        max_clouds = Inf; % degree difference to sky??
-        min_clouds = -10; % negative --> cloudy??
+        max_clouds = -15; % negative --> cloudy (clear days have -30 or -20, very cloudy is -10)
+        min_clouds = -Inf; % degree difference to sky
         
-        max_temp = 30;
-        min_temp = 0;
+        max_temp = 30; % night time temperature
+        min_temp = 0; % in C obviously
         
-        max_wind = 30;
+        max_wind = 40; % km/h
         min_wind = -Inf;
         
-        max_humid = 60;
+        max_humid = 85; % percent
         min_humid = -Inf;
         
-        show_day_frac = 0.2; % what fraction of a day to plot back
+        show_day_frac = 0.2; % what fraction of a day to plot back on GUI
         
         debug_bit = 1;
         
@@ -91,7 +93,7 @@ classdef SensorChecker < handle
         % list all the classes that status checker is following
         sensor_classes = {'obs.sens.Simulator', 'obs.sens.Boltwood', 'obs.sens.WindETH'}; 
         
-        version = 1.00;
+        version = 1.01;
         
     end
     
