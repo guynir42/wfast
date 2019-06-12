@@ -781,12 +781,14 @@ classdef SensorChecker < handle
             hold(input.ax, 'off');
             
             h_list = [];
+            ax_max = 50;
             
             % get temperatures
             [v,t] = obj.getWeatherTimeData(obj.temp_all, obj.temp_jul, input.day_frac);
             h = plot(input.ax, t, v, '-');
             for ii = 1:length(h), h(ii).DisplayName = ['temperature (C) ' obj.temp_ids{ii}]; end 
             h_list = [h_list; h];
+            if max(v)>ax_max, ax_max = max(v); end
             hold(input.ax, 'on');
             
             % get wind data
@@ -794,6 +796,7 @@ classdef SensorChecker < handle
             h = plot(input.ax, t, v, '-o');
             for ii = 1:length(h), h(ii).DisplayName = ['wind (km/h) ' obj.wind_ids{ii}]; end
             h_list = [h_list; h];
+            if max(v)>ax_max, ax_max = max(v); end
             hold(input.ax, 'on');
             
             % get humidity data
@@ -801,17 +804,21 @@ classdef SensorChecker < handle
             h = plot(input.ax, t, v, '-+');
             for ii = 1:length(h), h(ii).DisplayName = ['Humidity (%) ' obj.humid_ids{ii}]; end
             h_list = [h_list; h];
+            if max(v)>ax_max, ax_max = max(v); end
             hold(input.ax, 'on');
             
             % get light data
             [v,t] = obj.getWeatherTimeData(obj.light_all, obj.light_jul, input.day_frac);
-            h = plot(input.ax, t, v/20, '-*');
+            v = v/20;
+            h = plot(input.ax, t, v, '-*');
             for ii = 1:length(h), h(ii).DisplayName = ['daylight /20 ' obj.light_ids{ii}]; end
             h_list = [h_list; h];
+            if max(v)>ax_max, ax_max = max(v); end
             hold(input.ax, 'on');
             
             hold(input.ax, 'off');
-            input.ax.YLim = [-10, 50];
+            
+            input.ax.YLim = [-10, ax_max];
             
             legend(input.ax, h_list, 'Location', 'SouthWest');
             

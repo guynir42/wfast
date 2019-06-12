@@ -20,11 +20,12 @@ classdef AstroHavenGUI < handle
         
         panel_status;
         
-        panel_shutter1;
-        panel_shutter2;
+        panel_shutter_west;
+        panel_shutter_east;
         panel_shutter_both;
         
-        panel_stop;
+        panel_stop1;
+        panel_stop2;
         
     end
     
@@ -70,58 +71,68 @@ classdef AstroHavenGUI < handle
             movegui(obj.fig.fig, 'center');
             obj.fig.left = 24;
             obj.fig.bottom = -5;
-            N = 8;
+            
+            N = 10; % total number of rows
+            pos = N;
             
             %%%%%%%%%%% panel status %%%%%%%%%%%%%%%%%
             
-            obj.panel_status = GraphicPanel(obj.owner, [0 (N-1)/N 1 1/N], 'status');
-            obj.panel_status.addButton('button_status', 'status', 'info', 'status= ', '', '', 1/3);
-            obj.panel_status.addButton('button_reply', 'reply', 'info', 'rep= ', '', '', 1/3);
-            obj.panel_status.addButton('button_connect', 'connect', 'push', '', '', '', 1/3);
+            pos = pos - 3;
+            
+            obj.panel_status = GraphicPanel(obj.owner, [0 pos/N 1 3/N], 'status');
+            obj.panel_status.addButton('button_close', '', 'custom', 'close GUI', '', '', 1/4);
+            obj.panel_status.addButton('button_status', 'status', 'info', 'status= ', '', '', 1/4);
+            obj.panel_status.addButton('button_reply', 'reply', 'info', 'reply= ', '', '', 1/4);
+            obj.panel_status.addButton('button_connect', 'connect', 'push', '', '', '', 1/4);
+            obj.panel_status.addButton('button_west_str', 'shutter_west', 'info', 'West: ', '', '', 1/2);
+            obj.panel_status.addButton('button_east_str', 'shutter_east', 'info', 'East: ', '', '', 1/2);
+            obj.panel_status.addButton('button_west_deg', 'shutter_west_deg', 'info', 'West: ', ' deg', '', 1/2);
+            obj.panel_status.addButton('button_east_deg', 'shutter_east_deg', 'info', 'East: ', ' deg', '', 1/2);
             obj.panel_status.make;
+            
+            obj.panel_status.button_close.Callback = @obj.callback_close;
+            
+            %%%%%%%%%%% panel stop2 %%%%%%%%%%%%%%%%%%%
+            
+            pos = pos - 1;
+            
+            obj.panel_stop1 = GraphicPanel(obj.owner, [0 pos/N 1 1/N]);
+            obj.panel_stop1.addButton('button_stop', 'stop', 'push', 'STOP!');
+            obj.panel_stop1.make;
             
             %%%%%%%%%%% panel shutters %%%%%%%%%%%%%%%
             
-            obj.panel_shutter1 = GraphicPanel(obj.owner, [0 (N-3)/N 1 2/N], 'shutter1');
-            obj.panel_shutter1.number = 2;
-            obj.panel_shutter1.addButton('button_state', 'shutter1_deg', 'info', 'S1= ', ' deg', '', 1/3);
-            obj.panel_shutter1.addButton('button_full_close', 'close1Full', 'push', 'closeFull', '', '', 1/3);
-            obj.panel_shutter1.addButton('button_full_open', 'open1Full', 'push', 'openFull', '', '', 1/3);
-            obj.panel_shutter1.addButton('button_number', 'number1', 'input', 'N= ', '', '', 1/3);
-            obj.panel_shutter1.addButton('button_close', 'close1', 'push', 'close', '', '', 1/3);
-            obj.panel_shutter1.addButton('button_open', 'open1', 'push', 'open', '', '', 1/3);
+            pos = pos - 5;
             
-            obj.panel_shutter1.make;
+            obj.panel_shutter_west = GraphicPanel(obj.owner, [0/3 pos/N 1/3 5/N], 'West');
+            obj.panel_shutter_west.addButton('button_full_close', 'closeWestFull', 'push', 'closeWestFull');
+            obj.panel_shutter_west.addButton('button_close', 'closeWest', 'push', 'closeWest');
+            obj.panel_shutter_west.addButton('button_number', 'number_west', 'input', 'N= ');
+            obj.panel_shutter_west.addButton('button_open', 'openWest', 'push', 'openWest');
+            obj.panel_shutter_west.addButton('button_full_open', 'openWestFull', 'push', 'openWestFull');
+            obj.panel_shutter_west.make;
             
-            obj.panel_shutter2 = GraphicPanel(obj.owner, [0 (N-5)/N 1 2/N], 'shutter2');
-            obj.panel_shutter2.number = 2;
-            obj.panel_shutter2.addButton('button_state', 'shutter2_deg', 'info', 'S2= ', ' deg ', '', 1/3);
-            obj.panel_shutter2.addButton('button_full_close', 'close2Full', 'push', 'closeFull', '', '', 1/3);
-            obj.panel_shutter2.addButton('button_full_open', 'open2Full', 'push', 'openFull', '', '', 1/3);
-            obj.panel_shutter2.addButton('button_number', 'number2', 'input', 'N= ', '', '', 1/3);
-            obj.panel_shutter2.addButton('button_close', 'close2', 'push', 'close', '', '', 1/3);
-            obj.panel_shutter2.addButton('button_open', 'open2', 'push', 'open', '', '', 1/3);
-            
-            obj.panel_shutter2.make;
-            
-            obj.panel_shutter_both = GraphicPanel(obj.owner, [0 (N-7)/N 1 2/N], 'both shutters');
-            obj.panel_shutter_both.number = 2;
-            obj.panel_shutter_both.addButton('button_state', '', 'custom', 'both: ', '', '', 1/3);
-            obj.panel_shutter_both.addButton('button_full_close', 'closeBothFull', 'push', 'closeFull', '', '', 1/3);
-            obj.panel_shutter_both.addButton('button_full_open', 'openBothFull', 'push', 'openFull', '', '', 1/3);
-            obj.panel_shutter_both.addButton('button_number', 'number_both', 'input', 'N= ', '', '', 1/3);
-            obj.panel_shutter_both.addButton('button_close', 'closeBoth', 'push', 'close', '', '', 1/3);
-            obj.panel_shutter_both.addButton('button_open', 'openBoth', 'push', 'open', '', '', 1/3);
-            
+            obj.panel_shutter_both = GraphicPanel(obj.owner, [1/3 pos/N 1/3 5/N], 'Both');
+            obj.panel_shutter_both.addButton('button_full_close', 'closeBothFull', 'push', 'closeBothFull');
+            obj.panel_shutter_both.addButton('button_close', 'closeBoth', 'push', 'closeBoth');
+            obj.panel_shutter_both.addButton('button_number', 'number_both', 'input', 'N= ');
+            obj.panel_shutter_both.addButton('button_open', 'openBoth', 'push', 'openBoth');
+            obj.panel_shutter_both.addButton('button_full_open', 'openBothFull', 'push', 'openBothFull');
             obj.panel_shutter_both.make;
             
-            %%%%%%%%%%% panel stop %%%%%%%%%%%%%%%%%%%
-                        
-            obj.panel_stop = GraphicPanel(obj.owner, [0 0 1 1/N]);
-            obj.panel_stop.addButton('button_close', '', 'custom', 'CLOSE', '', '', 1/3);
-            obj.panel_stop.addButton('button_stop', 'stop', 'push', 'STOP', '', '', 2/3);
-            obj.panel_stop.make;
-            obj.panel_stop.button_close.Callback = @obj.callback_close;
+            obj.panel_shutter_east = GraphicPanel(obj.owner, [2/3 pos/N 1/3 5/N], 'East');
+            obj.panel_shutter_east.addButton('button_full_close', 'closeEastFull', 'push', 'closeEastFull');
+            obj.panel_shutter_east.addButton('button_close', 'closeEast', 'push', 'closeEast');
+            obj.panel_shutter_east.addButton('button_number', 'number_east', 'input', 'N= ');
+            obj.panel_shutter_east.addButton('button_open', 'openEast', 'push', 'openEast');
+            obj.panel_shutter_east.addButton('button_full_open', 'openEastFull', 'push', 'openEastFull', '', '', 1, 'blue');
+            obj.panel_shutter_east.make;
+            
+            %%%%%%%%%%% panel stop2 %%%%%%%%%%%%%%%%%%%
+            
+            obj.panel_stop2 = GraphicPanel(obj.owner, [0 0 1 1/N]);
+            obj.panel_stop2.addButton('button_stop', 'stop', 'push', 'STOP!');
+            obj.panel_stop2.make;
             
             obj.update;
             
@@ -137,13 +148,25 @@ classdef AstroHavenGUI < handle
                 obj.buttons{ii}.update;
             end
             
-            obj.panel_shutter_both.button_state.String = [obj.owner.shutter1 '/' obj.owner.shutter2];
+            if obj.owner.brake_bit
+                obj.panel_stop1.button_stop.BackgroundColor = util.plot.GraphicButton.defaultColor;
+                obj.panel_stop2.button_stop.BackgroundColor = util.plot.GraphicButton.defaultColor;
+            else
+                obj.panel_stop1.button_stop.BackgroundColor = 'red';
+                obj.panel_stop2.button_stop.BackgroundColor = 'red';
+            end
+            
+            if obj.owner.status
+                obj.panel_status.button_status.BackgroundColor = util.plot.GraphicButton.defaultColor;
+            else
+                obj.panel_status.button_status.BackgroundColor = 'red';
+            end
             
         end
                         
         function c = check(obj)
            
-            c = ~isempty(obj) && ~isempty(obj.panel_stop) && is_valid(obj.panel_stop);
+            c = ~isempty(obj) && ~isempty(obj.panel_stop2) && is_valid(obj.panel_stop2);
             
         end
         

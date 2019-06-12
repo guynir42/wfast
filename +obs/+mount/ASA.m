@@ -485,6 +485,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             obj.object.update;
             
             if obj.object.Alt_deg<obj.limit_alt
+                disp(['Target alt (' num2str(obj.object.Alt_deg) ') is below alt limit (' num2str(obj.limit_alt) ')']);
                 return;
             end
             
@@ -495,12 +496,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function val = check_while_moving(obj)
             
             val = 0;
+            try 
+                
+                if obj.telALT<obj.limit_alt
+                    return;
+                end
+
+
+                val = 1;
             
-            if obj.ALT<obj.limit_alt
-                return;
+            catch ME
+                warning(ME.getReport);
             end
-            
-            val = 1;
             
         end
         
@@ -518,7 +525,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     error('Prechecks failed, aborting slew');
                 end
                 
-                ra_hours_Jnow = obj.RA_deg_now./15; % convert to hours! 
+                ra_hours_Jnow = obj.object.RA_deg_now./15; % convert to hours! 
                 dec_deg_Jnow = obj.object.Dec_deg_now;
                 
                 obj.brake_bit = 0;

@@ -217,17 +217,17 @@ classdef ManagerGUI < handle
                 obj.panel_hardware.button_shutter_west.String = 'Shut.West: error';
                 obj.panel_hardware.button_shutter_east.String = 'Shut.East: error';
             else
-                if obj.owner.dome.shutter1_deg==0
+                if obj.owner.dome.shutter_west_deg==0
                     obj.panel_hardware.button_shutter_west.String = sprintf('Shut.West: open');
-                elseif obj.owner.dome.shutter1_deg==90
+                elseif obj.owner.dome.shutter_west_deg==90
                     obj.panel_hardware.button_shutter_west.String = sprintf('Shut.West: closed');
                 else
                     obj.panel_hardware.button_shutter_west.String = sprintf('Shut.West: %d deg', round(obj.owner.dome.shutter1_deg));
                 end
                 
-                if obj.owner.dome.shutter2_deg==0
+                if obj.owner.dome.shutter_east_deg==0
                     obj.panel_hardware.button_shutter_east.String = sprintf('Shut.East: open');
-                elseif obj.owner.dome.shutter2_deg==90
+                elseif obj.owner.dome.shutter_east_deg==90
                     obj.panel_hardware.button_shutter_east.String = sprintf('Shut.East: closed');
                 else
                     obj.panel_hardware.button_shutter_east.String = sprintf('Shut.East: %d deg', round(obj.owner.dome.shutter2_deg));
