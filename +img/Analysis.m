@@ -434,7 +434,7 @@ classdef Analysis < file.AstroData
             end
             
             if ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
-                obj.showNewEvents('parent', obj.aux_figure);
+                obj.showLastEvents('parent', obj.aux_figure);
             end
             
             drawnow;
@@ -462,9 +462,9 @@ classdef Analysis < file.AstroData
             
         end
         
-        function showNewEvents(obj, varargin)
+        function showLastEvents(obj, varargin)
             
-            if isempty(obj.finder.new_events)
+            if isempty(obj.finder.last_events)
                 return;
             end
             
@@ -476,11 +476,11 @@ classdef Analysis < file.AstroData
                 input.parent = gcf;
             end
             
-            for ii = 1:length(obj.finder.new_events)
+            for ii = 1:length(obj.finder.last_events)
                 
                 if ii>1, pause(2); end
                 
-                obj.finder.new_events(ii).show('parent', input.parent);
+                obj.finder.last_events(ii).show('parent', input.parent);
                 
             end
             

@@ -122,9 +122,9 @@ function obj = loadHDF5(filename, input)
             data_names = {info.Datasets.Name}';
         end
         
-        try 
-        gid = H5G.open(fid, input.location);
-        gid_cleanup = onCleanup(@() H5G.close(gid));
+        try % if it isn't H5G maybe it is H5D
+            gid = H5G.open(fid, input.location);
+            gid_cleanup = onCleanup(@() H5G.close(gid));
         catch 
             gid = H5D.open(fid, input.location);
             gid_cleanup = onCleanup(@() H5D.close(gid));
@@ -149,8 +149,8 @@ function obj = loadHDF5(filename, input)
         for ii = 1:length(att_names) % load all attributes saved in the file
 
             % check if attribute can even be loaded into object...
-            if strcmp(att_names{ii}, 'object_classname')
-                continue;               
+            if strcmp(att_names{ii}, 'object_classname') 
+                continue; % already used this one to construct the object         
             elseif isprop(obj, att_names{ii})
                 if input.debug_bit, disp(['loading attribute ' att_names{ii} ' as part of object...']); end                
             elseif isa(obj, 'dynamicprops')
@@ -205,12 +205,14 @@ function obj = loadHDF5(filename, input)
                 else % load a regular attribute...
                     mp = findprop(obj, att_names{ii});
                     if ~mp.Dependent && ~isobject(obj.(att_names{ii})) % skip over loading of Dependent properties or objects
-                        if isempty(value)
-                            obj.(att_names{ii}) = feval([class(obj.(att_names{ii})) '.empty']);
-                        elseif ischar(value) && isa(obj.(att_names{ii}), 'datetime')
-                            obj.(att_names{ii}) = util.text.str2time(value);
-                        else
-                            obj.(att_names{ii}) = value;
+                        try
+                            if isempty(value)
+                                obj.(att_names{ii}) = feval([class(obj.(att_names{ii})) '.empty']);
+                            elseif ischar(value) && isa(obj.(att_names{ii}), 'datetime')
+                                obj.(att_names{ii}) = util.text.str2time(value);
+                            else
+                                obj.(att_names{ii}) = value;
+                            end
                         end
                     end
                 end

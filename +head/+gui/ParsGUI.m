@@ -83,20 +83,23 @@ classdef ParsGUI < handle
             
             obj.panel_target = GraphicPanel(obj.owner, [0, 0.7, 0.5, 0.3], 'Target');
             obj.panel_target.addButton('button_reset', 'resetTarget', 'push', 'RESET');
-            obj.panel_target.addButton('button_name', 'target_name', 'input',' ', '', '', 0.8);
+            obj.panel_target.addButton('button_object', 'OBJECT', 'input',' ', '', '', 0.8);
             obj.panel_target.addButton('button_push_name', 'name_plus_plus', 'push', '++','','', 0.2);
             obj.panel_target.addButton('button_RA', 'RA', 'input', 'RA: ');
-            obj.panel_target.addButton('button_DE', 'DE', 'input', 'DE: ');
+            obj.panel_target.addButton('button_DEC', 'DEC', 'input', 'DE: ');
             obj.panel_target.number = 5;
             obj.panel_target.make;
-            obj.panel_target.button_name.Callback = @obj.callback_target_name;
+            obj.panel_target.button_object.Callback = @obj.callback_target_name;
             
             %%%%%%%%%%% panel instrument %%%%%%%%%%%%%%
             
             obj.panel_instrument = GraphicPanel(obj.owner, [0.5 0.7 0.5 0.3], 'Instrument');
-            obj.panel_instrument.addButton('button_filter', 'filter_name', 'input', ' ');
-            obj.panel_instrument.addButton('button_aperture', 'aperture', 'input', 'D= ', ' cm');
-            obj.panel_instrument.addButton('button_f_number', 'f_number', 'input', 'f/#= ');
+            obj.panel_instrument.addButton('button_project', 'PROJECT', 'input', ' ');
+            obj.panel_instrument.addButton('button_instrument', 'INST', 'input', ' ');
+            obj.panel_instrument.addButton('button_filter', 'FILTER', 'input', ' ');
+            obj.panel_instrument.addButton('button_aperture', 'TEL_APER', 'input', 'D= ', ' cm');
+            obj.panel_instrument.addButton('button_f_ratio', 'F_RATIO', 'input', 'f/#= ');
+            
             obj.panel_instrument.number = 5;
             obj.panel_instrument.make;
             obj.panel_instrument.button_filter.Callback = @obj.callback_filter_name;

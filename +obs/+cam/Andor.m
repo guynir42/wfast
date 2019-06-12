@@ -1125,7 +1125,7 @@ classdef Andor < file.AstroData
             obj.pars.frame_rate = obj.getFrameRateHW;
             
             if ~isempty(obj.focuser)
-                obj.pars.focus = obj.focuser.pos;
+                obj.pars.FOCUSPOS = obj.focuser.pos;
             end
             
             roi = obj.getROI_HW;

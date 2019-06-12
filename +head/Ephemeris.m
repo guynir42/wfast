@@ -1,17 +1,16 @@
-classdef Ephemeris < handle
+classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
 
     properties % objects
         
-%         pars@head.Parameters;        
         time@datetime;
         
     end
     
     properties % inputs/outputs
         
-        RA = '';
-        DE = '';
-                
+        RA_deg;
+        DEC_deg;
+        
     end
     
     properties % switches/controls
@@ -22,16 +21,29 @@ classdef Ephemeris < handle
     
     properties(Dependent=true)
         
-        juldate;
-        HA;
+        RA;
+        DEC;
+        
+        STARTTIME;
+        JD;
+        MJD;
+
         LST;
-        ALT;
-        AZ;
-        airmass;
+        LST_deg;
+        
+        HA;
+        HA_deg;
+        
+        ALT_deg;
+        
+        AZ_deg;
+        AIRMASS;
         
     end
     
     properties(Hidden=true)
+        
+        sidereal_time_type = 'mean'; % can also choose "apparent"
         
         latitude = 30.59678; % from my phone inside the dome (using whatsmylocation.net)
         longitude = 34.76202; % from my phone inside the dome (using whatsmylocation.net)
@@ -48,7 +60,7 @@ classdef Ephemeris < handle
 %         latitude = 31.907867; % of the observatory
 %         longitude = 34.811363; % of the observatory
                 
-        version = 1.00;
+        version = 1.02;
         
     end
     
@@ -66,8 +78,6 @@ classdef Ephemeris < handle
                 
                 for ii = 1:length(varargin)
                     
-%                     if isa(varargin{ii}, 'head.Parameters')
-%                         obj.pars = varargin{ii};
                     if isa(varargin{ii}, 'datetime')
                         obj.time = varargin{ii};
                     end
@@ -86,122 +96,130 @@ classdef Ephemeris < handle
     
     methods % getters
         
-        function val = file_start_datestr(obj)
+        function val = get.RA(obj)
+            
+            val = obj.deg2hour(obj.RA_deg);
+            
+        end
+        
+        function val = get.DEC(obj)
+            
+            val = obj.deg2sex(obj.DEC_deg);
+            
+        end
+        
+        function val = get.STARTTIME(obj)
             
             val = util.text.time2str(obj.time);
             
         end
         
-        function val = RA_rad(obj)
-           
-            if ischar(obj.RA)
-                val = obj.ra2rad(obj.RA);
-            else
-                val = obj.RA;
-            end
-            
-        end
-        
-        function val = DE_rad(obj)
-           
-            if ischar(obj.DE)
-                val = obj.dec2rad(obj.DE);
-            else
-                val = obj.DE;
-            end
-            
-        end
-        
-        function val = RA_deg(obj)
-           
-            val = 360/2/pi*obj.RA_rad;
-            
-        end
-        
-        function val = DE_deg(obj)
-           
-            val = 360/2/pi*obj.DE_rad;
-            
-        end
-        
-        function jd = get.juldate(obj)
+        function val = get.JD(obj)
 
-            if isempty(obj.file_start_datestr)
-                jd = [];
+            if isempty(obj.STARTTIME)
+                val = [];
             else
-                jd = juliandate(obj.file_start_datestr, 'yyyy-mm-ddThh:MM:ss');
+                val = juliandate(obj.STARTTIME, 'yyyy-mm-ddThh:MM:ss');
             end
              
         end
         
-        function [ha, l] = getHAandLST(obj)
+        function [ha, l] = getHAandLST(obj) % do we need this anymore?
 
-            l = obj.lst(obj.juldate, deg2rad(abs(obj.longitude))); % in fractions of day
+            l = obj.local_sidereal_time(obj.JD, abs(obj.longitude)); % in fractions of day
             
-            ha = 2*pi*l - obj.RA_rad; % in radians
-            
-        end
-        
-        function val = HA_rad(obj)
-            
-            val = obj.getHAandLST;
+            ha = 360*l - obj.RA; % in degrees
             
         end
         
-        function val = HA_deg(obj)
+        function val = get.LST_deg(obj) % stolen the math from Eran's lst function 
             
-            val = 360/2/pi*obj.HA_rad;
+            import util.text.cs;
             
-        end
-        
-        function ha = get.HA(obj)
-            
-            ha = obj.rad2ra(obj.HA_rad);
-            
-        end
-        
-        function val = LST_rad(obj)
-            
-            [~, val] = obj.getHAandLST;
-            
-        end
-        
-        function val = LST_deg(obj)
-            
-            val = 360/2/pi*obj.LST_rad;
-            
-        end
-        
-        function lst = get.LST(obj)
-            
-            lst = obj.rad2ra(2*pi*obj.LST_rad); % in text format (HH MM SS)
-            
-        end
+            % convert JD to integer day + fraction of day
+            TJD = floor(obj.JD - 0.5) + 0.5;
+            DayFrac = obj.JD - TJD;
+
+            T = (TJD - 2451545.0)./36525.0;
+
+            GMST0UT = 24110.54841 + 8640184.812866.*T + 0.093104.*T.*T - 6.2e-6.*T.*T.*T;
+
+            % convert to fraction of day in range [0 1)
+            GMST0UT = GMST0UT./86400.0;
+
+            GMST0UT = GMST0UT - floor(GMST0UT);
+            val = GMST0UT + 1.0027379093.*DayFrac + abs(obj.longitude)./360; % note this will fail for targets on the West longitude! 
+            val = val - floor(val);
+    
+            if cs(obj.sidereal_time_type, 'mean')
                 
-        function val = get.ALT(obj)
-            
-            val = obj.ha2alt(obj.HA_rad, obj.DE_rad, deg2rad(obj.latitude));
-            
-        end
-        
-        function val = ALT_deg(obj)
-            
-            val = 360/2/pi.*obj.ALT;
-            
-        end
-        
-        function val = get.AZ(obj)
-            
-            val = obj.ha2az(obj.HA_rad, obj.DE_rad, deg2rad(obj.latitude));
+            elseif cs(obj.sidereal_time_type, 'apparent')
+                % calculate nutation
+                nut_long = obj.nutation(obj.JD);
+                Obl    = obj.obliquity(obj.JD);
+                EquationOfEquinox = 3600.*nut_long.*cosd(Obl)./15; % convert to time seconds
+                val = val + EquationOfEquinox./86400; % convert to fractions of day
+            else
+                error('Unknown sidereal_time_type. Use "mean" or "apparent"'); 
+            end
+
+            val = val.*360; % convert to degrees
             
         end
         
-        function a = get.airmass(obj)
+        function val = get.LST(obj) % in text format (HH:MM:SS)
+            
+            val = obj.deg2hour(obj.LST_deg);
+            
+        end
+        
+        function val = get.HA_deg(obj)
+            
+            val = obj.LST_deg - obj.RA_deg;
+%             val = obj.getHAandLST;
+            
+        end
+        
+        function val = get.HA(obj)
+            
+            val = obj.deg2hour(obj.HA_deg);
+            
+        end
+        
+        function val = get.ALT_deg(obj)
+            
+%             val = obj.ha2alt(obj.HA_deg, obj.DEC_deg, obj.latitude);
+
+            val = asind(sind(obj.DEC_deg).*sind(obj.latitude) + cosd(obj.DEC_deg).*cosd(obj.latitude).*cosd(obj.HA_deg));
+            
+        end
+        
+        function val = get.AZ_deg(obj)
+            
+%             val = obj.ha2az(obj.HA_deg, obj.DEC_deg, deg2rad(obj.latitude));
+            
+            SinAlt = sind(obj.DEC_deg).*sind(obj.latitude) + cosd(obj.DEC_deg).*cosd(obj.HA_deg).*cosd(obj.latitude);
+            CosAlt = sqrt(1-SinAlt.*SinAlt);
+
+            SinAz  = (-cosd(obj.DEC_deg).*sind(obj.HA_deg))./CosAlt;
+            CosAz  = (sind(obj.DEC_deg).*cosd(obj.latitude) - cosd(obj.DEC_deg).*cosd(obj.HA_deg).*sind(obj.latitude))./CosAlt;
+
+            val = atan2d(SinAz, CosAz);
+            
+        end
+        
+        function val = get.AIRMASS(obj)
            
-            [~, a] = obj.ha2alt(obj.HA_rad, obj.DE_rad, degtorad(obj.latitude));
-            
-            if isnan(a)
-                a = [];
+%             [~, val] = obj.ha2alt(obj.HA_deg, obj.DE_deg, obj.latitude);
+            if obj.ALT_deg>87 % unreliable values near the horizon
+                val = []; 
+            else
+                
+                SecZ = 1./cosd(90-obj.ALT_deg);
+
+                val = SecZ - 0.0018167.*(SecZ - 1) - 0.002875.*(SecZ - 1).*(SecZ - 1)...
+                    - 0.0008083.*(SecZ - 1).*(SecZ - 1).*(SecZ - 1); % Hardie's polynomial formula
+
             end
             
         end
@@ -211,49 +229,67 @@ classdef Ephemeris < handle
     methods % setters
         
         function set.RA(obj, val)
-           
-            if isnumeric(val) && isvector(val) && length(val)==3
-                obj.RA = sprintf('%02d %02d %05.2f', val(1), val(2), val(3));
+
+            if isempty(val)
+                obj.RA_deg = [];
             elseif isnumeric(val) && isscalar(val)
-                obj.RA = obj.rad2ra(val);
+                obj.RA_deg = val*15;
+            elseif isnumeric(val) && length(val)==3
+                obj.RA_deg = 0;
+            elseif ischar(val)
+                obj.RA_deg = obj.hour2deg(val);
             else
-                obj.RA = val;
+                error('Input a string RA in HH:MM:SS format!');
             end
+            
+%             if isnumeric(val) && isvector(val) && length(val)==3
+%                 obj.RA = sprintf('%02d:%02d:%05.2f', val(1), val(2), val(3));
+%             elseif isnumeric(val) && isscalar(val)
+%                 obj.RA = obj.deg2hour(val);
+%             elseif ischar(val)
+%                 obj.RA = val;
+%             else
+%                 error('Unknown format for RA');
+%             end
             
         end 
         
-        function set.DE(obj, val)
-           
-            if isnumeric(val) && isvector(val) && length(val)==3
-                obj.DE = sprintf('%+03d %02d %04.1f', val(1), val(2), val(3));
-            elseif isnumeric(val) && isscalar(val)
-                obj.DE = obj.rad2dec(val);
+        function set.DEC(obj, val)
+            
+            if isempty(val)
+                obj.DEC_deg = [];
+            elseif ischar(val)
+                obj.DEC_deg = obj.sex2deg(val);
             else
-                obj.DE = val;
+                error('Input a string DEC in DD:MM:SS format!');
             end
             
+%             if isnumeric(val) && isvector(val) && length(val)==3
+%                 obj.DEC = sprintf('%+03d:%02d:%04.1f', val(1), val(2), val(3));
+%             elseif isnumeric(val) && isscalar(val)
+%                 obj.DEC = obj.deg2sex(val);
+%                 obj.DEC_deg = val;
+%             elseif ischar(val)
+%                 obj.DEC = val;
+%                 obj.DEC_deg = obj.hour2deg(val);
+%             else
+%                 error('Unknown format for DEC');
+%             end
+            
         end
+        
     end
     
     methods % calculations
         
-        function input(obj, RA,DE,time)
+        function input(obj, RA, DEC, time)
             
             if nargin<3
-                disp('Usage: input(RA,DE,time)');
+                disp('Usage: input(RA,DEC,time)');
             end
             
-            if ischar(RA)
-                obj.RA = RA;
-            elseif isnumeric(RA)
-                obj.RA_rad = RA;
-            end
-            
-            if ischar(DE)
-                obj.DE = DE;
-            elseif isnumeric(DE)
-                obj.DE_rad = DE;
-            end
+            obj.RA = RA;
+            obj.DEC = DEC;
             
             if nargin>3 && ~isempty(time)
                 
@@ -285,135 +321,86 @@ classdef Ephemeris < handle
     
     methods (Static=true)
         
-        function [rads, arcsecs] = dec2rad(Dec_string)
-            % convert declination string to radians (or arcsecs)
-            % usage: [rads, arcsecs] = dec2rad(Dec_string)
+        function str = deg2hour(number) % convert the degrees into hours then into HH:MM:SS string
             
-            if nargin==0
-                help('head.Ephemeris.dec2rad');
-                return;
-            end
-            
-            if isempty(Dec_string)
-                rads = [];
-                arcsecs = [];
-                return;
-            end
-            
-            if ischar(Dec_string)
-                Dec_string = {Dec_string};
-            end
-            
-            factors = [3600 60 1];
-            
-            numbers = util.text.extract_numbers(Dec_string);
-            
-            arcsecs = zeros(length(numbers),1);
-            
-            for ii = 1:length(numbers)
-                
-                sign = 1;
-                
-%                 for jj = 1:length(Dec_string{ii}) % pick up minus sign before first numeral if it is zero...
-%                     
-%                     if Dec_string{ii}(jj)=='0' && jj>1
-%                         if strcmp(Dec_string{ii}(jj-1), '-')
-%                             sign = -1;
-%                             break;
-%                         end
-%                     end
-%                 end
-
-                for jj = 1:length(Dec_string{ii}) % pick up minus sign
-                    
-                    if strcmp(Dec_string{ii}(jj), '-')
-                        sign = -1;
-                        break;
-                    end
-                    
-                end
-                
-                for jj = 1:min([3 length(numbers{ii})])
-                    arcsecs(ii) = arcsecs(ii) + abs(numbers{ii}(jj))*factors(jj);
-                end
-                
-                arcsecs(ii) = arcsecs(ii)*sign;
-                
-            end
-            
-            rads = arcsecs./head.Ephemeris.rad2arcsec;
+            str = head.Ephemeris.numbers2hour(number/15); 
             
         end
         
-        function [rads, arcsecs] = ra2rad(RA_string)
-            % convert right ascention string to radians (or arcsecs)
-            % usage: [rads, arcsecs] = ra2rad(RA_string)
+        function str = deg2sex(number) % convert degrees into DD:MM:SS string
             
-            if nargin==0
-                help('head.Ephemeris.ra2rad');
-                return;
-            end
-            
-            if isempty(RA_string)
-                rads = [];
-                arcsecs = [];
-                return;
-            end
-            
-            if ischar(RA_string)
-                RA_string = {RA_string};
-            end
-            
-            factors = 15.*[3600 60 1];
-            
-            numbers = util.text.extract_numbers(RA_string);
-            
-            arcsecs = zeros(length(numbers),1);
-            
-            for ii = 1:length(numbers)
-                
-                sign = 1;
-                
-                for jj = 1:length(RA_string{ii}) % pick up minus sign before first numeral if it is zero...
-                    
-                    if RA_string{ii}(jj)=='0' && jj>1
-                        if strcmp(RA_string{ii}(jj-1), '-')
-                            sign = -1;
-                            break;
-                        end
-                    end
-                end
-                
-                for jj = 1:min([3 length(numbers{ii})])
-                    arcsecs(ii) = arcsecs(ii) + numbers{ii}(jj)*factors(jj);
-                end
-                
-                arcsecs(ii) = arcsecs(ii)*sign;
-                
-            end
-            
-            rads = arcsecs./head.Ephemeris.rad2arcsec;
+            str = head.Ephemeris.numbers2sex(number);
             
         end
         
-        function val = rad2arcsec(rad)
+        function val = hour2deg(str) % convert an HH:MM:DD hour string to degrees
             
-            if nargin<1
-                rad = 1;
+            num = util.text.extract_numbers(str);
+            
+            if isempty(num)
+                val = [];
+            else
+            
+                hours = num{1}(1);
+                degrees = hours*15;
+                
+                if length(num{1})>1
+                    minutes = num{1}(2)*15;
+                else
+                    minutes = 0;
+                end
+                
+                if length(num{1})>2
+                    seconds = num{1}(3)*15;
+                else
+                    seconds = 0;
+                end
+                
+                val = degrees+minutes/60+seconds/3600;
+                
             end
-            
-            val = rad*360/(2*pi)*3600;
             
         end
         
-        function str = num2ra(hours, minutes, seconds)
+        function val = sex2deg(str) % convert a DD:MM:SS string (sexagesimal) to degrees
+            
+            num = util.text.extract_numbers(str);
+            
+            if isempty(num)
+                val = [];
+            else
+            
+                degrees = num{1}(1);
+                s = sign(degrees);
+                degrees = abs(degrees);
+                
+                if length(num{1})>1
+                    minutes = num{1}(2);
+                else
+                    minutes = 0;
+                end
+                
+                if length(num{1})>2
+                    seconds = num{1}(3);
+                else
+                    seconds = 0;
+                end
+                
+                val = degrees+minutes/60+seconds/3600;
+                val = val.*s;
+                
+            end
+            
+        end
+        
+        function str = numbers2hour(hours, minutes, seconds)
         % convert a number of hours (or hours, minutes, seconds) into a 
         % string of right ascention. 
         
             if nargin==0, help('head.Ephemeris.num2ra'); return; end
         
             if isempty(hours)
-                str = [];
+                str = '';
                 return;
             end
             
@@ -441,15 +428,20 @@ classdef Ephemeris < handle
             minutes = floor(mod(total_secs,3600)/60);
             seconds = mod(total_secs,60);
             
-            str = sprintf('%02d %02d %04.1f', hours, minutes, seconds);
+            str = sprintf('%02d:%02d:%04.1f', hours, minutes, seconds);
             
         end
         
-        function str = num2dec(degrees, minutes, seconds)
+        function str = numbers2sex(degrees, minutes, seconds) 
         % convert a number of degrees (or degrees, arcminutes, arcseconds) into a 
-        % string of declination
+        % string of sexidecimal degrees
         
             if nargin==0, help('head.Ephemeris.num2dec'); return; end
+            
+            if isempty(degrees)
+                str = '';
+                return;
+            end
             
             if iscell(degrees)
                 degrees = cell2mat(degrees);
@@ -487,189 +479,208 @@ classdef Ephemeris < handle
                 sign_str = '-';
             end
                 
-            str = sprintf('%s%02d %02d %04.1f', sign_str, degrees, minutes, seconds);
+            str = sprintf('%s%02d:%02d:%04.1f', sign_str, degrees, minutes, seconds);
             
         end
         
-        function str = rad2dec(radians)
+        function Obl=obliquity(JulianDay,Type)
+        % stolen from Eran's obliquity function 
             
-            degrees = radians*360/(2*pi);
-            
-            str = head.Ephemeris.num2dec(degrees);
-            
-        end
-        
-        function str = rad2ra(radians)
-            
-            hours = radians*24/(2*pi);
-            
-            str = head.Ephemeris.num2ra(hours);
-            
-        end
-
-        function LST = lst(JD,EastLong,STType)
-        %--------------------------------------------------------------------------
-        % lst function                                                       ephem
-        % Description: Local Sidereal Time, (mean or apparent), for vector of
-        %              JDs and a given East Longitude.
-        % Input  : - Vector of JD [days], in UT1 time scale.
-        %          - East Longitude in radians.
-        %          - Sidereal Time Type,
-        %            'm' - Mean (default).
-        %            'a' - apparent.
-        % Output : - vector of LST in fraction of day.
-        % Tested : Matlab 5.3
-        %     By : Eran O. Ofek                    Aug 1999
-        %    URL : http://weizmann.ac.il/home/eofek/matlab/
-        % Example: LST=lst(2451545+[0:1:5]',0);  % LST at Greenwhich 0 UT1
-        % Reliable: 1
-        %--------------------------------------------------------------------------
-
-            RAD = 180./pi;
-
-            if nargin==0, help('head.Ephemeris.lst'); return; end
-            
-            if (nargin==2)
-               STType = 'm';
-            elseif (nargin==3)
-               % do nothing
-            else
-               error('Illigal number of input arguments');
+            if nargin<2 || isempty(Type)
+                Type = 'L';
             end
-
-            % convert JD to integer day + fraction of day
-            TJD = floor(JD - 0.5) + 0.5;
-            DayFrac = JD - TJD;
-
-            T = (TJD - 2451545.0)./36525.0;
-
-            GMST0UT = 24110.54841 + 8640184.812866.*T + 0.093104.*T.*T - 6.2e-6.*T.*T.*T;
-
-            % convert to fraction of day in range [0 1)
-            GMST0UT = GMST0UT./86400.0;
-
-            GMST0UT = GMST0UT - floor(GMST0UT);
-            LST = GMST0UT + 1.0027379093.*DayFrac + EastLong./(2.*pi);
-            LST = LST - floor(LST);
-
-
-            switch STType
-             case {'m'}
-                % do nothing
-             case {'a'}
-                % calculate nutation
-                NutMat = ephem.nutation(JD);
-                Obl    = ephem.obliquity(JD);
-                EquationOfEquinox = (RAD.*3600).*NutMat(:,1).*cos(Obl)./15;
-                LST = LST + EquationOfEquinox./86400;    
-             otherwise
-                error('Unknown sidereal time type');
-            end
-            
-        end
         
-        function [Alt, AM] = ha2alt(HA,Dec,Lat)
-        %--------------------------------------------------------------------------
-        % ha2alt function                                                    ephem
-        % Description: Given Hour Angle as measured from the meridian, the source
-        %              declination and the observer Geodetic latitude, calculate
-        %              the source altitude above the horizon and its airmass.
-        % Input  : - Hour Angle [radians].
-        %          - Declination [radians].
-        %          - Latitude [radians].
-        % Output : - Altitude [radians].
-        %          - Airmass.
-        % See also: horiz_coo.m, ha2az.m
-        % Tested : Matlab 7.10
-        %     By : Eran O. Ofek                    Aug 2010
-        %    URL : http://weizmann.ac.il/home/eofek/matlab/
-        % Reliable: 1
-        %--------------------------------------------------------------------------
+            switch Type
+                case 'L'
+                    T   = (JulianDay - 2451545.0)./36525.0;
+                    Obl = 23.439291 - 0.0130042.*T - 0.00000016.*T.*T + 0.000000504.*T.*T.*T;
 
-            if nargin==0, help('head.Ephemeris.ha2alt'); return; end
-        
-            Alt = asin(sin(Dec).*sin(Lat) + cos(Dec).*cos(Lat).*cos(HA));
-            AM  = head.Ephemeris.hardie(pi./2-Alt);
+                case 'H'
+                    T   = (JulianDay - 2451545.0)./36525.0;
+                    U   = T./100;
+                    Obl = 23.44484666666667 ...
+                        +   (-4680.93.*U ...
+                        - 1.55.*U.^2 ...
+                        + 1999.25.*U.^3 ...
+                        - 51.38.*U.^4 ...
+                        - 249.67.*U.^5 ...
+                        - 39.05.*U.^6 ...
+                        + 7.12.*U.^7 ...
+                        + 27.87.*U.^8 ...
+                        + 5.79.*U.^9 ...
+                        + 2.45.*U.^10)./3600;
 
-        end
-        
-        function [Az,Alt,AM]=ha2az(HA,Dec,Lat)
-        %--------------------------------------------------------------------------
-        % ha2az function                                                     ephem
-        % Description: Given Hour Angle as measured from the meridian, the source
-        %              declination and the observer Geodetic latitude, calculate
-        %              the horizonal source azimuth
-        % Input  : - Hour Angle [radians].
-        %          - Declination [radians].
-        %          - Latitude [radians].
-        % Output : - Azimuth [radians].
-        %          - Altitude [radians].
-        %          - Airmass.
-        % See also: horiz_coo.m, ha2alt.m
-        % Tested : Matlab 7.10
-        %     By : Eran O. Ofek                    Aug 2010
-        %    URL : http://weizmann.ac.il/home/eofek/matlab/
-        % Example: [Az,Alt,AM]=ha2az(1,1,1)
-        % Reliable: 1
-        %--------------------------------------------------------------------------
-            
-            if nargin==0, help('head.Ephemeris.ha2az'); return; end
-
-            SinAlt = sin(Dec).*sin(Lat) + cos(Dec).*cos(HA).*cos(Lat);
-            CosAlt = sqrt(1-SinAlt.*SinAlt);
-
-            SinAz  = (-cos(Dec).*sin(HA))./CosAlt;
-            CosAz  = (sin(Dec).*cos(Lat) - cos(Dec).*cos(HA).*sin(Lat))./CosAlt;
-
-            Az     = atan2(SinAz, CosAz);
-            if (nargin>1)
-                Alt = asin(sin(Dec).*sin(Lat) + cos(Dec).*cos(Lat).*cos(HA));
-                if (nargin>2)
-                    AM  = head.Ephemeris.hardie(pi./2-Alt);
-                end
-            end
-
-        end
-        
-        function AM = hardie(X,Algo)
-        %--------------------------------------------------------------------------
-        % hardie function                                                    ephem
-        % Description: Calculate airmass using the Hardie formula.
-        % Input  : - Matrix of zenith distances [radians].
-        %          - Algorith: {'hardie','csc'}. Default is 'hardie'.
-        % Output : - Air mass.
-        % Tested : Matlab 4.2
-        %     By : Eran O. Ofek                    Jan 1994
-        %    URL : http://weizmann.ac.il/home/eofek/matlab/
-        % See also: airmass.m; hardie_inv.m
-        % Example: AM=hardie([1;1.1]);
-        % Reliable: 1
-        %--------------------------------------------------------------------------
-
-            RAD = 180./pi;
-
-            Def.Algo = 'hardie'; 
-            if nargin==1
-               Algo = Def.Algo;
-            elseif nargin==2
-               % do nothing
-            else
-               error('Illegal number of input arguments');
-            end
-
-            SecZ = 1./cos(X);
-            switch lower(Algo)
-                case 'hardie'
-                    AM   = SecZ - 0.0018167.*(SecZ - 1) - 0.002875.*(SecZ - 1).*(SecZ - 1) - 0.0008083.*(SecZ - 1).*(SecZ - 1).*(SecZ - 1);
-                case 'csc'
-                    AM = SecZ;
                 otherwise
-                    error('Unknown airmass algorith option');
+                    error('Unknown calculation type in obliquity.m');
             end
+            
+        end
+        
+        function [nut_long, nut_obli] = nutation(JD)
+        % stolen from Eran's nutation function 
+        
+            T   = (JD - 2451545.0)./36525.0;
+            
+            % Mean elongation of the Moon from the Sun:
+            D = (297.85036 + 445267.111480.*T - 0.0019142.*T.*T + T.*T.*T./189474);
+            
+            % Mean anomaly of the Sun (Earth):
+            M = (357.52772 + 35999.050340.*T - 0.0001603.*T.*T - T.*T.*T./300000);
+            
+            % Mean anomaly of the Moon:
+            Mt = (134.96298 + 477198.867398.*T + 0.0086972.*T.*T + T.*T.*T./56250);
+            
+            % Moon's argument of latitude
+            F = (93.27191 + 483202.017538.*T - 0.0036825.*T.*T + T.*T.*T./327270);
+            
+            % Longitude of ascending node of the Moon's mean orbit
+            Om = (125.04452 - 1934.136261.*T + 0.0020708.*T.*T + T.*T.*T./450000);
+            
+            % nutation in longitude [ 0."0001]
+            DLon = (-171996 - 174.2.*T).*sind(Om) + ...,
+                ( -13187 +   1.6.*T).*sind(2.*(-D + F + Om)) + ...,
+                (  -2274 -   0.2.*T).*sind(2.*(F + Om)) + ...,
+                (   2062 +   0.2.*T).*sind(2.*Om) + ...,
+                (   1426 -   3.4.*T).*sind(M) + ...,
+                (    712 +   0.1.*T).*sind(Mt) + ...,
+                (   -517 +   1.2.*T).*sind(2.*(-D + F + Om) + M) + ...,
+                (   -386 -   0.4.*T).*sind(2.*F + Om) + ...,
+                (   -301           ).*sind(Mt + 2.*(F + Om)) + ...,
+                (    217 -   0.5.*T).*sind(-M + 2.*(-D + F + Om)) + ...,
+                (   -158           ).*sind(-2.*D + Mt) + ...,
+                (    129 +   0.1.*T).*sind(2.*(-D + F) + Om) + ...,
+                (    123           ).*sind(-Mt + 2.*(F + Om)) + ...,
+                (     63           ).*sind(2.*D) + ...,
+                (     63 +   0.1.*T).*sind(Mt + Om) + ...,
+                (    -59           ).*sind(-Mt + 2.*(D + F + Om)) + ...,
+                (    -58 -   0.1.*T).*sind(-Mt + Om) + ...,
+                (    -51           ).*sind(Mt + 2.*F + Om) + ...,
+                (     48           ).*sind(2.*(-D + Mt)) + ...,
+                (     46           ).*sind(Om + 2.*(-Mt + F)) + ...,
+                (    -38           ).*sind(2.*(D + F + Om)) + ...,
+                (    -31           ).*sind(2.*(Mt + F + Om)) + ...,
+                (     29           ).*sind(2.*Mt) + ...,
+                (     29           ).*sind(Mt + 2.*(-D + F + Om)) + ...,
+                (     26           ).*sind(2.*F) + ...,
+                (    -22           ).*sind(2.*(-D + F)) + ...,
+                (     21           ).*sind(-Mt + Om + 2.*F) + ...,
+                (     17 -   0.1.*T).*sind(2.*M) + ...,
+                (     16           ).*sind(2.*D - Mt + Om) + ...,
+                (    -16 +   0.1.*T).*sind(2.*(-D + M + F + Om)) + ...,
+                (    -15           ).*sind(M + Om) + ...,
+                (    -13           ).*sind(-2.*D + Mt + Om) + ...,
+                (    -12           ).*sind(-M + Om) + ...,
+                (     11           ).*sind(2.*(Mt - F)) + ...,
+                (    -10           ).*sind(2.*(D + F) - Mt + Om) + ...,
+                (     -8           ).*sind(2.*(D + F + Om) + Mt) + ...,
+                (      7           ).*sind(2.*(F + Om) + M) + ...,
+                (     -7           ).*sind(-2.*D + M + Mt) + ...,
+                (     -7           ).*sind(-M + 2.*(F + Om)) + ...,
+                (     -7           ).*sind(2.*(D + F) + Om) + ...,
+                (      6           ).*sind(2.*D + Mt) + ...,
+                (      6           ).*sind(2.*(-D + Mt + F + Om)) + ...,
+                (      6           ).*sind(2.*(-D + F) + Mt + Om) + ...,
+                (     -6           ).*sind(2.*(D - Mt) + Om) + ...,
+                (     -6           ).*sind(2.*D + Om) + ...,
+                (      5           ).*sind(-M + Mt) + ...,
+                (     -5           ).*sind(2.*(F - D) + Om - M) + ...,
+                (     -5           ).*sind(Om - 2.*D) + ...,
+                (     -5           ).*sind(2.*(Mt + F) + Om) + ...,
+                (      4           ).*sind(2.*(Mt - D) + Om) + ...,
+                (      4           ).*sind(2.*(F - D) + M + Om) + ...,
+                (      4           ).*sind(Mt - 2.*F) + ...,
+                (     -4           ).*sind(Mt - D) + ...,
+                (     -4           ).*sind(M -2.*D) + ...,
+                (     -4           ).*sind(D) + ...,
+                (      3           ).*sind(Mt + 2.*F) + ...,
+                (     -3           ).*sind(2.*(F + Om - Mt)) + ...,
+                (     -3           ).*sind(Mt - D - M) + ...,
+                (     -3           ).*sind(M + Mt) + ...,
+                (     -3           ).*sind(Mt - M + 2.*(F - Om)) + ...,
+                (     -3           ).*sind(2.*(D + F + Om) - M - Mt) + ...,
+                (     -3           ).*sind(3.*Mt + 2.*(F + Om)) + ...,
+                (     -3           ).*sind(2.*(D + F + Om) - M);
+            
+            nut_long = DLon./10000/3600; % convert to degrees...
+            
+            if nargout>1
+                % nutation in obliquity [ 0."0001]
+                DObl = (  92025 +   8.9.*T).*cosd(Om) + ...,
+                    (   5736 -   3.1.*T).*cosd(2.*(-D + F + Om)) + ...,
+                    (    977 -   0.5.*T).*cosd(2.*(F + Om)) + ...,
+                    (   -895 +   0.5.*T).*cosd(2.*Om) + ...,
+                    (     54 -   0.1.*T).*cosd(M) + ...,
+                    (     -7           ).*cosd(Mt) + ...,
+                    (    224 -   0.6.*T).*cosd(2.*(-D + F + Om) + M) + ...,
+                    (    200           ).*cosd(2.*F + Om) + ...,
+                    (    129 -   0.1.*T).*cosd(Mt + 2.*(F + Om)) + ...,
+                    (    -95 +   0.3.*T).*cosd(-M + 2.*(-D + F + Om)) + ...,
+                    (    -70           ).*cosd(2.*(-D + F) + Om) + ...,
+                    (    -53           ).*cosd(-Mt + 2.*(F + Om)) + ...,
+                    (    -33           ).*cosd(Mt + Om) + ...,
+                    (     26           ).*cosd(-Mt + 2.*(D + F + Om)) + ...,
+                    (     32           ).*cosd(-Mt + Om) + ...,
+                    (     27           ).*cosd(Mt + 2.*F + Om) + ...,
+                    (    -24           ).*cosd(Om + 2.*(-Mt + F)) + ...,
+                    (     16           ).*cosd(2.*(D + F + Om)) + ...,
+                    (     13           ).*cosd(2.*(Mt + F + Om)) + ...,
+                    (    -12           ).*cosd(Mt + 2.*(-D + F + Om)) + ...,
+                    (    -10           ).*cosd(-Mt + Om + 2.*F) + ...,
+                    (     -8           ).*cosd(2.*D - Mt + Om) + ...,
+                    (      7           ).*cosd(2.*(-D + M + F + Om)) + ...,
+                    (      9           ).*cosd(M + Om) + ...,
+                    (      7           ).*cosd(-2.*D + Mt + Om) + ...,
+                    (      6           ).*cosd(-M + Om) + ...,
+                    (      5           ).*cosd(2.*(D + F) - Mt + Om) + ...,
+                    (      3           ).*cosd(2.*(D + F + Om) + Mt) + ...,
+                    (     -3           ).*cosd(2.*(F + Om) + M) + ...,
+                    (      3           ).*cosd(-M + 2.*(F + Om)) + ...,
+                    (      3           ).*cosd(2.*(D + F) + Om) + ...,
+                    (     -3           ).*cosd(2.*(-D + Mt + F + Om)) + ...,
+                    (     -3           ).*cosd(2.*(-D + F) + Mt + Om) + ...,
+                    (      3           ).*cosd(2.*(D - Mt) + Om) + ...,
+                    (      3           ).*cosd(2.*D + Om) + ...,
+                    (      3           ).*cosd(2.*(F - D) + Om - M) + ...,
+                    (      3           ).*cosd(Om - 2.*D) + ...,
+                    (      3           ).*cosd(2.*(Mt + F) + Om);
 
-            FlagI = X>87./RAD;
-            AM(FlagI) = NaN;
-
+                nut_obli = DObl./10000/3600; % convert to degrees...
+            end
+        end
+        
+    end
+    
+    properties (Transient=true, Hidden=true, Dependent=true)
+        
+        DE;
+        DE_deg;
+        
+    end
+    
+    methods
+        
+        function val = get.DE(obj)
+            
+            val = obj.DEC;
+            
+        end
+        
+        function set.DE(obj, val)
+            
+            obj.DEC = val;
+            
+        end
+        
+        function val = get.DE_deg(obj)
+            
+            val = obj.DEC_deg;
+            
+        end
+        
+        function set.DE_deg(obj, val)
+            
+            obj.DEC_deg = val;
+            
         end
         
     end

@@ -49,7 +49,7 @@ classdef Finder < handle
     
     properties(Dependent=true)
         
-        
+        ev_kept;
         
     end
     
@@ -120,6 +120,12 @@ classdef Finder < handle
     end
     
     methods % getters
+        
+        function val = get.ev_kept(obj)
+            
+            val = obj.ev([obj.ev.keep]==1);
+            
+        end
         
     end
     
@@ -328,14 +334,14 @@ classdef Finder < handle
                 if ismember(obj.ev(ii).star_index, obj.black_list_stars)
                     obj.ev(ii).keep = 0;
                     obj.ev(ii).is_real = 0;
-                    obj.ev(ii).bad_star = 1;
+                    obj.ev(ii).is_bad_star = 1;
                     obj.ev(ii).notes = sprintf('%s, star %d is on black list', obj.ev(ii).notes, obj.ev(ii).star_index);
                 end
                 
                 if ismember(obj.ev(ii).batch_index, obj.black_list_stars)
                     obj.ev(ii).keep = 0;
                     obj.ev(ii).is_real = 0;
-                    obj.ev(ii).bad_batch = 1;
+                    obj.ev(ii).is_bad_batch = 1;
                     obj.ev(ii).notes = sprintf('%s, batch %d is on black list', obj.ev(ii).notes, obj.ev(ii).batch_index);
                 end
                 

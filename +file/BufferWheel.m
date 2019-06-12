@@ -453,10 +453,18 @@ classdef BufferWheel < file.AstroData
         
         function val = get.target_dir(obj) % check for override. Default: get subfolder name from pars object (uses <target_name> or "dark" or "flat")
             
+            import util.text.cs;
+            
             if ~isempty(obj.target_dir_override)
                 val = obj.target_dir_override;                
-            elseif ~isempty(obj.pars) && ~isempty(obj.pars.folder_name)
-                val = obj.pars.folder_name;
+            elseif ~isempty(obj.pars)
+                if cs(obj.pars.type, 'dark')
+                    val = obj.dark_dir_name;
+                elseif cs(obj.pars.type, 'flat')
+                    val = obj.flat_dir_name;
+                else
+                    val = obj.pars.target_name;
+                end
             else
                 val = 'run1';
             end

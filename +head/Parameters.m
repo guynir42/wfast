@@ -1,5 +1,5 @@
-classdef Parameters < dynamicprops
-% this class contains all the useful information to be accessed by user
+classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicprops
+% This class contains all the useful information to be accessed by user
 % or saved as metadata for a specific observation. 
 % also lets you save or read metadata from file
 
@@ -11,143 +11,191 @@ classdef Parameters < dynamicprops
 
     properties % objects 
         
-        filter; % must be a head.Filter (enforced in the setter...)
+        filter_obj; % must be a head.Filter (enforced in the setter...)
         ephem@head.Ephemeris;
-        run_start_datetime;
+%         run_start_datetime;
         stars@head.Star;
         
     end
     
     properties 
         
-        im_size;
+%         im_size;
+        NAXIS; 
+        NAXIS1;
+        NAXIS2;
+        NAXIS3;
+        NAXIS4;
         
-        aperture = 57;
-        f_number = 1.8947; 
-                     
-        % needs to be updated from camera/simulation or read from file
-        expT;
-        frame_rate;
-        frame_rate_measured;
+%         aperture = 57;
+        TEL_APER = 57;
+%         f_number = 1.8947; 
+        FOCLEN = 108;
+        F_RATIO;
+        PIXSIZE = 6.5; % microns
+        SCALE; 
         
-%         clockFreq;
-%         shutter;
-        serial = 0;
+%         expT;
+        EXPTIME;
+%         frame_rate;
+        FRAMERATE;
+%         frame_rate_measured;
+        ACT_FRAMERATE; 
         
-        gain;
-        batch_size;
+        FILTER = 'F505W'; 
         
-        psf_sampling;
+%         gain;
+        GAIN; 
+        READNOISE;
+        DARKCUR;
+%         batch_size;
         
-        focus;
+        BINX = 1;
+        BINY = 1;
+        ROI; 
+        CCDSEC;
         
-        t_start; % most recent file (when it started filming)
-        t_end; % most recent file (when it finished filming)
+%         t_start; % most recent file (when it started filming)
+%         t_end; % most recent file (when it finished filming)
+        STARTTIME;
+        ENDTIME;
+        RUNSTART; 
         
-        target_name = 'star1';
-        type = '';
+%         target_name = 'star1';
+        OBJECT = 'star1';
+%         type = '';
+        TYPE;
         
-        project = 'WFAST';
-        instrument = 'Zyla_5.5';
+        COMMENT = '';
         
-        is_dark = 0;
-        is_flat = 0;
-        is_sim = 0;
+        PROJECT = 'WFAST';
+        INST = 'Zyla_5.5';
         
-        notes = '';
-                
-        seeing; % arcsec
-        temperature; % celsius
+%         is_dark = 0;
+%         is_flat = 0;
+%         is_sim = 0;
+        
+        IS_DARK = 0;
+        IS_FLAT = 0;
+        IS_SIMULATED = 0;
+
+%         notes = '';
+               
+        FOCUS_POS;
+         
+        SEEING; % arcsec
+%         temperature; % celsius
+        TEMP_DET; % detector temperature (celsius)
+        TEMP_OUT; % outside temperature (celsius)
+        
+        WIND_DIR;
+        WIND_SPEED;
+        HUMID_IN;
+        HUMID_OUT;
+        PRESSURE;
+        LIGHT;
+
         
     end
     
     properties(Dependent=true)
         
         % camera/telescope properties
-        focal_length;        
-        plate_scale; % arcseconds per pixel
-        aperture_area;
-        diff_limit; % arcseconds
+%         focal_length;        
+%         plate_scale; % arcseconds per pixel
+        
+%         diff_limit; % arcseconds
         
         % filter properties
-        filter_name;
-        wavelength;
-        bandwidth;
-        
+%         wavelength;
+%         bandwidth;
+        FILT_WAVE;
+        FILT_WIDTH;
+
         % stars (specific for each cutout - row vectors or matrices)
-        magnitude; % vector of magnitudes of all stars
-        separation; % vector separations from 1st star (arcsec)
-        pos_angle; % vector of position angles from 1st star (degrees)
-        star_x; % in pixels, relative to frame size (final position)
-        star_y; % in pixels, relative to frame size (final position)
+%         magnitude; % vector of magnitudes of all stars
+%         separation; % vector separations from 1st star (arcsec)
+%         pos_angle; % vector of position angles from 1st star (degrees)
+%         star_x; % in pixels, relative to frame size (final position)
+%         star_y; % in pixels, relative to frame size (final position)
         
         % ephemeris: time & coordinates
-        EXPTIME; % alias for expT
         RA = ''; % for the center of the image
-        DE = '';% for the center of the image
+        DEC = '';% for the center of the image
+        RA_DEG;
+        DEC_DEG;
+        
+        TELRA;
+        TELDEC; 
+        TELRA_DEG;
+        TELDEC_DEG;
         
         HA;
         LST;
         ALT;
         AZ;        
-        airmass;
+        AIRMASS;
         
-        longitude;
-        latitude;
+        MOONAZ;
+        MOONALT;
+        MOONILL;
+
+        SUNAZ;
+        SUNALT;
         
-        run_start_datestr;
-        night_start_datestr;
+%         longitude;
+%         latitude;
+        OBSLONG;
+        OBSLAT;
+         
+%         run_start_datestr;
         JD;
+        MJD;
+        MIDJD;
         
     end
        
     properties(Hidden=true) 
        
-        slit_size; % = 2.2; % in cm (also use aperture - the long edge of the asymetric scope)
+%         SLIT_SIZE; % = 2.2; % in cm (also use aperture - the long edge of the asymetric scope)
         
-        dead_time = 0;
+        DEADTIME = 0;
         
-        xbin = 1;
-        ybin = 1;
-                
-        pixel_size = 6.5; % microns
+%         xbin = 1;
+%         ybin = 1;
+        
+%         CCDID
+%         AMPID 
+           
+%         pixel_size = 6.5; % microns
         
         QE = 1;
         
-        default_aperture;
-        default_f_number;
-        default_filter_name = 'F505W';
-        default_im_size = [2560 2160];
+        default_APERTURE;
+        default_F_RATIO;
+        default_FILTER;
+        default_OBJECT;
         
-        datapath;
-        dark_name = 'dark';
-        flat_name = 'flat';
-                
-        use_folder_name = 1;
-        use_folder_date = 1;
-        
-        ccd_id;
-        amp_id;
-
-%         psf_size;
-%         psf_binning;
-        
-        AOI_height;
-        AOI_top;
-        AOI_width;
-        AOI_left;
-        
-        debug_bit = 0;
+%         datapath;
+%         dark_name = 'dark';
+%         flat_name = 'flat';
+%                 
+%         use_folder_name = 1;
+%         use_folder_date = 1;
+%         
+%         AOI_height;
+%         AOI_top;
+%         AOI_width;
+%         AOI_left;
         
 %         latitude = 31.907867; % of the observatory
 %         longitude = 34.811363; % of the observatory
         
-        default_project;
-        default_instrument;
+        CAMS_VER;
+        TELS_VER;
         
-        numImagesPerFile;
-        
-        version = 3.00;
+        debug_bit = 0;
+        version = 4.00;
           
     end
     
@@ -165,14 +213,13 @@ classdef Parameters < dynamicprops
             
                 if obj.debug_bit, fprintf('Parameters constructor v%4.2f\n', obj.version); end
                 
-                obj.datapath = getenv('DATA');
-                if isempty(obj.datapath)
-                    obj.datapath = pwd;
-                end
+%                 obj.datapath = getenv('DATA');
+%                 if isempty(obj.datapath)
+%                     obj.datapath = pwd;
+%                 end
                 
-                obj.filter = head.Filter(obj.default_filter_name);
-%                 obj.filter = head.Filter('clear');
-                obj.ephem = head.Ephemeris(obj);
+                obj.filter_obj = head.Filter(obj.FILTER);
+                obj.ephem = head.Ephemeris;
                 
                 util.oop.save_defaults(obj);
                 
@@ -185,47 +232,8 @@ classdef Parameters < dynamicprops
     end
     
     methods % reset methods
-       
-        function reset(obj)
-            
-            
-            
-        end
         
-        function initialize(obj)
-
-            obj.initializeTarget;
-            obj.initializeInstrument;
-            obj.initializeStars;
-                        
-        end
-        
-        function initializeTarget(obj)
-            
-            obj.RA = '';
-            obj.DE = '';
-            
-            if regexp(obj.target_name, 'star\d')==1
-                obj.name_plus_plus;
-            else
-                obj.target_name = 'star1';
-            end
-            
-            obj.type = '';
-%             obj.spec_type = '';
-            obj.notes = '';
-            
-        end
-        
-        function initializeInstrument(obj)
-            
-            obj.aperture = obj.default_aperture;
-            obj.f_number = obj.default_f_number;
-            obj.filter_name = obj.default_filter_name;
-            
-        end        
-        
-        function initializeStars(obj)
+        function clearStars(obj)
            
             obj.stars = head.Star.empty;
             
@@ -233,11 +241,25 @@ classdef Parameters < dynamicprops
         
         function clearObsConditions(obj)
            
-            obj.seeing = [];
-            obj.temperature = [];
-            
+            obj.SEEING = [];
+            obj.TEMP_DET = [];
+            obj.TEMP_OUT = [];
+            obj.WIND_DIR = [];
+            obj.WIND_SPEED = [];
+            obj.HUMID_IN = [];
+            obj.HUMID_OUT = [];
+            obj.PRESSURE = [];
+            obj.LIGHT = [];
+        
         end
                 
+        function resetTarget(obj)
+            
+            obj.OBJECT = obj.default_OBJECT;
+            obj.ephem.reset;
+            
+        end
+        
         function resetDrifts(obj)
            
             util.oop.setprop(obj.stars, 'drift_x', []);
@@ -249,46 +271,33 @@ classdef Parameters < dynamicprops
     
     methods % getters
         
-        % telescope parameters
-        function val = get.focal_length(obj)
-           
-            val = obj.aperture.*obj.f_number;
-            
-        end
-        
-        function val = get.plate_scale(obj)
-           
-            val = obj.ephem.rad2arcsec(obj.pixel_size.*1e-4./obj.focal_length);
-            
-        end
-        
-        function val = get.diff_limit(obj)
+        function val = diff_limit(obj)
             
             if isempty(obj.aperture) || isempty(obj.wavelength)
                 val = [];
             else
-                val = obj.wavelength*1e-7./obj.aperture*360*3600/2/pi;
+                val = obj.wavelength*1e-7./obj.APERTURE*360*3600/2/pi;
             end
             
         end
         
         function val = diff_limit_pix(obj)
            
-            if isempty(obj.diff_limit) || isempty(obj.diff_limit)
+            if isempty(obj.SCALE) || isempty(obj.diff_limit)
                 val = [];
             else            
-                val = obj.diff_limit./obj.plate_scale;
+                val = obj.diff_limit./obj.SCALE;
             end
             
         end
         
-        function val = get.aperture_area(obj)
+        function val = aperture_area(obj)
             
-            if isempty(obj.slit_size)
-                val = pi*(obj.aperture/2).^2;
-            else
-                val = obj.aperture*obj.slit_size;
-            end
+%             if isempty(obj.slit_size)
+                val = pi*(obj.APERTURE/2).^2;
+%             else
+%                 val = obj.aperture*obj.slit_size;
+%             end
             
         end
         
@@ -303,140 +312,35 @@ classdef Parameters < dynamicprops
         end
                 
         % camera and filter 
-        function val = get.im_size(obj)
-            
-            if isempty(obj.im_size)
-                val = obj.default_im_size;
-            else
-                val = obj.im_size;
-            end
-            
-            val = util.vec.imsize(val);
-            
-        end
-        
         function str = cam_name(obj)
            
-            c = strsplit(obj.instrument, {' ','_'});
+            c = strsplit(obj.INSTR, {' ','_'});
             
             str = c{1};
             
         end
-       
-        function val = get.filter_name(obj)
-            
-            if isempty(obj.filter)
-                val = '';
-            else
-                val = obj.filter.name;
-            end
-            
-        end
         
-        function val = get.wavelength(obj)
+        function val = get.FILT_WAVE(obj)
             
-            if isempty(obj.filter)
+            if isempty(obj.filter_obj)
                 val = [];
             else
-                val = obj.filter.wavelength;
+                val = obj.filter_obj.wavelength;
             end
             
         end
         
-        function val = get.bandwidth(obj)
+        function val = get.FILT_WIDTH(obj)
             
-            if isempty(obj.filter)
+            if isempty(obj.filter_obj)
                 val = [];
             else
-                val = obj.filter.bandwidth;
+                val = obj.filter_obj.bandwidth;
             end
-            
-        end
-        
-        function val = get.EXPTIME(obj)
-            
-            val = obj.expT;
             
         end
         
         % ephemeris
-        function name = folder_name(obj)
-            
-            import util.text.cs;
-            
-            if cs(obj.type, 'dark') && ~isempty(obj.dark_name)
-                name = obj.dark_name;
-            elseif cs(obj.type, 'flat') && ~isempty(obj.flat_name)
-                name = obj.flat_name;
-            else 
-                name = obj.target_name;
-            end
-            
-            if isempty(name) || ~ischar(name)
-                error('Parameters.folder_name is not a string!');
-            end
-
-        end
-        
-        function f = folder(obj) % to be depricated!
-            
-            import util.text.cs;
-            
-            f = obj.date_folder;
-            
-            if obj.use_folder_name 
-                
-                name = '';
-                if cs(obj.type, 'dark') && ~isempty(obj.dark_name)
-                    name = obj.dark_name;
-                elseif cs(obj.type, 'flat') && ~isempty(obj.flat_name)
-                    name = obj.flat_name;
-                elseif ~isempty(obj.target_name)
-                    name = obj.target_name;
-                end
-                
-                if ~isempty(name)
-                    f = fullfile(f,  name);
-                end
-                
-            end
-            
-        end
-           
-        function p = path(obj) % to be depricated!
-            
-            p = obj.folder;
-            
-        end
-        
-        function f = date_folder(obj) % to be depricated!
-            
-            f = obj.datapath;
-            
-            if obj.use_folder_date && ~builtin('isempty', obj.run_start_datetime)
-            
-                f = fullfile(f, datestr(obj.run_start_datetime, 'yyyy-mm-dd/'));
-                                
-            elseif obj.use_folder_date && ~isempty(obj.t_end)
-                
-                f = [fullfile(f, obj.t_end(1:10)) '/'];
-                
-            end
-            
-        end
-        
-        function val = get.run_start_datestr(obj)
-            
-            val = util.text.time2str(obj.run_start_datetime);
-            
-        end
-
-        function val = get.night_start_datestr(obj)
-            
-            val = '';
-            
-        end
-        
         function val = get.JD(obj)
             
             val = obj.ephem.juldate;
@@ -449,9 +353,21 @@ classdef Parameters < dynamicprops
             
         end
         
-        function val = get.DE(obj)
+        function val = get.DEC(obj)
             
-            val = obj.ephem.DE;
+            val = obj.ephem.DEC;
+            
+        end
+        
+        function val = get.RA_DEG(obj)
+            
+            val = obj.ephem.RA_deg;
+            
+        end
+        
+        function val = get.DEC_DEG(obj)
+            
+            val = obj.ephem.DEC_deg;
             
         end
         
@@ -479,14 +395,14 @@ classdef Parameters < dynamicprops
             
         end
         
-        function val = get.airmass(obj)
+        function val = get.AIRMASS(obj)
             
             val = obj.ephem.airmass;
             
         end        
         
         % stars
-        function val = get.magnitude(obj)
+        function val = magnitude(obj)
            
             if isempty(obj.stars)
                 val = [];
@@ -497,7 +413,7 @@ classdef Parameters < dynamicprops
                         
         end
         
-        function val = get.separation(obj)
+        function val = separation(obj)
                         
             if isempty(obj.stars)
                 val = [];
@@ -517,7 +433,7 @@ classdef Parameters < dynamicprops
             
         end
         
-        function val = get.pos_angle(obj)
+        function val = pos_angle(obj)
                         
             if isempty(obj.stars)
                 val = [];
@@ -537,7 +453,7 @@ classdef Parameters < dynamicprops
             
         end
                 
-        function val = get.star_x(obj)
+        function val = star_x(obj)
                         
             if isempty(obj.stars)
                 val = [];
@@ -553,7 +469,7 @@ classdef Parameters < dynamicprops
             
         end
                 
-        function val = get.star_y(obj)
+        function val = star_y(obj)
                         
             if isempty(obj.stars)
                 val = [];
@@ -570,12 +486,12 @@ classdef Parameters < dynamicprops
         end
         
         function str = getApertureString(obj)
-            
-           if isempty(obj.slit_size)
+           
+%            if isempty(obj.slit_size)
                str = sprintf('%dcm', round(obj.aperture));
-           else
-               str = sprintf('%dx%dcm', round(obj.aperture), round(obj.slit_size));
-           end
+%            else
+%                str = sprintf('%dx%dcm', round(obj.aperture), round(obj.slit_size));
+%            end
             
         end
         
@@ -587,73 +503,134 @@ classdef Parameters < dynamicprops
             
         end
         
-        function val = get.latitude(obj)
+        function val = get.OBSLONG(obj)
             
-            val = obj.ephem.latitude;
+            val = obj.ephem.longitude;
             
         end
         
-        function val = get.longitude(obj)
+        function val = get.OBSLAT(obj)
             
-            val = obj.ephem.longitude;
+            val = obj.ephem.latitude;
             
         end
         
     end
            
     methods % setters
-
-        % objects with loop-back
-        function set.ephem(obj, val)
-            
-            obj.ephem = val;
-%             obj.ephem.pars = obj;
-            
-        end
         
         % filter/telescope parameters
-        function set.focal_length(obj, val)
+        function set.FOCLEN(obj, val)
            
-            obj.f_number = val./obj.aperture;
+            obj.FOCLEN = val;
+            if ~isempty(obj.FOCLEN) && ~isempty(obj.TEL_APER)
+                ratio = obj.FOCLEN./obj.TEL_APER; 
+                if ~isequal(ratio, obj.F_RATIO)
+                    obj.F_RATIO = ratio;
+                end
+            elseif ~isempty(obj.FOCLEN) && ~isempty(obj.F_RATIO)
+                aperture = obj.FOCLEN./obj.F_RATIO; 
+                if ~isequal(aperture, obj.TEL_APER)
+                    obj.TEL_APER = aperture;
+                end
+            end
             
-        end
-        
-        function set.plate_scale(obj, val)
-           
-            obj.pixel_size = 2*pi/360/3600*(val).*1.e4.*obj.focal_length;
-            
-        end
-        
-        function set.filter(obj, val)
-            
-            if ischar(val)
-                obj.filter_name = val;
-                return;
-            elseif isa(val, 'head.Filter')
-                obj.filter = val;
-            else
-                error('Must enter a head.Filter object, or a name of a known filter (e.g. R,V,B...)');
+            if ~isempty(obj.FOCLEN) && ~isempty(obj.PIXSIZE)
+                scale = obj.PIXSIZE.*1e-4./obj.FOCLEN./2./pi.*360.*3600;
+                if ~isequal(scale, obj.SCALE)
+                    obj.SCALE = scale;
+                end
+            elseif ~isempty(obj.FOCLEN) && ~isempty(obj.SCALE)
+                pix = obj.SCALE.*obj.FOCLEN.*2.*pi./360./3600.*1e-4;
+                if ~isequal(pix, obj.PIXSIZE)
+                    obj.PIXSIZE = pix;
+                end
             end
             
         end
         
-        function set.filter_name(obj, val)
+        function set.TEL_APER(obj, val)
             
-            if isempty(obj.filter) || ~strcmpi(obj.filter_name, val)
-                obj.filter = head.Filter(val);
+            obj.TEL_APER = val;
+            if ~isempty(val) && ~isempty(obj.FOCLEN)
+                ratio = obj.FOCLEN./obj.TEL_APER; 
+                if ~isequal(ratio, obj.F_RATIO)
+                    obj.F_RATIO = ratio;
+                end
+            elseif ~isempty(val) && ~isempty(obj.F_RATIO)
+                focal = obj.F_RATIO.*obj.TEL_APER;
+                if ~isequal(focal, obj.FOCLEN)
+                    obj.FOCLEN = focal;
+                end
             end
-            
-        end
-        
-        function set.run_start_datestr(obj, val)
-            
-            obj.run_start_datetime = astro.text.str2time(val);
-            
-        end
 
-        function set.EXPTIME(obj, val)
+        end
+        
+        function set.F_RATIO(obj, val)
             
-            obj.expT = val;
+            obj.F_RAT = val;
+            if ~isempty(obj.F_RATIO) && ~isempty(obj.TEL_APER)
+                focal = obj.TEL_APER.*obj.F_RATIO; % 
+                if ~isequal(focal, obj.FOCLEN)
+                    obj.FOCLEN = focal;
+                end
+            elseif ~isempty(obj.F_RATIO) && ~isempty(obj.FOCLEN)
+                aperture = obj.FOCLEN./obj.F_RATIO;
+                if ~isequal(aperture, obj.TEL_APER)
+                    obj.TEL_APER = aperture;
+                end
+            end
+            
+        end
+        
+        function set.SCALE(obj, val)
+            
+            obj.SCALE = val;
+            if ~isempty(obj.SCALE) && ~isempty(obj.FOCLEN) 
+                pix = 2.*pi./360./3600.*1.e4.*obj.FOCLEN.*obj.SCALE;
+                if ~isequal(pix, obj.PIXSIZE)
+                    obj.PIXSIZE = pix;
+                end
+            elseif ~isempty(obj.SCALE) && ~isempty(obj.PIXSIZE)
+                focal = obj.PIXSIZE./(2.*pi./360./3600.*1.e4.*obj.SCALE);
+                if ~isequal(focal, obj.FOCLEN)
+                    obj.FOCLEN = focal;
+                end
+            end
+            
+        end
+        
+        function set.PIXSIZE(obj, val)
+            
+            obj.PIXSIZE = val;
+            if ~isempty(obj.PIXSIZE) && ~isempty(obj.FOCLEN)
+                scale = obj.PIXSIZE./(2.*pi./360./3600.*1.e4.*obj.FOCLEN);
+                if ~isequal(scale, obj.SCALE)
+                    obj.SCALE = scale;
+                end
+            elseif ~isempty(obj.PIXSIZE) && ~isempty(obj.SCALE)
+                focal = obj.PIXSIZE./(2.*pi./360./3600.*1.e4.*obj.SCALE);
+                if ~isequal(focal, obj.FOCLEN)
+                    obj.FOCLEN = focal;
+                end
+            end
+            
+        end
+        
+        function set.FILTER(obj, val)
+            
+            if ~strcmp(obj.FILTER, val)
+                
+                obj.FILTER = val;
+                
+                try
+                    obj.filter_obj = head.Filter(val);
+                catch ME
+                    disp(['Unknown filter name "' val '", cannot generate filter object']);
+                    obj.filter_obj = head.Filter.empty;
+                end
+                
+            end
             
         end
         
@@ -664,9 +641,9 @@ classdef Parameters < dynamicprops
             
         end 
         
-        function set.DE(obj, val)
+        function set.DEC(obj, val)
             
-            obj.ephem.DE = val;
+            obj.ephem.DEC = val;
             
         end
         
@@ -692,7 +669,7 @@ classdef Parameters < dynamicprops
         % target properties
         function name_plus_plus(obj)
             
-            obj.target_name = util.text.strPlusPlus(obj.target_name);
+            obj.TARGET = util.text.strPlusPlus(obj.TARGET);
             
         end
             
@@ -708,23 +685,21 @@ classdef Parameters < dynamicprops
         %   -location: (HDF5 only) where to save inside the file (default is '/').
         %   -name: (HDF5 only) what to call the dataset (default is name of object, e.g. "pars").
         %   -if_exist: overwrite (default), error, warning, nothing
-        
-        input = util.text.InputVars;
-        input.input_var('type', 'hdf5');
-        input.input_var('location', '/');
-        input.input_var('name', inputname(1), 'dataset name');
-        input.input_var('if_exists', 'overwrite', 'exists');
-        
-        if nargin<2
-            help('head.Parameters.save');
-            return;
-        end
-        
-        
-        input.scan_vars(varargin);
-        
-        warning('head.Parameters.save is not yet implemented!');
-            
+
+            if nargin<2
+                help('head.Parameters.save');
+                return;
+            end
+
+            input = util.text.InputVars;
+            input.input_var('type', 'hdf5');
+            input.input_var('location', '/');
+            input.input_var('name', inputname(1), 'dataset name');
+            input.input_var('if_exists', 'overwrite', 'exists');
+            input.scan_vars(varargin);
+
+            warning('head.Parameters.save is not yet implemented!');
+
         end
         
         function load(obj, filename)
@@ -739,22 +714,22 @@ classdef Parameters < dynamicprops
             
         end
                 
-        function writeFITS(obj, filename, timestamp)
+        function writeFITS(obj, filename, time_delay)
             
             file_ptr = matlab.io.fits.openFile(filename,'readwrite');
             cleanup = onCleanup(@() matlab.io.fits.closeFile(file_ptr));
             
-            if nargin<3 || isempty(timestamp)
+            if nargin<3 || isempty(time_delay)
 %                 timestamp = obj.obs_time_days;
 %                 if isempty(timestamp)
 %                     timestamp = datenum(clock);
 %                 end
-                timestamp = [];
+                time_delay = [];
             end
             
             try
                 
-                obj.writeFitsHeader(file_ptr, timestamp);
+                obj.writeFitsHeader(file_ptr, time_delay);
                 
             catch ME
                 rethrow(ME);
@@ -775,26 +750,27 @@ classdef Parameters < dynamicprops
                 matlab.io.fits.writeKey(file_ptr, 'DATE-OBS', start_time_str); 
             end
             
-            if ~isempty(obj.expT), matlab.io.fits.writeKey(file_ptr, 'EXPTIME',obj.expT, 'seconds'); end
-            if ~isempty(obj.pixel_size), matlab.io.fits.writeKey(file_ptr, 'XPIXSZ',obj.pixel_size, 'microns'); end
-            if ~isempty(obj.pixel_size), matlab.io.fits.writeKey(file_ptr, 'YPIXSZ',obj.pixel_size, 'microns'); end
-            if ~isempty(obj.xbin), matlab.io.fits.writeKey(file_ptr, 'XBINNING',obj.xbin); end
-            if ~isempty(obj.ybin), matlab.io.fits.writeKey(file_ptr, 'YBINNING',obj.ybin); end
-            if ~isempty(obj.filter_name), matlab.io.fits.writeKey(file_ptr, 'FILTER',obj.filter_name); end
-            if ~isempty(obj.type), matlab.io.fits.writeKey(file_ptr, 'IMAGETYP', obj.type); end
-            if ~isempty(obj.focal_length), matlab.io.fits.writeKey(file_ptr, 'FOCALLEN',obj.focal_length*10, 'mm'); end
-            if ~isempty(obj.aperture), matlab.io.fits.writeKey(file_ptr, 'APTDIA', obj.aperture*10, 'mm'); end
-            if ~isempty(obj.aperture), matlab.io.fits.writeKey(file_ptr, 'APTAREA',(obj.aperture*10/2).^2*pi, 'mm^2'); end
-            if ~isempty(obj.gain), matlab.io.fits.writeKey(file_ptr, 'EGAIN', obj.gain, 'e-/ADU'); end
-            if ~isempty(obj.target_name), matlab.io.fits.writeKey(file_ptr, 'OBJECT',obj.target_name); end
+            if ~isempty(obj.EXPTIME), matlab.io.fits.writeKey(file_ptr, 'EXPTIME',obj.EXPTIME, 'seconds'); end
+            if ~isempty(obj.PIXSIZE), matlab.io.fits.writeKey(file_ptr, 'XPIXSZ',obj.PIXSIZE, 'microns'); end
+            if ~isempty(obj.PIXSIZE), matlab.io.fits.writeKey(file_ptr, 'YPIXSZ',obj.PIXSIZE, 'microns'); end
+            if ~isempty(obj.BINX), matlab.io.fits.writeKey(file_ptr, 'XBINNING',obj.BINX); end
+            if ~isempty(obj.BINY), matlab.io.fits.writeKey(file_ptr, 'YBINNING',obj.BINY); end
+            if ~isempty(obj.FILTER), matlab.io.fits.writeKey(file_ptr, 'FILTER',obj.FILTER); end
+            if ~isempty(obj.TYPE), matlab.io.fits.writeKey(file_ptr, 'IMAGETYP', obj.TYPE); end
+            if ~isempty(obj.FOCLEN), matlab.io.fits.writeKey(file_ptr, 'FOCALLEN',obj.FOCLEN*10, 'mm'); end
+            if ~isempty(obj.APERTURE), matlab.io.fits.writeKey(file_ptr, 'APTDIA', obj.APERTURE*10, 'mm'); end
+            if ~isempty(obj.APERTURE), matlab.io.fits.writeKey(file_ptr, 'APTAREA',obj.aperture_area*100, 'mm^2'); end
+            if ~isempty(obj.GAIN), matlab.io.fits.writeKey(file_ptr, 'EGAIN', obj.GAIN, 'e-/ADU'); end
+            if ~isempty(obj.TARGET), matlab.io.fits.writeKey(file_ptr, 'OBJECT',obj.TARGET); end
             if ~isempty(obj.RA), matlab.io.fits.writeKey(file_ptr, 'OBJCTRA',obj.RA, 'hours'); end
             if ~isempty(obj.DE), matlab.io.fits.writeKey(file_ptr, 'OBJCTDEC',obj.DE, 'degree'); end
-            if ~isempty(obj.HA), matlab.io.fits.writeKey(file_ptr, 'OBJCTHA', head.Ephemeris.ra2rad(obj.HA)/2/pi*24, 'hours'); end
-            if ~isempty(obj.latitude), matlab.io.fits.writeKey(file_ptr, 'SITELAT', obj.latitude, 'degrees'); end
-            if ~isempty(obj.longitude), matlab.io.fits.writeKey(file_ptr, 'SITELONG', obj.longitude, 'degrees'); end
+%             if ~isempty(obj.HA), matlab.io.fits.writeKey(file_ptr, 'OBJCTHA', head.Ephemeris.ra2rad(obj.HA)/2/pi*24, 'hours'); end
+            if ~isempty(obj.HA), matlab.io.fits.writeKey(file_ptr, 'OBJCTHA', obj.HA*24/360, 'hours'); end
+            if ~isempty(obj.OBSLONG), matlab.io.fits.writeKey(file_ptr, 'SITELONG', obj.OBSLONG, 'degrees'); end
+            if ~isempty(obj.OBSLAT), matlab.io.fits.writeKey(file_ptr, 'SITELAT', obj.OBSLAT, 'degrees'); end
             if ~isempty(obj.JD), matlab.io.fits.writeKey(file_ptr, 'JD', obj.JD); end
-            if ~isempty(obj.airmass), matlab.io.fits.writeKey(file_ptr, 'AIRMASS', obj.airmass); end
-            if ~isempty(obj.instrument), matlab.io.fits.writeKey(file_ptr, 'INSTRUME', obj.instrument); end
+            if ~isempty(obj.AIRMASS), matlab.io.fits.writeKey(file_ptr, 'AIRMASS', obj.AIRMASS); end
+            if ~isempty(obj.INSTR), matlab.io.fits.writeKey(file_ptr, 'INSTRUME', obj.INSTR); end
             matlab.io.fits.writeKey(file_ptr, 'INPUTFMT', 'FITS');
             
         end
@@ -806,21 +782,15 @@ classdef Parameters < dynamicprops
         function update(obj, varargin)
            
             obj.ephem.update;
-            obj.run_start_datetime = obj.ephem.time;
+            obj.RUNSTART = util.text.time2str(obj.ephem.time);
             
-        end
-        
-        function updateObsTimeOffset(obj, time_offset_seconds) % to be depricated?
-            
-            obj.obs_time = obj.obs_time + time_offset_seconds/24/3600;
-                        
         end
         
         function val = stamp2str(obj, time_delay)
             
             time = util.text.str2time(obj.t_start);
             
-            time.Second = time.Second + time_delay;
+            time = time + seconds(time_delay);
             
             val = util.text.time2str(time);
             
@@ -837,6 +807,279 @@ classdef Parameters < dynamicprops
             end
             
             obj.gui.make;
+            
+        end
+        
+    end
+    
+    % what follows is some boilerplate needed to keep this class backward
+    % compatible after adhering to the ancient traditions of FITS headers. 
+    % don't bother reading it, it just allows my old reasonable property
+    % names to be used while displaying and saving only the FITS keywords. 
+    
+    properties(Transient=true, Hidden=true, Dependent=true)
+        
+        aperture;
+        im_size;
+        f_number;
+        frame_rate;
+        frame_rate_measured;
+        batch_size;
+        target_name;
+        instrument;
+        t_start;
+        t_end;
+        run_start_datestr;
+        notes;
+        wavelength;
+        bandwidth;
+        pixel_size;
+        plate_scale;
+        longitude;
+        latitude;
+        SITELONG;
+        SITELAT;
+        
+    end
+    
+    methods 
+        
+        function val = get.aperture(obj)
+            
+            val = obj.TEL_APER;
+            
+        end
+        
+        function set.aperture(obj, val)
+            
+            obj.TEL_APER = val;
+            
+        end
+        
+        function val = get.im_size(obj)
+            
+            val = [obj.NAXIS1 obj.NAXIS2];
+            if obj.NAXIS>2
+                val = [val obj.NAXIS3];
+            end
+            
+            if obj.NAXIS>3
+                val = [val obj.NAXIS4];
+            end
+            
+        end
+        
+        function set.im_size(obj, val)
+            
+            obj.NAXIS = length(val);
+            
+            for ii = 1:obj.NAXIS
+                obj.(['NAXIS' num2str(ii)]) = val(ii);
+            end
+            
+        end
+        
+        function val = get.f_number(obj)
+            
+            val = obj.F_RATIO;
+            
+        end
+        
+        function set.f_number(obj, val)
+            
+            obj.F_RATIO = val;
+            
+        end
+        
+        function val = get.frame_rate(obj)
+           
+            val = obj.FRAMERATE;
+            
+        end
+        
+        function set.frame_rate(obj, val)
+            
+            obj.FRAMERATE = val;
+            
+        end
+        
+        function val = get.frame_rate_measured(obj)
+           
+            val = obj.ACT_FRAMERATE;
+            
+        end
+        
+        function set.frame_rate_measured(obj, val)
+            
+            obj.ACT_FRAMERATE = val;
+            
+        end
+        
+        function val = get.batch_size(obj)
+            
+            val = obj.NAXIS3;
+            
+        end
+        
+        function set.batch_size(obj, val)
+            
+            obj.NAXIS3 = val;
+            
+        end
+        
+        function val = get.target_name(obj)
+           
+            val = obj.OBJECT;
+            
+        end
+        
+        function set.target_name(obj, val)
+            
+            obj.OBJECT = val;
+            
+        end
+        
+        function val = get.notes(obj)
+            
+            val = obj.COMMENT;
+            
+        end
+        
+        function set.notes(obj, val)
+            
+            obj.COMMENT = val;
+            
+        end
+        
+        function val = get.t_start(obj)
+            
+            val = obj.STARTTIME;
+            
+        end
+        
+        function set.t_start(obj, val)
+            
+            obj.STARTTIME = val;
+            
+        end
+        
+        function val = get.t_end(obj)
+            
+            val = obj.ENDTIME;
+            
+        end
+        
+        function set.t_end(obj, val)
+            
+            obj.ENDTIME = val;
+            
+        end
+        
+        function val = get.run_start_datestr(obj)
+            
+            val = obj.RUNSTART;
+            
+        end
+        
+        function set.run_start_datestr(obj, val)
+            
+            obj.RUNSTART = val;
+            
+        end
+        
+        function val = get.wavelength(obj)
+            
+            val = obj.FILT_WAVE;
+            
+        end
+        
+        function set.wavelength(obj, val)
+            
+            obj.FILT_WAVE = val;
+            
+        end
+        
+        function val = get.bandwidth(obj)
+            
+            val = obj.FILT_WIDTH;
+            
+        end
+        
+        function set.bandwidth(obj, val)
+            
+            obj.FILT_WIDTH = val;
+            
+        end
+        
+        function val = get.plate_scale(obj)
+            
+            val = obj.SCALE;
+            
+        end
+        
+        function set.plate_scale(obj, val)
+            
+            obj.SCALE = val;
+            
+        end
+        
+        function val = get.pixel_size(obj)
+            
+            val = obj.PIXSIZE;
+            
+        end
+        
+        function set.pixel_size(obj, val)
+            
+            obj.PIXSIZE = val;
+            
+        end
+        
+        function val = get.longitude(obj)
+            
+            val = obj.OBSLONG;
+            
+        end
+        
+        function set.longitude(obj, val)
+            
+            obj.OBSLONG = val;
+            
+        end
+        
+        function val = get.latitude(obj)
+            
+            val = obj.OBSLAT;
+            
+        end
+        
+        function set.latitude(obj, val)
+            
+            obj.OBSLAT = val;
+            
+        end
+        
+        function val = get.SITELONG(obj)
+            
+            val = obj.OBSLONG;
+            
+        end
+        
+        function set.SITELONG(obj, val)
+            
+            obj.OBSLONG = val;
+            
+        end
+        
+        function val = get.SITELAT(obj)
+            
+            val = obj.OBSLAT;
+            
+        end
+        
+        function set.SITELAT(obj, val)
+            
+            obj.OBSLAT = val;
             
         end
         
