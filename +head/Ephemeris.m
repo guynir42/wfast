@@ -109,6 +109,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     
     methods % reset/clear
         
+        function reset(obj)
+            
+            obj.RA_deg = [];
+            obj.Dec_deg = [];
+            obj.moon = [];
+            obj.sun = [];
+            
+            obj.update;
+            
+        end
+        
     end
     
     methods % getters

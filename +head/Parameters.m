@@ -98,6 +98,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         PRESSURE;
         LIGHT;
 
+        TELRA;
+        TELDEC; 
+        TELRA_DEG;
+        TELDEC_DEG;
         
     end
     
@@ -109,12 +113,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         
 %         diff_limit; % arcseconds
         
-        % filter properties
-%         wavelength;
-%         bandwidth;
-        FILT_WAVE;
-        FILT_WIDTH;
-
         % stars (specific for each cutout - row vectors or matrices)
 %         magnitude; % vector of magnitudes of all stars
 %         separation; % vector separations from 1st star (arcsec)
@@ -128,10 +126,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         RA_DEG;
         Dec_DEG;
         
-        TELRA;
-        TELDEC; 
-        TELRA_DEG;
-        TELDEC_DEG;
         
         HA;
         LST;
@@ -155,10 +149,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
 %         run_start_datestr;
         JD;
         MJD;
-        MIDJD;
+%         MIDJD;
         
+        % filter properties
+%         wavelength;
+%         bandwidth;
+        FILT_WAVE;
+        FILT_WIDTH;
+
     end
-       
+    
     properties(Hidden=true) 
        
 %         SLIT_SIZE; % = 2.2; % in cm (also use aperture - the long edge of the asymetric scope)
@@ -901,6 +901,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         t_end;
         run_start_datestr;
         notes;
+        filter_name;
         wavelength;
         bandwidth;
         pixel_size;
@@ -1009,6 +1010,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
             
         end
         
+        function val = get.instrument(obj)
+            
+            val = obj.INST;
+            
+        end
+        
+        function set.instrument(obj, val)
+            
+            obj.INST = val;
+            
+        end
+        
         function val = get.notes(obj)
             
             val = obj.COMMENT;
@@ -1054,6 +1067,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         function set.run_start_datestr(obj, val)
             
             obj.RUNSTART = val;
+            
+        end
+        
+        function val = get.filter_name(obj)
+            
+            val = obj.FILTER;
+            
+        end
+        
+        function set.filter_name(obj, val)
+            
+            obj.FILTER = val;
             
         end
         

@@ -1119,22 +1119,24 @@ classdef Andor < file.AstroData
         
         function update_pars(obj) % make sure "pars" object is updated with hardware values
             
-            obj.pars.datapath = obj.buffers.base_dir;
+%             obj.pars.datapath = obj.buffers.base_dir;
             
             obj.pars.expT = obj.getExpTimeHW;
             obj.pars.frame_rate = obj.getFrameRateHW;
             
             if ~isempty(obj.focuser)
-                obj.pars.FOCUSPOS = obj.focuser.pos;
+                obj.pars.FOCUS_POS = obj.focuser.pos;
             end
             
-            roi = obj.getROI_HW;
-            obj.pars.AOI_top = roi(1);
-            obj.pars.AOI_left = roi(2);
-            obj.pars.AOI_height = roi(3);
-            obj.pars.AOI_width = roi(4);
+%             roi = obj.getROI_HW;
+%             obj.pars.AOI_top = roi(1);
+%             obj.pars.AOI_left = roi(2);
+%             obj.pars.AOI_height = roi(3);
+%             obj.pars.AOI_width = roi(4);
             
-            obj.pars.im_size = [roi(3) roi(4)];
+            obj.pars.ROI = obj.getROI_HW;
+
+            obj.pars.im_size = [obj.pars.ROI(3) obj.pars.ROI(4)];
             
             obj.pars.batch_size = obj.batch_size;
             obj.pars.gain = obj.getGain;
