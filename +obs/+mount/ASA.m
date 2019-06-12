@@ -26,7 +26,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         limit_alt = 15; % degrees
         
-        use_accelerometer = 1;
+        use_accelerometer = 0;
         use_ultrasonic = 0;
         
         step_arcsec = 5;
@@ -280,19 +280,31 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function val = get.telRA_deg(obj)
             
-            val = obj.hndl.RightAscension*15; % convert hours to degrees!
+            try 
+                val = obj.hndl.RightAscension*15; % convert hours to degrees!
+            catch
+                val = [];
+            end
             
         end
         
         function val = get.telDEC_deg(obj)
             
-            val = obj.hndl.Declination;
+            try
+                val = obj.hndl.Declination;
+            catch
+                val = [];
+            end
             
         end
         
         function val = get.telDE_deg(obj)
             
-            val = obj.hndl.Declination;
+            try
+                val = obj.hndl.Declination;
+            catch
+                val = [];
+            end
             
         end
         
@@ -316,13 +328,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function val = get.telALT(obj)
             
-            val = obj.hndl.Altitude;
+            try
+                val = obj.hndl.Altitude;
+            catch
+                val = [];
+            end
             
         end
         
         function val = get.telAZ(obj)
             
-            val = obj.hndl.Azimuth;
+            try 
+                val = obj.hndl.Azimuth;
+            catch 
+                val = [];
+            end
             
         end
         
@@ -334,7 +354,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function val = LST_deg(obj)
             
-            val = obj.hndl.SiderealTime*15; % in degrees...
+            try 
+                val = obj.hndl.SiderealTime*15; % in degrees...
+            catch 
+                val = [];
+            end
             
         end
         
@@ -342,6 +366,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             val = head.Ephemeris.deg2hour(obj.LST_deg);
             
+        end
+        
+        function val = get.tracking(obj)
+            
+            try 
+                val = obj.hndl.Tracking;
+            catch 
+                val = [];
+            end
+        
         end
         
         function val = latitutde(obj)
@@ -367,7 +401,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             obj.object.RA = val; % note this is given in HOURS!
             obj.object.update;
             
-            obj.hndl.TargetRightAscension = obj.object.RA_deg/15; % also update the telescope's target field...
+            try
+                obj.hndl.TargetRightAscension = obj.object.RA_deg/15; % also update the telescope's target field...
+            catch ME
+%                 obj.log.error(ME.getReport);
+%                 rethrow(ME);
+            end
             
         end
         
@@ -376,7 +415,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             obj.object.RA_deg = val;
             obj.object.update;
             
-            obj.hndl.TargetRightAscension = obj.object.RA_deg/15; % also update the telescope's target field...
+            try
+                obj.hndl.TargetRightAscension = obj.object.RA_deg/15; % also update the telescope's target field...
+            catch ME
+%                 obj.log.error(ME.getReport);
+%                 rethrow(ME);
+            end
             
         end
         
@@ -385,7 +429,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             obj.object.Dec = val;
             obj.object.update;
             
-            obj.hndl.TargetDeclination = obj.object.Dec_deg;
+            try
+                obj.hndl.TargetDeclination = obj.object.Dec_deg;
+            end
             
         end
         
@@ -394,7 +440,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             obj.object.Dec_deg = val;
             obj.object.update;
             
-            obj.hndl.TargetDeclination = obj.object.Dec_deg;
+            try
+                obj.hndl.TargetDeclination = obj.object.Dec_deg;
+            end
             
         end
         
@@ -403,7 +451,20 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             obj.object.Dec_deg = val;
             obj.object.update;
             
-            obj.hndl.TargetDeclination = obj.object.Dec_deg;
+            try
+                obj.hndl.TargetDeclination = obj.object.Dec_deg;
+            end
+            
+        end
+        
+        function set.tracking(obj, val)
+            
+            try 
+                obj.hndl.Tracking = val;
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
             
         end
         
@@ -618,7 +679,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 return;
             end
             
-            if obj.ALT<-20 % this occurs when software is disconnected from mount (e.g., on power out)
+            if obj.telALT<-20 % this occurs when software is disconnected from mount (e.g., on power out)
                 obj.status = 0;
                 return;
             end

@@ -92,7 +92,7 @@ classdef ManagerGUI < handle
             obj.panel_hardware = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'hardware');
             obj.panel_hardware.number = N;
             obj.panel_hardware.addButton('button_RA', 'RA', 'info', 'RA: ', '', 'small', 0.5);
-            obj.panel_hardware.addButton('button_DE', 'DE', 'info', 'DE: ', '', 'small', 0.5);            
+            obj.panel_hardware.addButton('button_DE', 'DEC', 'info', 'DE: ', '', 'small', 0.5);            
             obj.panel_hardware.addButton('button_LST', 'LST', 'info', 'LST: ', '', 'small', 0.5);
             obj.panel_hardware.addButton('button_ALT', 'ALT', 'info', 'ALT: ', ' deg', 'small', 0.5);
             obj.panel_hardware.addButton('button_shutter_west', '', 'custom', 'West shutter: ', '', 'small', 0.5);
@@ -147,7 +147,7 @@ classdef ManagerGUI < handle
             pos = pos - N;
             
             obj.panel_report = GraphicPanel(obj.owner, [0.2, pos/N_middle, 0.6, N/N_middle], 'report');
-            obj.panel_report.addButton('button_report', 'report_string', 'info');
+            obj.panel_report.addButton('button_report', 'report', 'info');
             obj.panel_report.make;
             
             %%%%%%%%%%% panel weather %%%%%%%%%%%%%%%%
@@ -235,9 +235,9 @@ classdef ManagerGUI < handle
                 
             end
             
-            obj.panel_controls.button_interval_t1.String = ['P= ' num2str(obj.owner.checker.period1) 's'];
-            obj.panel_controls.button_interval_t2.String = ['P= ' num2str(obj.owner.checker.period2) 's'];
-            obj.panel_controls.button_interval_t3.String = ['P= ' num2str(obj.owner.checker.period3) 's'];
+            obj.panel_controls.button_interval_t1.String = ['P= ' num2str(obj.owner.period1) 's'];
+            obj.panel_controls.button_interval_t2.String = ['P= ' num2str(obj.owner.period2) 's'];
+            obj.panel_controls.button_interval_t3.String = ['P= ' num2str(obj.owner.period3) 's'];
             
             default_color = [1 1 1].*0.94;
             

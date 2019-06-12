@@ -1,4 +1,4 @@
-classdef Manager < handle
+classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 
     properties(Transient=true)
         
@@ -56,6 +56,7 @@ classdef Manager < handle
         
         sensors_ok;
         sensors_report;
+        report; 
         
         RA;
         DEC;
@@ -85,8 +86,6 @@ classdef Manager < handle
                 obj.log = util.sys.Logger('Top_level_manager'); % keep track of commands given and errors received... 
                 
                 obj.connect; % connect to all hardware
-                
-                obj.checker = obs.SensorChecker(obj); % checks the weather using all sensors
                 
             end
             
@@ -214,6 +213,20 @@ classdef Manager < handle
             
         end
         
+        function connectSensorChecker(obj)
+            
+            try
+                
+                obj.checker = obs.SensorChecker(obj); % checks the weather using all sensors
+                
+            catch ME
+                obj.log.error(ME.getReport);
+                warning(ME.getReport);
+                disp('Cannot initialize SensorChecker!');
+            end
+
+        end
+        
     end
     
     methods % reset/clear
@@ -232,13 +245,27 @@ classdef Manager < handle
         
         function val = get.sensors_ok(obj)
             
-            val = obj.checker.sensors_ok;
+            if isempty(obj.checker)
+                val = [];
+            else
+                val = obj.checker.sensors_ok;
+            end
             
         end
         
         function val = get.sensors_report(obj)
             
-            val = obj.checker.report;
+            if isempty(obj.checker)
+                val = '';
+            else
+                val = obj.checker.report;
+            end
+            
+        end
+        
+        function val = get.report(obj)
+            
+            val = sprintf('Sensors: %s | Devices: %s | state: %s', obj.sensors_report, obj.devices_report, obj.observatory_state);
             
         end
         
@@ -253,7 +280,7 @@ classdef Manager < handle
                     return;
                 end
                 
-                if obj.dome.is_close==0
+                if obj.dome.is_closed==0
                     val = 0;
                     return;
                 end
@@ -263,6 +290,16 @@ classdef Manager < handle
             catch ME
                 obj.log.error(ME.getReport);
                 warning(ME.getReport);
+            end
+            
+        end
+        
+        function val = observatory_state(obj)
+            
+            if obj.is_shutdown
+                val = 'SHUT';
+            else
+                val = 'OPEN';
             end
             
         end
@@ -379,8 +416,12 @@ classdef Manager < handle
             
             try 
             
+                if isempty(obj.checker)
+                    obj.connectSensorChecker;
+                end
+                
                 obj.checker.update; % go over all sensors and only tell them to collect data. It's reported back in t2
-            
+                
             catch ME
                 obj.log.error(ME.getReport);
                 rethrow(ME);
@@ -423,23 +464,7 @@ classdef Manager < handle
                     obj.setup_t1;
                 end
 
-                obj.updateDevices;
-
-                obj.checker.decision_all; % collect weather data and make a decision
-
-                obj.log.input(sprintf('Devices report: %s | Sensors report: %s', obj.devices_report, obj.sensors_report));
-
-                if obj.devices_ok==0
-                    if obj.is_shutdown==0
-                        obj.shutdown;
-                    end
-                end
-
-                if obj.sensors_ok==0
-                    if obj.is_shutdown==0
-                        obj.shutdown;
-                    end
-                end
+                obj.update;
                 
             catch ME
                 obj.log.error(ME.getReport);
@@ -546,6 +571,28 @@ classdef Manager < handle
     end
     
     methods % calculations / commands
+        
+        function update(obj)
+
+            obj.updateDevices;
+
+            obj.checker.decision_all; % collect weather data and make a decision
+
+            obj.log.input(obj.report);
+
+            if obj.devices_ok==0
+                if obj.is_shutdown==0
+                    obj.shutdown;
+                end
+            end
+
+            if obj.sensors_ok==0
+                if obj.is_shutdown==0
+                    obj.shutdown;
+                end
+            end
+            
+        end
         
         function shutdown(obj)
             
