@@ -106,11 +106,11 @@ classdef ManagerGUI < handle
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'controls');
             obj.panel_controls.number = N;
             obj.panel_controls.addButton('button_run_t1', '', 'custom', 'run t1', '', '', 0.5);
-            obj.panel_controls.addButton('button_interval_t1', '', 'custom', ['P= ' num2str(obj.owner.checker.period1)], '', '', 0.5);
+            obj.panel_controls.addButton('button_interval_t1', '', 'custom', ['P= ' num2str(obj.owner.period1) 's'], '', '', 0.5);
             obj.panel_controls.addButton('button_run_t2', '', 'custom', 'run t2', '', '', 0.5);
-            obj.panel_controls.addButton('button_interval_t2', '', 'custom', ['P= ' num2str(obj.owner.checker.period2)], '', '', 0.5);
+            obj.panel_controls.addButton('button_interval_t2', '', 'custom', ['P= ' num2str(obj.owner.period2) 's'], '', '', 0.5);
             obj.panel_controls.addButton('button_run_t3', '', 'custom', 'run t3', '', '', 0.5);
-            obj.panel_controls.addButton('button_interval_t3', '', 'custom', ['P= ' num2str(obj.owner.checker.period3)], '', '', 0.5);
+            obj.panel_controls.addButton('button_interval_t3', '', 'custom', ['P= ' num2str(obj.owner.period3) 's'], '', '', 0.5);
             
             obj.panel_controls.make;
             obj.panel_controls.button_run_t1.Callback = @obj.callback_run_t1;
@@ -235,9 +235,9 @@ classdef ManagerGUI < handle
                 
             end
             
-            obj.panel_controls.button_interval_t1.String = ['P= ' num2str(obj.owner.checker.period1)];
-            obj.panel_controls.button_interval_t2.String = ['P= ' num2str(obj.owner.checker.period2)];
-            obj.panel_controls.button_interval_t3.String = ['P= ' num2str(obj.owner.checker.period3)];
+            obj.panel_controls.button_interval_t1.String = ['P= ' num2str(obj.owner.checker.period1) 's'];
+            obj.panel_controls.button_interval_t2.String = ['P= ' num2str(obj.owner.checker.period2) 's'];
+            obj.panel_controls.button_interval_t3.String = ['P= ' num2str(obj.owner.checker.period3) 's'];
             
             default_color = [1 1 1].*0.94;
             
@@ -267,7 +267,7 @@ classdef ManagerGUI < handle
             
             if ~isempty(obj.owner.wind) && obj.owner.wind.status
                 obj.panel_objects.button_wind.String = 'WindETH: ok';
-                obj.panel_objects.button_weather.BackgroundColor = default_color;
+                obj.panel_objects.button_wind.BackgroundColor = default_color;
             else
                 obj.panel_objects.button_wind.String = 'WindETH: error';
                 obj.panel_objects.button_wind.BackgroundColor = 'red';
@@ -291,7 +291,7 @@ classdef ManagerGUI < handle
             
             if obj.debug_bit, disp('callback: run_t1'); end
             
-            obj.owner.checker.callback_t1;
+            obj.owner.callback_t1;
             
             obj.update;
             
@@ -301,13 +301,13 @@ classdef ManagerGUI < handle
             
             if obj.debug_bit, disp('callback: interval_t1'); end
             
-            rep = util.text.inputdlg('Choose an interval for timer 1', obj.owner.checker.period1);
+            rep = util.text.inputdlg('Choose an interval for timer 1', obj.owner.period1);
             
             num = str2num(rep);
             
-            if ~isempty(num) && num>0 && ~isequal(num, obj.owner.checker.period1)
-                obj.owner.checker.period1 = num;
-                obj.owner.checker.setup_t1;
+            if ~isempty(num) && num>0 && ~isequal(num, obj.owner.period1)
+                obj.owner.period1 = num;
+                obj.owner.setup_t1;
             end
             
             obj.update;
@@ -319,7 +319,7 @@ classdef ManagerGUI < handle
             
             if obj.debug_bit, disp('callback: run_t2'); end
             
-            obj.owner.checker.callback_t2;
+            obj.owner.callback_t2;
             
             obj.update;
             
@@ -329,13 +329,13 @@ classdef ManagerGUI < handle
             
             if obj.debug_bit, disp('callback: interval_t2'); end
             
-            rep = util.text.inputdlg('Choose an interval for timer 2', obj.owner.checker.period2);
+            rep = util.text.inputdlg('Choose an interval for timer 2', obj.owner.period2);
             
             num = str2num(rep);
             
-            if ~isempty(num) && num>0 && ~isequal(num, obj.owner.checker.period2)
-                obj.owner.checker.period2 = num;
-                obj.owner.checker.setup_t2;
+            if ~isempty(num) && num>0 && ~isequal(num, obj.owner.period2)
+                obj.owner.period2 = num;
+                obj.owner.setup_t2;
             end
             
             obj.update;
@@ -346,7 +346,7 @@ classdef ManagerGUI < handle
             
             if obj.debug_bit, disp('callback: run_t3'); end
             
-            obj.owner.checker.callback_t3;
+            obj.owner.callback_t3;
             
             obj.update;
             
@@ -356,13 +356,13 @@ classdef ManagerGUI < handle
             
             if obj.debug_bit, disp('callback: interval_t3'); end
             
-            rep = util.text.inputdlg('Choose an interval for timer 3', obj.owner.checker.period3);
+            rep = util.text.inputdlg('Choose an interval for timer 3', obj.owner.period3);
             
             num = str2num(rep);
             
-            if ~isempty(num) && num>0 && ~isequal(num, obj.owner.checker.period3)
-                obj.owner.checker.period3 = num;
-                obj.owner.checker.setup_t3;
+            if ~isempty(num) && num>0 && ~isequal(num, obj.owner.period3)
+                obj.owner.period3 = num;
+                obj.owner.setup_t3;
             end
             
             obj.update;

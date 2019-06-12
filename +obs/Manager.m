@@ -2,6 +2,10 @@ classdef Manager < handle
 
     properties(Transient=true)
         
+        t1; % quick timer (every minute or so) just to update sensors/devices
+        t2; % check that everything is connected and that weather is good, print to log file
+        t3; % verify that the other two are still running (every half an hour or so)
+        
         gui;
         
     end
@@ -10,46 +14,61 @@ classdef Manager < handle
         
         log@util.sys.Logger;
         
-        checker@obs.StatusChecker;
+        checker@obs.SensorChecker;
         
-        dome;
-        mount;
+        dome; % AstroHaven dome
+        mount; % ASA mount
         
-        weather;
-        wind;
-        humidity;
-        temperature;
-        
-    end
-    
-    properties % inputs/outputs
+        weather; % Boltwood weather station
+        wind; % windETH sensor
+        humidity; % humidity/temperature dog
+        temperature; % additional temperature meters
         
     end
     
     properties % switches/controls
         
+        % use these to override these devices/sensors
         use_dome = 1;
         use_mount = 1;
         use_weather = 1;
         use_wind = 1;
+        use_humidity = 0;
+        use_temperature = 0; 
+        
+        period1 = 60; % time between updates of all devices/sensors
+        period2 = 300; % time for equipment/weather check and log file
+        period3 = 1800; % time for verifying shorter timers are working (and other tests?)
         
         brake_bit = 1;
         debug_bit = 1;
         
     end
     
+    properties % inputs/outputs
+                
+        devices_ok = 1;
+        devices_report = 'OK';
+        
+    end
+    
     properties(Dependent=true)
         
+        sensors_ok;
+        sensors_report;
+        
         RA;
-        DE;
+        DEC;
         LST;
         ALT;
+        
+        is_shutdown;
         
     end
     
     properties(Hidden=true)
        
-        version = 1.00;
+        version = 1.01;
         
     end
     
@@ -67,7 +86,7 @@ classdef Manager < handle
                 
                 obj.connect; % connect to all hardware
                 
-                obj.checker = obs.StatusChecker(obj); % has timers that check weather/hardware status
+                obj.checker = obs.SensorChecker(obj); % checks the weather using all sensors
                 
             end
             
@@ -90,6 +109,23 @@ classdef Manager < handle
             if obj.use_wind
                 obj.connectWindETH;
             end
+            
+            % add additional devices
+            % ...
+            
+            
+            obj.setup_t3;
+            obj.setup_t2;
+            obj.setup_t1;
+                
+            
+        end
+        
+        function delete(obj) % destructor
+            
+            delete(obj.t3);
+            delete(obj.t2);
+            delete(obj.t1);
             
         end
         
@@ -182,24 +218,69 @@ classdef Manager < handle
     
     methods % reset/clear
         
+        function reset(obj)
+            
+            obj.setup_t3;
+            obj.setup_t2;
+            obj.setup_t1;
+            
+        end
+        
     end
     
     methods % getters
         
+        function val = get.sensors_ok(obj)
+            
+            val = obj.checker.sensors_ok;
+            
+        end
+        
+        function val = get.sensors_report(obj)
+            
+            val = obj.checker.report;
+            
+        end
+        
+        function val = get.is_shutdown(obj)
+            
+            val = 0;
+            
+            try 
+            
+                if obj.mount.tracking
+                    val = 0;
+                    return;
+                end
+                
+                if obj.dome.is_close==0
+                    val = 0;
+                    return;
+                end
+                    
+                val = 1; % if all checks are passed, value can be 1
+                
+            catch ME
+                obj.log.error(ME.getReport);
+                warning(ME.getReport);
+            end
+            
+        end
+        
         function val = get.RA(obj)
             
             if ~isempty(obj.mount)
-                val = obj.mount.RA_hex;
+                val = obj.mount.telRA;
             else
                 val = [];
             end
             
         end
         
-        function val = get.DE(obj)
+        function val = get.DEC(obj)
             
             if ~isempty(obj.mount)
-                val = obj.mount.DE_hex;
+                val = obj.mount.telDEC;
             else
                 val = [];
             end
@@ -209,7 +290,7 @@ classdef Manager < handle
         function val = get.LST(obj)
             
             if ~isempty(obj.mount)
-                val = obj.mount.LST_hex;
+                val = obj.mount.LST;
             else
                 val = [];
             end
@@ -219,17 +300,7 @@ classdef Manager < handle
         function val = get.ALT(obj)
             
             if ~isempty(obj.mount)
-                val = round(obj.mount.ALT);
-            else
-                val = [];
-            end
-            
-        end
-        
-        function val = report_string(obj)
-            
-            if ~isempty(obj.mount)
-                val = obj.checker.report;
+                val = round(obj.mount.telALT);
             else
                 val = [];
             end
@@ -272,13 +343,231 @@ classdef Manager < handle
             
         end
         
+        function val = areTimersRunning(obj)
+            
+            val(1) = strcmp(obj.t1.Running, 'on');
+            val(2) = strcmp(obj.t2.Running, 'on');
+            val(3) = strcmp(obj.t3.Running, 'on');
+            
+        end
+        
     end
     
     methods % setters
         
     end
     
+    methods % timer related
+        
+        function stop_timers(obj)
+            
+            obj.stop_t3;
+            obj.stop_t2;
+            obj.stop_t1;
+            
+        end
+        
+        function start_timers(obj)
+            
+            obj.setup_t3;
+            obj.setup_t2;
+            obj.setup_t1;
+            
+        end
+        
+        function callback_t1(obj, ~, ~) % update sensors 
+            
+            try 
+            
+                obj.checker.update; % go over all sensors and only tell them to collect data. It's reported back in t2
+            
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
+            
+        end
+        
+        function setup_t1(obj, ~, ~)
+            
+            if ~isempty(obj.t1) && isa(obj.t1, 'timer') && isvalid(obj.t1)
+                if strcmp(obj.t1.Running, 'on')
+                    stop(obj.t1);
+                    delete(obj.t1);
+                    obj.t1 = [];
+                end
+            end
+            
+            delete(timerfind('name', 'Status-check-t1'));
+            
+            obj.t1 = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'Status-check-t1', ...
+                'Period', obj.period1, 'StartDelay', obj.period1, ...
+                'TimerFcn', @obj.callback_t1, 'ErrorFcn', @obj.setup_t1);
+            
+            start(obj.t1);
+            
+        end
+        
+        function stop_t1(obj, ~, ~)
+            
+            stop(obj.t1);
+            
+        end 
+        
+        function callback_t2(obj, ~, ~) % collect (averaged) sensor data and check devices are all ok
+            
+            try
+
+                % make sure t1 is running! 
+                if isempty(obj.t1) || ~isvalid(obj.t1) || strcmp(obj.t1.Running, 'off')
+                    obj.setup_t1;
+                end
+
+                obj.updateDevices;
+
+                obj.checker.decision_all; % collect weather data and make a decision
+
+                obj.log.input(sprintf('Devices report: %s | Sensors report: %s', obj.devices_report, obj.sensors_report));
+
+                if obj.devices_ok==0
+                    if obj.is_shutdown==0
+                        obj.shutdown;
+                    end
+                end
+
+                if obj.sensors_ok==0
+                    if obj.is_shutdown==0
+                        obj.shutdown;
+                    end
+                end
+                
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
+            
+        end
+        
+        function setup_t2(obj, ~, ~)
+            
+            if ~isempty(obj.t2) && isa(obj.t2, 'timer') && isvalid(obj.t2)
+                if strcmp(obj.t2.Running, 'on')
+                    stop(obj.t2);
+                    delete(obj.t2);
+                    obj.t2 = [];
+                end
+            end
+            
+            delete(timerfind('name', 'Status-check-t2'));
+            
+            obj.t2 = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'Status-check-t2', ...
+                'Period', obj.period2, 'StartDelay', obj.period2, ...
+                'TimerFcn', @obj.callback_t2, 'ErrorFcn', @obj.setup_t2);
+            
+            start(obj.t2);
+            
+        end
+        
+        function stop_t2(obj, ~, ~)
+            
+            stop(obj.t2);
+            
+        end 
+        
+        function callback_t3(obj, ~, ~)
+            
+            try
+
+                % make sure t2 is running! 
+                if isempty(obj.t2) || ~isvalid(obj.t2) || strcmp(obj.t2.Running, 'off')
+                    obj.setup_t2;
+                end
+
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
+            
+        end
+        
+        function setup_t3(obj, ~, ~)
+            
+            if ~isempty(obj.t3) && isa(obj.t3, 'timer') && isvalid(obj.t3)
+                if strcmp(obj.t3.Running, 'on')
+                    stop(obj.t3);
+                    delete(obj.t3);
+                    obj.t3 = [];
+                end
+            end
+            
+            delete(timerfind('name', 'Status-check-t3'));
+            
+            obj.t3 = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'Status-check-t3', ...
+                'Period', obj.period3, 'StartDelay', obj.period3, ...
+                'TimerFcn', @obj.callback_t3, 'ErrorFcn', @obj.setup_t3);
+            
+            start(obj.t3);
+            
+        end
+        
+        function stop_t3(obj, ~, ~)
+            
+            stop(obj.t3);
+            
+        end
+        
+        function updateDevices(obj)
+        
+            obj.devices_ok = 1;
+            obj.devices_report = 'OK';
+            
+            if obj.use_dome
+                obj.dome.update;
+                if obj.dome.status==0
+                    obj.devices_ok = 0;
+                    obj.devices_report = 'Dome error!';
+                    return;
+                end
+            end
+            
+            if obj.use_mount
+                obj.mount.update;
+                if obj.mount.status==0
+                    obj.devices_ok = 0;
+                    obj.devices_report = 'Mount error!';
+                    return;
+                end
+            end
+            
+            % add maybe checks for boltwood if we think it is critical?
+            
+        end
+            
+    end
+    
     methods % calculations / commands
+        
+        function shutdown(obj)
+            
+            obj.log.input('Shutting down observatory!');
+            
+            try 
+
+                obj.stop; % stop any slews or shutter motion
+
+                obj.mount.tracking = 0; % later add command to park the telescope? 
+
+                obj.dome.closeBothFull;
+
+                % anything else we can do to put the dome to shutdown mode?
+                % ...
+
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
+            
+        end
         
         function stop(obj)
             

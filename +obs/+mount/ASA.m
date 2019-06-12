@@ -1,4 +1,4 @@
-classdef ASA < handle
+classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 
     properties(Transient=true)
         
@@ -8,7 +8,7 @@ classdef ASA < handle
         
         hndl;
         
-        target@head.Ephemeris;
+        object@head.Ephemeris;
         
         ard@obs.sens.ScopeAssistant;
         
@@ -39,28 +39,27 @@ classdef ASA < handle
     
     properties(Dependent=true)
         
-        RA_target; % in degrees        
-        DE_target; % in degrees
+        objRA_deg;
+        objDEC_deg;
         
-        RA_target_hex;
-        DE_target_hex;
+        objRA;
+        objDEC;
         
-        HA_target;
-        ALT_target;
-        AZ_target;
+        objHA;
+        objALT;
+        objAZ;
         
-        RA;
-        DE;        
+        telRA_deg;
+        telDEC_deg;
         
-        RA_hex;
-        DE_hex;
+        telRA;
+        telDEC;
         
-        HA;
-        ALT;
-        AZ;
+        telHA;
+        telALT;
+        telAZ;
         
         LST;
-        LST_hex;
         
         % can we get motor status from hndl??
         tracking;
@@ -71,7 +70,7 @@ classdef ASA < handle
     
     properties(Hidden=true)
        
-        version = 1.01;
+        version = 1.02;
         
     end
     
@@ -91,7 +90,7 @@ classdef ASA < handle
             
             try
             
-                obj.target = head.Ephemeris;
+                obj.object = head.Ephemeris;
 
                 obj.connect;
 
@@ -125,24 +124,23 @@ classdef ASA < handle
                 
                 obj.hndl = actxserver('AstrooptikServer.Telescope');
             
-                obj.hndl.SiteLatitude  = obj.target.latitude;
-                obj.hndl.SiteLongitude = obj.target.longitude;
+                obj.hndl.SiteLatitude  = obj.object.latitude;
+                obj.hndl.SiteLongitude = obj.object.longitude;
                 
                 obj.hndl.Connected = 1;
             
                 obj.hndl.MotorOn;
                 
-                if obj.use_accelerometer
+                if obj.use_accelerometer && isempty(obj.ard) 
                     
-                    if isempty(obj.ard) 
-                        try
-                            obj.ard = obs.sens.ScopeAssistant;
-                            obj.ard.telescope = obj;
-                        catch ME
-                            obj.use_accelerometer = 0;
-                            warning(ME.getReport);
-                        end
+                    try
+                        obj.ard = obs.sens.ScopeAssistant;
+                        obj.ard.telescope = obj;
+                    catch ME
+                        obj.use_accelerometer = 0;
+                        warning(ME.getReport);
                     end
+
                 end
                 
                 if obj.use_accelerometer
@@ -218,7 +216,7 @@ classdef ASA < handle
         
         function reset(obj)
             
-            obj.target.reset;
+            obj.object.reset;
             
         end
         
@@ -226,113 +224,137 @@ classdef ASA < handle
     
     methods % getters
         
-        function val = get.RA_target(obj)
-            % get RA of user target in deg
-            val = rad2deg(obj.target.RA_rad);
+        function val = get.objRA_deg(obj)
+
+            val = obj.object.RA_deg;
+            
+        end
+        
+        function val = get.objDEC_deg(obj)
+            
+            val = obj.object.Dec_deg;
+            
+        end
+        
+        function val = get.DE_target_deg(obj)
+            
+            val = obj.object.Dec_deg;
+            
+        end
+        
+        function val = get.objRA(obj)
+            
+            val = obj.object.RA; 
+            
+        end
+        
+        function val = get.objDEC(obj)
+            
+            val = obj.object.DE;
             
         end
         
         function val = get.DE_target(obj)
-            % get Dec of user target in deg
-            val = rad2deg(obj.target.DE_rad);
+            
+            val = obj.object.DE;
             
         end
         
-        function val = get.RA_target_hex(obj)
+        function val = get.objHA(obj)
             
-            val = obj.target.RA; 
-            
-        end
-        
-        function val = get.DE_target_hex(obj)
-            
-            val = obj.target.DE;
+            val = obj.object.HA;
             
         end
         
-        function val = get.HA_target(obj)
+        function val = get.objALT(obj)
             
-            val = obj.target.HA;
-            
-        end
-        
-        function val = get.ALT_target(obj)
-            
-            val = rad2deg(obj.target.ALT);
+            val = obj.object.Alt_deg;
             
         end
         
-        function val = get.AZ_target(obj)
+        function val = get.objAZ(obj)
             
-            val = rad2deg(obj.target.AZ);
-            
-        end
-        
-        function val = get.RA(obj)
-            
-            val = obj.hndl.RightAscension/24*360;
+            val = obj.object.Az_deg;
             
         end
         
-        function val = get.DE(obj)
+        function val = get.telRA_deg(obj)
+            
+            val = obj.hndl.RightAscension*15; % convert hours to degrees!
+            
+        end
+        
+        function val = get.telDEC_deg(obj)
             
             val = obj.hndl.Declination;
             
         end
         
-        function val = get.RA_hex(obj)
+        function val = get.telDE_deg(obj)
             
-            val = head.Ephemeris.rad2ra(deg2rad(obj.RA));
-            
-        end
-        
-        function val = get.DE_hex(obj)
-            
-            val = head.Ephemeris.rad2dec(deg2rad(obj.DE));
+            val = obj.hndl.Declination;
             
         end
         
-        function val = get.ALT(obj)
+        function val = get.telRA(obj)
+            
+            val = head.Ephemeris.deg2hour(obj.telRA_deg);
+            
+        end
+        
+        function val = get.telDEC(obj)
+            
+            val = head.Ephemeris.deg2sex(obj.telDEC_deg);
+            
+        end
+        
+        function val = get.telDE(obj)
+            
+            val = head.Ephemeris.deg2sex(obj.telDEC_deg);
+            
+        end
+        
+        function val = get.telALT(obj)
             
             val = obj.hndl.Altitude;
             
         end
         
-        function val = get.AZ(obj)
+        function val = get.telAZ(obj)
             
             val = obj.hndl.Azimuth;
             
         end
         
-        function val = get.HA(obj)
+        function val = get.telHA(obj)
             
-            val = obj.LST - obj.RA;
+            val = head.Ephemeris.deg2hour(obj.LST_deg - obj.telRA_deg);
+            
+        end
+        
+        function val = LST_deg(obj)
+            
+            val = obj.hndl.SiderealTime*15; % in degrees...
             
         end
         
         function val = get.LST(obj)
             
-            val = obj.hndl.SiderealTime/24*360; % in degrees...
-            
-        end
-        
-        function val = get.LST_hex(obj)
-            
-            val = head.Ephemeris.rad2ra(deg2rad(obj.LST));
+            val = head.Ephemeris.deg2hour(obj.LST_deg);
             
         end
         
         function val = latitutde(obj)
             
 %             val = obj.hndl.SiteLatitude;
-            val = obj.target.latitude;
+            val = obj.object.latitude;
             
         end
         
         function val = longitude(obj)
            
 %             val = obj.hndl.SiteLongitude;
-            val = obj.target.longitude;
+            val = obj.object.longitude;
 
         end
         
@@ -340,19 +362,48 @@ classdef ASA < handle
     
     methods % setters
         
-        function set.RA_target(obj, val)
+        function set.objRA(obj, val)
             
-            obj.hndl.TargetRightAscension = val*24/360;
-            obj.target.RA = deg2rad(val);
-%             obj.RA_target = val; % should we make this dependent?
+            obj.object.RA = val; % note this is given in HOURS!
+            obj.object.update;
+            
+            obj.hndl.TargetRightAscension = obj.object.RA_deg/15; % also update the telescope's target field...
             
         end
         
-        function set.DE_target(obj, val)
+        function set.objRA_deg(obj, val)
             
-            obj.hndl.TargetDeclination = val;
-            obj.target.DE = deg2rad(val);
-%             obj.DE_target = val; % should we make this dependent?
+            obj.object.RA_deg = val;
+            obj.object.update;
+            
+            obj.hndl.TargetRightAscension = obj.object.RA_deg/15; % also update the telescope's target field...
+            
+        end
+        
+        function set.objDEC(obj, val)
+            
+            obj.object.Dec = val;
+            obj.object.update;
+            
+            obj.hndl.TargetDeclination = obj.object.Dec_deg;
+            
+        end
+        
+        function set.objDEC_deg(obj, val)
+            
+            obj.object.Dec_deg = val;
+            obj.object.update;
+            
+            obj.hndl.TargetDeclination = obj.object.Dec_deg;
+            
+        end
+        
+        function set.DE_target_deg(obj, val)
+            
+            obj.object.Dec_deg = val;
+            obj.object.update;
+            
+            obj.hndl.TargetDeclination = obj.object.Dec_deg;
             
         end
         
@@ -362,7 +413,7 @@ classdef ASA < handle
         
         function inputTarget(obj, varargin)
             
-            obj.target.input(varargin{:}); % Ephemeris now uses Eran's name resolver
+            obj.object.input(varargin{:}); % Ephemeris now uses Eran's name resolver
             
         end
         
@@ -370,9 +421,9 @@ classdef ASA < handle
             
             val = 0;
             
-            obj.target.update;
+            obj.object.update;
             
-            if obj.target.Alt_deg<obj.limit_alt
+            if obj.object.Alt_deg<obj.limit_alt
                 return;
             end
             
@@ -394,11 +445,11 @@ classdef ASA < handle
         
         function slew(obj, varargin)
             
-            if isempty(obj.target.RA) || isempty(obj.target.DE) 
+            if isempty(obj.object.RA) || isempty(obj.object.DE) 
                 error('Please provide a target with viable RA/DE');
             end
             
-            obj.log.input(sprintf('Slewing to target. RA= %s | DE= %s | ALT= %4.2f', obj.target.RA, obj.target.DE, obj.target.ALT_deg));
+            obj.log.input(sprintf('Slewing to target. RA= %s | DE= %s | ALT= %4.2f', obj.object.RA, obj.object.DE, obj.object.ALT_deg));
             
             try 
                 
@@ -407,7 +458,7 @@ classdef ASA < handle
                 end
                 
                 ra_hours_Jnow = obj.RA_deg_now./15; % convert to hours! 
-                dec_deg_Jnow = obj.target.Dec_deg_now;
+                dec_deg_Jnow = obj.object.Dec_deg_now;
                 
                 obj.brake_bit = 0;
                 obj.hndl.SlewToCoordinatesAsync(ra_hours_Jnow, dec_deg_Jnow);
@@ -547,7 +598,7 @@ classdef ASA < handle
         
         function update(obj)
             
-            obj.target.update;
+            obj.object.update;
             
             try
                 obj.hndl.Connected;
@@ -636,6 +687,15 @@ classdef ASA < handle
     methods(Static=true)
         
         
+        
+    end
+    
+    properties(Transient=true, Hidden=true, Dependent=true)
+        
+        DE_target_deg;
+        DE_target;
+        telDE_deg;
+        telDE;
         
     end
     

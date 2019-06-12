@@ -150,14 +150,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             end
         end
         
-        function [ha, l] = getHAandLST(obj) % do we need this anymore?
-
-            l = obj.local_sidereal_time(obj.JD, abs(obj.longitude)); % in fractions of day
-            
-            ha = 360*l - obj.RA; % in degrees
-            
-        end
-        
         function val = get.LST_deg(obj) % stolen the math from Eran's lst function 
             
             import util.text.cs;
@@ -202,8 +194,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         function val = get.HA_deg(obj)
             
             val = obj.LST_deg - obj.RA_deg;
-%             val = obj.getHAandLST;
-            
+
         end
         
         function val = get.HA(obj)
