@@ -746,7 +746,7 @@ classdef Acquisition < file.AstroData
             
             obj.brake_bit = val;
             
-            if isprop(obj.src, 'brake_bit')
+            if obj.brake_bit && isprop(obj.src, 'brake_bit')
                 obj.src.brake_bit = val;
             end
             
@@ -1316,11 +1316,6 @@ classdef Acquisition < file.AstroData
             
             try 
                 
-                if obj.brake_bit==0
-                    disp('Cannot call single while in an active acquisition (set brake_bit to 1)');
-                    return;
-                end
-                
                 obj.src.single; 
                 obj.images = obj.src.images;
                 obj.timestamps = obj.src.timestamps;
@@ -1576,14 +1571,22 @@ classdef Acquisition < file.AstroData
         function runPreview(obj, varargin) % I'm not sure we need this... 
             
             if obj.is_running
+                disp('Cannot run a preview during another run');
                 return;
             else
                 obj.is_running = 1;
             end
             
+            try 
             obj.single;
             obj.findStars;
             obj.show;
+            obj.is_running = 0;
+             
+            catch ME
+                obj.is_running = 0;
+                rethrow(ME);
+            end
             
 %             if ~isempty(varargin) && isa(varargin{1}, 'util.text.InputVars')
 %                 input = varargin{1};
@@ -1662,9 +1665,8 @@ classdef Acquisition < file.AstroData
                 input.num_batches = length(obj.af.pos);
             
                 obj.stash_parameters(input);
-%                 cleanup = onCleanup(@obj.unstash_parameters);
                 obj.brake_bit = 0;
-                cleanup = onCleanup(@obj.finishup);
+                cleanup = onCleanup(@obj.finishupFocus);
 %                 obj.startup(input);
 
                 for ii = 1:input.num_batches
@@ -1790,6 +1792,22 @@ classdef Acquisition < file.AstroData
             
             if obj.gui.check
                 obj.show;
+            end
+            
+        end
+        
+        function finishupFocus(obj)
+            
+            if obj.debug_bit, disp(['Finished run "' obj.run_name '" with ' num2str(obj.batch_counter) ' batches.']); end
+            
+            obj.brake_bit = 1;
+            
+            obj.unstash_parameters;
+            
+            obj.is_running = 0;
+            
+            if ~isempty(obj.gui) && obj.gui.check
+                obj.gui.update;
             end
             
         end
