@@ -803,7 +803,7 @@ classdef Andor < file.AstroData
             try 
                 
                 if obj.brake_bit==0
-                    disp('Cannot start a new acquisition while old one is still runnning (turn off brake_bit)');
+                    disp('Cannot startup camera while it is still runnning (turn off brake_bit)');
                 end
                 
                 input = obj.makeInputVars(varargin{:});

@@ -154,7 +154,7 @@ classdef AcqGUI < handle
             obj.panel_controls.input_expT.Tooltip = 'Exposure time for each frame (seconds)';
             obj.panel_controls.input_frame_rate.Tooltip = 'Nominal frame rate to be uphel by camera (Hz). Use NaN to make camera take images as fast as possible';
             obj.panel_controls.button_mextractor.Tooltip = 'Use mextractor and astrometry to find stars and match them to a catalog';
-            obj.panel_controls.button_arbitrary_pos.Tooltip = 'Choose arbitrary positions for cutous (for debugging)';
+            obj.panel_controls.button_arbitrary_pos.Tooltip = 'Find stars in the image or choose arbitrary positions (for debugging)';
             obj.panel_controls.button_adjust.Tooltip = 'Adjust the cutout positions as stars drift in the field';
             obj.panel_controls.button_background.Tooltip = 'Use background subtraction on all analysis data';
             obj.panel_controls.button_simple_phot.Tooltip = 'Use simple summing of cutouts <or> full photometry object';
@@ -182,7 +182,7 @@ classdef AcqGUI < handle
             pos = pos - N;
             obj.panel_objects = GraphicPanel(obj.owner, [1-W_right pos/N_right W_right N/N_right], 'objects');
             obj.panel_objects.number = N;
-            obj.panel_objects.addButton('button_pars', 'pars', 'push', 'Parameters GUI');
+            obj.panel_objects.addButton('button_pars', 'pars', 'push', 'Header GUI');
             obj.panel_objects.addButton('button_buffers', 'buffers', 'push', 'Buffers GUI');
             obj.panel_objects.addButton('button_reader', 'reader', 'push', 'Reader GUI');
             obj.panel_objects.addButton('button_calibration', 'cal', 'push', 'Calibration GUI');
