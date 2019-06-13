@@ -3,4 +3,6 @@ ARCHIVE/
 test.*
 obj.*
 *.mat
+*.h5
+*.h5z
 *.m~

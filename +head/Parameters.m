@@ -41,8 +41,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
 %         f_number = 1.8947; 
         FOCLEN = 108;
         F_RATIO;
-        SCALE; 
+        
         PIXSIZE = 6.5; % microns
+        SCALE; 
         
 %         expT;
         EXPTIME;
@@ -226,6 +227,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
                 
                 obj.filter_obj = head.Filter(obj.FILTER);
                 obj.ephem = head.Ephemeris;
+                
+                obj.FOCLEN = obj.FOCLEN; % this should fill the values for SCALE and F_RATIO
                 
                 util.oop.save_defaults(obj);
                 

@@ -42,7 +42,7 @@ classdef Finder < handle
     properties % switches/controls
         
         threshold = 5; % threshold (in units of S/N) for peak of event 
-        time_range_thresh = -1; % threshold for including area around peak (in continuous time)
+        time_range_thresh = -2; % threshold for including area around peak (in continuous time)
         kern_range_thresh = -1; % area threshold (in kernels, discontinuous) NOTE: if negative this will be relative to "threshold"
         star_range_thresh = -1; % area threshold (in stars, discontinuous) NOTE: if this is higher than "threshold" there will be no area around peak
         
@@ -220,15 +220,15 @@ classdef Finder < handle
             
                 t = tic;
                 obj.cal.input(vertcat(obj.prev_fluxes, input.fluxes), vertcat(obj.prev_timestamps, input.timestamps)); 
-                fprintf('Calibration time: %f seconds.\n', toc(t));
+                if obj.debug_bit>1, fprintf('Calibration time: %f seconds.\n', toc(t)); end
                 
                 t = tic;
                 obj.filt.input(obj.cal.fluxes_subtracted, obj.cal.timestamps); 
-                fprintf('Filtering time: %f seconds.\n', toc(t));
+                if obj.debug_bit>1, fprintf('Filtering time: %f seconds.\n', toc(t)); end
                 
                 t = tic;
                 obj.findEvents;
-                fprintf('Triggering time: %f seconds.\n', toc(t));
+                if obj.debug_bit>1, fprintf('Triggering time: %f seconds.\n', toc(t)); end
                 
                 t = tic;
                 obj.storeEventHousekeeping(input); % add some data from this batch to the triggered events
@@ -237,13 +237,13 @@ classdef Finder < handle
                 obj.ev = [obj.ev obj.new_events];
                 obj.new_events = trig.Event.empty;
             
-                fprintf('Housekeeping time: %f seconds.\n', toc(t));
+                if obj.debug_bit>1, fprintf('Housekeeping time: %f seconds.\n', toc(t)); end
             
                 t = tic;
                 
                 obj.checkEvents; % make sure we aren't taking events that already exist
             
-                fprintf('Checking time: %f seconds.\n', toc(t));
+                if obj.debug_bit>1, fprintf('Checking time: %f seconds.\n', toc(t)); end
                 
             end
             
@@ -311,7 +311,7 @@ classdef Finder < handle
             thresh = obj.getTimeThresh;
             time_range = [];
 
-            for jj = 1:N % go backward in time
+            for jj = 0:N % go backward in time
 
                 idx = time_index - jj;
 

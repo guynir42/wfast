@@ -95,7 +95,6 @@ classdef Event < handle
         gauss_sigma; % gaussian width used by photometry (empty if not using PSF photometry)
         
         which_batch = 'first'; % can be "first" or "second", depending on where is the peak in the 2-batch window
-        frame_index = []; % which frame the peak occured (inside the batch)
         
     end
     
@@ -226,6 +225,16 @@ classdef Event < handle
             
         end
         
+        function val = frame_index(obj) % which frame the peak occured (inside the batch)
+            
+            val = obj.time_index;
+            
+            if util.text.cs(obj.which_batch, 'second')
+                val = val + size(obj.cutouts_first,3);
+            end
+            
+        end
+        
     end
     
     methods % setters
@@ -341,8 +350,11 @@ classdef Event < handle
             
             input.ax.NextPlot = 'add';
             range = obj.time_indices;
-            h2 = plot(input.ax, obj.timestamps(range), obj.flux_filtered(range));
-            h2.DisplayName = 'trigger region';
+            if ~isempty(range)
+                h2 = plot(input.ax, obj.timestamps(range), obj.flux_filtered(range));
+                h2.DisplayName = 'trigger region';
+            end
+            
             f = obj.flux_raw_all(:,obj.star_index);
             m = mean(f);
             if ~isempty(obj.stds_raw_all)
@@ -352,17 +364,22 @@ classdef Event < handle
                 s = s(obj.star_index);
             end
             
+            input.ax.ColorOrderIndex = 3;
             h3 = plot(input.ax, obj.timestamps, (f-m)./s, '-');
             h3.DisplayName = 'Raw LC';
             
-            h4 = plot(input.ax, obj.kernel_timestamps+obj.peak_timestamp, obj.best_kernel*5, ':');
+            sign = 1;
+            if obj.is_positive==0
+                sign = -1;
+            end
+            h4 = plot(input.ax, obj.kernel_timestamps+obj.peak_timestamp, obj.best_kernel*5*sign, ':');
             h4.DisplayName = 'best filter';
             
             xlabel(input.ax, 'timestamp (seconds)');
             ylabel(input.ax, 'flux S/N');   
             
             if strcmp(obj.which_batch, 'first')
-                lh = legend(input.ax, 'Location', 'NorthEast');
+                lh = legend(input.ax, 'Location', 'SouthEast');
             else
                 lh = legend(input.ax, 'Location', 'SouthWest');
             end
@@ -370,7 +387,7 @@ classdef Event < handle
             lh.FontSize = input.font_size-6;
             
             util.plot.inner_title(sprintf('id: %d | star: %d | batches: %d-%d | S/N= %4.2f | \\sigma= %4.2f', ...
-                obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.stds_raw_all(1,obj.kern_index, obj.star_index)),...
+                obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.stds_raw_all(1, obj.star_index)),...
                 'ax', input.ax, 'Position', 'NorthWest', 'FontSize', input.font_size);
             
             input.ax.YLim(1) = -max(abs(input.ax.YLim));
