@@ -8,9 +8,10 @@ classdef AcqGUI < handle
              
         buttons = {};
         
-        font_size = 16;
-        edit_font_size = 14;
-        small_font_size = 12;
+        font_size = 13;
+        big_font_size = 16;
+        edit_font_size = 12;
+        small_font_size = 11;
         
         debug_bit = 1;
         
@@ -101,37 +102,63 @@ classdef AcqGUI < handle
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left W_left N/N_left], 'controls');
             obj.panel_controls.number = N;
             obj.panel_controls.addButton('button_source_choose', 'chooseSource', 'push', 'choose src', '', '', 2/3);
-            obj.panel_controls.addButton('button_source_gui', 'src', 'push', 'GUI', '', '', 1/3);
+            obj.panel_controls.addButton('button_source_gui', 'src', 'push', 'GUI', '', 'big', 1/3);
             
             obj.panel_controls.addButton('button_reset', 'reset', 'push', 'RESET', '', '', 1/3);
-            obj.panel_controls.addButton('input_name', 'run_name', 'input_text', 'name= ', '', '', 2/3);
+            obj.panel_controls.addButton('input_name', 'run_name', 'input_text', 'object= ', '', '', 2/3);
             
             obj.panel_controls.addButton('button_num_files', 'num_files', 'info', 'max= ', '', '', 1/3);
-            obj.panel_controls.addButton('input_num_batches', 'num_batches', 'input', 'Nbatches= ', '', '', 1/3);
-            obj.panel_controls.addButton('input_batch_size', 'batch_size', 'input', 'Nframes= ', '', '', 1/3);
+            obj.panel_controls.addButton('input_num_batches', 'num_batches', 'input', 'Nbatch= ', '', '', 1/3);
+            obj.panel_controls.addButton('input_batch_size', 'batch_size', 'input', 'Nframe= ', '', '', 1/3);
             
             obj.panel_controls.addButton('button_stars_found', 'num_stars_found', 'info', ' ', '', '', 1/3);
             obj.panel_controls.addButton('input_num_stars', 'num_stars', 'input', 'Nstars= ', '', '', 1/3);
             obj.panel_controls.addButton('input_cut_size', 'cut_size', 'input', 'size= ', '', '', 1/3);
             
-            obj.panel_controls.addButton('input_edges', 'avoid_edges', 'input', 'edge= ', '', '', 1/3);
+            obj.panel_controls.addButton('input_edges', 'avoid_edges', 'input', 'edges= ', '', '', 1/3);
             obj.panel_controls.addButton('input_num_bgs', 'num_backgrounds', 'input', 'Nbgs= ', '', '', 1/3);
             obj.panel_controls.addButton('input_cut_size_bg', 'cut_size_bg', 'input', 'size= ', '', '', 1/3);
             
             obj.panel_controls.addButton('input_expT', 'expT', 'input', 'T= ', 's', '', 0.5);
             obj.panel_controls.addButton('input_frame_rate', 'frame_rate', 'input', 'f= ', 'Hz', '', 0.5);
             
-            obj.panel_controls.addButton('button_mextractor', 'use_mextractor', 'toggle', 'mextractor', 'mextractor', '', 0.5, 'red');
-            obj.panel_controls.addButton('button_arbitrary_pos', 'use_arbitrary_pos', 'toggle', 'arbitrary', 'arbitrary', '', 0.5, 'red');
+            obj.panel_controls.addButton('button_mextractor', 'use_mextractor', 'toggle', 'mextractor off', 'mextractor on', '', 0.5, 'red');
+            obj.panel_controls.addButton('button_arbitrary_pos', 'use_arbitrary_pos', 'toggle', 'find pos', 'arbitrary pos', '', 0.5, 'red');
             
-            obj.panel_controls.addButton('button_adjust', 'use_adjust_cutouts', 'toggle', 'adjust', 'adjust', '', 0.5, 'red');
-            obj.panel_controls.addButton('button_background', 'use_background', 'toggle', 'b/g', 'b/g', '', 0.5, 'red');
+            obj.panel_controls.addButton('button_adjust', 'use_adjust_cutouts', 'toggle', 'no adjust', 'adjust on', '', 0.5, 'red');
+            obj.panel_controls.addButton('button_background', 'use_background', 'toggle', 'sub b/g off', 'sub b/g on', '', 0.5, 'red');
             
-            obj.panel_controls.addButton('button_simple_phot', 'use_simple_photometry', 'toggle', 'simple phot', 'simple phot', '', 0.5, 'red');
+            obj.panel_controls.addButton('button_simple_phot', 'use_simple_photometry', 'toggle', 'full phot', 'simple phot', '', 0.5, 'red');
             obj.panel_controls.addButton('button_placeholder', '', 'custom', ' ', '', '', 0.5);
             
             obj.panel_controls.make;
+            
             obj.panel_controls.button_num_files.Callback = @obj.callback_num_files;
+            obj.panel_controls.button_num_files.Enable = 'inactive';
+            obj.panel_controls.button_stars_found.Enable = 'inactive';
+            obj.panel_controls.button_placeholder.Enable = 'off';
+            
+            obj.panel_controls.button_source_choose.Tooltip = 'Choose camera or reader';
+            obj.panel_controls.button_source_gui.Tooltip = 'Open the GUI of the camera/reader';
+            obj.panel_controls.button_reset.Tooltip = 'Starts a new run. Reset the positions and batch counter';
+            obj.panel_controls.input_name.Tooltip = 'Object name (will be used also as folder name)';
+            obj.panel_controls.button_num_files.Tooltip = 'Maximum number of batches from reader. For camera it is Inf';
+            obj.panel_controls.input_num_batches.Tooltip = 'How many batches should this run be';
+            obj.panel_controls.input_batch_size.Tooltip = ['Number of images for each batch (default=' num2str(obj.owner.default_batch_size) ')'];
+            obj.panel_controls.button_stars_found.Tooltip = 'How many stars were found by "findStars" or mextractor';
+            obj.panel_controls.input_num_stars.Tooltip = 'Maximum number of stars/cutouts in this run';
+            obj.panel_controls.input_cut_size.Tooltip = 'Size of square cutouts (in pixels)'; 
+            obj.panel_controls.input_edges.Tooltip = 'Avoids finding stars close to the edge of the frame (pixels)';
+            obj.panel_controls.input_num_bgs.Tooltip = 'Number of background sampling points';
+            obj.panel_controls.input_cut_size_bg.Tooltip = 'Size of square cutouts of background sample points';
+            obj.panel_controls.input_expT.Tooltip = 'Exposure time for each frame (seconds)';
+            obj.panel_controls.input_frame_rate.Tooltip = 'Nominal frame rate to be uphel by camera (Hz). Use NaN to make camera take images as fast as possible';
+            obj.panel_controls.button_mextractor.Tooltip = 'Use mextractor and astrometry to find stars and match them to a catalog';
+            obj.panel_controls.button_arbitrary_pos.Tooltip = 'Choose arbitrary positions for cutous (for debugging)';
+            obj.panel_controls.button_adjust.Tooltip = 'Adjust the cutout positions as stars drift in the field';
+            obj.panel_controls.button_background.Tooltip = 'Use background subtraction on all analysis data';
+            obj.panel_controls.button_simple_phot.Tooltip = 'Use simple summing of cutouts <or> full photometry object';
+            
             
             %%%%%%%%%%% panel contrast %%%%%%%%%%%%%%%
             
@@ -144,6 +171,7 @@ classdef AcqGUI < handle
             obj.panel_close = uipanel('Position', [0 0 W_left 1/N_left]);
             obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE');
             obj.button_close.Callback = @obj.callback_close;
+            obj.button_close.Tooltip = 'Close the GUI';
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% RIGHT SIDE %%%%%%%%%%%%%%%%%%%%
             
@@ -175,10 +203,14 @@ classdef AcqGUI < handle
             pos = pos - N;
             obj.panel_save = GraphicPanel(obj.owner, [1-W_right pos/N_right W_right N/N_right], 'save');
             obj.panel_save.number = N;
-            obj.panel_save.addButton('button_save', 'use_save', 'toggle', 'save', 'save', '', 1, 'red');
-            obj.panel_save.addButton('button_trig', 'use_triggered_save', 'toggle', 'trig_save', 'trig_save', '', 1, 'red');
+            obj.panel_save.addButton('button_save', 'use_save', 'toggle', 'save off', 'save on', '', 1, 'red');
+            obj.panel_save.addButton('button_trig', 'use_triggered_save', 'toggle', 'trig save off', 'trig save on', '', 1, 'red');
             
             obj.panel_save.make;
+            
+            obj.panel_save.button_save.Tooltip = 'Save cutouts and stack images of each batch';
+            obj.panel_save.button_trig.Tooltip = 'Save full frame images when triggered on events';
+            
             
             %%%%%%%%%%% panel run %%%%%%%%%%%%%%%%%%
             
@@ -190,20 +222,32 @@ classdef AcqGUI < handle
             obj.panel_run.addButton('button_focus', 'runFocus', 'push', 'FOCUS', '', '', 0.15);
             obj.panel_run.make;
             obj.panel_run.button_run.Callback = @obj.callback_run;
+            obj.panel_run.button_preview.Tooltip = 'Run a single batch just to see the field';
+            obj.panel_run.button_run.Tooltip = 'Start a run / continue a run / stop the run';
+            obj.panel_run.button_focus.Tooltip = 'Start an autofocus run';
             
             %%%%%%%%%%% panel info %%%%%%%%%%%%%%%%%%
             
             obj.panel_info = GraphicPanel(obj.owner, [W_left 0.9 1-W_left-W_right 0.1], 'info', 0);
             obj.panel_info.addButton('button_frame_rate', 'frame_rate_average', 'info', 'f= ', ' Hz'); 
             obj.panel_info.addButton('button_width', 'average_width', 'info', 'width= ', ' px', 'small', 0.5);
-            obj.panel_info.addButton('button_seeing', 'average_width', 'custom', 'seeing= ', '"', 'small', 0.5);
-            obj.panel_info.addButton('button_offset_y', 'average_offsets', 'custom', 'dy= ', '', 'small', 0.5);
-            obj.panel_info.addButton('button_offset_x', 'average_offsets', 'custom', 'dx= ', '', 'small', 0.5);
+            obj.panel_info.addButton('button_seeing', 'average_width', 'custom', 'seeing= ', ' "', 'small', 0.5);
+            obj.panel_info.addButton('button_offset_y', 'average_offsets', 'custom', 'dy= ', ' px', 'small', 0.5);
+            obj.panel_info.addButton('button_offset_x', 'average_offsets', 'custom', 'dx= ', ' px', 'small', 0.5);
             obj.panel_info.addButton('button_flux', 'average_flux', 'info', 'flux= ', '', 'small', 0.5);
             obj.panel_info.addButton('button_bg', 'average_background', 'info', 'b/g= ', '', 'small', 0.5);
             obj.panel_info.addButton('button_temperature', 'sensor_temperature', 'info', 's.temp= '); 
             
             obj.panel_info.make;
+            
+            obj.panel_info.button_frame_rate.Tooltip = 'Measured frame rate (averaged over a few batches)';
+            obj.panel_info.button_width.Tooltip = '2nd moment of stars, averaged over all cutouts (pixels)';
+            obj.panel_info.button_seeing.Tooltip = 'Full width at half maximum (arcsec)';
+            obj.panel_info.button_offset_y.Tooltip = 'Average offset/drift/1st moment in the y direction (pixels)';
+            obj.panel_info.button_offset_x.Tooltip = 'Average offset/drift/1st moment in the x direction (pixels)';
+            obj.panel_info.button_flux.Tooltip = 'Average flux of all stars';
+            obj.panel_info.button_bg.Tooltip = 'Average background of all stars';
+            obj.panel_info.button_temperature.Tooltip = 'Sensor temperature (C)';
             
             %%%%%%%%%%% panel image %%%%%%%%%%%%%%%%%%
             
@@ -221,8 +265,15 @@ classdef AcqGUI < handle
             
             obj.button_flip = GraphicButton(obj.panel_image, [0.9 0.00 0.1 0.05], obj.owner, 'use_flip', 'toggle', 'flip', '', 'small');
             
-            obj.button_reset_axes = GraphicButton(obj.panel_image, [0.9 0.95 0.1 0.05], obj.owner, '', 'custom','reset');
+            obj.button_reset_axes = GraphicButton(obj.panel_image, [0.9 0.95 0.1 0.05], obj.owner, '', 'custom','new axes');
             obj.button_reset_axes.Callback = @obj.makeAxes;
+            
+            obj.button_batch_num.Tooltip = 'How many batches already taken in this run';
+            obj.button_time_left.Tooltip = 'Estimate for remaining run time';
+            obj.button_gb_left.Tooltip = 'Estimate for hard drive spaced needed for the remaining batches in this run';
+            obj.button_show_what.Tooltip = 'Display images, stack, or stack processed (dark, flat, background removed)';
+            obj.button_flip.Tooltip = 'Flip the image 180 degrees (for viewing beyond the meridian)';
+            obj.button_reset_axes.Tooltip = 'Generate a new image axes with contrast and zoom initialized';
             
             obj.update;
             
@@ -247,7 +298,7 @@ classdef AcqGUI < handle
         end
                 
         function update(obj,~,~)
-                        
+            
             if ~obj.check
                 return;
             end
@@ -255,6 +306,10 @@ classdef AcqGUI < handle
             for ii = 1:length(obj.buttons)
                 obj.buttons{ii}.update;
             end
+            
+            obj.panel_contrast.font_size = obj.font_size;
+            obj.panel_contrast.edit_font_size = obj.edit_font_size;
+            obj.panel_contrast.update;
             
             if isa(obj.owner.src, 'file.Reader')
                 obj.panel_controls.button_source_choose.String = 'src: Reader';
@@ -264,7 +319,7 @@ classdef AcqGUI < handle
                 obj.panel_controls.button_source_choose.String = 'src: Camera';
             end
             
-            obj.panel_info.button_seeing.String = sprintf('seeing= %4.2f', obj.owner.average_width.*obj.owner.pars.plate_scale.*2.355);
+            obj.panel_info.button_seeing.String = sprintf('seeing= %4.2f"', obj.owner.average_width.*obj.owner.pars.plate_scale.*2.355);
             
 %             obj.panel_info.button_offsets.String = sprintf('dx,dy= %4.2f,%4.2f', obj.owner.average_offsets(2), obj.owner.average_offsets(1));
             if length(obj.owner.average_offsets)==2
@@ -275,16 +330,72 @@ classdef AcqGUI < handle
                 obj.panel_info.button_offset_y.String = 'dy= ';
             end
             
-            if obj.owner.brake_bit
-                if obj.owner.start_index>1
-                    obj.panel_run.button_run.String = 'CONTINUE';
-                else
-                    obj.panel_run.button_run.String = 'RUN';
-                end
-%                 obj.button_run.Enable = 'on';
+            if obj.owner.brake_bit && (obj.owner.is_running || obj.owner.is_running_single) % started a run but not yet took off the brake bit
+                obj.panel_run.button_run.Enable = 'off';
+%                 obj.panel_run.button_run.String = 'STARTING UP';
             else
-                obj.panel_run.button_run.String = 'STOP';
-%                 obj.button_run.Enable = 'off';
+
+                if obj.owner.brake_bit
+                    obj.panel_run.button_run.Enable = 'on';
+                    if obj.owner.start_index>1
+                        obj.panel_run.button_run.String = 'CONTINUE THIS RUN';
+                    else
+                        obj.panel_run.button_run.String = 'START NEW RUN';
+                    end
+    %                 
+                else % still running
+                    obj.panel_run.button_run.Enable = 'on';
+                    obj.panel_run.button_run.String = 'STOP';
+                end
+
+            end
+            
+            if obj.owner.is_running || obj.owner.is_running_single
+                
+                obj.panel_controls.button_source_choose.Enable = 'off';
+                obj.panel_controls.button_reset.Enable = 'off';
+                obj.panel_controls.input_name.Enable = 'off';
+                obj.panel_controls.input_num_batches.Enable = 'off';
+                obj.panel_controls.input_batch_size.Enable = 'off';
+                obj.panel_controls.input_num_stars.Enable = 'off';
+                obj.panel_controls.input_cut_size.Enable = 'off';
+                obj.panel_controls.input_edges.Enable = 'off';
+                obj.panel_controls.input_num_bgs.Enable = 'off';
+                obj.panel_controls.input_cut_size_bg.Enable = 'off';
+                obj.panel_controls.input_expT.Enable = 'off';
+                obj.panel_controls.input_frame_rate.Enable = 'off';
+                obj.panel_controls.button_mextractor.Enable = 'off';
+                obj.panel_controls.button_arbitrary_pos.Enable = 'off';
+                obj.panel_controls.button_adjust.Enable = 'off';
+                obj.panel_controls.button_background.Enable = 'off';
+                obj.panel_controls.button_simple_phot.Enable = 'off';
+                
+                obj.panel_run.button_preview.Enable = 'off';
+                obj.panel_run.button_focus.Enable = 'off';
+                
+            else
+                
+                obj.panel_controls.button_source_choose.Enable = 'on';
+                obj.panel_controls.button_reset.Enable = 'on';
+                obj.panel_controls.input_name.Enable = 'on';
+                obj.panel_controls.input_num_batches.Enable = 'on';
+                obj.panel_controls.input_batch_size.Enable = 'on';
+                obj.panel_controls.input_num_stars.Enable = 'on';
+                obj.panel_controls.input_cut_size.Enable = 'on';
+                obj.panel_controls.input_edges.Enable = 'on';
+                obj.panel_controls.input_num_bgs.Enable = 'on';
+                obj.panel_controls.input_cut_size_bg.Enable = 'on';
+                obj.panel_controls.input_expT.Enable = 'on';
+                obj.panel_controls.input_frame_rate.Enable = 'on';
+                obj.panel_controls.button_mextractor.Enable = 'on';
+                obj.panel_controls.button_arbitrary_pos.Enable = 'on';
+                obj.panel_controls.button_adjust.Enable = 'on';
+                obj.panel_controls.button_background.Enable = 'on';
+                obj.panel_controls.button_simple_phot.Enable = 'on';
+                
+                obj.panel_run.button_preview.Enable = 'on';
+                obj.panel_run.button_focus.Enable = 'on';
+                
             end
             
             for ii = 1:length(obj.button_show_what.String)
@@ -295,6 +406,8 @@ classdef AcqGUI < handle
             end
             
             obj.panel_objects.button_focuser.String = sprintf('Focuser: %6.4f', obj.owner.cam.focuser.pos);
+            
+            drawnow;
             
         end
                         
@@ -311,14 +424,13 @@ classdef AcqGUI < handle
         function callback_run(obj, ~, ~)
             
             if obj.owner.brake_bit
-                if obj.debug_bit, disp('callback: run'); end            
+                if obj.debug_bit, disp('callback: run'); end
                 obj.owner.run;
             else
                 if obj.debug_bit, disp('callback: stop'); end            
                 obj.owner.brake_bit = 1;
+                obj.update;
             end
-            
-            obj.update;
             
         end
         

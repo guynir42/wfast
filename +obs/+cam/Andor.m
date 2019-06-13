@@ -206,9 +206,10 @@ classdef Andor < file.AstroData
         
         num_restarts; % how many times did the camera get stuck (synchronous mode only!)
         
+        is_running = 0;
         brake_bit = 1; % when 1 the camera is stopped. Is set to 0 on "startup". 
         
-        version = 1.00;
+        version = 1.01;
         
     end
     
@@ -769,6 +770,13 @@ classdef Andor < file.AstroData
         
         function run(obj, varargin) % calls "startup", loops over calls to "batch", then calls "finishup"
             
+            if obj.is_running
+                disp('Camera is already running. Set is_running to zero...');
+                return;
+            else
+                obj.is_running = 1;
+            end
+            
             obj.startup(varargin);
             
             try
@@ -793,6 +801,10 @@ classdef Andor < file.AstroData
         function startup(obj, varargin)
             
             try 
+                
+                if obj.brake_bit==0
+                    disp('Cannot start a new acquisition while old one is still runnning (turn off brake_bit)');
+                end
                 
                 input = obj.makeInputVars(varargin{:});
                 
@@ -868,7 +880,7 @@ classdef Andor < file.AstroData
 
                     obs.cam.mex_new.startup(obj, obj.mex_flag, obj.buffers.buf, obj.buffers.index_rec_vec, obj.num_batches, obj.batch_size); % call the mex file for async recording
 
-                else
+                else % synchronous startup option
 
                     if strcmp(obj.getCycleModeHW, 'Fixed') % this shouldn't happen (we don't use this mode anymore)
                         [rc] = obs.cam.sdk.AT_SetInt(obj.hndl,'FrameCount',obj.batch_size); obs.cam.sdk.AT_CheckWarning(rc);
@@ -905,6 +917,7 @@ classdef Andor < file.AstroData
 
             catch ME
                 obj.log.error(ME.getReport);
+                obj.is_running = 0;
                 rethrow(ME);
             end
                 
@@ -913,45 +926,48 @@ classdef Andor < file.AstroData
         function finishup(obj) % called at end of each run. Shuts down everything (when use_save=1 will also add a finish readme file)
             
             try 
-            if obj.use_async
-                
-                obj.stop;
-                
-            else
-                
-                [rc] = obs.cam.sdk.AT_Command(obj.hndl,'AcquisitionStop'); obs.cam.sdk.AT_CheckWarning(rc);
-            
-                [rc] = obs.cam.sdk.AT_Flush(obj.hndl); obs.cam.sdk.AT_CheckWarning(rc);
-            
-            end
-            
-            if obj.use_save
-                filename = obj.buffers.getReadmeFilename('Z');
-                util.oop.save(obj, filename, 'name', 'camera');  
-            end
-            
-            if obj.use_audio
-                try
-                    obj.audio.playShowsOver;
-                catch ME
-                    warning(ME.getReport);
+                if obj.use_async
+
+                    obj.stop;
+
+                else
+
+                    [rc] = obs.cam.sdk.AT_Command(obj.hndl,'AcquisitionStop'); obs.cam.sdk.AT_CheckWarning(rc);
+
+                    [rc] = obs.cam.sdk.AT_Flush(obj.hndl); obs.cam.sdk.AT_CheckWarning(rc);
+
                 end
-            end
-            
-            if obj.use_progress
-                obj.prog.finish(obj.batch_counter);
-            end
-            
-            obj.brake_bit = 1;
-            
-            obj.unstash_parameters; % return all parameters to values they were in before this run
-            
-            if ~isempty(obj.gui)
-                obj.gui.update;
-            end
+
+                if obj.use_save
+                    filename = obj.buffers.getReadmeFilename('Z');
+                    util.oop.save(obj, filename, 'name', 'camera');  
+                end
+
+                if obj.use_audio
+                    try
+                        obj.audio.playShowsOver;
+                    catch ME
+                        warning(ME.getReport);
+                    end
+                end
+
+                if obj.use_progress
+                    obj.prog.finish(obj.batch_counter);
+                end
+
+                obj.brake_bit = 1;
+
+                obj.unstash_parameters; % return all parameters to values they were in before this run
+                
+                obj.is_running = 0;
+                
+                if ~isempty(obj.gui)
+                    obj.gui.update;
+                end
             
             catch ME
                 obj.log.error(ME.getReport);
+                obj.is_running = 0;
                 rethrow(ME);
             end
         end

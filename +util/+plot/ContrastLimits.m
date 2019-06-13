@@ -184,8 +184,19 @@ classdef ContrastLimits < handle
             obj.button_high.font_size = 'small';
             obj.slider_high = uicontrol(obj.panel, 'Style', 'Slider',  'Units', 'Normalized', 'Position', p{7}, 'Callback', @obj.callback_sliders);
             
-            obj.button_auto = GraphicButton(obj.panel, p{8}, obj, 'autodyn', 'push', 'auto');
-            obj.button_reset = GraphicButton(obj.panel, p{9}, obj, 'reset', 'push', 'reset');
+            obj.button_auto = GraphicButton(obj.panel, p{8}, obj, 'autodyn', 'push', 'autodyn');
+            obj.button_reset = GraphicButton(obj.panel, p{9}, obj, 'reset', 'push', 'reset axes');
+            
+            obj.input_clim.Tooltip = 'Set the contrast limit manually (use [min max] values)';
+            obj.button_min.Tooltip = 'Set the minimum value for the sliders';
+            obj.button_max.Tooltip = 'Set the maximum value for the sliders';
+            obj.button_low.Enable = 'inactive';
+            obj.button_high.Enable = 'inactive';
+            obj.slider_low.TooltipString = 'Control the black level (lowest values clipped)';
+            obj.slider_high.TooltipString = 'Control the white level (highest values clipped)';
+            obj.button_auto.Tooltip = 'Use util.img.autodyn function to set the contrast limits';
+            obj.button_reset.Tooltip = 'Reset the axes to the default contrast limits';
+            
             
             obj.update;
             

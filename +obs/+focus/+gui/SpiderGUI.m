@@ -95,7 +95,7 @@ classdef SpiderGUI < handle
             
             %%%%%%%%%%% panel tip %%%%%%%%%%%%%%%%%%
             
-            obj.panel_tip = GraphicPanel(obj.owner, [1/3 1/6 1/3 4/6], 'position');
+            obj.panel_tip = GraphicPanel(obj.owner, [1/3 1/6 1/3 4/6], 'tip');
             obj.panel_tip.addButton('value', 'tip', 'input', ' ');
             obj.panel_tip.addButton('up', 'tip_up', 'push', 'UP');
             obj.panel_tip.addButton('step', 'step_tip', 'input', ' ');
@@ -104,7 +104,7 @@ classdef SpiderGUI < handle
             
             %%%%%%%%%%% panel tilt %%%%%%%%%%%%%%%%%%
             
-            obj.panel_tilt = GraphicPanel(obj.owner, [2/3 1/6 1/3 4/6], 'position');
+            obj.panel_tilt = GraphicPanel(obj.owner, [2/3 1/6 1/3 4/6], 'tilt');
             obj.panel_tilt.addButton('value', 'tilt', 'input', ' ');
             obj.panel_tilt.addButton('up', 'tilt_up', 'push', 'UP');
             obj.panel_tilt.addButton('step', 'step_tilt', 'input', ' ');

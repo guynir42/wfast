@@ -148,6 +148,8 @@ classdef Acquisition < file.AstroData
     properties(Hidden=true)
        
         brake_bit = 1; % when this is set to 1 (using the GUI, for example), the run stops. 
+        is_running = 0; % when this is 1, cannot start a new run or anything
+        is_running_single = 0; % when this is 1, cannot start a new run or anything
         
         default_saturation_value;
         
@@ -1030,13 +1032,22 @@ classdef Acquisition < file.AstroData
     methods % commands/calculations
         
         function run(obj, varargin)
-                        
-            obj.startup(varargin);
+            
+            if obj.is_running || obj.is_running_single
+                disp('Already running, set is_running and is_running_single to zero...');
+                return;
+            else
+                obj.is_running = 1;
+            end
+            
+            check = obj.startup(varargin);
             
             try 
                 
                 cleanup = onCleanup(@obj.finishup);
 
+                if check==0, return; end
+            
                 if obj.start_index
                     idx = obj.start_index;
                 else
@@ -1080,9 +1091,20 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function startup(obj, varargin)
+        function check = startup(obj, varargin)
+            
+            check = 0;
             
             try 
+                
+                if obj.brake_bit==0
+                    disp('Cannot start a new acquisition while old one is still runnning (turn off brake_bit)');
+                    return;
+                end
+
+                if ~isempty(obj.gui) && obj.gui.check
+                    obj.gui.update;
+                end
                 
                 input = obj.makeInputVars(varargin{:});
             
@@ -1149,6 +1171,8 @@ classdef Acquisition < file.AstroData
                 
                 obj.brake_bit = 0;
                 
+                check = 1;
+                
             catch ME
                 obj.log.error(ME.getReport);
                 obj.unstash_parameters;
@@ -1187,6 +1211,12 @@ classdef Acquisition < file.AstroData
             obj.brake_bit = 1;
             
             obj.unstash_parameters;
+            
+            obj.is_running = 0;
+            
+            if ~isempty(obj.gui) && obj.gui.check
+                obj.gui.update;
+            end
             
         end
         
@@ -1271,21 +1301,40 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function single(obj) % get a single batch and calculate stack_proc from it... 
+        function check = single(obj) % get a single batch and calculate stack_proc from it... 
+            
+            check = 0;
+            
+            if obj.is_running_single
+                disp('Already running "single". Set is_running_single to zero...');
+                return;
+            else
+                obj.is_running_single = 1;
+            end
             
             obj.log.input('Getting single batch from source');
             
             try 
-            obj.src.single; 
-            obj.images = obj.src.images;
-            obj.timestamps = obj.src.timestamps;
-            obj.stack = sum(obj.src.images,3);
-            obj.num_sum = size(obj.src.images,3);
+                
+                if obj.brake_bit==0
+                    disp('Cannot call single while in an active acquisition (set brake_bit to 1)');
+                    return;
+                end
+                
+                obj.src.single; 
+                obj.images = obj.src.images;
+                obj.timestamps = obj.src.timestamps;
+                obj.stack = sum(obj.src.images,3);
+                obj.num_sum = size(obj.src.images,3);
 
-            obj.stack_proc = obj.cal.input(obj.stack, 'sum', obj.num_sum); % stack after calibration
+                obj.stack_proc = obj.cal.input(obj.stack, 'sum', obj.num_sum); % stack after calibration
 
+                check = 1;
+                obj.is_running_single = 0;
+                
             catch ME
                 obj.log.error(ME.getReport);
+                obj.is_running_single = 0;
                 rethrow(ME);
             end
             
@@ -1526,6 +1575,12 @@ classdef Acquisition < file.AstroData
         
         function runPreview(obj, varargin) % I'm not sure we need this... 
             
+            if obj.is_running
+                return;
+            else
+                obj.is_running = 1;
+            end
+            
             obj.single;
             obj.findStars;
             obj.show;
@@ -1544,6 +1599,12 @@ classdef Acquisition < file.AstroData
         
         function runLive(obj, varargin) % I'm not sure we need this... 
             
+            if obj.is_running
+                return;
+            else
+                obj.is_running = 1;
+            end
+            
             if ~isempty(varargin) && isa(varargin{1}, 'util.text.InputVars')
                 input = varargin{1};
                 input.scan_vars(varargin{2:end});
@@ -1558,10 +1619,21 @@ classdef Acquisition < file.AstroData
         
         function runFocus(obj, varargin)
             
+            if obj.is_running || obj.is_running_single
+                disp('Already running, set is_running and is_running_single to zero...');
+                return;
+            else
+                obj.is_running = 1;
+            end
+            
             obj.log.input('Running autofocus');
             
             try
                
+                if ~isempty(obj.gui) && obj.gui.check
+                    obj.gui.update;
+                end
+                
                 old_pos = [];
                 
                 if isempty(obj.cam) || isempty(obj.cam.focuser)
@@ -1573,7 +1645,10 @@ classdef Acquisition < file.AstroData
                     'pass_source', {'async', 0}, varargin{:});
 
                 obj.reset;
-                obj.single;
+                
+                check = obj.single;
+                if check==0, return; end
+                
                 obj.findStarsFocus;
                 
                 old_pos = obj.cam.focuser.pos; % keep this in case of error/failure
@@ -1607,7 +1682,9 @@ classdef Acquisition < file.AstroData
                         warning(ME.getReport);
                     end
                     
-                    obj.single;
+                    check = obj.single;
+                    if check==0, return; end
+                    
                     obj.phot_stack.input(obj.clip.input(obj.stack_proc), 'positions', obj.clip.positions); 
                     
                     if ~isempty(obj.gui) && obj.gui.check
@@ -1641,6 +1718,8 @@ classdef Acquisition < file.AstroData
                 rethrow(ME);
                 
             end
+            
+            obj.cam.focuser.pos = obj.af.pos(1); % go back to lower position, then go back up (like the tank cannon)
             
             if ~isnan(obj.af.found_pos)
                 obj.cam.focuser.pos = obj.af.found_pos;

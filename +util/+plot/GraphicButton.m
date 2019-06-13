@@ -39,6 +39,7 @@ classdef GraphicButton < handle
         FontSize;
         Enable;
         BackgroundColor;
+        Tooltip;
         
     end
     
@@ -226,6 +227,12 @@ classdef GraphicButton < handle
             
         end
         
+        function val = get.Tooltip(obj)
+            
+            val = obj.control.TooltipString;
+            
+        end
+        
     end
     
     methods % setters
@@ -275,6 +282,12 @@ classdef GraphicButton < handle
         function set.BackgroundColor(obj, val)
             
             obj.control.BackgroundColor= val;
+            
+        end
+        
+        function set.Tooltip(obj, val)
+            
+            obj.control.TooltipString = val;
             
         end
         
