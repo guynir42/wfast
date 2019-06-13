@@ -12,35 +12,55 @@ classdef Event < handle
     
     properties % inputs/outputs
         
-        serial;
-        notes = '';
-        keep = 1;
-        is_real = 1;
-        is_duplicate = 0;
-        is_offset = 0;
-        is_simulated = 0;
-        is_global = 0;
-        is_cosmic_ray = 0;
-        is_artefact = 0;
-        is_bad_batch = 0;
-        is_bad_star = 0;
+        serial; % which event in the run (including unkept events)
+        
+        notes = ''; % why this event was not kept
+        keep = 1; % only keep the "real" events that are not duplicates
+        is_real = 1; % can still be a duplicate
+        is_duplicate = 0; % has a better event in the other batch
+        is_offset = 0; % the star's position offset is too big to be a real event
+        is_global = 0; % this event is triggered on many stars at the same time, suggesting a non-astronomical event
+        is_cosmic_ray = 0; % cosmic ray
+        is_artefact = 0; % some other sort of image artefact
+        is_bad_batch = 0; % this batch is noisy and has lots of events
+        is_bad_star = 0; % this star is constantly triggering (black listed)
+        is_simulated = 0; % we've added this event on purpose
+        is_forced = 0; % we've forced the system to trigger on a subtrheshold event
         % ...
         
-        range_time_idx;
-        range_kernels_idx;
-        range_stars;
+        snr; % trigger value
+        is_positive; % is the filter-response positive (typically for occultations)
         
-        peak_timestamp;
-        best_kernel;
-        star_index;
-        snr;
+        timestamps; % all timestamps for the 2-batch window
+        flux_filtered; % flux of the best star and best kernel, after filtering and normalizing
+        flux_fitted; % best fit flux model (to be filled later, adding a occult.Parameters object)
+        flux_raw_all; % all the fluxes in the 2-batch window *
+        stds_raw_all; % noise values for each of the above fluxes
         
-        timestamps;
-        flux_filtered;
-        flux_fitted;
-        flux_raw_all;
-        stds;
+        time_index; % index in the 2-batch time window where the maximum value occured
+        kern_index; % index of the best kernel
+        star_index; % index of the best star 
         
+        time_indices; % what continuous range of timestamp indices passed the time_range_thresh
+        kern_indices; % what assorted kernel indices passed the kern_range_thresh inside the time range for one star
+        star_indices; % what assorted star indices passed the kern_range_thresh inside the time range for one kernel
+        
+        peak_timestamp; % timestamp for time_index
+        best_kernel; % full kernel that goes with kern_index
+        
+        threshold; % trigger threshold used (in S/N units)
+        
+        % NOTE: these can be absolute thresholds (positive) or relative to threshold (negative). 
+        time_range_thresh; % all times around the peak (for same star/kernel) above this threshold are also part of the event
+        kern_range_thresh; % any kernels in the time range above this threshold are also included in the event
+        star_range_thresh; % any stars in the time range above this threshold are also included in the event
+        
+        % The following are additional metadata collected by Photometry class
+        % "at_peak" means values for all stars at the time of event peak (row vector)
+        % "at_star" means values for this star on all timestamps (column vector)
+        % They intersect at star_index and time_index 
+        % "time_average" means for each star, averaged over time (row vector)
+        % "star_average" means for each timestamp, averaged between stars (column vector)
         backgrounds_at_peak;
         backgrounds_at_star;
         backgrounds_time_average;
@@ -71,11 +91,11 @@ classdef Event < handle
         bad_pixels_time_average;
         bad_pixels_star_average;
         
-        aperture;
-        gauss_sigma;
+        aperture; % aperture radius used by photometry (empty if not using aperture photometry)
+        gauss_sigma; % gaussian width used by photometry (empty if not using PSF photometry)
         
-        which_batch = 'first'; % can be "first" or "second", depending on where is the peak
-        frame_index = []; 
+        which_batch = 'first'; % can be "first" or "second", depending on where is the peak in the 2-batch window
+        frame_index = []; % which frame the peak occured (inside the batch)
         
     end
     
@@ -111,7 +131,7 @@ classdef Event < handle
         t_end;
         t_end_stamp;
         
-        version = 1.00;
+        version = 1.01;
         
     end
     
@@ -122,8 +142,6 @@ classdef Event < handle
             if ~isempty(varargin) && isa(varargin{1}, 'trig.Event')
                 if obj.debug_bit, fprintf('Event copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
-            elseif length(varargin)>=1 && istable(varargin{1})
-                obj.input(varargin{:});
             else
                 if obj.debug_bit, fprintf('Event constructor v%4.2f\n', obj.version); end
             
@@ -216,7 +234,7 @@ classdef Event < handle
     
     methods % calculations
         
-        function input(obj, table_row, fluxes, timestamps, kernels, stds)
+        function input(obj, table_row, fluxes, timestamps, kernels, stds) % to be depricated! 
             
             box = table_row{1, 'BoundingBox'};
             idx = table_row{1, 'VoxelIdxList'}{1};
@@ -322,13 +340,13 @@ classdef Event < handle
             h1.DisplayName = 'Filtered LC';
             
             input.ax.NextPlot = 'add';
-            range = obj.range_time_idx;
+            range = obj.time_indices;
             h2 = plot(input.ax, obj.timestamps(range), obj.flux_filtered(range));
             h2.DisplayName = 'trigger region';
             f = obj.flux_raw_all(:,obj.star_index);
             m = mean(f);
-            if ~isempty(obj.stds)
-                s = obj.stds(obj.star_index);
+            if ~isempty(obj.stds_raw_all)
+                s = obj.stds_raw_all(obj.star_index);
             else
                 s = std(obj.flux_raw_all);
                 s = s(obj.star_index);
@@ -352,7 +370,7 @@ classdef Event < handle
             lh.FontSize = input.font_size-6;
             
             util.plot.inner_title(sprintf('id: %d | star: %d | batches: %d-%d | S/N= %4.2f | \\sigma= %4.2f', ...
-                obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.stds(obj.star_index)),...
+                obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.stds_raw_all(1,obj.kern_index, obj.star_index)),...
                 'ax', input.ax, 'Position', 'NorthWest', 'FontSize', input.font_size);
             
             input.ax.YLim(1) = -max(abs(input.ax.YLim));

@@ -41,6 +41,15 @@ classdef Finder < handle
     
     properties % switches/controls
         
+        threshold = 5; % threshold (in units of S/N) for peak of event 
+        time_range_thresh = -1; % threshold for including area around peak (in continuous time)
+        kern_range_thresh = -1; % area threshold (in kernels, discontinuous) NOTE: if negative this will be relative to "threshold"
+        star_range_thresh = -1; % area threshold (in stars, discontinuous) NOTE: if this is higher than "threshold" there will be no area around peak
+        
+        max_events = 5; % how many events can we have triggered on the same 2-batch window?
+        max_stars = 5; % how many stars can we afford to have triggered at the same time? 
+        max_frames = 50; % maximum length of trigger area (very long events are disqualified)
+        
         use_conserve_memory = 0;
         
         debug_bit = 1;
@@ -121,6 +130,36 @@ classdef Finder < handle
     
     methods % getters
         
+        function val = getTimeThresh(obj)
+            
+            if obj.time_range_thresh>0
+                val = obj.time_range_thresh;
+            else
+                val = obj.threshold + obj.time_range_thresh;
+            end
+            
+        end
+        
+        function val = getKernThresh(obj)
+            
+            if obj.time_range_thresh>0
+                val = obj.kern_range_thresh;
+            else
+                val = obj.threshold + obj.kern_range_thresh;
+            end
+            
+        end
+        
+        function val = getStarThresh(obj)
+            
+            if obj.star_range_thresh>0
+                val = obj.star_range_thresh;
+            else
+                val = obj.threshold + obj.star_range_thresh;
+            end
+            
+        end
+        
         function val = get.ev_kept(obj)
             
             val = obj.ev([obj.ev.keep]==1);
@@ -188,74 +227,11 @@ classdef Finder < handle
                 fprintf('Filtering time: %f seconds.\n', toc(t));
                 
                 t = tic;
-            
-                obj.new_events = obj.filt.found_events;
+                obj.findEvents;
+                fprintf('Triggering time: %f seconds.\n', toc(t));
                 
-                for ii = 1:length(obj.new_events)
-                    
-                    this_ev = obj.new_events(ii);
-                    this_ev.serial = length(obj.ev) + ii;
-                    this_ev.flux_raw_all = vertcat(obj.prev_fluxes, input.fluxes); 
-                    this_ev.cutouts_first = obj.prev_cutouts;
-                    this_ev.cutouts_second = input.cutouts;
-                    this_ev.positions_first = obj.prev_positions;
-                    this_ev.positions_second = input.positions;
-                    this_ev.stack_first = obj.prev_stack;
-                    this_ev.stack_second = input.stack;
-                    this_ev.batch_index_first = obj.prev_batch_index;
-                    this_ev.batch_index_second = input.batch_index;
-                    this_ev.filename_first = obj.prev_filename;
-                    this_ev.filename_second = input.filename;
-                    if ischar(input.t_end) && isnumeric(input.t_end_stamp)
-                        this_ev.t_end = input.t_end;
-                        this_ev.t_end_stamp = input.t_end_stamp;
-                    end
-
-                    b = vertcat(obj.prev_backgrounds, input.backgrounds);
-                    this_ev.backgrounds_at_peak = b(this_ev.frame_index, :);
-                    this_ev.backgrounds_at_star = b(:, this_ev.star_index);
-                    this_ev.backgrounds_time_average = mean(b, 1, 'omitnan'); 
-                    this_ev.backgrounds_star_average = mean(b, 2, 'omitnan'); 
-                    
-                    v = vertcat(obj.prev_variances, input.variances);
-                    this_ev.variances_at_peak = v(this_ev.frame_index, :);
-                    this_ev.variances_at_star = v(:, this_ev.star_index);
-                    this_ev.variances_time_average = mean(v, 1, 'omitnan'); 
-                    this_ev.variances_star_average = mean(v, 2, 'omitnan'); 
-                    
-                    dx = vertcat(obj.prev_offsets_x, input.offsets_x);
-                    this_ev.offsets_x_at_peak = dx(this_ev.frame_index, :);
-                    this_ev.offsets_x_at_star = dx(:, this_ev.star_index);
-                    this_ev.offsets_x_time_average = mean(dx, 1, 'omitnan'); 
-                    this_ev.offsets_x_star_average = mean(dx, 2, 'omitnan'); 
-                    
-                    dy = vertcat(obj.prev_offsets_y, input.offsets_y);
-                    this_ev.offsets_y_at_peak = dy(this_ev.frame_index, :);
-                    this_ev.offsets_y_at_star = dy(:, this_ev.star_index);
-                    this_ev.offsets_y_time_average = mean(dy, 1, 'omitnan'); 
-                    this_ev.offsets_y_star_average = mean(dy, 2, 'omitnan'); 
-                    
-                    w = vertcat(obj.prev_widths, input.widths);
-                    this_ev.widths_at_peak = w(this_ev.frame_index, :);
-                    this_ev.widths_at_star = w(:, this_ev.star_index);
-                    this_ev.widths_time_average = mean(w, 1, 'omitnan'); 
-                    this_ev.widths_star_average = mean(w, 2, 'omitnan'); 
-                    
-                    p = vertcat(obj.prev_bad_pixels, input.bad_pixels);
-                    this_ev.bad_pixels_at_peak = p(this_ev.frame_index, :); 
-                    this_ev.bad_pixels_at_star = p(:, this_ev.star_index); 
-                    this_ev.bad_pixels_time_average = mean(p, 1, 'omitnan'); 
-                    this_ev.bad_pixels_star_average = mean(p, 2, 'omitnan'); 
-                    
-                    this_ev.aperture = input.aperture;
-                    this_ev.gauss_sigma = input.gauss_sigma;
-                    
-                    % any other info that needs to be saved along with the event object? 
-                    % ...
-
-                end
-                
-                obj.check_new_events; % make sure we aren't taking events that already exist
+                t = tic;
+                obj.storeEventHousekeeping(input); % add some data from this batch to the triggered events
                 
                 obj.last_events = obj.new_events;
                 obj.ev = [obj.ev obj.new_events];
@@ -263,6 +239,12 @@ classdef Finder < handle
             
                 fprintf('Housekeeping time: %f seconds.\n', toc(t));
             
+                t = tic;
+                
+                obj.checkEvents; % make sure we aren't taking events that already exist
+            
+                fprintf('Checking time: %f seconds.\n', toc(t));
+                
             end
             
             % store these for next time
@@ -282,7 +264,168 @@ classdef Finder < handle
             
         end
         
-        function check_new_events(obj)
+        function findEvents(obj)
+            
+            obj.new_events = trig.Event.empty;
+            
+            ff = obj.filt.fluxes_filtered; % dim 1 is time, dim 2 is kernels, dim 3 is stars
+            
+            for ii = 1:obj.max_events
+                
+                [mx, idx] = util.stat.maxnd(abs(ff)); % note we are triggering on negative and positive events
+                
+                if mx<obj.threshold, break; end 
+                
+                ev = trig.Event;
+                ev.snr = mx; % note this is positive even for negative filter responses! 
+                
+                ev.time_index = idx(1); 
+                ev.kern_index = idx(2);
+                ev.star_index = idx(3);
+                
+                ev.time_indices = obj.findTimeRange(ff, ev.time_index, ev.kern_index, ev.star_index); % find continuous area that is above time_range_thresh
+                
+                ev.kern_indices = find(max(abs(ff(ev.time_indices, :, ev.star_index)))>obj.getKernThresh);
+                
+                ev.star_indices = find(max(abs(ff(ev.time_indices, ev.kern_index, :)))>obj.getStarThresh);
+                
+                ev.timestamps = obj.filt.timestamps;
+                ev.flux_filtered = obj.filt.fluxes_filtered(:,ev.kern_index,ev.star_index);
+                ev.flux_raw_all = permute(obj.filt.fluxes, [1,3,2]);
+                ev.stds_raw_all = permute(obj.filt.stds, [1,3,2]);
+                
+                ff(ev.time_indices, :, :) = 0; % don't look at the same region twice
+                
+                obj.new_events(end+1) = ev; % add this event to the list
+                
+            end
+            
+            
+            
+        end
+        
+        function time_range = findTimeRange(obj, ff, time_index, kern_index, star_index)
+
+            N = size(ff,1); % time length
+            
+            thresh = obj.getTimeThresh;
+            time_range = [];
+
+            for jj = 1:N % go backward in time
+
+                idx = time_index - jj;
+
+                if idx<1, break; end
+
+                if abs(ff(idx, kern_index, star_index))>=thresh
+                    time_range = [time_range, idx];
+                else 
+                    break;
+                end
+
+            end
+
+            time_range = flip(time_range);
+
+            for jj = 1:N % go forward in time
+
+                idx = time_index + jj;
+
+                if idx>N, break; end
+
+                if abs(ff(idx, kern_index, star_index))>=thresh
+                    time_range = [time_range, idx];
+                else 
+                    break;
+                end
+
+            end
+
+        end
+        
+        function storeEventHousekeeping(obj, input) % store all the additional metadata about this event
+            
+            for ii = 1:length(obj.new_events)
+                
+                ev = obj.new_events(ii);
+                
+                ev.serial = length(obj.ev) + ii; % just keep a running index
+                
+                % fluxes and timestamps
+                ev.is_positive = obj.filt.fluxes_filtered(ev.time_index, ev.kern_index, ev.star_index)>0;
+                
+                ev.peak_timestamp = ev.timestamps(ev.time_index);
+                ev.best_kernel = obj.filt.kernels(:,ev.kern_index);
+                
+                ev.threshold = obj.threshold;
+                ev.time_range_thresh = obj.time_range_thresh;
+                ev.kern_range_thresh = obj.kern_range_thresh;
+                ev.star_range_thresh = obj.star_range_thresh;
+                
+                % housekeeping data from photometry
+                b = vertcat(obj.prev_backgrounds, input.backgrounds);
+                ev.backgrounds_at_peak = b(ev.frame_index, :);
+                ev.backgrounds_at_star = b(:, ev.star_index);
+                ev.backgrounds_time_average = mean(b, 1, 'omitnan');
+                ev.backgrounds_star_average = mean(b, 2, 'omitnan');
+                
+                v = vertcat(obj.prev_variances, input.variances);
+                ev.variances_at_peak = v(ev.frame_index, :);
+                ev.variances_at_star = v(:, ev.star_index);
+                ev.variances_time_average = mean(v, 1, 'omitnan');
+                ev.variances_star_average = mean(v, 2, 'omitnan');
+                
+                dx = vertcat(obj.prev_offsets_x, input.offsets_x);
+                ev.offsets_x_at_peak = dx(ev.frame_index, :);
+                ev.offsets_x_at_star = dx(:, ev.star_index);
+                ev.offsets_x_time_average = mean(dx, 1, 'omitnan');
+                ev.offsets_x_star_average = mean(dx, 2, 'omitnan');
+                
+                dy = vertcat(obj.prev_offsets_y, input.offsets_y);
+                ev.offsets_y_at_peak = dy(ev.frame_index, :);
+                ev.offsets_y_at_star = dy(:, ev.star_index);
+                ev.offsets_y_time_average = mean(dy, 1, 'omitnan');
+                ev.offsets_y_star_average = mean(dy, 2, 'omitnan');
+                
+                w = vertcat(obj.prev_widths, input.widths);
+                ev.widths_at_peak = w(ev.frame_index, :);
+                ev.widths_at_star = w(:, ev.star_index);
+                ev.widths_time_average = mean(w, 1, 'omitnan');
+                ev.widths_star_average = mean(w, 2, 'omitnan');
+                
+                p = vertcat(obj.prev_bad_pixels, input.bad_pixels);
+                ev.bad_pixels_at_peak = p(ev.frame_index, :);
+                ev.bad_pixels_at_star = p(:, ev.star_index);
+                ev.bad_pixels_time_average = mean(p, 1, 'omitnan');
+                ev.bad_pixels_star_average = mean(p, 2, 'omitnan');
+                
+                ev.aperture = input.aperture;
+                ev.gauss_sigma = input.gauss_sigma;
+                
+                ev.cutouts_first = obj.prev_cutouts;
+                ev.cutouts_second = input.cutouts;
+                ev.positions_first = obj.prev_positions;
+                ev.positions_second = input.positions;
+                ev.stack_first = obj.prev_stack;
+                ev.stack_second = input.stack;
+                ev.batch_index_first = obj.prev_batch_index;
+                ev.batch_index_second = input.batch_index;
+                ev.filename_first = obj.prev_filename;
+                ev.filename_second = input.filename;
+                if ischar(input.t_end) && isnumeric(input.t_end_stamp)
+                    ev.t_end = input.t_end;
+                    ev.t_end_stamp = input.t_end_stamp;
+                end
+                
+                % any other info that needs to be saved along with the event object?
+                % ...
+                
+            end
+            
+        
+        end
+        
+        function checkEvents(obj)
             
             t = tic;
             
@@ -309,7 +452,7 @@ classdef Finder < handle
                     
                 end
                 
-                obj.new_events(ii).self_check;
+                obj.new_events(ii).self_check; % should this move to before duplicate check?
                 
             end
             
@@ -322,12 +465,16 @@ classdef Finder < handle
             t = tic;
             
             stars = [obj.ev.star_index];
-            [N,E] = histcounts(stars, 'BinWidth', 1, 'BinLimits', [1 max(stars)]);
-            obj.black_list_stars = [obj.black_list_stars E(N>5)];
+            if ~isempty(stars)
+                [N,E] = histcounts(stars, 'BinWidth', 1, 'BinLimits', [1 max(stars)]);
+                obj.black_list_stars = [obj.black_list_stars E(N>5)];
+            end
             
             batches = [obj.ev.batch_index];
-            [N,E] = histcounts(batches, 'BinWidth', 1, 'BinLimits', [1 max(batches)]);
-            obj.black_list_batches = [obj.black_list_batches E(N>5)];
+            if ~isempty(batches)
+                [N,E] = histcounts(batches, 'BinWidth', 1, 'BinLimits', [1 max(batches)]);
+                obj.black_list_batches = [obj.black_list_batches E(N>5)];
+            end
             
             for ii = 1:length(obj.ev)
                 

@@ -41,8 +41,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
 %         f_number = 1.8947; 
         FOCLEN = 108;
         F_RATIO;
-        PIXSIZE = 6.5; % microns
         SCALE; 
+        PIXSIZE = 6.5; % microns
         
 %         expT;
         EXPTIME;
@@ -122,9 +122,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         
         % ephemeris: time & coordinates
         RA = ''; % for the center of the image
-        Dec = '';% for the center of the image
+        DEC = '';% for the center of the image
         RA_DEG;
-        Dec_DEG;
+        DEC_DEG;
         
         
         HA;
@@ -179,6 +179,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         default_F_RATIO;
         default_FILTER;
         default_OBJECT;
+        
+        filter_name_full; % for backward compatibility with older versions.
         
 %         datapath;
 %         dark_name = 'dark';
@@ -275,6 +277,22 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
     
     methods % getters
         
+        function val = get.filter_obj(obj)
+            
+            if ~isempty(obj.filter_obj)
+                val = obj.filter_obj;
+            else
+
+                try 
+                    obj.filter_obj = head.Filter(obj.FILTER);
+                catch 
+                    obj.filter_obj = head.Filter.empty;
+                end
+
+            end
+            
+        end
+        
         function val = diff_limit(obj)
             
             if isempty(obj.aperture) || isempty(obj.wavelength)
@@ -324,6 +342,26 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
             
         end
         
+        function val = get.FILTER(obj)
+        
+            if ~isempty(obj.FILTER) && util.text.cs('[1x1 head.Filter]', obj.FILTER) % patch for backward compatibility with older headers where "filter" was the object
+                obj.FILTER = obj.filter_name_full;
+            end
+                
+            val = obj.FILTER;
+
+        end
+%         
+%         function val = get.filter_name_full(obj)
+%             
+%             if isempty(obj.filter_name_full) && ~isempty(obj.FILTER)
+%                 val = obj.FILTER;
+%             else
+%                 val = obj.filter_name_full;
+%             end
+%             
+%         end
+%         
         function val = get.FILT_WAVE(obj)
             
             if isempty(obj.filter_obj)
@@ -363,7 +401,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
             
         end
         
-        function val = get.Dec(obj)
+        function val = get.DEC(obj)
             
             val = obj.ephem.DEC;
             
@@ -375,7 +413,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
             
         end
         
-        function val = get.Dec_DEG(obj)
+        function val = get.DEC_DEG(obj)
             
             val = obj.ephem.DEC_deg;
             
@@ -686,34 +724,45 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
             end
             
         end
-        
-        function set.FILTER(obj, val)
-            
-            if ~strcmp(obj.FILTER, val)
-                
-                obj.FILTER = val;
-                
-                try
-                    obj.filter_obj = head.Filter(val);
-                catch ME
-                    disp(['Unknown filter name "' val '", cannot generate filter object']);
-                    obj.filter_obj = head.Filter.empty;
-                end
-                
-            end
-            
-        end
-        
+%         
+%         function set.FILTER(obj, val)
+%             
+%             if ~util.text.cs('[1x1 head.Filter]', val) % patch for backward compatibility with older headers where "filter" was the object
+%             
+%             end
+%                 
+%             if ~strcmp(obj.FILTER, val)
+%                 
+%                 obj.FILTER = val;
+%                 
+%                 try
+%                     obj.filter_obj = head.Filter(val);
+%                 catch ME
+%                     disp(['Unknown filter name "' val '", cannot generate filter object']);
+%                 end
+%                 
+%             end
+%             
+%         end
+%         
         % ephemeris
         function set.RA(obj, val)
             
-            obj.ephem.RA = val;
+            if iscell(val) && isscalar(val)
+                obj.ephem.RA = val{1};
+            else
+                obj.ephem.RA = val;
+            end
             
         end 
         
-        function set.Dec(obj, val)
+        function set.DEC(obj, val)
             
-            obj.ephem.DEC = val;
+            if iscell(val) && isscalar(val)
+                obj.ephem.Dec = val{1};
+            else
+                obj.ephem.Dec = val;
+            end
             
         end
         
@@ -892,6 +941,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         aperture;
         im_size;
         f_number;
+        focal_length;
         frame_rate;
         frame_rate_measured;
         batch_size;
@@ -901,7 +951,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         t_end;
         run_start_datestr;
         notes;
-        filter_name;
+        DE;
+        focus;
         wavelength;
         bandwidth;
         pixel_size;
@@ -959,6 +1010,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         function set.f_number(obj, val)
             
             obj.F_RATIO = val;
+            
+        end
+        
+        function val = get.focal_length(obj)
+            
+            val = obj.FOCLEN;
+            
+        end
+        
+        function set.focal_length(obj, val)
+            
+            obj.FOCLEN = val;
             
         end
         
@@ -1034,6 +1097,30 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
             
         end
         
+        function val = get.DE(obj)
+            
+            val = obj.DEC;
+            
+        end
+        
+        function set.DE(obj, val)
+            
+            obj.DEC = val;
+            
+        end
+        
+        function val = get.focus(obj)
+            
+            val = obj.FOCUS_POS;
+            
+        end
+        
+        function set.focus(obj, val)
+            
+            obj.FOCUS_POS = val;
+            
+        end
+        
         function val = get.t_start(obj)
             
             val = obj.STARTTIME;
@@ -1067,18 +1154,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         function set.run_start_datestr(obj, val)
             
             obj.RUNSTART = val;
-            
-        end
-        
-        function val = get.filter_name(obj)
-            
-            val = obj.FILTER;
-            
-        end
-        
-        function set.filter_name(obj, val)
-            
-            obj.FILTER = val;
             
         end
         

@@ -218,7 +218,7 @@ function obj = loadHDF5(filename, input)
                 end
 
             catch ME
-                warning(['ERROR loading attribute ' att_names{ii} ': ' getReport(ME)]);
+                warning(['ERROR loading attribute "' att_names{ii} '": ' getReport(ME)]);
             end
 
         end % for ii = 1:length(att_names)

@@ -308,6 +308,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 error('Input a string RA in HH:MM:SS format or a scalar hour or a 3-vector [H,M,S]!');
             end
             
+            obj.updateSecondaryCoords;
+            
         end 
         
         function set.Dec(obj, val)
@@ -323,6 +325,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             else
                 error('Input a string DEC in DD:MM:SS format or a scalar in degrees or a 3-vector [d,m,s]!');
             end
+            
+            obj.updateSecondaryCoords;
             
         end
         
@@ -374,11 +378,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             obj.time = datetime('now', 'timezone', 'UTC');
             
+            obj.updateSecondaryCoords;
+            
+        end
+        
+        function updateSecondaryCoords(obj)
+            
             obj.updateMoon;
             obj.updateSun;
             obj.updateEquatorialNow;
             obj.updateEcliptic;
-            obj.updateGalactic;
+            obj.updateGalactic; 
             
         end
         
@@ -386,11 +396,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             obj.time = obj.time + hours(H);
             
-            obj.updateMoon;
-            obj.updateSun;
-            obj.updateEquatorialNow;
-            obj.updateEcliptic;
-            obj.updateGalactic;
+            obj.updateSecondaryCoords
             
         end
         
