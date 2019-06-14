@@ -134,8 +134,8 @@ classdef AcqGUI < handle
             obj.panel_controls.make;
             
             obj.panel_controls.button_num_files.Callback = @obj.callback_num_files;
-            obj.panel_controls.button_num_files.Enable = 'inactive';
-            obj.panel_controls.button_stars_found.Enable = 'inactive';
+%             obj.panel_controls.button_num_files.Enable = 'inactive';
+%             obj.panel_controls.button_stars_found.Enable = 'inactive';
             obj.panel_controls.button_placeholder.Enable = 'off';
             
             obj.panel_controls.button_source_choose.Tooltip = 'Choose camera or reader';

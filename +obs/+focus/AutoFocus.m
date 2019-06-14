@@ -38,8 +38,10 @@ classdef AutoFocus < handle
     
     properties % switches/controls
         
+        use_min_position = 1;
+        
         use_fit_tip_tilt = 0;
-       
+        
         step = 0.01;
         range = 0.15;
         
@@ -140,12 +142,21 @@ classdef AutoFocus < handle
         
         function calculate(obj)
             
-            obj.fitCurves;
-            if obj.use_fit_tip_tilt
-                obj.fitSurface;
-                obj.findPosTipTilt;
+            if obj.use_min_position
+                
+                [~,idx] = min(mean(obj.widths, 1, 'omitnan'), [], 'omitnan');
+                obj.found_pos = obj.pos(idx);
+                
             else
-                obj.findPosOnly;
+                
+                obj.fitCurves;
+                if obj.use_fit_tip_tilt
+                    obj.fitSurface;
+                    obj.findPosTipTilt;
+                else
+                    obj.findPosOnly;
+                end
+                
             end
             
         end
@@ -280,6 +291,10 @@ classdef AutoFocus < handle
 %                     end
 %                 end
                 
+            end
+            
+            if obj.use_min_position
+                plot(obj.ax, obj.pos, mean(obj.widths,1,'omitnan'), 'LineWidth', 3, 'Color', 'k');
             end
             
             hold(obj.ax, 'off');

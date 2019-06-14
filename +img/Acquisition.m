@@ -1176,6 +1176,7 @@ classdef Acquisition < file.AstroData
             catch ME
                 obj.log.error(ME.getReport);
                 obj.unstash_parameters;
+                obj.is_running = 0;
                 rethrow(ME);
             end
             
@@ -1455,6 +1456,7 @@ classdef Acquisition < file.AstroData
 
                     obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.positions); % run photometry on the stack to verify flux and adjust positions
                     if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
+                    
                 end
 
                 % add second test and maybe quit the run if it fails...
@@ -1643,7 +1645,7 @@ classdef Acquisition < file.AstroData
                     error('must be connected to camera and focuser!');
                 end
 
-                input = obj.makeInputVars('reset', 0, 'batch_size', 100, 'expT', 0.025, 'frame_rate', 10, 'batch_size', 10, ...
+                input = obj.makeInputVars('reset', 0, 'batch_size', 100, 'expT', 0.025, 'frame_rate', 25, ...
                     'num_stars', 25, 'use audio', 0, 'use_save', 0, 'run name', 'focus', 'prog', 0, ...
                     'pass_source', {'async', 0}, varargin{:});
 
@@ -1669,14 +1671,16 @@ classdef Acquisition < file.AstroData
                 cleanup = onCleanup(@obj.finishupFocus);
 %                 obj.startup(input);
 
-                for ii = 1:input.num_batches
+                p = [obj.af.pos flip(obj.af.pos)];
 
+                for ii = 1:length(p)
                     if obj.brake_bit
                         return;
                     end
 
                     try 
-                        obj.cam.focuser.pos = obj.af.pos(ii);
+                        
+                        obj.cam.focuser.pos = p(ii);
                         
                         pause(0.1);
             
@@ -1688,6 +1692,12 @@ classdef Acquisition < file.AstroData
                     if check==0, return; end
                     
                     obj.phot_stack.input(obj.clip.input(obj.stack_proc), 'positions', obj.clip.positions); 
+
+                    obj.checkRealign;
+
+                    if obj.use_adjust_cutouts
+                        obj.clip.positions = double(obj.clip.positions + obj.average_offsets);
+                    end
                     
                     if ~isempty(obj.gui) && obj.gui.check
                         obj.show;
@@ -1721,7 +1731,7 @@ classdef Acquisition < file.AstroData
                 
             end
             
-            obj.cam.focuser.pos = obj.af.pos(1); % go back to lower position, then go back up (like the tank cannon)
+%             obj.cam.focuser.pos = obj.af.pos(1); % go back to lower position, then go back up (like the tank cannon)
             
             if ~isnan(obj.af.found_pos)
                 obj.cam.focuser.pos = obj.af.found_pos;
