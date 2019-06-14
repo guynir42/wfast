@@ -1,4 +1,28 @@
 classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
+% Control ASA mount. 
+% This class works mainly by giving an "object" and then letting the mount
+% slew to that object. It also has shortcut fields to change various 
+% parameters in the mount object itself (which is in "hndl"). 
+%
+% To give a target use inputTarget(star_name) or inputTarget(RA,DEC). 
+% Make sure the target parmeters are correctly translated to the object 
+% coordinates objRA and objDEC. Also make sure the objALT is big enough. 
+% To make the telescope go to target just use "slew" without arguments. 
+% 
+% NOTE: All parameters of the mount / target are given in degrees or in 
+%       sexagesimal strings (HH:MM:SS for RA and DD:MM:SS for DEC). 
+%
+% NOTE: this class performs some tests on the target object before the slew
+%       and during the movement, and will stop the motion in case there's 
+%       trouble. In addition the arduino accelerometer can be enabled to 
+%       make constant checks for altitude and stop the motion of the telescope
+%       if needed (even during manual slew). Make sure use_acceleromter=1. 
+%       If there is a problem communicating with arduino then set it to 0. 
+%
+% Additional commands will be implemented later on. 
+% 
+% 
+% PLEASE READ THE COMMENTS ON PROPERTIES FOR MORE DETAIL!
 
     properties(Transient=true)
         
@@ -6,32 +30,32 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
     
     properties % objects
         
-        hndl;
+        hndl; % ASCOM object
         
-        object@head.Ephemeris;
+        object@head.Ephemeris; % all position and time calculations done using Ephemeris class
         
-        ard@obs.sens.ScopeAssistant;
+        ard@obs.sens.ScopeAssistant; % connect to accelerometer and ultrasonic sensor
         
-        log@util.sys.Logger;
+        log@util.sys.Logger; % keep track of all commands and errors
         
     end
     
     properties % inputs/outputs
         
-        status = 0;
+        status = 0; % if connected and responsive, set this to 1
         
     end
     
     properties % switches/controls
         
-        limit_alt = 15; % degrees
+        limit_alt = 15; % degrees above horizon where telescope is not allowed to go
         
-        use_accelerometer = 0;
-        use_ultrasonic = 0;
+        use_accelerometer = 0; % make constant checks for altitude outside of the mounts own sensors
+        use_ultrasonic = 0; % make constant checks that there is nothing in front of the telescope
         
-        step_arcsec = 5;
+        step_arcsec = 5; % not used yet
         
-        brake_bit = 1; 
+        brake_bit = 1; % when slewing, set this to 0. Interrupts may set it back to 1 to stop the slew. 
         
         debug_bit = 1;
         
@@ -39,32 +63,37 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
     
     properties(Dependent=true)
         
-        objRA_deg;
+        % these are parameters of the target object
+        % they are kept in the Ephemeris class
+        objRA_deg; 
         objDEC_deg;
         
-        objRA;
-        objDEC;
+        objRA; % string in HH:MM:SS format
+        objDEC; % string in DD:MM:SS format
         
-        objHA;
-        objALT;
-        objAZ;
+        % these are read-only values for inspection
+        objHA; % string in HH:MM:SS format
+        objALT; % degrees
+        objAZ; % degrees 
         
-        telRA_deg;
+        % these are read out directly from the mount        
+        % these are read-only values for inspection
+        telRA_deg; 
         telDEC_deg;
         
-        telRA;
-        telDEC;
+        telRA; % string in HH:MM:SS format
+        telDEC; % string in DD:MM:SS format
         
-        telHA;
-        telALT;
-        telAZ;
+        telHA; % string in HH:MM:SS format
+        telALT; % degrees
+        telAZ; % degrees
         
-        LST;
+        LST; % string in HH:MM:SS format
         
         % can we get motor status from hndl??
-        tracking;
+        tracking; % 1 when tracking is on
         
-        rate;
+        rate; % do we need this??
         
     end
     
@@ -752,13 +781,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
     end    
     
-    methods(Static=true)
-        
-        
-        
-    end
-    
-    properties(Transient=true, Hidden=true, Dependent=true)
+    properties(Transient=true, Hidden=true, Dependent=true) % for backward compatibility
         
         DE_target_deg;
         DE_target;
