@@ -59,6 +59,8 @@ classdef Acquisition < file.AstroData
         
         prev_fluxes; % fluxes measured in previous batch (for triggering)
         
+        prev_average_width;
+        
         batch_counter = 0;
         
     end
@@ -613,6 +615,16 @@ classdef Acquisition < file.AstroData
         function val = get.average_width(obj)
             
             val = obj.phot_stack.average_width;
+            
+        end
+        
+        function val = getWidthEstimate(obj)
+            
+            if isempty(obj.prev_average_width)
+                val = 1.6;
+            else
+                val = obj.prev_average_width;
+            end
             
         end
         
@@ -1391,6 +1403,8 @@ classdef Acquisition < file.AstroData
                 % must send the average adjustment back to mount controller (should we still adjust the cutouts though??)
             end
             
+            obj.prev_average_width = obj.average_width;
+            
         end
         
         function findStars(obj)
@@ -1408,8 +1422,8 @@ classdef Acquisition < file.AstroData
             elseif obj.use_mextractor
                 % add the code for mextractor+astrometry here
             elseif obj.use_quick_find_stars
-                T = util.img.quick_find_stars(obj.stack_proc, 'psf', 1.6, 'number', obj.num_stars,...
-                    'dilate', obj.cut_size-5, 'saturation', obj.saturation_value.*obj.num_sum); 
+                T = util.img.quick_find_stars(obj.stack_proc, 'psf', obj.getWidthEstimate, 'number', obj.num_stars,...
+                    'dilate', obj.cut_size-5, 'saturation', obj.saturation_value.*obj.num_sum, 'unflagged', 1); 
                 if isempty(T)
                     error('Could not find any stars using quick_find_stars!');
                 end
@@ -1504,7 +1518,7 @@ classdef Acquisition < file.AstroData
                 if ~isempty(obj.phot.gui) && obj.phot.gui.check, obj.phot.gui.update; end
 
                 obj.fluxes = obj.phot.fluxes;
-
+                
 %                 obj.lightcurves.input(obj.phot.fluxes, obj.timestamps, obj.phot.weights, ...
 %                     obj.phot.backgrounds, obj.phot.variances, ...
 %                     obj.phot.offsets_x, obj.phot.offsets_y, obj.phot.centroids_x, obj.phot.centroids_y, ...

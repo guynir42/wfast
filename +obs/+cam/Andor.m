@@ -834,7 +834,7 @@ classdef Andor < file.AstroData
                 obj.setExpTimeHW(obj.expT); 
                 obj.setFrameRateHW(obj.frame_rate);
 
-                obj.setShutterModeHW('rolling'); % maybe add this as an optional argument?
+                obj.setShutterModeHW('rolling'); % maybe add this as an optional argument?fi
                 
                 if isempty(obj.frame_rate) || isnan(obj.frame_rate) % in this mode the camera takes an image as soon as it gets a command to "software trigger"
                     [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'TriggerMode','Software'); obs.cam.sdk.AT_CheckWarning(rc);

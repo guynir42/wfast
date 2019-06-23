@@ -32,7 +32,7 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     input.input_var('psf_sigma', 2);
     input.input_var('mean', []);
     input.input_var('std', []);
-    input.input_var('sigma', 7);
+    input.input_var('sigma', 5);
     input.input_var('saturation', 5e6); % saturation by default for 100 images in a stack
     input.input_var('edges', []);
     input.input_var('fraction', 0.8); % fraction of MX_twice or MX_half that must surpass MX to be counted as point-source or extended-source

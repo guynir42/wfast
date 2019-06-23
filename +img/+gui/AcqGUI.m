@@ -337,7 +337,7 @@ classdef AcqGUI < handle
 
                 if obj.owner.brake_bit
                     obj.panel_run.button_run.Enable = 'on';
-                    if obj.owner.start_index>1
+                    if obj.owner.batch_counter>0
                         obj.panel_run.button_run.String = 'CONTINUE THIS RUN';
                     else
                         obj.panel_run.button_run.String = 'START NEW RUN';
