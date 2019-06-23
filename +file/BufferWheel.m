@@ -534,8 +534,8 @@ classdef BufferWheel < file.AstroData
             field_id = 0; % default field is zero, which means observing on non-defined field
             
             filter_name = 'unknown';
-            if ~isempty(obj.pars) && ~isempty(obj.pars.filter_name)
-                filter_name = obj.pars.filter_name;
+            if ~isempty(obj.pars) && ~isempty(obj.pars.filter)
+                filter_name = obj.pars.filter;
             end
             
             if cs(obj.file_type, 'hdf5', 'h5')
