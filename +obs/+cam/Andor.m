@@ -303,8 +303,8 @@ classdef Andor < file.AstroData
                 rc = obs.cam.sdk.AT_SetBool(obj.hndl, 'SpuriousNoiseFilter', 0); obs.cam.sdk.AT_CheckWarning(rc);
                 rc = obs.cam.sdk.AT_SetBool(obj.hndl, 'StaticBlemishCorrection', 0); obs.cam.sdk.AT_CheckWarning(rc);
                 
-                [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'ElectronicShutteringMode','Rolling'); obs.cam.sdk.AT_CheckWarning(rc);
-                               
+%                 [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'ElectronicShutteringMode','Rolling'); obs.cam.sdk.AT_CheckWarning(rc);
+                
                 [rc, val] = obs.cam.sdk.AT_IsEnumIndexImplemented(obj.hndl, 'SimplePreAmpGainControl',2); obs.cam.sdk.AT_CheckWarning(rc);
                 if(val)
                     [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'SimplePreAmpGainControl','16-bit (low noise & high well capacity)'); obs.cam.sdk.AT_CheckWarning(rc);
@@ -834,6 +834,8 @@ classdef Andor < file.AstroData
                 obj.setExpTimeHW(obj.expT); 
                 obj.setFrameRateHW(obj.frame_rate);
 
+                obj.setShutterModeHW('rolling'); % maybe add this as an optional argument?
+                
                 if isempty(obj.frame_rate) || isnan(obj.frame_rate) % in this mode the camera takes an image as soon as it gets a command to "software trigger"
                     [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'TriggerMode','Software'); obs.cam.sdk.AT_CheckWarning(rc);
                 else % in this mode there is a fixed frame rate, so the frame rate may be lower than the maximum 
@@ -1534,6 +1536,28 @@ classdef Andor < file.AstroData
                 str_out = str;
             else
                 disp(str);
+            end
+            
+        end
+        
+        function val = getShutterModeHW(obj)
+            
+            [rc, idx] = obs.cam.sdk.AT_GetEnumIndex(obj.hndl,'ElectronicShutteringMode'); obs.cam.sdk.AT_CheckWarning(rc);
+            
+            [rc, val] = obs.cam.sdk.AT_GetEnumStringByIndex(obj.hndl,'ElectronicShutteringMode', idx, 30); obs.cam.sdk.AT_CheckWarning(rc);
+
+        end
+        
+        function setShutterModeHW(obj, val)
+            
+            if isempty(val) || ~ischar(val) 
+                error('Input a shutter mode, either "global" or "rolling"'); 
+            elseif util.text.cs(val, 'global')
+                [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'ElectronicShutteringMode','Global'); obs.cam.sdk.AT_CheckWarning(rc);
+            elseif util.text.cs(val, 'rolling')
+                [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'ElectronicShutteringMode','Rolling'); obs.cam.sdk.AT_CheckWarning(rc);
+            else
+                error('Unknown shutter mode: "%s". Use "global" or "rolling"', val);
             end
             
         end
