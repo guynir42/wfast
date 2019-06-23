@@ -47,6 +47,8 @@ classdef Event < handle
         
         peak_timestamp; % timestamp for time_index
         best_kernel; % full kernel that goes with kern_index
+        time_step;
+        duration;
         
         threshold; % trigger threshold used (in S/N units)
         

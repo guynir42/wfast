@@ -10,7 +10,7 @@ classdef Finder < handle
         
         cal@trig.Calibrator;
         filt@trig.Filter;
-        ev@trig.Event;
+        all_events@trig.Event;
         new_events@trig.Event;
         last_events@trig.Event;
         
@@ -21,6 +21,21 @@ classdef Finder < handle
         
         black_list_stars;
         black_list_batches;
+         
+        timestamps;
+        cutouts;
+        positions;
+        stack;
+        batch_index;
+        filename;
+        
+        fluxes;
+        backgrounds;
+        variances;
+        offsets_x;
+        offsets_y;
+        widths;
+        bad_pixels;
         
         prev_timestamps;
         prev_cutouts;
@@ -37,12 +52,17 @@ classdef Finder < handle
         prev_widths;
         prev_bad_pixels;
         
+        dt; 
+        coverage_total;
+        coverage_lost;
+        snr_values;
+        
     end
     
     properties % switches/controls
         
         threshold = 5; % threshold (in units of S/N) for peak of event 
-        time_range_thresh = -2; % threshold for including area around peak (in continuous time)
+        time_range_thresh = -2.5; % threshold for including area around peak (in continuous time)
         kern_range_thresh = -1; % area threshold (in kernels, discontinuous) NOTE: if negative this will be relative to "threshold"
         star_range_thresh = -1; % area threshold (in stars, discontinuous) NOTE: if this is higher than "threshold" there will be no area around peak
         
@@ -58,7 +78,7 @@ classdef Finder < handle
     
     properties(Dependent=true)
         
-        ev_kept;
+        kept_events;
         
     end
     
@@ -91,7 +111,7 @@ classdef Finder < handle
         
         function reset(obj)
             
-            obj.ev = trig.Event.empty;
+            obj.all_events = trig.Event.empty;
             obj.new_events = trig.Event.empty;
             obj.last_events = trig.Event.empty;
             
@@ -115,11 +135,30 @@ classdef Finder < handle
             obj.prev_batch_index = [];
             obj.prev_filename = [];
             
+            obj.dt = []; 
+            obj.coverage_total = 0;
+            obj.coverage_lost = 0;
+            obj.snr_values = [];
+            
             obj.clear;
             
         end
         
         function clear(obj)
+            
+            obj.fluxes = [];
+            obj.backgrounds = [];
+            obj.variances = [];
+            obj.offsets_x = [];
+            obj.offsets_y = [];
+            obj.widths = [];
+            obj.bad_pixels = [];
+            obj.timestamps = [];
+            obj.cutouts = [];
+            obj.positions = [];
+            obj.stack = [];
+            obj.batch_index = [];
+            obj.filename = [];
             
             obj.cal.clear;
             obj.filt.clear;
@@ -160,9 +199,9 @@ classdef Finder < handle
             
         end
         
-        function val = get.ev_kept(obj)
+        function val = get.kept_events(obj)
             
-            val = obj.ev([obj.ev.keep]==1);
+            val = obj.all_events([obj.all_events.keep]==1);
             
         end
         
@@ -216,6 +255,20 @@ classdef Finder < handle
             
             obj.clear;
             
+            obj.fluxes = input.fluxes;
+            obj.backgrounds = input.backgrounds;
+            obj.variances = input.variances;
+            obj.offsets_x = input.offsets_x;
+            obj.offsets_y = input.offsets_y;
+            obj.widths = input.widths;
+            obj.bad_pixels = input.bad_pixels;
+            obj.timestamps = input.timestamps;
+            obj.cutouts = input.cutouts;
+            obj.positions = input.positions;
+            obj.stack = input.stack;
+            obj.batch_index = input.batch_index;
+            obj.filename = input.filename;
+            
             if ~isempty(obj.prev_fluxes) % skip first batch! 
             
                 t = tic;
@@ -234,7 +287,7 @@ classdef Finder < handle
                 obj.storeEventHousekeeping(input); % add some data from this batch to the triggered events
                 
                 obj.last_events = obj.new_events;
-                obj.ev = [obj.ev obj.new_events];
+                obj.all_events = [obj.all_events obj.new_events];
                 obj.new_events = trig.Event.empty;
             
                 if obj.debug_bit>1, fprintf('Housekeeping time: %f seconds.\n', toc(t)); end
@@ -270,6 +323,12 @@ classdef Finder < handle
             
             ff = obj.filt.fluxes_filtered; % dim 1 is time, dim 2 is kernels, dim 3 is stars
             
+            [~,idx] = util.stat.maxnd(abs(ff(1:length(obj.timestamps),:,:)));
+            
+            obj.snr_values(end+1) = ff(idx(1),idx(2),idx(3));
+            
+            obj.dt = median(diff(obj.timestamps));
+            
             for ii = 1:obj.max_events
                 
                 [mx, idx] = util.stat.maxnd(abs(ff)); % note we are triggering on negative and positive events
@@ -290,17 +349,22 @@ classdef Finder < handle
                 ev.star_indices = find(max(abs(ff(ev.time_indices, ev.kern_index, :)))>obj.getStarThresh);
                 
                 ev.timestamps = obj.filt.timestamps;
+                ev.time_step = obj.dt;
+                ev.duration =  obj.dt + obj.filt.timestamps(ev.time_indices(end))-obj.filt.timestamps(ev.time_indices(1));
+                
                 ev.flux_filtered = obj.filt.fluxes_filtered(:,ev.kern_index,ev.star_index);
                 ev.flux_raw_all = permute(obj.filt.fluxes, [1,3,2]);
                 ev.stds_raw_all = permute(obj.filt.stds, [1,3,2]);
                 
-                ff(ev.time_indices, :, :) = 0; % don't look at the same region twice
-                
                 obj.new_events(end+1) = ev; % add this event to the list
+                
+                obj.coverage_lost = obj.coverage_lost + ev.duration; % how much time is "zeroed out"
+                
+                ff(ev.time_indices, :, :) = 0; % don't look at the same region twice
                 
             end
             
-            
+            obj.coverage_total = obj.coverage_total + obj.timestamps(end) - obj.timestamps(1) + obj.dt;
             
         end
         
@@ -349,7 +413,7 @@ classdef Finder < handle
                 
                 ev = obj.new_events(ii);
                 
-                ev.serial = length(obj.ev) + ii; % just keep a running index
+                ev.serial = length(obj.all_events) + ii; % just keep a running index
                 
                 % fluxes and timestamps
                 ev.is_positive = obj.filt.fluxes_filtered(ev.time_index, ev.kern_index, ev.star_index)>0;
@@ -421,7 +485,6 @@ classdef Finder < handle
                 % ...
                 
             end
-            
         
         end
         
@@ -464,40 +527,40 @@ classdef Finder < handle
             
             t = tic;
             
-            stars = [obj.ev.star_index];
+            stars = [obj.all_events.star_index];
             if ~isempty(stars)
                 [N,E] = histcounts(stars, 'BinWidth', 1, 'BinLimits', [1 max(stars)]);
                 obj.black_list_stars = [obj.black_list_stars E(N>5)];
             end
             
-            batches = [obj.ev.batch_index];
+            batches = [obj.all_events.batch_index];
             if ~isempty(batches)
                 [N,E] = histcounts(batches, 'BinWidth', 1, 'BinLimits', [1 max(batches)]);
                 obj.black_list_batches = [obj.black_list_batches E(N>5)];
             end
             
-            for ii = 1:length(obj.ev)
+            for ii = 1:length(obj.all_events)
                 
-                if ismember(obj.ev(ii).star_index, obj.black_list_stars)
-                    obj.ev(ii).keep = 0;
-                    obj.ev(ii).is_real = 0;
-                    obj.ev(ii).is_bad_star = 1;
-                    obj.ev(ii).notes = sprintf('%s, star %d is on black list', obj.ev(ii).notes, obj.ev(ii).star_index);
+                if ismember(obj.all_events(ii).star_index, obj.black_list_stars)
+                    obj.all_events(ii).keep = 0;
+                    obj.all_events(ii).is_real = 0;
+                    obj.all_events(ii).is_bad_star = 1;
+                    obj.all_events(ii).notes = sprintf('%s, star %d is on black list', obj.all_events(ii).notes, obj.all_events(ii).star_index);
                 end
                 
-                if ismember(obj.ev(ii).batch_index, obj.black_list_stars)
-                    obj.ev(ii).keep = 0;
-                    obj.ev(ii).is_real = 0;
-                    obj.ev(ii).is_bad_batch = 1;
-                    obj.ev(ii).notes = sprintf('%s, batch %d is on black list', obj.ev(ii).notes, obj.ev(ii).batch_index);
+                if ismember(obj.all_events(ii).batch_index, obj.black_list_stars)
+                    obj.all_events(ii).keep = 0;
+                    obj.all_events(ii).is_real = 0;
+                    obj.all_events(ii).is_bad_batch = 1;
+                    obj.all_events(ii).notes = sprintf('%s, batch %d is on black list', obj.all_events(ii).notes, obj.all_events(ii).batch_index);
                 end
                 
             end
             
             if obj.use_conserve_memory
-                for ii = 1:length(obj.ev)
-                    if obj.ev(ii).keep==0
-                        obj.ev(ii).clearImages;
+                for ii = 1:length(obj.all_events)
+                    if obj.all_events(ii).keep==0
+                        obj.all_events(ii).clearImages;
                     end
                 end
             end

@@ -44,6 +44,9 @@ classdef Analysis < file.AstroData
         stack_cutouts_sub;
         stack_cutouts_bg;
         stack_proc;
+        deep_stack;
+        deep_stack_aligned;
+        subtract_stack;
         
         prev_stack;
         

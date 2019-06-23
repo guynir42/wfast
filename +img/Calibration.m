@@ -121,6 +121,9 @@ classdef Calibration < handle
     
     properties % switches and controls
         
+        % switches for generating dark/flat
+        use_median = 0;
+        
         % switches for calibrating images
         use_flat = 1; % when calibrating images, choose if to divide by flat
         use_single = 1; % output everything in single precision... 
@@ -692,8 +695,13 @@ classdef Calibration < handle
             current_frames = size(images,3);
             
             % dark mean
-            d_mean = sum(images,3);
-            obj.dark_mean = runningMean(obj.dark_mean, obj.num_darks, d_mean, current_frames);
+            if obj.use_median
+                d_sum = current_frames.*double(median(images,3));
+            else
+                d_sum = sum(images,3);
+            end
+            
+            obj.dark_mean = runningMean(obj.dark_mean, obj.num_darks, d_sum, current_frames);
             
             % dark variance
             d_var = var(double(images), [], 3)*current_frames;
