@@ -32,9 +32,11 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     input.input_var('psf_sigma', 2);
     input.input_var('mean', []);
     input.input_var('std', []);
-    input.input_var('sigma', 3.5);
+    input.input_var('sigma', 7);
     input.input_var('saturation', 5e6); % saturation by default for 100 images in a stack
     input.input_var('edges', []);
+    input.input_var('fraction', 0.8); % fraction of MX_twice or MX_half that must surpass MX to be counted as point-source or extended-source
+    input.input_var('unflagged', 0); % only leave rows which have flag==0
     input.scan_vars(varargin{:});
     
     if isempty(input.edges)
@@ -78,9 +80,9 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
         I2 = I_reduced;
         I2(isnan(I2)) = 0;
         
-        If = filter2(k, I2); %./sqrt(util.stat.sum2(k)); 
-        If_half = filter2(k_half, I2); %./sqrt(util.stat.sum2(k_half));
-        If_twice = filter2(k_twice, I2); %./sqrt(util.stat.sum2(k_twice));
+        If = filter2(k, I2); % ./sqrt(util.stat.sum2(k)); 
+        If_half = filter2(k_half, I2); % ./sqrt(util.stat.sum2(k_half));
+        If_twice = filter2(k_twice, I2); % ./sqrt(util.stat.sum2(k_twice));
 
         BW = If>=thresholds(ii);
 
@@ -110,14 +112,14 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
             MX_twice = zeros(N,1);
 
             for jj = 1:N
-                MX = max(If(T.PixelIdxList{jj}));
-                MX_half = max(If_half(T.PixelIdxList{jj}));
-                MX_twice = max(If_twice(T.PixelIdxList{jj}));
+                MX(jj) = max(If(T.PixelIdxList{jj}));
+                MX_half(jj) = max(If_half(T.PixelIdxList{jj}));
+                MX_twice(jj) = max(If_twice(T.PixelIdxList{jj}));
             end
 
             f = zeros(size(P,1),1);    
-            f(MX<MX_half) = 2; % point source 
-            f(MX<MX_twice) = 3; % extended object
+            f(MX<MX_half*input.fraction) = 2; % point source 
+            f(MX<MX_twice*input.fraction) = 3; % extended object
             f(MX>input.saturation) = 1; % saturated star 
 
             pos = vertcat(pos, P);
@@ -138,6 +140,10 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     T2 = table(flux, flag);
     
     table_props = horzcat(T2, table_props);
+    
+    if input.unflagged
+        table_props(logical(flag), :) = []; % remove all non-zero flag stars
+    end
     
     table_props = sortrows(table_props, 1, 'descend');
     
