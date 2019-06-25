@@ -7,7 +7,7 @@ classdef Andor < file.AstroData
 % Each batch consists of filling properties "images" and "timestamps" and 
 % a few timing parameters ("t_start", "t_end", "t_end_stamp"). See the 
 % description of file.AstroData for more details. 
-%
+%hutter
 % The camera can run in synchronous/async modes. 
 % Synchronuous mode just holds up the main thread until all images are captured. 
 % Async mode lets the camera run on a separate thread using C++/mex. 
@@ -834,7 +834,7 @@ classdef Andor < file.AstroData
                 obj.setExpTimeHW(obj.expT); 
                 obj.setFrameRateHW(obj.frame_rate);
 
-                obj.setShutterModeHW('rolling'); % maybe add this as an optional argument?fi
+                obj.setShutterModeHW('rolling'); % maybe add this as an optional argument?
                 
                 if isempty(obj.frame_rate) || isnan(obj.frame_rate) % in this mode the camera takes an image as soon as it gets a command to "software trigger"
                     [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'TriggerMode','Software'); obs.cam.sdk.AT_CheckWarning(rc);

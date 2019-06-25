@@ -1659,7 +1659,7 @@ classdef Acquisition < file.AstroData
                     error('must be connected to camera and focuser!');
                 end
 
-                input = obj.makeInputVars('reset', 0, 'batch_size', 100, 'expT', 0.025, 'frame_rate', 25, ...
+                input = obj.makeInputVars('reset', 0, 'batch_size', 10, 'expT', 0.03, 'frame_rate', 25, ...
                     'num_stars', 25, 'use audio', 0, 'use_save', 0, 'run name', 'focus', 'prog', 0, ...
                     'pass_source', {'async', 0}, varargin{:});
 
@@ -1685,7 +1685,8 @@ classdef Acquisition < file.AstroData
                 cleanup = onCleanup(@obj.finishupFocus);
 %                 obj.startup(input);
 
-                p = [obj.af.pos flip(obj.af.pos)];
+                p = obj.af.pos;
+%                 p = [obj.af.pos flip(obj.af.pos)];
 
                 for ii = 1:length(p)
                     if obj.brake_bit
