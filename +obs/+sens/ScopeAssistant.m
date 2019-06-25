@@ -31,10 +31,12 @@ classdef ScopeAssistant < handle
     
     properties % switches/controls
         
-        port_name = 'COM20';
+        port_name = 'COM20'; % used only for USB (not used now)
+        bluetooth_name = 'HC-06'; 
+        bluetooth_id = ''; 
         
         use_check_alt = 1;
-        alt_limit = 15;
+        alt_limit = 10;
         
         default_period = 0.1;
         
@@ -60,7 +62,7 @@ classdef ScopeAssistant < handle
     
     properties(Hidden=true)
        
-        version = 1.00;
+        version = 1.01;
         
     end
     
@@ -82,7 +84,77 @@ classdef ScopeAssistant < handle
             
         end
         
-        function connect(obj, port_name)
+        function connect(obj, varargin)
+            
+%             obj.connectUSB(varargin{:});
+            obj.connectBluetooth(varargin{:});
+            
+            pause(0.1);
+            
+            obj.setupTimer(obj.default_period);
+            
+        end
+        
+        function connectBluetooth(obj, name, id)
+            
+            if nargin>1 && ~isempty(name)
+                obj.bluetoot_name = name;
+            end
+            
+            if nargin>2 && ~isempty(id)
+                obj.bluetooth_id = id;
+            end
+            
+            % first, make sure to close existing connections...
+            try
+                fclose(obj.hndl);
+                delete(obj.hndl);
+            end
+            
+            if isempty(obj.bluetooth_name)
+                error('Must supply a name for a bluetooth device (e.g., HC-06)');
+            end
+            
+            % must be paired to the bluetooth device! 
+            obj.hndl = Bluetooth(obj.bluetooth_name, 1); % second argument is channel==1
+            
+            if isempty(obj.bluetooth_id) || isnumeric(obj.bluetooth_id)
+                
+                in = instrhwinfo('bluetooth', obj.bluetooth_name);
+                
+                if isnumeric(obj.bluetooth_id) && obj.bluetooth_id>0
+                    idx = obj.bluetooth_id;
+                else
+                    idx = 1;
+                end
+                
+                if idx>length(in)
+                    error('Cannot open device number %d, there are only %d devices named "%s".', idx, length(in), obj.bluetooth_name);
+                end
+                
+                if isempty(in(idx).RemoteID)
+                    error('Device not found. Make sure to pair the device!');
+                end
+                
+                if obj.debug_bit
+                    fprintf('Found a bluetooth device with ID: %s\n', obj.bluetooth_id);
+                end
+                
+                obj.bluetooth_id = in(idx).RemoteID(9:end);
+                
+            end
+            
+            obj.hndl.RemoteID = obj.bluetooth_id; 
+            
+            fopen(obj.hndl);
+            
+            pause(0.1);
+            
+            obj.update;
+            
+        end
+        
+        function connectUSB(obj, port_name)
             
             if nargin>1 && ~isempty(port_name)
                 obj.port_name = port_name;
@@ -102,10 +174,6 @@ classdef ScopeAssistant < handle
             obj.hndl = serial(obj.port_name);
             
             fopen(obj.hndl);
-            
-            pause(0.1);
-            
-            obj.setupTimer(obj.default_period);
             
         end
         
@@ -245,14 +313,22 @@ classdef ScopeAssistant < handle
                 disp(['ALT= ' num2str(obj.ALT)]);
             end
             
-            if ~isempty(obj.telescope) && obj.use_check_alt && obj.ALT<obj.alt_limit
-                obj.telescope.stop;
+            if ~isempty(obj.telescope) && obj.telescope.use_accelerometer && obj.use_check_alt && obj.ALT<obj.alt_limit
                 
-                if obj.log_message_sent==0
-                    disp('Arduino sending stop signal to telescope!');
-                    obj.telescope.log.input(['Arduino stopped telescope at angle ALT: ' num2str(obj.ALT) ' degrees...']);
-                    obj.log_message_sent = 1;
+                try 
+                    
+                    obj.telescope.stop;
+
+                    if obj.log_message_sent==0
+                        disp('Arduino sending stop signal to telescope!');
+                        obj.telescope.log.input(['Arduino stopped telescope at angle ALT: ' num2str(obj.ALT) ' degrees...']);
+                        obj.log_message_sent = 1;
+                    end
+
+                catch ME
+                    warning(ME.getReport);
                 end
+                
             end
             
             if obj.ALT>30

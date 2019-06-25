@@ -50,7 +50,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         limit_alt = 15; % degrees above horizon where telescope is not allowed to go
         
-        use_accelerometer = 0; % make constant checks for altitude outside of the mounts own sensors
+        use_accelerometer = 1; % make constant checks for altitude outside of the mounts own sensors
         use_ultrasonic = 0; % make constant checks that there is nothing in front of the telescope
         
         step_arcsec = 5; % not used yet
@@ -103,7 +103,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
     end
     
-    methods % constructor
+    methods % constructor nd connect commands
         
         function obj = ASA(varargin)
             
@@ -160,20 +160,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
                 obj.hndl.MotorOn;
                 
-                if obj.use_accelerometer && isempty(obj.ard) 
+                obj.update;
+                
+                if obj.status
                     
-                    try
-                        obj.ard = obs.sens.ScopeAssistant;
-                        obj.ard.telescope = obj;
+                    try 
+                        obj.connectArduino;
                     catch ME
-                        obj.use_accelerometer = 0;
                         warning(ME.getReport);
                     end
-
-                end
-                
-                if obj.use_accelerometer
-                    obj.ard.connect;
+                    
                 end
                 
             catch ME
@@ -181,6 +177,26 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 rethrow(ME);
             end
             
+        end
+        
+        function connectArduino(obj)
+
+            if obj.use_accelerometer && isempty(obj.ard) 
+
+                try
+                    obj.ard = obs.sens.ScopeAssistant;
+                    obj.ard.telescope = obj;
+                catch ME
+                    obj.use_accelerometer = 0;
+                    warning(ME.getReport);
+                end
+
+            end
+
+            if obj.use_accelerometer
+                obj.ard.connect;
+            end
+
         end
         
         function loadServer(obj)

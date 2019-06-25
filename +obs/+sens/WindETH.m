@@ -49,7 +49,9 @@ classdef WindETH < handle
     
     properties (Hidden = true)
         
-        version = 1.00;
+        north_az = 112.5;
+        
+        version = 1.01;
         
     end
     
@@ -183,6 +185,11 @@ classdef WindETH < handle
                 obj.wind_speed = str2double(WindSpeedString);
                 
                 Az = obs.sens.WindETH.dir2az(WindAzString);
+                
+                if ~isempty(obj.north_az)
+                    Az = mod(Az - obj.north_az, 360);
+                end
+                
                 if (isnan(Az))
                     obj.status = 0;
                 end

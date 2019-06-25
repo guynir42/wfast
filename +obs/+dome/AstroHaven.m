@@ -397,7 +397,7 @@ classdef AstroHaven < handle
              
             if nargin<2 || isempty(number)
                 if ~isempty(obj.number_east) && obj.number_east>0
-                    number = obj.number2;
+                    number = obj.number_east;
                 else
                     number = 1;
                 end
@@ -530,6 +530,8 @@ classdef AstroHaven < handle
                     end
 
                 end
+                
+                obj.send('R');
                 
             catch ME
                 obj.log.error(ME.getReport);
