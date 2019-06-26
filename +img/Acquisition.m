@@ -1134,7 +1134,7 @@ classdef Acquisition < file.AstroData
                     error('Run scheduled to take %4.2f hours with these parameter... aborting!', obj.getTimeLeft/3600); 
                 end
                 
-                if obj.getGbLeft>util.sys.disk_space(obj.buf.directory)
+                if obj.use_save && obj.getGbLeft>util.sys.disk_space(obj.buf.directory)
                     error('Run scheduled requires an estimated %5.2f Gb of storage. Only %5.2f Gb available on drive!', obj.getGbLeft, util.sys.disk_space(obj.buf.directory));
                 end
                     
@@ -1685,8 +1685,8 @@ classdef Acquisition < file.AstroData
                 cleanup = onCleanup(@obj.finishupFocus);
 %                 obj.startup(input);
 
-                p = obj.af.pos;
-%                 p = [obj.af.pos flip(obj.af.pos)];
+%                 p = obj.af.pos;
+                p = [obj.af.pos flip(obj.af.pos)];
 
                 for ii = 1:length(p)
                     if obj.brake_bit
