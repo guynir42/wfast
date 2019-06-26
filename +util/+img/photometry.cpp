@@ -455,12 +455,13 @@ void Photometry::calculate(int j){
 		//(this->*ap_func)(ap_array, x,y); // make an offset aperture mask
 		
 		
-		// find the number of bad pixels
-		for(int i=0;i<N;i++) if(isnan(image_raw[i])) bad_array[i]=1; // find all the bad pixels in the image
-		bad_pixel[j]=sumArrays(bad_array);
 		
 		main_mask(ap_array, x, y);
 		secondary_mask(bg_array, x, y);
+		
+		// find the number of bad pixels in the aperture mask... 
+		for(int i=0;i<N;i++) if(isnan(image_raw[i]) && ap_array[i]>0) bad_array[i]=1; // find all the bad pixels in the image
+		bad_pixel[j]=sumArrays(bad_array);
 		
 		for(int i=0;i<N;i++) if(bad_array[i]){ ap_array[i]=NAN; bg_array[i]=NAN; } // make sure the ap/bg arrays have NaNs everywhere the original image has NaNs
 		
