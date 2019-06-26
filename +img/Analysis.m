@@ -296,7 +296,7 @@ classdef Analysis < file.AstroData
                     feval(obj.func, obj);
                 end
                 
-                obj.prog.show(ii);
+                obj.prog.showif(ii);
                 
                 if ~isempty(obj.gui) && obj.gui.check
                     obj.gui.update; 

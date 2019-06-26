@@ -1,7 +1,7 @@
 classdef GraphicPanel < dynamicprops
 % usage: GraphicPanel(owner, position, title='', is_vertical=1, self_name='gui')
 % Container for GraphicButton objects. 
-% Add buttons using obj.addButton(button_name, var_name='', type='', str1='', str2='', font_size='', split=1, color_on=[], color_off=[])
+% Add buttons using obj.addButton(button_name, var_name='', type='', str1='', str2='', font_size='', split=1, color_on=[], color_off=[], tooltip)
 % when you are done, use "make".
 % The object creates and populates a uipanel with all the buttons. 
 
@@ -15,7 +15,7 @@ classdef GraphicPanel < dynamicprops
         is_vertical = 1; % if panel goes down or sideways. 
         number;
         
-        list_of_button_details = struct('button_name', {}, 'var_name',{}, 'type', {}, 'str1', {}, 'str2', {}, 'font_size', {}, 'split', {}, 'color_on', {}, 'color_off', {}); 
+        list_of_button_details = struct('button_name', {}, 'var_name',{}, 'type', {}, 'str1', {}, 'str2', {}, 'font_size', {}, 'split', {}, 'color_on', {}, 'color_off', {}, 'tooltip', {}); 
         
         panel;
         position;
@@ -44,7 +44,7 @@ classdef GraphicPanel < dynamicprops
                         
         end
         
-        function addButton(obj, button_name, var_name, type, str1, str2, font_size, split, color_on, color_off)
+        function addButton(obj, button_name, var_name, type, str1, str2, font_size, split, color_on, color_off, tooltip)
         % usage: obj.addButton(button_name, var_name='', type='', str1='', str2='', font_size='', split=1, color_on=[], color_off=[])
             
             if nargin<2, help('util.plot.GraphicPanel.addButton'); return; end
@@ -81,8 +81,12 @@ classdef GraphicPanel < dynamicprops
                 color_off = [];
             end
             
+            if nargin<11 || isempty(tooltip)
+                tooltip = '';
+            end
+            
             obj.list_of_button_details(end+1) = struct('button_name', button_name, 'var_name', var_name, 'type', type,...
-                'str1', str1, 'str2', str2, 'font_size', font_size, 'split', split, 'color_on', color_on, 'color_off', color_off);
+                'str1', str1, 'str2', str2, 'font_size', font_size, 'split', split, 'color_on', color_on, 'color_off', color_off, 'tooltip', tooltip);
             
         end
         
@@ -131,7 +135,9 @@ classdef GraphicPanel < dynamicprops
                         addprop(obj, button.button_name);
                     end
                     
-                    obj.(button.button_name) = util.plot.GraphicButton(obj.panel, pos, obj.owner, button.var_name, button.type, button.str1, button.str2, button.font_size, obj.self_name, [], button.color_on, button.color_off);
+                    obj.(button.button_name) = util.plot.GraphicButton(obj.panel, pos, obj.owner, button.var_name, button.type, button.str1, button.str2, ...
+                        button.font_size, obj.self_name, [], button.color_on, button.color_off, button.tooltip);
+                    
                     split_pos = split_pos + button.split;
                     
                     obj.buttons(end+1) = obj.(button.button_name);

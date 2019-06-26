@@ -8,9 +8,10 @@ classdef AnalysisGUI < handle
              
         buttons = {};
         
-        font_size = 16;
-        edit_font_size = 14;
-        small_font_size = 12;
+        font_size = 12;
+        big_font_size = 16;
+        edit_font_size = 11;
+        small_font_size = 10;
         
         debug_bit = 1;
         
@@ -31,6 +32,7 @@ classdef AnalysisGUI < handle
         
         panel_image;
         button_reset_axes;
+        button_batch_counter;
         axes_image;
     
         panel_run;
@@ -91,8 +93,10 @@ classdef AnalysisGUI < handle
             
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'controls', 1); % last input is for vertical (default)
             obj.panel_controls.number = N;
-            obj.panel_controls.addButton('button_bg_stack', 'use_background_stack', 'toggle', 'b/g stack', 'b/g stack', 'small', 0.5, 'red');
-            obj.panel_controls.addButton('button_bg_cutouts', 'use_background_cutouts', 'toggle', 'b/g cutouts', 'b/g cutouts', 'small', 0.5, 'red');
+            obj.panel_controls.addButton('button_reset', 'reset', 'push', 'RESET', '', 'big', 0.5, '', '', 'Start a new run by reseting all events and lightcurves');
+            obj.panel_controls.addButton('input_num_batches', 'num_batches', 'input', 'Nbatch= ', '', '', 0.5, '', '', 'Maximum batches, limited by user input or by number of files in reader'); 
+            obj.panel_controls.addButton('button_bg_stack', 'use_background_stack', 'toggle', 'b/g stack off', 'b/g stack on', 'small', 0.5, 'red', '', 'Subtract background from stack images');
+            obj.panel_controls.addButton('button_bg_cutouts', 'use_background_cutouts', 'toggle', 'b/g cutouts off', 'b/g cutouts on', 'small', 0.5, 'red', '', 'Subtract background from cutouts');
             obj.panel_controls.make;
             
             %%%%%%%%%%% panel contrast %%%%%%%%%%%%%%%
@@ -100,6 +104,10 @@ classdef AnalysisGUI < handle
             N = 5; pos = pos - N;
             
             obj.panel_contrast = util.plot.ContrastLimits(obj.axes_image, obj.fig.fig, [0 pos/N_left 0.2 5/N_left], 1); % last input is for vertical (default)
+            obj.panel_contrast.font_size = obj.font_size;
+            obj.panel_contrast.big_font_size = obj.big_font_size;
+            obj.panel_contrast.small_font_size = obj.small_font_size;
+            obj.panel_contrast.edit_font_size = obj.edit_font_size;
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
             
@@ -151,8 +159,12 @@ classdef AnalysisGUI < handle
                         
             obj.makeAxes;
             
-            obj.button_reset_axes = GraphicButton(obj.panel_image, [0.9 0.95 0.1 0.05], obj.owner, '', 'custom','reset');
+            obj.button_batch_counter = GraphicButton(obj.panel_image, [0.0 0.0 0.15 0.05], obj.owner, 'batch_counter', 'info', 'N= ');
+            obj.button_batch_counter.Tooltip = 'How many batches already finished';
+            
+            obj.button_reset_axes = GraphicButton(obj.panel_image, [0.85 0.95 0.15 0.05], obj.owner, '', 'custom', 'new axes', '');
             obj.button_reset_axes.Callback = @obj.makeAxes;
+            obj.button_reset_axes.Tooltip = 'Create a new image axis, zoomed out and with default contrast limits'; 
             
             
             %%%%%%%%%%% panel run/stop %%%%%%%%%%%%%%%
@@ -161,7 +173,7 @@ classdef AnalysisGUI < handle
             
             obj.panel_run = GraphicPanel(obj.owner, [0.2 pos/N_middle 0.6 N/N_middle]);
             
-            obj.panel_run.addButton('button_run', '', 'custom', 'RUN');
+            obj.panel_run.addButton('button_run', '', 'custom', 'RUN', '', 'big');
             obj.panel_run.make;
             obj.panel_run.button_run.Callback = @obj.callback_run;
             
@@ -196,11 +208,16 @@ classdef AnalysisGUI < handle
             obj.panel_progress.button_progress.String = obj.owner.prog.show;
             
             if obj.owner.brake_bit
-                obj.panel_run.button_run.String = 'RUN';
-                
+                if obj.owner.batch_counter==0
+                    obj.panel_run.button_run.String = 'START NEW RUN';
+                else
+                    obj.panel_run.button_run.String = 'CONTINUE';
+                end
             else
                 obj.panel_run.button_run.String = 'STOP';
             end
+            
+            obj.panel_contrast.update;
             
         end
                         

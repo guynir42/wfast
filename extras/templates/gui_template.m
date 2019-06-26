@@ -8,9 +8,10 @@ classdef objGUI < handle
              
         buttons = {};
         
-        font_size = 16;
-        edit_font_size = 14;
-        small_font_size = 12;
+        font_size = 12;
+        big_font_size = 16;
+        edit_font_size = 11;
+        small_font_size = 10;
         
         debug_bit = 1;
         
@@ -85,7 +86,7 @@ classdef objGUI < handle
             
             %%%%%%%%%%% panel controls %%%%%%%%%%%%%%%
             
-            % Add buttons using obj.addButton(button_name, var_name='', type='', str1='', str2='', font_size='', split=1, color_on=[], color_off=[])
+            % Add buttons using obj.addButton(button_name, var_name='', type='', str1='', str2='', font_size='', split=1, color_on=[], color_off=[], tooltip)
             
             num_buttons = 5;
             pos = pos-num_buttons;
@@ -97,6 +98,10 @@ classdef objGUI < handle
             %%%%%%%%%%% panel contrast %%%%%%%%%%%%%%%
             
             obj.panel_contrast = util.plot.ContrastLimits(obj.axes_image, obj.fig.fig, [0 pos/N_left 0.2 5/N_left], 1); % last input is for vertical (default)
+            obj.panel_contrast.font_size = obj.font_size;
+            obj.panel_contrast.big_font_size = obj.big_font_size;
+            obj.panel_contrast.small_font_size = obj.small_font_size;
+            obj.panel_contrast.edit_font_size = obj.edit_font_size;
             
             %%%%%%%%%%%%%%%%%%% RIGHT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -113,8 +118,9 @@ classdef objGUI < handle
                         
             obj.makeAxes;
             
-            obj.button_reset_axes = GraphicButton(obj.panel_image, [0.9 0.95 0.1 0.05], obj.owner, '', 'custom','reset');
+            obj.button_reset_axes = GraphicButton(obj.panel_image, [0.85 0.95 0.15 0.05], obj.owner, '', 'custom', 'new axes', '');
             obj.button_reset_axes.Callback = @obj.makeAxes;
+            obj.button_reset_axes.Tooltip = 'Create a new image axis, zoomed out and with default contrast limits'; 
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
             
@@ -150,6 +156,8 @@ classdef objGUI < handle
             for ii = 1:length(obj.buttons)
                 obj.buttons{ii}.update;
             end
+            
+            obj.panel_contrast.update;
             
         end
                         

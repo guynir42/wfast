@@ -1411,10 +1411,16 @@ classdef Acquisition < file.AstroData
             
 %             disp('findStars');
             
+            S = obj.stack_proc;
+
             if obj.use_remove_saturated
                 mu = median(squeeze(util.stat.corner_mean(util.img.jigsaw(obj.stack_proc))));
                 sig = median(squeeze(util.stat.corner_std(util.img.jigsaw(obj.stack_proc))));
-                obj.stack_proc = util.img.remove_saturated(obj.stack_proc, 'saturation', 4.5e4*obj.num_sum, 'threshold', mu+5*sig, 'dilate', 4); % note the saturation value is X100 because we are looking at the stack
+                S = util.img.remove_saturated(S, 'saturation', 4.5e4*obj.num_sum, 'threshold', mu+5*sig, 'dilate', 4); % note the saturation value is X100 because we are looking at the stack
+            end
+            
+            if obj.use_remove_bad_pixels
+                S = util.img.maskBadPixels(S); 
             end
             
             if obj.use_arbitrary_pos
@@ -1422,7 +1428,7 @@ classdef Acquisition < file.AstroData
             elseif obj.use_mextractor
                 % add the code for mextractor+astrometry here
             elseif obj.use_quick_find_stars
-                T = util.img.quick_find_stars(obj.stack_proc, 'psf', obj.getWidthEstimate, 'number', obj.num_stars,...
+                T = util.img.quick_find_stars(S, 'psf', obj.getWidthEstimate, 'number', obj.num_stars,...
                     'dilate', obj.cut_size-5, 'saturation', obj.saturation_value.*obj.num_sum, 'unflagged', 1); 
                 if isempty(T)
                     error('Could not find any stars using quick_find_stars!');
@@ -1433,7 +1439,7 @@ classdef Acquisition < file.AstroData
                 obj.num_stars_found = size(obj.clip.positions,1);
                 
             else
-                obj.clip.findStars(obj.stack_proc);                
+                obj.clip.findStars(S);                
             end
             
             obj.ref_stack = obj.stack_proc;

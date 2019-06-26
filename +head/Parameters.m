@@ -16,6 +16,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
 %         run_start_datetime;
         stars@head.Star;
         
+        WCS; % to be expanded later
+        
     end
     
     properties 
