@@ -87,6 +87,9 @@ classdef ScopeAssistant < handle
         function connect(obj, varargin)
             
 %             obj.connectUSB(varargin{:});
+
+            disp('connecting arduino bluetooth');
+
             obj.connectBluetooth(varargin{:});
             
             pause(0.1);
@@ -209,6 +212,10 @@ classdef ScopeAssistant < handle
     
     methods % getters
         
+        function val = is_connected(obj)
+            val = ~isempty(obj.hndl) && isvalid(obj.hndl) && strcmp(obj.hndl.Status, 'open');
+        end
+        
         function val = get.acc_vec(obj)
             
             if isempty(obj.gain) || isempty(obj.bias)
@@ -265,7 +272,7 @@ classdef ScopeAssistant < handle
             
             obj.status = 0;
             
-            if ~strcmp(obj.hndl.Status, 'open')
+            if ~obj.is_connected
                 error('Device is closed, use fopen or connect function');
             end
             

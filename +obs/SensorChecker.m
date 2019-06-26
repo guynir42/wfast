@@ -666,6 +666,9 @@ classdef SensorChecker < handle
             obj.collect_wind;
             str = [str 'WIND: ' obj.wind_str];
             
+            obj.collect_wind_az;
+            str = [str 'WIND_AZ: ' obj.wind_az_str];
+            
             obj.collect_humid;
             str = [str 'HUMID: ' obj.humid_str];
             

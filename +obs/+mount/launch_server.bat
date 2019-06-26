@@ -4,4 +4,6 @@ cd "C:\Program Files (x86)\Autoslew\"
 
 start "" "C:\Program Files (x86)\Autoslew\AstroOptikServer.exe" &
 
+sleep 1
+
 exit

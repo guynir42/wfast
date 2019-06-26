@@ -347,7 +347,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             if ischar(RA) && isempty(DEC)
 
                 if ~isempty(which('celestial.coo.coo_resolver', 'function'))
-                    [RA, DEC] = celestial.coo.coo_resolver(RA, 'OutUnits', 'deg');
+                    [RA, DEC] = celestial.coo.coo_resolver(RA, 'OutUnits', 'deg', 'NameServer', @VO.name.server_simbad);
                     RA = RA/15;
                 else
                     error('no name resolver has been found... try adding MAAT to the path.');

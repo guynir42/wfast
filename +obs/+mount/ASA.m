@@ -103,7 +103,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
     end
     
-    methods % constructor nd connect commands
+    methods % constructor and connect commands
         
         function obj = ASA(varargin)
             
@@ -153,6 +153,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 obj.hndl = actxserver('AstrooptikServer.Telescope');
             
+                if ~obj.checkServer
+                    return;
+                end
+                
                 obj.hndl.SiteLatitude  = obj.object.latitude;
                 obj.hndl.SiteLongitude = obj.object.longitude;
                 
@@ -162,10 +166,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 obj.update;
                 
-                if obj.status
+                if obj.status % need better checks here
                     
                     try 
-                        obj.connectArduino;
+                        
+                        if obj.use_accelerometer
+                            obj.connectArduino;
+                        end
+                
                     catch ME
                         warning(ME.getReport);
                     end
@@ -181,11 +189,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function connectArduino(obj)
 
-            if obj.use_accelerometer && isempty(obj.ard) 
+            if isempty(obj.ard) 
 
                 try
                     obj.ard = obs.sens.ScopeAssistant;
-                    obj.ard.telescope = obj;
                 catch ME
                     obj.use_accelerometer = 0;
                     warning(ME.getReport);
@@ -193,10 +200,37 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 
             end
 
-            if obj.use_accelerometer
+            if isempty(obj.ard.telescope)
+                obj.ard.telescope = obj;
+            end
+            
+            if obj.ard.is_connected==0
                 obj.ard.connect;
             end
-
+            
+            obj.ard.update;
+            
+        end
+        
+        function val = checkServer(obj)
+            
+            val = 0;
+            
+            [~, str] = system('tasklist /fi "imagename eq AstroOptikServer.exe"'); % check 
+                
+            str = strip(str);
+            idx = strfind(str, 'AstroOptikServer.exe');
+            
+            if ~isempty(idx)
+                
+                num = util.text.extract_numbers(str(idx:end)); % found the server, now check the memory usage
+                
+                if num{1}(3)>30
+                    val = 1;
+                end
+                
+            end
+            
         end
         
         function loadServer(obj)
@@ -208,24 +242,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             for ii = 1:100
                 
-                [~, str] = system('tasklist /fi "imagename eq AstroOptikServer.exe"'); % check 
-                
-                str = strip(str);
-                idx = strfind(str, 'AstroOptikServer.exe');
-                
-                if isempty(idx)
-                    continue; % can't find the server on the tasklist
+                if obj.checkServer
+                    return;
                 else
-                    num = util.text.extract_numbers(str(idx:end)); % found the server, now check the memory usage
-                    if num{1}(3)>30
-                        return; % server has loaded and is connected to telescope
-                    end
-                    % if this last condition fails, repeatedly, it means
-                    % the server is stuck on a dialog... 
+                    pause(0.05);
                 end
                 
-                pause(0.05);
-            
             end
             
             obj.killServer;
@@ -738,13 +760,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             try
                
-                if isempty(obj.ard) && obj.use_accelerometer
-                    obj.ard = obs.sens.ScopeAssistant;
-                    obj.ard.telescope = obj;
-                end
-                
-                if ~isempty(obj.ard) && obj.use_accelerometer
-                    obj.ard.update;
+                if obj.use_accelerometer
+                    obj.connectArduino;
                 end
                 
             catch ME
