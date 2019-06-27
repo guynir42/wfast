@@ -41,6 +41,8 @@ classdef ContrastLimits < handle
         position = [0 0 1 1];
         vertical_mode = 1;
         
+        margin;
+        
         debug_bit = 1;
         
     end
@@ -51,7 +53,7 @@ classdef ContrastLimits < handle
     
     methods % constructor
         
-        function obj = ContrastLimits(ax, parent, position, vertical_mode)
+        function obj = ContrastLimits(ax, parent, position, vertical_mode, margin)
            
 %             if nargin<1 || isempty(ax)
 %                 error('must supply an axes object!')
@@ -67,6 +69,12 @@ classdef ContrastLimits < handle
             
             if nargin<4 || isempty(vertical_mode)
                 vertical_mode = [];
+            end
+            
+            if nargin<5 || isempty(margin)
+                margin = [];
+            else
+                obj.margin = margin;
             end
             
             obj.ax = ax;
@@ -171,6 +179,21 @@ classdef ContrastLimits < handle
             import util.plot.GraphicButton;
             
             p = obj.calcPositions;
+            
+            if ~isempty(obj.margin)
+                
+                m = obj.margin;
+                if isscalar(m)
+                    m = [1 1].*m;
+                end
+                
+                for ii = 1:length(p)
+                    
+                    p{ii} = p{ii} + [m -m.*2];
+                    
+                end
+                
+            end
             
             obj.panel = uipanel(obj.parent, 'Title', 'contrast', 'Units', 'Normalized', 'Position', obj.position);
             

@@ -10,8 +10,8 @@ classdef AnalysisGUI < handle
         
         font_size = 12;
         big_font_size = 16;
-        edit_font_size = 11;
-        small_font_size = 10;
+        edit_font_size = 10;
+        small_font_size = 8;
         
         debug_bit = 1;
         
@@ -86,27 +86,28 @@ classdef AnalysisGUI < handle
             
             %%%%%%%%%%%%%%%%%%% LEFT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
-            N_left = 10; pos = N_left;
+            N_left = 20; pos = N_left;
             
             %%%%%%%%%%% panel controls %%%%%%%%%%%%%%%
             
             % Add buttons using obj.addButton(button_name, var_name='', type='', str1='', str2='', font_size='', split=1, color_on=[], color_off=[])
             
-            N = 4; pos = pos - N;
+            N = 13; pos = pos - N;
             
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'controls', 1); % last input is for vertical (default)
             obj.panel_controls.number = N;
-            obj.panel_controls.addButton('button_reset', 'reset', 'push', 'RESET', '', 'big', 0.5, '', '', 'Start a new run by reseting all events and lightcurves');
-            obj.panel_controls.addButton('input_num_batches', 'num_batches', 'input', 'Nbatch= ', '', '', 0.5, '', '', 'Maximum batches, limited by user input or by number of files in reader'); 
+            obj.panel_controls.addButton('button_reset', 'reset', 'push', 'RESET', '', '', 0.5, '', '', 'Start a new run by reseting all events and lightcurves');
+            obj.panel_controls.addButton('input_num_batches', 'num_batches', 'input', 'Nbatch= ', '', 'small', 0.5, '', '', 'Maximum batches, limited by user input or by number of files in reader'); 
             obj.panel_controls.addButton('button_bg_stack', 'use_background_stack', 'toggle', 'b/g stack off', 'b/g stack on', 'small', 0.5, 'red', '', 'Subtract background from stack images');
             obj.panel_controls.addButton('button_bg_cutouts', 'use_background_cutouts', 'toggle', 'b/g cutouts off', 'b/g cutouts on', 'small', 0.5, 'red', '', 'Subtract background from cutouts');
+            obj.panel_controls.margin = [0.03 0.01];
             obj.panel_controls.make;
             
             %%%%%%%%%%% panel contrast %%%%%%%%%%%%%%%
             
             N = 5; pos = pos - N;
             
-            obj.panel_contrast = util.plot.ContrastLimits(obj.axes_image, obj.fig.fig, [0 pos/N_left 0.2 5/N_left], 1); % last input is for vertical (default)
+            obj.panel_contrast = util.plot.ContrastLimits(obj.axes_image, obj.fig.fig, [0 pos/N_left 0.2 5/N_left], 1, [0.01 0.01]); % 4th input is for vertical (default), 5th is margin
             obj.panel_contrast.font_size = obj.font_size;
             obj.panel_contrast.big_font_size = obj.big_font_size;
             obj.panel_contrast.small_font_size = obj.small_font_size;
@@ -114,19 +115,19 @@ classdef AnalysisGUI < handle
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
             
-            N = 1; pos = pos - N;
+            N = 2; pos = pos - N;
             
             obj.panel_close = uipanel('Position', [0 pos 0.2 N/N_left]);
-            obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE');
+            obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1]+[0.1 0.1 -0.2 -0.2], obj.owner, '', 'custom', 'CLOSE');
             obj.button_close.Callback = @obj.callback_close;
             
             %%%%%%%%%%%%%%%%%%% RIGHT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%
             
-            N_right = 10; pos = N_right;
+            N_right = 20; pos = N_right;
             
             %%%%%%%%%%% panel objects %%%%%%%%%%%%%%%%
             
-            N = 10; pos = pos - N;
+            N = 20; pos = pos - N;
             
             obj.panel_objects = GraphicPanel(obj.owner, [0.8 pos/N_right 0.2 N/N_right], 'objects'); 
             obj.panel_objects.number = N;
@@ -136,11 +137,11 @@ classdef AnalysisGUI < handle
             obj.panel_objects.addButton('button_clipper', 'clip', 'push', 'Clipper');
             obj.panel_objects.addButton('button_background', 'back', 'push', 'Background');
             obj.panel_objects.addButton('button_photometry', 'phot', 'push', 'Photometry');
-            obj.panel_objects.addButton('button_light_basic', 'light_basic', 'push', 'basic', '', '', 1/3);
-            obj.panel_objects.addButton('button_light_ap', 'light_ap', 'push', 'aper', '', '', 1/3);
-            obj.panel_objects.addButton('button_light_gauss', 'light_gauss', 'push', 'gauss', '', '', 1/3);
+%             obj.panel_objects.addButton('button_light_basic', 'light_basic', 'push', 'basic', '', '', 1/3);
+            obj.panel_objects.addButton('button_light_ap', 'light_ap', 'push', 'lightcurves', '', '', 1);
+%             obj.panel_objects.addButton('button_light_gauss', 'light_gauss', 'push', 'gauss', '', '', 1/3);
             obj.panel_objects.addButton('button_finder', 'finder', 'push', 'Finder');
-            
+            obj.panel_objects.margin = [0.1 0.005];
             obj.panel_objects.make;
             
             %%%%%%%%%%%%%%%%%%%%%% MIDDLE %%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -151,7 +152,8 @@ classdef AnalysisGUI < handle
             
             N = 1; pos = pos - N;
             obj.panel_progress = GraphicPanel(obj.owner, [0.2 pos/N_middle 0.6 N/N_middle]);
-            obj.panel_progress.addButton('button_progress', '', 'custom', ' ', '', 'small');
+            obj.panel_progress.addButton('button_progress', '', 'custom', ' ', '', 'edit');
+            obj.panel_progress.margin = [0.0 0.0];
             obj.panel_progress.make;
             
             %%%%%%%%%%% panel info %%%%%%%%%%%%%%%%%%%
@@ -160,6 +162,7 @@ classdef AnalysisGUI < handle
             obj.panel_info = GraphicPanel(obj.owner, [0.2 pos/N_middle 0.6 N/N_middle], 0); 
             obj.panel_info.addButton('button_fwhm', 'FWHM', 'info', 'FWHM= ', 'pix', '', 0.5); 
             obj.panel_info.addButton('button_seeing', 'seeing', 'info', 'seeing= ', '"', '', 0.5);
+            obj.panel_info.margin = 0.1;
             obj.panel_info.make;
             
             %%%%%%%%%%% panel image %%%%%%%%%%%%%%%%%%
@@ -188,6 +191,7 @@ classdef AnalysisGUI < handle
             obj.panel_run = GraphicPanel(obj.owner, [0.2 pos/N_middle 0.6 N/N_middle]);
             
             obj.panel_run.addButton('button_run', '', 'custom', 'RUN', '', 'big');
+            obj.panel_run.margin = [0.02 0.1];
             obj.panel_run.make;
             obj.panel_run.button_run.Callback = @obj.callback_run;
             

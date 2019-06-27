@@ -19,6 +19,7 @@ classdef GraphicPanel < dynamicprops
         
         panel;
         position;
+        margin;
         
     end
         
@@ -136,7 +137,7 @@ classdef GraphicPanel < dynamicprops
                     end
                     
                     obj.(button.button_name) = util.plot.GraphicButton(obj.panel, pos, obj.owner, button.var_name, button.type, button.str1, button.str2, ...
-                        button.font_size, obj.self_name, [], button.color_on, button.color_off, button.tooltip);
+                        button.font_size, obj.self_name, [], button.color_on, button.color_off, button.tooltip, obj.margin);
                     
                     split_pos = split_pos + button.split;
                     

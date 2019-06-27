@@ -21,6 +21,8 @@ classdef GraphicButton < handle
         color_on; % apply this color when on
         color_off;
         
+        margin;
+        
         func = @owner.update; % callback for this object
         
         self_name; % containing object should have a "gui" object (or something else)
@@ -52,7 +54,7 @@ classdef GraphicButton < handle
     
     methods % constructor
         
-        function obj = GraphicButton(parent, position, owner, var_name, type, str1, str2, font_size, self_name, buttons_name, color_on, color_off, tooltip)
+        function obj = GraphicButton(parent, position, owner, var_name, type, str1, str2, font_size, self_name, buttons_name, color_on, color_off, tooltip, margin)
 
             import util.text.cs;
             
@@ -96,6 +98,12 @@ classdef GraphicButton < handle
             
             if nargin<13 || isempty(tooltip)
                 tooltip = '';
+            end
+            
+            if nargin<14 || isempty(margin)
+                obj.margin = [];
+            else
+                obj.margin = margin;
             end
             
             if cs(type, 'push')
@@ -175,6 +183,18 @@ classdef GraphicButton < handle
             if isprop(obj.owner.(self_name), buttons_name)
                 
                 obj.owner.(self_name).(buttons_name){end+1} = obj;
+                
+            end
+            
+            if ~isempty(obj.margin)
+                
+                margin_vec = obj.margin;
+                
+                if isscalar(margin_vec)
+                    margin_vec = [1 1].*margin_vec;
+                end
+                
+                obj.control.Position = obj.control.Position + [margin_vec -margin_vec.*2];
                 
             end
             
