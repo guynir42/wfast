@@ -9,9 +9,10 @@
 #define STRLN 64 // maximum string length (for copying)
 
 // utility functions to compare strings
-int cs(const char *keyword, const char *compare_str, int num_letters=3);
-int cs(const char *keyword, const char *str1, const char *str2, int num_letters=3);
-int cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters=3);
+bool cs(const char *keyword, const char *compare_str, int num_letters=3);
+bool cs(const char *keyword, const char *str1, const char *str2, int num_letters=3);
+bool cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters=3);
+bool parse_bool(mxArray *value);
 
 // Usage: [flux, weight, background, variance, offset_x, offset_y, width] = photometry(cutouts, varargin)
 
@@ -100,7 +101,10 @@ class Photometry{
 	float sumArrays(const float *array1, const float *array2);
 	float sumArrays(const float *array1, const float *array2, const float *array3);
 	float sumArrays(const float *array1, const float *array2, const float *array3, const float *array4);
-
+	
+	// just to catch some bugs:
+	bool isAllNaNs(const float *array); 
+	
 	// print on screen
 	void printMatrix(const int *array, const char *name);
 	void printMatrix(const float *array, const char *name);
@@ -328,8 +332,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){
 		else if(cs(key, "subtract")){
 			if(val==0 || mxIsEmpty(val)) subtract=1; // if no input, assume positive
 			else{
-				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
-				subtract=mxGetScalar(val);
+				subtract=parse_bool(val); 
 			}
 			
 		}
@@ -424,26 +427,26 @@ void Photometry::calculate(int j){
 	
 	// mexPrintf("N= %d | iter= %d\n", N, num_iter);
 	
-	float *x=(float *)mxCalloc(N, sizeof(float));; // grid with shift added using offset_x
+	float *x=(float *)mxCalloc(N, sizeof(float)); // grid with shift added using offset_x
 	float *y=(float *)mxCalloc(N, sizeof(float)); // grid with shift added using offset_y
 	float *x2=(float *)mxCalloc(N, sizeof(float)); // grid with shift added using found moment
 	float *y2=(float *)mxCalloc(N, sizeof(float)); // grid with shift added using found moment
 	float *ap_array=(float *)mxCalloc(N, sizeof(float)); // grid with the aperture shape
 	float *bg_array=(float *)mxCalloc(N, sizeof(float)); // grid with the background shape
 	float *bad_array=(float *)mxCalloc(N, sizeof(float)); // grid with the bad pixels marked
-	float *image_raw=(float *)mxCalloc(N, sizeof(float));
 	float *image_sub=(float *)mxCalloc(N, sizeof(float));
-	float *image=0; // can be image_raw or image_sub depending on value of "subtract" option
-	memcpy(image_raw, &cutouts[j*N], N*sizeof(float)); // grab a copy of the current cutout!
+	float *image=(float *)mxCalloc(N, sizeof(float)); // can be a copy of image_raw or image_sub depending on value of "subtract" option
+	float *image_raw=&cutouts[j*N]; // a pointer to the raw data
 	
 	if(ap_type==0 && bg_type==0) num_iter=1; // if using the simplest aperture/background we have nothing to gain from running iterations...
 	
 	for(int k=0;k<num_iter;k++){ // number of iterations 
 		
+		// if offsets exists from last iteration or last batch, use them
 		float dx=offset_x[j];
-		if(isnan(dx)) dx=0;
+		if(isnan(dx)) dx=0; // NaN values must be replaced with null position
 		float dy=offset_y[j];
-		if(isnan(dy)) dy=0;
+		if(isnan(dy)) dy=0; // NaN values must be replaced with null position
 	
 		for(int i=0;i<N;i++){ // x,y grid with offsets
 			x[i]=X[i]-dx;
@@ -454,20 +457,12 @@ void Photometry::calculate(int j){
 		//(this->*bg_func)(bg_array, x,y); // make an offset background mask
 		//(this->*ap_func)(ap_array, x,y); // make an offset aperture mask
 		
-		
-		// find the number of bad pixels
-		for(int i=0;i<N;i++) if(isnan(image_raw[i])) bad_array[i]=1; // find all the bad pixels in the image
-		bad_pixel[j]=sumArrays(bad_array);
-		
 		main_mask(ap_array, x, y);
 		secondary_mask(bg_array, x, y);
 		
-		for(int i=0;i<N;i++) if(bad_array[i]){ ap_array[i]=NAN; bg_array[i]=NAN; } // make sure the ap/bg arrays have NaNs everywhere the original image has NaNs
-		
-		weight[j]=sumArrays(ap_array); // number of pixels in this aperture
-		for(int i=0;i<N;i++) ap_array[i]/=weight[j]; // normalize aperture
-		float sum_ap_square=sumArrays(ap_array, ap_array); // normaliztion by sum(ap^2)
-		
+		// printMatrix(ap_array, "ap_array");
+		// printMatrix(bg_array, "bg_array");
+	
 		// first calculate the b/g so we can subtract it! 
 		float bg_weight=sumArrays(bg_array);
 
@@ -476,29 +471,56 @@ void Photometry::calculate(int j){
 		
 		// now make a background subtracted image
 		for(int i=0;i<N;i++) image_sub[i]=image_raw[i]-background[j];
-		if(subtract) image=image_sub;
-		else image=image_raw;
-		
+		if(subtract) memcpy(image, image_sub, N*sizeof(float));
+		else memcpy(image, image_raw, N*sizeof(float));
 		variance[j]=sumArrays(image_sub, image_sub, bg_array)/bg_weight; // variance of the background area
+		
+		// use the variance to find negative outlier pixels and mark them as bad pixels
+		float std=sqrt(variance[j]);
+		for(int i=0;i<N;i++) if(image[i]<-3*std) image[i]=NAN; 
+		
+		// find the number of bad pixels in the aperture mask... 				
+		bad_pixel[j]=0;
+		for(int i=0;i<N;i++){
+		
+			bad_array[i]=0; 
+			if(isnan(image[i]) && ap_array[i]>0){
+				bad_array[i]=1; // find all the bad pixels in the image
+				bad_pixel[j]++;
+			}
+		}
+		
+		for(int i=0;i<N;i++) if(bad_array[i]){ ap_array[i]=NAN; bg_array[i]=NAN; } // make sure the ap/bg arrays have NaNs everywhere the original image has NaNs
+		
+		weight[j]=sumArrays(ap_array); // number of pixels in this aperture
+		
+		for(int i=0;i<N;i++) ap_array[i]/=weight[j]; // normalize aperture
+		float sum_ap_square=sumArrays(ap_array, ap_array); // normaliztion by sum(ap^2)
 		
 		for(int i=0;i<N;i++) image[i]*=ap_array[i]/sum_ap_square; // weigh by the normalized aperture
 		
 		float m0=sumArrays(image); // flux after going through aperture, normalized by sum(ap^2)
 
+		 // debug output! 
+		// mexPrintf("j= %d | ap_array[312]= %f | weight[j]= %f | sum_ap_square= %f | m0= %f | offset_x= %f | offset_y= %f\n", j, ap_array[312], weight[j], sum_ap_square, m0, offset_x[j], offset_y[j]);
+		// if (isAllNaNs(image)) mexPrintf("Found image j= %d with all nans!\n", j);
+		
+		// calculate first moments
 		float m1x=sumArrays(image, X)/m0;
 		float m1y=sumArrays(image, Y)/m0;
 		
 		for(int i=0;i<N;i++){ // x,y grid with offsets using new moments
-			x2[i]=X[i]-m1x;
-			y2[i]=Y[i]-m1y;
+			if(isnan(m1x)==0) x2[i]=X[i]-m1x;
+			if(isnan(m1y)==0) y2[i]=Y[i]-m1y;
 		}
 		
+		// second moments (using the new grids)
 		float m2x=sumArrays(image, x2, x2)/m0;
 		float m2y=sumArrays(image, y2, y2)/m0;
 		
 		flux[j]=m0;
 		
-		if(m0>0){ // values are reliable enough to fill the other parameters
+		if(m0>0 && fabs(m1x)<dims[1]/2 && fabs(m1y)<dims[0]/2){ // values are reliable enough to fill the other parameters
 			offset_x[j]=m1x;
 			offset_y[j]=m1y;
 			width[j]=sqrt((m2x+m2y)/2);
@@ -520,7 +542,7 @@ void Photometry::calculate(int j){
 	mxFree(ap_array);
 	mxFree(bg_array);
 	mxFree(bad_array);
-	mxFree(image_raw);
+	mxFree(image);
 	mxFree(image_sub);
 	
 }
@@ -711,6 +733,22 @@ float Photometry::sumArrays(const float *array1, const float *array2, const floa
 	
 }
 
+bool Photometry::isAllNaNs(const float *array){
+	
+	int num_vals=0;
+	int num_nans=0;
+	
+	for(int i=0;i<N; i++){
+		
+		num_vals++;
+		if (isnan(array[i])) num_nans++;
+		
+	}
+	
+	return num_vals==num_nans;
+	
+}
+
 void Photometry::printMatrix(const int *array, const char *name){
 	
 	mexPrintf("%s= \n", name);
@@ -736,7 +774,7 @@ void Photometry::printMatrix(const float *array, const char *name){
 	
 }
 
-int cs(const char *keyword, const char *compare_str, int num_letters){
+bool cs(const char *keyword, const char *compare_str, int num_letters){
 	
 	char str1[STRLN]={0};
 	char str2[STRLN]={0};
@@ -788,14 +826,24 @@ int cs(const char *keyword, const char *compare_str, int num_letters){
 	
 }
 
-int cs(const char *keyword, const char *str1, const char *str2, int num_letters){
+bool cs(const char *keyword, const char *str1, const char *str2, int num_letters){
 
 	return cs(keyword, str1, num_letters) || cs(keyword, str2, num_letters);
 
 }
 
-int cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters){
+bool cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters){
 
 	return cs(keyword, str1, num_letters) || cs(keyword, str2, num_letters) || cs(keyword, str3, num_letters);
 
+}
+
+bool parse_bool(mxArray *value){
+	
+	if (mxIsEmpty(value)) return 0;
+	if (mxIsScalar(value)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotScalar", "Input 1 to parse_bool must be a scalar!");
+	if (mxIsLogical(value)) return mxGetScalar(value)!=0;
+	if (mxIsNumeric(value)) return mxGetScalar(value)!=0;
+	if (mxIsChar(value)) return cs(mxArrayToString(value), "yes", "on");
+	
 }

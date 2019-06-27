@@ -610,7 +610,8 @@ classdef Photometry < handle
             import util.stat.sum2;
             
             if obj.use_mex
-                [f,w,b,v,x,y,W,p] = util.img.photometry(single(obj.cutouts), 'square', [], 'corners', obj.corner_size, 'widths', obj.widths);
+                [f,w,b,v,x,y,W,p] = util.img.photometry(single(obj.cutouts), 'square', [], 'corners', obj.corner_size,...
+                    'widths', obj.widths, 'subtract', obj.use_backgrounds);
             else
                 [f,w,b,v,x,y,W,p] = obj.calculate('none', 'corner', 1);
             end
@@ -658,7 +659,7 @@ classdef Photometry < handle
             
             if obj.use_mex
                 [f,w,b,v,x,y,W,p] = util.img.photometry(single(obj.cutouts), 'circle', obj.aperture, 'annulus', obj.annulus,...
-                    'widths', obj.widths, 'iterations', obj.iterations, 'subtract', double(obj.use_backgrounds));
+                    'widths', obj.widths, 'iterations', obj.iterations, 'subtract', obj.use_backgrounds);
             else
                 [f,w,b,v,x,y,W,p] = obj.calculate('circle', 'annulus', obj.iterations);
             end
@@ -706,7 +707,7 @@ classdef Photometry < handle
             
             if obj.use_mex
                 [f,w,b,v,x,y,W,p] = util.img.photometry(single(obj.cutouts), 'gauss', obj.gauss_sigma, 'annulus', obj.annulus,...
-                    'iterations', obj.iterations, 'widths', obj.widths, 'subtract', double(obj.use_backgrounds));
+                    'iterations', obj.iterations, 'widths', obj.widths, 'subtract', obj.use_backgrounds);
             else
                 [f,w,b,v,x,y,W,p] = obj.calculate('gaussian', 'annulus', obj.iterations);
             end

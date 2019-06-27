@@ -1,10 +1,10 @@
 classdef GraphicButton < handle
+% usage: GraphicButton(parent, position, owner, var_name, type, str1, str2, font_size, self_name, buttons_name, color_on, color_off, tooltip)
 % Wrapper for uicontrol. 
 % Has some defaults for controlling an object "owner" that is responsible
 % for this GUI object. Also adds itself to the GUI's button array, for easy
 % updating. Defaults are: toggle, push, info, custom (to define your own). 
 %
-% TEST PROTOCOL: f1=figure; b=util.GraphicButton(f1, [0 0 0.2 0.2], [], '', 'custom', ''); delete(f1);
 
     properties
         
@@ -24,7 +24,7 @@ classdef GraphicButton < handle
         func = @owner.update; % callback for this object
         
         self_name; % containing object should have a "gui" object (or something else)
-        
+                
         control@matlab.ui.control.UIControl;
         
     end
@@ -52,7 +52,7 @@ classdef GraphicButton < handle
     
     methods % constructor
         
-        function obj = GraphicButton(parent, position, owner, var_name, type, str1, str2, font_size, self_name, buttons_name, color_on, color_off)
+        function obj = GraphicButton(parent, position, owner, var_name, type, str1, str2, font_size, self_name, buttons_name, color_on, color_off, tooltip)
 
             import util.text.cs;
             
@@ -92,6 +92,10 @@ classdef GraphicButton < handle
             
             if nargin<12 || isempty(color_off)
                 color_off = [];
+            end
+            
+            if nargin<13 || isempty(tooltip)
+                tooltip = '';
             end
             
             if cs(type, 'push')
@@ -165,6 +169,7 @@ classdef GraphicButton < handle
             obj.self_name = self_name;
             obj.color_on = color_on;
             obj.color_off = color_off;
+            obj.Tooltip = tooltip;
             obj.update;
             
             if isprop(obj.owner.(self_name), buttons_name)

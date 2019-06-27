@@ -34,9 +34,10 @@ classdef ContrastLimits < handle
         min_val = 0;
         clim;
         
-        font_size = 18;
-        edit_font_size = 14;
-        small_font_size = 12;
+        font_size = 12;
+        big_font_size = 16;
+        edit_font_size = 11;
+        small_font_size = 10;
         position = [0 0 1 1];
         vertical_mode = 1;
         
