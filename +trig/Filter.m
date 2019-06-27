@@ -165,7 +165,7 @@ classdef Filter < handle
             
             obj.clear;
             
-            obj.fluxes = fluxes; % expect it to be a 2D matrix, dim1 is time, dim2 is star index
+            obj.fluxes = fluxes - mean(fluxes, 'omitnan'); % expect it to be a 2D matrix, dim1 is time, dim2 is star index
             
             obj.convolution;
 %             obj.find_events;

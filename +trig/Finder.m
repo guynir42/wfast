@@ -47,6 +47,7 @@ classdef Finder < handle
         prev_fluxes;
         prev_backgrounds;
         prev_variances;
+        prev_weights;
         prev_offsets_x;
         prev_offsets_y;
         prev_widths;
@@ -237,6 +238,7 @@ classdef Finder < handle
             input.input_var('fluxes', []);
             input.input_var('backgrounds', []);
             input.input_var('variances', []);
+            input.input_var('weights',[]); 
             input.input_var('offsets_x', [], 'offset_x', 'dx');
             input.input_var('offsets_y', [], 'offset_y', 'dy');
             input.input_var('widths', []);
@@ -251,6 +253,7 @@ classdef Finder < handle
             input.input_var('filename', '');
             input.input_var('t_end', [], 8);
             input.input_var('t_end_stamp', [], 8);
+            input.input_var('used_background_sub', []); 
             input.scan_vars(varargin{:});
             
             obj.clear;
@@ -304,6 +307,7 @@ classdef Finder < handle
             obj.prev_fluxes = input.fluxes;
             obj.prev_backgrounds = input.backgrounds;
             obj.prev_variances = input.variances;
+            obj.prev_weights = input.weights;
             obj.prev_offsets_x = input.offsets_x;
             obj.prev_offsets_y = input.offsets_y;
             obj.prev_widths = input.widths;
@@ -422,6 +426,7 @@ classdef Finder < handle
                 ev.best_kernel = obj.filt.kernels(:,ev.kern_index);
                 
                 ev.threshold = obj.threshold;
+                ev.used_background_sub = input.used_background_sub;
                 ev.time_range_thresh = obj.time_range_thresh;
                 ev.kern_range_thresh = obj.kern_range_thresh;
                 ev.star_range_thresh = obj.star_range_thresh;
@@ -438,6 +443,12 @@ classdef Finder < handle
                 ev.variances_at_star = v(:, ev.star_index);
                 ev.variances_time_average = mean(v, 1, 'omitnan');
                 ev.variances_star_average = mean(v, 2, 'omitnan');
+                
+                w = vertcat(obj.prev_weights, input.weights);
+                ev.weights_at_peak = w(ev.frame_index, :);
+                ev.weights_at_star = w(:, ev.star_index);
+                ev.weights_time_average = mean(w, 1, 'omitnan');
+                ev.weights_star_average = mean(w, 2, 'omitnan');
                 
                 dx = vertcat(obj.prev_offsets_x, input.offsets_x);
                 ev.offsets_x_at_peak = dx(ev.frame_index, :);

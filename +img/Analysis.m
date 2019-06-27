@@ -26,6 +26,8 @@ classdef Analysis < file.AstroData
 %         light_cosqrt@img.Lightcurves;
         % light_fit@img.Lightcurves;
         
+        model_psf@ModelPSF;
+        
         finder@trig.Finder;
         
         prog@util.sys.ProgressBar;
@@ -395,26 +397,31 @@ classdef Analysis < file.AstroData
             
             obj.cutouts_sub = obj.cutouts_proc - B./obj.num_sum;
             
+            %%%%%%%%%%%%%%%%%%%%% PSF modeling %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            obj.model_psf.input(obj.cutouts_sub, obj.phot.offsets_x, obj.phot.offsets_y);
+            
             %%%%%%%%%%%%%%%%%%%%% LIGHTCURVE ANALYSIS %%%%%%%%%%%%%%%%%%%%%
             
             obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps, 'positions', obj.positions); 
             
-            obj.light_original.input('fluxes', obj.fluxes, 'timestamps', obj.timestamps);
-            obj.light_basic.getData(obj.phot, 'basic');
-            if obj.light_basic.gui.check, obj.light_basic.gui.update; end
+%             obj.light_original.input('fluxes', obj.fluxes, 'timestamps', obj.timestamps);
+%             obj.light_basic.getData(obj.phot, 'basic');
+%             if obj.light_basic.gui.check, obj.light_basic.gui.update; end
             
             obj.light_ap.getData(obj.phot, 'ap');
             if obj.light_ap.gui.check, obj.light_ap.gui.update; end
             
-            obj.light_gauss.getData(obj.phot, 'gauss');
-            if obj.light_gauss.gui.check, obj.light_gauss.gui.update; end
+%             obj.light_gauss.getData(obj.phot, 'gauss');
+%             if obj.light_gauss.gui.check, obj.light_gauss.gui.update; end
             
             f = obj.phot.fluxes;
             b = obj.phot.backgrounds;
             v = obj.phot.variances;
+            wt = obj.phot.weights;
             dx = obj.phot.offsets_x;
             dy = obj.phot.offsets_y;
-            w = obj.phot.widths;
+            wd = obj.phot.widths;
             p = obj.phot.bad_pixels;
             
             r = [];
@@ -427,10 +434,11 @@ classdef Analysis < file.AstroData
                 r = obj.phot.aperture;
             end
             
-            obj.finder.input(f, b, v, dx, dy, w, p, r, g, ...
+            obj.finder.input(f, b, v, wt, dx, dy, wd, p, r, g, ...
                 obj.timestamps, obj.cutouts_proc, obj.positions, obj.stack_proc, ...
                 obj.batch_counter+1, 'filename', obj.reader.this_filename, ...
-                't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp);
+                't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp,...
+                'used_background', obj.phot.use_backgrounds);
             
             if ~isempty(obj.gui) && obj.gui.check
                 obj.show('ax', obj.gui.axes_image);

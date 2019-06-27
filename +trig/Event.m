@@ -51,6 +51,7 @@ classdef Event < handle
         duration;
         
         threshold; % trigger threshold used (in S/N units)
+        used_background_sub; % did the photometery object use local (e.g., annulus) b/g subtraction?
         
         % NOTE: these can be absolute thresholds (positive) or relative to threshold (negative). 
         time_range_thresh; % all times around the peak (for same star/kernel) above this threshold are also part of the event
@@ -72,6 +73,11 @@ classdef Event < handle
         variances_at_star;
         variances_time_average;
         variances_star_average;
+        
+        weights_at_peak;
+        weights_at_star;
+        weights_time_average;
+        weights_star_average;
         
         offsets_x_at_peak;
         offsets_x_at_star;
@@ -341,19 +347,19 @@ classdef Event < handle
             
             input = util.text.InputVars;
             input.input_var('ax', [], 'axes', 'axis');
-            input.input_var('font_size', 14);
+            input.input_var('font_size', 12);
             input.scan_vars(varargin{:});
             
             if isempty(input.ax), input.ax = gca; end
             
             input.ax.NextPlot = 'replace';
-            h1 = plot(input.ax, obj.timestamps, obj.flux_filtered);
+            h1 = plot(input.ax, obj.timestamps, obj.flux_filtered, 'LineWidth', 2);
             h1.DisplayName = 'Filtered LC';
             
             input.ax.NextPlot = 'add';
             range = obj.time_indices;
             if ~isempty(range)
-                h2 = plot(input.ax, obj.timestamps(range), obj.flux_filtered(range));
+                h2 = plot(input.ax, obj.timestamps(range), obj.flux_filtered(range), 'LineWidth', 2);
                 h2.DisplayName = 'trigger region';
             end
             
@@ -374,27 +380,43 @@ classdef Event < handle
             if obj.is_positive==0
                 sign = -1;
             end
+
             h4 = plot(input.ax, obj.kernel_timestamps+obj.peak_timestamp, obj.best_kernel*5*sign, ':');
             h4.DisplayName = 'best filter';
             
+            h5 = plot(input.ax, obj.timestamps, obj.backgrounds_at_star, '--'); 
+            h5.DisplayName = 'background';
+            
+            h6 = plot(input.ax, obj.timestamps, obj.offsets_x_at_star, 'o', 'MarkerSize', 1);
+            h6.DisplayName = 'offset x';
+            
+            h7 = plot(input.ax, obj.timestamps, obj.offsets_y_at_star, 'o', 'MarkerSize', 1);
+            h7.DisplayName = 'offset y';
+            
+            h8 = bar(input.ax, obj.timestamps, obj.bad_pixels_at_star-mean(obj.bad_pixels_at_star)-5, 'BaseValue', -5, 'FaceAlpha', 0.5);
+            h8.DisplayName = 'relative bad pixels';
+            
             xlabel(input.ax, 'timestamp (seconds)');
-            ylabel(input.ax, 'flux S/N');   
+            ylabel(input.ax, 'flux S/N');
             
-            if strcmp(obj.which_batch, 'first')
-                lh = legend(input.ax, 'Location', 'SouthEast');
-            else
-                lh = legend(input.ax, 'Location', 'SouthWest');
-            end
+%             if strcmp(obj.which_batch, 'first')
+%                 lh = legend(input.ax, 'Location', 'SouthEast');
+%             else
+%                 lh = legend(input.ax, 'Location', 'SouthWest');
+%             end
+
+            lh = legend(input.ax, 'Location', 'South', 'Orientation', 'Vertical');
             
-            lh.FontSize = input.font_size-6;
+            lh.FontSize = input.font_size-4;
+            lh.NumColumns = 2;
             
             util.plot.inner_title(sprintf('id: %d | star: %d | batches: %d-%d | S/N= %4.2f | \\sigma= %4.2f', ...
                 obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.stds_raw_all(1, obj.star_index)),...
                 'ax', input.ax, 'Position', 'NorthWest', 'FontSize', input.font_size);
             
-            input.ax.YLim(1) = -max(abs(input.ax.YLim));
             input.ax.YLim(2) = max(abs(input.ax.YLim));
-
+            input.ax.YLim(1) = -max(abs(input.ax.YLim))-2;
+            
             input.ax.XLim = [obj.timestamps(1) obj.timestamps(end)];
 
             input.ax.NextPlot = 'replace';
@@ -483,19 +505,19 @@ classdef Event < handle
 
                     use_autodyn = isempty(input.bias) && isempty(input.dynamic_range);
                     
-                    util.plot.show(cutouts(:,:,idx_start+ii-1), 'fancy', 0, ...
+                    util.plot.show(cutouts(:,:,idx_start+ii-1), 'fancy', 0, 'ax', ax{ii}, ...
                         'autodyn', use_autodyn, 'bias', input.bias, 'dyn', input.dynamic_range);
 
                     if idx_start+ii-1==idx
-                        util.plot.inner_title([num2str(idx_start+ii-1) '*'], 'Position', 'NorthWest', 'Color', 'red');
+                        util.plot.inner_title([num2str(idx_start+ii-1) '*'], 'Position', 'NorthWest', 'Color', 'red', 'Parent', ax{ii});
                     else
-                        util.plot.inner_title(num2str(idx_start+ii-1), 'Position', 'NorthWest');
+                        util.plot.inner_title(num2str(idx_start+ii-1), 'Position', 'NorthWest', 'Parent', ax{ii});
                     end
                     
                     if ~isempty(rad)
-                        viscircles(cen(ii,:), rad, 'EdgeColor', col);
+                        viscircles(ax{ii}, cen(ii,:), rad, 'EdgeColor', col);
                         if idx_start+ii-1==idx
-                            util.plot.inner_title(str, 'Position', 'bottom', 'Color', col);
+                            util.plot.inner_title(str, 'Position', 'bottom', 'Color', col, 'Parent', ax{ii});
                         end
                     end
                 
@@ -522,7 +544,7 @@ classdef Event < handle
             if ~isempty(obj.stack)
                 
                 util.plot.show(obj.stack, 'fancy', 1, 'autodyn', 1, 'ax', input.ax); 
-                title('');
+                title(input.ax, '');
                 
                 if ~isempty(obj.cutouts) && ~isempty(obj.positions)
                     

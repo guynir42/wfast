@@ -23,6 +23,12 @@ function [M_out, idx_end] = insert_matrix(M_old, M_new, idx, fill_value, double_
         return;
     end
     
+    if isempty(M_old)
+        M_out = M_new;
+        idx_end = size(M_out);
+        return;
+    end
+    
     if nargin<4 || isempty(fill_value)
         fill_value = 0;
     end

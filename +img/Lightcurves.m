@@ -102,6 +102,8 @@ classdef Lightcurves < handle
             obj.variances_full = [];
             obj.offsets_x_full = [];
             obj.offsets_y_full = [];
+            obj.centroids_x_full = [];
+            obj.centroids_y_full = [];
             obj.widths_full = [];
             obj.bad_pixels_full = [];
             
