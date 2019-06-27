@@ -73,6 +73,7 @@ classdef Acquisition < file.AstroData
         use_refine_bg = 0;
         
         % these swithces determine how stars are picked when run begins
+        use_remove_bad_pixels = true;
         use_remove_saturated = false; % remove all stars with any pixels about saturation value
         saturation_value = 50000; % consider any pixels above this to be saturated
         

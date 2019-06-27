@@ -135,8 +135,8 @@ classdef AutoFocus < handle
         function input(obj, idx, position, widths, fluxes)
             
             obj.pos(idx) = position;
-            obj.widths(:,idx) = util.vec.tocolumn(widths);
-            obj.weights(:,idx) = util.vec.tocolumn(fluxes);
+            obj.widths(1:length(widths),idx) = util.vec.tocolumn(widths);
+            obj.weights(1:length(widths),idx) = util.vec.tocolumn(fluxes);
             
         end
         
