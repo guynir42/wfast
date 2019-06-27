@@ -623,7 +623,11 @@ classdef Acquisition < file.AstroData
         
         function val = get.average_width(obj)
             
-            val = obj.phot_stack.average_width;
+            if obj.use_model_psf
+                val = obj.model_psf.fwhm/2.355;
+            else
+                val = obj.phot_stack.average_width;
+            end
             
         end
         
@@ -1418,6 +1422,11 @@ classdef Acquisition < file.AstroData
                 % must send the average adjustment back to mount controller (should we still adjust the cutouts though??)
             end
             
+            if obj.use_model_psf
+                obj.model_psf.input(obj.stack_cutouts, obj.phot_stack.offsets_x, obj.phot_stack.offsets_y);
+                
+            end
+            
             obj.prev_average_width = obj.average_width;
             
         end
@@ -1741,8 +1750,7 @@ classdef Acquisition < file.AstroData
                     
                     if obj.af.use_model_psf
                         obj.model_psf.input(cutouts, obj.phot_stack.offsets_x, obj.phot_stack.offsets_y);
-                        FWHM = util.img.fwhm(obj.model_psf.stack);
-                        obj.af.input(ii, obj.cam.focuser.pos, FWHM);
+                        obj.af.input(ii, obj.cam.focuser.pos, obj.model_psf.fwhm);
                     else
                         obj.af.input(ii, obj.cam.focuser.pos, obj.phot_stack.widths, obj.phot_stack.fluxes);
                     end
