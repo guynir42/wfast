@@ -89,15 +89,15 @@ classdef AcqGUI < handle
             movegui(obj.fig.fig, 'center');
             obj.fig.clear;
             
-            N_left = 15;
-            N_right = 15;
+            N_left = 20;
+            N_right = 20;
             W_left = 0.25;
             W_right = 0.15;
             
             %%%%%%%%%%% panel controls %%%%%%%%%%%%%%%
             
             pos = N_left;
-            N = 9;
+            N = 13;
             pos = pos - N;
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left W_left N/N_left], 'controls');
             obj.panel_controls.number = N;
@@ -129,14 +129,14 @@ classdef AcqGUI < handle
             obj.panel_controls.addButton('button_background', 'use_background', 'toggle', 'sub b/g off', 'sub b/g on', '', 0.5, 'red');
             
             obj.panel_controls.addButton('button_simple_phot', 'use_simple_photometry', 'toggle', 'full phot', 'simple phot', '', 0.5, 'red');
-            obj.panel_controls.addButton('button_placeholder', '', 'custom', ' ', '', '', 0.5);
+            obj.panel_controls.addButton('button_model_psf', 'use_model_psf', 'toggle', 'no model PSF', 'use model PSF', '', 0.5, 'red');
             
+            obj.panel_controls.margin = [0.02 0.01];
             obj.panel_controls.make;
             
             obj.panel_controls.button_num_files.Callback = @obj.callback_num_files;
 %             obj.panel_controls.button_num_files.Enable = 'inactive';
 %             obj.panel_controls.button_stars_found.Enable = 'inactive';
-            obj.panel_controls.button_placeholder.Enable = 'off';
             
             obj.panel_controls.button_source_choose.Tooltip = 'Choose camera or reader';
             obj.panel_controls.button_source_gui.Tooltip = 'Open the GUI of the camera/reader';
@@ -158,18 +158,18 @@ classdef AcqGUI < handle
             obj.panel_controls.button_adjust.Tooltip = 'Adjust the cutout positions as stars drift in the field';
             obj.panel_controls.button_background.Tooltip = 'Use background subtraction on all analysis data';
             obj.panel_controls.button_simple_phot.Tooltip = 'Use simple summing of cutouts <or> full photometry object';
-            
+            obj.panel_controls.button_model_psf.Tooltip = 'Use the stack of PSFs to model the average width, etc...';
             
             %%%%%%%%%%% panel contrast %%%%%%%%%%%%%%%
             
             N = 5;
             pos = pos - N;
-            obj.panel_contrast = util.plot.ContrastLimits(obj.axes_image, obj.fig.fig, [0 pos/N_left W_left N/N_left]);
+            obj.panel_contrast = util.plot.ContrastLimits(obj.axes_image, obj.fig.fig, [0 pos/N_left W_left N/N_left], 1, [0.02 0.01]);
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
             
-            obj.panel_close = uipanel('Position', [0 0 W_left 1/N_left]);
-            obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE');
+            obj.panel_close = uipanel('Position', [0 0 W_left 2/N_left]);
+            obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1]+[0.05 0.1 -0.1 -0.2], obj.owner, '', 'custom', 'CLOSE');
             obj.button_close.Callback = @obj.callback_close;
             obj.button_close.Tooltip = 'Close the GUI';
             
@@ -178,13 +178,14 @@ classdef AcqGUI < handle
             %%%%%%%%%%% panel objects %%%%%%%%%%%%%%%%
             
             pos = N_right;
-            N = 12;
+            N = 14;
             pos = pos - N;
             obj.panel_objects = GraphicPanel(obj.owner, [1-W_right pos/N_right W_right N/N_right], 'objects');
             obj.panel_objects.number = N;
             obj.panel_objects.addButton('button_pars', 'pars', 'push', 'Header GUI');
-            obj.panel_objects.addButton('button_buffers', 'buffers', 'push', 'Buffers GUI');
+            obj.panel_objects.addButton('button_camera', 'cam', 'push', 'Camera GUI');
             obj.panel_objects.addButton('button_reader', 'reader', 'push', 'Reader GUI');
+            obj.panel_objects.addButton('button_buffers', 'buffers', 'push', 'Buffers GUI');
             obj.panel_objects.addButton('button_calibration', 'cal', 'push', 'Calibration GUI');
             obj.panel_objects.addButton('button_background', 'back', 'push', 'Background GUI');
             obj.panel_objects.addButton('button_clipper', 'clip', 'push', 'Clipper GUI');
@@ -194,18 +195,19 @@ classdef AcqGUI < handle
             obj.panel_objects.addButton('button_lightcurves', 'lightcurves', 'push', 'Lightcurves GUI');
             obj.panel_objects.addButton('button_deflator', 'deflator', 'push', 'Deflator GUI');
             obj.panel_objects.addButton('button_focuser', '', 'custom', 'Focuser: '); 
+            obj.panel_objects.margin = [0.02 0.01];
             obj.panel_objects.make;
             obj.panel_objects.button_focuser.Callback = @obj.callback_focuser;
             
             %%%%%%%%%%% panel save %%%%%%%%%%%%%%%%%%%
             
-            N = 3;
+            N = 6;
             pos = pos - N;
             obj.panel_save = GraphicPanel(obj.owner, [1-W_right pos/N_right W_right N/N_right], 'save');
             obj.panel_save.number = N;
             obj.panel_save.addButton('button_save', 'use_save', 'toggle', 'save off', 'save on', '', 1, 'red');
             obj.panel_save.addButton('button_trig', 'use_triggered_save', 'toggle', 'trig save off', 'trig save on', '', 1, 'red');
-            
+            obj.panel_save.margin = [0.02 0.01];
             obj.panel_save.make;
             
             obj.panel_save.button_save.Tooltip = 'Save cutouts and stack images of each batch';
@@ -220,6 +222,7 @@ classdef AcqGUI < handle
             obj.panel_run.addButton('button_preview', 'runPreview', 'push', 'PREVIEW', '', '', 0.15);
             obj.panel_run.addButton('button_run', '', 'custom', 'RUN', '', '', 0.7);
             obj.panel_run.addButton('button_focus', 'runFocus', 'push', 'FOCUS', '', '', 0.15);
+            obj.panel_run.margin = [0.005 0.1];
             obj.panel_run.make;
             obj.panel_run.button_run.Callback = @obj.callback_run;
             obj.panel_run.button_preview.Tooltip = 'Run a single batch just to see the field';
@@ -237,7 +240,7 @@ classdef AcqGUI < handle
             obj.panel_info.addButton('button_flux', 'average_flux', 'info', 'flux= ', '', 'small', 0.5);
             obj.panel_info.addButton('button_bg', 'average_background', 'info', 'b/g= ', '', 'small', 0.5);
             obj.panel_info.addButton('button_temperature', 'sensor_temperature', 'info', 's.temp= '); 
-            
+            obj.panel_info.margin = [0.01 0.03];
             obj.panel_info.make;
             
             obj.panel_info.button_frame_rate.Tooltip = 'Measured frame rate (averaged over a few batches)';
