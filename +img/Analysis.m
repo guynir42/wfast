@@ -26,7 +26,7 @@ classdef Analysis < file.AstroData
 %         light_cosqrt@img.Lightcurves;
         % light_fit@img.Lightcurves;
         
-        model_psf@ModelPSF;
+        model_psf@img.ModelPSF;
         
         finder@trig.Finder;
         
@@ -51,6 +51,8 @@ classdef Analysis < file.AstroData
         subtract_stack;
         
         prev_stack;
+        
+        FWHM; % latest measured full width half maximum
         
         batch_counter = 0;
         
@@ -118,6 +120,8 @@ classdef Analysis < file.AstroData
                 obj.light_ap = img.Lightcurves; obj.light_ap.signal_method = 'aperture'; obj.light_ap.background_method = 'annulus';
                 obj.light_gauss = img.Lightcurves; obj.light_gauss.signal_method = 'gauss'; obj.light_gauss.background_method = 'annulus';
                 
+                obj.model_psf = img.ModelPSF;
+                
                 obj.finder = trig.Finder;
                 obj.finder.setupKernels;
                 
@@ -175,6 +179,16 @@ classdef Analysis < file.AstroData
         function val = get.num_batches(obj)
             
             val = min([obj.num_batches_limit, obj.reader.getNumBatches]);
+            
+        end
+        
+        function val = seeing(obj)
+            
+            if isempty(obj.pars)
+                val = obj.FWHM.*1.24;
+            else
+                val = obj.FWHM.*obj.pars.SCALE;
+            end
             
         end
         
@@ -397,10 +411,6 @@ classdef Analysis < file.AstroData
             
             obj.cutouts_sub = obj.cutouts_proc - B./obj.num_sum;
             
-            %%%%%%%%%%%%%%%%%%%%% PSF modeling %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            
-            obj.model_psf.input(obj.cutouts_sub, obj.phot.offsets_x, obj.phot.offsets_y);
-            
             %%%%%%%%%%%%%%%%%%%%% LIGHTCURVE ANALYSIS %%%%%%%%%%%%%%%%%%%%%
             
             obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps, 'positions', obj.positions); 
@@ -414,6 +424,14 @@ classdef Analysis < file.AstroData
             
 %             obj.light_gauss.getData(obj.phot, 'gauss');
 %             if obj.light_gauss.gui.check, obj.light_gauss.gui.update; end
+            
+            %%%%%%%%%%%%%%%%%%%%% PSF modeling %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            obj.model_psf.input(obj.cutouts_sub, obj.phot.offsets_x, obj.phot.offsets_y);
+            
+            obj.FWHM = util.img.fwhm(obj.model_psf.stack);
+            
+            %%%%%%%%%%%%%%%%%%%%% Event finding %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
             f = obj.phot.fluxes;
             b = obj.phot.backgrounds;

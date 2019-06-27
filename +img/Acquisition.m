@@ -33,6 +33,8 @@ classdef Acquisition < file.AstroData
         flux_buf@util.vec.CircularBuffer;
         lightcurves@img.Lightcurves;
         
+        model_psf@img.ModelPSF;
+        
         af@obs.focus.AutoFocus;
         
         % output to file
@@ -84,6 +86,8 @@ classdef Acquisition < file.AstroData
         use_cutouts = true;
         use_adjust_cutouts = 1; % use adjustments in software (not by moving the mount)
         use_simple_photometry = 1; % use only sums on the cutouts instead of Photometry object for full cutouts
+        
+        use_model_psf = 1;
         
         use_save = false; % must change this when we are ready to really start
         use_triggered_save = false;
@@ -179,6 +183,8 @@ classdef Acquisition < file.AstroData
         use_arbitrary_pos_;
         use_cutouts_;
         use_adjust_cutouts_;
+        use_simple_photometry_;
+        use_model_psf_;
         use_save_;
         use_triggered_save_;
         use_show_;
@@ -246,6 +252,8 @@ classdef Acquisition < file.AstroData
                 obj.phot.use_aperture = 0;
                 obj.phot.use_gaussian = 0;
                 obj.lightcurves = img.Lightcurves;
+                
+                obj.model_psf = img.ModelPSF;
                 
                 obj.af = obs.focus.AutoFocus;
                 
@@ -792,6 +800,8 @@ classdef Acquisition < file.AstroData
                 input.input_var('use_arbitrary_pos', []);
                 input.input_var('use_cutouts', []);
                 input.input_var('use_adjust_cutouts', []);
+                input.input_var('use_simple_photometry', []);
+                input.input_var('use_model_psf', []);
                 input.input_var('use_save', [], 'save');
                 input.input_var('use_trigger_save', []);
                 input.input_var('use_show', [], 'show');
@@ -836,6 +846,8 @@ classdef Acquisition < file.AstroData
             obj.use_arbitrary_pos_ = obj.use_arbitrary_pos;
             obj.use_cutouts_ = obj.use_cutouts;
             obj.use_adjust_cutouts_ = obj.use_adjust_cutouts;
+            obj.use_simple_photometry_ = obj.use_simple_photometry;
+            obj.use_model_psf_ = obj.use_model_psf;
             obj.use_save_ = obj.use_save;
             obj.use_triggered_save_ = obj.use_triggered_save;
             obj.use_show_ = obj.use_show;
@@ -886,6 +898,8 @@ classdef Acquisition < file.AstroData
             obj.use_arbitrary_pos = obj.use_arbitrary_pos_;
             obj.use_cutouts = obj.use_cutouts_;
             obj.use_adjust_cutouts = obj.use_adjust_cutouts_;
+            obj.use_simple_photometry = obj.use_simple_photometry_;
+            obj.use_model_psf = obj.use_model_psf_;
             obj.use_save = obj.use_save_;
             obj.use_triggered_save = obj.use_triggered_save_;
             obj.use_show = obj.use_show_;
@@ -1666,8 +1680,8 @@ classdef Acquisition < file.AstroData
                     error('must be connected to camera and focuser!');
                 end
 
-                input = obj.makeInputVars('reset', 0, 'batch_size', 10, 'expT', 0.03, 'frame_rate', 25, ...
-                    'num_stars', 25, 'use audio', 0, 'use_save', 0, 'run name', 'focus', 'prog', 0, ...
+                input = obj.makeInputVars('reset', 0, 'batch_size', obj.af.batch_size, 'expT', obj.af.expT, 'frame_rate', obj.af.frame_rate, ...
+                    'use_model_psf', obj.af.use_model_psf, 'use audio', 0, 'use_save', 0, 'run name', 'focus', 'prog', 0, ...
                     'pass_source', {'async', 0}, varargin{:});
 
                 obj.reset;
@@ -1692,10 +1706,14 @@ classdef Acquisition < file.AstroData
                 cleanup = onCleanup(@obj.finishupFocus);
 %                 obj.startup(input);
 
-%                 p = obj.af.pos;
-                p = [obj.af.pos flip(obj.af.pos)];
-
+                if obj.af.use_loop_back
+                    p = [obj.af.pos flip(obj.af.pos)];
+                else
+                    p = obj.af.pos;
+                end
+                
                 for ii = 1:length(p)
+                    
                     if obj.brake_bit
                         return;
                     end
@@ -1704,7 +1722,7 @@ classdef Acquisition < file.AstroData
                         
                         obj.cam.focuser.pos = p(ii);
                         
-                        pause(0.1);
+                        pause(0.05);
             
                     catch ME
                         warning(ME.getReport);
@@ -1721,12 +1739,18 @@ classdef Acquisition < file.AstroData
                         obj.clip.positions = double(obj.clip.positions + obj.average_offsets);
                     end
                     
+                    if obj.af.use_model_psf
+                        obj.model_psf.input(cutouts, obj.phot_stack.offsets_x, obj.phot_stack.offsets_y);
+                        FWHM = util.img.fwhm(obj.model_psf.stack);
+                        obj.af.input(ii, obj.cam.focuser.pos, FWHM);
+                    else
+                        obj.af.input(ii, obj.cam.focuser.pos, obj.phot_stack.widths, obj.phot_stack.fluxes);
+                    end
+                    
                     if ~isempty(obj.gui) && obj.gui.check
                         obj.show;
                         obj.gui.update;
                     end
-                    
-                    obj.af.input(ii, obj.cam.focuser.pos, obj.phot_stack.widths, obj.phot_stack.fluxes);
                     
                     obj.af.plot;
 
@@ -1811,7 +1835,7 @@ classdef Acquisition < file.AstroData
                 I_masked = I;
                 I_masked(~unmask{ii}) = M;
                 
-                T = util.img.quick_find_stars(I_masked, 'mean', M, 'std', sqrt(V), 'number', 5, varargin{:});
+                T = util.img.quick_find_stars(I_masked, 'mean', M, 'std', sqrt(V), 'number', obj.af.num_stars_per_quadrant, varargin{:});
             
                 if ~isempty(T)
                     T_all = vertcat(T_all, T);

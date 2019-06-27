@@ -30,9 +30,12 @@ classdef AnalysisGUI < handle
             
         panel_progress
         
+        panel_info;
+        
         panel_image;
         button_reset_axes;
         button_batch_counter;
+        input_num_rect;
         axes_image;
     
         panel_run;
@@ -151,9 +154,17 @@ classdef AnalysisGUI < handle
             obj.panel_progress.addButton('button_progress', '', 'custom', ' ', '', 'small');
             obj.panel_progress.make;
             
+            %%%%%%%%%%% panel info %%%%%%%%%%%%%%%%%%%
+            
+            N = 1; pos = pos - N;
+            obj.panel_info = GraphicPanel(obj.owner, [0.2 pos/N_middle 0.6 N/N_middle], 0); 
+            obj.panel_info.addButton('button_fwhm', 'FWHM', 'info', 'FWHM= ', 'pix', '', 0.5); 
+            obj.panel_info.addButton('button_seeing', 'seeing', 'info', 'seeing= ', '"', '', 0.5);
+            obj.panel_info.make;
+            
             %%%%%%%%%%% panel image %%%%%%%%%%%%%%%%%%
             
-            N = 8; pos = pos - N;
+            N = 7; pos = pos - N;
             
             obj.panel_image = uipanel('Title', '', 'Position', [0.2 pos/N_middle 0.6 N/N_middle]);
                         
@@ -161,6 +172,9 @@ classdef AnalysisGUI < handle
             
             obj.button_batch_counter = GraphicButton(obj.panel_image, [0.0 0.0 0.15 0.05], obj.owner, 'batch_counter', 'info', 'N= ');
             obj.button_batch_counter.Tooltip = 'How many batches already finished';
+            
+            obj.input_num_rect = GraphicButton(obj.panel_image, [0.0 0.95 0.15 0.05], obj.owner, 'display_num_rect_stars', 'input', ' ', ' rect');
+            obj.input_num_rect.Tooltip = 'How many rectangles (maximum) to show on screen';
             
             obj.button_reset_axes = GraphicButton(obj.panel_image, [0.85 0.95 0.15 0.05], obj.owner, '', 'custom', 'new axes', '');
             obj.button_reset_axes.Callback = @obj.makeAxes;

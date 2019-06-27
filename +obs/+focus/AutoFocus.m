@@ -38,6 +38,14 @@ classdef AutoFocus < handle
     
     properties % switches/controls
         
+        expT = 0.03;
+        frame_rate = NaN;
+        batch_size = 10;
+        use_loop_back = 1;
+        num_stars_per_quadrant = 5;
+        
+        use_model_psf = 1;
+        
         use_min_position = 1;
         
         use_fit_tip_tilt = 0;
@@ -134,9 +142,13 @@ classdef AutoFocus < handle
         
         function input(obj, idx, position, widths, fluxes)
             
+            if nargin<5 || isempty(fluxes)
+                fluxes = 1;
+            end
+            
             obj.pos(idx) = position;
             obj.widths(1:length(widths),idx) = util.vec.tocolumn(widths);
-            obj.weights(1:length(widths),idx) = util.vec.tocolumn(fluxes);
+            obj.weights(1:length(fluxes),idx) = util.vec.tocolumn(fluxes);
             
         end
         

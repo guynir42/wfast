@@ -17,12 +17,13 @@ classdef ModelPSF < handle
         stack; 
         mask;
         
+        fwhm;
         
     end
     
     properties % switches/controls
         
-        use_mex = 0;
+        use_mex = 1;
         radius = 5;
         
         debug_bit = 1;
@@ -96,7 +97,11 @@ classdef ModelPSF < handle
             dx(isnan(dx)) = 0;
             dy = obj.offsets_y;
             dy(isnan(dy)) = 0;
-                
+            
+            if isempty(dx) || isempty(dy)
+                obj.cutouts_shifted = obj.cutouts;
+            end
+            
             if obj.use_mex
                 obj.cutouts_shifted = util.img.shift(obj.cutouts, -dx, -dy);
             else
@@ -115,6 +120,8 @@ classdef ModelPSF < handle
             obj.stack = sum(sum(obj.cutouts_shifted,3, 'omitnan'),4, 'omitnan');
             
             obj.mask = util.img.ellipse('radius', obj.radius, 'size', [size(obj.cutouts,1), size(obj.cutouts,2)]);
+            
+            
             
         end
         
