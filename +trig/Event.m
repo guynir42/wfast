@@ -32,10 +32,11 @@ classdef Event < handle
         is_positive; % is the filter-response positive (typically for occultations)
         
         timestamps; % all timestamps for the 2-batch window
-        flux_filtered; % flux of the best star and best kernel, after filtering and normalizing
-        flux_fitted; % best fit flux model (to be filled later, adding a occult.Parameters object)
         flux_raw_all; % all the fluxes in the 2-batch window *
-        stds_raw_all; % noise values for each of the above fluxes
+        flux_filtered; % flux of the best star and best kernel, after filtering and normalizing
+        flux_detrended; % flux of the best star after removing slow changes (trends)
+        std_flux; % noise level of the detrended flux
+        flux_fitted; % best fit flux model (to be filled later, adding a occult.Parameters object)
         
         time_index; % index in the 2-batch time window where the maximum value occured
         kern_index; % index of the best kernel
@@ -363,17 +364,12 @@ classdef Event < handle
                 h2.DisplayName = 'trigger region';
             end
             
-            f = obj.flux_raw_all(:,obj.star_index);
-            m = mean(f);
-            if ~isempty(obj.stds_raw_all)
-                s = obj.stds_raw_all(obj.star_index);
-            else
-                s = std(obj.flux_raw_all);
-                s = s(obj.star_index);
-            end
+%             f = obj.flux_raw_all(:,obj.star_index);
+            f = obj.flux_detrended;
+            s = obj.std_flux;
             
             input.ax.ColorOrderIndex = 3;
-            h3 = plot(input.ax, obj.timestamps, (f-m)./s, '-');
+            h3 = plot(input.ax, obj.timestamps, f./s, '-');
             h3.DisplayName = 'Raw LC';
             
             sign = 1;
@@ -411,7 +407,7 @@ classdef Event < handle
             lh.NumColumns = 2;
             
             util.plot.inner_title(sprintf('id: %d | star: %d | batches: %d-%d | S/N= %4.2f | \\sigma= %4.2f', ...
-                obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.stds_raw_all(1, obj.star_index)),...
+                obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.std_flux),...
                 'ax', input.ax, 'Position', 'NorthWest', 'FontSize', input.font_size);
             
             input.ax.YLim(2) = max(abs(input.ax.YLim));

@@ -279,7 +279,7 @@ classdef Finder < handle
                 if obj.debug_bit>1, fprintf('Calibration time: %f seconds.\n', toc(t)); end
                 
                 t = tic;
-                obj.filt.input(obj.cal.fluxes_subtracted, obj.cal.timestamps); 
+                obj.filt.input(obj.cal.fluxes_detrended, obj.cal.stds_detrended, obj.cal.timestamps); 
                 if obj.debug_bit>1, fprintf('Filtering time: %f seconds.\n', toc(t)); end
                 
                 t = tic;
@@ -357,8 +357,11 @@ classdef Finder < handle
                 ev.duration =  obj.dt + obj.filt.timestamps(ev.time_indices(end))-obj.filt.timestamps(ev.time_indices(1));
                 
                 ev.flux_filtered = obj.filt.fluxes_filtered(:,ev.kern_index,ev.star_index);
-                ev.flux_raw_all = permute(obj.filt.fluxes, [1,3,2]);
-                ev.stds_raw_all = permute(obj.filt.stds, [1,3,2]);
+%                 ev.flux_raw_all = permute(obj.filt.fluxes, [1,3,2]);
+%                 ev.stds_raw_all = permute(obj.filt.stds, [1,3,2]);
+                ev.flux_detrended = obj.cal.fluxes_detrended(:,ev.star_index); 
+                ev.std_flux = std(ev.flux_detrended, [], 'omitnan');
+                ev.flux_raw_all = obj.cal.fluxes;
                 
                 obj.new_events(end+1) = ev; % add this event to the list
                 

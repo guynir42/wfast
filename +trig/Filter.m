@@ -130,7 +130,7 @@ classdef Filter < handle
                 obj.fluxes = permute(f, [1,n+1,2:n]); % must permute star index to 3rd dimension (and any other dimensions of flux must be "pushed up"
             end
             
-            obj.stds = std(obj.fluxes, [], 1, 'omitnan'); % estimate the noise in each lightcurve
+%             obj.stds = std(obj.fluxes, [], 1, 'omitnan'); % estimate the noise in each lightcurve
             obj.fluxes = fillmissing(obj.fluxes, 'linear'); % get rid of NaN values before doing the FFT
             
         end
@@ -139,7 +139,7 @@ classdef Filter < handle
     
     methods % calculations
         
-        function input(obj, fluxes, timestamps, kernels)
+        function input(obj, fluxes, stds, timestamps, kernels)
             
             if nargin<2
                 help('trig.Calibrator.input'); return;
@@ -149,14 +149,16 @@ classdef Filter < handle
                 return;
             end
             
-            if nargin>2 && ~isempty(timestamps)
-                obj.timestamps = util.vec.tocolumn(timestamps);
-            else
+            if nargin<3 || isempty(stds)
+                stds = std(fluxes, 'omitnan');
+            end
+            
+            if nargin<4 || isempty(timestamps)
                 obj.timestamps = (1:size(fluxes,1))'./obj.frame_rate;
             end
             
-            if nargin>3 && ~isempty(kernels)
-                obj.kernels = kernels;
+            if nargin>=5 && ~isempty(kernels)
+                obj.kernels = kernels; % update the kernels
             end
             
             if isempty(obj.kernels)
@@ -164,8 +166,13 @@ classdef Filter < handle
             end
             
             obj.clear;
+  
+            obj.fluxes = fluxes;
+            n = ndims(stds); 
+            obj.stds = permute(stds, [1,n+1,2:n]); % push an extra dimension in position 2
+            obj.timestamps = util.vec.tocolumn(timestamps);
             
-            obj.fluxes = fluxes - mean(fluxes, 'omitnan'); % expect it to be a 2D matrix, dim1 is time, dim2 is star index
+%             obj.fluxes = fluxes - mean(fluxes, 'omitnan'); % expect it to be a 2D matrix, dim1 is time, dim2 is star index
             
             obj.convolution;
 %             obj.find_events;
@@ -183,7 +190,7 @@ classdef Filter < handle
                 k = util.img.pad2size(obj.kernels, [L Sk(2:end)]);
                 obj.kernels_fft = conj(fft(k)); 
             end
-            
+                        
             Sf = size(obj.fluxes);
             
             % if fluxes ends up having many dimensions (above 4) we will need to patch the pad2size function 

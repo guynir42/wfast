@@ -14,21 +14,16 @@ classdef Calibrator < handle
         
         timestamps;
         fluxes;
-        fluxes_reduced;
-        fluxes_subtracted;
         fluxes_no_outliers;
-        fluxes_calibrated;
-        fluxes_cal_no_outliers;
+        fluxes_detrended;
+        stds_detrended
+        fluxes_global_cal;
+        fluxes_global_cal_no_outliers;
         
         a_pars;
         b_pars;
         
         idx_outliers;
-        sub_var;
-        out_var;
-        out_mean;
-        cal_mean;
-        cal_var;
         
     end
     
@@ -52,7 +47,7 @@ classdef Calibrator < handle
     
     properties(Hidden=true)
        
-        version = 1.00;
+        version = 1.01;
         
     end
     
@@ -84,21 +79,16 @@ classdef Calibrator < handle
             
             obj.timestamps = [];
             obj.fluxes = [];
-            obj.fluxes_reduced = [];
-            obj.fluxes_subtracted = [];
             obj.fluxes_no_outliers = [];
-            obj.fluxes_calibrated = [];
-            obj.fluxes_cal_no_outliers = [];
+            obj.fluxes_detrended = [];
+            obj.stds_detrended = [];
+            obj.fluxes_global_cal = [];
+            obj.fluxes_global_cal_no_outliers = [];
             
             obj.a_pars = [];
             obj.b_pars = [];
             
             obj.idx_outliers = [];
-            obj.sub_var = [];
-            obj.out_mean = [];
-            obj.out_var = [];
-            obj.cal_mean = [];
-            obj.cal_var = [];
             
         end
         
@@ -132,7 +122,7 @@ classdef Calibrator < handle
             obj.clear;
             
             obj.fluxes = fluxes;
-            obj.fluxes_reduced = obj.fluxes;
+            obj.fluxes_no_outliers = fluxes;
             
             if ~isempty(input.timestamps)
                 obj.timestamps = input.timestamps;
@@ -155,11 +145,6 @@ classdef Calibrator < handle
                 
             end
             
-            obj.fluxes_no_outliers = obj.fluxes;
-            obj.fluxes_no_outliers(obj.idx_outliers) = NaN;
-            obj.out_mean = mean(obj.fluxes_no_outliers, 1, 'omitnan');
-            obj.out_var = var(obj.fluxes_no_outliers, [], 1, 'omitnan');
-            
         end
         
         function fit(obj)
@@ -168,7 +153,7 @@ classdef Calibrator < handle
             
             % some useful shorthands
             s = @(x) sum(x,1, 'omitnan');
-            f = obj.fluxes_reduced;
+            f = obj.fluxes_no_outliers;
             t = obj.timestamps;
             n = size(f,1);
             
@@ -185,11 +170,12 @@ classdef Calibrator < handle
             
             t = tic;
             
-            obj.fluxes_subtracted = obj.fluxes_reduced - obj.b_pars - obj.a_pars.*obj.timestamps;
+            obj.fluxes_detrended = obj.fluxes_no_outliers - obj.b_pars - obj.a_pars.*obj.timestamps;
+            obj.fluxes_detrended = obj.fluxes_detrended - mean(obj.fluxes_detrended, 'omitnan');
             
-            obj.sub_var = var(obj.fluxes_subtracted, [], 1, 'omitnan');
+            obj.stds_detrended = std(obj.fluxes_detrended, [], 1, 'omitnan');
             
-            idx = abs(obj.fluxes_subtracted./sqrt(obj.sub_var))>obj.num_sigma;
+            idx = abs(obj.fluxes_detrended./obj.stds_detrended)>obj.num_sigma;
             
             if isempty(obj.idx_outliers)
                 obj.idx_outliers = idx;
@@ -197,7 +183,8 @@ classdef Calibrator < handle
                 obj.idx_outliers = obj.idx_outliers | idx;
             end
             
-            obj.fluxes_reduced(obj.idx_outliers) = NaN;
+            obj.fluxes_no_outliers = obj.fluxes;
+            obj.fluxes_no_outliers(obj.idx_outliers) = NaN;
             
             if obj.debug_bit>1, fprintf('runtime "outlier_removal": %f seconds\n', toc(t)); end
             
@@ -208,7 +195,7 @@ classdef Calibrator < handle
             t = tic;
             
             F = obj.fluxes_no_outliers;
-            V = obj.out_var;
+            V = var(obj.fluxes_no_outliers, [], 'omitnan');
             
             S = sum(F, 2, 'omitnan'); % sum of fluxe for each frame
 %             S = sum(F.^2./V,2,'omitnan'); % sum of fluxe for each frame
@@ -217,14 +204,11 @@ classdef Calibrator < handle
             
             T = S./S_average; % transparency for each image (relative to mean image)
             
-            obj.fluxes_calibrated = obj.fluxes./T;
+            obj.fluxes_global_cal = obj.fluxes./T;
             
-            obj.fluxes_cal_no_outliers = obj.fluxes_calibrated;
-            obj.fluxes_cal_no_outliers(obj.idx_outliers) = NaN;
+            obj.fluxes_global_cal_no_outliers = obj.fluxes_global_cal;
+            obj.fluxes_global_cal_no_outliers(obj.idx_outliers) = NaN;
             
-            obj.cal_mean = mean(obj.fluxes_cal_no_outliers, 1, 'omitnan');
-            obj.cal_var = var(obj.fluxes_cal_no_outliers, [], 1, 'omitnan');
-           
             if obj.debug_bit>1, fprintf('runtime "global_calibration": %f seconds\n', toc(t)); end
 
         end
@@ -276,9 +260,12 @@ classdef Calibrator < handle
                     
                 else
                     
-                    str = sprintf('Star %d: mean flux = %6.2f | var: %6.2f', ii, obj.cal_mean(ii), obj.cal_var(ii));
+                    cal_mean = mean(obj.fluxes_global_cal_no_outliers, 'omitnan');
+                    cal_var = var(obj.fluxes_global_cal_no_outliers, [], 'omitnan');
+                    
+                    str = sprintf('Star %d: mean flux = %6.2f | var: %6.2f', ii, cal_mean(ii), cal_var(ii));
 
-                    h = plot(input.ax, obj.timestamps, obj.fluxes_calibrated(:,ii), '-');
+                    h = plot(input.ax, obj.timestamps, obj.fluxes_global_cal(:,ii), '-');
                     h.DisplayName = str;
                     h.ButtonDownFcn = @obj.callback_touch;
                     
