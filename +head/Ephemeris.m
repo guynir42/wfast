@@ -315,13 +315,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         function set.Dec(obj, val)
             
             if isempty(val)
-                obj.DEC_deg = [];
+                obj.Dec_deg = [];
             elseif isnumeric(val) && isscalar(val)
-                obj.DEC_deg = val;
+                obj.Dec_deg = val;
             elseif isnumeric(val) && length(val)==3
-                obj.DEC_deg = val(1) + val(2)/60 + val(3)/3600;
+                obj.Dec_deg = sign(val(1))*(abs(val(1)) + val(2)/60 + val(3)/3600);
             elseif ischar(val)
-                obj.DEC_deg = obj.sex2deg(val);
+                obj.Dec_deg = obj.sex2deg(val);
             else
                 error('Input a string DEC in DD:MM:SS format or a scalar in degrees or a 3-vector [d,m,s]!');
             end
