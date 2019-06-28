@@ -1749,7 +1749,7 @@ classdef Acquisition < file.AstroData
                     end
                     
                     if obj.af.use_model_psf
-                        obj.model_psf.input(cutouts, obj.phot_stack.offsets_x, obj.phot_stack.offsets_y);
+                        obj.model_psf.input(obj.stack_cutouts, obj.phot_stack.offsets_x, obj.phot_stack.offsets_y);
                         obj.af.input(ii, obj.cam.focuser.pos, obj.model_psf.fwhm);
                     else
                         obj.af.input(ii, obj.cam.focuser.pos, obj.phot_stack.widths, obj.phot_stack.fluxes);

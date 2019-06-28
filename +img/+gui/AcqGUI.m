@@ -372,6 +372,7 @@ classdef AcqGUI < handle
                 obj.panel_controls.button_adjust.Enable = 'off';
                 obj.panel_controls.button_background.Enable = 'off';
                 obj.panel_controls.button_simple_phot.Enable = 'off';
+                obj.panel_controls.button_model_psf.Enable = 'off';
                 
                 obj.panel_run.button_preview.Enable = 'off';
                 obj.panel_run.button_focus.Enable = 'off';
@@ -395,6 +396,7 @@ classdef AcqGUI < handle
                 obj.panel_controls.button_adjust.Enable = 'on';
                 obj.panel_controls.button_background.Enable = 'on';
                 obj.panel_controls.button_simple_phot.Enable = 'on';
+                obj.panel_controls.button_model_psf.Enable = 'on';
                 
                 obj.panel_run.button_preview.Enable = 'on';
                 obj.panel_run.button_focus.Enable = 'on';
