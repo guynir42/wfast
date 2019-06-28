@@ -64,6 +64,8 @@ classdef Analysis < file.AstroData
         use_background_cutouts = 1; % subtract b/g from the cutouts (and stack cutouts!)
         use_refine_bg = 0; % need to figure out exactly how to do this
         
+        use_save_fits = 0;
+        
         use_audio = 0;
         
         display_num_rect_stars = 30;
@@ -457,6 +459,25 @@ classdef Analysis < file.AstroData
                 obj.batch_counter+1, 'filename', obj.reader.this_filename, ...
                 't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp,...
                 'used_background', obj.phot.use_backgrounds);
+            
+            %%%%%%%%%%%%%%%%%%%% save FITS files of stacks %%%%%%%%%%%%%%%%
+            
+            if obj.use_save_fits
+                
+                f = obj.reader.this_filename;
+                d = obj.reader.current_dir; 
+                d = fullfile(d, 'FITS/');
+                
+                if ~exist(d, 'dir')
+                    mkdir(d);
+                end
+                
+                fitswrite(double(obj.stack_proc), fullfile(d,f)); 
+                obj.pars.writeFITS(fullfile(d,f), [], obj.num_sum);
+                
+            end
+            
+            %%%%%%%%%%%%%%%%%%%% Update GUI and show stuff %%%%%%%%%%%%%%%%
             
             if ~isempty(obj.gui) && obj.gui.check
                 obj.show('ax', obj.gui.axes_image);

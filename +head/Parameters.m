@@ -131,6 +131,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         
         
         HA;
+        HA_DEG;
         LST;
         ALT;
         AZ;        
@@ -427,6 +428,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         function val = get.HA(obj)
             
             val = obj.ephem.HA;
+            
+        end
+        
+        function val = get.HA_DEG(obj)
+            
+            val = obj.ephem.HA_deg;
             
         end
         
@@ -838,7 +845,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
             
         end
                 
-        function writeFITS(obj, filename, time_delay)
+        function writeFITS(obj, filename, time_delay, num_sum) % write keywords into a FITS file
             
             file_ptr = matlab.io.fits.openFile(filename,'readwrite');
             cleanup = onCleanup(@() matlab.io.fits.closeFile(file_ptr));
@@ -851,9 +858,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
                 time_delay = [];
             end
             
+            if nargin<4 || isempty(num_sum)
+                num_sum = 1;
+            end
+            
             try
                 
-                obj.writeFitsHeader(file_ptr, time_delay);
+                obj.writeFitsHeader(file_ptr, time_delay, num_sum);
                 
             catch ME
                 rethrow(ME);
@@ -861,7 +872,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
             
         end
         
-        function writeFitsHeader(obj, file_ptr, time_delay)
+        function writeFitsHeader(obj, file_ptr, time_delay, num_sum)
             
             if nargin<3 || isempty(time_delay)
                 start_time_str = obj.t_start;
@@ -869,12 +880,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
                 start_time_str = obj.stamp2str(time_delay);
             end
             
+            if nargin<4 || isempty(num_sum)
+                num_sum = 1;
+            end
+            
             if ~isempty(start_time_str)
                 obj.ephem.time = util.text.str2time(start_time_str);
                 matlab.io.fits.writeKey(file_ptr, 'DATE-OBS', start_time_str); 
             end
             
-            if ~isempty(obj.EXPTIME), matlab.io.fits.writeKey(file_ptr, 'EXPTIME',obj.EXPTIME, 'seconds'); end
+            if ~isempty(obj.EXPTIME), matlab.io.fits.writeKey(file_ptr, 'EXPTIME',obj.EXPTIME.*num_sum, 'seconds'); end
             if ~isempty(obj.PIXSIZE), matlab.io.fits.writeKey(file_ptr, 'XPIXSZ',obj.PIXSIZE, 'microns'); end
             if ~isempty(obj.PIXSIZE), matlab.io.fits.writeKey(file_ptr, 'YPIXSZ',obj.PIXSIZE, 'microns'); end
             if ~isempty(obj.BINX), matlab.io.fits.writeKey(file_ptr, 'XBINNING',obj.BINX); end
@@ -886,10 +901,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
             if ~isempty(obj.APERTURE), matlab.io.fits.writeKey(file_ptr, 'APTAREA',obj.aperture_area*100, 'mm^2'); end
             if ~isempty(obj.GAIN), matlab.io.fits.writeKey(file_ptr, 'EGAIN', obj.GAIN, 'e-/ADU'); end
             if ~isempty(obj.TARGET), matlab.io.fits.writeKey(file_ptr, 'OBJECT',obj.TARGET); end
-            if ~isempty(obj.RA), matlab.io.fits.writeKey(file_ptr, 'OBJCTRA',obj.RA, 'hours'); end
-            if ~isempty(obj.DE), matlab.io.fits.writeKey(file_ptr, 'OBJCTDEC',obj.DE, 'degree'); end
-%             if ~isempty(obj.HA), matlab.io.fits.writeKey(file_ptr, 'OBJCTHA', head.Ephemeris.ra2rad(obj.HA)/2/pi*24, 'hours'); end
-            if ~isempty(obj.HA), matlab.io.fits.writeKey(file_ptr, 'OBJCTHA', obj.HA*24/360, 'hours'); end
+            if ~isempty(obj.RA), matlab.io.fits.writeKey(file_ptr, 'OBJCTRA',obj.RA_DEG, 'degree'); end
+            if ~isempty(obj.DE), matlab.io.fits.writeKey(file_ptr, 'OBJCTDEC',obj.DEC_DEG, 'degree'); end
+            if ~isempty(obj.HA), matlab.io.fits.writeKey(file_ptr, 'OBJCTHA', obj.HA_DEG, 'degree'); end
             if ~isempty(obj.OBSLONG), matlab.io.fits.writeKey(file_ptr, 'SITELONG', obj.OBSLONG, 'degrees'); end
             if ~isempty(obj.OBSLAT), matlab.io.fits.writeKey(file_ptr, 'SITELAT', obj.OBSLAT, 'degrees'); end
             if ~isempty(obj.JD), matlab.io.fits.writeKey(file_ptr, 'JD', obj.JD); end
