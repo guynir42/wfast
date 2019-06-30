@@ -527,7 +527,28 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function set.tracking(obj, val)
             
             try 
-                obj.hndl.Tracking = val;
+                
+                if obj.hndl.Tracking~=val
+
+                    obj.hndl.Tracking = val;
+
+                    res = 0.01;
+                    N = 100;
+                    tic;
+                    for ii = 1:N
+
+                        if obj.hndl.Tracking==val
+                            return;
+                        end
+
+                        pause(res);
+
+                    end
+
+                    error('Timeout after %f seconds waiting for mount to set tracking to %d.', toc, val);
+
+                end
+                
             catch ME
                 obj.log.error(ME.getReport);
                 rethrow(ME);

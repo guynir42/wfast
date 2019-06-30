@@ -8,9 +8,10 @@ classdef AstroHavenGUI < handle
              
         buttons = {};
         
-        font_size = 16;
-        edit_font_size = 14;
-        small_font_size = 12;
+        font_size = 12;
+        big_font_size = 14;
+        edit_font_size = 11;
+        small_font_size = 10;
         
         debug_bit = 1;
         
@@ -31,7 +32,7 @@ classdef AstroHavenGUI < handle
     
     properties (Hidden=true)
               
-        version = 1.00;
+        version = 1.01;
         
     end
             
@@ -88,6 +89,7 @@ classdef AstroHavenGUI < handle
             obj.panel_status.addButton('button_east_str', 'shutter_east', 'info', 'East: ', '', '', 1/2);
             obj.panel_status.addButton('button_west_deg', 'shutter_west_deg', 'info', 'West: ', ' deg', '', 1/2);
             obj.panel_status.addButton('button_east_deg', 'shutter_east_deg', 'info', 'East: ', ' deg', '', 1/2);
+            obj.panel_status.margin = [0.03 0.01];
             obj.panel_status.make;
             
             obj.panel_status.button_close.Callback = @obj.callback_close;
@@ -97,7 +99,7 @@ classdef AstroHavenGUI < handle
             pos = pos - 1;
             
             obj.panel_stop1 = GraphicPanel(obj.owner, [0 pos/N 1 1/N]);
-            obj.panel_stop1.addButton('button_stop', 'stop', 'push', 'STOP!');
+            obj.panel_stop1.addButton('button_stop', 'stop', 'push', 'STOP!', '', 'big');
             obj.panel_stop1.make;
             
             %%%%%%%%%%% panel shutters %%%%%%%%%%%%%%%
@@ -110,6 +112,7 @@ classdef AstroHavenGUI < handle
             obj.panel_shutter_west.addButton('button_number', 'number_west', 'input', 'N= ');
             obj.panel_shutter_west.addButton('button_open', 'openWest', 'push', 'openWest');
             obj.panel_shutter_west.addButton('button_full_open', 'openWestFull', 'push', 'openWestFull');
+            obj.panel_shutter_west.margin = [0.1 0.01];
             obj.panel_shutter_west.make;
             
             obj.panel_shutter_both = GraphicPanel(obj.owner, [1/3 pos/N 1/3 5/N], 'Both');
@@ -118,6 +121,7 @@ classdef AstroHavenGUI < handle
             obj.panel_shutter_both.addButton('button_number', 'number_both', 'input', 'N= ');
             obj.panel_shutter_both.addButton('button_open', 'openBoth', 'push', 'openBoth');
             obj.panel_shutter_both.addButton('button_full_open', 'openBothFull', 'push', 'openBothFull');
+            obj.panel_shutter_both.margin = [0.1 0.01];
             obj.panel_shutter_both.make;
             
             obj.panel_shutter_east = GraphicPanel(obj.owner, [2/3 pos/N 1/3 5/N], 'East');
@@ -126,12 +130,13 @@ classdef AstroHavenGUI < handle
             obj.panel_shutter_east.addButton('button_number', 'number_east', 'input', 'N= ');
             obj.panel_shutter_east.addButton('button_open', 'openEast', 'push', 'openEast');
             obj.panel_shutter_east.addButton('button_full_open', 'openEastFull', 'push', 'openEastFull', '', '', 1, 'blue');
+            obj.panel_shutter_east.margin = [0.1 0.01];
             obj.panel_shutter_east.make;
             
             %%%%%%%%%%% panel stop2 %%%%%%%%%%%%%%%%%%%
             
             obj.panel_stop2 = GraphicPanel(obj.owner, [0 0 1 1/N]);
-            obj.panel_stop2.addButton('button_stop', 'stop', 'push', 'STOP!');
+            obj.panel_stop2.addButton('button_stop', 'stop', 'push', 'STOP!', '', 'big');
             obj.panel_stop2.make;
             
             obj.update;

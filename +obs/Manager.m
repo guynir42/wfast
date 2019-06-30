@@ -81,6 +81,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         ALT; % shortcut to mount telALT
         LST; % shortcut to mount LST
         
+        tracking; % shortcut to mount tracking
+        
         is_shutdown; % will be 1 when dome is closed and mount not tracking (add mount in parking at some point)
         
     end
@@ -366,6 +368,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
+        function val = get.tracking(obj)
+            
+            val = obj.mount.tracking;
+            
+        end
+        
         function val = average_temp(obj) % average of all sensors that can measure this
             
             val = mean(obj.checker.temp_now, 'omitnan');
@@ -413,6 +421,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     end
     
     methods % setters
+        
+        function set.tracking(obj, val)
+            
+            obj.mount.tracking = val;
+            
+        end
         
     end
     
@@ -624,11 +638,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
+        function closeDome(obj)
+            
+            obj.dome.closeBothFull;
+            
+        end
+        
         function shutdown(obj) % command to shut down observatory (close dome, stop tracking)
             
             obj.log.input('Shutting down observatory!');
             
-            disp('Shutting down observatory!');
+            disp([char(obj.log.time) ': Shutting down observatory!']);
             
             try 
 
@@ -636,7 +656,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 
                 obj.mount.tracking = 0; % later add command to park the telescope? 
 
-                obj.dome.closeBothFull;
+                obj.closeDome;
 
                 % anything else we can do to put the dome to shutdown mode?
                 % ...

@@ -8,9 +8,10 @@ classdef ManagerGUI < handle
              
         buttons = {};
         
-        font_size = 16;
-        edit_font_size = 14;
-        small_font_size = 12;
+        font_size = 13;
+        big_font_size = 16;
+        edit_font_size = 11;
+        small_font_size = 9;
         
         debug_bit = 1;
         
@@ -18,7 +19,10 @@ classdef ManagerGUI < handle
     
     properties % gui stuff
         
-        panel_hardware;
+        panel_telescope;
+        
+        panel_dome;
+        
         panel_controls;
         
         panel_report;
@@ -40,7 +44,7 @@ classdef ManagerGUI < handle
     
     properties (Hidden=true)
               
-        version = 1.00;
+        version = 1.01;
         
     end
             
@@ -82,26 +86,48 @@ classdef ManagerGUI < handle
             obj.fig.width = 36;
             
             
-            N_left = 10;
+            N_left = 20;
             pos = N_left;
             
-            %%%%%%%%%%% panel hardware %%%%%%%%%%%%%%%
+            %%%%%%%%%%% panel telescope %%%%%%%%%%%%%%%
+            
+            N = 5;
+            pos = pos - N;
+            obj.panel_telescope = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'telescope');
+            obj.panel_telescope.number = N;
+            obj.panel_telescope.addButton('button_RA', 'RA', 'info', 'RA: ', '', '', 0.5);
+            obj.panel_telescope.addButton('button_DE', 'DEC', 'info', 'DE: ', '', '', 0.5);            
+            obj.panel_telescope.addButton('button_LST', 'LST', 'info', 'LST: ', '', '', 0.5);
+            obj.panel_telescope.addButton('button_ALT', 'ALT', 'info', 'ALT: ', ' deg', '', 0.5);
+            obj.panel_telescope.addButton('button_tracking', 'tracking', 'toggle', 'tracking off', 'tracking on', '', 0.5, 'red');
+            obj.panel_telescope.margin = [0.02 0.01];
+            obj.panel_telescope.make;
+            
+            obj.panel_telescope.button_RA.Tooltip = 'Current right ascention of mount';
+            obj.panel_telescope.button_DE.Tooltip = 'Current declination of mount';
+            obj.panel_telescope.button_LST.Tooltip = 'Local Sidereal Time';
+            obj.panel_telescope.button_ALT.Tooltip = 'Current altitidue of mount';
+            obj.panel_telescope.button_tracking.Tooltip = 'Turn telescope tracking on and off';
+            
+            %%%%%%%%%%% panel dome %%%%%%%%%%%%%%%
             
             N = 4;
             pos = pos - N;
-            obj.panel_hardware = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'hardware');
-            obj.panel_hardware.number = N;
-            obj.panel_hardware.addButton('button_RA', 'RA', 'info', 'RA: ', '', 'small', 0.5);
-            obj.panel_hardware.addButton('button_DE', 'DEC', 'info', 'DE: ', '', 'small', 0.5);            
-            obj.panel_hardware.addButton('button_LST', 'LST', 'info', 'LST: ', '', 'small', 0.5);
-            obj.panel_hardware.addButton('button_ALT', 'ALT', 'info', 'ALT: ', ' deg', 'small', 0.5);
-            obj.panel_hardware.addButton('button_shutter_west', '', 'custom', 'West shutter: ', '', 'small', 0.5);
-            obj.panel_hardware.addButton('button_shutter_east', '', 'custom', 'East shutter: ', '', 'small', 0.5);
-            obj.panel_hardware.make;
+            obj.panel_dome = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'dome');
+            obj.panel_dome.number = N;            
+            obj.panel_dome.addButton('button_close_dome', 'closeDome', 'push', 'Close Dome');
+            obj.panel_dome.addButton('button_shutter_west', '', 'custom', 'West shutter: ', '', 'small', 0.5);
+            obj.panel_dome.addButton('button_shutter_east', '', 'custom', 'East shutter: ', '', 'small', 0.5);
+            obj.panel_dome.margin = [0.02 0.01];
+            obj.panel_dome.make;
+            
+            obj.panel_dome.button_close_dome.Tooltip = 'Immediately close both shutters';
+            obj.panel_dome.button_shutter_west.Tooltip = 'Position of West shutter';
+            obj.panel_dome.button_shutter_east.Tooltip = 'Position of East shutter';
             
             %%%%%%%%%%% panel controls %%%%%%%%%%%%%%%
             
-            N = 5;
+            N = 9;
             pos = pos - N;
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'controls');
             obj.panel_controls.number = N;
@@ -113,21 +139,41 @@ classdef ManagerGUI < handle
             obj.panel_controls.addButton('button_interval_t2', '', 'custom', ['P= ' num2str(obj.owner.period2) 's'], '', '', 0.5);
             obj.panel_controls.addButton('button_run_t3', '', 'custom', 'run t3', '', '', 0.5);
             obj.panel_controls.addButton('button_interval_t3', '', 'custom', ['P= ' num2str(obj.owner.period3) 's'], '', '', 0.5);
-            
+            obj.panel_controls.margin = [0.01 0.01];
             obj.panel_controls.make;
+            
+            obj.panel_controls.button_autoshutdown.Tooltip = 'Allow manager to close dome and stop tracking if weather is bad or if there is a device failure';
+            
             obj.panel_controls.button_run_t1.Callback = @obj.callback_run_t1;
+            obj.panel_controls.button_run_t1.Tooltip = 'Immediately run the timer 1 callback (update sensors)';
+            
             obj.panel_controls.button_interval_t1.Callback = @obj.callback_interval_t1;
+            obj.panel_controls.button_interval_t1.Tooltip = 'Change the interval of timer 1';
+            
             obj.panel_controls.button_run_t2.Callback = @obj.callback_run_t2;
+            obj.panel_controls.button_run_t2.Tooltip = 'Immediately run the time 2 callback (check observatory and shutdown if needed)';
+            
             obj.panel_controls.button_interval_t2.Callback = @obj.callback_interval_t2;
+            obj.panel_controls.button_interval_t2.Tooltip = 'Change the interval of timer 2';
+            
             obj.panel_controls.button_run_t3.Callback = @obj.callback_run_t3;
+            obj.panel_controls.button_run_t3.Tooltip = 'Immediately run the timer 3 callback (verify other timers are still running)';
+            
             obj.panel_controls.button_interval_t3.Callback = @obj.callback_interval_t3;
+            obj.panel_controls.button_interval_t3.Tooltip = 'Change the interval of timer 3';
+            
+            %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
+            
+            obj.panel_close = uipanel('Position', [0 0 0.2 2/N_left]);
+            obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1]+[0.05 0.1 -0.1 -0.2], obj.owner, '', 'custom', 'CLOSE');
+            obj.button_close.Callback = @obj.callback_close;
             
             %%%%%%%%%%% panel objects %%%%%%%%%%%%%%%%
             
-            N_right = 10;
+            N_right = 20;
             pos = N_right;
             
-            N = 9;
+            N = 20;
             pos = pos - N;
             
             obj.panel_objects = GraphicPanel(obj.owner, [0.8 pos/N_right 0.2 N/N_right], 'objects');
@@ -137,12 +183,12 @@ classdef ManagerGUI < handle
             obj.panel_objects.addButton('button_mount', 'mount', 'push', 'mount');
             obj.panel_objects.addButton('button_weather', 'weather', 'push', 'BoltWood');
             obj.panel_objects.addButton('button_wind', 'wind', 'push', 'WindETH');
-            
+            obj.panel_objects.margin = [0.01 0.005];
             obj.panel_objects.make;
             
             %%%%%%%%%%% panel report %%%%%%%%%%%%%%%%%
             
-            N_middle = 10;
+            N_middle = 20;
             pos = N_middle;
             
             N = 1;
@@ -158,19 +204,20 @@ classdef ManagerGUI < handle
             pos = pos - N;
             
             obj.panel_weather = GraphicPanel(obj.owner, [0.2, pos/N_middle, 0.6, N/N_middle], 'weather');
-            obj.panel_weather.addButton('button_temp', 'average_temp', 'info', 'T= ', 'C', '', 1/3);
+            obj.panel_weather.addButton('button_temp', 'average_temp', 'info', 'Amb. Temp= ', 'C', '', 1/3);
             obj.panel_weather.addButton('button_clouds', 'average_clouds', 'info', 'dT= ', 'C', '', 1/3);
-            obj.panel_weather.addButton('button_light', 'average_light', 'info', 'L= ', '', '', 1/3);
-            obj.panel_weather.addButton('button_wind', 'average_wind', 'info', 'wind= ', 'km/h', '', 1/3);
-            obj.panel_weather.addButton('button_wind_az', 'average_wind_az', 'info', 'az= ', 'deg', '', 1/3);
-            obj.panel_weather.addButton('button_hummid', 'average_humid', 'info', 'h= ', '%', '', 1/3);
+            obj.panel_weather.addButton('button_light', 'average_light', 'info', 'Light= ', '', '', 1/3);
+            obj.panel_weather.addButton('button_wind', 'average_wind', 'info', 'wind= ', ' km/h', '', 1/3);
+            obj.panel_weather.addButton('button_wind_az', 'average_wind_az', 'info', 'wind az= ', ' deg', '', 1/3);
+            obj.panel_weather.addButton('button_hummid', 'average_humid', 'info', 'humidity= ', '%', '', 1/3);
+            obj.panel_weather.margin = [0.01 0.01];
             obj.panel_weather.number = N;
             
             obj.panel_weather.make;
             
             %%%%%%%%%%% panel image %%%%%%%%%%%%%%%%%%
             
-            N = pos-1;
+            N = 15;
             pos = pos - N;
             
             obj.panel_image = uipanel('Title', '', 'Position', [0.2 pos/N_middle 0.6 N/N_middle]);
@@ -182,15 +229,10 @@ classdef ManagerGUI < handle
             
             %%%%%%%%%%% panel stop %%%%%%%%%%%%%%%%%%%
             
-            obj.panel_stop = GraphicPanel(obj.owner, [0.2 0 0.6 1/N_middle]);
+            obj.panel_stop = GraphicPanel(obj.owner, [0.2 0 0.6 2/N_middle]);
             obj.panel_stop.addButton('button_stop', 'stop', 'push', 'STOP');
+            obj.panel_stop.margin = [0.01 0.1];
             obj.panel_stop.make;
-            
-            %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
-            
-            obj.panel_close = uipanel('Position', [0 0 0.2 1/N_left]);
-            obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE');
-            obj.button_close.Callback = @obj.callback_close;
             
             obj.update;
             
@@ -215,24 +257,36 @@ classdef ManagerGUI < handle
                 obj.buttons{ii}.update;
             end
             
+            if obj.owner.mount.telRA_deg<obj.owner.mount.LST_deg && strcmp(obj.owner.mount.hndl.SideOfPier, 'pierWest')
+                obj.panel_telescope.button_RA.BackgroundColor = 'red';
+            else
+                obj.panel_telescope.button_RA.BackgroundColor = util.plot.GraphicButton.defaultColor;
+            end
+            
+            if obj.owner.mount.telALT<20
+                obj.panel_telescope.button_ALT.control.ForegroundColor = 'red';
+            else
+                obj.panel_telescope.button_ALT.control.ForegroundColor = 'black';
+            end
+            
             if obj.owner.dome.status==0
-                obj.panel_hardware.button_shutter_west.String = 'Shut.West: error';
-                obj.panel_hardware.button_shutter_east.String = 'Shut.East: error';
+                obj.panel_dome.button_shutter_west.String = 'Shut.West: error';
+                obj.panel_dome.button_shutter_east.String = 'Shut.East: error';
             else
                 if obj.owner.dome.shutter_west_deg==0
-                    obj.panel_hardware.button_shutter_west.String = sprintf('Shut.West: open');
+                    obj.panel_dome.button_shutter_west.String = sprintf('Shut.West: open');
                 elseif obj.owner.dome.shutter_west_deg==90
-                    obj.panel_hardware.button_shutter_west.String = sprintf('Shut.West: closed');
+                    obj.panel_dome.button_shutter_west.String = sprintf('Shut.West: closed');
                 else
-                    obj.panel_hardware.button_shutter_west.String = sprintf('Shut.West: %d deg', round(obj.owner.dome.shutter_west_deg));
+                    obj.panel_dome.button_shutter_west.String = sprintf('Shut.West: %d deg', round(obj.owner.dome.shutter_west_deg));
                 end
                 
                 if obj.owner.dome.shutter_east_deg==0
-                    obj.panel_hardware.button_shutter_east.String = sprintf('Shut.East: open');
+                    obj.panel_dome.button_shutter_east.String = sprintf('Shut.East: open');
                 elseif obj.owner.dome.shutter_east_deg==90
-                    obj.panel_hardware.button_shutter_east.String = sprintf('Shut.East: closed');
+                    obj.panel_dome.button_shutter_east.String = sprintf('Shut.East: closed');
                 else
-                    obj.panel_hardware.button_shutter_east.String = sprintf('Shut.East: %d deg', round(obj.owner.dome.shutter_east_deg));
+                    obj.panel_dome.button_shutter_east.String = sprintf('Shut.East: %d deg', round(obj.owner.dome.shutter_east_deg));
                 end
                 
             end
@@ -244,34 +298,34 @@ classdef ManagerGUI < handle
             default_color = [1 1 1].*0.94;
             
             if ~isempty(obj.owner.dome) && obj.owner.dome.status
-                obj.panel_objects.button_dome.String = 'dome: ok';
+                obj.panel_objects.button_dome.String = 'dome GUI (status ok)';
                 obj.panel_objects.button_dome.BackgroundColor = default_color;
             else
-                obj.panel_objects.button_dome.String = 'dome: error';
+                obj.panel_objects.button_dome.String = 'dome GUI (status: error)';
                 obj.panel_objects.button_dome.BackgroundColor = 'red';
             end
             
             if ~isempty(obj.owner.mount) && obj.owner.mount.status
-                obj.panel_objects.button_mount.String = 'mount: ok';
+                obj.panel_objects.button_mount.String = 'mount GUI (status: ok)';
                 obj.panel_objects.button_mount.BackgroundColor = default_color;
             else
-                obj.panel_objects.button_mount.String = 'mount: error';
+                obj.panel_objects.button_mount.String = 'mount GUI (status: error)';
                 obj.panel_objects.button_mount.BackgroundColor = 'red';
             end
             
             if ~isempty(obj.owner.weather) && obj.owner.weather.status
-                obj.panel_objects.button_weather.String = 'BoltWood: ok';
+                obj.panel_objects.button_weather.String = 'BoltWood (status: ok)';
                 obj.panel_objects.button_weather.BackgroundColor = default_color;
             else
-                obj.panel_objects.button_weather.String = 'BoltWood: error';
+                obj.panel_objects.button_weather.String = 'BoltWood (status: error)';
                 obj.panel_objects.button_weather.BackgroundColor = 'red';
             end
             
             if ~isempty(obj.owner.wind) && obj.owner.wind.status
-                obj.panel_objects.button_wind.String = 'WindETH: ok';
+                obj.panel_objects.button_wind.String = 'WindETH (status: ok)';
                 obj.panel_objects.button_wind.BackgroundColor = default_color;
             else
-                obj.panel_objects.button_wind.String = 'WindETH: error';
+                obj.panel_objects.button_wind.String = 'WindETH (status: error)';
                 obj.panel_objects.button_wind.BackgroundColor = 'red';
             end
             
