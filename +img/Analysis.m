@@ -19,10 +19,10 @@ classdef Analysis < file.AstroData
         back@img.Background;
         phot@img.Photometry;
         
-        light_original@img.Lightcurves;
-        light_basic@img.Lightcurves;
-        light_ap@img.Lightcurves;
-        light_gauss@img.Lightcurves;
+%         light_original@img.Lightcurves;
+%         light_basic@img.Lightcurves;
+        lightcurves@img.Lightcurves;
+%         light_gauss@img.Lightcurves;
 %         light_cosqrt@img.Lightcurves;
         % light_fit@img.Lightcurves;
         
@@ -117,10 +117,10 @@ classdef Analysis < file.AstroData
                 obj.phot.use_basic = 0;
                 obj.phot.use_aperture = 1;
                 obj.phot.use_gaussian = 0;
-                obj.light_original = img.Lightcurves; 
-                obj.light_basic = img.Lightcurves; obj.light_basic.signal_method = 'square'; obj.light_basic.background_method = 'corners';
-                obj.light_ap = img.Lightcurves; obj.light_ap.signal_method = 'aperture'; obj.light_ap.background_method = 'annulus';
-                obj.light_gauss = img.Lightcurves; obj.light_gauss.signal_method = 'gauss'; obj.light_gauss.background_method = 'annulus';
+%                 obj.light_original = img.Lightcurves; 
+%                 obj.light_basic = img.Lightcurves; obj.light_basic.signal_method = 'square'; obj.light_basic.background_method = 'corners';
+                obj.lightcurves = img.Lightcurves; obj.lightcurves.signal_method = 'aperture'; obj.lightcurves.background_method = 'annulus';
+%                 obj.light_gauss = img.Lightcurves; obj.light_gauss.signal_method = 'gauss'; obj.light_gauss.background_method = 'annulus';
                 
                 obj.model_psf = img.ModelPSF;
                 
@@ -417,15 +417,8 @@ classdef Analysis < file.AstroData
             
             obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps, 'positions', obj.positions); 
             
-%             obj.light_original.input('fluxes', obj.fluxes, 'timestamps', obj.timestamps);
-%             obj.light_basic.getData(obj.phot, 'basic');
-%             if obj.light_basic.gui.check, obj.light_basic.gui.update; end
-            
-            obj.light_ap.getData(obj.phot, 'ap');
-            if obj.light_ap.gui.check, obj.light_ap.gui.update; end
-            
-%             obj.light_gauss.getData(obj.phot, 'gauss');
-%             if obj.light_gauss.gui.check, obj.light_gauss.gui.update; end
+            obj.lightcurves.getData(obj.phot);
+            if obj.lightcurves.gui.check, obj.lightcurves.gui.update; end
             
             %%%%%%%%%%%%%%%%%%%%% PSF modeling %%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -443,6 +436,7 @@ classdef Analysis < file.AstroData
             dy = obj.phot.offsets_y;
             wd = obj.phot.widths;
             p = obj.phot.bad_pixels;
+            phot_pars = obj.phot.pars_struct; % maybe also give this to model_psf??
             
             r = [];
             g = [];
@@ -458,7 +452,7 @@ classdef Analysis < file.AstroData
                 obj.timestamps, obj.cutouts_proc, obj.positions, obj.stack_proc, ...
                 obj.batch_counter+1, 'filename', obj.reader.this_filename, ...
                 't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp,...
-                'used_background', obj.phot.use_backgrounds);
+                'used_background', obj.phot.use_backgrounds, 'pars', phot_pars);
             
             %%%%%%%%%%%%%%%%%%%% save FITS files of stacks %%%%%%%%%%%%%%%%
             

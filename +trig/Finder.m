@@ -14,6 +14,7 @@ classdef Finder < handle
         new_events@trig.Event;
         last_events@trig.Event;
         
+        phot_pars; % a struct with some housekeeping about how the photometry was done
         
     end
     
@@ -254,6 +255,7 @@ classdef Finder < handle
             input.input_var('t_end', [], 8);
             input.input_var('t_end_stamp', [], 8);
             input.input_var('used_background_sub', []); 
+            input.input_var('phot_pars', [], 'pars_struct');
             input.scan_vars(varargin{:});
             
             obj.clear;
@@ -271,6 +273,7 @@ classdef Finder < handle
             obj.stack = input.stack;
             obj.batch_index = input.batch_index;
             obj.filename = input.filename;
+            obj.phot_pars = input.phot_pars;
             
             if ~isempty(obj.prev_fluxes) % skip first batch! 
             
@@ -494,6 +497,8 @@ classdef Finder < handle
                     ev.t_end = input.t_end;
                     ev.t_end_stamp = input.t_end_stamp;
                 end
+                
+                ev.phot_pars = obj.phot_pars;
                 
                 % any other info that needs to be saved along with the event object?
                 % ...

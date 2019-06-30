@@ -8,6 +8,8 @@ classdef Event < handle
     
     properties % objects
         
+        phot_pars; % a struct with some housekeeping about how the photometry was done
+        
     end
     
     properties % inputs/outputs

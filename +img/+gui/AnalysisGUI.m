@@ -138,7 +138,7 @@ classdef AnalysisGUI < handle
             obj.panel_objects.addButton('button_background', 'back', 'push', 'Background');
             obj.panel_objects.addButton('button_photometry', 'phot', 'push', 'Photometry');
 %             obj.panel_objects.addButton('button_light_basic', 'light_basic', 'push', 'basic', '', '', 1/3);
-            obj.panel_objects.addButton('button_light_ap', 'light_ap', 'push', 'lightcurves', '', '', 1);
+            obj.panel_objects.addButton('button_lightcurves', 'lightcurves', 'push', 'lightcurves', '', '', 1);
 %             obj.panel_objects.addButton('button_light_gauss', 'light_gauss', 'push', 'gauss', '', '', 1/3);
             obj.panel_objects.addButton('button_finder', 'finder', 'push', 'Finder');
             obj.panel_objects.margin = [0.1 0.005];
