@@ -82,7 +82,8 @@ class Photometry{
 	void parseInputs(int nrhs, const mxArray *prhs[]);
 	void run();
 	void calculate(int j);
-
+	float getWidthFromMoments(float m2x, float m2y, float mxy);
+	
 	// these are various shapes that can be used to intersect the image/cutout
 	void main_mask(float *array, float *x, float *y);
 	void square_mask(float *array, float *x, float *y);
@@ -517,13 +518,15 @@ void Photometry::calculate(int j){
 		// second moments (using the new grids)
 		float m2x=sumArrays(image, x2, x2)/m0;
 		float m2y=sumArrays(image, y2, y2)/m0;
+		float mxy=sumArrays(image, x2, y2)/m0;
 		
 		flux[j]=m0;
 		
 		if(m0>0 && fabs(m1x)<dims[1]/2 && fabs(m1y)<dims[0]/2){ // values are reliable enough to fill the other parameters
 			offset_x[j]=m1x;
 			offset_y[j]=m1y;
-			width[j]=sqrt((m2x+m2y)/2);
+			// width[j]=sqrt((m2x+m2y)/2);
+			width[j]=getWidthFromMoments(m2x, m2y, mxy);
 		}
 		else{
 			offset_x[j]=NAN;
@@ -545,6 +548,19 @@ void Photometry::calculate(int j){
 	mxFree(image);
 	mxFree(image_sub);
 	
+}
+
+float Photometry::getWidthFromMoments(float m2x, float m2y, float mxy){
+// got this little nugget from: https://yutsumura.com/express-the-eigenvalues-of-a-2-by-2-matrix-in-terms-of-the-trace-and-determinant/
+
+	float tr=m2x+m2y;
+	float det=m2x*m2y - mxy*mxy;
+	
+	float r1=(tr-sqrt(tr*tr-4*det))/2;
+	float r2=(tr+sqrt(tr*tr-4*det))/2;
+	
+	return (sqrt(r1)+sqrt(r2))/2;
+
 }
 
 void Photometry::main_mask(float *array, float *x, float *y){

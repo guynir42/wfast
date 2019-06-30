@@ -1443,7 +1443,6 @@ classdef Acquisition < file.AstroData
 
                 if obj.use_model_psf
                     obj.model_psf.input(obj.stack_cutouts, obj.phot_stack.offsets_x, obj.phot_stack.offsets_y);
-
                 end
 
                 obj.prev_average_width = obj.average_width;
@@ -1759,18 +1758,8 @@ classdef Acquisition < file.AstroData
                     if check==0, return; end
                     obj.batch_counter = obj.batch_counter + 1;
                     
-%                     obj.stack_cutouts = obj.clip.input(obj.stack_proc);
-%                     obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.clip.positions); 
-% 
-%                     obj.checkRealign;
-% 
-%                     if obj.use_adjust_cutouts
-%                         obj.clip.positions = double(obj.clip.positions + obj.average_offsets);
-%                     end
-                    
                     if obj.use_model_psf
-%                         obj.model_psf.input(obj.stack_cutouts, obj.phot_stack.offsets_x, obj.phot_stack.offsets_y);
-                        obj.af.input(ii, obj.cam.focuser.pos, obj.model_psf.fwhm, 1, obj.positions);
+                        obj.af.input(ii, obj.cam.focuser.pos, [obj.model_psf.maj_axis obj.model_psf.min_axis], [1 1], obj.positions);
                     else
                         obj.af.input(ii, obj.cam.focuser.pos, obj.phot_stack.widths, obj.phot_stack.fluxes, obj.positions);
                     end

@@ -152,11 +152,11 @@ classdef ModelPSF < handle
             [R,E] = eig(M);
             
             obj.angle = asind(R(4));
-            ax = [E(1) E(4)];
-            obj.maj_axis = max(ax);
-            obj.min_axis = min(ax);
+            obj.maj_axis = max(sqrt(diag(E)));
+            obj.min_axis = min(sqrt(diag(E)));
             
-            obj.fwhm = sqrt(mean([obj.m2x,obj.m2y])).*2.355;
+%             obj.fwhm = sqrt(mean([obj.m2x,obj.m2y])).*2.355;
+            obj.fwhm = util.img.fwhm(I);
             
         end
         

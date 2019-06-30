@@ -434,7 +434,7 @@ classdef Photometry < handle
                         m1y = sum2(I.*obj.Y)./m0;
                         m2x = sum2(I.*(obj.X-m1x).^2)./m0;
                         m2y = sum2(I.*(obj.Y-m1y).^2)./m0;
-%                         mxy = sum2(I.*(obj.X-m1x).*(obj.Y-m1y))./m0;
+                        mxy = sum2(I.*(obj.X-m1x).*(obj.Y-m1y))./m0;
                         
                         % quality checks:
                         if m0==0
@@ -443,7 +443,7 @@ classdef Photometry < handle
                             m1y = 0;
                             m2x = NaN;
                             m2y = NaN;
-%                             mxy = NaN;
+                            mxy = NaN;
                         end
                         
                         if m2x<0, m2x = NaN; if obj.debug_bit>3, disp('m2x is negative!'); end, end
@@ -452,8 +452,16 @@ classdef Photometry < handle
                         dx = m1x;
                         dy = m1y;
                         
-                        W = sqrt(mean([m2x,m2y], 'omitnan')); % should we add mxy??
+%                         W = sqrt(mean([m2x,m2y], 'omitnan')); % should we add mxy??
                         
+                        M = [m2x mxy; mxy m2y];
+                        
+                        [V, D] = eig(M);
+                        
+                        % use V to calculate rotation angle?
+                        
+                        W = mean(sqrt(diag(D)), 'omitnan');
+
                     end
 
                     flux(jj,ii) = m0;
