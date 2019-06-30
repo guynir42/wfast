@@ -62,7 +62,7 @@ classdef Finder < handle
     
     properties % switches/controls
         
-        threshold = 5; % threshold (in units of S/N) for peak of event 
+        threshold = 7.5; % threshold (in units of S/N) for peak of event 
         time_range_thresh = -2.5; % threshold for including area around peak (in continuous time)
         kern_range_thresh = -1; % area threshold (in kernels, discontinuous) NOTE: if negative this will be relative to "threshold"
         star_range_thresh = -1; % area threshold (in stars, discontinuous) NOTE: if this is higher than "threshold" there will be no area around peak
@@ -71,7 +71,7 @@ classdef Finder < handle
         max_stars = 5; % how many stars can we afford to have triggered at the same time? 
         max_frames = 50; % maximum length of trigger area (very long events are disqualified)
         
-        use_conserve_memory = 0;
+        use_conserve_memory = 1;
         
         debug_bit = 1;
         

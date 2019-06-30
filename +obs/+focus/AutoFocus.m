@@ -24,6 +24,8 @@ classdef AutoFocus < handle
         x_max = 2160;
         y_max = 2560;
         
+        pos_range_vector;
+        
         fit_results = {};
         min_positions; % minimum of curves for each star
         min_positions_reduced; % replace NaNs with zeros
@@ -130,23 +132,36 @@ classdef AutoFocus < handle
     
     methods % calculations
         
-        function startup(obj, focuser_pos, xy_positions, num_stars)
+%         function startup(obj, focuser_pos, xy_positions, num_stars)
+%             
+%             obj.pos = focuser_pos + (-obj.range:obj.step:obj.range);
+%             obj.widths = NaN(num_stars, length(obj.pos));
+%             obj.weights = NaN(num_stars, length(obj.pos));
+%             obj.min_positions = NaN(num_stars,1);
+%             obj.xy_pos = xy_positions;
+%             
+%         end
+        
+        function val = getPosScanValues(obj, current_pos)
             
-            obj.pos = focuser_pos + (-obj.range:obj.step:obj.range);
-            obj.widths = NaN(num_stars, length(obj.pos));
-            obj.weights = NaN(num_stars, length(obj.pos));
-            obj.min_positions = NaN(num_stars,1);
-            obj.xy_pos = xy_positions;
+            val = current_pos + (-obj.range:obj.step:obj.range);
+            
+            obj.pos_range_vector = val;
             
         end
-        
-        function input(obj, idx, position, widths, fluxes)
+
+        function input(obj, idx, position, widths, fluxes, xy_pos)
             
             if nargin<5 || isempty(fluxes)
                 fluxes = 1;
             end
             
+            if nargin>=6 && ~isempty(xy_pos)
+                obj.xy_pos = xy_pos;
+            end
+            
             obj.pos(idx) = position;
+            
             obj.widths(1:length(widths),idx) = util.vec.tocolumn(widths);
             obj.weights(1:length(fluxes),idx) = util.vec.tocolumn(fluxes);
             
@@ -313,6 +328,10 @@ classdef AutoFocus < handle
             
             xlabel(obj.ax, 'focuser position (mm)');
             ylabel(obj.ax, 'width (second moment)');
+            
+            if ~isempty(obj.pos_range_vector)
+                obj.ax.XLim = [min(obj.pos_range_vector), max(obj.pos_range_vector)];
+            end
             
 %             legend(h, {'center', 'upper left', 'lower left', 'upper right', 'lower right'}, 'Parent', obj.fig);
             

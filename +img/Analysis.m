@@ -464,16 +464,21 @@ classdef Analysis < file.AstroData
             
             if obj.use_save_fits
                 
-                f = obj.reader.this_filename;
-                d = obj.reader.current_dir; 
+                [d, f] = fileparts(obj.reader.this_filename);
+                
+                d = strrep(d, ' (Weizmann Institute)', '');
+                
                 d = fullfile(d, 'FITS/');
                 
                 if ~exist(d, 'dir')
                     mkdir(d);
                 end
                 
-                fitswrite(double(obj.stack_proc), fullfile(d,f)); 
-                obj.pars.writeFITS(fullfile(d,f), [], obj.num_sum);
+                fullname = fullfile(d,[f,'.fits']);
+                fprintf('Saving "stack_proc" in FITS file: %s\n', fullname);
+                
+                fitswrite(double(obj.stack_proc), fullname); 
+                obj.pars.writeFITS(fullname, [], obj.num_sum);
                 
             end
             

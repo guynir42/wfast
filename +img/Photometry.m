@@ -51,10 +51,10 @@ classdef Photometry < handle
     properties % switches/controls
         
         use_mex = 1; % use the new mex function for faster processing
-        use_backgrounds = 0; % remove background from individual cutout
+        use_backgrounds = 1; % remove background from individual cutout
         
-        iterations = 3; % repeat the photometry and relocate the aperutre to the centroid
-        use_basic = 1;
+        iterations = 2; % repeat the photometry and relocate the aperutre to the centroid
+        use_basic = 0;
         use_aperture = 1;
         use_gaussian = 0;
         

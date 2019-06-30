@@ -127,7 +127,9 @@ classdef AstroData < dynamicprops
             list = properties(file.AstroData);
             
             for ii = 1:length(list)
-                obj.(list{ii}) = other.(list{ii});
+                if ~isempty(other.(list{ii}))
+                    obj.(list{ii}) = other.(list{ii});
+                end
             end
             
         end

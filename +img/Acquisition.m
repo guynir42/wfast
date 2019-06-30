@@ -1349,12 +1349,29 @@ classdef Acquisition < file.AstroData
             try 
                 
                 obj.src.single; 
-                obj.images = obj.src.images;
-                obj.timestamps = obj.src.timestamps;
-                obj.stack = sum(obj.src.images,3);
-                obj.num_sum = size(obj.src.images,3);
+                obj.prev_stack = obj.stack_proc; % keep one stack from last batch
+                obj.clear;
+                obj.copyFrom(obj.src); % get the data into this object
 
-                obj.stack_proc = obj.cal.input(obj.stack, 'sum', obj.num_sum); % stack after calibration
+                % if src is using ROI, must update the calibration object to do the same
+                if isprop(obj.src, 'use_roi') && obj.src.use_roi 
+
+                    obj.cal.use_roi = 1;
+
+                    obj.cal.ROI = obj.src.ROI;
+
+                else
+                    obj.cal.use_roi = 0;
+                end
+
+                obj.calcStack;
+                
+%                 obj.images = obj.src.images;
+%                 obj.timestamps = obj.src.timestamps;
+%                 obj.stack = sum(obj.src.images,3);
+%                 obj.num_sum = size(obj.src.images,3);
+% 
+%                 obj.stack_proc = obj.cal.input(obj.stack, 'sum', obj.num_sum); % stack after calibration
 
                 check = 1;
                 obj.is_running_single = 0;
@@ -1406,28 +1423,32 @@ classdef Acquisition < file.AstroData
 %                 obj.findStars; % this replaces the clipper findStars with somethinig better, or just runs it explicitely... 
 %             end
             
-            obj.stack_cutouts = obj.clip.input(obj.stack_proc); % if no positions are known, it will call "findStars"
-            
-            obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.clip.positions); % run photometry on the stack to verify flux and adjust positions
-            if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
-            
-            obj.checkRealign;
-            
-            % store the latest fluxes from the stack cutouts
-            obj.flux_buf.input(obj.phot_stack.fluxes);
-            
-            if obj.use_adjust_cutouts
-                obj.clip.positions = double(obj.clip.positions + obj.average_offsets);
-            else
-                % must send the average adjustment back to mount controller (should we still adjust the cutouts though??)
-            end
-            
-            if obj.use_model_psf
-                obj.model_psf.input(obj.stack_cutouts, obj.phot_stack.offsets_x, obj.phot_stack.offsets_y);
+            if ~isempty(obj.positions) % if no positions are known just skip this part
+                
+                obj.stack_cutouts = obj.clip.input(obj.stack_proc);  
+                
+                obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.clip.positions); % run photometry on the stack to verify flux and adjust positions
+                if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
+
+                obj.checkRealign;
+
+                % store the latest fluxes from the stack cutouts
+                obj.flux_buf.input(obj.phot_stack.fluxes);
+
+                if obj.use_adjust_cutouts
+                    obj.clip.positions = double(obj.clip.positions + obj.average_offsets);
+                else
+                    % must send the average adjustment back to mount controller (should we still adjust the cutouts though??)
+                end
+
+                if obj.use_model_psf
+                    obj.model_psf.input(obj.stack_cutouts, obj.phot_stack.offsets_x, obj.phot_stack.offsets_y);
+
+                end
+
+                obj.prev_average_width = obj.average_width;
                 
             end
-            
-            obj.prev_average_width = obj.average_width;
             
         end
         
@@ -1704,22 +1725,19 @@ classdef Acquisition < file.AstroData
                 
                 obj.cam.focuser.pos = obj.cam.focuser.pos - obj.af.range; % starting point for scan... 
             
-                obj.af.startup(old_pos, obj.positions, input.num_stars);
+                p = obj.af.getPosScanValues(old_pos);
             
-                pause(0.1);
-            
-                input.num_batches = length(obj.af.pos);
+                if obj.af.use_loop_back
+                    p = [p flip(p)];
+                end
+                
+                input.num_batches = length(p);
             
                 obj.stash_parameters(input);
                 obj.brake_bit = 0;
                 cleanup = onCleanup(@obj.finishupFocus);
 %                 obj.startup(input);
-
-                if obj.af.use_loop_back
-                    p = [obj.af.pos flip(obj.af.pos)];
-                else
-                    p = obj.af.pos;
-                end
+%                 obj.src.startup('use_save', 0, 'use_async', 0, obj.pass_source{:});
                 
                 for ii = 1:length(p)
                     
@@ -1739,20 +1757,26 @@ classdef Acquisition < file.AstroData
                     
                     check = obj.single;
                     if check==0, return; end
+                    obj.batch_counter = obj.batch_counter + 1;
                     
-                    obj.phot_stack.input(obj.clip.input(obj.stack_proc), 'positions', obj.clip.positions); 
-
-                    obj.checkRealign;
-
-                    if obj.use_adjust_cutouts
-                        obj.clip.positions = double(obj.clip.positions + obj.average_offsets);
+%                     obj.stack_cutouts = obj.clip.input(obj.stack_proc);
+%                     obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.clip.positions); 
+% 
+%                     obj.checkRealign;
+% 
+%                     if obj.use_adjust_cutouts
+%                         obj.clip.positions = double(obj.clip.positions + obj.average_offsets);
+%                     end
+                    
+                    if obj.use_model_psf
+%                         obj.model_psf.input(obj.stack_cutouts, obj.phot_stack.offsets_x, obj.phot_stack.offsets_y);
+                        obj.af.input(ii, obj.cam.focuser.pos, obj.model_psf.fwhm, 1, obj.positions);
+                    else
+                        obj.af.input(ii, obj.cam.focuser.pos, obj.phot_stack.widths, obj.phot_stack.fluxes, obj.positions);
                     end
                     
-                    if obj.af.use_model_psf
-                        obj.model_psf.input(obj.stack_cutouts, obj.phot_stack.offsets_x, obj.phot_stack.offsets_y);
-                        obj.af.input(ii, obj.cam.focuser.pos, obj.model_psf.fwhm);
-                    else
-                        obj.af.input(ii, obj.cam.focuser.pos, obj.phot_stack.widths, obj.phot_stack.fluxes);
+                    if obj.use_progress
+                        obj.prog.showif(obj.batch_counter);
                     end
                     
                     if ~isempty(obj.gui) && obj.gui.check
@@ -1779,6 +1803,8 @@ classdef Acquisition < file.AstroData
                     obj.cam.focuser.pos = old_pos; 
                 end
                 
+                obj.unstash_parameters;
+                obj.is_running = 0;
                 obj.clip.reset; % don't save these star positions! 
                 obj.positions = [];
                 rethrow(ME);
