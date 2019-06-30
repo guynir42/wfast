@@ -480,8 +480,8 @@ classdef Finder < handle
                 ev.aperture = input.aperture;
                 ev.gauss_sigma = input.gauss_sigma;
                 
-                ev.cutouts_first = obj.prev_cutouts;
-                ev.cutouts_second = input.cutouts;
+                ev.cutouts_first = obj.prev_cutouts(:,:,:,ev.star_index);
+                ev.cutouts_second = input.cutouts(:,:,:,ev.star_index);
                 ev.positions_first = obj.prev_positions;
                 ev.positions_second = input.positions;
                 ev.stack_first = obj.prev_stack;
@@ -580,6 +580,20 @@ classdef Finder < handle
             end
             
             if obj.debug_bit>1, fprintf('runtime "finishup": %f seconds\n', toc(t)); end
+            
+        end
+        
+        function saveEvents(obj, filename)
+            
+            for ii = 1:length(obj.all_events)
+                if obj.all_events(ii).keep
+                    events(ii) = obj.all_events(ii).reduce_memory;
+                else
+                    events(ii) = obj.all_events(ii);
+                end
+            end
+            
+            save(filename, 'events');
             
         end
         

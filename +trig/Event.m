@@ -316,6 +316,47 @@ classdef Event < handle
             
         end
         
+        function new_obj = reduce_memory(obj)
+            
+            if util.text.cs(obj.which_batch, 'first')
+                other_batch = 'second';
+            else
+                other_batch = 'first';
+            end
+            
+            % make shallow, temporary copies of arrays
+            stack_temp = obj.(['stack_' obj.which_batch]);
+            cutouts_temp = obj.(['cutouts_' obj.which_batch]);
+            pos_temp = obj.(['positions_', obj.which_batch]);
+            
+            stack_temp2 = obj.(['stack_' other_batch]);
+            cutouts_temp2 = obj.(['cutouts_' other_batch]);
+            pos_temp2 = obj.(['positions_', other_batch]);
+            
+            obj.clearImages; % first clear the images to make copying fast
+            new_obj = util.oop.full_copy(obj);
+            
+            % new object gets only the relevant arrays (50% storage) and
+            % only gets shallow copies of the data (quick copy)
+            new_obj.(['stack_' obj.which_batch]) = stack_temp;
+            new_obj.(['cutouts_' obj.which_batch]) = cutouts_temp;
+            new_obj.(['positions_', obj.which_batch]) = pos_temp;
+            
+            % recover the temporary arrays so input event returns to normal
+            obj.(['stack_' obj.which_batch]) = stack_temp;
+            obj.(['cutouts_' obj.which_batch]) = cutouts_temp;
+            obj.(['positions_', obj.which_batch]) = pos_temp;
+            
+            obj.(['stack_' other_batch]) = stack_temp2;
+            obj.(['cutouts_' other_batch]) = cutouts_temp2;
+            obj.(['positions_', other_batch]) = pos_temp2;
+            
+        end
+        
+        function reload_memory(obj) % loads cutouts/positions/stack from file
+            error('not yet implemented!');
+        end
+        
     end
     
     methods % plotting tools / GUI
