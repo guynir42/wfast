@@ -471,7 +471,11 @@ classdef Event < handle
             input.input_var('dynamic_range', []);
             input.scan_vars(varargin{:});
             
-            cutouts = cat(3, obj.cutouts_first(:,:,:,obj.star_index), obj.cutouts_second(:,:,:,obj.star_index));
+            if ndims(obj.cutouts)>=4
+                cutouts = cat(3, obj.cutouts_first(:,:,:,obj.star_index), obj.cutouts_second(:,:,:,obj.star_index));
+            else
+                cutouts = cat(3, obj.cutouts_first, obj.cutouts_second);
+            end
             
             if ~isempty(cutouts)
                 
