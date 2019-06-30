@@ -59,7 +59,9 @@ function file_handle = save(obj, filename, varargin)
         input.input_var('data_save', 1);
         input.input_var('format', [], 'type');
         input.input_var('append', 0);
-        input.input_var('name', inputname(1));    
+        input.input_var('name', inputname(1));
+        input.input_var('hidden', 0, 'use_hidden', 5);
+        input.input_var('dependent', 1, 'use_dependent', 5);
         input.input_var('debug_bit', 0);
         input.input_var('handle_list', {});
 
@@ -177,7 +179,13 @@ function file_handle = save(obj, filename, varargin)
 %     group_handle_cleanup = onCleanup(@() H5G.close(group_handle));
     
 %     props = util.oop.list_props(obj); % get the property list, including dynamic properties... 
-    props = properties(obj);
+    if input.hidden
+        warning off MATLAB:structOnObject;
+        st = struct(obj);
+        props = fieldnames(st);
+    else
+        props = properties(obj); % just get the good old fashioned, visible (non-hidden non-private) member names
+    end
     
     % now go over the properties and save them all... 
     for ii = 1:length(props)
@@ -185,8 +193,10 @@ function file_handle = save(obj, filename, varargin)
         name = props{ii};
         try
             p = findprop(obj, name);
-            if p.Transient
+            if p.Transient 
                 if input.debug_bit, disp(['prop: "' name '" is transient. Skipping...']); end
+            elseif input.dependent==0 && p.Dependent
+                if input.debug_bit, disp(['prop: "' name '" is dependent. Skipping...']); end
             else
                 group_handle = saveProperty(group_handle, name, obj.(name), input);
             end
@@ -341,7 +351,7 @@ function file_handle = saveProperty(file_handle, name, value, input)
             
             file_handle = saveMatrix(file_handle, name, value, input);
             
-        elseif ismatrix(value)
+        else
             
             if input.debug_bit 
                 fprintf('prop: "%s" is a matrix... ', name);
@@ -427,7 +437,16 @@ function file_handle = saveNumericAtt(file_handle, name, value, input)
         acpl_cleanup = onCleanup(@() H5P.close(acpl));
         
         % data type
-        type_id = H5T.copy('H5T_NATIVE_DOUBLE');
+        if isa(value, 'double')
+            type_id = H5T.copy('H5T_NATIVE_DOUBLE');
+        elseif isa(value, 'uint16')
+            type_id = H5T.copy('H5T_NATIVE_USHORT');
+        elseif isa(value, 'single')
+            type_id = H5T.copy('H5T_NATIVE_FLOAT');
+        else
+            error('Unsupported numeric attribute type "%s". Use "double" or "single" or "uint16"', class(value));
+        end
+        
         type_id_cleanup = onCleanup(@() H5T.close(type_id));
                 
         % data space
@@ -501,8 +520,10 @@ function file_handle = saveMatrix(file_handle, name, value, input)
             datatype = 'H5T_NATIVE_DOUBLE'; 
         elseif isa(value, 'uint16')
             datatype = 'H5T_NATIVE_USHORT';
+        elseif isa(value, 'single')
+            datatype = 'H5T_NATIVE_FLOAT';
         else
-            error(['unknown datatype: "' class(value) '" use "double" or uint16...']);
+            error(['unknown datatype: "' class(value) '" use "double" or "uint16"...']);
             % add other types as well...
         end
         

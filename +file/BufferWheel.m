@@ -959,7 +959,7 @@ classdef BufferWheel < file.AstroData
             if obj.use_mex
                 
                 if obj.use_write_pars && ~isempty(obj.pars) % need to replace this with util.oop.save to structure and then get mexWrite to 
-                    obj.pars_struct_cell = util.oop.save(obj.pars, 'w', 'name', 'pars', 'format', 'struct');
+                    obj.pars_struct_cell = util.oop.save(obj.pars, 'w', 'name', 'pars', 'dependent', 1, 'hidden', 1, 'format', 'struct');
                 else
                     obj.pars_struct_cell = {};
                 end
