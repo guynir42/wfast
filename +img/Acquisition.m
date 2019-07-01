@@ -1081,7 +1081,7 @@ classdef Acquisition < file.AstroData
             obj.log.input('Connecting to PcSync as server');
             
             try
-                s.connect;
+                obj.sync.connect;
             catch ME
                 obj.log.error(ME.getReport);
                 rethrow(ME);

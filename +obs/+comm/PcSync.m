@@ -184,6 +184,7 @@ classdef PcSync < handle
                 obj.hndl.BytesAvailableFcnMode = 'byte';
                 obj.hndl.BytesAvailableFcnCount = 32;
                 obj.hndl.OutputBufferSize = 50*1024; 
+                obj.hndl.InputBufferSize = 50*1024;
                 
                 fopen(obj.hndl);
             
