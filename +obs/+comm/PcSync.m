@@ -134,7 +134,10 @@ classdef PcSync < handle
                 
                 obj.hndl = tcpip(obj.remote_ip, obj.remote_port, 'NetworkRole', obj.role, 'Timeout', 10);
                 obj.hndl.BytesAvailableFcn = @obj.read_data;
+                obj.hndl.BytesAvailableFcnMode = 'byte';
+                obj.hndl.BytesAvailableFcnCount = 32;
                 obj.hndl.OutputBufferSize = 50*1024; 
+                
                 fopen(obj.hndl);
             
             catch ME
@@ -180,20 +183,26 @@ classdef PcSync < handle
         
         function read_data(obj, ~, ~)
             
-            obj.raw_data_received = uint8(fread(obj.hndl, obj.hndl.BytesAvailable))';
+            if obj.debug_bit>1, fprintf('read data with %d bytes\n', obj.hndl.BytesAvailable); end
             
-            value = getArrayFromByteStream(obj.raw_data_received)
-            
-            if ischar(value)
-                if strcmp(obj.checksum, value)
+            if obj.hndl.BytesAvailable>0
+                
+                obj.raw_data_received = uint8(fread(obj.hndl, obj.hndl.BytesAvailable))';
+
+                value = getArrayFromByteStream(obj.raw_data_received);
+
+                if ischar(value)
+                    if strcmp(obj.checksum, value)
+                        obj.status = 1;
+                    else
+                        error('Received a response: %s which is not consistent with checksum: %s', value, obj.checksum);
+                    end
+                elseif isstruct(value)
+                    obj.input = value;
                     obj.status = 1;
-                else
-                    error('Received a response: %s which is not consistent with checksum: %s', value, obj.checksum);
+                    obj.confirm;
                 end
-            elseif isstruct(value)
-                obj.input = value;
-                obj.status = 1;
-                obj.confirm;
+                
             end
             
         end
