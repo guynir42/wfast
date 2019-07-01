@@ -552,15 +552,15 @@ classdef Event < handle
                         'autodyn', use_autodyn, 'bias', input.bias, 'dyn', input.dynamic_range);
 
                     if idx_start+ii-1==idx
-                        util.plot.inner_title([num2str(idx_start+ii-1) '*'], 'Position', 'NorthWest', 'Color', 'red', 'Parent', ax{ii});
+                        util.plot.inner_title([num2str(idx_start+ii-1) '*'], 'Position', 'NorthWest', 'Color', 'red', 'ax', ax{ii});
                     else
-                        util.plot.inner_title(num2str(idx_start+ii-1), 'Position', 'NorthWest', 'Parent', ax{ii});
+                        util.plot.inner_title(num2str(idx_start+ii-1), 'Position', 'NorthWest', 'ax', ax{ii});
                     end
                     
                     if ~isempty(rad)
                         viscircles(ax{ii}, cen(ii,:), rad, 'EdgeColor', col);
                         if idx_start+ii-1==idx
-                            util.plot.inner_title(str, 'Position', 'bottom', 'Color', col, 'Parent', ax{ii});
+                            util.plot.inner_title(str, 'Position', 'bottom', 'Color', col, 'ax', ax{ii});
                         end
                     end
                 

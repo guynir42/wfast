@@ -61,7 +61,7 @@ classdef Photometry < handle
         corner_size = 0.15; % fraction of the cut_size or pixel value (must be smaller than cut_size!)
         aperture = 5;
         annulus = 8;
-        annulus_outer = []; % empty means take the rest of the cutout
+        annulus_outer = 11; % empty means take the rest of the cutout
         gauss_sigma = 2;
         gauss_thresh = 1e-6;
         
@@ -640,18 +640,18 @@ classdef Photometry < handle
             import util.stat.sum2;
             
             if obj.use_mex
-                [f,w,b,v,x,y,W,p] = util.img.photometry(single(obj.cutouts), 'square', [], 'corners', obj.corner_size,...
+                [f,wt,b,v,x,y,wd,p] = util.img.photometry(single(obj.cutouts), 'square', [], 'corners', obj.corner_size,...
                     'widths', obj.widths, 'subtract', obj.use_backgrounds);
             else
-                [f,w,b,v,x,y,W,p] = obj.calculate('none', 'corner', 1);
+                [f,wt,b,v,x,y,wd,p] = obj.calculate('none', 'corner', 1);
             end
             
             x(abs(x)>size(obj.cutouts,2)) = NaN;
             y(abs(y)>size(obj.cutouts,1)) = NaN;
-            w(w<0 | w>size(obj.cutouts,1) | w>size(obj.cutouts,2)) = NaN;
+            wd(wd<0 | wd>size(obj.cutouts,1) | wd>size(obj.cutouts,2)) = NaN;
             
             obj.fluxes_basic = f;
-            obj.weights_basic = w;
+            obj.weights_basic = wt;
             obj.backgrounds_basic = b;
             obj.variances_basic = v;
             
@@ -663,7 +663,7 @@ classdef Photometry < handle
                 obj.centroids_y_basic = y + obj.positions(:,2)';
             end
             
-            obj.widths_basic = W;
+            obj.widths_basic = wd;
             obj.bad_pixels_basic = p;
             
             % update the newest values
@@ -688,18 +688,18 @@ classdef Photometry < handle
         function calcAperture(obj)
             
             if obj.use_mex
-                [f,w,b,v,x,y,W,p] = util.img.photometry(single(obj.cutouts), 'circle', obj.aperture, 'annulus', obj.annulus,...
+                [f,wt,b,v,x,y,wd,p] = util.img.photometry(single(obj.cutouts), 'circle', obj.aperture, 'annulus', obj.annulus,...
                     'widths', obj.widths, 'iterations', obj.iterations, 'subtract', obj.use_backgrounds);
             else
-                [f,w,b,v,x,y,W,p] = obj.calculate('circle', 'annulus', obj.iterations);
+                [f,wt,b,v,x,y,wd,p] = obj.calculate('circle', 'annulus', obj.iterations);
             end
             
             x(abs(x)>size(obj.cutouts,2)/2+obj.aperture) = NaN;
             y(abs(y)>size(obj.cutouts,1)/2+obj.aperture) = NaN;
-            w(w<0 | w>size(obj.cutouts,1) | w>size(obj.cutouts,2)) = NaN;
+            wd(wd<0 | wd>size(obj.cutouts,1) | wd>size(obj.cutouts,2)) = NaN;
             
             obj.fluxes_ap = f;
-            obj.weights_ap = w;
+            obj.weights_ap = wt;
             obj.backgrounds_ap = b;
             obj.variances_ap = v;
             
@@ -711,7 +711,7 @@ classdef Photometry < handle
                 obj.centroids_y_ap = y + obj.positions(:,2)';
             end
             
-            obj.widths_ap = W;
+            obj.widths_ap = wd;
             obj.bad_pixels_ap = p;
             
             % update the newest values
@@ -736,18 +736,18 @@ classdef Photometry < handle
         function calcGaussian(obj)
             
             if obj.use_mex
-                [f,w,b,v,x,y,W,p] = util.img.photometry(single(obj.cutouts), 'gauss', obj.gauss_sigma, 'annulus', obj.annulus,...
+                [f,wt,b,v,x,y,wd,p] = util.img.photometry(single(obj.cutouts), 'gauss', obj.gauss_sigma, 'annulus', obj.annulus,...
                     'iterations', obj.iterations, 'widths', obj.widths, 'subtract', obj.use_backgrounds);
             else
-                [f,w,b,v,x,y,W,p] = obj.calculate('gaussian', 'annulus', obj.iterations);
+                [f,wt,b,v,x,y,wd,p] = obj.calculate('gaussian', 'annulus', obj.iterations);
             end
             
             x(abs(x)>size(obj.cutouts,2)/2+obj.gauss_sigma*3) = NaN;
             y(abs(y)>size(obj.cutouts,1)/2+obj.gauss_sigma*3) = NaN;
-            w(w<0 | w>size(obj.cutouts,1) | w>size(obj.cutouts,2)) = NaN;
+            wd(wd<0 | wd>size(obj.cutouts,1) | wd>size(obj.cutouts,2)) = NaN;
             
             obj.fluxes_gauss = f;
-            obj.weights_gauss = w;
+            obj.weights_gauss = wt;
             obj.backgrounds_gauss = b;
             obj.variances_gauss = v;
             
@@ -759,7 +759,7 @@ classdef Photometry < handle
                 obj.centroids_y_gauss = y + obj.positions(:,2)';
             end
             
-            obj.widths_gauss = W*sqrt(2); % correction given because weighing by PSF makes the second moment smaller
+            obj.widths_gauss = wd*sqrt(2); % correction given because weighing by PSF makes the second moment smaller
             obj.bad_pixels_gauss = p;
             
             % update the newest values
@@ -1052,6 +1052,7 @@ classdef Photometry < handle
                 h(ii).ButtonDownFcn = @obj.callback_touch_point;
             end
             
+            ax3.ColorOrderIndex = 1;
             h = plot(ax3, 1:Ns, obj.offsets_y(1:Nf, 1:Ns), '+');
             
             for ii = 1:length(h)
@@ -1059,6 +1060,7 @@ classdef Photometry < handle
                 h(ii).ButtonDownFcn = @obj.callback_touch_point;
             end
             
+            ax3.ColorOrderIndex = 1;
             h = plot(ax3, 1:Ns, obj.widths(1:Nf, 1:Ns), 'o');
             
             for ii = 1:length(h)

@@ -104,6 +104,7 @@ classdef PhotGUI < handle
             obj.panel_aperutres.addButton('button_corners', 'corner_size', 'input', 'corners= ');
             obj.panel_aperutres.addButton('button_aperture', 'aperture', 'input', 'ap= ');
             obj.panel_aperutres.addButton('button_annulus', 'annulus', 'input', 'ann= ');
+            obj.panel_aperutres.addButton('button_outer', 'annulus_outer', 'input', 'ann.out= '); 
             obj.panel_aperutres.addButton('button_gauss_sigma', 'gauss_sigma', 'input', 'gauss sig= ');
             
             obj.panel_aperutres.make;
@@ -140,7 +141,7 @@ classdef PhotGUI < handle
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
             
-            obj.panel_close = uipanel('Position', [0 0 0.2 0.1]);
+            obj.panel_close = uipanel('Position', [0 0 0.2 1/N]);
             obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE');
             obj.button_close.Callback = @obj.callback_close;
             

@@ -380,7 +380,7 @@ classdef Lightcurves < handle
                 type = '';
             end
             
-            list = {'fluxes', 'weights', 'backgrounds', 'variances', 'offsets_x', 'offsets_y', 'centroids_x', 'centroids_y', 'widths', 'bad_pixels', 'pars_struct'};
+            list = {'fluxes', 'weights', 'backgrounds', 'variances', 'offsets_x', 'offsets_y', 'centroids_x', 'centroids_y', 'widths', 'bad_pixels'};
             
             if ~isempty(type)
                 list2 = strcat(list, ['_' type]);
@@ -394,7 +394,8 @@ classdef Lightcurves < handle
                 input.input_var(list{ii}, photometry.(list2{ii}));
             end
             
-            input.input_var('timestamps', photometry.timestamps, 'pars', photometry.pars_struct);
+            input.input_var('timestamps', photometry.timestamps);
+            input.input_var('pars_struct', photometry.pars_struct);
             
             obj.input(input);
             

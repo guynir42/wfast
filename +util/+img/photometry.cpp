@@ -484,7 +484,7 @@ void Photometry::calculate(int j){
 		bad_pixel[j]=0;
 		for(int i=0;i<N;i++){
 		
-			bad_array[i]=0; 
+			bad_array[i]=0; // initialization 
 			if(isnan(image[i]) && ap_array[i]>0){
 				bad_array[i]=1; // find all the bad pixels in the image
 				bad_pixel[j]++;

@@ -8,10 +8,10 @@ classdef AnalysisGUI < handle
              
         buttons = {};
         
-        font_size = 12;
+        font_size = 14;
         big_font_size = 16;
-        edit_font_size = 10;
-        small_font_size = 8;
+        edit_font_size = 12;
+        small_font_size = 10;
         
         debug_bit = 1;
         
