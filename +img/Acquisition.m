@@ -288,11 +288,12 @@ classdef Acquisition < file.AstroData
 
         function setupDefaults(obj)
 
-            obj.num_batches = 2;
+            obj.num_batches = 500;
             obj.batch_size = 100;
             
-            obj.num_stars = 250;
-            obj.cut_size = 20;
+            obj.num_stars = 1000;
+            obj.cut_size = 25;
+            obj.avoid_edges = 100;
             
             obj.num_backgrounds = 50;
             obj.cut_size_bg = 32;
@@ -624,7 +625,7 @@ classdef Acquisition < file.AstroData
         function val = get.average_width(obj)
             
             if obj.use_model_psf
-                val = obj.model_psf.fwhm/2.355;
+                val = (obj.model_psf.maj_axis+obj.model_psf.min_axis)/2;
             else
                 val = obj.phot_stack.average_width;
             end
@@ -633,11 +634,23 @@ classdef Acquisition < file.AstroData
         
         function val = getWidthEstimate(obj)
             
-            if isempty(obj.prev_average_width)
+            if isempty(obj.prev_average_width) || ~isreal(obj.prev_average_width) || obj.prev_average_width<=0
                 val = 1.6;
             else
                 val = obj.prev_average_width;
             end
+            
+        end
+        
+        function val = major_axis(obj)
+            
+            val = obj.model_psf.maj_axis;
+            
+        end
+        
+        function val = minor_axis(obj)
+            
+            val = obj.model_psf.min_axis;
             
         end
         
@@ -1748,8 +1761,8 @@ classdef Acquisition < file.AstroData
                         
                         obj.cam.focuser.pos = p(ii);
                         
-                        pause(0.05);
-            
+                        pause(0.1);
+                    
                     catch ME
                         warning(ME.getReport);
                     end
@@ -1868,6 +1881,9 @@ classdef Acquisition < file.AstroData
             
             obj.clip.positions = T_all.pos;
             obj.positions = double(T_all.pos);
+            
+            obj.ref_positions = obj.positions;
+            obj.ref_stack = obj.stack_proc;
             
             if obj.gui.check
                 obj.show;

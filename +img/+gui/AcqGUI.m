@@ -235,17 +235,21 @@ classdef AcqGUI < handle
             obj.panel_info.addButton('button_frame_rate', 'frame_rate_average', 'info', 'f= ', ' Hz'); 
             obj.panel_info.addButton('button_width', 'average_width', 'info', 'width= ', ' px', 'small', 0.5);
             obj.panel_info.addButton('button_seeing', 'average_width', 'custom', 'seeing= ', ' "', 'small', 0.5);
+            obj.panel_info.addButton('button_min_axis', 'minor_axis', 'info', 'b= ', ' px', 'small', 0.5);
+            obj.panel_info.addButton('button_maj_axis', 'major_axis', 'info', 'a= ', ' px', 'small', 0.5);
             obj.panel_info.addButton('button_offset_y', 'average_offsets', 'custom', 'dy= ', ' px', 'small', 0.5);
             obj.panel_info.addButton('button_offset_x', 'average_offsets', 'custom', 'dx= ', ' px', 'small', 0.5);
             obj.panel_info.addButton('button_flux', 'average_flux', 'info', 'flux= ', '', 'small', 0.5);
             obj.panel_info.addButton('button_bg', 'average_background', 'info', 'b/g= ', '', 'small', 0.5);
             obj.panel_info.addButton('button_temperature', 'sensor_temperature', 'info', 's.temp= '); 
-            obj.panel_info.margin = [0.01 0.03];
+            obj.panel_info.margin = [0.005 0.03];
             obj.panel_info.make;
             
             obj.panel_info.button_frame_rate.Tooltip = 'Measured frame rate (averaged over a few batches)';
             obj.panel_info.button_width.Tooltip = '2nd moment of stars, averaged over all cutouts (pixels)';
             obj.panel_info.button_seeing.Tooltip = 'Full width at half maximum (arcsec)';
+            obj.panel_info.button_min_axis.Tooltip = 'Minor axis of the stacked PSF';
+            obj.panel_info.button_maj_axis.Tooltip = 'Major axis of the stacked PSF';
             obj.panel_info.button_offset_y.Tooltip = 'Average offset/drift/1st moment in the y direction (pixels)';
             obj.panel_info.button_offset_x.Tooltip = 'Average offset/drift/1st moment in the x direction (pixels)';
             obj.panel_info.button_flux.Tooltip = 'Average flux of all stars';

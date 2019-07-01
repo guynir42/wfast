@@ -8,9 +8,10 @@ classdef SpiderGUI < handle
              
         buttons = {};
         
-        font_size = 16;
-        edit_font_size = 14;
-        small_font_size = 12;
+        font_size = 12;
+        big_font_size = 14;
+        edit_font_size = 11;
+        small_font_size = 10;
         
         debug_bit = 1;
         
@@ -18,7 +19,7 @@ classdef SpiderGUI < handle
     
     properties % gui stuff
         
-        panel_connect;
+        panel_status;
         
         panel_pos;
         panel_tip;
@@ -71,50 +72,62 @@ classdef SpiderGUI < handle
             obj.fig = util.plot.FigHandler('focus spider');
             
             obj.fig.bottom = 5;
-            obj.fig.height = 16;
-            obj.fig.width = 10;
+            obj.fig.height = 10;
+            obj.fig.width = 8;
             movegui(obj.fig.fig, 'center');
-            obj.fig.left = 30;
+            obj.fig.left = 20;
             
-            %%%%%%%%%%% panel connect %%%%%%%%%%%%%%%%%%
+            N = 7;
+            pos = N;
             
-            obj.panel_connect = GraphicPanel(obj.owner, [0 5/6 1 1/6], 'connection', 0);
-            obj.panel_connect.addButton('status', 'status', 'info', 'status= ', '', '', 0.7);
-            obj.panel_connect.addButton('connect', 'connect', 'custom', 'CONNECT', '', '', 0.3);
-            obj.panel_connect.make;
-            obj.panel_connect.connect.Callback = @obj.callback_connect;
+            %%%%%%%%%%% panel status %%%%%%%%%%%%%%%%%%
+            
+            pos = pos-2;
+            obj.panel_status = GraphicPanel(obj.owner, [0 pos/N 1 2/N], 'connection', 1);
+            obj.panel_status.addButton('status', 'status', 'info', 'status= ', '', '', 0.7);
+            obj.panel_status.addButton('connect', 'connect', 'custom', 'CONNECT', '', '', 0.3);
+            obj.panel_status.addButton('vector', 'pos_vec', 'info', 'pos= ');
+            obj.panel_status.margin = [0.01 0.05];
+            obj.panel_status.make;
+            obj.panel_status.connect.Callback = @obj.callback_connect;
             
             %%%%%%%%%%% panel pos %%%%%%%%%%%%%%%%%%
             
-            obj.panel_pos = GraphicPanel(obj.owner, [0/3 1/6 1/3 4/6], 'position');
+            pos = pos-4;
+            obj.panel_pos = GraphicPanel(obj.owner, [0/3 pos/N 1/3 4/N], 'position');
             obj.panel_pos.addButton('value', 'pos', 'input', ' ');
             obj.panel_pos.addButton('up', 'up', 'push', 'UP');
             obj.panel_pos.addButton('step', 'step', 'input', ' ');
             obj.panel_pos.addButton('down', 'down', 'push', 'DOWN');
+            obj.panel_pos.margin = [0.1 0.03];
             obj.panel_pos.make;
             
             %%%%%%%%%%% panel tip %%%%%%%%%%%%%%%%%%
             
-            obj.panel_tip = GraphicPanel(obj.owner, [1/3 1/6 1/3 4/6], 'tip');
+            obj.panel_tip = GraphicPanel(obj.owner, [1/3 pos/N 1/3 4/N], 'tip');
             obj.panel_tip.addButton('value', 'tip', 'input', ' ');
             obj.panel_tip.addButton('up', 'tip_up', 'push', 'UP');
             obj.panel_tip.addButton('step', 'step_tip', 'input', ' ');
             obj.panel_tip.addButton('down', 'tip_down', 'push', 'DOWN');
+            obj.panel_tip.margin = [0.1 0.03];
             obj.panel_tip.make;
             
             %%%%%%%%%%% panel tilt %%%%%%%%%%%%%%%%%%
             
-            obj.panel_tilt = GraphicPanel(obj.owner, [2/3 1/6 1/3 4/6], 'tilt');
+            obj.panel_tilt = GraphicPanel(obj.owner, [2/3 pos/N 1/3 4/N], 'tilt');
             obj.panel_tilt.addButton('value', 'tilt', 'input', ' ');
             obj.panel_tilt.addButton('up', 'tilt_up', 'push', 'UP');
             obj.panel_tilt.addButton('step', 'step_tilt', 'input', ' ');
             obj.panel_tilt.addButton('down', 'tilt_down', 'push', 'DOWN');
+            obj.panel_tilt.margin = [0.1 0.03];
             obj.panel_tilt.make;
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
             
-            obj.panel_close = uipanel('Position', [0 0 1 0.1]);
+            pos = pos - 1;
+            obj.panel_close = uipanel('Position', [0 pos 1 1/N]);
             obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE');
+            obj.button_close.font_size = 'big';
             obj.button_close.Callback = @obj.callback_close;
             
             obj.update;
@@ -132,9 +145,9 @@ classdef SpiderGUI < handle
             end
             
             if obj.owner.status
-                obj.panel_connect.connect.String = 'Disconnect';
+                obj.panel_status.connect.String = 'Disconnect';
             else
-                obj.panel_connect.connect.String = 'connect';
+                obj.panel_status.connect.String = 'connect';
             end
             
         end
