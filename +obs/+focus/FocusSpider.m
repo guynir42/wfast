@@ -140,6 +140,12 @@ classdef FocusSpider < handle
             
         end
         
+        function val = pos_vec(obj)
+            
+            val = [obj.actuators.pos];
+            
+        end
+        
     end
     
     methods % setters
@@ -257,25 +263,25 @@ classdef FocusSpider < handle
         
         function tip_up(obj)
             
-            obj.pos = obj.tip + obj.step_tip;
+            obj.tip = obj.tip + obj.step_tip;
             
         end
         
         function tip_down(obj)
             
-            obj.pos = obj.tip - obj.step_tip;
+            obj.tip = obj.tip - obj.step_tip;
             
         end
         
         function tilt_up(obj)
             
-            obj.pos = obj.tilt + obj.step_tilt;
+            obj.tilt = obj.tilt + obj.step_tilt;
             
         end
         
         function tilt_down(obj)
             
-            obj.pos = obj.tilt - obj.step_tilt;
+            obj.tilt = obj.tilt - obj.step_tilt;
             
         end
         

@@ -8,7 +8,7 @@ classdef Photometry < handle
     
     properties % objects
         
-        
+        pars_struct; % a struct with some housekeeping about how the photometry was done
         
     end
     
@@ -297,6 +297,8 @@ classdef Photometry < handle
             
             obj.updateAverages;
             
+            obj.updatePars;
+            
             if ~isempty(obj.gui) && obj.gui.check
                 obj.gui.update;
             end
@@ -345,9 +347,6 @@ classdef Photometry < handle
             else
                 error('Unknown background shape "%s". Use "corner" or "annulus"', bg_shape);
             end
-            
-            c = size(obj.cutouts); c = c(1:2);
-            [obj.X,obj.Y] = meshgrid((1:c(2))-floor(c(2)/2)-1, (1:c(1))-floor(c(1)/2)-1); 
             
             if ~isempty(obj.fluxes)
                 flux = obj.fluxes;
@@ -435,7 +434,7 @@ classdef Photometry < handle
                         m1y = sum2(I.*obj.Y)./m0;
                         m2x = sum2(I.*(obj.X-m1x).^2)./m0;
                         m2y = sum2(I.*(obj.Y-m1y).^2)./m0;
-%                         mxy = sum2(I.*(obj.X-m1x).*(obj.Y-m1y))./m0;
+                        mxy = sum2(I.*(obj.X-m1x).*(obj.Y-m1y))./m0;
                         
                         % quality checks:
                         if m0==0
@@ -444,7 +443,7 @@ classdef Photometry < handle
                             m1y = 0;
                             m2x = NaN;
                             m2y = NaN;
-%                             mxy = NaN;
+                            mxy = NaN;
                         end
                         
                         if m2x<0, m2x = NaN; if obj.debug_bit>3, disp('m2x is negative!'); end, end
@@ -453,8 +452,16 @@ classdef Photometry < handle
                         dx = m1x;
                         dy = m1y;
                         
-                        W = sqrt(mean([m2x,m2y], 'omitnan')); % should we add mxy??
+%                         W = sqrt(mean([m2x,m2y], 'omitnan')); % should we add mxy??
                         
+                        M = [m2x mxy; mxy m2y];
+                        
+                        [V, D] = eig(M);
+                        
+                        % use V to calculate rotation angle?
+                        
+                        W = mean(sqrt(diag(D)), 'omitnan');
+
                     end
 
                     flux(jj,ii) = m0;
@@ -474,7 +481,18 @@ classdef Photometry < handle
             
         end
         
+        function makeAxes(obj)
+            
+            c = size(obj.cutouts); c = c(1:2);
+            [obj.X,obj.Y] = meshgrid((1:c(2))-floor(c(2)/2)-1, (1:c(1))-floor(c(1)/2)-1); 
+            
+        end
+        
         function val = makeCorners(obj, ~, ~)
+            
+            if isempty(obj.X) || isempty(obj.Y)
+                obj.makeAxes;
+            end
             
             val = zeros(obj.cut_size);
             
@@ -513,6 +531,10 @@ classdef Photometry < handle
                 dy = 0;
             end
             
+            if isempty(obj.X) || isempty(obj.Y)
+                obj.makeAxes;
+            end
+            
             R = obj.aperture;
             
             if isnan(R) % use NaN to indicate automatically choose radius
@@ -549,6 +571,10 @@ classdef Photometry < handle
                 dy = 0;
             end
             
+            if isempty(obj.X) || isempty(obj.Y)
+                obj.makeAxes;
+            end
+            
             R1 = obj.annulus;
             
             if isempty(obj.annulus_outer)
@@ -579,6 +605,10 @@ classdef Photometry < handle
             
             if nargin<3 || isempty(dy)
                 dy = 0;
+            end
+            
+            if isempty(obj.X) || isempty(obj.Y)
+                obj.makeAxes;
             end
             
             sig = obj.gauss_sigma;
@@ -772,6 +802,37 @@ classdef Photometry < handle
             obj.average_offset_x = median(F./M.*DX, 'omitnan');
             obj.average_offset_y = median(F./M.*DY, 'omitnan');
             obj.average_width = median(W.*F./M, 'omitnan');
+            
+        end
+        
+        function updatePars(obj)
+            
+            obj.pars_struct = struct;
+            obj.pars_struct.used_bg_sub = obj.use_backgrounds;
+            
+            if obj.use_fitter
+                obj.pars_struct.signal_method = 'fitter';
+                % any other parameters?
+            elseif obj.use_gaussian
+                obj.pars_struct.signal_method = 'gaussian';
+                obj.pars_struct.radius = obj.gauss_sigma;
+                obj.pars_struct.radius = obj.gauss_thresh;
+                obj.pars_struct.background_method = 'annulus';
+                obj.pars_struct.annulus = obj.annulus;
+                obj.pars_struct.annulus_outer = obj.annulus_outer;
+                obj.pars_struct.iterations = obj.iterations;
+            elseif obj.use_aperture
+                obj.pars_struct.signal_method = 'aperture';
+                obj.pars_struct.radius = obj.aperture;
+                obj.pars_struct.background_method = 'annulus';
+                obj.pars_struct.annulus = obj.annulus;
+                obj.pars_struct.annulus_outer = obj.annulus_outer;
+                obj.pars_struct.iterations = obj.iterations;
+            elseif obj.use_basic
+                obj.pars_struct.signal_method = 'square';
+                obj.pars_struct.background_method = 'corners';
+                obj.pars_struct.corner_size = obj.corner_size;
+            end
             
         end
         

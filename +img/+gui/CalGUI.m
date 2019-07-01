@@ -41,7 +41,7 @@ classdef CalGUI < handle
         button_interp_mask;
         button_conv_mask;
         input_mask_sigma;
-        input_mask_var_sigma;
+        input_mask_var_thresh;
         input_replace_value;
         button_autosave;
                 
@@ -144,7 +144,7 @@ classdef CalGUI < handle
             obj.button_interp_mask = GraphicButton(obj.panel_controls, [0 5/num 1 1/num], obj.cal, 'use_interp_mask', 'toggle', 'no interp mask', 'use interp mask');
             obj.button_conv_mask = GraphicButton(obj.panel_controls, [0 4/num 1 1/num], obj.cal, 'use_conv_mask', 'toggle', 'no conv mask', 'use conv mask');
             obj.input_mask_sigma = GraphicButton(obj.panel_controls, [0 3/num 1 1/num], obj.cal, 'dark_mask_sigma', 'input', 'mask sigma= ');
-            obj.input_mask_var_sigma = GraphicButton(obj.panel_controls, [0 2/num 1 1/num], obj.cal, 'dark_mask_var_sigma', 'input', 'var sigma= ');
+            obj.input_mask_var_thresh = GraphicButton(obj.panel_controls, [0 2/num 1 1/num], obj.cal, 'dark_mask_var_thresh', 'input', 'var thresh= ');
             obj.input_replace_value = GraphicButton(obj.panel_controls, [0 1/num 1 1/num], obj.cal, 'replace_value', 'input', 'replace_value= ');
             obj.button_autosave = GraphicButton(obj.panel_controls, [0 0/num 1 1/num], obj.cal, 'autosave', 'toggle', 'no autosave', 'autosave');
             

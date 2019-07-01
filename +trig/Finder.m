@@ -14,6 +14,7 @@ classdef Finder < handle
         new_events@trig.Event;
         last_events@trig.Event;
         
+        phot_pars; % a struct with some housekeeping about how the photometry was done
         
     end
     
@@ -254,6 +255,7 @@ classdef Finder < handle
             input.input_var('t_end', [], 8);
             input.input_var('t_end_stamp', [], 8);
             input.input_var('used_background_sub', []); 
+            input.input_var('phot_pars', [], 'pars_struct');
             input.scan_vars(varargin{:});
             
             obj.clear;
@@ -271,6 +273,7 @@ classdef Finder < handle
             obj.stack = input.stack;
             obj.batch_index = input.batch_index;
             obj.filename = input.filename;
+            obj.phot_pars = input.phot_pars;
             
             if ~isempty(obj.prev_fluxes) % skip first batch! 
             
@@ -480,8 +483,8 @@ classdef Finder < handle
                 ev.aperture = input.aperture;
                 ev.gauss_sigma = input.gauss_sigma;
                 
-                ev.cutouts_first = obj.prev_cutouts;
-                ev.cutouts_second = input.cutouts;
+                ev.cutouts_first = obj.prev_cutouts(:,:,:,ev.star_index);
+                ev.cutouts_second = input.cutouts(:,:,:,ev.star_index);
                 ev.positions_first = obj.prev_positions;
                 ev.positions_second = input.positions;
                 ev.stack_first = obj.prev_stack;
@@ -494,6 +497,8 @@ classdef Finder < handle
                     ev.t_end = input.t_end;
                     ev.t_end_stamp = input.t_end_stamp;
                 end
+                
+                ev.phot_pars = obj.phot_pars;
                 
                 % any other info that needs to be saved along with the event object?
                 % ...
@@ -580,6 +585,20 @@ classdef Finder < handle
             end
             
             if obj.debug_bit>1, fprintf('runtime "finishup": %f seconds\n', toc(t)); end
+            
+        end
+        
+        function saveEvents(obj, filename)
+            
+            for ii = 1:length(obj.all_events)
+                if obj.all_events(ii).keep
+                    events(ii) = obj.all_events(ii).reduce_memory;
+                else
+                    events(ii) = obj.all_events(ii);
+                end
+            end
+            
+            save(filename, 'events');
             
         end
         

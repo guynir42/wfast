@@ -19,6 +19,13 @@ classdef ModelPSF < handle
         
         fwhm;
         
+        m2x;
+        m2y;
+        mxy;
+        maj_axis;
+        min_axis;
+        angle;
+        
     end
     
     properties % switches/controls
@@ -117,11 +124,39 @@ classdef ModelPSF < handle
                 end
             end
             
+            obj.calcStack;
+            
+        end
+        
+        function calcStack(obj)
+            
+            import util.stat.sum2;
+            
             obj.stack = sum(sum(obj.cutouts_shifted,3, 'omitnan'),4, 'omitnan');
             
             obj.mask = util.img.ellipse('radius', obj.radius, 'size', [size(obj.cutouts,1), size(obj.cutouts,2)]);
             
+            c = size(obj.cutouts); c = c(1:2);
+            [X, Y] = meshgrid((1:c(2))-floor(c(2)/2)-1, (1:c(1))-floor(c(1)/2)-1); 
             
+            I = obj.stack.*obj.mask;
+            
+            S = sum2(I);
+            
+            obj.m2x = sum2(X.^2.*I)./S;
+            obj.m2y = sum2(Y.^2.*I)./S;
+            obj.mxy = sum2(X.*Y.*I)./S;
+            
+            M = [obj.m2x obj.mxy; obj.mxy obj.m2y];
+            
+            [R,E] = eig(M);
+            
+            obj.angle = asind(R(4));
+            obj.maj_axis = max(sqrt(diag(E)));
+            obj.min_axis = min(sqrt(diag(E)));
+            
+%             obj.fwhm = sqrt(mean([obj.m2x,obj.m2y])).*2.355;
+            obj.fwhm = util.img.fwhm(I);
             
         end
         

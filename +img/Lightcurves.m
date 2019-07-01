@@ -8,6 +8,8 @@ classdef Lightcurves < handle
     
     properties % objects
         
+        phot_pars; % a struct with some housekeeping about how the photometry was done
+        
     end
     
     properties % inputs/outputs
@@ -16,6 +18,7 @@ classdef Lightcurves < handle
         num_frames = 0;
         total_frames;
         
+        % can be replaced by phot_pars
         signal_method = '';
         background_method = '';
         
@@ -346,6 +349,7 @@ classdef Lightcurves < handle
                 input.input_var('offsets_y', []);
                 input.input_var('widths', []);
                 input.input_var('bad_pixels', []);
+                input.input_var('pars_struct', [], 'phot_pars');
                 input.scan_vars(varargin{:});
             end
             
@@ -364,6 +368,10 @@ classdef Lightcurves < handle
             obj.bad_pixels_full = insert_matrix(obj.bad_pixels_full, input.bad_pixels, [obj.frame_index,1], NaN, obj.use_double_up);
             obj.frame_index = obj.frame_index + N;
             
+            if ~isempty(input.pars_struct)
+                obj.phot_pars = input.pars_struct;
+            end
+            
         end
         
         function getData(obj, photometry, type)
@@ -372,7 +380,7 @@ classdef Lightcurves < handle
                 type = '';
             end
             
-            list = {'fluxes', 'weights', 'backgrounds', 'variances', 'offsets_x', 'offsets_y', 'centroids_x', 'centroids_y', 'widths', 'bad_pixels'};
+            list = {'fluxes', 'weights', 'backgrounds', 'variances', 'offsets_x', 'offsets_y', 'centroids_x', 'centroids_y', 'widths', 'bad_pixels', 'pars_struct'};
             
             if ~isempty(type)
                 list2 = strcat(list, ['_' type]);
@@ -386,7 +394,7 @@ classdef Lightcurves < handle
                 input.input_var(list{ii}, photometry.(list2{ii}));
             end
             
-            input.input_var('timestamps', photometry.timestamps);
+            input.input_var('timestamps', photometry.timestamps, 'pars', photometry.pars_struct);
             
             obj.input(input);
             

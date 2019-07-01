@@ -137,7 +137,8 @@ classdef Calibration < handle
         replace_value = NaN;
         
         dark_mask_sigma = 5; % how hot a pixel must be (relative to dark noise) to be considered a "bad pixel"
-        dark_mask_var_sigma = 100;
+        dark_mask_var_thresh = 120; % pixels with variance above this value are bad pixels. 
+        dark_mask_var_sigma = 100; % how many "sigmas" above the mean variance value to cut (to be depricated)
         dark_mask_var_ratio = 0.99; % what fraction of pixel variance is considered "bad pixels" (to be depricated)
         
         % switches for making darks/flats (can we get rid of this??)
@@ -163,7 +164,8 @@ classdef Calibration < handle
     properties (Hidden=true)
     
         default_dark_mask_sigma;
-        default_dark_mask_var_sigma;
+        default_dark_mask_var_thresh;
+        default_dark_mask_var_sigma; % we're not using this anymore...
         default_dark_mask_var_ratio; % we're not using this anymore...
         
         version = 1.06;
@@ -484,6 +486,14 @@ classdef Calibration < handle
         function set.dark_mask_sigma(obj, sigma)
            
             obj.dark_mask_sigma = sigma;
+            obj.dark_mask = [];
+            obj.dark_mask_cut = [];
+            
+        end
+        
+        function set.dark_mask_var_thresh(obj, val)
+           
+            obj.dark_mask_var_thresh = val;
             obj.dark_mask = [];
             obj.dark_mask_cut = [];
             
@@ -934,12 +944,14 @@ classdef Calibration < handle
             
             if obj.debug_bit>2, fprintf('dark_mean stats: mu= %4.2f | sig= %4.2f | num_pix= %d | frac= %g\n', mu, sig, nnz(idx), nnz(idx)/numel(idx)); end
             
-            % find the pixels with unusual variance values
+            % variance values
             v = obj.dark_var(:);
-            [mu,sig] = util.stat.sigma_clipping(v, 'dist', 'weibul', 'iterations', 5);
+            M(v>obj.dark_mask_var_thresh) = true; % replace old method with simple cut value
             
-            idx = abs(v - mu)>sig*obj.dark_mask_var_sigma;
-            M(idx) = true;
+            % find the pixels with unusual variance values (old method)
+%             [mu,sig] = util.stat.sigma_clipping(v, 'dist', 'weibul', 'iterations', 5);
+%             idx = abs(v - mu)>sig*obj.dark_mask_var_sigma;
+%             M(idx) = true;
             
             if obj.debug_bit>2, fprintf('dark_mean stats: mu= %4.2f | sig= %4.2f | num_pix= %d | frac= %g\n', mu, sig, nnz(idx), nnz(idx)/numel(idx)); end
             
@@ -1434,11 +1446,12 @@ classdef Calibration < handle
                 obj.gui.axes_mask = ax;
             end
                         
-            if obj.brake_bit==1 && ~isempty(obj.dark_mask)
+            if ~isempty(obj.dark_mask)
                 show(obj.dark_mask, 'fancy', 0, 'ax', ax, varargin{:});
                 inner_title(ax, 'dark mask', 'color', 'red');
                 inner_title(ax, ['fraction= ' num2str(mean2(obj.dark_mask))], 'Position', 'bottom', 'Color', 'red');
             end
+            
             axis(ax,'image');
 
             
@@ -1495,6 +1508,7 @@ classdef Calibration < handle
             end
             
             obj.gui.makeGUI;
+            obj.show;
             
         end
         
