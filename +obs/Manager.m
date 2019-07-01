@@ -40,6 +40,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         humidity; % humidity/temperature dog
         temperature; % additional temperature meters
         
+        sync@obs.comm.PcSync;
+        
     end
     
     properties % switches/controls
@@ -133,6 +135,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             % ...
             
             obj.connectSensorChecker; % create checker object that collects sensor data
+            
+            obj.constructPcSync;
             
             % start the 3 layers of timers
             obj.setup_t3; % check t2 is alive (half hour period)
@@ -248,6 +252,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 disp('Cannot initialize SensorChecker!');
             end
 
+        end
+        
+        function constructPcSync(obj)
+            
+            try
+                
+                obj.sync = obs.comm.PcSync('client');
+                obj.sync.name = 'Manager-PC';
+                
+            catch ME
+                obj.log.error(ME.getReport);
+                warning(ME.getReport);
+                disp('Cannot create a PcSync tcp/ip object')
+            end
+            
         end
         
     end
@@ -609,6 +628,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.gui.update;
             end
             
+            obj.updateCameraComputer;
+            
         end
         
         function updateDevices(obj) % run "update" for each device and see if the status is still good
@@ -635,6 +656,37 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             end
             
             % add maybe checks for boltwood if we think it is critical?
+            
+        end
+        
+        function updateCameraComputer(obj)
+            
+            try 
+                
+                if ~obj.sync.is_connected % maybe add a check for status as well??
+                    obj.sync.connect;
+                end
+
+            catch 
+                % do nothing, as we can be waiting for ever for server to connect
+            end
+            
+            % obj.sync.output.OBJECT = ???
+            obj.sync.output.RA = obj.mount.objRA;
+            obj.sync.output.DEC = obj.mount.objDEC;            
+            obj.sync.output.RA_DEG = obj.mount.objRA_deg;
+            obj.sync.output.DEC_DEG = obj.mount.obj.DEC_deg;
+            obj.sync.output.TELRA = obj.mount.telRA;
+            obj.sync.output.TELDEC = obj.mount.telDEC;
+            obj.sync.output.TELRA_DEG = obj.mount.telRA_deg;
+            obj.sync.output.TELDEC_DEG = obj.mount.telDEC_deg;
+            obj.sync.output.TEMP_OUT = obj.checker.temp_now;
+            obj.sync.output.WIND_DIR = obj.checker.wind_az_now;
+            obj.sync.output.WIND_SPEED = obj.checker.wind_now;
+            obj.sync.output.HUMID_OUT = obj.checker.humid_now;
+            obj.sync.output.LIGHT = obj.checker.light_now;
+            
+            % add additional parameters and some commands like "start run"
             
         end
         

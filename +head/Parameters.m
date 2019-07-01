@@ -920,7 +920,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         function update(obj, varargin)
            
             obj.ephem.update;
-            obj.RUNSTART = util.text.time2str(obj.ephem.time);
             
         end
         
@@ -932,6 +931,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
             
             val = util.text.time2str(time);
             
+        end
+        
+    end
+    
+    methods (Static=true)
+        
+        function list = makeSyncList
+            
+            list = {'OBJECT', 'RA', 'DEC', 'RA_DEG', 'DEC_DEG', 'TELRA', 'TELDEC', 'TELRA_DEG', 'TELDEC_DEG',...
+                'TEMP_IN', 'TEMP_OUT', 'WIND_DIR', 'WIND_SPEED', 'HUMID_IN', 'HUMID_OUT', 'PRESSURE', 'LIGHT'};
+                
         end
         
     end

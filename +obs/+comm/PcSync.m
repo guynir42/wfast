@@ -38,6 +38,7 @@ classdef PcSync < handle
         
         name;
         timeout;
+        is_connected;
         
     end
     
@@ -108,9 +109,55 @@ classdef PcSync < handle
     
     methods % getters
         
+        function val = get.name(obj)
+            
+            if isempty(obj.hndl)
+                val = [];
+            else
+                val = obj.hndl.Name;
+            end
+            
+        end
+        
+        function val = get.timeout(obj)
+            
+            if isempty(obj.hndl)
+                val = [];
+            else
+                val = obj.hndl.Timeout;
+            end
+            
+        end
+        
+        function val = get.is_connected(obj)
+            
+            if isempty(obj.hndl) || ~isvalid(obj.hndl) || ~strcmp(obj.hndl.Status, 'open')
+                val = 0;
+            else
+                val = 1;
+            end
+            
+        end
+        
     end
     
     methods % setters
+        
+        function set.name(obj, val)
+            
+            if ~isempty(obj.hndl)
+                obj.hndl.Name = val;
+            end
+            
+        end
+        
+        function set.timeout(obj, val)
+            
+            if ~isempty(obj.hndl)
+                obj.hndl.Timeout = val;
+            end
+            
+        end
         
     end
     

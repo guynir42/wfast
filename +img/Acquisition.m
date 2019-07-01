@@ -42,6 +42,8 @@ classdef Acquisition < file.AstroData
         
         deflator@file.Deflator;
         
+        sync@obs.comm.PcSync;
+        
         log@util.sys.Logger;
         
     end
@@ -275,6 +277,9 @@ classdef Acquisition < file.AstroData
                 obj.src = obj.reader;
                 
                 obj.deflator = file.Deflator;
+                
+                obj.sync = obs.comm.PcSync('server'); % no connect command is given, since this is still blocking indefinitely...
+                obj.sync.name = 'Cam-PC';
                 
                 obj.setupDefaults;
                 
@@ -1071,6 +1076,43 @@ classdef Acquisition < file.AstroData
             
         end
         
+        function connectSync(obj)
+            
+            obj.log.input('Connecting to PcSync as server');
+            
+            try
+                s.connect;
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
+            
+        end
+        
+        function getSyncData(obj)
+            
+            try 
+                
+                s = obj.sync.input;
+                
+                list = head.Parameters.makeSyncList; 
+                
+                if ~isempty(s) && isstruct(s)
+                    
+                    for ii = 1:length(list)
+                        if isfield(s, list{ii})
+                            obj.pars.(list{ii}) = s.(list{ii});
+                        end
+                    end
+                    
+                end
+                
+            catch ME
+                warning(ME.getReport)
+            end
+            
+        end
+        
     end
     
     methods % commands/calculations
@@ -1119,16 +1161,22 @@ classdef Acquisition < file.AstroData
         
         function update(obj, input)
             
-            if ~isempty(input.RA)
-                obj.pars.RA = input.RA;
-            end
+            obj.getSyncData;
             
-            if ~isempty(input.DE)
-                obj.pars.DE = input.DE;
-            end
-            
-            if ~isempty(input.run_name)
-                obj.pars.target_name = input.run_name;
+            if nargin>=2 && ~isempty(input) && isa(input, 'util.text.InputVars')
+                
+                if ~isempty(input.RA)
+                    obj.pars.RA = input.RA;
+                end
+
+                if ~isempty(input.DE)
+                    obj.pars.DE = input.DE;
+                end
+
+                if ~isempty(input.run_name)
+                    obj.pars.target_name = input.run_name;
+                end
+                
             end
             
             obj.pars.update;
@@ -1185,7 +1233,8 @@ classdef Acquisition < file.AstroData
                 end
                 
                 obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
-
+                obj.pars.RUNSTART = util.text.time2str(obj.pars.ephem.time);
+                
                 if obj.use_save
                     try
                         filename = obj.buf.getReadmeFilename;
@@ -1286,6 +1335,8 @@ classdef Acquisition < file.AstroData
             end
             
             drawnow; % make sure commands to the GUI and other callbacks are noticed... 
+            
+            obj.update;
             
             obj.copyFrom(obj.src); % get the data into this object
             
