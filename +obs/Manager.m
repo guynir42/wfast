@@ -675,18 +675,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.sync.output.RA = obj.mount.objRA;
             obj.sync.output.DEC = obj.mount.objDEC;            
             obj.sync.output.RA_DEG = obj.mount.objRA_deg;
-            obj.sync.output.DEC_DEG = obj.mount.obj.DEC_deg;
+            obj.sync.output.DEC_DEG = obj.mount.objDEC_deg;
             obj.sync.output.TELRA = obj.mount.telRA;
             obj.sync.output.TELDEC = obj.mount.telDEC;
             obj.sync.output.TELRA_DEG = obj.mount.telRA_deg;
             obj.sync.output.TELDEC_DEG = obj.mount.telDEC_deg;
-            obj.sync.output.TEMP_OUT = obj.checker.temp_now;
-            obj.sync.output.WIND_DIR = obj.checker.wind_az_now;
-            obj.sync.output.WIND_SPEED = obj.checker.wind_now;
-            obj.sync.output.HUMID_OUT = obj.checker.humid_now;
-            obj.sync.output.LIGHT = obj.checker.light_now;
+            
+            obj.sync.output.TEMP_OUT = mean(obj.checker.temp_now, 'omitnan');
+            obj.sync.output.WIND_DIR = mean(obj.checker.wind_az_now, 'omitnan');
+            obj.sync.output.WIND_SPEED = mean(obj.checker.wind_now, 'omitnan');
+            obj.sync.output.HUMID_OUT = mean(obj.checker.humid_now, 'omitnan');
+            obj.sync.output.LIGHT = mean(obj.checker.light_now, 'omitnan');
             
             % add additional parameters and some commands like "start run"
+            
+            obj.sync.update;
             
         end
         
