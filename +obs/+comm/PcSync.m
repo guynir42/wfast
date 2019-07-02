@@ -2,11 +2,12 @@ classdef PcSync < handle
 
     properties(Transient=true)
         
+        hndl;
+        
     end
     
     properties % objects
         
-        hndl;
         input;
         output;
         

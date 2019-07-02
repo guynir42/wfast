@@ -1101,7 +1101,9 @@ classdef Acquisition < file.AstroData
                     
                     for ii = 1:length(list)
                         if isfield(s, list{ii})
-                            obj.pars.(list{ii}) = s.(list{ii});
+                            try
+                                obj.pars.(list{ii}) = s.(list{ii});
+                            end
                         end
                     end
                     
