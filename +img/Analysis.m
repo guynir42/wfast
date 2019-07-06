@@ -413,9 +413,10 @@ classdef Analysis < file.AstroData
             
             obj.cutouts_sub = obj.cutouts_proc - B./obj.num_sum;
             
-            %%%%%%%%%%%%%%%%%%%%% LIGHTCURVE ANALYSIS %%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%%%%%%%%%%%% PHOTOMETRY ANALYSIS %%%%%%%%%%%%%%%%%%%%%
             
-            obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps, 'positions', obj.positions); 
+            obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps, ...
+                'positions', obj.positions, 'variance', single(2.5)); % need to add the sky background too
             
             obj.lightcurves.getData(obj.phot);
             if obj.lightcurves.gui.check, obj.lightcurves.gui.update; end
@@ -429,12 +430,13 @@ classdef Analysis < file.AstroData
             %%%%%%%%%%%%%%%%%%%%% Event finding %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
             f = obj.phot.fluxes;
+            e = obj.phot.errors;
+            a = obj.phot.areas;
             b = obj.phot.backgrounds;
             v = obj.phot.variances;
-            wt = obj.phot.weights;
-            dx = obj.phot.offsets_x;
-            dy = obj.phot.offsets_y;
-            wd = obj.phot.widths;
+            x = obj.phot.offsets_x;
+            y = obj.phot.offsets_y;
+            w = obj.phot.widths;
             p = obj.phot.bad_pixels;
             phot_pars = obj.phot.pars_struct; % maybe also give this to model_psf??
             
@@ -448,7 +450,7 @@ classdef Analysis < file.AstroData
                 r = obj.phot.aperture;
             end
             
-            obj.finder.input(f, b, v, wt, dx, dy, wd, p, r, g, ...
+            obj.finder.input(f, e, a, b, v, x, y, w, p, r, g, ...
                 obj.timestamps, obj.cutouts_proc, obj.positions, obj.stack_proc, ...
                 obj.batch_counter+1, 'filename', obj.reader.this_filename, ...
                 't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp,...

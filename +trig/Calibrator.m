@@ -14,6 +14,7 @@ classdef Calibrator < handle
         
         timestamps;
         fluxes;
+        errors;
         fluxes_no_outliers;
         fluxes_detrended;
         stds_detrended
@@ -47,7 +48,7 @@ classdef Calibrator < handle
     
     properties(Hidden=true)
        
-        version = 1.01;
+        version = 1.02;
         
     end
     
@@ -79,6 +80,7 @@ classdef Calibrator < handle
             
             obj.timestamps = [];
             obj.fluxes = [];
+            obj.errors = [];
             obj.fluxes_no_outliers = [];
             obj.fluxes_detrended = [];
             obj.stds_detrended = [];
@@ -116,6 +118,7 @@ classdef Calibrator < handle
             
             input = util.text.InputVars;
             input.use_ordered_numeric = 1;
+            input.input_var('errors', []);
             input.input_var('timestamps', []);
             input.scan_vars(varargin{:});
             
@@ -123,6 +126,7 @@ classdef Calibrator < handle
             
             obj.fluxes = fluxes;
             obj.fluxes_no_outliers = fluxes;
+            obj.errors = input.errors;
             
             if ~isempty(input.timestamps)
                 obj.timestamps = input.timestamps;
@@ -156,6 +160,7 @@ classdef Calibrator < handle
             f = obj.fluxes_no_outliers;
             t = obj.timestamps;
             n = size(f,1);
+            % need to adapt this to using the error estimates
             
             denom = n.*s(t.^2)-s(t).^2;
             

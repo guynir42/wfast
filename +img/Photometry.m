@@ -20,16 +20,17 @@ classdef Photometry < handle
         cutouts; % cutouts as given from analysis/acquisition (after calibration)
         cutouts_proc; % subtract backround, kill spurius negative pixels, etc
         
-        cutouts_ap;
-        cutouts_psf;
+        var_map; % can be scalar or a map of the same size as cutouts
+        gain; % can be scalar or a map of the same size as cutouts
         
         timestamps;
         
-        psf; % either given or found from the image
+        psf; % either given or found from the image (to be depricated)
         
         % outputs
         fluxes;
-        weights;
+        errors;
+        areas;
         backgrounds;
         variances;
         centroids_x;
@@ -52,6 +53,7 @@ classdef Photometry < handle
         
         use_mex = 1; % use the new mex function for faster processing
         use_backgrounds = 1; % remove background from individual cutout
+        use_self_psf = 0; % use image as a proxy for its own PSF
         
         iterations = 2; % repeat the photometry and relocate the aperutre to the centroid
         use_basic = 0;
@@ -70,7 +72,6 @@ classdef Photometry < handle
         
         % fitting parameters
         bg_noise = 1;
-        gain = 1;
         saturation_value = 50000;
         
         % not really using these...
@@ -113,7 +114,8 @@ classdef Photometry < handle
         cut_size_latest;
         
         fluxes_basic;
-        weights_basic;
+        errors_basic;
+        areas_basic;
         backgrounds_basic;
         variances_basic;
         offsets_x_basic;
@@ -124,7 +126,8 @@ classdef Photometry < handle
         bad_pixels_basic;
         
         fluxes_ap;
-        weights_ap;
+        errors_ap;
+        areas_ap;
         backgrounds_ap;
         variances_ap;
         offsets_x_ap;
@@ -135,7 +138,8 @@ classdef Photometry < handle
         bad_pixels_ap;
         
         fluxes_gauss;
-        weights_gauss;
+        errors_gauss;
+        areas_gauss;
         backgrounds_gauss;
         variances_gauss;
         offsets_x_gauss;
@@ -146,7 +150,8 @@ classdef Photometry < handle
         bad_pixels_gauss;
         
         fluxes_fit;
-        weights_fit;
+        errors_fit;
+        areas_fit;
         backgrounds_fit;
         variances_fit;
         offsets_x_fit;
@@ -156,7 +161,7 @@ classdef Photometry < handle
         widths_fit;
         bad_pixels_fit;
         
-        version = 1.04;
+        version = 1.05;
         
     end
     
@@ -180,6 +185,9 @@ classdef Photometry < handle
         
         function reset(obj)
             
+            obj.var_map = [];
+            obj.gain = [];
+            
             obj.clear;
             
         end
@@ -188,13 +196,12 @@ classdef Photometry < handle
             
             obj.cutouts = [];
             obj.cutouts_proc = [];
-            obj.cutouts_ap = [];
-            obj.cutouts_psf = [];
             obj.timestamps = [];
             obj.psf = [];
             
             obj.fluxes = [];
-            obj.weights = [];
+            obj.errors = [];
+            obj.areas = [];
             obj.backgrounds = [];
             obj.variances = [];
             obj.offsets_x = [];
@@ -203,7 +210,8 @@ classdef Photometry < handle
             obj.bad_pixels = [];
             
             obj.fluxes_basic = [];
-            obj.weights_basic = [];
+            obj.errors_basic = [];
+            obj.areas_basic = [];
             obj.backgrounds_basic = [];
             obj.variances_basic = [];
             obj.offsets_x_basic = [];
@@ -212,7 +220,8 @@ classdef Photometry < handle
             obj.bad_pixels_basic = [];
             
             obj.fluxes_ap = [];
-            obj.weights_ap = [];
+            obj.errors_ap = [];
+            obj.areas_ap = [];
             obj.backgrounds_ap = [];
             obj.variances_ap = [];
             obj.offsets_x_ap = [];
@@ -221,7 +230,8 @@ classdef Photometry < handle
             obj.bad_pixels_ap = [];
             
             obj.fluxes_gauss = [];
-            obj.weights_gauss = [];
+            obj.errors_gauss = [];
+            obj.areas_gauss = [];
             obj.backgrounds_gauss = [];
             obj.variances_gauss = [];
             obj.offsets_x_gauss = [];
@@ -230,7 +240,8 @@ classdef Photometry < handle
             obj.bad_pixels_gauss = [];
             
             obj.fluxes_fit = [];
-            obj.weights_fit = [];
+            obj.errors_fit = [];
+            obj.areas_fit = [];
             obj.backgrounds_fit = [];
             obj.variances_fit = [];
             obj.offsets_x_fit = [];
@@ -263,6 +274,8 @@ classdef Photometry < handle
             input = util.text.InputVars;
             input.use_ordered_numeric = 1;
             input.input_var('cutouts', [], 'images');
+            input.input_var('variance', [], 'var_map');
+            input.input_var('gain', [], 'gain_map', 'gain_scalar');
             input.input_var('positions', []);
             input.input_var('timestamps', [], 'times');
             input.scan_vars(varargin{:});
@@ -274,6 +287,8 @@ classdef Photometry < handle
             end
             
             obj.positions = input.positions;
+            obj.var_map = input.variance;
+            obj.gain = input.gain;
             obj.timestamps = input.timestamps;
             
             obj.cut_size_latest = size(input.cutouts);
@@ -305,7 +320,7 @@ classdef Photometry < handle
             
         end
         
-        function preprocess(obj)
+        function preprocess(obj) % we don't even use this... 
             
             I = obj.cutouts;
             
@@ -315,7 +330,7 @@ classdef Photometry < handle
             
         end
         
-        function [flux, weight, background, variance, offset_x, offset_y, width, bad_pixels] = calculate(obj, shape, bg_shape, iterations)
+        function [fluxes, errors, areas, backgrounds, variances, offsets_x, offsets_y, widths, bad_pixels] = calculate(obj, shape, bg_shape, iterations)
 
             import util.stat.sum2;
             import util.stat.median2;
@@ -331,11 +346,11 @@ classdef Photometry < handle
             end
             
             if cs(shape, 'none')
-                make_shape = @(x,y) ones(obj.cut_size, 'like', obj.cutouts);
+                ap_shape = @(x,y) ones(obj.cut_size, 'like', obj.cutouts);
             elseif cs(shape, 'circle', 'aperture')
-                make_shape = @(x,y) obj.makeCircle(x,y);
+                ap_shape = @(x,y) obj.makeCircle(x,y);
             elseif cs(shape, 'gaussian')
-                make_shape = @(x,y) obj.makeGaussian(x,y);
+                ap_shape = @(x,y) obj.makeGaussian(x,y);
             else
                 error('Unknown shape "%s". Use "none", "circle" or "gaussian"', shape);
             end
@@ -349,45 +364,51 @@ classdef Photometry < handle
             end
             
             if ~isempty(obj.fluxes)
-                flux = obj.fluxes;
+                fluxes = obj.fluxes;
             else
-                flux = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
+                fluxes = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
             end
             
-            if ~isempty(obj.weights)
-                weight = obj.weights;
+            if ~isempty(obj.errors)
+                errors = obj.errors;
             else
-                weight = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
+                errors = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
+            end
+            
+            if ~isempty(obj.areas)
+                areas = obj.areas;
+            else
+                areas = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
             end
             
             if ~isempty(obj.backgrounds)
-                background = obj.backgrounds;
+                backgrounds = obj.backgrounds;
             else
-                background = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
+                backgrounds = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
             end
             
             if ~isempty(obj.variances)
-                variance = obj.variances;
+                variances = obj.variances;
             else
-                variance = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
+                variances = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
             end
             
             if ~isempty(obj.offsets_x)
-                offset_x = obj.offsets_x;
+                offsets_x = obj.offsets_x;
             else
-                offset_x = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
+                offsets_x = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
             end
             
             if ~isempty(obj.offsets_y)
-                offset_y = obj.offsets_y;
+                offsets_y = obj.offsets_y;
             else
-                offset_y = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
+                offsets_y = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
             end
             
             if ~isempty(obj.widths)
-                width = obj.widths;
+                widths = obj.widths;
             else
-                width = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
+                widths = NaN(size(obj.cutouts,3), size(obj.cutouts,4));    
             end
             
             if ~isempty(obj.bad_pixels)
@@ -401,20 +422,21 @@ classdef Photometry < handle
 
                 for jj = 1:size(obj.cutouts,3) % go over frames of the same star
                     
-                    dx = offset_x(jj,ii);
+                    dx = offsets_x(jj,ii);
                     if isnan(dx), dx = 0; end
-                    dy = offset_y(jj,ii);
+                    dy = offsets_y(jj,ii);
                     if isnan(dy), dy = 0; end
                     
                     for kk = 1:iterations
                         
                         I = obj.cutouts(:,:,jj,ii);
                         
-                        ap = make_shape(dx,dy); % should we also let radius/psf_sigma change with the width?? 
                         
-                        bad_mask = ap .* isnan(I); % how many (fractional) bad pixels are in the aperture
+                        ap = ap_shape(dx,dy); % should we also let radius/psf_sigma change with the width?? 
                         
-                        ap(isnan(I)) = nan; % aperture must have NaN values in the same places (for weight calculation)
+                        bad_mask = ap.*isnan(I); % how many (fractional) bad pixels are in the aperture
+                        
+                        ap(isnan(I)) = nan; % aperture must have NaN values in the same places (for area calculation)
                         
                         ann = make_bg_shape(dx,dy);
                         ann(isnan(I)) = nan; 
@@ -422,13 +444,41 @@ classdef Photometry < handle
                         B = median2(I.*ann); % background per pixel...
                         V = var2(I.*ann); 
                         
+                        if isempty(obj.var_map)
+                            v = ones(size(obj.cutouts,1), size(obj.cutouts,2), 'float').*V;
+                        elseif isscalar(obj.var_map)
+                            v = ones(size(obj.cutouts,1), size(obj.cutouts,2), 'float').*obj.var_map;
+                        else
+                            v = obj.var_map(:,:,jj,ii);
+                        end
+                        
+                        if isscalar(obj.gain)
+                            g = obj.gain;
+                        else
+                            g = obj.gain(:,:,jj,ii);
+                        end
+                        
                         if obj.use_backgrounds
                             I = I - B;
                         end
                         
-                        S = sum2(ap);
-                        ap = ap./S;
-                        I = I.*ap./sum2(ap.^2);
+                        if obj.use_self_psf
+                            e = (g.*I+v);
+                            weight = ap.*g.*I./e;
+                        else
+                            e = v;
+                            weight = ap./e;
+                        end
+                        
+                        % new method
+                        E = sum2(e);
+                        I = I.*weight./sum2(weight); % reweigh the whole image
+                        
+                        % old method:
+%                         S = sum2(ap);
+%                         ap = ap./S;
+%                         I = I.*ap./sum2(ap.^2);
+
                         m0 = sum2(I);
                         m1x = sum2(I.*obj.X)./m0;
                         m1y = sum2(I.*obj.Y)./m0;
@@ -464,13 +514,14 @@ classdef Photometry < handle
 
                     end
 
-                    flux(jj,ii) = m0;
-                    weight(jj,ii) = S;
-                    background(jj,ii) = B;
-                    variance(jj,ii) = V;
-                    offset_x(jj,ii) = dx;
-                    offset_y(jj,ii) = dy;
-                    width(jj,ii) = W;                    
+                    fluxes(jj,ii) = m0;
+                    areas(jj,ii) = S;
+                    errors(jj,ii) = E; 
+                    backgrounds(jj,ii) = B;
+                    variances(jj,ii) = V;
+                    offsets_x(jj,ii) = dx;
+                    offsets_y(jj,ii) = dy;
+                    widths(jj,ii) = W;                    
                     bad_pixels(jj,ii) = sum2(bad_mask);
                         
                     % add break point if dx and dy don't change much...
@@ -640,10 +691,11 @@ classdef Photometry < handle
             import util.stat.sum2;
             
             if obj.use_mex
-                [f,wt,b,v,x,y,wd,p] = util.img.photometry(single(obj.cutouts), 'square', [], 'corners', obj.corner_size,...
-                    'widths', obj.widths, 'subtract', obj.use_backgrounds);
+                [f,e,a,b,v,x,y,wd,p] = util.img.photometry(single(obj.cutouts), 'square', [], 'corners', obj.corner_size,...
+                    'widths', obj.widths, 'subtract', obj.use_backgrounds, ...
+                    'var_map', obj.var_map, 'use_self', obj.use_self_psf);
             else
-                [f,wt,b,v,x,y,wd,p] = obj.calculate('none', 'corner', 1);
+                [f,e,a,b,v,x,y,wd,p] = obj.calculate('none', 'corner', 1);
             end
             
             x(abs(x)>size(obj.cutouts,2)) = NaN;
@@ -651,7 +703,8 @@ classdef Photometry < handle
             wd(wd<0 | wd>size(obj.cutouts,1) | wd>size(obj.cutouts,2)) = NaN;
             
             obj.fluxes_basic = f;
-            obj.weights_basic = wt;
+            obj.errors_basic = e;
+            obj.areas_basic = a;
             obj.backgrounds_basic = b;
             obj.variances_basic = v;
             
@@ -668,7 +721,8 @@ classdef Photometry < handle
             
             % update the newest values
             obj.fluxes = obj.fluxes_basic;
-            obj.weights = obj.weights_basic;
+            obj.errors = obj.errors_basic;
+            obj.areas = obj.areas_basic;
             obj.backgrounds = obj.backgrounds_basic;
             obj.variances = obj.variances_basic;
             
@@ -688,10 +742,11 @@ classdef Photometry < handle
         function calcAperture(obj)
             
             if obj.use_mex
-                [f,wt,b,v,x,y,wd,p] = util.img.photometry(single(obj.cutouts), 'circle', obj.aperture, 'annulus', obj.annulus,...
-                    'widths', obj.widths, 'iterations', obj.iterations, 'subtract', obj.use_backgrounds);
+                [f,e,a,b,v,x,y,wd,p] = util.img.photometry(single(obj.cutouts), 'circle', obj.aperture, 'annulus', obj.annulus,...
+                    'widths', obj.widths, 'iterations', obj.iterations, 'subtract', obj.use_backgrounds, ...
+                    'var_map', obj.var_map, 'use_self', obj.use_self_psf);
             else
-                [f,wt,b,v,x,y,wd,p] = obj.calculate('circle', 'annulus', obj.iterations);
+                [f,e,a,b,v,x,y,wd,p] = obj.calculate('circle', 'annulus', obj.iterations);
             end
             
             x(abs(x)>size(obj.cutouts,2)/2+obj.aperture) = NaN;
@@ -699,7 +754,8 @@ classdef Photometry < handle
             wd(wd<0 | wd>size(obj.cutouts,1) | wd>size(obj.cutouts,2)) = NaN;
             
             obj.fluxes_ap = f;
-            obj.weights_ap = wt;
+            obj.errors_ap = e;
+            obj.areas_ap = a;
             obj.backgrounds_ap = b;
             obj.variances_ap = v;
             
@@ -716,7 +772,8 @@ classdef Photometry < handle
             
             % update the newest values
             obj.fluxes = obj.fluxes_ap;
-            obj.weights = obj.weights_ap;
+            obj.errors = obj.errors_ap;
+            obj.areas = obj.areas_ap;
             obj.backgrounds = obj.backgrounds_ap;
             obj.variances = obj.variances_ap;
             
@@ -736,10 +793,11 @@ classdef Photometry < handle
         function calcGaussian(obj)
             
             if obj.use_mex
-                [f,wt,b,v,x,y,wd,p] = util.img.photometry(single(obj.cutouts), 'gauss', obj.gauss_sigma, 'annulus', obj.annulus,...
-                    'iterations', obj.iterations, 'widths', obj.widths, 'subtract', obj.use_backgrounds);
+                [f,e,a,b,v,x,y,wd,p] = util.img.photometry(single(obj.cutouts), 'gauss', obj.gauss_sigma, 'annulus', obj.annulus,...
+                    'iterations', obj.iterations, 'widths', obj.widths, 'subtract', obj.use_backgrounds, ...
+                    'var_map', obj.var_map, 'use_self', obj.use_self_psf);
             else
-                [f,wt,b,v,x,y,wd,p] = obj.calculate('gaussian', 'annulus', obj.iterations);
+                [f,e,a,b,v,x,y,wd,p] = obj.calculate('gaussian', 'annulus', obj.iterations);
             end
             
             x(abs(x)>size(obj.cutouts,2)/2+obj.gauss_sigma*3) = NaN;
@@ -747,7 +805,8 @@ classdef Photometry < handle
             wd(wd<0 | wd>size(obj.cutouts,1) | wd>size(obj.cutouts,2)) = NaN;
             
             obj.fluxes_gauss = f;
-            obj.weights_gauss = wt;
+            obj.errors_gauss = e;
+            obj.areas_gauss = a;
             obj.backgrounds_gauss = b;
             obj.variances_gauss = v;
             
@@ -764,7 +823,8 @@ classdef Photometry < handle
             
             % update the newest values
             obj.fluxes = obj.fluxes_gauss;
-            obj.weights = obj.weights_gauss;
+            obj.errors = obj.errors_gauss;
+            obj.areas = obj.areas_gauss;
             obj.backgrounds = obj.backgrounds_gauss;
             obj.variances = obj.variances_gauss;
             
@@ -809,6 +869,23 @@ classdef Photometry < handle
             
             obj.pars_struct = struct;
             obj.pars_struct.used_bg_sub = obj.use_backgrounds;
+            obj.pars_struct.use_self_psf = obj.use_self_psf;
+            
+            if ~isempty(obj.var_map)
+                if isscalar(obj.var_map)
+                    obj.pars_struct.variance = obj.var_map;
+                else
+                    obj.pars_struct.variance = 'map';
+                end
+            end
+            
+            if ~isempty(obj.gain)
+                if isscalar(obj.gain)
+                    obj.pars_struct.gain = obj.gain;
+                else
+                    obj.pars_struct.gain = 'map';
+                end
+            end
             
             if obj.use_fitter
                 obj.pars_struct.signal_method = 'fitter';
@@ -836,6 +913,7 @@ classdef Photometry < handle
             
         end
         
+        % everything below this are functions we don't use 
         function calcFit(obj) % need to finish this or remove it
             
             if obj.use_gaussian_psf
@@ -970,13 +1048,6 @@ classdef Photometry < handle
             
         end
         
-        function makePSF(obj) % make an image based PSF
-            
-            obj.psf = sum(obj.cutouts_aperture, 4, 'omitnan');
-            obj.psf = obj.psf./util.stat.sum2(obj.psf);
-            
-        end
-        
     end
     
     methods % plotting tools / GUI
@@ -1012,9 +1083,11 @@ classdef Photometry < handle
             if Nf>size(obj.fluxes,1), Nf = size(obj.fluxes,1); end
             
             ax1 = axes('Parent', parent, 'Position', [0.15 0.52 0.83 0.4]);
+            delete(ax1.Children);
+            ax1.NextPlot = 'add';
             
-            h = plot(ax1, 1:Ns, obj.fluxes(1:Nf, 1:Ns), '*');
-            for ii = 1:length(h)
+            for ii = 1:Nf
+                h(ii) = errorbar(ax1, 1:Ns, obj.fluxes(ii, 1:Ns), obj.errors(ii, 1:Ns), '*');
                 h(ii).UserData = ['flux= %4.2f, frame= ' num2str(ii)];
                 h(ii).ButtonDownFcn = @obj.callback_touch_point;
             end

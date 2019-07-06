@@ -74,6 +74,7 @@ classdef Calibration < handle
         flat_mean_transformed;
         
         dark_mean_cut; % a 4D matrix with the cutouts of dark_mean (same positions as the data)
+        dark_var_cut; % a 4D matrix with the cutouts of dark_var (same positions as the data)
         dark_mask_cut; % a 4D matrix with the cutouts of dark_mask (same positions as the data)
         flat_field_cut; % a 4D matrix with the cutouts of flat_field (same positions as the data)
         
@@ -88,7 +89,6 @@ classdef Calibration < handle
     end
     
     properties % outputs
-        
         
         num_darks = 0; % how many dark frames were summed
         dark_mean; % mean of all darks
@@ -466,6 +466,13 @@ classdef Calibration < handle
             obj.dark_mask = [];
             obj.dark_mask_cut = [];
             obj.dark_var_transformed = [];
+            
+        end
+        
+        function set.dark_var_transformed(obj, val)
+            
+            obj.dark_var_transformed = val;
+            obj.dark_var_cut = [];
             
         end
             
@@ -969,7 +976,8 @@ classdef Calibration < handle
                 return;
             end
                         
-            if isempty(obj.dark_mean_cut) || isempty(obj.dark_mask_cut) || isempty(obj.flat_field_cut) || isempty(obj.clip) ...
+            if isempty(obj.dark_mean_cut) || isempty(obj.dark_var_cut) || ...
+                    isempty(obj.dark_mask_cut) || isempty(obj.flat_field_cut) || isempty(obj.clip) ...
                     || ~obj.clip.is_equal(clipper) || cut_size~=obj.clip.cut_size
                 
                 if obj.debug_bit>1, disp('updating cutouts for calibration!'); end            
@@ -985,6 +993,7 @@ classdef Calibration < handle
                 % actually update the cutouts... 
                 if obj.checkDark
                     obj.dark_mean_cut = obj.clip.cutMatrix(obj.dark_mean_transformed);
+                    obj.dark_var_cut = obj.clip.cutMatrix(obj.dark_var_transformed);
                     obj.dark_mask_cut = obj.clip.cutMatrix(obj.dark_mask_transformed);
                 end
                 
