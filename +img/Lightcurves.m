@@ -45,7 +45,8 @@ classdef Lightcurves < handle
         timestamps;
         fluxes;
         fluxes_cal;
-        weights;
+        errors;
+        areas;
         backgrounds;
         variances;
         centroids_x;
@@ -60,8 +61,9 @@ classdef Lightcurves < handle
     properties(Hidden=true)
         
         fluxes_full;
+        errors_full;
         timestamps_full;
-        weights_full;
+        areas_full;
         backgrounds_full;
         variances_full;
         centroids_x_full;
@@ -71,10 +73,10 @@ classdef Lightcurves < handle
         widths_full;
         bad_pixels_full;
         
-        show_what_list = {'fluxes', 'weights', 'backgrounds', 'variances', 'centroids', 'offsets', 'widths', 'bad_pixels'};
+        show_what_list = {'fluxes', 'areas', 'backgrounds', 'variances', 'centroids', 'offsets', 'widths', 'bad_pixels'};
         show_cal_list = {'raw', 'cal', 'both'};
         
-        version = 1.03;
+        version = 1.04;
         
     end
     
@@ -99,8 +101,9 @@ classdef Lightcurves < handle
         function reset(obj)
             
             obj.fluxes_full = [];
+            obj.errors_full = [];
             obj.timestamps_full = [];
-            obj.weights_full = [];
+            obj.areas_full = [];
             obj.backgrounds_full = [];
             obj.variances_full = [];
             obj.offsets_x_full = [];
@@ -143,7 +146,7 @@ classdef Lightcurves < handle
                 f = obj.fluxes;
                 
                 if obj.use_subtract_backgrounds
-                    f = f - obj.backgrounds.*obj.weights;
+                    f = f - obj.backgrounds.*obj.areas;
                 end
                 
                 f_frames_average = median(f,2, 'omitnan'); 
@@ -151,6 +154,22 @@ classdef Lightcurves < handle
                 val = f./f_frames_average_norm;
             
             end
+        end
+        
+        function val = get.errors(obj)
+            
+            val = obj.errors_full;
+            
+            if isempty(val)
+                return;
+            end
+            
+            val = val(1:obj.frame_index-1,:);
+            
+            if all(isnan(val))
+                val = [];
+            end
+            
         end
         
         function val = get.timestamps(obj)
@@ -169,9 +188,9 @@ classdef Lightcurves < handle
             
         end
         
-        function val = get.weights(obj)
+        function val = get.areas(obj)
             
-            val = obj.weights_full;
+            val = obj.areas_full;
             
             if isempty(val)
                 return;
@@ -339,8 +358,9 @@ classdef Lightcurves < handle
                 input = util.text.InputVars;
                 input.use_ordered_numeric = 1;
                 input.input_var('fluxes', [], 'fluxes_raw');
+                input.input_var('errors', []);
                 input.input_var('timestamps', [], 'times');
-                input.input_var('weights', []);
+                input.input_var('areas', []);
                 input.input_var('backgrounds', []);
                 input.input_var('variances', []);
                 input.input_var('centroids_x', []);
@@ -356,8 +376,9 @@ classdef Lightcurves < handle
             N = size(input.fluxes,1);
             
             obj.fluxes_full = insert_matrix(obj.fluxes_full, input.fluxes, [obj.frame_index,1], NaN, obj.use_double_up);
+            obj.errors_full = insert_matrix(obj.errors_full, input.errors, [obj.frame_index,1], NaN, obj.use_double_up);
             obj.timestamps_full = insert_matrix(obj.timestamps_full, input.timestamps, [obj.frame_index,1], NaN, obj.use_double_up);
-            obj.weights_full = insert_matrix(obj.weights_full, input.weights, [obj.frame_index,1], NaN, obj.use_double_up);
+            obj.areas_full = insert_matrix(obj.areas_full, input.areas, [obj.frame_index,1], NaN, obj.use_double_up);
             obj.backgrounds_full = insert_matrix(obj.backgrounds_full, input.backgrounds, [obj.frame_index,1], NaN, obj.use_double_up);
             obj.variances_full = insert_matrix(obj.variances_full, input.variances, [obj.frame_index,1], NaN, obj.use_double_up);
             obj.centroids_x_full = insert_matrix(obj.centroids_x_full, input.centroids_x, [obj.frame_index,1], NaN, obj.use_double_up);
@@ -380,7 +401,7 @@ classdef Lightcurves < handle
                 type = '';
             end
             
-            list = {'fluxes', 'weights', 'backgrounds', 'variances', 'offsets_x', 'offsets_y', 'centroids_x', 'centroids_y', 'widths', 'bad_pixels'};
+            list = {'fluxes', 'errors', 'areas', 'backgrounds', 'variances', 'offsets_x', 'offsets_y', 'centroids_x', 'centroids_y', 'widths', 'bad_pixels'};
             
             if ~isempty(type)
                 list2 = strcat(list, ['_' type]);
@@ -405,15 +426,16 @@ classdef Lightcurves < handle
             
             timestamps = obj.timestamps;
             fluxes = obj.fluxes;
+            errors = obj.errors;
             backgrounds = obj.backgrounds;
             variances = obj.variances;
-            weights = obj.weights;
+            areas = obj.areas;
             centroids_x = obj.centroids_x;
             centroids_y = obj.centroids_y;
             widths = obj.widths;
             bad_pixels = obj.bad_pixels;
             
-            save(filename, 'timestamps', 'fluxes', 'weights', 'backgrounds', 'variances', 'centroids_x', 'centroids_y', 'widths', 'bad_pixels');
+            save(filename, 'timestamps', 'fluxes', 'errors', 'areas', 'backgrounds', 'variances', 'centroids_x', 'centroids_y', 'widths', 'bad_pixels');
             
         end
         
@@ -454,9 +476,9 @@ classdef Lightcurves < handle
                 
                 ylabel(input.ax, 'flux (counts)');
             
-            elseif cs(obj.show_what, 'weights')
+            elseif cs(obj.show_what, 'areas')
                 obj.addPlots(input.ax, obj.weights);
-                ylabel(input.ax, 'weights (pixels in aperture)');
+                ylabel(input.ax, 'areas (pixels in aperture)');
             elseif cs(obj.show_what, 'offsets')
                 obj.addPlots(input.ax, obj.offsets_x, '-');
                 obj.addPlots(input.ax, obj.offsets_y, ':');

@@ -67,6 +67,11 @@ classdef Event < handle
         % They intersect at star_index and time_index 
         % "time_average" means for each star, averaged over time (row vector)
         % "star_average" means for each timestamp, averaged between stars (column vector)
+        areas_at_peak;
+        areas_at_star;
+        areas_time_average;
+        areas_star_average;
+        
         backgrounds_at_peak;
         backgrounds_at_star;
         backgrounds_time_average;
@@ -76,11 +81,6 @@ classdef Event < handle
         variances_at_star;
         variances_time_average;
         variances_star_average;
-        
-        weights_at_peak;
-        weights_at_star;
-        weights_time_average;
-        weights_star_average;
         
         offsets_x_at_peak;
         offsets_x_at_star;
@@ -141,7 +141,7 @@ classdef Event < handle
         t_end;
         t_end_stamp;
         
-        version = 1.01;
+        version = 1.02;
         
     end
     

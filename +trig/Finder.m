@@ -31,6 +31,8 @@ classdef Finder < handle
         filename;
         
         fluxes;
+        errors;
+        areas;
         backgrounds;
         variances;
         offsets_x;
@@ -46,9 +48,10 @@ classdef Finder < handle
         prev_filename;
         
         prev_fluxes;
+        prev_errors
+        prev_areas;
         prev_backgrounds;
         prev_variances;
-        prev_weights;
         prev_offsets_x;
         prev_offsets_y;
         prev_widths;
@@ -74,6 +77,8 @@ classdef Finder < handle
         
         use_conserve_memory = 1;
         
+        frame_rate = 25; % if timestamps are not given explicitely
+        
         debug_bit = 1;
         
     end
@@ -86,7 +91,7 @@ classdef Finder < handle
     
     properties(Hidden=true)
        
-        version = 1.00;
+        version = 1.01;
         
     end
     
@@ -237,9 +242,10 @@ classdef Finder < handle
             input = util.text.InputVars;
             input.use_ordered_numeric = 1;
             input.input_var('fluxes', []);
+            input.input_var('errors', []);
+            input.input_var('areas', []);
             input.input_var('backgrounds', []);
             input.input_var('variances', []);
-            input.input_var('weights',[]); 
             input.input_var('offsets_x', [], 'offset_x', 'dx');
             input.input_var('offsets_y', [], 'offset_y', 'dy');
             input.input_var('widths', []);
@@ -261,6 +267,8 @@ classdef Finder < handle
             obj.clear;
             
             obj.fluxes = input.fluxes;
+            obj.errors = input.errors;
+            obj.areas = input.areas;
             obj.backgrounds = input.backgrounds;
             obj.variances = input.variances;
             obj.offsets_x = input.offsets_x;
@@ -275,10 +283,15 @@ classdef Finder < handle
             obj.filename = input.filename;
             obj.phot_pars = input.phot_pars;
             
+            if all(obj.timestamps==0)
+%                 obj.timestamps = []; % in case we didn't properly stored the times
+                obj.timestamps = (1:size(input.fluxes,1))'./obj.frame_rate;
+            end
+            
             if ~isempty(obj.prev_fluxes) % skip first batch! 
             
                 t = tic;
-                obj.cal.input(vertcat(obj.prev_fluxes, input.fluxes), vertcat(obj.prev_timestamps, input.timestamps)); 
+                obj.cal.input(vertcat(obj.prev_fluxes, obj.fluxes), vertcat(obj.prev_errors, obj.errors), vertcat(obj.prev_timestamps, obj.timestamps)); 
                 if obj.debug_bit>1, fprintf('Calibration time: %f seconds.\n', toc(t)); end
                 
                 t = tic;
@@ -308,9 +321,10 @@ classdef Finder < handle
             
             % store these for next time
             obj.prev_fluxes = input.fluxes;
+            obj.prev_errors = input.errors;
+            obj.prev_areas = input.areas;
             obj.prev_backgrounds = input.backgrounds;
             obj.prev_variances = input.variances;
-            obj.prev_weights = input.weights;
             obj.prev_offsets_x = input.offsets_x;
             obj.prev_offsets_y = input.offsets_y;
             obj.prev_widths = input.widths;
@@ -365,6 +379,7 @@ classdef Finder < handle
                 ev.flux_detrended = obj.cal.fluxes_detrended(:,ev.star_index); 
                 ev.std_flux = std(ev.flux_detrended, [], 'omitnan');
                 ev.flux_raw_all = obj.cal.fluxes;
+                % somewhere around here we MUST make use of the flux errors
                 
                 obj.new_events(end+1) = ev; % add this event to the list
                 
@@ -437,7 +452,13 @@ classdef Finder < handle
                 ev.kern_range_thresh = obj.kern_range_thresh;
                 ev.star_range_thresh = obj.star_range_thresh;
                 
-                % housekeeping data from photometry
+                % housekeeping data from photometry 
+                a = vertcat(obj.prev_areas, obj.areas);
+                ev.areas_at_peak = a(ev.frame_index, :);
+                ev.areas_at_star = a(:, ev.star_index);
+                ev.areas_time_average = mean(a, 1, 'omitnan');
+                ev.areas_star_average = mean(a, 2, 'omitnan');
+                
                 b = vertcat(obj.prev_backgrounds, input.backgrounds);
                 ev.backgrounds_at_peak = b(ev.frame_index, :);
                 ev.backgrounds_at_star = b(:, ev.star_index);
@@ -449,12 +470,6 @@ classdef Finder < handle
                 ev.variances_at_star = v(:, ev.star_index);
                 ev.variances_time_average = mean(v, 1, 'omitnan');
                 ev.variances_star_average = mean(v, 2, 'omitnan');
-                
-                w = vertcat(obj.prev_weights, input.weights);
-                ev.weights_at_peak = w(ev.frame_index, :);
-                ev.weights_at_star = w(:, ev.star_index);
-                ev.weights_time_average = mean(w, 1, 'omitnan');
-                ev.weights_star_average = mean(w, 2, 'omitnan');
                 
                 dx = vertcat(obj.prev_offsets_x, input.offsets_x);
                 ev.offsets_x_at_peak = dx(ev.frame_index, :);
