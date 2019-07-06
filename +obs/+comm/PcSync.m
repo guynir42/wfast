@@ -215,12 +215,14 @@ classdef PcSync < handle
         
         function update(obj)
             
-            obj.hndl.BytesAvailableFcn = @obj.read_data;
-            obj.output.time = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
-            
-            obj.status = 0;
-            flushinput(obj.hndl);
-            obj.send(obj.output);
+            if obj.is_connected
+                obj.hndl.BytesAvailableFcn = @obj.read_data;
+                obj.output.time = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
+
+                obj.status = 0;
+                flushinput(obj.hndl);
+                obj.send(obj.output);
+            end
             
         end
         
