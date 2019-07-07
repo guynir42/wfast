@@ -275,6 +275,9 @@ classdef Reader < file.AstroData
             obj.dataset_names.magnitudes = {'magnitudes'};
             obj.dataset_names.temperatures = {'temperatures'};
             
+            obj.dataset_names.cutouts_bg = {'cutouts_bg'};
+            obj.dataset_names.positions_bg = {'positions_bg'};
+            
             obj.dataset_names.stack = {'stack', 'full_sum', 'images_sum', 'image_sum', 'summed_image', 'images_stack', 'image_stack'};
             obj.attribute_names.num_sum = {'num_sum'};
             
@@ -659,7 +662,7 @@ classdef Reader < file.AstroData
             
             for jj = 1:length(att_list) % search for important attributes
             
-                if util.text.cs(att_list{jj}, obj.attribute_names.(att_name))
+                if any(strcmp(att_list{jj}, obj.attribute_names.(att_name)))
                     
                     obj.(att_name) = h5readatt(filename, util.text.sa('/', data_name), att_list{jj});
                     if iscell(obj.(att_name)) && ~isempty(obj.(att_name))
@@ -744,7 +747,7 @@ classdef Reader < file.AstroData
                         att_names = {obj.info.Datasets(ii).Attributes.Name};
                     end
                     
-                    if cs(data_name, obj.dataset_names.images) && all(data_size) % dataset_names.images may be a cell array of different optional names
+                    if any(strcmp(data_name, obj.dataset_names.images)) && all(data_size) % dataset_names.images may be a cell array of different optional names
                         
                         if length(data_size)>=3
                             num_images_on_file = data_size(3);
@@ -778,7 +781,38 @@ classdef Reader < file.AstroData
                         
                         num_images_loaded = size(loaded_images,3);
                         
-                    elseif cs(data_name, obj.dataset_names.cutouts) && all(data_size) % dataset_names.cutouts is a cell array of different optional names for this dataset
+                    elseif any(strcmp(data_name, obj.dataset_names.cutouts_bg)) && all(data_size) % dataset_names.cutouts is a cell array of different optional names for this dataset
+                        
+                        num_images_on_file = data_size(3);
+                        
+                        if frame_start>num_images_on_file || (~isempty(obj.temp_frame_index_finish) && frame_start>obj.temp_frame_index_finish) % if the index of the first frame is already out of this file
+                            obj.advanceFile; % this is not supposed to happen because of the "advanceFile" at the end of this function
+                            return;
+                        end
+                        
+                        num_frames = min(num_frames, num_images_on_file-obj.temp_frame_index_start+1); % make sure we don't ask for more frames than we have on file
+                        start_vec = [top, left, frame_start];
+                        step_vec = [height, width, num_frames];
+                        
+                        if length(data_size)==4
+                            start_vec = [start_vec 1];
+                            step_vec = [step_vec data_size(4)];
+                        end
+                        
+                        loaded_cutouts = h5read(filename, sa('/', data_name), start_vec, step_vec);
+                        
+                        obj.cutouts_bg = cat(3, obj.cutouts_bg, loaded_cutouts); % append to the images from previous files
+                        
+                        if ~num_images_loaded % if the file doesn't have images but does have cutouts, count the cutout frames
+                            num_images_loaded = size(loaded_cutouts,3);
+                        end
+                                                
+                    elseif any(strcmp(data_name, obj.dataset_names.positions_bg)) && all(data_size) % data_names.positions may be a cell array of different optional names
+                        
+                        loaded_positions = h5read(filename, sa('/', data_name)); % read the entire "positions_bg" dataset, if it exists
+                        obj.positions_bg = cat(3, obj.positions_bg, loaded_positions);
+                        
+                    elseif any(strcmp(data_name, obj.dataset_names.cutouts)) && all(data_size) % dataset_names.cutouts is a cell array of different optional names for this dataset
                         
                         num_images_on_file = data_size(3);
                         
@@ -804,34 +838,34 @@ classdef Reader < file.AstroData
                             num_images_loaded = size(loaded_cutouts,3);
                         end
                                                 
-                    elseif cs(data_name, obj.dataset_names.positions) && all(data_size) % data_names.positions may be a cell array of different optional names
+                    elseif any(strcmp(data_name, obj.dataset_names.positions)) && all(data_size) % data_names.positions may be a cell array of different optional names
                         
                         loaded_positions = h5read(filename, sa('/', data_name)); % read the entire "positions" dataset, if it exists
                         obj.positions = cat(3, obj.positions, loaded_positions);
                         
-                    elseif cs(data_name, obj.dataset_names.coordinates) && all(data_size) % data_names.coordinates may be a cell array of different optional names
+                    elseif any(strcmp(data_name, obj.dataset_names.coordinates)) && all(data_size) % data_names.coordinates may be a cell array of different optional names
                         
                         loaded_coordinates = h5read(filename, sa('/', data_name)); % read the entire "cordinates" dataset, if it exists
                         obj.positions = cat(3, obj.coordinates, loaded_coordinates);
                         
-                    elseif cs(data_name, obj.dataset_names.magnitudes) && all(data_size) % data_names.magnitudes may be a cell array of different optional names
+                    elseif any(strcmp(data_name, obj.dataset_names.magnitudes)) && all(data_size) % data_names.magnitudes may be a cell array of different optional names
                         
                         loaded_magnitudes = h5read(filename, sa('/', data_name)); % read the entire "magnitudes" dataset, if it exists
                         obj.magnitudes = cat(3, obj.magnitudes, loaded_magnitudes);
                         
-                    elseif cs(data_name, obj.dataset_names.temperatures) && all(data_size) % data_names.temperatures may be a cell array of different optional names
+                    elseif any(strcmp(data_name, obj.dataset_names.temperatures)) && all(data_size) % data_names.temperatures may be a cell array of different optional names
                         
                         loaded_temperatures = h5read(filename, sa('/', data_name)); % read the entire "temperatures" dataset, if it exists
                         obj.temperatures = cat(3, obj.temperatures, loaded_temperatures);
                         
-                    elseif cs(data_name, obj.dataset_names.stack) && all(data_size)
+                    elseif any(strcmp(data_name, obj.dataset_names.stack)) && all(data_size)
                         
                         loaded_stack = h5read(filename, sa('/', data_name)); % if there are any stack images (or "full_sum" images) just get them from the file. 
                         obj.stack = cat(3, obj.stack, loaded_stack); % append to previous file's results. 
                         
                         obj.getAttribute(filename, data_name, att_names, 'num_sum'); % need to add this to the "stack" property
                         
-                    elseif cs(data_name, obj.dataset_names.timestamps) && all(data_size) % data_names.timestamps may be a cell array of different optional names
+                    elseif any(strcmp(data_name, obj.dataset_names.timestamps)) && all(data_size) % data_names.timestamps may be a cell array of different optional names
                         
                         num_images_on_file = max(data_size); % timestamps should be 1D vector or 2D 1xN vector
                         
@@ -849,7 +883,7 @@ classdef Reader < file.AstroData
                         obj.getAttribute(filename, data_name, att_names, 't_end');
                         obj.getAttribute(filename, data_name, att_names, 't_end_stamp');
                         
-                    elseif cs(data_name, obj.dataset_names.psfs) && all(data_size) % data_names.psfs may be a cell array of different optional names
+                    elseif any(strcmp(data_name, obj.dataset_names.psfs)) && all(data_size) % data_names.psfs may be a cell array of different optional names
                         
                         num_images_on_file = data_size(3);
                         % do we need a check for frame_start>num_images_on_file? maybe need to verify no images exist??
@@ -867,7 +901,7 @@ classdef Reader < file.AstroData
                             num_images_loaded = size(loaded_psfs,3);
                         end
                         
-                    elseif cs(data_name, obj.dataset_names.fluxes) && data_size(1) % data_names.fluxes may be a cell array of different optional names
+                    elseif any(strcmp(data_name, obj.dataset_names.fluxes)) && data_size(1) % data_names.fluxes may be a cell array of different optional names
                         
                         num_images_on_file = data_size(1); % fluxes should be 2D with number of frames in the 1st dim
                         
@@ -876,7 +910,7 @@ classdef Reader < file.AstroData
                         loaded_fluxes = h5read(filename, sa('/', data_name), [frame_start 1], [num_frames Inf]); % must check the dimensions on file fit what I think I am saving...
                         obj.fluxes = cat(1, obj.fluxes, loaded_fluxes); % append to the existing images
                         
-                    elseif cs(data_name, obj.dataset_names.pars) 
+                    elseif any(strcmp(data_name, obj.dataset_names.pars)) 
                         obj.loadParsHDF5(filename, loaded_pars, data_name, att_names);
                     end
                     
@@ -892,7 +926,7 @@ classdef Reader < file.AstroData
                         att_names = {obj.info.Groups(ii).Attributes.Name};
                     end
                     
-                    if cs(group_name, strcat('/', obj.dataset_names.pars))
+                    if any(strcmp(group_name, strcat('/', obj.dataset_names.pars)))
                         obj.loadParsHDF5(filename, loaded_pars, group_name, att_names);
                     end
                     
@@ -934,7 +968,7 @@ classdef Reader < file.AstroData
                 util.oop.copy_props(obj.pars, loaded_pars); % make a shallow copy (sub-objects are referenced, then loaded_pars is destroyed)
                 
                 % additional loading of attributes (mostly Dependent) for backward compatibility with older files.
-                props = {'RA', 'DE'};
+                props = {'RA_DEG', 'DEC_DEG'};
                 
                 for ii = 1:length(att_names)                    
                     for jj = 1:length(props)                        

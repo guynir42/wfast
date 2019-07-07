@@ -391,7 +391,7 @@ classdef Deflator < file.AstroData
                 obj.buffers.gui.update;
             end
             
-            obj.pars = head.Parameters(obj.reader.pars);
+%             obj.pars = head.Parameters(obj.reader.pars);
                         
             obj.buffers.directory = obj.out_subdir.pwd;
             
