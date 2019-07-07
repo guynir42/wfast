@@ -552,16 +552,19 @@ void Photometry::calculate(int j){
 				weight[i]=ap_array[i]/error_array[i];
 			} // for i (and if not bad pixel)
 		}
-		error[j]=sqrt(sumArrays(error_array, ap_array));
 		
-		float total_weight=sumArrays(weight);
-		for(int i=0;i<N;i++) image[i]=image[i]*weight[i]/total_weight;
+		// float total_weight=sumArrays(weight);
+		// for(int i=0;i<N;i++) image[i]=image[i]*weight[i]/total_weight;
+		for(int i=0;i<N;i++) image[i]=image[i]*ap_array[i];
 		
 		 // debug output! 
 		// mexPrintf("j= %d | ap_array[312]= %f | area[j]= %f | sum_ap_square= %f | m0= %f | offset_x= %f | offset_y= %f\n", j, ap_array[312], area[j], sum_ap_square, m0, offset_x[j], offset_y[j]);
 		// if (isAllNaNs(image)) mexPrintf("Found image j= %d with all nans!\n", j);
 		
 		float m0=sumArrays(image); // flux after going through aperture and weighing
+		
+		// the error estimate includes the source noise! 
+		error[j]=sqrt(sumArrays(error_array, ap_array)+gain_scalar*m0);
 		
 		// calculate first moments
 		float m1x=sumArrays(image, X)/m0;
