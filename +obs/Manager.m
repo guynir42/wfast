@@ -477,6 +477,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 obj.checker.update; % go over all sensors and only tell them to collect data. It's reported back in t2
                 
+                obj.sync.update;
+                
                 if ~isempty(obj.gui) && obj.gui.check
                     obj.gui.update;
                 end
@@ -663,13 +665,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             try 
                 
-                if ~obj.sync.is_connected % maybe add a check for status as well??
+                if ~obj.sync.is_connected || ~obj.sync.status
                     obj.sync.connect;
                 end
 
             catch 
                 % do nothing, as we can be waiting for ever for server to connect
             end
+            
+            obj.sync.outgoing.stop_camera = 0; % the default is to allow camera to continue
             
             % obj.sync.outgoing.OBJECT = ???
             if ~isempty(obj.mount) && obj.use_mount
@@ -688,8 +692,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.sync.outgoing.HUMID_OUT = mean(obj.checker.humid_now, 'omitnan');
             obj.sync.outgoing.LIGHT = mean(obj.checker.light_now, 'omitnan');
             
+            if obj.dome.is_closed
+                obj.sync.outgoing.stop_camera = 1;
+            end
+            
+            
             % add additional parameters and some commands like "start run"
-                        
+            
             obj.sync.update;
             
         end

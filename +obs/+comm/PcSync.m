@@ -190,6 +190,8 @@ classdef PcSync < handle
                 
                 fopen(obj.hndl);
             
+                obj.update;
+                
             catch ME
                 obj.log.error(ME.getReport);
                 rethrow(ME);
