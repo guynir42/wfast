@@ -94,6 +94,9 @@ classdef Acquisition < file.AstroData
         use_save = false; % must change this when we are ready to really start
         use_triggered_save = false;
         
+        use_ignore_manager = 0; % if true, will not use any data from Manager (via sync object)
+        use_ignore_manager_stop = 0; % if true, will not respect stop commands from Manager (via sync object)
+        
         % display parameters
         use_show = true;
         
@@ -1093,7 +1096,7 @@ classdef Acquisition < file.AstroData
             
             try 
                 
-                s = obj.sync.input;
+                s = obj.sync.incoming;
                 
                 list = head.Parameters.makeSyncList; 
                 
@@ -1107,6 +1110,10 @@ classdef Acquisition < file.AstroData
                         end
                     end
                     
+                end
+                
+                if obj.use_ignore_manager_stop==0 && isfield(s, 'stop_camera') && s.stop_camera
+                    obj.brake_bit = 1; % allow for manager to send stop command to camera... 
                 end
                 
             catch ME
@@ -1163,7 +1170,9 @@ classdef Acquisition < file.AstroData
         
         function update(obj, input)
             
-            obj.getSyncData;
+            if obj.use_ignore_manager==0
+                obj.getSyncData;
+            end
             
             if nargin>=2 && ~isempty(input) && isa(input, 'util.text.InputVars')
                 

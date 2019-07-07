@@ -289,6 +289,16 @@ classdef Event < handle
                         
         end
         
+        function addNote(obj, str)
+            
+            if isempty(obj.note)
+                obj.note = str;
+            else
+                obj.note = [obj.note ', ' str];
+            end
+            
+        end
+        
         function val = is_same(obj, other)
             
             val = 0;

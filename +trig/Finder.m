@@ -536,11 +536,11 @@ classdef Finder < handle
                         if obj.new_events(ii).snr<obj.last_events(jj).snr % old event is better, mark off the new one
                             obj.new_events(ii).keep = 0;
                             obj.new_events(ii).is_duplicate = 1;
-                            obj.new_events(ii).notes = [obj.new_events(ii).notes ', duplicate of ' num2str(obj.last_events(jj).serial)];
+                            obj.new_events(ii).addNote(['duplicate of ' num2str(obj.last_events(jj).serial)]);
                         else % new event is better, mark off the old one
                             obj.last_events(jj).keep = 0;
                             obj.last_events(jj).is_duplicate = 1;
-                            obj.last_events(jj).notes = [obj.last_events(jj).notes ', duplicate of ' num2str(obj.new_events(ii).serial)];
+                            obj.last_events(jj).addNote(['duplicate of ' num2str(obj.new_events(ii).serial)]);
                         end
                         
                         break;

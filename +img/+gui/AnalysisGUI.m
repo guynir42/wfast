@@ -159,7 +159,7 @@ classdef AnalysisGUI < handle
             %%%%%%%%%%% panel info %%%%%%%%%%%%%%%%%%%
             
             N = 1; pos = pos - N;
-            obj.panel_info = GraphicPanel(obj.owner, [0.2 pos/N_middle 0.6 N/N_middle], 0); 
+            obj.panel_info = GraphicPanel(obj.owner, [0.2 pos/N_middle 0.6 N/N_middle], '', 0); 
             obj.panel_info.addButton('button_fwhm', 'FWHM', 'info', 'FWHM= ', 'pix', '', 0.5); 
             obj.panel_info.addButton('button_seeing', 'seeing', 'info', 'seeing= ', '"', '', 0.5);
             obj.panel_info.margin = 0.1;

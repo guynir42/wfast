@@ -27,6 +27,8 @@ classdef AcqGUI < handle
         
         panel_save;
         
+        panel_sync;
+        
         panel_run;
         button_run;
         
@@ -48,7 +50,7 @@ classdef AcqGUI < handle
     
     properties (Hidden=true)
               
-        version = 1.00;
+        version = 1.01;
         
     end
             
@@ -201,7 +203,7 @@ classdef AcqGUI < handle
             
             %%%%%%%%%%% panel save %%%%%%%%%%%%%%%%%%%
             
-            N = 6;
+            N = 3;
             pos = pos - N;
             obj.panel_save = GraphicPanel(obj.owner, [1-W_right pos/N_right W_right N/N_right], 'save');
             obj.panel_save.number = N;
@@ -213,6 +215,18 @@ classdef AcqGUI < handle
             obj.panel_save.button_save.Tooltip = 'Save cutouts and stack images of each batch';
             obj.panel_save.button_trig.Tooltip = 'Save full frame images when triggered on events';
             
+            %%%%%%%%%%% panel sync %%%%%%%%%%%%%%%%%%%
+            
+            N = 3;
+            pos = pos - N;
+            obj.panel_sync = GraphicPanel(obj.owner, [1-W_right pos/N_right W_right N/N_right], 'sync');
+            obj.panel_sync.number = N;
+            obj.panel_sync.addButton('button_ignore_manager', 'use_ignore_manager', 'toggle', 'sync on', 'sync ignored', '', 0.5, 'red');
+            obj.panel_sync.addButton('button_ignore_manager_stop', 'use_ignore_manager_stop', 'toggle', 'stopp enabled', 'stop ignored', '', 0.5, 'red');
+            obj.panel_sync.make;
+            
+            obj.panel_sync.button_ignore_manager.Tooltip = 'Allow Manager to update camera with weather and coordinates';
+            obj.panel_sync.button_ignore_manager_stop.Tooltip = 'Allow Manager to send stop command when tracking is off or when shutting down observatory';
             
             %%%%%%%%%%% panel run %%%%%%%%%%%%%%%%%%
             

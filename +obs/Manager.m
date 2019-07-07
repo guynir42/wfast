@@ -671,24 +671,25 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 % do nothing, as we can be waiting for ever for server to connect
             end
             
-            % obj.sync.output.OBJECT = ???
-            obj.sync.output.RA = obj.mount.objRA;
-            obj.sync.output.DEC = obj.mount.objDEC;            
-            obj.sync.output.RA_DEG = obj.mount.objRA_deg;
-            obj.sync.output.DEC_DEG = obj.mount.objDEC_deg;
-            obj.sync.output.TELRA = obj.mount.telRA;
-            obj.sync.output.TELDEC = obj.mount.telDEC;
-            obj.sync.output.TELRA_DEG = obj.mount.telRA_deg;
-            obj.sync.output.TELDEC_DEG = obj.mount.telDEC_deg;
+            % obj.sync.outgoing.OBJECT = ???
+            if ~isempty(obj.mount) && obj.use_mount
+                
+                if isempty(obj.mount.sync)
+                    obj.mount.sync = obj.sync; % share the handle to this object
+                end
+                
+                obj.mount.updateCamera;
+                
+            end
             
-            obj.sync.output.TEMP_OUT = mean(obj.checker.temp_now, 'omitnan');
-            obj.sync.output.WIND_DIR = mean(obj.checker.wind_az_now, 'omitnan');
-            obj.sync.output.WIND_SPEED = mean(obj.checker.wind_now, 'omitnan');
-            obj.sync.output.HUMID_OUT = mean(obj.checker.humid_now, 'omitnan');
-            obj.sync.output.LIGHT = mean(obj.checker.light_now, 'omitnan');
+            obj.sync.outgoing.TEMP_OUT = mean(obj.checker.temp_now, 'omitnan');
+            obj.sync.outgoing.WIND_DIR = mean(obj.checker.wind_az_now, 'omitnan');
+            obj.sync.outgoing.WIND_SPEED = mean(obj.checker.wind_now, 'omitnan');
+            obj.sync.outgoing.HUMID_OUT = mean(obj.checker.humid_now, 'omitnan');
+            obj.sync.outgoing.LIGHT = mean(obj.checker.light_now, 'omitnan');
             
             % add additional parameters and some commands like "start run"
-            
+                        
             obj.sync.update;
             
         end
@@ -713,6 +714,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 
                 obj.closeDome;
 
+                obj.sync.outgoing.stop_camera = 1; % make sure camera stops running also
+                obj.sync.update;
+                
                 % anything else we can do to put the dome to shutdown mode?
                 % ...
 

@@ -9,8 +9,8 @@ classdef PcSync < handle
     
     properties % objects
         
-        input;
-        output;
+        incoming; % struct with data that got received from other side
+        outgoing; % struct with data to be sent to the other side
         
         log@util.sys.Logger;
         
@@ -102,8 +102,8 @@ classdef PcSync < handle
         
         function reset(obj)
             
-            obj.input = struct;
-            obj.output = struct;
+            obj.incoming = struct;
+            obj.outgoing = struct;
             
         end
         
@@ -218,11 +218,11 @@ classdef PcSync < handle
             
             if obj.is_connected
                 obj.hndl.BytesAvailableFcn = @obj.read_data;
-                obj.output.time = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
+                obj.outgoing.time = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
 
                 obj.status = 0;
                 flushinput(obj.hndl);
-                obj.send(obj.output);
+                obj.send(obj.outgoing);
             end
             
         end
@@ -250,7 +250,7 @@ classdef PcSync < handle
                         error('Received a response: %s which is not consistent with checksum: %s', value, obj.checksum);
                     end
                 elseif isstruct(value)
-                    obj.input = value;
+                    obj.incoming = value;
                     obj.status = 1;
                     obj.confirm;
                 end
