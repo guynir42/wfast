@@ -505,9 +505,15 @@ classdef Event < handle
             
             lh.FontSize = input.font_size-4;
             lh.NumColumns = 2;
-            
-            util.plot.inner_title(sprintf('id: %d | star: %d | batches: %d-%d | event S/N= %4.2f | star S/N= %4.2f', ...
-                obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.star_snr),...
+
+            if isempty(obj.notes)
+                note_str = '';
+            else
+                note_str = [', ' obj.notes];
+            end
+
+            util.plot.inner_title(sprintf('id: %d | star: %d | batches: %d-%d | event S/N= %4.2f | star S/N= %4.2f%s', ...
+                obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.star_snr, note_str),...
                 'ax', input.ax, 'Position', 'NorthWest', 'FontSize', input.font_size);
             
             input.ax.YLim(2) = max(abs(input.ax.YLim));

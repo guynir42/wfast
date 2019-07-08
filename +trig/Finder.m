@@ -606,14 +606,14 @@ classdef Finder < handle
                     obj.all_events(ii).keep = 0;
                     obj.all_events(ii).is_real = 0;
                     obj.all_events(ii).is_bad_star = 1;
-                    obj.all_events(ii).notes = sprintf('%s, star %d is on black list', obj.all_events(ii).notes, obj.all_events(ii).star_index);
+                    obj.all_events(ii).addNote(sprintf('%s, star %d is on black list', obj.all_events(ii).notes, obj.all_events(ii).star_index));
                 end
                 
                 if ismember(obj.all_events(ii).batch_index, obj.black_list_stars)
                     obj.all_events(ii).keep = 0;
                     obj.all_events(ii).is_real = 0;
                     obj.all_events(ii).is_bad_batch = 1;
-                    obj.all_events(ii).notes = sprintf('%s, batch %d is on black list', obj.all_events(ii).notes, obj.all_events(ii).batch_index);
+                    obj.all_events(ii).addNote(sprintf('%s, batch %d is on black list', obj.all_events(ii).notes, obj.all_events(ii).batch_index));
                 end
                 
             end
