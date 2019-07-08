@@ -22,6 +22,10 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	int ndims=mxGetNumberOfDimensions(prhs[0]);	
 	
 	if(ndims>3) mexErrMsgIdAndTxt("MATLAB:util:stat:sum_singles:inputMoreThan3D", "Input 1 to sum_singles should have at most 3 dimensions...");
+	if(ndims<3){ 
+		plhs[0]=mxDuplicateArray(prhs[0]);
+		return;
+	}
 	
 	mwSize dims_out[2]={dims[0], dims[1]};
 	int N=dims_out[0]*dims_out[1]; // total size of output array 
