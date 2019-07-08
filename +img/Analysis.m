@@ -64,7 +64,7 @@ classdef Analysis < file.AstroData
         use_background_cutouts = 1; % subtract b/g from the cutouts (and stack cutouts!)
         use_refine_bg = 0; % need to figure out exactly how to do this
         
-        use_save_fits = 0;
+        use_fits_save = 0;
         use_fits_flip = 0;
         use_fits_roi = 0;
         fits_roi = [];
@@ -485,7 +485,7 @@ classdef Analysis < file.AstroData
             
             %%%%%%%%%%%%%%%%%%%% save FITS files of stacks %%%%%%%%%%%%%%%%
             
-            if obj.use_save_fits
+            if obj.use_fits_save
                 
                 [d, f] = fileparts(obj.reader.this_filename);
                 
@@ -505,8 +505,8 @@ classdef Analysis < file.AstroData
                     I = rot(I,180);
                 end
                 
-                if obj.use_fits_roi && obj.fits_roi
-                    I = I(obj.fits_roi(2):obj.fits_roi(4),obj.fits_roi(1):obj.fits_roi(3));
+                if obj.use_fits_roi && ~isempty(obj.fits_roi)
+                    I = I(obj.fits_roi(1):obj.fits_roi(1)+obj.fits_roi(3)-1,obj.fits_roi(2):obj.fits_roi(2)+obj.fits_roi(4)-1);
                 end
                 
                 fitswrite(I, fullname); 
