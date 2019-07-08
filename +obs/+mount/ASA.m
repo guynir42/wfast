@@ -813,7 +813,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 obj.hndl.AbortSlew;
                 
                 if ~isempty(obj.sync)
+
+                    if obj.sync.outgoing.stop_camera==0
+                        obj.log.input('Dome closed, sending camera stop command');
+                        disp(obj.log.report);
+                    end
+
                     obj.sync.outgoing.stop_camera = 1;
+                    
                 end
                 
             catch ME

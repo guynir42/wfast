@@ -693,7 +693,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.sync.outgoing.LIGHT = mean(obj.checker.light_now, 'omitnan');
             
             if obj.dome.is_closed
+                
+                if obj.sync.outgoing.stop_camera==0
+                    obj.log.input('Dome closed, sending camera stop command');
+                    disp(obj.log.report);
+                end
+                
                 obj.sync.outgoing.stop_camera = 1;
+                
             end
             
             
