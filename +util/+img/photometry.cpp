@@ -463,6 +463,20 @@ void Photometry::calculate(int j){
 	
 	if(ap_type==0 && bg_type==0) num_iter=1; // if using the simplest aperture/background we have nothing to gain from running iterations...
 	
+	if(isAllNaNs(image_raw)){
+		// mexPrintf("skipping image, all nans\n");
+		flux[j]=NAN;
+		error[j]=NAN;
+		area[j]=0;
+		background[j]=NAN;
+		variance[j]=NAN;
+		offset_x[j]=NAN;
+		offset_y[j]=NAN;
+		width[j]=NAN;
+		bad_pixel[j]=N;
+		return;
+	}
+	
 	for(int k=0;k<num_iter;k++){ // number of iterations 
 		
 		// if offsets exists from last iteration or last batch, use them

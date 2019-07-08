@@ -17,9 +17,12 @@ classdef Calibrator < handle
         errors;
         fluxes_no_outliers;
         fluxes_detrended;
+        fluxes_detrended_no_outliers;
         stds_detrended
         fluxes_global_cal;
         fluxes_global_cal_no_outliers;
+        
+        star_snrs;
         
         a_pars;
         b_pars;
@@ -83,6 +86,7 @@ classdef Calibrator < handle
             obj.errors = [];
             obj.fluxes_no_outliers = [];
             obj.fluxes_detrended = [];
+            obj.fluxes_detrended_no_outliers = [];
             obj.stds_detrended = [];
             obj.fluxes_global_cal = [];
             obj.fluxes_global_cal_no_outliers = [];
@@ -149,6 +153,8 @@ classdef Calibrator < handle
                 
             end
             
+            obj.star_snrs = mean(obj.fluxes_no_outliers, 'omitnan')./obj.stds_detrended;
+            
         end
         
         function fit(obj)
@@ -175,8 +181,10 @@ classdef Calibrator < handle
             
             t = tic;
             
-            obj.fluxes_detrended = obj.fluxes_no_outliers - obj.b_pars - obj.a_pars.*obj.timestamps;
-            obj.fluxes_detrended = obj.fluxes_detrended - mean(obj.fluxes_detrended, 'omitnan');
+            obj.fluxes_detrended_no_outliers = obj.fluxes_no_outliers - obj.b_pars - obj.a_pars.*obj.timestamps; 
+            % make sure to get the fluxes WITH outliers *but* subtract the mean WITHOUT outliers
+            obj.fluxes_detrended = obj.fluxes - obj.b_pars - obj.a_pars.*obj.timestamps - mean(obj.fluxes_detrended_no_outliers, 'omitnan');
+            obj.fluxes_detrended_no_outliers = obj.fluxes_detrended_no_outliers - mean(obj.fluxes_detrended_no_outliers, 'omitnan'); 
             
             obj.stds_detrended = std(obj.fluxes_detrended, [], 1, 'omitnan');
             

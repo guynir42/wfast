@@ -141,6 +141,8 @@ classdef Calibration < handle
         dark_mask_var_sigma = 100; % how many "sigmas" above the mean variance value to cut (to be depricated)
         dark_mask_var_ratio = 0.99; % what fraction of pixel variance is considered "bad pixels" (to be depricated)
         
+        use_remove_empty_frames = 1;
+        
         % switches for making darks/flats (can we get rid of this??)
         use_calc_gain = 0;
         use_mv_points = 0; % choose if to collect mean and variance data when making flats (used for calculating gain)
@@ -1047,7 +1049,18 @@ classdef Calibration < handle
             else
                 I = double(input.images); 
             end
-                    
+            
+            %%%%%%%%%%%%%%%%% Take care of zero frames %%%%%%%%%%%%%%%%%%%%
+            
+            if obj.use_remove_empty_frames
+                
+                idx = squeeze(sum(util.stat.sum2(abs(I)),4)==0); % vector of true if the whole frame (dim 3) is zero
+                I(:,:,idx,:) = NaN;
+                
+%                 I(I==0) = NaN;
+                
+            end
+            
             if ~isempty(input.clipper) % this means we are working with cutouts
                 
                 if ~isa(input.clipper, 'img.Clipper') && ~(isnumeric(input.clipper) && size(input.clipper, 2)==2)

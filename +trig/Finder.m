@@ -8,6 +8,8 @@ classdef Finder < handle
     
     properties % objects
         
+        pars@head.Parameters;
+        
         cal@trig.Calibrator;
         filt@trig.Filter;
         all_events@trig.Event;
@@ -60,6 +62,8 @@ classdef Finder < handle
         dt; 
         coverage_total;
         coverage_lost;
+        star_hours_total;
+        star_hours_lost;
         snr_values;
         
     end
@@ -74,6 +78,11 @@ classdef Finder < handle
         max_events = 5; % how many events can we have triggered on the same 2-batch window?
         max_stars = 5; % how many stars can we afford to have triggered at the same time? 
         max_frames = 50; % maximum length of trigger area (very long events are disqualified)
+        
+        % additional cuts on events
+        min_star_snr = 5;
+        max_num_nans = 1;
+        max_corr = 0.75;
         
         use_conserve_memory = 1;
         
@@ -145,6 +154,8 @@ classdef Finder < handle
             obj.dt = []; 
             obj.coverage_total = 0;
             obj.coverage_lost = 0;
+            obj.star_hours_total = 0;
+            obj.star_hours_lost = 0;
             obj.snr_values = [];
             
             obj.clear;
@@ -284,8 +295,12 @@ classdef Finder < handle
             obj.phot_pars = input.phot_pars;
             
             if all(obj.timestamps==0)
-%                 obj.timestamps = []; % in case we didn't properly stored the times
-                obj.timestamps = (1:size(input.fluxes,1))'./obj.frame_rate;
+%                 obj.timestamps = []; % in case we didn't properly store the times
+                if isempty(obj.prev_timestamps)
+                    obj.timestamps = (1:size(input.fluxes,1))'./obj.frame_rate;
+                else
+                    obj.timestamps = obj.prev_timestamps(end)+(1:size(input.fluxes,1))'./obj.frame_rate;
+                end
             end
             
             if ~isempty(obj.prev_fluxes) % skip first batch! 
@@ -305,6 +320,8 @@ classdef Finder < handle
                 t = tic;
                 obj.storeEventHousekeeping(input); % add some data from this batch to the triggered events
                 
+                obj.checkEvents; % make sure we aren't taking events that already exist
+            
                 obj.last_events = obj.new_events;
                 obj.all_events = [obj.all_events obj.new_events];
                 obj.new_events = trig.Event.empty;
@@ -313,28 +330,26 @@ classdef Finder < handle
             
                 t = tic;
                 
-                obj.checkEvents; % make sure we aren't taking events that already exist
-            
                 if obj.debug_bit>1, fprintf('Checking time: %f seconds.\n', toc(t)); end
                 
             end
             
             % store these for next time
-            obj.prev_fluxes = input.fluxes;
-            obj.prev_errors = input.errors;
-            obj.prev_areas = input.areas;
-            obj.prev_backgrounds = input.backgrounds;
-            obj.prev_variances = input.variances;
-            obj.prev_offsets_x = input.offsets_x;
-            obj.prev_offsets_y = input.offsets_y;
-            obj.prev_widths = input.widths;
-            obj.prev_bad_pixels = input.bad_pixels;
-            obj.prev_timestamps = input.timestamps;
-            obj.prev_cutouts = input.cutouts;
-            obj.prev_positions = input.positions;
-            obj.prev_stack = input.stack;
-            obj.prev_batch_index = input.batch_index;
-            obj.prev_filename = input.filename;
+            obj.prev_fluxes = obj.fluxes;
+            obj.prev_errors = obj.errors;
+            obj.prev_areas = obj.areas;
+            obj.prev_backgrounds = obj.backgrounds;
+            obj.prev_variances = obj.variances;
+            obj.prev_offsets_x = obj.offsets_x;
+            obj.prev_offsets_y = obj.offsets_y;
+            obj.prev_widths = obj.widths;
+            obj.prev_bad_pixels = obj.bad_pixels;
+            obj.prev_timestamps = obj.timestamps;
+            obj.prev_cutouts = obj.cutouts;
+            obj.prev_positions = obj.positions;
+            obj.prev_stack = obj.stack;
+            obj.prev_batch_index = obj.batch_index;
+            obj.prev_filename = obj.filename;
             
         end
         
@@ -344,7 +359,13 @@ classdef Finder < handle
             
             ff = obj.filt.fluxes_filtered; % dim 1 is time, dim 2 is kernels, dim 3 is stars
             
-            [~,idx] = util.stat.maxnd(abs(ff(1:length(obj.timestamps),:,:)));
+            good_stars = obj.cal.star_snrs>obj.min_star_snr;
+            
+            [~,idx] = util.stat.maxnd(abs(ff(1:length(obj.timestamps),:,good_stars))); % only get the best S/N for first batch (for record keeping)
+            
+            if isempty(idx)
+                return; % this can happen if all stars are below the S/N threshold
+            end
             
             obj.snr_values(end+1) = ff(idx(1),idx(2),idx(3));
             
@@ -352,7 +373,7 @@ classdef Finder < handle
             
             for ii = 1:obj.max_events
                 
-                [mx, idx] = util.stat.maxnd(abs(ff)); % note we are triggering on negative and positive events
+                [mx, idx] = util.stat.maxnd(abs(ff(:,:,good_stars))); % note we are triggering on negative and positive events
                 
                 if mx<obj.threshold, break; end 
                 
@@ -363,7 +384,7 @@ classdef Finder < handle
                 ev.kern_index = idx(2);
                 ev.star_index = idx(3);
                 
-                ev.time_indices = obj.findTimeRange(ff, ev.time_index, ev.kern_index, ev.star_index); % find continuous area that is above time_range_thresh
+                ev.time_indices = obj.findTimeRange(ff, ev.time_index, ev.star_index); % find continuous area that is above time_range_thresh
                 
                 ev.kern_indices = find(max(abs(ff(ev.time_indices, :, ev.star_index)))>obj.getKernThresh);
                 
@@ -384,16 +405,18 @@ classdef Finder < handle
                 obj.new_events(end+1) = ev; % add this event to the list
                 
                 obj.coverage_lost = obj.coverage_lost + ev.duration; % how much time is "zeroed out"
+                obj.star_hours_lost = obj.star_hours_lost + (ev.duration)*sum(good_stars);
                 
                 ff(ev.time_indices, :, :) = 0; % don't look at the same region twice
                 
             end
             
             obj.coverage_total = obj.coverage_total + obj.timestamps(end) - obj.timestamps(1) + obj.dt;
+            obj.star_hours_total = obj.star_hours_total + (obj.timestamps(end) - obj.timestamps(1) + obj.dt)*sum(good_stars);
             
         end
         
-        function time_range = findTimeRange(obj, ff, time_index, kern_index, star_index)
+        function time_range = findTimeRange(obj, ff, time_index, star_index)
 
             N = size(ff,1); % time length
             
@@ -406,7 +429,7 @@ classdef Finder < handle
 
                 if idx<1, break; end
 
-                if abs(ff(idx, kern_index, star_index))>=thresh
+                if any(abs(ff(idx, :, star_index))>=thresh)
                     time_range = [time_range, idx];
                 else 
                     break;
@@ -422,7 +445,7 @@ classdef Finder < handle
 
                 if idx>N, break; end
 
-                if abs(ff(idx, kern_index, star_index))>=thresh
+                if any(abs(ff(idx, :, star_index))>=thresh)
                     time_range = [time_range, idx];
                 else 
                     break;
@@ -451,6 +474,7 @@ classdef Finder < handle
                 ev.time_range_thresh = obj.time_range_thresh;
                 ev.kern_range_thresh = obj.kern_range_thresh;
                 ev.star_range_thresh = obj.star_range_thresh;
+                ev.star_snr = obj.cal.star_snrs(ev.star_index);
                 
                 % housekeeping data from photometry 
                 a = vertcat(obj.prev_areas, obj.areas);
@@ -514,6 +538,9 @@ classdef Finder < handle
                 end
                 
                 ev.phot_pars = obj.phot_pars;
+                
+                ev.max_num_nans = obj.max_num_nans;
+                ev.max_corr = obj.max_corr;
                 
                 % any other info that needs to be saved along with the event object?
                 % ...

@@ -26,6 +26,10 @@ classdef Event < handle
         is_artefact = 0; % some other sort of image artefact
         is_bad_batch = 0; % this batch is noisy and has lots of events
         is_bad_star = 0; % this star is constantly triggering (black listed)
+        is_corr_bg = 0; % if there is strong anti-correlation to background
+        is_corr_area = 0; % if there is strong correlation to aperture area
+        is_nan_flux = 0; % this event has too many NaN values in the raw flux around the peak
+        is_nan_offsets = 0; % this event has too many NaN values in the offsets of x or y around the peak
         is_simulated = 0; % we've added this event on purpose
         is_forced = 0; % we've forced the system to trigger on a subtrheshold event
         % ...
@@ -52,6 +56,7 @@ classdef Event < handle
         best_kernel; % full kernel that goes with kern_index
         time_step;
         duration;
+        star_snr;
         
         threshold; % trigger threshold used (in S/N units)
         used_background_sub; % did the photometery object use local (e.g., annulus) b/g subtraction?
@@ -110,6 +115,9 @@ classdef Event < handle
     end
     
     properties % switches/controls
+        
+        max_corr;
+        max_num_nans;
         
         debug_bit = 1;
         
@@ -289,16 +297,6 @@ classdef Event < handle
                         
         end
         
-        function addNote(obj, str)
-            
-            if isempty(obj.note)
-                obj.note = str;
-            else
-                obj.note = [obj.note ', ' str];
-            end
-            
-        end
-        
         function val = is_same(obj, other)
             
             val = 0;
@@ -321,10 +319,59 @@ classdef Event < handle
         
         function self_check(obj)
             
+            % check if there are too many NaNs in the raw flux during the event
+            NN = nnz(isnan(obj.flux_raw_all(obj.time_indices, obj.star_index)));
+            if NN>=obj.max_num_nans
+                obj.keep = 0;
+                obj.is_nan_flux = 1;
+                obj.addNote(sprintf('flux with %d NaNs', NN));
+            end
             
+            Nidx = isnan(obj.offsets_x_at_star) | isnan(obj.offsets_y_at_star); 
+            if nnz(Nidx)>=obj.max_num_nans && ~all(Nidx) % if all frames have NaN offsets (i.e., forced photometry), it is ok. If some of them do, it is bad shape
+                obj.keep = 0;
+                obj.is_nan_offsets = 1;
+                obj.addNote(sprintf('offsets with %d NaNs', NN));
+            end
+            
+            corr = obj.correlation(obj.backgrounds_at_star);
+            if corr<-obj.max_corr
+                obj.keep = 0;
+                obj.is_corr_bg = 1;
+                obj.addNote(sprintf('signal is anti correlated with background at a %f level', corr));
+            end
+            
+            corr = obj.correlation(obj.areas_at_star);
+            if corr>obj.max_corr
+                obj.keep = 0;
+                obj.is_corr_area = 1;
+                obj.addNote(sprintf('signal is correlated with aperture area at a %f level', corr));
+            end
             
             % add any other checks you can think about
             % ...
+            
+        end
+        
+        function val = correlation(obj, vector)
+            f = obj.flux_detrended;
+            t = obj.time_indices;
+            
+            val = sum(f(t).*vector(t), 'omitnan')./sqrt(sum(f(t).^2, 'omitnan').*sum(vector(t).^2, 'omitnan'));
+            
+        end
+        
+    end
+        
+    methods % utilities
+        
+        function addNote(obj, str)
+            
+            if isempty(obj.notes)
+                obj.notes = str;
+            else
+                obj.notes = [obj.notes ', ' str];
+            end
             
         end
         
@@ -442,8 +489,8 @@ classdef Event < handle
             h7 = plot(input.ax, obj.timestamps, obj.offsets_y_at_star, 'o', 'MarkerSize', 1);
             h7.DisplayName = 'offset y';
             
-            h8 = bar(input.ax, obj.timestamps, obj.bad_pixels_at_star-mean(obj.bad_pixels_at_star)-5, 'BaseValue', -5, 'FaceAlpha', 0.5);
-            h8.DisplayName = 'relative bad pixels';
+%             h8 = bar(input.ax, obj.timestamps, obj.bad_pixels_at_star-mean(obj.bad_pixels_at_star)-5, 'BaseValue', -5, 'FaceAlpha', 0.5);
+%             h8.DisplayName = 'relative bad pixels';
             
             xlabel(input.ax, 'timestamp (seconds)');
             ylabel(input.ax, 'flux S/N');
@@ -459,8 +506,8 @@ classdef Event < handle
             lh.FontSize = input.font_size-4;
             lh.NumColumns = 2;
             
-            util.plot.inner_title(sprintf('id: %d | star: %d | batches: %d-%d | S/N= %4.2f | \\sigma= %4.2f', ...
-                obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.std_flux),...
+            util.plot.inner_title(sprintf('id: %d | star: %d | batches: %d-%d | event S/N= %4.2f | star S/N= %4.2f', ...
+                obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.star_snr),...
                 'ax', input.ax, 'Position', 'NorthWest', 'FontSize', input.font_size);
             
             input.ax.YLim(2) = max(abs(input.ax.YLim));
@@ -481,6 +528,7 @@ classdef Event < handle
             input.input_var('number', 9);
             input.input_var('bias', []);
             input.input_var('dynamic_range', []);
+            input.input_var('font_size', 10);
             input.scan_vars(varargin{:});
             
             if ndims(obj.cutouts)>=4
@@ -549,6 +597,18 @@ classdef Event < handle
                 Nrows = ceil(sqrt(input.number));
                 Ncols = Nrows;
 
+                if isempty(input.bias) || isempty(input.dynamic_range)
+                    dyn = util.img.autodyn(cutouts);
+                    if ~isempty(input.bias)
+                        dyn(1) = input.bias;
+                    elseif ~isempty(input.dynamic_range)
+                        dyn(2) = input.dynamic_range;
+                    end
+
+                else
+                    dyn = [input.bias, input.dynamic_range];
+                end
+
                 for ii = 1:input.number
 
                     x = mod(ii-1, Nrows);
@@ -556,31 +616,34 @@ classdef Event < handle
 
                     ax{ii} = axes('Position', [x/Ncols y/Nrows 1/Ncols 1/Nrows], 'Parent', panel);
 
-                    use_autodyn = isempty(input.bias) && isempty(input.dynamic_range);
+                    imagesc(ax{ii}, cutouts(:,:,idx_start+ii-1));
+                    ax{ii}.CLim = dyn;
+                    axis(ax{ii}, 'image');
+                    ax{ii}.XTick = [];
+                    ax{ii}.YTick = [];
                     
-                    util.plot.show(cutouts(:,:,idx_start+ii-1), 'fancy', 0, 'ax', ax{ii}, ...
-                        'autodyn', use_autodyn, 'bias', input.bias, 'dyn', input.dynamic_range);
-
                     if idx_start+ii-1==idx
-                        util.plot.inner_title([num2str(idx_start+ii-1) '*'], 'Position', 'NorthWest', 'Color', 'red', 'ax', ax{ii});
+                        util.plot.inner_title([num2str(idx_start+ii-1) '*'], 'Position', 'NorthWest', 'Color', 'red', 'FontSize', input.font_size, 'ax', ax{ii});
                     else
-                        util.plot.inner_title(num2str(idx_start+ii-1), 'Position', 'NorthWest', 'ax', ax{ii});
+                        util.plot.inner_title(num2str(idx_start+ii-1), 'Position', 'NorthWest', 'FontSize', input.font_size, 'ax', ax{ii});
                     end
                     
                     if ~isempty(rad)
                         viscircles(ax{ii}, cen(ii,:), rad, 'EdgeColor', col);
                         if idx_start+ii-1==idx
-                            util.plot.inner_title(str, 'Position', 'bottom', 'Color', col, 'ax', ax{ii});
+                            util.plot.inner_title(str, 'Position', 'bottom', 'Color', col, 'FontSize', input.font_size, 'ax', ax{ii});
                         end
                     end
                 
                 end
                 
-                clim = ax{idx-idx_start+1}.CLim;
-                for ii = 1:length(ax)
-                    ax{ii}.CLim = clim;
-                end
-                    
+                panel.Children = panel.Children([5,1,2,3,4,6,7,8,9]); % move the center cutout to top (for the inner titles)
+%                 
+%                 clim = ax{idx-idx_start+1}.CLim;
+%                 for ii = 1:length(ax)
+%                     ax{ii}.CLim = clim;
+%                 end
+%                     
             end
             
         end

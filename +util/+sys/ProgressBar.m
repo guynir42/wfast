@@ -226,7 +226,7 @@ classdef ProgressBar < handle
         
         function c = check(obj, number)
             
-            c = number>0 && number~=obj.current_number && mod(number, obj.dividor)==0;
+            c = number>0 && mod(number, obj.dividor)==0;
             
         end
         

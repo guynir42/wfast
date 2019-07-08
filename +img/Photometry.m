@@ -206,6 +206,8 @@ classdef Photometry < handle
             obj.variances = [];
             obj.offsets_x = [];
             obj.offsets_y = [];
+            obj.centroids_x = [];
+            obj.centroids_y = [];
             obj.widths = [];
             obj.bad_pixels = [];
             
@@ -216,6 +218,8 @@ classdef Photometry < handle
             obj.variances_basic = [];
             obj.offsets_x_basic = [];
             obj.offsets_y_basic = [];
+            obj.centroids_x_basic = [];
+            obj.centroids_y_basic = [];
             obj.widths_basic = [];
             obj.bad_pixels_basic = [];
             
@@ -226,6 +230,8 @@ classdef Photometry < handle
             obj.variances_ap = [];
             obj.offsets_x_ap = [];
             obj.offsets_y_ap = [];
+            obj.centroids_x_ap = [];
+            obj.centroids_y_ap = [];
             obj.widths_ap = [];
             obj.bad_pixels_ap = [];
             
@@ -236,6 +242,8 @@ classdef Photometry < handle
             obj.variances_gauss = [];
             obj.offsets_x_gauss = [];
             obj.offsets_y_gauss = [];
+            obj.centroids_x_gauss = [];
+            obj.centroids_y_gauss = [];
             obj.widths_gauss = [];
             obj.bad_pixels_gauss = [];
             
@@ -246,6 +254,8 @@ classdef Photometry < handle
             obj.variances_fit = [];
             obj.offsets_x_fit = [];
             obj.offsets_y_fit = [];
+            obj.centroids_x_fit = [];
+            obj.centroids_y_fit = [];
             obj.widths_fit = [];
             obj.bad_pixels_fit = [];
             
@@ -445,14 +455,16 @@ classdef Photometry < handle
                         V = var2(I.*ann); 
                         
                         if isempty(obj.var_map)
-                            v = ones(size(obj.cutouts,1), size(obj.cutouts,2), 'float').*V;
+                            v = ones(size(obj.cutouts,1), size(obj.cutouts,2), 'single').*V;
                         elseif isscalar(obj.var_map)
-                            v = ones(size(obj.cutouts,1), size(obj.cutouts,2), 'float').*obj.var_map;
+                            v = ones(size(obj.cutouts,1), size(obj.cutouts,2), 'single').*obj.var_map;
                         else
                             v = obj.var_map(:,:,jj,ii);
                         end
                         
-                        if isscalar(obj.gain)
+                        if isempty(obj.gain)
+                            g = 1;
+                        elseif isscalar(obj.gain)
                             g = obj.gain;
                         else
                             g = obj.gain(:,:,jj,ii);
@@ -475,7 +487,7 @@ classdef Photometry < handle
                         I = I.*weight./sum2(weight); % reweigh the whole image
                         
                         % old method:
-%                         S = sum2(ap);
+                        S = sum2(ap);
 %                         ap = ap./S;
 %                         I = I.*ap./sum2(ap.^2);
 
@@ -506,12 +518,13 @@ classdef Photometry < handle
                         
                         M = [m2x mxy; mxy m2y];
                         
-                        [V, D] = eig(M);
+                        if any(isnan(M(:)))
+                            W = NaN;
+                        else
+                            [X, D] = eig(M); % use X to calculate rotation angle? 
+                            W = mean(sqrt(diag(D)), 'omitnan');
+                        end
                         
-                        % use V to calculate rotation angle?
-                        
-                        W = mean(sqrt(diag(D)), 'omitnan');
-
                     end
 
                     fluxes(jj,ii) = m0;
