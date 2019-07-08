@@ -682,6 +682,18 @@ classdef Acquisition < file.AstroData
             
         end
         
+        function set.src(obj, val)
+            
+            if isempty(obj.src) || isempty(val)
+                obj.src = val;
+            elseif obj.src~=val
+                num_batches = obj.src.num_batches;
+                obj.src = val;
+                obj.src.num_batches = num_batches;
+            end
+            
+        end
+        
         function set.run_name(obj, val)
             
             if ~isempty(obj.pars)

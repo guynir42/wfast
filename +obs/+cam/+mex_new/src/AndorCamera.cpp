@@ -500,7 +500,7 @@ unsigned int AndorCamera::getTimeout(){ // in milliseconds
 	
 	// printf("timeout= %d | expT= %f\n", timeout, expT);
 	if (timeout>expT*10000) return timeout;
-	else return (unsigned int) expT*10000;
+	else return (unsigned int) (expT*10000);
 
 }
 

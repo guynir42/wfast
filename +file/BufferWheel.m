@@ -91,6 +91,7 @@ classdef BufferWheel < file.AstroData
         product_type = 'Raw'; % can be Raw, ROI, Cutouts (including stacks), Dark (always raw), Dlat (always raw). Can append additional strings like "Sim" or "Cal" or "Proc"
         dir_extension = ''; % overrides any automatic directory extensions... 
         use_dir_types = 0; % automatically add a dir_extension equal to "type"
+        use_year_folder = 1; % add a YYYY folder before YYYY-MM-DD folder
         
         % write parameters
         use_save_raw_images = 1; % if set to 0, will not save to disk the full frame raw images! 
@@ -511,7 +512,12 @@ classdef BufferWheel < file.AstroData
                 d = obj.flat_dir_name;
             end
             
-            val = fullfile(obj.base_dir, obj.date_dir, d);
+            
+            if obj.use_year_folder
+                val = fullfile(obj.base_dir, obj.date_dir(1:4), obj.date_dir, d);
+            else
+                val = fullfile(obj.base_dir, obj.date_dir, d);
+            end
             
         end
         
