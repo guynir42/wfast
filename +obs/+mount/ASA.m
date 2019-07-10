@@ -851,7 +851,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             obj.sync.outgoing.TELRA_DEG = obj.telRA_deg;
             obj.sync.outgoing.TELDEC_DEG = obj.telDEC_deg;
             
-            if obj.tracking==0 || abs(obj.objRA_deg-obj.telRA_deg)>0.25 % if mount stops tracking or is 1 time-minute away from target RA, stop the camera (e.g., when reaching limit)
+            if obj.tracking==0 || abs(obj.objRA_deg-obj.telRA_deg)>1 % if mount stops tracking or is 4 time-minutes away from target RA, stop the camera (e.g., when reaching limit)
                 obj.sync.outgoing.stop_camera = 1;
             else
                 obj.sync.outgoing.stop_camera = 0;
