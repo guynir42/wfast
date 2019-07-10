@@ -422,19 +422,35 @@ classdef Lightcurves < handle
             
         end
         
-        function saveAsMAT(obj, filename)
+        function saveAsMAT(obj, filename, star_indices)
+            
+            if nargin<3 || isempty(star_indices)
+                star_indices = [];
+            end
             
             timestamps = obj.timestamps;
-            fluxes = obj.fluxes;
-            errors = obj.errors;
-            backgrounds = obj.backgrounds;
-            variances = obj.variances;
-            areas = obj.areas;
-            centroids_x = obj.centroids_x;
-            centroids_y = obj.centroids_y;
-            widths = obj.widths;
-            bad_pixels = obj.bad_pixels;
             
+            if isempty(star_indices)
+                fluxes = obj.fluxes;
+                errors = obj.errors;
+                areas = obj.areas;
+                backgrounds = obj.backgrounds;
+                variances = obj.variances;
+                centroids_x = obj.centroids_x;
+                centroids_y = obj.centroids_y;
+                widths = obj.widths;
+                bad_pixels = obj.bad_pixels;
+            else
+                fluxes = obj.fluxes(:,star_indices);
+                errors = obj.errors(:,star_indices);
+                areas = obj.areas(:,star_indices);
+                backgrounds = obj.backgrounds(:,star_indices);
+                variances = obj.variances(:,star_indices);
+                centroids_x = obj.centroids_x(:,star_indices);
+                centroids_y = obj.centroids_y(:,star_indices);
+                widths = obj.widths(:,star_indices);
+                bad_pixels = obj.bad_pixels(:,star_indices);
+            end
             save(filename, 'timestamps', 'fluxes', 'errors', 'areas', 'backgrounds', 'variances', 'centroids_x', 'centroids_y', 'widths', 'bad_pixels');
             
         end

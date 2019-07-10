@@ -373,7 +373,7 @@ classdef Finder < handle
             
             for ii = 1:obj.max_events
                 
-                [mx, idx] = util.stat.maxnd(abs(ff(:,:,good_stars))); % note we are triggering on negative and positive events
+                [mx, idx] = util.stat.maxnd(abs(ff.*util.vec.topages(good_stars))); % note we are triggering on negative and positive events
                 
                 if mx<obj.threshold, break; end 
                 
@@ -405,14 +405,14 @@ classdef Finder < handle
                 obj.new_events(end+1) = ev; % add this event to the list
                 
                 obj.coverage_lost = obj.coverage_lost + ev.duration; % how much time is "zeroed out"
-                obj.star_hours_lost = obj.star_hours_lost + (ev.duration)*sum(good_stars);
+                obj.star_hours_lost = obj.star_hours_lost + (ev.duration)*sum(good_stars)/3600;
                 
                 ff(ev.time_indices, :, :) = 0; % don't look at the same region twice
                 
             end
             
             obj.coverage_total = obj.coverage_total + obj.timestamps(end) - obj.timestamps(1) + obj.dt;
-            obj.star_hours_total = obj.star_hours_total + (obj.timestamps(end) - obj.timestamps(1) + obj.dt)*sum(good_stars);
+            obj.star_hours_total = obj.star_hours_total + (obj.timestamps(end) - obj.timestamps(1) + obj.dt)*sum(good_stars)/3600;
             
         end
         

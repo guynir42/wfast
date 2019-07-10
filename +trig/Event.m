@@ -304,8 +304,8 @@ classdef Event < handle
             for ii = 1:length(other)
                 
                 if obj.star_index==other(ii).star_index
-                    t_self = obj.timestamps(obj.range_time_idx);
-                    t_other = other(ii).timestamps(other(ii).range_time_idx);
+                    t_self = obj.timestamps(obj.time_indices);
+                    t_other = other(ii).timestamps(other(ii).time_indices);
                     if ~isempty(intersect(t_self, t_other))
                         val = 1;
                         return;
