@@ -296,7 +296,7 @@ classdef Analysis < file.AstroData
             
         end
         
-        function run(obj)
+        function obj = run(obj)
             
             if ~obj.cal.checkDark
                 error('Cannot start a new run without loading darks into calibration object!');
@@ -502,7 +502,7 @@ classdef Analysis < file.AstroData
                 
                 I = double(obj.stack_proc);
                 if obj.use_fits_flip
-                    I = rot(I,180);
+                    I = rot90(I,2);
                 end
                 
                 if obj.use_fits_roi && ~isempty(obj.fits_roi)
