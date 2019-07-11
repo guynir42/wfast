@@ -139,11 +139,13 @@ classdef Reader < file.AstroData
         frame_index_start = 1; % in each file, start reading from this index
         frame_index_finish = []; % in each file, finish reading on this index (or to the end of file)
         
-        % Area Of Interest
+        % Area Of Interest (to be depricated)
         AOI_left;
         AOI_width;
         AOI_top;
         AOI_height;
+        
+        ROI = [1 1 2560 2160];
         
         use_transpose = 0; % switches rows for columns
         use_reshape = 0; % for files saved with the wrong row/column sizes (correct data, wrong division into rows/columns)

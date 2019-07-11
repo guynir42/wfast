@@ -18,7 +18,8 @@ classdef Analysis < file.AstroData
         clip_bg@img.Clipper;
         back@img.Background;
         phot@img.Photometry;
-        
+        phot_stack@img.Photometry;
+        flux_buf@util.vec.CircularBuffer;
 %         light_original@img.Lightcurves;
 %         light_basic@img.Lightcurves;
         lightcurves@img.Lightcurves;
@@ -31,6 +32,9 @@ classdef Analysis < file.AstroData
         finder@trig.Finder;
         
         prog@util.sys.ProgressBar;
+        
+        image_mextractor;
+        catalog;
         
         func; % any function that takes first argument this object and runs custom analysis
         
@@ -52,6 +56,8 @@ classdef Analysis < file.AstroData
         
         prev_stack;
         
+        num_stars_found;
+        
         FWHM; % latest measured full width half maximum
         
         batch_counter = 0;
@@ -59,6 +65,10 @@ classdef Analysis < file.AstroData
     end
     
     properties % switches/controls
+        
+        num_stars = 500;
+        cut_size = 21;
+        saturation_value = 50000; % consider any pixels above this to be saturated
         
         use_background_stack = 1; % subtract b/g from the full-frame stack
         use_background_cutouts = 1; % subtract b/g from the cutouts (and stack cutouts!)
@@ -68,6 +78,8 @@ classdef Analysis < file.AstroData
         use_fits_flip = 0;
         use_fits_roi = 0;
         fits_roi = [];
+        
+        min_star_temp; % when using MAAT astrometry, select only stars above this effective temperature
         
         use_audio = 0;
         
@@ -81,6 +93,8 @@ classdef Analysis < file.AstroData
     properties(Dependent=true)
         
         num_batches;
+        average_width;
+        average_offsets;
         
     end
     
@@ -92,6 +106,8 @@ classdef Analysis < file.AstroData
         use_cutout_adjustment = 0; % turn adjustments on/off
         cutout_adjustment_pixels = 0; % how many pixels to push (back or forward) relative to today's positions
         use_cutout_adjustment_floor = 0; % use floor of positions before (instead of) using round(). 
+        
+        prev_average_width;
         
         num_batches_limit;
         version = 1.01;
@@ -120,6 +136,10 @@ classdef Analysis < file.AstroData
                 obj.phot.use_basic = 0;
                 obj.phot.use_aperture = 1;
                 obj.phot.use_gaussian = 0;
+                
+                obj.phot_stack = img.Photometry;
+                obj.flux_buf = util.vec.CircularBuffer;
+                
 %                 obj.light_original = img.Lightcurves; 
 %                 obj.light_basic = img.Lightcurves; obj.light_basic.signal_method = 'square'; obj.light_basic.background_method = 'corners';
                 obj.lightcurves = img.Lightcurves; obj.lightcurves.signal_method = 'aperture'; obj.lightcurves.background_method = 'annulus';
@@ -159,6 +179,8 @@ classdef Analysis < file.AstroData
             
             obj.batch_counter = 0;
 
+            obj.clear;
+            
             obj.prev_stack = [];
             
         end
@@ -175,6 +197,15 @@ classdef Analysis < file.AstroData
                 
             end
             
+            clear@file.AstroData(obj);
+            
+            obj.cutouts_proc = [];
+            obj.cutouts_sub = [];
+            obj.cutouts_bg_proc = [];
+            obj.stack_cutouts = [];
+            obj.stack_cutouts_sub = [];
+            obj.stack_cutouts_bg = [];
+            obj.stack_proc = [];
         end
         
     end
@@ -194,6 +225,34 @@ classdef Analysis < file.AstroData
             else
                 val = obj.FWHM.*obj.pars.SCALE;
             end
+            
+        end
+        
+        function val = thisFilename(obj)
+            
+            val = obj.reader.prev_filename;
+            
+        end
+        
+        function val = getWidthEstimate(obj)
+            
+            if isempty(obj.prev_average_width) || ~isreal(obj.prev_average_width) || obj.prev_average_width<=0
+                val = 1.6;
+            else
+                val = obj.prev_average_width;
+            end
+            
+        end
+        
+        function val = get.average_width(obj)
+            
+            val = (obj.model_psf.maj_axis+obj.model_psf.min_axis)/2;
+            
+        end
+        
+        function val = get.average_offsets(obj)
+            
+            val = [obj.phot_stack.average_offset_x obj.phot_stack.average_offset_y];
             
         end
         
@@ -221,7 +280,7 @@ classdef Analysis < file.AstroData
             
             obj.brake_bit = val;
             obj.reader.brake_bit = val;
-            
+
         end
     
         function set.num_batches(obj, val)
@@ -248,19 +307,19 @@ classdef Analysis < file.AstroData
                 end
             end
             
-            obj.cal.reader_dark.dir.cd(obj.reader.dir.pwd);
-            obj.cal.reader_dark.dir.cd('..');
-            if obj.cal.reader_dark.dir.smart_cd('dark')
-                obj.cal.reader_dark.loadFiles;
-            end
-            
-            obj.cal.reader_flat.dir.cd(obj.reader.dir.pwd);
-            obj.cal.reader_flat.dir.cd('..');
-            if obj.cal.reader_flat.dir.smart_cd('flat')
-                obj.cal.reader_flat.loadFiles;
-            end
-            
-            obj.cal.load; 
+%             obj.cal.reader_dark.dir.cd(r.dir.pwd);
+%             obj.cal.reader_dark.dir.cd('..');
+%             if obj.cal.reader_dark.dir.smart_cd('dark')
+%                 obj.cal.reader_dark.loadFiles;
+%             end
+%             
+%             obj.cal.reader_flat.dir.cd(r.dir.pwd);
+%             obj.cal.reader_flat.dir.cd('..');
+%             if obj.cal.reader_flat.dir.smart_cd('flat')
+%                 obj.cal.reader_flat.loadFiles;
+%             end
+%             
+%             obj.cal.load; 
             
         end
         
@@ -337,32 +396,54 @@ classdef Analysis < file.AstroData
             
             t = tic;
             
+            obj.clear;
+            
             obj.reader.batch;
             obj.copyFrom(obj.reader); 
-            obj.clip.positions = obj.positions;
-            obj.clip.cut_size = size(obj.cutouts,1);
             
-            if obj.use_cutout_adjustment
+            if isempty(obj.images) && isempty(obj.stack)
+                disp(['empty batch in filename: ' obj.thisFilename]);
+                return;
+            elseif ~isempty(obj.images)
+                obj.num_sum = size(obj.images,3);
+                obj.stack = util.stat.sum_single(obj.images); % sum along the 3rd dimension directly into single precision
+                obj.positions = obj.clip.positions;
+                obj.positions_bg = obj.clip_bg.positions;
+            elseif ~isempty(obj.stack)
                 
-                if obj.use_cutout_adjustment_floor
-                    obj.clip.positions = floor(obj.positions) + obj.cutout_adjustment_pixels;
-                else
-                    obj.clip.positions = obj.positions + obj.cutout_adjustment_pixels;
+                obj.clip.positions = obj.positions;
+                obj.clip.cut_size = size(obj.cutouts,1);
+                
+                obj.num_stars_found = size(obj.positions,1);
+                
+                obj.clip_bg.positions = obj.positions_bg;
+                obj.clip_bg.cut_size = size(obj.cutouts_bg,1);
+                
+                if isempty(obj.num_sum) 
+                    if ~isempty(obj.cutouts)
+                        obj.num_sum = size(obj.cutouts,3);
+                    else
+                        error('Unknown num_sum, and no cutouts to figure it out!');
+                    end
                 end
                 
             end
             
-            obj.clip_bg.positions = obj.positions_bg;
-            obj.clip_bg.cut_size = size(obj.cutouts_bg,1);
+%             if obj.use_cutout_adjustment
+%                 
+%                 if obj.use_cutout_adjustment_floor
+%                     obj.clip.positions = floor(obj.positions) + obj.cutout_adjustment_pixels;
+%                 else
+%                     obj.clip.positions = obj.positions + obj.cutout_adjustment_pixels;
+%                 end
+%                 
+%             end
             
             if isempty(obj.positions_bg)
                 obj.clip_bg.num_stars = 50;
                 obj.clip_bg.cut_size = 20;
                 obj.clip_bg.arbitraryPositions;
-            end
-            
-            if isempty(obj.num_sum)
-                obj.num_sum = size(obj.cutouts,3);
+                obj.positions_bg = obj.clip_bg.positions;
             end
             
             if obj.debug_bit>1, fprintf('Time to get data: %f seconds\n', toc(t)); end
@@ -378,6 +459,10 @@ classdef Analysis < file.AstroData
                 obj.stack_proc = obj.cal.input(obj.stack, 'sum', obj.num_sum);
             end
             
+            if isempty(obj.positions)
+                obj.findStars;
+            end
+
             % cutouts of the stack
             obj.stack_cutouts = obj.clip.input(obj.stack_proc); 
             obj.stack_cutouts_bg = obj.clip_bg.input(obj.stack_proc); 
@@ -402,11 +487,24 @@ classdef Analysis < file.AstroData
                 obj.stack_cutouts_sub = obj.stack_cutouts;
             end
             
+            if isempty(obj.cutouts) && ~isempty(obj.images)
+                obj.adjustPositions; % got a chance to realign the positions before making cutouts from raw images
+            end
+            
             if obj.debug_bit>1, fprintf('Time for stack analysis: %f seconds\n', toc(t)); end
             
             %%%%%%%%%%%%%%%%%%%%% CUTOUT ANALYSIS %%%%%%%%%%%%%%%%%%%%%%%%%
             
             t = tic;
+            
+            if isempty(obj.cutouts)
+                if ~isempty(obj.images)
+                    obj.cutouts = obj.clip.input(obj.images);
+                    obj.cutouts_bg = obj.clip_bg.input(obj.images);
+                else
+                    error('Cannot produce cutouts without images!');
+                end
+            end
             
             obj.cutouts_proc = obj.cal.input(obj.cutouts, 'clip', obj.clip);
             
@@ -477,7 +575,7 @@ classdef Analysis < file.AstroData
             
             obj.finder.input(f, e, a, b, v, x, y, w, p, r, g, ...
                 obj.timestamps, obj.cutouts_proc, obj.positions, obj.stack_proc, ...
-                obj.batch_counter+1, 'filename', obj.reader.prev_filename, ...
+                obj.batch_counter+1, 'filename', obj.thisFilename, ...
                 't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp,...
                 'used_background', obj.phot.use_backgrounds, 'pars', phot_pars);
             
@@ -487,7 +585,7 @@ classdef Analysis < file.AstroData
             
             if obj.use_fits_save
                 
-                [d, f] = fileparts(obj.reader.this_filename);
+                [d, f] = fileparts(obj.thisFilename);
                 
                 d = strrep(d, ' (Weizmann Institute)', '');
                 
@@ -525,6 +623,158 @@ classdef Analysis < file.AstroData
             end
             
             drawnow;
+            
+        end
+        
+        function findStars(obj)
+            
+            T = util.img.quick_find_stars(obj.stack_proc, 'psf', obj.getWidthEstimate, 'number', obj.num_stars,...
+               'dilate', obj.cut_size-5, 'saturation', obj.saturation_value.*obj.num_sum, 'unflagged', 1); 
+            
+            if isempty(T)
+                error('Could not find any stars using quick_find_stars!');
+            end
+
+            obj.clip.positions = T.pos;
+            obj.positions = T.pos;
+
+        end
+        
+        function adjustPositions(obj)
+            
+            obj.stack_cutouts = obj.clip.input(obj.stack_proc);  
+
+            obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.clip.positions); % run photometry on the stack to verify flux and adjust positions
+            if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
+
+            obj.checkRealign;
+            
+            % store the latest fluxes from the stack cutouts
+            obj.flux_buf.input(obj.phot_stack.fluxes);
+
+            obj.clip.positions = double(obj.clip.positions + obj.average_offsets);
+            
+            obj.model_psf.input(obj.stack_cutouts, obj.phot_stack.offsets_x, obj.phot_stack.offsets_y);
+            
+            obj.prev_average_width = obj.average_width;
+            
+        end
+        
+        function checkRealign(obj)
+            
+            if size(obj.flux_buf.data, 2)~=size(obj.phot_stack.fluxes,2)
+                obj.flux_buf.reset;
+            end
+            
+            if ~is_empty(obj.flux_buf) % check that stars are still aligned properly... 
+                
+                mean_fluxes = obj.flux_buf.mean;
+                mean_fluxes(mean_fluxes<=0) = NaN;
+
+                new_fluxes = obj.phot_stack.fluxes;
+                new_fluxes(isnan(mean_fluxes)) = [];
+                mean_fluxes(isnan(mean_fluxes)) = [];
+
+                % maybe 0.5 is arbitrary and should be turned into parameters?
+                if sum(new_fluxes<0.5*mean_fluxes)>0.5*numel(mean_fluxes) % lost half the flux in more than half the stars...
+
+                    disp('Lost star positions, using quick_align');
+                    
+                    [~,shift] = util.img.quick_align(obj.stack_proc, obj.ref_stack);
+                    obj.clip.positions = double(obj.ref_positions + flip(shift));
+                    
+                    obj.stack_cutouts = obj.clip.input(obj.stack_proc);
+
+                    obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.positions); % run photometry on the stack to verify flux and adjust positions
+                    if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
+                    
+                end
+
+                % add second test and maybe quit the run if it fails...
+                
+            end
+            
+        end
+        
+        function S = runMextractor(obj, I)
+            
+            if isempty(which('mextractor'))
+                error('Cannot load the MAAT package. Make sure it is on the path...');
+            end
+            
+            if nargin<2 || isempty(I)
+                I = obj.stack_proc;
+            end
+            
+            if isempty(I)
+                error('Must supply an image to run mextractor (or fill stack_proc).');
+            end
+            
+            I = regionfill(I, isnan(I));
+            
+            S = SIM;
+            S.Im = I;
+            evalc('S = mextractor(S);');
+            
+            SN = S.Cat(:,find(strcmp(S.ColCell, 'SN')));
+            SN2 = S.Cat(:,find(strcmp(S.ColCell, 'SN_UNF')));
+            S.Cat = S.Cat(SN>SN2-2,:);
+            
+            obj.image_mextractor = S;
+            
+        end
+        
+        function T = runAstrometry(obj, S)
+            
+            if isempty(which('astrometry'))
+                error('Cannot load the MAAT package. Make sure it is on the path...');
+            end
+            
+            if nargin<2 || isempty(S)
+                if ~isempty(obj.image_mextractor)
+                    S = obj.image_mextractor;
+                else
+                    error('Must supply a SIM object to run astrometry (or fill image_mextractor).');
+                end
+            end
+            
+%             addpath(fullfile(getenv('DATA'), 'GAIA\DR2'));
+            
+            [~,S]=astrometry(S, 'RA', obj.pars.RA_DEG/180*pi, 'Dec', obj.pars.DEC_DEG/180*pi, 'Scale', obj.pars.SCALE, 'Flip',[1 1;1 -1;-1 1;-1 -1], 'RefCatMagRange', [7 17], 'BlockSize', [3000 3000], 'ApplyPM', false);
+            
+            % update RA/Dec in catalog according to WCS
+            obj.image_mextractor = update_coordinates(S);
+            
+            %  Match sources with GAIA
+            SS = catsHTM.sources_match('GAIADR2',obj.image_mextractor);
+            
+            SS.Cat = SS.Cat(~isnan(SS.Cat(:,1)),:);
+            
+            [~, idx] = unique(SS.Cat(:,1:2), 'rows');
+            
+            T = array2table(SS.Cat(idx,:), 'VariableNames', SS.ColCell);
+            
+            T = T(T{:,'Mag_G'}<16.5,:); % remove very faint stars... 
+            
+            obj.catalog = T;
+            
+        end
+        
+        function findStarsMAAT(obj)
+            
+            if isempty(which('mextractor'))
+                error('Cannot load the MAAT package. Make sure it is on the path...');
+            end
+            
+            T = obj.catalog;
+            
+            if obj.min_star_temp
+                T = T(T{:,'Teff'}>=obj.min_star_temp,:); % select only stars with temperature above minimal level (hotter stars have smaller angular scale)
+            end
+            
+            T = sortrows(T, 'Mag_G');
+            
+            
             
         end
         

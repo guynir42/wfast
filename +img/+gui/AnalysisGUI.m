@@ -96,6 +96,8 @@ classdef AnalysisGUI < handle
             
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'controls', 1); % last input is for vertical (default)
             obj.panel_controls.number = N;
+            obj.panel_controls.addButton('button_browse', 'chooseDir', 'push', 'browse', '', '', 0.5, '', '', 'Choose a folder to analize'); 
+            obj.panel_controls.addButton('button_', '', 'custom', ' ', '', '', 0.5, '', '', '');
             obj.panel_controls.addButton('button_reset', 'reset', 'push', 'RESET', '', '', 0.5, '', '', 'Start a new run by reseting all events and lightcurves');
             obj.panel_controls.addButton('input_num_batches', 'num_batches', 'input', 'Nbatch= ', '', 'small', 0.5, '', '', 'Maximum batches, limited by user input or by number of files in reader'); 
             obj.panel_controls.addButton('button_bg_stack', 'use_background_stack', 'toggle', 'b/g stack off', 'b/g stack on', 'small', 0.5, 'red', '', 'Subtract background from stack images');

@@ -187,6 +187,13 @@ classdef Photometry < handle
             
             obj.var_map = [];
             obj.gain = [];
+
+            obj.average_flux = [];
+            obj.average_background = [];
+            obj.average_variance = [];
+            obj.average_offset_x = [];
+            obj.average_offset_y = [];
+            obj.average_width = [];
             
             obj.clear;
             

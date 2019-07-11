@@ -94,6 +94,7 @@ classdef Acquisition < file.AstroData
         use_save = false; % must change this when we are ready to really start
         use_triggered_save = false;
         
+        use_sync = 1; % if false, do not send or receive messages from PcSync object
         use_ignore_manager = 0; % if true, will not use any data from Manager (via sync object)
         use_ignore_manager_stop = 0; % if true, will not respect stop commands from Manager (via sync object)
         
@@ -1124,7 +1125,7 @@ classdef Acquisition < file.AstroData
                     
                 end
                 
-                if obj.use_ignore_manager_stop==0 && isfield(s, 'stop_camera') && s.stop_camera
+                if obj.use_sync && obj.use_ignore_manager_stop==0 && isfield(s, 'stop_camera') && s.stop_camera
                     obj.brake_bit = 1; % allow for manager to send stop command to camera... 
                 end
                 
@@ -1182,7 +1183,7 @@ classdef Acquisition < file.AstroData
         
         function update(obj, input)
             
-            if obj.use_ignore_manager==0
+            if obj.use_sync && obj.use_ignore_manager==0
                 obj.getSyncData;
             end
             

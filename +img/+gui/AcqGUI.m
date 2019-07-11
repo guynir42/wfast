@@ -428,7 +428,9 @@ classdef AcqGUI < handle
                 end
             end
             
-            obj.panel_objects.button_focuser.String = sprintf('Focuser: %6.4f', obj.owner.cam.focuser.pos);
+            if ~isempty(obj.owner.cam) && ~isempty(obj.owner.cam.focuser)
+                obj.panel_objects.button_focuser.String = sprintf('Focuser: %6.4f', obj.owner.cam.focuser.pos);
+            end
             
             drawnow;
             

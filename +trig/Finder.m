@@ -138,6 +138,8 @@ classdef Finder < handle
             obj.filt.reset;
             
             obj.prev_fluxes = [];
+            obj.prev_errors = [];
+            obj.prev_areas = [];
             obj.prev_backgrounds = [];
             obj.prev_variances = [];
             obj.prev_offsets_x = [];
@@ -165,6 +167,8 @@ classdef Finder < handle
         function clear(obj)
             
             obj.fluxes = [];
+            obj.errors = [];
+            obj.areas = [];
             obj.backgrounds = [];
             obj.variances = [];
             obj.offsets_x = [];
@@ -361,7 +365,7 @@ classdef Finder < handle
             
             good_stars = obj.cal.star_snrs>obj.min_star_snr;
             
-            [~,idx] = util.stat.maxnd(abs(ff(1:length(obj.timestamps),:,good_stars))); % only get the best S/N for first batch (for record keeping)
+            [~,idx] = util.stat.maxnd(abs(ff.*util.vec.topages(good_stars))); % only get the best S/N for first batch (for record keeping)
             
             if isempty(idx)
                 return; % this can happen if all stars are below the S/N threshold
