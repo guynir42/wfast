@@ -107,6 +107,9 @@ classdef Analysis < file.AstroData
         cutout_adjustment_pixels = 0; % how many pixels to push (back or forward) relative to today's positions
         use_cutout_adjustment_floor = 0; % use floor of positions before (instead of) using round(). 
         
+        analysis_dir_save = 0;
+        analysis_dir_log = 0;
+        
         prev_average_width;
         
         num_batches_limit;
@@ -182,6 +185,9 @@ classdef Analysis < file.AstroData
             obj.clear;
             
             obj.prev_stack = [];
+            
+            obj.analysis_dir_save = 0;
+            obj.analysis_dir_log = 0;
             
         end
         
@@ -291,7 +297,7 @@ classdef Analysis < file.AstroData
         
     end
     
-    methods % calculations
+    methods % utilities
         
         function chooseDir(obj, dirname)
             
@@ -322,6 +328,56 @@ classdef Analysis < file.AstroData
 %             obj.cal.load; 
             
         end
+        
+        function write_log(obj, filename)
+            
+            fid = fopen(filename, 'at');
+            on_cleanup = onCleanup(@() fclose(fid));
+            
+            obs_date = obj.pars.STARTTIME;
+            read_date = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
+            
+            ev_str = '';
+            
+            for ii = 1:length(obj.finder.last_events)
+                
+                if obj.finder.last_events(ii).keep
+                    star_str = '*';
+                else
+                    star_str = '';
+                end
+                
+                ev_str = sprintf('%s%4.2f%s ', obj.finder.last_events(ii).snr, star_str);
+                
+            end
+            
+            f = [0 0 0];
+            if ~isempty(obj.fluxes), f(1) = obj.fluxes(1,1); end
+            if size(obj.fluxes,2)>=10, f(2) = obj.fluxes(1,10); end
+            if size(obj.fluxes,2)>=100, f(3) = obj.fluxes(1,100); end
+            
+            fprintf(fid, 'Batch: %04d, ObsDate: %s, Flux: [%6.3f %6.3f %6.3f], Events S/N: [%s], ReadDate: %s\n',...
+                obj.batch_counter, obs_date, f(1), f(2), f(3), ev_str, read_date);
+            
+        end
+        
+        function saveResults(obj, dirname, varargin)
+            
+            % add parsing of varargin later
+            
+            
+            name = obj.pars.OBJECT;
+            
+            obj.lightcurves.saveAsMAT(fullfile(dirname, ['lightcurves_' name]));
+            
+            finder = obj.finder;
+            save(fullfile(dirname, ['finder_' name]), 'finder');
+            
+        end
+        
+    end
+    
+    methods % calculations
         
         function startup(obj)
             
@@ -355,10 +411,46 @@ classdef Analysis < file.AstroData
             
         end
         
-        function obj = run(obj)
+        function obj = run(obj, varargin)
             
             if ~obj.cal.checkDark
                 error('Cannot start a new run without loading darks into calibration object!');
+            end
+            
+            input = util.text.InputVars;
+            input.input_var('reset', 0); % reset the object before running (i.e., start a new run)
+            input.input_var('logging', []); % create log files in the analysis folder
+            input.input_var('save', []); % save the events and lightcurves from this run
+            input.scan_vars(varargin{:});
+            
+            if input.reset
+                obj.reset;
+            end
+            
+            % update hidden variables in case we use GUI to stop then continue this run
+            if ~isempty(input.logging)
+                obj.analysis_dir_log = input.logging;
+            end
+            
+            if ~isempty(input.save)
+                obj.analysis_dir_save = input.save;
+            end
+            
+            if obj.analysis_dir_log || obj.analysis_dir_save
+                
+                log_time = datetime('now', 'TimeZone', 'UTC');
+                log_dir = fullfile(obj.reader.dir.pwd, ['analysis_' char(log_time, 'yyyy-MM-dd')]);
+                log_name = fullfile(log_dir, 'analysis_log.txt');
+                log_obj = fullfile(log_dir, 'analysis_parameters.txt');
+                
+                if obj.batch_counter==0
+                    if exist(log_dir, 'dir')
+                        error('Folder %s already exists! Is this run already being processed?', log_dir);
+                    else
+                        mkdir(log_dir);
+                    end
+                end
+                
             end
             
             cleanup = onCleanup(@() obj.finishup);
@@ -367,10 +459,17 @@ classdef Analysis < file.AstroData
             for ii = obj.batch_counter+1:obj.num_batches
                 
                 if obj.brake_bit
-                    return;
+                    return; % skip the saving of events/lightcurves
                 end
                 
                 obj.batch;
+                
+                if obj.analysis_dir_log
+                    obj.write_log(log_name);
+                    if ~exist(log_obj, 'file')
+                        util.oop.save(obj, log_obj, 'hidden', 1); 
+                    end
+                end
                 
                 if ~isempty(obj.func)
                     feval(obj.func, obj);
@@ -386,6 +485,11 @@ classdef Analysis < file.AstroData
                 
                 obj.batch_counter = obj.batch_counter + 1;
                 
+            end
+            
+            % only do this if all batches were processed
+            if obj.analysis_dir_save
+                obj.saveResults(log_dir);
             end
             
         end
@@ -486,6 +590,8 @@ classdef Analysis < file.AstroData
             else
                 obj.stack_cutouts_sub = obj.stack_cutouts;
             end
+            
+            obj.phot_stack.input(obj.stack_cutouts_sub, 'positions', obj.clip.positions); % run photometry on the stack to verify flux and adjust positions
             
             if isempty(obj.cutouts) && ~isempty(obj.images)
                 obj.adjustPositions; % got a chance to realign the positions before making cutouts from raw images
@@ -642,9 +748,6 @@ classdef Analysis < file.AstroData
         
         function adjustPositions(obj)
             
-            obj.stack_cutouts = obj.clip.input(obj.stack_proc);  
-
-            obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.clip.positions); % run photometry on the stack to verify flux and adjust positions
             if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
 
             obj.checkRealign;
