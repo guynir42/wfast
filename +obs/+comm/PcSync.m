@@ -3,7 +3,8 @@ classdef PcSync < handle
 
     properties(Transient=true)
         
-        hndl;
+        hndl_rx;
+        hndl_tx;
         
     end
     
@@ -29,7 +30,8 @@ classdef PcSync < handle
     properties % switches/controls
         
         remote_ip = '192.168.1.100';
-        remote_port = 4012;
+        remote_port_rx = 4012;
+        remote_port_tx = 4013;
         role = '';
         
         debug_bit = 1;
@@ -49,7 +51,12 @@ classdef PcSync < handle
         default_client_remote_ip = '192.168.1.101';
         default_server_remote_ip = '192.168.1.100';
         
-        version = 1.00;
+        default_server_remote_port_rx = 4012;
+        default_server_remote_port_tx = 4013;
+        default_client_remote_port_rx = 4013;
+        default_client_remote_port_tx = 4012;
+        
+        version = 1.01;
         
     end
     
@@ -68,11 +75,19 @@ classdef PcSync < handle
                 if isscalar(varargin) && ischar(varargin{1})
                     
                     if cs(varargin{1}, 'server')
+                        
                         obj.role = 'Server';
                         obj.remote_ip = obj.default_server_remote_ip;
+                        obj.remote_port_rx = obj.default_server_remote_port_rx;
+                        obj.remote_port_tx = obj.default_server_remote_port_tx;
+                        
                     elseif cs(varargin{1}, 'client')
+                        
                         obj.role = 'Client';
                         obj.remote_ip = obj.default_client_remote_ip;
+                        obj.remote_port_rx = obj.default_client_remote_port_rx;
+                        obj.remote_port_tx = obj.default_client_remote_port_tx;
+                        
                     % add additional initializations? 
                     end
                     
@@ -111,29 +126,11 @@ classdef PcSync < handle
     
     methods % getters
         
-        function val = get.name(obj)
-            
-            if isempty(obj.hndl)
-                val = [];
-            else
-                val = obj.hndl.Name;
-            end
-            
-        end
-        
-        function val = get.timeout(obj)
-            
-            if isempty(obj.hndl)
-                val = [];
-            else
-                val = obj.hndl.Timeout;
-            end
-            
-        end
-        
         function val = get.is_connected(obj)
             
-            if isempty(obj.hndl) || ~isvalid(obj.hndl) || ~strcmp(obj.hndl.Status, 'open')
+            if isempty(obj.hndl_rx) || isempty(obj.hndl_tx) ...
+                    || ~isvalid(obj.hndl_rx) || ~isvalid(obj.hndl_tx) ...
+                    || ~strcmp(obj.hndl_rx.Status, 'open') || ~strcmp(obj.hndl_tx.Status, 'open')
                 val = 0;
             else
                 val = 1;
@@ -145,22 +142,6 @@ classdef PcSync < handle
     
     methods % setters
         
-        function set.name(obj, val)
-            
-            if ~isempty(obj.hndl)
-                obj.hndl.Name = val;
-            end
-            
-        end
-        
-        function set.timeout(obj, val)
-            
-            if ~isempty(obj.hndl)
-                obj.hndl.Timeout = val;
-            end
-            
-        end
-        
     end
     
     methods % calculations
@@ -171,7 +152,7 @@ classdef PcSync < handle
                 timeout = 10; % we will need to be smart about implementing this timeout, maybe using an extra worker
             end
             
-            obj.log.input(['Setting up new connection to ' obj.remote_ip ':' num2str(obj.remote_port) ' with role: ' obj.role]);
+            obj.log.input(['Setting up new connection to ' obj.remote_ip ':' num2str(obj.remote_port_tx) '/' num2str(obj.remote_port_rx) ' with role: ' obj.role]);
             
             try
                 
@@ -181,14 +162,23 @@ classdef PcSync < handle
                 
                 obj.disconnect;
                 
-                obj.hndl = tcpip(obj.remote_ip, obj.remote_port, 'NetworkRole', obj.role, 'Timeout', 10);
-                obj.hndl.BytesAvailableFcn = @obj.read_data;
-                obj.hndl.BytesAvailableFcnMode = 'byte';
-                obj.hndl.BytesAvailableFcnCount = 32;
-                obj.hndl.OutputBufferSize = 50*1024; 
-                obj.hndl.InputBufferSize = 50*1024;
+                obj.hndl_tx = tcpip(obj.remote_ip, obj.remote_port_tx, 'NetworkRole', obj.role, 'Timeout', 10);
+                obj.hndl_tx.BytesAvailableFcn = @obj.read_data;
+                obj.hndl_tx.BytesAvailableFcnMode = 'byte';
+                obj.hndl_tx.BytesAvailableFcnCount = 32;
+                obj.hndl_tx.OutputBufferSize = 50*1024; 
+                obj.hndl_tx.InputBufferSize = 50*1024;
                 
-                fopen(obj.hndl);
+                fopen(obj.hndl_tx);
+            
+                obj.hndl_rx = tcpip(obj.remote_ip, obj.remote_port_rx, 'NetworkRole', obj.role, 'Timeout', 10);
+                obj.hndl_rx.BytesAvailableFcn = @obj.read_data;
+                obj.hndl_rx.BytesAvailableFcnMode = 'byte';
+                obj.hndl_rx.BytesAvailableFcnCount = 32;
+                obj.hndl_rx.OutputBufferSize = 50*1024; 
+                obj.hndl_rx.InputBufferSize = 50*1024;
+                
+                fopen(obj.hndl_rx);
             
                 obj.update;
                 
@@ -201,57 +191,73 @@ classdef PcSync < handle
         
         function disconnect(obj)
             
-            if ~isempty(obj.hndl) && isvalid(obj.hndl)
-                delete(obj.hndl);
-                obj.hndl = [];
+            if ~isempty(obj.hndl_tx) && isvalid(obj.hndl_tx)
+                delete(obj.hndl_tx);
+                obj.hndl_tx = [];
+            end
+            
+            if ~isempty(obj.hndl_rx) && isvalid(obj.hndl_rx)
+                delete(obj.hndl_rx);
+                obj.hndl_rx = [];
             end
 
         end
         
-        function send(obj, value)
+        function send(obj, value, rx_or_tx)
             
-            obj.raw_data_sent = getByteStreamFromArray(value);
-            obj.checksum = util.oop.getHash(obj.raw_data_sent);
-            fwrite(obj.hndl, obj.raw_data_sent);
+            if nargin<3 || isempty(rx_or_tx)
+                rx_or_tx = 'tx';
+            end
             
+            if strcmpi(rx_or_tx, 'tx') % primary transmission mode
+                obj.raw_data_sent = getByteStreamFromArray(value);
+                obj.checksum = util.oop.getHash(obj.raw_data_sent);
+                fwrite(obj.hndl_tx, obj.raw_data_sent);
+            elseif strcmpi(rx_or_tx, 'rx') % reply only (e.g., sending back the hash of latest incoming data)
+                temp_raw_data = getByteStreamFromArray(value);
+                fwrite(obj.hndl_rx, temp_raw_data);
+            else
+                error('Must choose RX or TX for 3rd input to send()');
+            end
+                
         end
         
         function update(obj)
             
             if obj.is_connected
-                obj.hndl.BytesAvailableFcn = @obj.read_data;
+                obj.hndl_rx.BytesAvailableFcn = @obj.read_data;
                 obj.outgoing.time = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
 
                 obj.status = 0;
-                flushinput(obj.hndl);
+                flushinput(obj.hndl_tx);
                 obj.send(obj.outgoing);
             end
             
         end
         
-        function confirm(obj)
+        function reply_hash(obj)
             
-            obj.send(util.oop.getHash(obj.raw_data_received));
+            obj.send(util.oop.getHash(obj.raw_data_received), 'rx');
             
         end
         
-        function read_data(obj, ~, ~)
+        function read_data(obj, hndl, ~)
             
-            if obj.debug_bit>1, fprintf('read data with %d bytes\n', obj.hndl.BytesAvailable); end
+            if obj.debug_bit>1, fprintf('read data with %d bytes\n', hndl.BytesAvailable); end
             
-            if obj.hndl.BytesAvailable>0
+            if hndl.BytesAvailable>0
                 
-                obj.raw_data_received = uint8(fread(obj.hndl, obj.hndl.BytesAvailable))';
+                data = uint8(fread(hndl, hndl.BytesAvailable))';
                 
                 try
-                    value = getArrayFromByteStream(obj.raw_data_received);
+                    value = getArrayFromByteStream(data);
                 catch ME
                     value = [];
                     warning(ME.getReport)
                 end
                 
                 if isempty(value)
-                    % what to do here??
+                    % pass 
                 elseif ischar(value)
                     if strcmp(obj.checksum, value)
                         obj.status = 1;
@@ -259,6 +265,7 @@ classdef PcSync < handle
                         error('Received a response: %s which is not consistent with checksum: %s', value, obj.checksum);
                     end
                 elseif isstruct(value)
+                    obj.raw_data_received = data;
                     obj.incoming = value;
                     obj.status = 1;
                     obj.confirm;
