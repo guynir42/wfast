@@ -97,6 +97,9 @@ classdef Acquisition < file.AstroData
         use_sync = 1; % if false, do not send or receive messages from PcSync object
         use_ignore_manager = 0; % if true, will not use any data from Manager (via sync object)
         use_ignore_manager_stop = 0; % if true, will not respect stop commands from Manager (via sync object)
+        use_autoguide = 1; % if true, send back adjustments on drifts to telescope
+        
+        camera_angle = 15; % degrees between image top and cardinal south/north (when after meridian)
         
         % display parameters
         use_show = true;
@@ -339,6 +342,9 @@ classdef Acquisition < file.AstroData
             obj.batch_counter = 0;
             obj.start_index = 1;
             obj.positions = [];
+            
+            obj.sync.outgoing.RA_rate = 0;
+            obj.sync.outgoing.DE_rate = 0;
 
         end
         
@@ -414,14 +420,24 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function val = getTimeLeft(obj)
+        function val = getFrameRateEstimate(obj)
             
             if ~isempty(obj.frame_rate_average)
-                val = (obj.num_batches-obj.batch_counter).*obj.batch_size./obj.frame_rate_average;
+                val = obj.frame_rate_average;
             elseif ~isempty(obj.frame_rate) && ~isnan(obj.frame_rate)
-                val = (obj.num_batches-obj.batch_counter).*obj.batch_size./obj.frame_rate;
+                val = obj.frame_rate;
             else
                 val = [];
+            end
+            
+        end
+        
+        function val = getTimeLeft(obj)
+            
+            if isempty(obj.getFrameRateEstimate)
+                val = [];
+            else
+                val = (obj.num_batches-obj.batch_counter).*obj.batch_size./obj.getFrameRateEstimate;
             end
             
         end
@@ -1526,7 +1542,31 @@ classdef Acquisition < file.AstroData
                 if obj.use_adjust_cutouts
                     obj.clip.positions = double(obj.clip.positions + obj.average_offsets);
                 else
-                    % must send the average adjustment back to mount controller (should we still adjust the cutouts though??)
+                    
+                end
+                
+                if obj.batch_counter>5 && obj.use_sync && obj.use_autoguide && obj.sync.status
+                    % send the average adjustment back to mount controller (should we still adjust the cutouts though??)
+                    rot = [cosd(obj.camera_angle) sind(obj.camera_angle); -sind(obj.camera_angle) cosd(obj.camera_angle)];
+                    vec = rot*(obj.average_offsets.*obj.pars.SCALE./obj.batch_size.*obj.getFrameRateEstimate)'; % units of arcsec/second
+                    vec = vec*0.7;
+                    dRA = vec(1)/15; % convert from arcsec to RA seconds
+                    dDE = vec(2);
+                    
+                    if isfield(obj.sync.outgoing, 'RA_rate') && ~isempty(obj.sync.outgoing.RA_rate)
+                        obj.sync.outgoing.RA_rate = obj.sync.outgoing.RA_rate + dRA;
+                    else
+                        obj.sync.outgoing.RA_rate = dRA;
+                    end
+                    
+                    if isfield(obj.sync.outgoing, 'DE_rate') && ~isempty(obj.sync.outgoing.DE_rate)
+                        obj.sync.outgoing.DE_rate = obj.sync.outgoing.DE_rate + dDE;
+                    else
+                        obj.sync.outgoing.DE_rate = dDE;
+                    end
+                    
+                    obj.sync.update;
+                     
                 end
 
                 if obj.use_model_psf
