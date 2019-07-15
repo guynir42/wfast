@@ -127,7 +127,7 @@ classdef AcqGUI < handle
             obj.panel_controls.addButton('input_frame_rate', 'frame_rate', 'input', 'f= ', 'Hz', '', 0.5);
             
             obj.panel_controls.addButton('button_mextractor', 'use_mextractor', 'toggle', 'mextractor off', 'mextractor on', '', 0.5, obj.color_on);
-            obj.panel_controls.addButton('button_arbitrary_pos', 'use_arbitrary_pos', 'toggle', 'find pos', 'arbitrary pos', '', 0.5, obj.color_on, 'red');
+            obj.panel_controls.addButton('button_arbitrary_pos', 'use_arbitrary_pos', 'toggle', 'find pos', 'arbitrary pos', '', 0.5, 'red', obj.color_on);
             
             obj.panel_controls.addButton('button_adjust', 'use_adjust_cutouts', 'toggle', 'no adjust', 'adjust on', '', 0.5, obj.color_on);
             obj.panel_controls.addButton('button_background', 'use_background', 'toggle', 'sub b/g off', 'sub b/g on', '', 0.5, obj.color_on);
@@ -228,8 +228,8 @@ classdef AcqGUI < handle
             obj.panel_sync.addButton('button_autoguide', 'use_autoguide', 'toggle', 'guiding off', 'guiding on', '', 1, obj.color_on);
             obj.panel_sync.make;
             
-            obj.panel_sync.button_ignore_manager.Tooltip = 'Allow Manager to update camera with weather and coordinates';
-            obj.panel_sync.button_ignore_manager_stop.Tooltip = 'Allow Manager to send stop command when tracking is off or when shutting down observatory';
+            obj.panel_sync.button_sync.Tooltip = 'Allow Manager to update camera with weather/coordinates and send back guiding data';
+            obj.panel_sync.button_sync_stop.Tooltip = 'Allow Manager to send stop command when tracking is off or when shutting down observatory';
             
             %%%%%%%%%%% panel run %%%%%%%%%%%%%%%%%%
             
@@ -433,6 +433,14 @@ classdef AcqGUI < handle
             
             if ~isempty(obj.owner.cam) && ~isempty(obj.owner.cam.focuser)
                 obj.panel_objects.button_focuser.String = sprintf('Focuser: %6.4f', obj.owner.cam.focuser.pos);
+            end
+            
+            if obj.owner.use_sync
+                obj.panel_sync.button_sync_stop.Enable = 'on';
+                obj.panel_sync.button_autoguide.Enable = 'on';
+            else
+                obj.panel_sync.button_sync_stop.Enable = 'off';
+                obj.panel_sync.button_autoguide.Enable = 'off';
             end
             
             drawnow;
