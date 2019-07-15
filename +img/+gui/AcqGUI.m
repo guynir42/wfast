@@ -13,6 +13,8 @@ classdef AcqGUI < handle
         edit_font_size = 12;
         small_font_size = 11;
         
+        color_on = [0 0.3 1];
+        
         debug_bit = 1;
         
     end
@@ -124,14 +126,14 @@ classdef AcqGUI < handle
             obj.panel_controls.addButton('input_expT', 'expT', 'input', 'T= ', 's', '', 0.5);
             obj.panel_controls.addButton('input_frame_rate', 'frame_rate', 'input', 'f= ', 'Hz', '', 0.5);
             
-            obj.panel_controls.addButton('button_mextractor', 'use_mextractor', 'toggle', 'mextractor off', 'mextractor on', '', 0.5, 'red');
-            obj.panel_controls.addButton('button_arbitrary_pos', 'use_arbitrary_pos', 'toggle', 'find pos', 'arbitrary pos', '', 0.5, 'red');
+            obj.panel_controls.addButton('button_mextractor', 'use_mextractor', 'toggle', 'mextractor off', 'mextractor on', '', 0.5, obj.color_on);
+            obj.panel_controls.addButton('button_arbitrary_pos', 'use_arbitrary_pos', 'toggle', 'find pos', 'arbitrary pos', '', 0.5, obj.color_on, 'red');
             
-            obj.panel_controls.addButton('button_adjust', 'use_adjust_cutouts', 'toggle', 'no adjust', 'adjust on', '', 0.5, 'red');
-            obj.panel_controls.addButton('button_background', 'use_background', 'toggle', 'sub b/g off', 'sub b/g on', '', 0.5, 'red');
+            obj.panel_controls.addButton('button_adjust', 'use_adjust_cutouts', 'toggle', 'no adjust', 'adjust on', '', 0.5, obj.color_on);
+            obj.panel_controls.addButton('button_background', 'use_background', 'toggle', 'sub b/g off', 'sub b/g on', '', 0.5, obj.color_on);
             
-            obj.panel_controls.addButton('button_simple_phot', 'use_simple_photometry', 'toggle', 'full phot', 'simple phot', '', 0.5, 'red');
-            obj.panel_controls.addButton('button_model_psf', 'use_model_psf', 'toggle', 'no model PSF', 'use model PSF', '', 0.5, 'red');
+            obj.panel_controls.addButton('button_simple_phot', 'use_simple_photometry', 'toggle', 'full phot', 'simple phot', '', 0.5, obj.color_on);
+            obj.panel_controls.addButton('button_model_psf', 'use_model_psf', 'toggle', 'no model PSF', 'use model PSF', '', 0.5, obj.color_on);
             
             obj.panel_controls.margin = [0.02 0.01];
             obj.panel_controls.make;
@@ -207,8 +209,8 @@ classdef AcqGUI < handle
             pos = pos - N;
             obj.panel_save = GraphicPanel(obj.owner, [1-W_right pos/N_right W_right N/N_right], 'save');
             obj.panel_save.number = N;
-            obj.panel_save.addButton('button_save', 'use_save', 'toggle', 'save off', 'save on', '', 1, 'red');
-            obj.panel_save.addButton('button_trig', 'use_triggered_save', 'toggle', 'trig save off', 'trig save on', '', 1, 'red');
+            obj.panel_save.addButton('button_save', 'use_save', 'toggle', 'save off', 'save on', '', 1, obj.color_on, 'red');
+            obj.panel_save.addButton('button_trig', 'use_triggered_save', 'toggle', 'trig save off', 'trig save on', '', 1, obj.color_on);
             obj.panel_save.margin = [0.02 0.01];
             obj.panel_save.make;
             
@@ -221,9 +223,9 @@ classdef AcqGUI < handle
             pos = pos - N;
             obj.panel_sync = GraphicPanel(obj.owner, [1-W_right pos/N_right W_right N/N_right], 'sync');
             obj.panel_sync.number = N;
-            obj.panel_sync.addButton('button_ignore_manager', 'use_ignore_manager', 'toggle', 'sync on', 'sync ignored', '', 1, 'red');
-            obj.panel_sync.addButton('button_ignore_manager_stop', 'use_ignore_manager_stop', 'toggle', 'stop enabled', 'stop ignored', '', 1, 'red');
-            obj.panel_sync.addButton('button_autoguide', 'use_autoguide', 'toggle', 'guiding off', 'guiding on', '', 1, 'red');
+            obj.panel_sync.addButton('button_sync', 'use_sync', 'toggle', 'sync off', 'sync on', '', 1, obj.color_on);
+            obj.panel_sync.addButton('button_sync_stop', 'use_sync_stop', 'toggle', 'stop ignored', 'stop enabled', '', 1, obj.color_on);
+            obj.panel_sync.addButton('button_autoguide', 'use_autoguide', 'toggle', 'guiding off', 'guiding on', '', 1, obj.color_on);
             obj.panel_sync.make;
             
             obj.panel_sync.button_ignore_manager.Tooltip = 'Allow Manager to update camera with weather and coordinates';

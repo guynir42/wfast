@@ -25,6 +25,7 @@ class Photometry{
 	float var_scalar=0; // if var_map is not given, use a scalar. If 0, adopt the value from annulus/corners
 	float *gain_map=0;
 	float gain_scalar=1; // calculate the source noise using the gain
+	bool interpolate=0; // if true, interpolate over bad pixels using 8 neighboor average
 	
 	float epsilon=0.1f; // minimal value for both dx, dy to change. If change is smaller than epsilon, further iterations are skipped... 
 	mwSize *dims=0;

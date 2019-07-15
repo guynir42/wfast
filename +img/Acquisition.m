@@ -96,7 +96,7 @@ classdef Acquisition < file.AstroData
         
         use_sync = 1; % if false, do not send or receive messages from PcSync object
         use_ignore_manager = 0; % if true, will not use any data from Manager (via sync object)
-        use_ignore_manager_stop = 0; % if true, will not respect stop commands from Manager (via sync object)
+        use_sync_stop = 1; % if false, will not respect stop commands from Manager (via sync object)
         use_autoguide = 1; % if true, send back adjustments on drifts to telescope
         
         camera_angle = 15; % degrees between image top and cardinal south/north (when after meridian)
@@ -1141,7 +1141,7 @@ classdef Acquisition < file.AstroData
                     
                 end
                 
-                if obj.use_sync && obj.use_ignore_manager_stop==0 && isfield(s, 'stop_camera') && s.stop_camera
+                if obj.use_sync && obj.use_sync_stop && isfield(s, 'stop_camera') && s.stop_camera
                     obj.brake_bit = 1; % allow for manager to send stop command to camera... 
                 end
                 

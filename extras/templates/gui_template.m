@@ -13,6 +13,8 @@ classdef objGUI < handle
         edit_font_size = 11;
         small_font_size = 10;
         
+        color_on = [0 0.3 1];
+        
         debug_bit = 1;
         
     end

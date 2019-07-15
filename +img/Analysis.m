@@ -93,6 +93,8 @@ classdef Analysis < file.AstroData
     
     properties(Dependent=true)
         
+        filename;
+        directory;
         num_batches;
         average_width;
         average_offsets;
@@ -218,6 +220,20 @@ classdef Analysis < file.AstroData
     end
     
     methods % getters
+        
+        function val = get.filename(obj)
+            
+            [~,file, ext] = fileparts(obj.reader.prev_filename);
+            
+            val = [file, ext];
+            
+        end
+        
+        function val = get.directory(obj)
+            
+            val = fileparts(obj.reader.prev_filename);
+            
+        end
         
         function val = get.num_batches(obj)
             
@@ -857,7 +873,9 @@ classdef Analysis < file.AstroData
             
 %             addpath(fullfile(getenv('DATA'), 'GAIA\DR2'));
             
-            [~,S]=astrometry(S, 'RA', obj.pars.RA_DEG/180*pi, 'Dec', obj.pars.DEC_DEG/180*pi, 'Scale', obj.pars.SCALE, 'Flip',[1 1;1 -1;-1 1;-1 -1], 'RefCatMagRange', [7 17], 'BlockSize', [3000 3000], 'ApplyPM', false);
+            [~,S]=astrometry(S, 'RA', obj.pars.RA_DEG/180*pi, 'Dec', obj.pars.DEC_DEG/180*pi, 'Scale', obj.pars.SCALE,...
+                'Flip',[1 1;1 -1;-1 1;-1 -1], 'RefCatMagRange', [7 17], 'BlockSize', [3000 3000], 'ApplyPM', false, ...
+                'MinRot', -25, 'MaxRot', 25);
             
             % update RA/Dec in catalog according to WCS
             obj.image_mextractor = update_coordinates(S);
@@ -922,7 +940,7 @@ classdef Analysis < file.AstroData
             
             T = sortrows(T, 'Mag_G'); % sort stars from brightest to faintest
             
-            obj.positions = [T.XPEAK T.YPEAK];
+            obj.positions = [T.XPEAK_IMAGE T.YPEAK_IMAGE];
             obj.clip.positions = obj.positions;
             
             obj.magnitudes = T{:,'Mag_G'};
