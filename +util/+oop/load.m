@@ -204,7 +204,7 @@ function obj = loadHDF5(filename, input)
 
                 else % load a regular attribute...
                     mp = findprop(obj, att_names{ii});
-                    if ~mp.Dependent && ~isobject(obj.(att_names{ii})) % skip over loading of Dependent properties or objects
+                    if ~isobject(obj.(att_names{ii})) % skip over loading objects
                         try
                             if isempty(value)
                                 obj.(att_names{ii}) = feval([class(obj.(att_names{ii})) '.empty']);

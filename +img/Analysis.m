@@ -34,6 +34,7 @@ classdef Analysis < file.AstroData
         prog@util.sys.ProgressBar;
         
         image_mextractor;
+        matched_gaia;
         catalog;
         
         func; % any function that takes first argument this object and runs custom analysis
@@ -274,10 +275,16 @@ classdef Analysis < file.AstroData
             
             for ii = 1:length(list)
                 
-                if isobject(obj.(list{ii})) && ~isempty(obj.(list{ii})) && isprop(obj.(list{ii}), 'pars') 
-                    obj.(list{ii}).pars = val;
+                try
+                    if isobject(obj.(list{ii})) && ~isempty(obj.(list{ii})) && ~istable(obj.(list{ii})) && isprop(obj.(list{ii}), 'pars') 
+                        obj.(list{ii}).pars = val;
+                    end
+                catch ME
+                    
+                    disp(['trouble setting "pars" into variable: ' list{ii}]);
+                    warning(ME.getReport);
+                    
                 end
-                
             end
             
         end
@@ -834,7 +841,7 @@ classdef Analysis < file.AstroData
             
         end
         
-        function T = runAstrometry(obj, S)
+        function SS = runAstrometry(obj, S)
             
             if isempty(which('astrometry'))
                 error('Cannot load the MAAT package. Make sure it is on the path...');
@@ -858,16 +865,43 @@ classdef Analysis < file.AstroData
             %  Match sources with GAIA
             SS = catsHTM.sources_match('GAIADR2',obj.image_mextractor);
             
-            SS.Cat = SS.Cat(~isnan(SS.Cat(:,1)),:);
+            obj.matched_gaia = SS;
             
-            [~, idx] = unique(SS.Cat(:,1:2), 'rows');
             
-            T = array2table(SS.Cat(idx,:), 'VariableNames', SS.ColCell);
             
-            T = T(T{:,'Mag_G'}<16.5,:); % remove very faint stars... 
+        end
+        
+        function T = makeCatalog(obj)
+            
+            S = obj.image_mextractor;
+            SS = obj.matched_gaia;
+            
+            T = array2table([SS.Cat, S.Cat], 'VariableNames', [SS.ColCell, S.ColCell]);
+            
+            T = T(~isnan(T{:,1}),:);
+             
+            [~, idx] = unique(T{:,1:2}, 'rows');
+            T = T(idx,:);
+
+%             T.Properties.VariableNames; % change variable names??
+
+            T.RA = T.RA.*180/pi;
+            T.Dec = T.Dec.*180/pi;
+            T.Dist = T.Dist.*180/pi*3600;
+            
+            T.ALPHAWIN_J2000 = T.ALPHAWIN_J2000.*180/pi;
+            T.DELTAWIN_J2000 = T.DELTAWIN_J2000.*180/pi;
+            
+            T.Properties.VariableUnits = {'deg', 'deg', 'year', '"', '"', '"', '"', '"', '"', '"', '"', '', '', '', ...
+                'mag', 'mag', 'mag', 'mag', 'mag', 'mag', 'km/s', 'km/s', '', 'K', 'K', 'K', '', '', '"', '',  ...
+                'pix', 'pix', 'pix', 'pix', 'pix', 'pix', 'pix', 'deg', '', ...
+                'deg', 'deg', 'counts', 'counts', '', '', '', '','', 'counts', 'counts', 'mag', 'mag', '', '', '', ...
+                'counts', 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', ...
+                'counts', 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', ...
+                '', '', 'arcsec'}; % input units for all variables
             
             obj.catalog = T;
-            
+
         end
         
         function findStarsMAAT(obj)
@@ -876,15 +910,23 @@ classdef Analysis < file.AstroData
                 error('Cannot load the MAAT package. Make sure it is on the path...');
             end
             
-            T = obj.catalog;
+            obj.runMextractor;
+            obj.runAstrometry;
+            T = obj.makeCatalog;
+                        
+            % add additional tests to remove irrelvant stars
             
             if obj.min_star_temp
                 T = T(T{:,'Teff'}>=obj.min_star_temp,:); % select only stars with temperature above minimal level (hotter stars have smaller angular scale)
             end
             
-            T = sortrows(T, 'Mag_G');
+            T = sortrows(T, 'Mag_G'); % sort stars from brightest to faintest
             
+            obj.positions = [T.XPEAK T.YPEAK];
+            obj.clip.positions = obj.positions;
             
+            obj.magnitudes = T{:,'Mag_G'};
+            obj.coordinates = [T.RA T.Dec];
             
         end
         
