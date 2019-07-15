@@ -13,6 +13,8 @@ classdef ManagerGUI < handle
         edit_font_size = 11;
         small_font_size = 9;
         
+        color_on = [0 0.3 1];
+        
         debug_bit = 1;
         
     end
@@ -99,7 +101,7 @@ classdef ManagerGUI < handle
             obj.panel_telescope.addButton('button_DE', 'DEC', 'info', 'DE: ', '', '', 0.5);            
             obj.panel_telescope.addButton('button_LST', 'LST', 'info', 'LST: ', '', '', 0.5);
             obj.panel_telescope.addButton('button_ALT', 'ALT', 'info', 'ALT: ', ' deg', '', 0.5);
-            obj.panel_telescope.addButton('button_tracking', 'tracking', 'toggle', 'tracking off', 'tracking on', '', 0.5, 'red');
+            obj.panel_telescope.addButton('button_tracking', 'tracking', 'toggle', 'tracking off', 'tracking on', '', 0.5, obj.color_on, 'red');
             obj.panel_telescope.margin = [0.02 0.01];
             obj.panel_telescope.make;
             
@@ -132,7 +134,7 @@ classdef ManagerGUI < handle
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'controls');
             obj.panel_controls.number = N;
             obj.panel_controls.addButton('button_autoshutdown', 'use_shutdown', 'toggle', 'auto shut down disabled', 'auto shutdown enabled', ...
-                'small', 1, 'black', 'red'); 
+                '', 1, obj.color_on, 'red'); 
             obj.panel_controls.addButton('button_run_t1', '', 'custom', 'run t1', '', '', 0.5);
             obj.panel_controls.addButton('button_interval_t1', '', 'custom', ['P= ' num2str(obj.owner.period1) 's'], '', '', 0.5);
             obj.panel_controls.addButton('button_run_t2', '', 'custom', 'run t2', '', '', 0.5);

@@ -99,6 +99,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         rate; % do we need this??
         
+        dRA;
+        dDE;
+        
     end
     
     properties(Hidden=true)
@@ -461,6 +464,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 %             val = obj.hndl.SiteLongitude;
             val = obj.object.longitude;
 
+        end
+        
+        function val = get.dRA(obj)
+            
+            val = obj.hndl.RightAscensionRate;
+            
+        end
+        
+        function val = get.dDE(obj)
+            
+            val = obj.hndl.DeclinationRate;
+            
         end
         
     end
