@@ -472,7 +472,14 @@ classdef Analysis < file.AstroData
                 end
                 
                 if ~isempty(obj.func)
-                    feval(obj.func, obj);
+                    
+                    if isa(obj.func, 'function_handle')
+                        feval(obj.func, obj);
+                    elseif iscell(obj.func)
+                        for jj = 1:length(obj.func)
+                            feval(obj.func{jj}, obj);
+                        end
+                    end
                 end
                 
                 obj.prog.showif(ii);
