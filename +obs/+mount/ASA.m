@@ -690,7 +690,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             try 
             
-                if obj.sync.status
+                if obj.sync.status && obj.tracking
                     if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'RA_rate') && ~isempty(obj.sync.incoming.RA_rate)
                         obj.hndl.RightAscensionRate = obj.sync.incoming.RA_rate;
                     end

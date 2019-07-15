@@ -268,7 +268,7 @@ classdef PcSync < handle
                     obj.raw_data_received = data;
                     obj.incoming = value;
                     obj.status = 1;
-                    obj.confirm;
+                    obj.reply_hash;
                 end
                 
             end
