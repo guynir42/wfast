@@ -242,10 +242,17 @@ classdef PcSync < handle
             if obj.hndl.BytesAvailable>0
                 
                 obj.raw_data_received = uint8(fread(obj.hndl, obj.hndl.BytesAvailable))';
-
-                value = getArrayFromByteStream(obj.raw_data_received);
-
-                if ischar(value)
+                
+                try
+                    value = getArrayFromByteStream(obj.raw_data_received);
+                catch ME
+                    value = [];
+                    warning(ME.getReport)
+                end
+                
+                if isempty(value)
+                    % what to do here??
+                elseif ischar(value)
                     if strcmp(obj.checksum, value)
                         obj.status = 1;
                     else

@@ -223,6 +223,7 @@ classdef AcqGUI < handle
             obj.panel_sync.number = N;
             obj.panel_sync.addButton('button_ignore_manager', 'use_ignore_manager', 'toggle', 'sync on', 'sync ignored', '', 1, 'red');
             obj.panel_sync.addButton('button_ignore_manager_stop', 'use_ignore_manager_stop', 'toggle', 'stop enabled', 'stop ignored', '', 1, 'red');
+            obj.panel_sync.addButton('button_autoguide', 'use_autoguide', 'toggle', 'guiding off', 'guiding on', '', 1, 'red');
             obj.panel_sync.make;
             
             obj.panel_sync.button_ignore_manager.Tooltip = 'Allow Manager to update camera with weather and coordinates';

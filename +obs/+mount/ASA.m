@@ -38,6 +38,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         sync@obs.comm.PcSync; % to be given from Manager to pass data on to camera computer
         
+        timer; % timer object
+        
         log@util.sys.Logger; % keep track of all commands and errors
         
     end
@@ -648,12 +650,69 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     obj.sync.update;
                 end
                 
+                obj.setup_timer;
+                
+                if ~isempty(obj.sync)
+                    obj.sync.incoming = struct;
+                end
+                
+                obj.hndl.RightAscensionRate = 0;
+                obj.hndl.DeclinationRate = 0;
+                
             catch ME
                 obj.log.error(ME.getReport);
                 rethrow(ME);
             end
             
         end
+        
+        function setup_timer(obj, ~, ~)
+            
+            if ~isempty(obj.timer) && isa(obj.timer, 'timer') && isvalid(obj.timer)
+                if strcmp(obj.timer.Running, 'on')
+                    stop(obj.timer);
+                    delete(obj.timer);
+                    obj.timer = [];
+                end
+            end
+            
+            delete(timerfind('name', 'mount-timer'));
+            
+            obj.timer = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'mount-timer', ...
+                'Period', 1, 'StartDelay', 1, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer);
+            
+            start(obj.timer);
+            
+        end
+        
+        
+        function callback_timer(obj, ~, ~) % update sensors and GUI
+            
+            try 
+            
+                if obj.sync.status
+                    if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'RA_rate') && ~isempty(obj.sync.incoming.RA_rate)
+                        obj.hndl.RightAscensionRate = obj.sync.incoming.RA_rate;
+                    end
+                    
+                    if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'DE_rate') && ~isempty(obj.sync.incoming.DE_rate)
+                        obj.hndl.DeclinationRate = obj.sync.incoming.DE_rate;
+                    end
+                else
+                    % what to do here? reconnect or leave that to t1?
+                end
+                
+%                 if ~isempty(obj.gui) && obj.gui.check
+%                     obj.gui.update;
+%                 end
+                
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
+            
+        end
+        
         
         function adjustPosition(obj, RA_deg, DE_deg)
             
