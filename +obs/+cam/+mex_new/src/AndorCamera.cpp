@@ -148,7 +148,7 @@ void AndorCamera::loadFromOptionsStruct(const mxArray *options){ // load additio
 
 void AndorCamera::startup(){
 	
-	if(debug_bit) printf("starting Andor camera...\n");
+	if(debug_bit) mexPrintf("starting Andor camera...\n");
 	
 	AT_64 ImageSizeBytes; AT_GetInt((AT_H) hndl, L"ImageSizeBytes", &ImageSizeBytes); 
 	//cast so that the value can be used in the AT_QueueBuffer function 
@@ -513,7 +513,7 @@ void AndorCamera::printout(){ // print to screen some info on the camera switche
 
 void AndorCamera::report_error(const char *string, int error_value, double *mex_flag_cam){ // print error on screen and set error flag
 	
-	printf("ERROR in %s: return value %d... stopping camera! \n", string, error_value);
+	//printf("ERROR in %s: return value %d... stopping camera! \n", string, error_value);
 	mex_flag_cam[1]=1;
 	mex_flag_cam[2]=error_value;
 	
