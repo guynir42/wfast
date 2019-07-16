@@ -153,9 +153,12 @@ classdef AnalysisGUI < handle
             
             N = 4; pos = pos - N;
             
-            obj.panel_fits = GraphicPanel(obj.owner, [0.8 pos/N_right 0.2 N/N_right], 'objects'); 
+            obj.panel_fits = GraphicPanel(obj.owner, [0.8 pos/N_right 0.2 N/N_right], 'fits'); 
             obj.panel_fits.number = N;
-            obj.panel_fits.addButton('button_use_fits_save', 'use_fits_save', 'toggle', 'fits save off', 'fits save on', '', [], 'blue');
+            obj.panel_fits.addButton('button_fits_save', 'use_fits_save', 'toggle', 'fits save off', 'fits save on', '', [], obj.color_on);
+            obj.panel_fits.addButton('button_fits_flip', 'use_fits_flip', 'toggle', 'fits flip off', 'fits flip on', '', [], obj.color_on);
+            obj.panel_fits.addButton('button_fits_roi', 'use_fits_roi', 'toggle', 'fits ROI off', 'fits ROI on', '', [], obj.color_on);
+            obj.panel_fits.addButton('input_fits_roi', 'fits_roi', 'input', 'ROI= ');
             
             obj.panel_fits.margin = [0.1 0.005];
             obj.panel_fits.make;
@@ -177,8 +180,8 @@ classdef AnalysisGUI < handle
             
             N = 3; pos = pos - N;
             obj.panel_info = GraphicPanel(obj.owner, [0.2 pos/N_middle 0.6 N/N_middle], '', 1); 
-            obj.panel_info.addButton('button_filename', 'filename', 'info', ' ', '', 'small');
             obj.panel_info.addButton('button_directory', 'directory', 'info', ' ', '', 'small');
+            obj.panel_info.addButton('button_filename', 'filename', 'info', ' ', '', 'small');
             obj.panel_info.addButton('button_fwhm', 'FWHM', 'info', 'FWHM= ', 'pix', '', 0.5); 
             obj.panel_info.addButton('button_seeing', 'seeing', 'info', 'seeing= ', '"', '', 0.5);
             obj.panel_info.margin = 0.00;
