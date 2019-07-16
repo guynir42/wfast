@@ -398,6 +398,34 @@ classdef Analysis < file.AstroData
             
         end
         
+        function saveSummary(obj, dirname)
+            
+            filename = ['summary' obj.pars.OBJECT];
+            
+            fid = fopen(fullfile(dirname, filename), 'rt');
+            onc = onCleanup(@() fclose(fid));
+            
+            fprintf(fid, 'Summary for run %s, with %d batches.\n', obj.pars.OBJECT, obj.batch_counter);
+                        
+            v = obj.finder.snr_values;
+            
+            fprintf(fid, 'S/N for all batches distrubuted: min= %f median= %f max= %f\n',...
+                min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
+            
+            v = [obj.finder.all_events.snr];
+            
+            fprintf(fid, 'S/N for all triggered events distrubuted: min= %f median= %f max= %f\n',...
+                min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
+            
+            v = [obj.finder.kept_events.snr];
+            
+            fprintf(fid, 'S/N for all kept events distrubuted: min= %f median= %f max= %f\n',...
+                min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
+            
+            fprintf(fid, 'Number of events: total= %d | kept= %d\n', length(obj.finder.all_events), length(obj.finder.kept_events));
+            
+        end
+        
     end
     
     methods % calculations
@@ -520,6 +548,10 @@ classdef Analysis < file.AstroData
             % only do this if all batches were processed
             if obj.analysis_dir_save
                 obj.saveResults(log_dir);
+            end
+            
+            if obj.analysis_dir_log
+                obj.saveSummary(log_dir);
             end
             
         end
