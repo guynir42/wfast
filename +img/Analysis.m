@@ -400,29 +400,36 @@ classdef Analysis < file.AstroData
         
         function saveSummary(obj, dirname)
             
-            filename = ['summary' obj.pars.OBJECT];
+            filename = ['summary_' obj.pars.OBJECT '.txt'];
             
-            fid = fopen(fullfile(dirname, filename), 'rt');
-            onc = onCleanup(@() fclose(fid));
+            fid = fopen(fullfile(dirname, filename), 'wt');
             
-            fprintf(fid, 'Summary for run %s, with %d batches.\n', obj.pars.OBJECT, obj.batch_counter);
-                        
-            v = obj.finder.snr_values;
+            if fid<0
+                warning('Cannot open file %s', fullfile(dirname, filename));
+            else
+
+                onc = onCleanup(@() fclose(fid));
+
+                fprintf(fid, 'Summary for run %s, with %d batches.\n', obj.pars.OBJECT, obj.batch_counter);
+
+                v = abs(obj.finder.snr_values);
+
+                fprintf(fid, 'S/N for all batches distrubuted: min= %f median= %f max= %f\n',...
+                    min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
+
+                v = abs([obj.finder.all_events.snr]);
+
+                fprintf(fid, 'S/N for all triggered events distrubuted: min= %f median= %f max= %f\n',...
+                    min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
+
+                v = abs([obj.finder.kept_events.snr]);
+
+                fprintf(fid, 'S/N for all kept events distrubuted: min= %f median= %f max= %f\n',...
+                    min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
+
+                fprintf(fid, 'Number of events: total= %d | kept= %d\n', length(obj.finder.all_events), length(obj.finder.kept_events));
             
-            fprintf(fid, 'S/N for all batches distrubuted: min= %f median= %f max= %f\n',...
-                min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
-            
-            v = [obj.finder.all_events.snr];
-            
-            fprintf(fid, 'S/N for all triggered events distrubuted: min= %f median= %f max= %f\n',...
-                min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
-            
-            v = [obj.finder.kept_events.snr];
-            
-            fprintf(fid, 'S/N for all kept events distrubuted: min= %f median= %f max= %f\n',...
-                min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
-            
-            fprintf(fid, 'Number of events: total= %d | kept= %d\n', length(obj.finder.all_events), length(obj.finder.kept_events));
+            end
             
         end
         
