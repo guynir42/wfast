@@ -1545,7 +1545,7 @@ classdef Acquisition < file.AstroData
                     
                 end
                 
-                if obj.batch_counter>5 && obj.use_sync && obj.use_autoguide && obj.sync.status
+                if obj.batch_counter>5 && obj.use_sync && obj.use_autoguide && obj.sync.status && ~isempty(obj.getFrameRateEstimate)
                     % send the average adjustment back to mount controller (should we still adjust the cutouts though??)
                     rot = [cosd(obj.camera_angle) sind(obj.camera_angle); -sind(obj.camera_angle) cosd(obj.camera_angle)];
                     vec = rot*(obj.average_offsets.*obj.pars.SCALE./obj.batch_size.*obj.getFrameRateEstimate)'; % units of arcsec/second
