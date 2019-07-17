@@ -40,8 +40,6 @@ classdef PcSync < handle
     
     properties(Dependent=true)
         
-        name;
-        timeout;
         is_connected;
         
     end
