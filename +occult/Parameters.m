@@ -66,12 +66,12 @@ classdef Parameters < handle
     properties % occultation parameters
         
         % scalar values
-        T = 25; % integration time (millisecond)
-        f = 28; % observation frame rate (Hz)
-        W = 2.8; % width of observation window (sec)
+        T = 30; % integration time (millisecond)
+        f = 25; % observation frame rate (Hz)
+        W = 4; % width of observation window (sec)
         
         % noise parameters
-        snr = 0.1; % noise snr (can be scalar or vector of any length)
+        snr = 10; % noise snr (can be scalar or vector of any length)
         Niter = 1; % number of iterations of each noise snr value
         
     end
@@ -98,7 +98,7 @@ classdef Parameters < handle
         default_snr;
         default_Niter;
         
-        version = 1.00;
+        version = 1.01;
         
     end
     
