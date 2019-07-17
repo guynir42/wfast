@@ -133,7 +133,7 @@ classdef CurveGenerator < handle
         function reset(obj)
             
             obj.lc.reset;
-            obj.get_time = 0;
+            obj.runtime_get = 0;
             
         end
         
