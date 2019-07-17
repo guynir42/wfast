@@ -2,7 +2,7 @@ classdef Finder < handle
 
     properties(Transient=true)
         
-        generator@occult.CurveGenerator;
+        bank@occult.FilterBank;
         
     end
     
@@ -237,18 +237,22 @@ classdef Finder < handle
         
         function setupKernels(obj)
             
-            if isempty(obj.generator)
-                obj.generator = occult.CurveGenerator;
+            if isempty(obj.bank)
+                obj.bank = occult.FilterBank;
             end
             
             % some easy parameters
-            obj.generator.R = 0;
-            obj.generator.r = 1;
-            obj.generator.b = 0;
-            obj.generator.v = 5:5:30;
+%             obj.bank.R = 0;
+%             obj.bank.r = 1;
+%             obj.bank.b = 0;
+%             obj.bank.v = 5:5:30;
+%             
+%             obj.bank.getLightCurves;
+%             obj.filt.kernels = obj.bank.lc.flux - 1;
             
-            obj.generator.getLightCurves;
-            obj.filt.kernels = obj.generator.lc.flux - 1;
+            % consider changing the default parameters of bank
+            obj.bank.makeBank;
+            obj.filt.kernels = reshape(obj.bank.bank-1, [size(obj.bank.bank,1), obj.bank.num_pars]);
             
         end
         

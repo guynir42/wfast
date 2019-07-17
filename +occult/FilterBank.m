@@ -57,7 +57,7 @@ classdef FilterBank < handle
                 if obj.debug_bit, fprintf('FilterBank copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             
-            elseif ~isempty(varargin{1}) && isa(varargin{1}, 'occult.CurveGenerator')
+            elseif ~isempty(varargin) && isa(varargin{1}, 'occult.CurveGenerator')
                 if obj.debug_bit, fprintf('FilterBank generator-based constructor v%4.2f\n', obj.version); end
                 
                 obj.gen = varargin{1};
@@ -205,7 +205,7 @@ classdef FilterBank < handle
                             if isempty(values)
                                 obj.snr_map(ii,jj,kk,mm) = NaN;
                             else
-                                obj.snr_map(ii,jj,kk,mm) = min(values);
+                                obj.snr_map(ii,jj,kk,mm) = max(values);
                             end
                             
                         end % for mm (v_list)

@@ -75,6 +75,10 @@ classdef Analysis < file.AstroData
         use_background_cutouts = 1; % subtract b/g from the cutouts (and stack cutouts!)
         use_refine_bg = 0; % need to figure out exactly how to do this
         
+        use_photometry = 1;
+        use_psf_model = 1;
+        use_event_finding = 1;
+        
         use_fits_save = 0;
         use_fits_flip = 0;
         use_fits_roi = 0;
@@ -702,59 +706,71 @@ classdef Analysis < file.AstroData
             if obj.debug_bit>1, fprintf('Time for cutouts: %f seconds\n', toc(t)); end
             
             %%%%%%%%%%%%%%%%%%%%% PHOTOMETRY ANALYSIS %%%%%%%%%%%%%%%%%%%%%
-            
-            t = tic;
-            
-            obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps, ...
-                'positions', obj.positions, 'variance', single(2.5)); % need to add the sky background too
-            
-            obj.lightcurves.getData(obj.phot);
-            if obj.lightcurves.gui.check, obj.lightcurves.gui.update; end
-            
-            if obj.debug_bit>1, fprintf('Time for photometry: %f seconds\n', toc(t)); end
+
+            if obj.use_photometry
+
+                t = tic;
+
+                obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps, ...
+                    'positions', obj.positions, 'variance', single(2.5)); % need to add the sky background too
+
+                obj.lightcurves.getData(obj.phot);
+                if obj.lightcurves.gui.check, obj.lightcurves.gui.update; end
+
+                if obj.debug_bit>1, fprintf('Time for photometry: %f seconds\n', toc(t)); end
+
+            end
             
             %%%%%%%%%%%%%%%%%%%%% PSF modeling %%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
-            t = tic;
-            
-            obj.model_psf.input(obj.cutouts_sub, obj.phot.offsets_x, obj.phot.offsets_y);
-            
-            obj.FWHM = util.img.fwhm(obj.model_psf.stack);
-            
-            if obj.debug_bit>1, fprintf('Time for PSF model: %f seconds\n', toc(t)); end
+            if obj.use_psf_model
+
+                t = tic;
+
+                obj.model_psf.input(obj.cutouts_sub, obj.phot.offsets_x, obj.phot.offsets_y);
+
+                obj.FWHM = util.img.fwhm(obj.model_psf.stack);
+
+                if obj.debug_bit>1, fprintf('Time for PSF model: %f seconds\n', toc(t)); end
+
+            end
             
             %%%%%%%%%%%%%%%%%%%%% Event finding %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
-            t = tic;
-            
-            f = obj.phot.fluxes;
-            e = obj.phot.errors;
-            a = obj.phot.areas;
-            b = obj.phot.backgrounds;
-            v = obj.phot.variances;
-            x = obj.phot.offsets_x;
-            y = obj.phot.offsets_y;
-            w = obj.phot.widths;
-            p = obj.phot.bad_pixels;
-            phot_pars = obj.phot.pars_struct; % maybe also give this to model_psf??
-            
-            r = [];
-            g = [];
-            
-            if obj.phot.use_gaussian
-                g = obj.phot.gauss_sigma;
-            elseif obj.phot.use_aperture
-                
-                r = obj.phot.aperture;
+            if obj.use_event_finding
+
+                t = tic;
+
+                f = obj.phot.fluxes;
+                e = obj.phot.errors;
+                a = obj.phot.areas;
+                b = obj.phot.backgrounds;
+                v = obj.phot.variances;
+                x = obj.phot.offsets_x;
+                y = obj.phot.offsets_y;
+                w = obj.phot.widths;
+                p = obj.phot.bad_pixels;
+                phot_pars = obj.phot.pars_struct; % maybe also give this to model_psf??
+
+                r = [];
+                g = [];
+
+                if obj.phot.use_gaussian
+                    g = obj.phot.gauss_sigma;
+                elseif obj.phot.use_aperture
+
+                    r = obj.phot.aperture;
+                end
+
+                obj.finder.input(f, e, a, b, v, x, y, w, p, r, g, ...
+                    obj.timestamps, obj.cutouts_proc, obj.positions, obj.stack_proc, ...
+                    obj.batch_counter+1, 'filename', obj.thisFilename, ...
+                    't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp,...
+                    'used_background', obj.phot.use_backgrounds, 'pars', phot_pars);
+
+                if obj.debug_bit>1, fprintf('Time to find events: %f seconds\n', toc(t)); end
+
             end
-            
-            obj.finder.input(f, e, a, b, v, x, y, w, p, r, g, ...
-                obj.timestamps, obj.cutouts_proc, obj.positions, obj.stack_proc, ...
-                obj.batch_counter+1, 'filename', obj.thisFilename, ...
-                't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp,...
-                'used_background', obj.phot.use_backgrounds, 'pars', phot_pars);
-            
-            if obj.debug_bit>1, fprintf('Time to find events: %f seconds\n', toc(t)); end
             
             %%%%%%%%%%%%%%%%%%%% save FITS files of stacks %%%%%%%%%%%%%%%%
             
