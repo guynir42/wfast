@@ -286,7 +286,7 @@ classdef Acquisition < file.AstroData
                 obj.deflator = file.Deflator;
                 
                 obj.sync = obs.comm.PcSync('server'); % no connect command is given, since this is still blocking indefinitely...
-                obj.sync.name = 'Cam-PC';
+%                 obj.sync.name = 'Cam-PC';
                 
                 obj.setupDefaults;
                 
