@@ -151,7 +151,7 @@ classdef Catalog < handle
             if obj.debug_bit>1
                 S = mextractor(S, 'Verbose', true, 'Thresh', obj.threshold);
             else
-                ceval('S = mextractor(S, ''Thresh'', obj.threshold)');
+                evalc('S = mextractor(S, ''Thresh'', obj.threshold)');
             end
 
             SN = S.Cat(:,find(strcmp(S.ColCell, 'SN')));

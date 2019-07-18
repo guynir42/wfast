@@ -213,14 +213,36 @@ classdef PcSync < handle
             if strcmpi(rx_or_tx, 'tx') % primary transmission mode
                 obj.raw_data_sent = getByteStreamFromArray(value);
                 obj.checksum = util.oop.getHash(obj.raw_data_sent);
+                obj.waitForTransferStatus(obj.hndl_tx);
                 fwrite(obj.hndl_tx, obj.raw_data_sent);
             elseif strcmpi(rx_or_tx, 'rx') % reply only (e.g., sending back the hash of latest incoming data)
                 temp_raw_data = getByteStreamFromArray(value);
+                obj.waitForTransferStatus(obj.hndl_rx);
                 fwrite(obj.hndl_rx, temp_raw_data);
             else
                 error('Must choose RX or TX for 3rd input to send()');
             end
                 
+        end
+        
+        function waitForTransferStatus(obj, hndl)
+            
+            res = 0.01;
+            
+            timeout = 5;
+            
+            for ii = 1:timeout/res
+                
+                if strcmp(hndl.TransferStatus, 'idle')
+                    return;
+                end
+                
+                pause(res);
+                
+            end
+            
+            error('Timeout afer %f seconds while waiting for tcp/ip object to clear the TransferStatus', timeout);
+            
         end
         
         function update(obj)
@@ -230,7 +252,7 @@ classdef PcSync < handle
                 obj.outgoing.time = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
 
                 obj.status = 0;
-                flushinput(obj.hndl_tx);
+%                 flushinput(obj.hndl_tx);
                 obj.send(obj.outgoing);
             end
             
