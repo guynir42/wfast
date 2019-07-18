@@ -15,9 +15,9 @@ classdef FilterBank < handle
         
         % inputs: 
         R_list = 0:0.25:0.5; % star radius, FSU
-        r_list = 0.1:0.1:2; % occulter radius, FSU
+        r_list = 0.3:0.1:2; % occulter radius, FSU
         b_list = 0:0.2:2; % impact parameter, FSU
-        v_list = 3:1:30; % crossing velocity (projected), FSU/second
+        v_list = 5:5:30; % crossing velocity (projected), FSU/second
         % lets assume t=0 for all!
         
         W = 4; % time window, seconds
@@ -198,7 +198,7 @@ classdef FilterBank < handle
                                     continue;
                                 end
                                 
-                                values = [values obj.compareLightcurves(obj.bank(:,ii,jj,kk,mm), obj.bank(:,idx(1), idx(2), idx(3), idx(4)))];
+                                values = [values obj.compareKernels(obj.bank(:,ii,jj,kk,mm), obj.bank(:,idx(1), idx(2), idx(3), idx(4)))];
                                 
                             end
                             
@@ -220,7 +220,11 @@ classdef FilterBank < handle
             
         end
         
-        function snr = compareLightcurves(obj, this_flux, that_flux)
+        function snr = compareKernels(obj, this_flux, that_flux, full_xcorr)
+            
+            if nargin<4 || isempty(full_xcorr)
+                full_xcorr = 0;
+            end
             
             f1 = this_flux - 1;
             f2 = that_flux - 1;
@@ -229,10 +233,64 @@ classdef FilterBank < handle
             k1 = f1./sqrt(sum(f1.^2));
             k2 = f2./sqrt(sum(f2.^2));
             
-            self_signal = sum(k1.*f1);
-            cross_signal = sum(k2.*f1);
+            if full_xcorr==0
+                self_signal = sum(k1.*f1);
+                cross_signal = sum(k2.*f1);
+            else
+                self_signal = max(filter2(f1,k1));
+                cross_signal = max(filter2(f1,k2));
+            end
             
             snr = cross_signal./self_signal;
+            
+        end
+        
+        function values = monteCarloCheck(obj, num_trials, full_xcorr)
+           
+            if nargin<3 || isempty(full_xcorr)
+                full_xcorr = 1;
+            end
+            
+            obj.prog.start(num_trials);
+            
+            values = NaN(num_trials,1);
+            
+            flat_bank = reshape(obj.bank, [size(obj.bank,1), obj.num_pars]);
+            
+            for ii = 1:num_trials
+                
+                obj.gen.lc.pars = obj.randomPars;
+                obj.gen.getLightCurves;
+                
+                snr = util.stat.maxnd(obj.compareKernels(obj.gen.lc.flux, flat_bank, full_xcorr));
+                
+                if snr<0.9
+                    fprintf('S/N = %f | R= %f | r= %f | b= %f | v= %f\n', snr, obj.gen.R, obj.gen.r, obj.gen.b, obj.gen.v);
+                end
+                
+                values(ii) = snr;
+                
+                obj.prog.showif(ii);
+                
+            end
+            
+        end
+        
+        function pars = randomPars(obj)
+            
+            pars = occult.Parameters;
+            
+            vec = obj.R_list;
+            pars.R = rand*(max(vec)-min(vec))+min(vec);
+            
+            vec = obj.r_list;
+            pars.r = rand*(max(vec)-min(vec))+min(vec);
+            
+            vec = obj.b_list;
+            pars.b = rand*(max(vec)-min(vec))+min(vec);
+            
+            vec = obj.v_list;
+            pars.v = rand*(max(vec)-min(vec))+min(vec);
             
         end
         
@@ -269,7 +327,7 @@ classdef FilterBank < handle
                 end
 
                 new_lc = obj.bank(:, neigh_idx(1), neigh_idx(2), neigh_idx(3), neigh_idx(4));
-                loss = obj.compareLightcurves(core_lc, new_lc);
+                loss = obj.compareKernels(core_lc, new_lc);
                 
                 h = plot(ax, obj.timestamps, new_lc, ':');
                 h.DisplayName = sprintf('R(%d) | r(%d) | b(%d) | v(%d) | loss= %f', neigh_idx(1), neigh_idx(2), neigh_idx(3), neigh_idx(4), loss);

@@ -15,7 +15,6 @@ classdef Filter < handle
         % input once when setting up object
         kernels; 
         kernels_fft;
-        k_factor;
         
         % input each batch
         timestamps; % 1D array (will be set to uniform sampling if not provided)
@@ -36,6 +35,8 @@ classdef Filter < handle
         num_sigma_area = 3.5; % define region around peak sigma that is still considered connected (to be depricated!)
         
         frame_rate = 25; % if timestamps are not given explicitely
+        
+        mem_max_gb = 10; % maximum allowed memory for FFTing the 3D matrix of time*kernel*flux
         
         debug_bit = 1;
         
@@ -111,15 +112,14 @@ classdef Filter < handle
                 obj.kernels = k;
 
                 obj.kernels = obj.kernels./sqrt(sum(obj.kernels.^2, 1, 'omitnan')); % normalize kernels
-                obj.k_factor = sqrt(sum(obj.kernels, 1, 'omitnan')); % do we need this? 
-
+                
                 obj.kernels_fft = []; % clear the lazy loaded FFT'd kernels
 
             end
             
         end
         
-        function set.fluxes(obj, f)
+        function set.fluxes(obj, f) % make sure fluxes is along dim 1 and 3 (instead of a 2D matrix)
             
             if isempty(f)
                 obj.fluxes = [];
@@ -196,7 +196,16 @@ classdef Filter < handle
             % if fluxes ends up having many dimensions (above 4) we will need to patch the pad2size function 
             f = util.img.pad2size(obj.fluxes, [L Sf(2:end)]); % keep all dimensions of fluxes except the first, which is padded
             obj.fluxes_fft = fft(f);
-            obj.fluxes_filtered = real(fftshift(ifft(obj.kernels_fft.*obj.fluxes_fft),1))./obj.stds; % ./obj.k_factor;
+            
+            if obj.debug_bit>1, disp(['memory usage: ' num2str(L*size(obj.kernels_fft,2)*size(obj.fluxes_fft,3)*4/1024^3)]); end
+            
+            if L*size(obj.kernels_fft,2)*size(obj.fluxes_fft,3)*4<obj.mem_max_gb*1024^3
+                obj.fluxes_filtered = real(fftshift(ifft(obj.kernels_fft.*obj.fluxes_fft),1))./obj.stds;
+            else
+                for ii = 1:size(obj.fluxes_fft,3)
+                    obj.fluxes_filtered(:,:,ii) = real(fftshift(ifft(obj.kernels_fft.*obj.fluxes_fft(:,:,ii)),1))./obj.stds(:,:,ii);
+                end
+            end
             obj.fluxes_filtered = util.img.crop2size(obj.fluxes_filtered, [Sf(1), Sk(2), Sf(3:end)]); % crop back to original dimensions...
             
             if obj.debug_bit>1, fprintf('runtime "convolution": %f seconds\n', toc(t)); end

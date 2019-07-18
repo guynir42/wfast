@@ -982,11 +982,7 @@ classdef Analysis < file.AstroData
             if isempty(which('mextractor'))
                 error('Cannot load the MAAT package. Make sure it is on the path...');
             end
-            
-            obj.runMextractor;
-            obj.runAstrometry;
-            T = obj.makeCatalog;
-                        
+             
             % add additional tests to remove irrelvant stars
             
             if obj.min_star_temp

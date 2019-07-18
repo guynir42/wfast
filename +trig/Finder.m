@@ -252,7 +252,7 @@ classdef Finder < handle
             
             % consider changing the default parameters of bank
             obj.bank.makeBank;
-            obj.filt.kernels = reshape(obj.bank.bank-1, [size(obj.bank.bank,1), obj.bank.num_pars]);
+            obj.filt.kernels = single(reshape(obj.bank.bank-1, [size(obj.bank.bank,1), obj.bank.num_pars]));
             
         end
         
