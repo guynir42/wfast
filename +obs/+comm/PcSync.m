@@ -185,6 +185,8 @@ classdef PcSync < handle
             hndl.BytesAvailableFcnCount = 32;
             hndl.OutputBufferSize = 50*1024; 
             hndl.InputBufferSize = 50*1024;
+            flushinput(hndl);
+            flushoutput(hndl);
 
             fopen(hndl);
 
@@ -267,6 +269,8 @@ classdef PcSync < handle
         function read_data(obj, hndl, ~)
             
             if obj.debug_bit>1, fprintf('read data with %d bytes\n', hndl.BytesAvailable); end
+            
+            obj.waitForTransferStatus(hndl);
             
             if hndl.BytesAvailable>0
                 
