@@ -54,6 +54,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         limit_alt = 15; % degrees above horizon where telescope is not allowed to go
         
+        use_guiding = 1;
         use_accelerometer = 1; % make constant checks for altitude outside of the mounts own sensors
         use_ultrasonic = 0; % make constant checks that there is nothing in front of the telescope
         
@@ -99,8 +100,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         rate; % do we need this??
         
-        dRA;
-        dDE;
+        rate_RA;
+        rate_DE;
         
     end
     
@@ -466,13 +467,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 
         end
         
-        function val = get.dRA(obj)
+        function val = get.rate_RA(obj)
             
             val = obj.hndl.RightAscensionRate;
             
         end
         
-        function val = get.dDE(obj)
+        function val = get.rate_DE(obj)
             
             val = obj.hndl.DeclinationRate;
             
@@ -575,6 +576,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
+        function set.rate_RA(obj, val)
+            
+            obj.hndl.RightAscensionRate = val;
+            
+        end
+        
+        function set.rate_DE(obj, val)
+            
+            obj.hndl.DeclinationRate = val;
+            
+        end
+        
     end
     
     methods % calculations / commands
@@ -671,8 +684,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     obj.sync.incoming = struct;
                 end
                 
-                obj.hndl.RightAscensionRate = 0;
-                obj.hndl.DeclinationRate = 0;
+                obj.resetRate;
                 
             catch ME
                 obj.log.error(ME.getReport);
@@ -700,18 +712,19 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        
         function callback_timer(obj, ~, ~) % update sensors and GUI
             
             try 
             
-                if obj.sync.status && obj.tracking
-                    if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'RA_rate') && ~isempty(obj.sync.incoming.RA_rate)
-                        obj.hndl.RightAscensionRate = obj.sync.incoming.RA_rate;
+                if obj.use_guiding && obj.tracking && obj.sync.status
+                    if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'RA_rate_delta') && ~isempty(obj.sync.incoming.RA_rate_delta)
+                        obj.rate_RA = obj.rate_RA + obj.sync.incoming.RA_rate_delta;
+                        obj.sync.outgoing.RA_rate = obj.rate_RA;
                     end
                     
-                    if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'DE_rate') && ~isempty(obj.sync.incoming.DE_rate)
-                        obj.hndl.DeclinationRate = obj.sync.incoming.DE_rate;
+                    if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'DE_rate_delta') && ~isempty(obj.sync.incoming.DE_rate_delta)
+                        obj.hrate_DE = obj.rate_DE + obj.sync.incoming.DE_rate_delta;
+                        obj.sync.outgoing.DE_rate = obj.rate_DE;
                     end
                 else
                     % what to do here? reconnect or leave that to t1?
@@ -728,6 +741,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
+        function resetRate(obj)
+            
+            obj.rate_RA = 0;
+            obj.rate_DE = 0;
+                
+        end
         
         function adjustPosition(obj, RA_deg, DE_deg)
             
@@ -885,11 +904,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 obj.brake_bit = 1;
             
                 obj.hndl.AbortSlew;
+                obj.resetRate;
                 
                 if ~isempty(obj.sync)
 
                     if obj.sync.outgoing.stop_camera==0
-                        obj.log.input('Dome closed, sending camera stop command');
+                        obj.log.input('Telescope stopped, sending camera stop command');
                         disp(obj.log.report);
                     end
 

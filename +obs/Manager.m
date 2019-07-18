@@ -259,7 +259,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             try
                 
                 obj.sync = obs.comm.PcSync('client');
-                obj.sync.name = 'Manager-PC';
                 
             catch ME
                 obj.log.error(ME.getReport);
