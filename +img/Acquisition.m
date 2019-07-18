@@ -343,8 +343,8 @@ classdef Acquisition < file.AstroData
             obj.start_index = 1;
             obj.positions = [];
             
-            obj.sync.outgoing.RA_rate = 0;
-            obj.sync.outgoing.DE_rate = 0;
+            obj.sync.outgoing.RA_rate_delta = 0;
+            obj.sync.outgoing.DE_rate_delta = 0;
 
         end
         
@@ -1553,17 +1553,8 @@ classdef Acquisition < file.AstroData
                     dRA = vec(1)/15; % convert from arcsec to RA seconds
                     dDE = vec(2);
                     
-                    if isfield(obj.sync.outgoing, 'RA_rate') && ~isempty(obj.sync.outgoing.RA_rate)
-                        obj.sync.outgoing.RA_rate = obj.sync.outgoing.RA_rate + dRA;
-                    else
-                        obj.sync.outgoing.RA_rate = dRA;
-                    end
-                    
-                    if isfield(obj.sync.outgoing, 'DE_rate') && ~isempty(obj.sync.outgoing.DE_rate)
-                        obj.sync.outgoing.DE_rate = obj.sync.outgoing.DE_rate + dDE;
-                    else
-                        obj.sync.outgoing.DE_rate = dDE;
-                    end
+                    obj.sync.outgoing.RA_rate_delta = dRA;
+                    obj.sync.outgoing.DE_rate_delta = dDE;
                     
                     obj.sync.update;
                      
