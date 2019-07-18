@@ -160,24 +160,14 @@ classdef PcSync < handle
                 
                 obj.disconnect;
                 
-                obj.hndl_tx = tcpip(obj.remote_ip, obj.remote_port_tx, 'NetworkRole', obj.role, 'Timeout', 10);
-                obj.hndl_tx.BytesAvailableFcn = @obj.read_data;
-                obj.hndl_tx.BytesAvailableFcnMode = 'byte';
-                obj.hndl_tx.BytesAvailableFcnCount = 32;
-                obj.hndl_tx.OutputBufferSize = 50*1024; 
-                obj.hndl_tx.InputBufferSize = 50*1024;
+                if strcmpi(obj.role, 'server')
+                    obj.hndl_rx = obj.connectSocket(obj.remote_ip, obj.remote_port_rx);
+                    obj.hndl_tx = obj.connectSocket(obj.remote_ip, obj.remote_port_tx);
+                else
+                    obj.hndl_tx = obj.connectSocket(obj.remote_ip, obj.remote_port_tx);
+                    obj.hndl_rx = obj.connectSocket(obj.remote_ip, obj.remote_port_rx);
+                end
                 
-                fopen(obj.hndl_tx);
-            
-                obj.hndl_rx = tcpip(obj.remote_ip, obj.remote_port_rx, 'NetworkRole', obj.role, 'Timeout', 10);
-                obj.hndl_rx.BytesAvailableFcn = @obj.read_data;
-                obj.hndl_rx.BytesAvailableFcnMode = 'byte';
-                obj.hndl_rx.BytesAvailableFcnCount = 32;
-                obj.hndl_rx.OutputBufferSize = 50*1024; 
-                obj.hndl_rx.InputBufferSize = 50*1024;
-                
-                fopen(obj.hndl_rx);
-            
                 obj.update;
                 
             catch ME
@@ -185,6 +175,19 @@ classdef PcSync < handle
                 rethrow(ME);
             end
             
+        end
+        
+        function hndl = connectSocket(obj, remote_ip, remote_port)
+
+            hndl = tcpip(remote_ip, remote_port, 'NetworkRole', obj.role, 'Timeout', 10);
+            hndl.BytesAvailableFcn = @obj.read_data;
+            hndl.BytesAvailableFcnMode = 'byte';
+            hndl.BytesAvailableFcnCount = 32;
+            hndl.OutputBufferSize = 50*1024; 
+            hndl.InputBufferSize = 50*1024;
+
+            fopen(hndl);
+
         end
         
         function disconnect(obj)
