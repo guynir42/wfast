@@ -27,7 +27,7 @@ classdef WorldCoordinates < handle
     
     properties % switches/controls
         
-        use_tpv = 0;
+        use_tpv = 1;
         max_pv_indices = 40;
         
         debug_bit = 1;
@@ -102,8 +102,11 @@ classdef WorldCoordinates < handle
                 
             end
             
-            obj.parsePVstruct(w.tpv);
-        
+            if isfield(w, 'tpv')
+                obj.parsePVstruct(w.tpv);
+            elseif isfield(w, 'PV')
+                obj.parsePVstruct(w.PV);
+            end
             
         end
         
@@ -127,7 +130,7 @@ classdef WorldCoordinates < handle
             
         end
         
-        function [RA_Dec] = xy2coo(obj, x, y)
+        function RA_Dec = xy2coo(obj, x, y)
             
             if nargin<3 || isempty(y)
                 if size(x,2)==2
@@ -169,6 +172,12 @@ classdef WorldCoordinates < handle
             RA_Dec(1) = RA;
             RA_Dec(2) = Dec;
 
+        end
+        
+        function XY = coo2xy(obj, RA, Dec)
+            
+            error('Not yet implemented!');
+            
         end
         
     end

@@ -7,6 +7,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         
         gui@head.gui.ParsGUI;
         
+        cat@head.Catalog; % this is transient right now because I don't know how to save tables (yet)
+        
     end
 
     properties % objects 
@@ -16,7 +18,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
 %         run_start_datetime;
         stars@head.Star;
         
-        WCS; % to be expanded later
+        WCS@head.WorldCoordinates; % to be expanded later
         
     end
     
@@ -101,6 +103,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         PRESSURE;
         LIGHT;
 
+        % hardware (mount) coordinates
         TELRA;
         TELDEC; 
         TELRA_DEG;
@@ -124,8 +127,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
 %         star_y; % in pixels, relative to frame size (final position)
         
         % ephemeris: time & coordinates
-        RA = ''; % for the center of the image
-        DEC = '';% for the center of the image
+        
+        % measured from observations
+        OBSRA; 
+        OBSDEC;
+        OBSRA_DEG;
+        OBSDEC_DEG;
+        
+        % given by scheduler
+        RA; % for the center of the image
+        DEC;% for the center of the image
         RA_DEG;
         DEC_DEG;
         
@@ -400,6 +411,31 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
             val = obj.ephem.MJD;
             
         end
+        
+        function val = get.OBSRA(obj)
+            
+            val = head.Ephemeris.deg2hour(obj.OBSRA_DEG);
+            
+        end
+        
+        function val = get.OBSDEC(obj)
+            
+            val = head.Ephemeris.deg2sex(obj.OBSDEC_DEG);
+            
+        end
+        
+        function val = get.OBSRA_DEG(obj)
+            
+            val = obj.WCS.CRVAL(1);
+            
+        end
+        
+        function val = get.OBSDEC_DEG(obj)
+            
+            val = obj.WCS.CRVAL(2);
+            
+        end
+        
         
         function val = get.RA(obj)
             

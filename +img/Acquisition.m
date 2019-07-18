@@ -80,6 +80,7 @@ classdef Acquisition < file.AstroData
         use_remove_bad_pixels = true;
         use_remove_saturated = false; % remove all stars with any pixels about saturation value
         saturation_value = 50000; % consider any pixels above this to be saturated
+        min_star_temp; % set a lower limit on temperature of stars for findStarsMAAT;
         
         use_quick_find_stars = true; % use new method that runs faster
         use_mextractor = false; % use mextractor to identify stars and find their WCS and catalog mag/temp
@@ -1589,7 +1590,7 @@ classdef Acquisition < file.AstroData
             if obj.use_arbitrary_pos
                 obj.clip.arbitraryPositions; % maybe add some input parameters?
             elseif obj.use_mextractor
-                % add the code for mextractor+astrometry here
+                obj.findStarsMAAT;
             elseif obj.use_quick_find_stars
                 T = util.img.quick_find_stars(S, 'psf', obj.getWidthEstimate, 'number', obj.num_stars,...
                     'dilate', obj.cut_size-5, 'saturation', obj.saturation_value.*obj.num_sum, 'unflagged', 1); 
@@ -1607,6 +1608,38 @@ classdef Acquisition < file.AstroData
             
             obj.ref_stack = obj.stack_proc;
             obj.ref_positions = obj.clip.positions;
+            
+        end
+        
+        function findStarsMAAT(obj)
+            
+            if isempty(which('mextractor'))
+                error('Cannot load the MAAT package. Make sure it is on the path...');
+            end
+             
+            % add additional tests to remove irrelvant stars
+            
+            obj.pars.cat.input(obj.stack_proc);
+            
+            T = obj.pars.data;
+            
+            if obj.min_star_temp
+                T = T(T{:,'Teff'}>=obj.min_star_temp,:); % select only stars with temperature above minimal level (hotter stars have smaller angular scale)
+            end
+            
+            T = sortrows(T, 'Mag_G'); % sort stars from brightest to faintest
+            
+            if height(T)>obj.num_stars
+                T = T(1:obj.num_stars,:);
+            end
+            
+            obj.num_stars_found = height(T);
+            
+            obj.positions = [T.XPEAK_IMAGE T.YPEAK_IMAGE];
+            obj.clip.positions = obj.positions;
+            
+            obj.magnitudes = T{:,'Mag_G'};
+            obj.coordinates = [T.RA T.Dec];
             
         end
         
