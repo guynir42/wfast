@@ -672,8 +672,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 % do nothing, as we can be waiting for ever for server to connect
             end
             
-            obj.sync.outgoing.stop_camera = 0; % the default is to allow camera to continue
-            
             % obj.sync.outgoing.OBJECT = ???
             if ~isempty(obj.mount) && obj.use_mount
                 
@@ -699,7 +697,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
                 
                 obj.sync.outgoing.stop_camera = 1;
-                
+            else
+                obj.sync.outgoing.stop_camera = 0;
             end
             
             

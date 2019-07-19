@@ -216,11 +216,11 @@ classdef PcSync < handle
                 obj.raw_data_sent = getByteStreamFromArray(value);
                 obj.checksum = util.oop.getHash(obj.raw_data_sent);
                 obj.waitForTransferStatus(obj.hndl_tx);
-                fprintf(obj.hndl_tx, '%s\n', obj.raw_data_sent);
+                fwrite(obj.hndl_tx, [obj.raw_data_sent; 10]);
             elseif strcmpi(rx_or_tx, 'rx') % reply only (e.g., sending back the hash of latest incoming data)
                 temp_raw_data = getByteStreamFromArray(value);
                 obj.waitForTransferStatus(obj.hndl_rx);
-                fprintf(obj.hndl_rx, '%s\n', temp_raw_data);
+                fwrite(obj.hndl_tx, [temp_raw_data; 10]); 
             else
                 error('Must choose RX or TX for 3rd input to send()');
             end

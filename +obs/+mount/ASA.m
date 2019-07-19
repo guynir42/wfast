@@ -103,6 +103,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         rate_RA;
         rate_DE;
         
+        pier_side;
+        
     end
     
     properties(Hidden=true)
@@ -479,6 +481,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
+        function val = get.pier_side(obj)
+            
+            val = obj.hndl.SideOfPier;
+            
+        end
+        
     end
     
     methods % setters
@@ -706,7 +714,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             delete(timerfind('name', 'mount-timer'));
             
             obj.timer = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'mount-timer', ...
-                'Period', 1, 'StartDelay', 1, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer);
+                'Period', 2, 'StartDelay', 1, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer);
             
             start(obj.timer);
             
@@ -717,13 +725,19 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             try 
             
                 if obj.use_guiding && obj.tracking && obj.sync.status
+                    
+                    direction = 1;
+                    if strcmp(obj.pier_side, 'pierWest')
+                        direction  = -1;
+                    end
+                    
                     if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'RA_rate_delta') && ~isempty(obj.sync.incoming.RA_rate_delta)
-                        obj.rate_RA = obj.rate_RA + obj.sync.incoming.RA_rate_delta;
+                        obj.rate_RA = obj.rate_RA + direction*obj.sync.incoming.RA_rate_delta;
                         obj.sync.outgoing.RA_rate = obj.rate_RA;
                     end
                     
                     if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'DE_rate_delta') && ~isempty(obj.sync.incoming.DE_rate_delta)
-                        obj.hrate_DE = obj.rate_DE + obj.sync.incoming.DE_rate_delta;
+                        obj.rate_DE = obj.rate_DE + direction*obj.sync.incoming.DE_rate_delta;
                         obj.sync.outgoing.DE_rate = obj.rate_DE;
                     end
                 else
