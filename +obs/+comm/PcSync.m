@@ -288,14 +288,20 @@ classdef PcSync < handle
                         variable = getArrayFromByteStream(data(1:end-1));
                         break;
                     catch ME
+                        
                         if strcmp(ME.identifier, 'MATLAB:Deserialize:BadVersionOrEndian')
-                            disp(['"data" cannot be parsed after ' num2str(length(data)-1) ' bytes... try to append more!']);
+                            
+                            if obj.debug_bit
+                                disp(['"data" cannot be parsed after ' num2str(length(data)-1) ' bytes... try to append more!']);
+                            end
+                            
                             continue;
+                            
                         else
-                            rethrow(ME);
+                            warning(ME.getReport);
+                            return;
                         end
-%                         value = [];
-%                         warning(ME.getReport)
+                        
                     end
                     
                 end
@@ -303,7 +309,7 @@ classdef PcSync < handle
             end % for ii 
                 
             if isempty(variable)
-                disp('Received an empty variable');
+%                 disp('Received an empty variable');
             elseif ischar(variable)
                 if strcmp(obj.checksum, variable)
                     obj.status = 1;
