@@ -216,11 +216,11 @@ classdef PcSync < handle
                 obj.raw_data_sent = getByteStreamFromArray(value);
                 obj.checksum = util.oop.getHash(obj.raw_data_sent);
                 obj.waitForTransferStatus(obj.hndl_tx);
-                fwrite(obj.hndl_tx, [obj.raw_data_sent; 10]);
+                fwrite(obj.hndl_tx, [obj.raw_data_sent 10]);
             elseif strcmpi(rx_or_tx, 'rx') % reply only (e.g., sending back the hash of latest incoming data)
                 temp_raw_data = getByteStreamFromArray(value);
                 obj.waitForTransferStatus(obj.hndl_rx);
-                fwrite(obj.hndl_tx, [temp_raw_data; 10]); 
+                fwrite(obj.hndl_tx, [temp_raw_data 10]); 
             else
                 error('Must choose RX or TX for 3rd input to send()');
             end
@@ -285,11 +285,11 @@ classdef PcSync < handle
                     data = vertcat(data, new_data);
                     
                     try
-                        variable = getArrayFromByteStream(data);
+                        variable = getArrayFromByteStream(data(1:end-1));
                         break;
                     catch ME
                         if strcmp(ME.identifier, 'MATLAB:Deserialize:BadVersionOrEndian')
-                            disp(['"data" cannot be parsed after ' num2str(length(data)) ' bytes... try to append more!']);
+                            disp(['"data" cannot be parsed after ' num2str(length(data)-1) ' bytes... try to append more!']);
                             continue;
                         else
                             rethrow(ME);
@@ -311,7 +311,7 @@ classdef PcSync < handle
                     error('Received a response: %s which is not consistent with checksum: %s', variable, obj.checksum);
                 end
             elseif isstruct(variable)
-                obj.raw_data_received = data;
+                obj.raw_data_received = data(1:end-1);
                 obj.incoming = variable;
                 obj.status = 1;
                 obj.reply_hash;
