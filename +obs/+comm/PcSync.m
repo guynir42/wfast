@@ -181,7 +181,7 @@ classdef PcSync < handle
 
             hndl = tcpip(remote_ip, remote_port, 'NetworkRole', obj.role, 'Timeout', 10);
             hndl.BytesAvailableFcn = @obj.read_data;
-            hndl.BytesAvailableFcnMode = 'byte';
+            hndl.BytesAvailableFcnMode = 'terminator';
             hndl.BytesAvailableFcnCount = 32;
             hndl.OutputBufferSize = 50*1024; 
             hndl.InputBufferSize = 50*1024;
@@ -216,11 +216,11 @@ classdef PcSync < handle
                 obj.raw_data_sent = getByteStreamFromArray(value);
                 obj.checksum = util.oop.getHash(obj.raw_data_sent);
                 obj.waitForTransferStatus(obj.hndl_tx);
-                fwrite(obj.hndl_tx, obj.raw_data_sent);
+                fprintf(obj.hndl_tx, '%s\n', obj.raw_data_sent);
             elseif strcmpi(rx_or_tx, 'rx') % reply only (e.g., sending back the hash of latest incoming data)
                 temp_raw_data = getByteStreamFromArray(value);
                 obj.waitForTransferStatus(obj.hndl_rx);
-                fwrite(obj.hndl_rx, temp_raw_data);
+                fprintf(obj.hndl_rx, '%s\n', temp_raw_data);
             else
                 error('Must choose RX or TX for 3rd input to send()');
             end
@@ -270,36 +270,53 @@ classdef PcSync < handle
             
             if obj.debug_bit>1, fprintf('read data with %d bytes\n', hndl.BytesAvailable); end
             
-            obj.waitForTransferStatus(hndl);
+%             obj.waitForTransferStatus(hndl);
             
-            if hndl.BytesAvailable>0
-                
-                data = uint8(fread(hndl, hndl.BytesAvailable))';
-                
-                try
-                    value = getArrayFromByteStream(data);
-                catch ME
-                    value = [];
-                    warning(ME.getReport)
-                end
-                
-                if isempty(value)
-                    % pass 
-                elseif ischar(value)
-                    if strcmp(obj.checksum, value)
-                        obj.status = 1;
-                    else
-                        error('Received a response: %s which is not consistent with checksum: %s', value, obj.checksum);
+            data = uint8([]);
+            variable = [];
+            
+            for ii = 1:3
+
+                if hndl.BytesAvailable>0
+                    
+                    obj.waitForTransferStatus(hndl);
+                    
+                    new_data = uint8(fread(hndl, hndl.BytesAvailable))'; % this may be only a part of the message...
+                    data = vertcat(data, new_data);
+                    
+                    try
+                        variable = getArrayFromByteStream(data);
+                        break;
+                    catch ME
+                        if strcmp(ME.identifier, 'MATLAB:Deserialize:BadVersionOrEndian')
+                            disp(['"data" cannot be parsed after ' num2str(length(data)) ' bytes... try to append more!']);
+                            continue;
+                        else
+                            rethrow(ME);
+                        end
+%                         value = [];
+%                         warning(ME.getReport)
                     end
-                elseif isstruct(value)
-                    obj.raw_data_received = data;
-                    obj.incoming = value;
-                    obj.status = 1;
-                    obj.reply_hash;
+                    
                 end
                 
+            end % for ii 
+                
+            if isempty(variable)
+                disp('Received an empty variable');
+            elseif ischar(variable)
+                if strcmp(obj.checksum, variable)
+                    obj.status = 1;
+                else
+                    error('Received a response: %s which is not consistent with checksum: %s', variable, obj.checksum);
+                end
+            elseif isstruct(variable)
+                obj.raw_data_received = data;
+                obj.incoming = variable;
+                obj.status = 1;
+                obj.reply_hash;
             end
-            
+
         end
         
     end
