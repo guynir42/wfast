@@ -377,13 +377,14 @@ classdef ManagerGUI < handle
             
             rep = util.text.inputdlg('Choose an interval for timer 1', obj.owner.period1);
             
-            num = str2num(rep);
-            
-            if ~isempty(num) && num>0 && ~isequal(num, obj.owner.period1)
-                obj.owner.period1 = num;
-                obj.owner.setup_t1;
+            if ~isempty(rep)
+                num = str2num(rep);
+
+                if ~isempty(num) && num>0 && ~isequal(num, obj.owner.period1)
+                    obj.owner.period1 = num;
+                    obj.owner.setup_t1;
+                end
             end
-            
             obj.update;
             
         end
@@ -405,11 +406,13 @@ classdef ManagerGUI < handle
             
             rep = util.text.inputdlg('Choose an interval for timer 2', obj.owner.period2);
             
-            num = str2num(rep);
-            
-            if ~isempty(num) && num>0 && ~isequal(num, obj.owner.period2)
-                obj.owner.period2 = num;
-                obj.owner.setup_t2;
+            if ~isempty(rep)
+                num = str2num(rep);
+
+                if ~isempty(num) && num>0 && ~isequal(num, obj.owner.period2)
+                    obj.owner.period2 = num;
+                    obj.owner.setup_t2;
+                end
             end
             
             obj.update;
@@ -432,11 +435,13 @@ classdef ManagerGUI < handle
             
             rep = util.text.inputdlg('Choose an interval for timer 3', obj.owner.period3);
             
-            num = str2num(rep);
-            
-            if ~isempty(num) && num>0 && ~isequal(num, obj.owner.period3)
-                obj.owner.period3 = num;
-                obj.owner.setup_t3;
+            if ~isempty(rep)
+                num = str2num(rep);
+
+                if ~isempty(num) && num>0 && ~isequal(num, obj.owner.period3)
+                    obj.owner.period3 = num;
+                    obj.owner.setup_t3;
+                end
             end
             
             obj.update;

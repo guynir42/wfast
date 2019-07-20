@@ -171,7 +171,7 @@ classdef PcSync < handle
                     obj.hndl_rx = obj.connectSocket('rx');
                 end
                 
-                obj.update;
+%                 obj.update;
                 
             catch ME
                 obj.log.error(ME.getReport);
@@ -183,16 +183,22 @@ classdef PcSync < handle
         function hndl = connectSocket(obj, rx_or_tx)
 
             hndl = tcpip(obj.remote_ip, obj.(['remote_port_' rx_or_tx]), 'NetworkRole', obj.role, 'Timeout', 10);
-            hndl.BytesAvailableFcn = ['obj.read_data_' rx_or_tx];
-            hndl.BytesAvailableFcnMode = 'terminator';
-%             hndl.BytesAvailableFcnCount = 32;
             hndl.OutputBufferSize = 50*1024; 
             hndl.InputBufferSize = 50*1024;
             flushinput(hndl);
             flushoutput(hndl);
 
             fopen(hndl);
-
+            
+%             hndl.BytesAvailableFcnCount = 32;
+            hndl.BytesAvailableFcnMode = 'terminator';
+            if strcmp(rx_or_tx, 'tx')
+                hndl.BytesAvailableFcn = @obj.read_data_tx;
+            else
+                hndl.BytesAvailableFcn = @obj.read_data_rx;
+            end
+            
+            
         end
         
         function disconnect(obj)

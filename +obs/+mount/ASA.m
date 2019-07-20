@@ -724,20 +724,22 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             try 
             
-                if obj.use_guiding && obj.tracking && obj.sync.status
+                if obj.use_guiding && obj.tracking % && obj.sync.status
                     
                     direction = 1;
-                    if strcmp(obj.pier_side, 'pierWest')
+                    if strcmp(obj.pier_side, 'pierEast')
                         direction  = -1;
                     end
                     
                     if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'RA_rate_delta') && ~isempty(obj.sync.incoming.RA_rate_delta)
                         obj.rate_RA = obj.rate_RA + direction*obj.sync.incoming.RA_rate_delta;
+                        obj.sync.incoming.RA_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
                         obj.sync.outgoing.RA_rate = obj.rate_RA;
                     end
                     
                     if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'DE_rate_delta') && ~isempty(obj.sync.incoming.DE_rate_delta)
                         obj.rate_DE = obj.rate_DE + direction*obj.sync.incoming.DE_rate_delta;
+                        obj.sync.incoming.DE_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
                         obj.sync.outgoing.DE_rate = obj.rate_DE;
                     end
                 else

@@ -664,7 +664,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             try 
                 
-                if ~obj.sync.is_connected || ~obj.sync.status
+                if ~obj.sync.is_connected % || ~obj.sync.status
                     obj.sync.connect;
                 end
 
