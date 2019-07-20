@@ -46,6 +46,9 @@ classdef PcSync < handle
     
     properties(Hidden=true)
        
+        raw_data_rx_temp; % for broken up incoming messages
+        raw_data_tx_temp;
+        
         default_client_remote_ip = '192.168.1.101';
         default_server_remote_ip = '192.168.1.100';
         
@@ -161,11 +164,11 @@ classdef PcSync < handle
                 obj.disconnect;
                 
                 if strcmpi(obj.role, 'server')
-                    obj.hndl_rx = obj.connectSocket(obj.remote_ip, obj.remote_port_rx);
-                    obj.hndl_tx = obj.connectSocket(obj.remote_ip, obj.remote_port_tx);
+                    obj.hndl_rx = obj.connectSocket('rx');
+                    obj.hndl_tx = obj.connectSocket('tx');
                 else
-                    obj.hndl_tx = obj.connectSocket(obj.remote_ip, obj.remote_port_tx);
-                    obj.hndl_rx = obj.connectSocket(obj.remote_ip, obj.remote_port_rx);
+                    obj.hndl_tx = obj.connectSocket('tx');
+                    obj.hndl_rx = obj.connectSocket('rx');
                 end
                 
                 obj.update;
@@ -177,12 +180,12 @@ classdef PcSync < handle
             
         end
         
-        function hndl = connectSocket(obj, remote_ip, remote_port)
+        function hndl = connectSocket(obj, rx_or_tx)
 
-            hndl = tcpip(remote_ip, remote_port, 'NetworkRole', obj.role, 'Timeout', 10);
-            hndl.BytesAvailableFcn = @obj.read_data;
+            hndl = tcpip(obj.remote_ip, obj.(['remote_port_' rx_or_tx]), 'NetworkRole', obj.role, 'Timeout', 10);
+            hndl.BytesAvailableFcn = ['obj.read_data_' rx_or_tx];
             hndl.BytesAvailableFcnMode = 'terminator';
-            hndl.BytesAvailableFcnCount = 32;
+%             hndl.BytesAvailableFcnCount = 32;
             hndl.OutputBufferSize = 50*1024; 
             hndl.InputBufferSize = 50*1024;
             flushinput(hndl);
@@ -212,22 +215,23 @@ classdef PcSync < handle
                 rx_or_tx = 'tx';
             end
             
+            byte_stream = getByteStreamFromArray(value);
+            
             if strcmpi(rx_or_tx, 'tx') % primary transmission mode
-                obj.raw_data_sent = getByteStreamFromArray(value);
+                obj.raw_data_sent = sprintf('%s Message length is %010d\n', byte_stream, length(byte_stream));
                 obj.checksum = util.oop.getHash(obj.raw_data_sent);
                 obj.waitForTransferStatus(obj.hndl_tx);
-                fwrite(obj.hndl_tx, [obj.raw_data_sent 10]);
+                fwrite(obj.hndl_tx, obj.raw_data_sent);
             elseif strcmpi(rx_or_tx, 'rx') % reply only (e.g., sending back the hash of latest incoming data)
-                temp_raw_data = getByteStreamFromArray(value);
                 obj.waitForTransferStatus(obj.hndl_rx);
-                fwrite(obj.hndl_tx, [temp_raw_data 10]); 
+                fwrite(obj.hndl_tx, sprintf('%s Message length is %010d\n', byte_stream, length(byte_stream))); 
             else
                 error('Must choose RX or TX for 3rd input to send()');
             end
                 
         end
         
-        function waitForTransferStatus(obj, hndl)
+        function waitForTransferStatus(~, hndl)
             
             res = 0.01;
             
@@ -266,39 +270,74 @@ classdef PcSync < handle
             
         end
         
-        function read_data(obj, hndl, ~)
+        function read_data(obj, hndl, rx_or_tx) % can be called separately for rx or tx
             
-            if obj.debug_bit>1, fprintf('read data with %d bytes\n', hndl.BytesAvailable); end
+            if obj.debug_bit>1, fprintf('Received data with %d bytes\n', hndl.BytesAvailable); end
             
 %             obj.waitForTransferStatus(hndl);
             
-            data = uint8([]);
             variable = [];
             
-            for ii = 1:3
+            data_name = ['raw_data_' rx_or_tx '_temp'];
+            
+            data_temp = obj.(data_name);
+            
+            for ii = 1:10
 
                 if hndl.BytesAvailable>0
                     
                     obj.waitForTransferStatus(hndl);
                     
                     new_data = uint8(fread(hndl, hndl.BytesAvailable))'; % this may be only a part of the message...
-                    data = vertcat(data, new_data);
+                                       
+                    data_temp = horzcat(data_temp, new_data); % add the latest data to temp buffer
+                    
+                    if length(obj.raw_data_rx_temp)<30 % message is too short (no footer attached!)
+                        if obj.debug_bit>1, disp(['Message is too short, only ' num2str(length(obj.raw_data_rx_temp))]); end
+                        break;
+                    end
+                    
+                    footer_str = char(data_temp(end-28:end-1)); % include only the text and number (no line break, no leading space)
+                    
+                    if ~strcmp(footer_str(1:18), 'Message length is ') % message doesn't have correct footer string
+                        if obj.debug_bit>1, disp(['Incorrect footer string: ' footer_str]); end
+                        break;
+                    end
+                                        
+                    idx = regexp(char(footer_data), '\d{10}');
+                    
+                    if isempty(idx) || idx~=19
+                        if obj.debug_bit>1, disp(['Numeric values index is ' num2str(idx) '... should be at 19']); end
+                        break;
+                    end
+                    
+                    L = str2double(footer_data(19:29));
+                    
+                    if length(data_temp)<L
+                        if obj.debug_bit>1, fprintf('Length of message is %d, smaller than required by footer data (%d bytes). Dropping entire message!\n', length(data_temp), L); end
+                        obj.(data_name) = uint8([]);
+                        return;
+                    end
                     
                     try
-                        variable = getArrayFromByteStream(data(1:end-1));
-                        break;
-                    catch ME
+                    
+                        variable = getArrayFromByteStream(data_temp(end-30-L+1:end-30)); % read L bytes from collected data, minus footer string. 
+                        break; % upon success, should break from the loop also... 
+                    
+                    catch ME % failed to deserialize the values... 
                         
                         if strcmp(ME.identifier, 'MATLAB:Deserialize:BadVersionOrEndian')
                             
-                            if obj.debug_bit
-                                disp(['"data" cannot be parsed after ' num2str(length(data)-1) ' bytes... try to append more!']);
+                            if obj.debug_bit>1
+                                disp(['"data" cannot be parsed after ' num2str(length(data_temp)-30) ' bytes... try to append more!']); % this should not happen any more! 
                             end
                             
                             continue;
                             
                         else
+                            disp(['Got a different error: ' ME.identifier]);
                             warning(ME.getReport);
+                            obj.(data_name) = uint8([]); % upon a generic error, should drop the whole message
                             return;
                         end
                         
@@ -307,21 +346,35 @@ classdef PcSync < handle
                 end
                 
             end % for ii 
-                
+            
+            obj.(data_name) = data_temp; % if no "return" was issued, update the raw_data_rx_temp or raw_data_tx_temp with latest data
+            
             if isempty(variable)
-%                 disp('Received an empty variable');
-            elseif ischar(variable)
-                if strcmp(obj.checksum, variable)
-                    obj.status = 1;
-                else
-                    error('Received a response: %s which is not consistent with checksum: %s', variable, obj.checksum);
-                end
-            elseif isstruct(variable)
-                obj.raw_data_received = data(1:end-1);
+                if obj.debug_bit>1, disp('Received an empty variable'); end
+            elseif strcmp(rx_or_tx, 'tx') && ischar(variable)
+                
+            elseif strcmp(rx_or_tx, 'rx') && isstruct(variable)
+                if obj.debug_bit>1, disp(['Successfully deserialized message with ' num2str(length(obj.raw_data_rx_temp)-1) ' bytes! Converted into a struct... ']); end
+                obj.raw_data_received = data_temp;
+                obj.(data_name) = uint8([]);
                 obj.incoming = variable;
                 obj.status = 1;
                 obj.reply_hash;
+            else
+                warning('Wrong type of data received in %s pipe, class(variable)= %s', rx_or_tx, class(variable)); % this shouldn't happen! 
             end
+
+        end
+        
+        function read_data_rx(obj, hndl, ~)
+            
+            obj.read_data(hndl, 'rx');
+
+        end
+        
+        function read_data_tx(obj, hndl, ~)
+            
+            obj.read_data(hndl, 'tx');
 
         end
         
