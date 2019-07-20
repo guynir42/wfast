@@ -57,7 +57,7 @@ classdef PcSync < handle
         default_client_remote_port_rx = 4013;
         default_client_remote_port_tx = 4012;
         
-        version = 1.01;
+        version = 1.02;
         
     end
     
@@ -230,7 +230,7 @@ classdef PcSync < handle
                 fwrite(obj.hndl_tx, obj.raw_data_sent);
             elseif strcmpi(rx_or_tx, 'rx') % reply only (e.g., sending back the hash of latest incoming data)
                 obj.waitForTransferStatus(obj.hndl_rx);
-                fwrite(obj.hndl_tx, sprintf('%s Message length is %010d\n', byte_stream, length(byte_stream))); 
+                fwrite(obj.hndl_rx, sprintf('%s Message length is %010d\n', byte_stream, length(byte_stream))); 
             else
                 error('Must choose RX or TX for 3rd input to send()');
             end
