@@ -218,7 +218,7 @@ classdef PcSync < handle
             byte_stream = getByteStreamFromArray(value);
             
             if strcmpi(rx_or_tx, 'tx') % primary transmission mode
-                obj.raw_data_sent = sprintf('%s Message length is %010d\n', byte_stream, length(byte_stream));
+                obj.raw_data_sent = uint8(sprintf('%s Message length is %010d\n', byte_stream, length(byte_stream)));
                 obj.checksum = util.oop.getHash(obj.raw_data_sent);
                 obj.waitForTransferStatus(obj.hndl_tx);
                 fwrite(obj.hndl_tx, obj.raw_data_sent);
@@ -254,7 +254,8 @@ classdef PcSync < handle
         function update(obj)
             
             if obj.is_connected
-                obj.hndl_rx.BytesAvailableFcn = @obj.read_data;
+                obj.hndl_rx.BytesAvailableFcn = @obj.read_data_rx;
+                obj.hndl_tx.BytesAvailableFcn = @obj.read_data_tx;
                 obj.outgoing.time = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
 
                 obj.status = 0;
@@ -304,14 +305,14 @@ classdef PcSync < handle
                         break;
                     end
                                         
-                    idx = regexp(char(footer_data), '\d{10}');
+                    idx = regexp(char(footer_str), '\d{10}');
                     
                     if isempty(idx) || idx~=19
                         if obj.debug_bit>1, disp(['Numeric values index is ' num2str(idx) '... should be at 19']); end
                         break;
                     end
                     
-                    L = str2double(footer_data(19:29));
+                    L = str2double(footer_str(19:end));
                     
                     if length(data_temp)<L
                         if obj.debug_bit>1, fprintf('Length of message is %d, smaller than required by footer data (%d bytes). Dropping entire message!\n', length(data_temp), L); end
@@ -352,7 +353,10 @@ classdef PcSync < handle
             if isempty(variable)
                 if obj.debug_bit>1, disp('Received an empty variable'); end
             elseif strcmp(rx_or_tx, 'tx') && ischar(variable)
-                
+                if ~strcmp(obj.checksum, variable)
+                    warning('Checksum for latest transmission was %s, received confirmation checksum: %s', obj.checksum, variable)
+                end
+                obj.status = 1;
             elseif strcmp(rx_or_tx, 'rx') && isstruct(variable)
                 if obj.debug_bit>1, disp(['Successfully deserialized message with ' num2str(length(obj.raw_data_rx_temp)-1) ' bytes! Converted into a struct... ']); end
                 obj.raw_data_received = data_temp;
