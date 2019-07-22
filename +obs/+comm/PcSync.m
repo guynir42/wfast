@@ -300,8 +300,8 @@ classdef PcSync < handle
                                        
                     data_temp = horzcat(data_temp, new_data); % add the latest data to temp buffer
                     
-                    if length(obj.raw_data_rx_temp)<30 % message is too short (no footer attached!)
-                        if obj.debug_bit>1, disp(['Message is too short, only ' num2str(length(obj.raw_data_rx_temp))]); end
+                    if length(data_temp)<30 % message is too short (no footer attached!)
+                        if obj.debug_bit>1, disp(['Message is too short, only ' num2str(length(data_temp))]); end
                         break;
                     end
                     
