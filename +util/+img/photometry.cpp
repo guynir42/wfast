@@ -431,7 +431,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){
 	if(bad_pixel_ptr==0) bad_pixel_ptr=mxCreateNumericArray(2, (const mwSize*) out_dims, mxSINGLE_CLASS, mxREAL);
 	bad_pixel=(float*) mxGetData(bad_pixel_ptr);
 	
-	if(debug_bit){ // check that all inputs have been received! 
+	if(debug_bit>1){ // check that all inputs have been received! 
 		mexPrintf("cutouts: [");
 		for(int i=0;i<ndims;i++){if(i>0) mexPrintf("x"); mexPrintf("%d", dims[i]); }
 		mexPrintf("] (%s) ", mxGetClassName(prhs[0]));
@@ -464,13 +464,13 @@ void Photometry::run(){
 				
 		for(int i=0;i<num_threads-1;i++){
 			
-			mexPrintf("Sending a thread for indices %d to %d\n", current_idx, current_idx+step);
+			if(debug_bit>2) mexPrintf("Sending a thread for indices %d to %d\n", current_idx, current_idx+step);
 			t.push_back(std::thread(&Photometry::run_idx, this, current_idx, current_idx+step));
 			current_idx+=step; 
 			
 		}
 		
-		mexPrintf("Running on main thread indices %d to %d\n", current_idx, num_cutouts);
+		if(debug_bit>2) mexPrintf("Running on main thread indices %d to %d\n", current_idx, num_cutouts);
 		run_idx(current_idx,num_cutouts); // run the remaining cutouts on the main thread! 
 		
 		for(int i=0;i<num_threads-1;i++){
