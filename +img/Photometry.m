@@ -714,7 +714,7 @@ classdef Photometry < handle
             if obj.use_mex
                 [f,e,a,b,v,x,y,wd,p] = util.img.photometry(single(obj.cutouts), 'square', [], 'corners', obj.corner_size,...
                     'widths', obj.widths, 'subtract', obj.use_backgrounds, ...
-                    'var_map', obj.var_map, 'use_self', obj.use_self_psf);
+                    'var_map', obj.var_map, 'use_self', obj.use_self_psf, 'threads', obj.num_threads, 'debug_bit', obj.debug_bit);
             else
                 [f,e,a,b,v,x,y,wd,p] = obj.calculate('none', 'corner', 1);
             end
@@ -816,7 +816,7 @@ classdef Photometry < handle
             if obj.use_mex
                 [f,e,a,b,v,x,y,wd,p] = util.img.photometry(single(obj.cutouts), 'gauss', obj.gauss_sigma, 'annulus', obj.annulus,...
                     'iterations', obj.iterations, 'widths', obj.widths, 'subtract', obj.use_backgrounds, ...
-                    'var_map', obj.var_map, 'use_self', obj.use_self_psf);
+                    'var_map', obj.var_map, 'use_self', obj.use_self_psf, 'threads', obj.num_threads, 'debug_bit', obj.debug_bit);
             else
                 [f,e,a,b,v,x,y,wd,p] = obj.calculate('gaussian', 'annulus', obj.iterations);
             end
