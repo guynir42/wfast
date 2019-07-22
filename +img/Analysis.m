@@ -593,8 +593,10 @@ classdef Analysis < file.AstroData
                 
                 obj.num_stars_found = size(obj.positions,1);
                 
-                obj.clip_bg.positions = obj.positions_bg;
-                obj.clip_bg.cut_size = size(obj.cutouts_bg,1);
+                if ~isempty(obj.positions_bg)
+                    obj.clip_bg.positions = obj.positions_bg;
+                    obj.clip_bg.cut_size = size(obj.cutouts_bg,1);
+                end
                 
                 if isempty(obj.num_sum) 
                     if ~isempty(obj.cutouts)
@@ -616,7 +618,7 @@ classdef Analysis < file.AstroData
 %                 
 %             end
             
-            if isempty(obj.positions_bg)
+            if isempty(obj.clip_bg.positions)
                 obj.clip_bg.num_stars = 50;
                 obj.clip_bg.cut_size = 20;
                 obj.clip_bg.arbitraryPositions;
