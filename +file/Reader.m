@@ -71,6 +71,8 @@ classdef Reader < file.AstroData
     
         latest_input@util.text.InputVars;
         
+        filenames; % cell array of file names that match
+        
     end
     
     properties % object
@@ -123,7 +125,6 @@ classdef Reader < file.AstroData
     properties % switches
        
         glob_string = '*.h5*'; % match files based on this glob-expression
-        filenames; % cell array of file names that match
         
         % batch limits
         num_batches = []; % if you only want to read a few batches

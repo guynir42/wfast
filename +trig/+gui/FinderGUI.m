@@ -187,12 +187,12 @@ classdef FinderGUI < handle
             
             %%%%%%%%%%% panel image %%%%%%%%%%%%%%%%%%
             
-            num_buttons = 10; pos = pos - num_buttons;
+            num_buttons = 11; pos = pos - num_buttons;
             obj.panel_image = uipanel('Title', '', 'Position', [0.2 pos/N_middle 0.8 num_buttons/N_middle]);
             
             %%%%%%%%%%% panel chooser %%%%%%%%%%%%%%%%%%
             
-            obj.panel_chooser = GraphicPanel(obj.owner, [0.2 0/N_middle 0.8 2/N_middle], '', 0); % last input is for horizontal
+            obj.panel_chooser = GraphicPanel(obj.owner, [0.2 0/N_middle 0.8 1/N_middle], '', 0); % last input is for horizontal
             obj.panel_chooser.addButton('button_play', '', 'custom', 'PLAY', '', '', [], [], [], 'Show all events in a loop');
             obj.panel_chooser.addButton('button_prev', 'display_prev_event', 'push', 'PREV', '', '', [], [], [], 'Show previous event');
             obj.panel_chooser.addButton('input_index', 'display_event_idx', 'input', 'idx= ', '', '', [], [], [], 'Index of currently displayed event');

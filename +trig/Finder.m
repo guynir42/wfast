@@ -746,6 +746,12 @@ classdef Finder < handle
             
             obj.this_event.show('Parent', parent);
             
+            if ~isempty(obj.gui) && obj.gui.check
+                obj.gui.update;
+            end
+            
+            drawnow;
+            
         end
         
         function val = this_event(obj)
@@ -801,6 +807,10 @@ classdef Finder < handle
                 
             end
             
+            if ~isempty(obj.gui) && obj.gui.check
+                obj.all_events(obj.display_event_idx).show('parent', obj.gui.panel_image);
+            end
+            
         end
         
         function display_next_event(obj)
@@ -824,7 +834,7 @@ classdef Finder < handle
             obj.display_event_idx = obj.display_event_idx + 1;
             
             if obj.display_event_idx>obj.num_events
-                obj.display_event_idx = obj.num_events;
+                obj.display_event_idx = 1;
             end
             
             if obj.use_display_kept_events
@@ -843,7 +853,11 @@ classdef Finder < handle
                         break;
                     end
                 end
-                 
+            
+            end
+
+            if ~isempty(obj.gui) && obj.gui.check
+                obj.all_events(obj.display_event_idx).show('parent', obj.gui.panel_image);
             end
             
         end
@@ -864,6 +878,27 @@ classdef Finder < handle
             ax = axes('Parent', parent);
             
             histogram(ax, abs(obj.snr_values), 'BinWidth', 0.2);
+            
+        end
+        
+        function showLatest(obj, parent)
+            
+            if isempty(parent) || ~isvalid(parent)
+                if ~isempty(obj.gui) && obj.gui.check
+                    parent = obj.gui.panel_image;
+                else
+                    parent = gcf;
+                end
+            end
+            
+            for ii = 1:length(obj.last_events)
+                
+                if ii>1, pause(2); end
+                
+                obj.display_event_idx = obj.last_events(ii).serial;
+                obj.show(parent);
+            end
+            
             
         end
         

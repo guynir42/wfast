@@ -374,7 +374,7 @@ classdef Analysis < file.AstroData
                     star_str = '';
                 end
                 
-                ev_str = sprintf('%s%4.2f%s ', obj.finder.last_events(ii).snr, star_str);
+                ev_str = sprintf('%s%4.2f%s ', ev_str, obj.finder.last_events(ii).snr, star_str);
                 
             end
             
@@ -812,9 +812,9 @@ classdef Analysis < file.AstroData
             end
             
             if ~isempty(obj.finder.gui) && obj.finder.gui.check
-                obj.showLastEvents('parent', obj.finder.gui.panel_image);
+                obj.finder.showLatest(obj.finder.gui.panel_image);
             elseif ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
-                obj.showLastEvents('parent', obj.aux_figure);
+                obj.finder.showLatest(obj.aux_figure);
             end
             
             drawnow;
@@ -1021,30 +1021,6 @@ classdef Analysis < file.AstroData
 
             obj.clip.showRectangles('color', 'black', 'ax', input.ax, 'delete', 1, 'text', 1, 'num', obj.display_num_rect_stars);
             obj.clip_bg.showRectangles('color', 'red', 'ax', input.ax, 'delete', 0, 'text', 0);
-            
-        end
-        
-        function showLastEvents(obj, varargin)
-            
-            if isempty(obj.finder.last_events)
-                return;
-            end
-            
-            input = util.text.InputVars;
-            input.input_var('parent', []);
-            input.scan_vars(varargin{:});
-            
-            if isempty(input.parent)
-                input.parent = gcf;
-            end
-            
-            for ii = 1:length(obj.finder.last_events)
-                
-                if ii>1, pause(2); end
-                
-                obj.finder.last_events(ii).show('parent', input.parent);
-                
-            end
             
         end
         
