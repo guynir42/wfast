@@ -738,7 +738,7 @@ classdef Finder < handle
             
             if nargin<2 || isempty(parent)
                 if ~isempty(obj.gui) && obj.gui.check
-                    parent = obj.gui.image_axes;
+                    parent = obj.gui.panel_image;
                 else
                     parent = gcf;
                 end

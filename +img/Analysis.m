@@ -809,7 +809,9 @@ classdef Analysis < file.AstroData
                 obj.show('ax', obj.gui.axes_image);
             end
             
-            if ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
+            if ~isempty(obj.finder.gui) && obj.finder.gui.check
+                obj.showLastEvents('parent', obj.finder.gui.panel_image);
+            elseif ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
                 obj.showLastEvents('parent', obj.aux_figure);
             end
             
