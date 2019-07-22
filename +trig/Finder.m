@@ -2,6 +2,8 @@ classdef Finder < handle
 
     properties(Transient=true)
         
+        gui@trig.gui.FinderGUI;
+        hist_fig;
         bank@occult.FilterBank;
         
     end
@@ -70,17 +72,16 @@ classdef Finder < handle
     
     properties % switches/controls
         
+        min_star_snr = 5; % stars with lower S/N are not even tested for events
         threshold = 7.5; % threshold (in units of S/N) for peak of event 
         time_range_thresh = -2.5; % threshold for including area around peak (in continuous time)
         kern_range_thresh = -1; % area threshold (in kernels, discontinuous) NOTE: if negative this will be relative to "threshold"
         star_range_thresh = -1; % area threshold (in stars, discontinuous) NOTE: if this is higher than "threshold" there will be no area around peak
         
+        % additional cuts on events
         max_events = 5; % how many events can we have triggered on the same 2-batch window?
         max_stars = 5; % how many stars can we afford to have triggered at the same time? 
         max_frames = 50; % maximum length of trigger area (very long events are disqualified)
-        
-        % additional cuts on events
-        min_star_snr = 5;
         max_num_nans = 1;
         max_corr = 0.75;
         
@@ -88,12 +89,17 @@ classdef Finder < handle
         
         frame_rate = 25; % if timestamps are not given explicitely
         
+        display_event_idx = [];
+        use_display_kept_events = 0;
+        
+        
         debug_bit = 1;
         
     end
     
     properties(Dependent=true)
         
+        total_batches;
         kept_events;
         
     end
@@ -221,9 +227,67 @@ classdef Finder < handle
             
         end
         
+        function val = get.total_batches(obj)
+            
+            val = length(obj.snr_values);
+            
+        end
+        
         function val = get.kept_events(obj)
             
             val = obj.all_events([obj.all_events.keep]==1);
+            
+        end
+        
+        function val = num_events(obj)
+            
+            val = length(obj.all_events);
+            
+        end
+        
+        function val = num_kept(obj)
+            
+            val = length(obj.kept_events);
+            
+        end
+        
+        function val = obs_pars_str(obj)
+            
+            if isempty(obj.pars)
+                val = '';
+            else
+                val = sprintf('date: %s', obj.pars.STARTTIME(1:10)); % need to expand this...
+            end
+            
+        end
+        
+        function val = phot_pars_str(obj)
+            
+            if isempty(obj.phot_pars)
+                val = '';
+            else
+                
+                val = '';
+                
+                val = [val 'b/g sub: ' num2str(obj.phot_pars.used_bg_sub)];
+                
+                if strcmpi(obj.phot_pars.signal_method, 'aperture')
+                    val = [val sprintf(' | aperture %4.2f pix radius', obj.phot_pars.radius)];
+                end
+                
+                if strcmpi(obj.phot_pars.signal_method, 'aperture')
+                    val = [val sprintf(' | annulus %4.2f-%4.2f pixels', obj.phot_pars.annulus, obj.phot_pars.annulus_outer)];
+                end
+                
+                val = [val ' | iter= ' num2str(obj.phot_pars.iterations)];
+                
+            end
+            
+        end
+        
+        function val = event_pars_str(obj)
+            
+            val = '';
             
         end
         
@@ -655,6 +719,153 @@ classdef Finder < handle
     end
     
     methods % plotting tools / GUI
+        
+        function makeGUI(obj)
+            
+            if isempty(obj.gui)
+                obj.gui = trig.gui.FinderGUI(obj);
+            end
+            
+            obj.gui.make;
+            
+        end
+        
+        function show(obj, parent)
+            
+            if isempty(obj.this_event)
+                return;
+            end
+            
+            if nargin<2 || isempty(parent)
+                if ~isempty(obj.gui) && obj.gui.check
+                    parent = obj.gui.image_axes;
+                else
+                    parent = gcf;
+                end
+            end
+            
+            obj.this_event.show('Parent', parent);
+            
+        end
+        
+        function val = this_event(obj)
+            
+            if isempty(obj.display_event_idx) || obj.display_event_idx>obj.num_events
+                val = trig.Event.empty;
+            else
+                val = obj.all_events(obj.display_event_idx);
+            end
+            
+        end
+        
+        function display_prev_event(obj)
+           
+            if obj.use_display_kept_events
+                if isempty(obj.kept_events)
+                    obj.display_event_idx = [];
+                    return;
+                end
+            else
+                if isempty(obj.all_events)
+                    obj.display_event_idx = [];
+                    return;
+                end
+            end
+            
+            if isempty(obj.display_event_idx)
+                obj.display_event_idx = 1;
+            end
+            
+            obj.display_event_idx = obj.display_event_idx - 1;
+            
+            if obj.display_event_idx<1
+                obj.display_event_idx = obj.num_events;
+            end
+            
+            if obj.use_display_kept_events
+                
+                for ii = obj.display_event_idx:-1:1
+                    if obj.all_events(ii).keep
+                        obj.display_event_idx = ii;
+                        break;
+                    end
+                end
+                
+                % loop back around...
+                for ii = obj.num_events:-1:obj.display_event_idx
+                    if obj.all_events(ii).keep
+                        obj.display_event_idx = ii;
+                        break;
+                    end
+                end
+                
+            end
+            
+        end
+        
+        function display_next_event(obj)
+           
+            if obj.use_display_kept_events
+                if isempty(obj.kept_events)
+                    obj.display_event_idx = [];
+                    return;
+                end
+            else
+                if isempty(obj.all_events)
+                    obj.display_event_idx = [];
+                    return;
+                end
+            end
+            
+            if isempty(obj.display_event_idx)
+                obj.display_event_idx = 0;
+            end
+            
+            obj.display_event_idx = obj.display_event_idx + 1;
+            
+            if obj.display_event_idx>obj.num_events
+                obj.display_event_idx = obj.num_events;
+            end
+            
+            if obj.use_display_kept_events
+                
+                for ii = obj.display_event_idx:obj.num_events
+                    if obj.all_events(ii).keep
+                        obj.display_event_idx = ii;
+                        break;
+                    end
+                end
+                
+                % loop back around...
+                for ii = 1:obj.display_event_idx
+                    if obj.all_events(ii).keep
+                        obj.display_event_idx = ii;
+                        break;
+                    end
+                end
+                 
+            end
+            
+        end
+        
+        function histogram(obj, parent)
+            
+            if nargin<2 || isempty(parent)
+                
+                if isempty(obj.hist_fig) || ~isa(obj.hist_fig, 'matlab.ui.Figure') || ~isvalid(obj.hist_fig)
+                    obj.hist_fig = figure;
+                end
+                
+                parent = obj.hist_fig;
+                
+            end
+            
+            delete(parent.Children);
+            ax = axes('Parent', parent);
+            
+            histogram(ax, abs(obj.snr_values), 'BinWidth', 0.2);
+            
+        end
         
     end    
     
