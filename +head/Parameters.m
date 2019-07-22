@@ -426,13 +426,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         
         function val = get.OBSRA_DEG(obj)
             
-            val = obj.WCS.CRVAL(1);
+            if isempty(obj.WCS) || isempty(obj.WCS.CRVAL)
+                val = [];
+            else
+                val = obj.WCS.CRVAL(1);
+            end
             
         end
         
         function val = get.OBSDEC_DEG(obj)
             
-            val = obj.WCS.CRVAL(2);
+            if isempty(obj.WCS) || isempty(obj.WCS.CRVAL)
+                val = [];
+            else
+                val = obj.WCS.CRVAL(2);
+            end
             
         end
         

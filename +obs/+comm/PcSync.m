@@ -267,6 +267,7 @@ classdef PcSync < handle
                 obj.status = 0;
 %                 flushinput(obj.hndl_tx);
                 obj.send(obj.outgoing);
+                
             end
             
         end
