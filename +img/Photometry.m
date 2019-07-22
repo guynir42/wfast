@@ -52,6 +52,7 @@ classdef Photometry < handle
     properties % switches/controls
         
         use_mex = 1; % use the new mex function for faster processing
+        num_threads = 1; % for multithreaded mex photometry
         use_backgrounds = 1; % remove background from individual cutout
         use_self_psf = 0; % use image as a proxy for its own PSF
         
@@ -300,7 +301,7 @@ classdef Photometry < handle
             if isa(input.cutouts, 'single')
                 obj.cutouts = input.cutouts;
             else
-                obj.cutouts = double(input.cutouts);
+                obj.cutouts = single(input.cutouts);
             end
             
             obj.positions = input.positions;
@@ -764,7 +765,7 @@ classdef Photometry < handle
             if obj.use_mex
                 [f,e,a,b,v,x,y,wd,p] = util.img.photometry(single(obj.cutouts), 'circle', obj.aperture, 'annulus', obj.annulus,...
                     'widths', obj.widths, 'iterations', obj.iterations, 'subtract', obj.use_backgrounds, ...
-                    'var_map', obj.var_map, 'use_self', obj.use_self_psf);
+                    'var_map', obj.var_map, 'use_self', obj.use_self_psf, 'threads', obj.num_threads, 'debug_bit', obj.debug_bit);
             else
                 [f,e,a,b,v,x,y,wd,p] = obj.calculate('circle', 'annulus', obj.iterations);
             end

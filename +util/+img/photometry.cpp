@@ -5,6 +5,8 @@
 #include <string.h>
 #include <vector>
 #include <cctype>
+#include <thread>
+#include <chrono>
 
 #define STRLN 64 // maximum string length (for copying)
 
@@ -26,6 +28,7 @@ class Photometry{
 	float *gain_map=0;
 	float gain_scalar=1; // calculate the source noise using the gain
 	bool interpolate=0; // if true, interpolate over bad pixels using 8 neighboor average
+	int num_threads=1;
 	
 	float epsilon=0.1f; // minimal value for both dx, dy to change. If change is smaller than epsilon, further iterations are skipped... 
 	mwSize *dims=0;
@@ -61,7 +64,7 @@ class Photometry{
 	// these can be shared with all calculations
 	float *X=0; // grid points not including shifts. 
 	float *Y=0; // grid points not including shifts. 
-
+		
 	// output arrays are defined here (in C++)
 	float *flux=0;
 	float *error=0;
@@ -89,6 +92,7 @@ class Photometry{
 	~Photometry();
 	void parseInputs(int nrhs, const mxArray *prhs[]);
 	void run();
+	void run_idx(int start_idx, int end_idx); // use this to run only a subset of the cutouts (for multithreading)
 	void calculate(int j);
 	float getWidthFromMoments(float m2x, float m2y, float mxy);
 	
@@ -180,6 +184,7 @@ Photometry::~Photometry(){ // destructor cleans up intermidiate arrays
 	
 	mxFree(X);
 	mxFree(Y);
+	
 	
 }
 
@@ -380,6 +385,14 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){
 			}
 			
 		}
+		else if(cs(key, "threads")){
+			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			else{
+				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
+				num_threads=mxGetScalar(val);
+			}
+			
+		}
 		else if(cs(key, "multiplier")){
 			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
 			else{
@@ -435,14 +448,49 @@ void Photometry::run(){
 
 	// mexPrintf("num_cutouts= %d\n", num_cutouts);
 
-	for(int j=0;j<num_cutouts;j++){ // number of cutouts
+	if(num_threads<=1){
+		for(int j=0;j<num_cutouts;j++){ // number of cutouts
+			
+			calculate(j);
+			
+		} // for j
+	}
+	else{
 		
-		calculate(j);
+		int step=num_cutouts/num_threads;
+		int current_idx=0;
 		
-	} // for j
+		std::vector<std::thread> t;
+				
+		for(int i=0;i<num_threads-1;i++){
+			
+			mexPrintf("Sending a thread for indices %d to %d\n", current_idx, current_idx+step);
+			t.push_back(std::thread(&Photometry::run_idx, this, current_idx, current_idx+step));
+			current_idx+=step; 
+			
+		}
+		
+		mexPrintf("Running on main thread indices %d to %d\n", current_idx, num_cutouts);
+		run_idx(current_idx,num_cutouts); // run the remaining cutouts on the main thread! 
+		
+		for(int i=0;i<num_threads-1;i++){
+			t[i].join();
+		}
+		
+	}
 	
 	if(debug_bit>2) printMatrix(cutouts, "cutouts");
 	
+}
+
+void Photometry::run_idx(int start_idx, int end_idx){
+
+	for(int j=start_idx;j<end_idx;j++){ // partial list of cutouts
+			
+			calculate(j);
+			
+	} // for j
+
 }
 
 void Photometry::calculate(int j){
