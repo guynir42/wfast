@@ -236,21 +236,36 @@ classdef Analysis < file.AstroData
         
         function val = get.filename(obj)
             
-            [~,file, ext] = fileparts(obj.reader.prev_filename);
-            
-            val = [file, ext];
+            if isempty(obj.reader) || isempty(obj.reader.prev_filename)
+                val = '';
+            else
+                [~,file, ext] = fileparts(obj.reader.prev_filename);
+                val = [file, ext];
+            end
             
         end
         
         function val = get.directory(obj)
-            
-            val = fileparts(obj.reader.prev_filename);
+           
+            if isempty(obj.reader) || isempty(obj.reader.prev_filename)
+                val = '';
+            else
+                val = fileparts(obj.reader.prev_filename);
+            end
             
         end
         
         function val = get.num_batches(obj)
             
-            val = min([obj.num_batches_limit, obj.reader.getNumBatches]);
+            if isempty(obj.reader) && isempty(obj.num_batches_limit)
+                val = [];
+            elseif ~isempty(obj.num_batches_limit)
+                val = obj.num_batches_limit;
+            elseif ~isempty(obj.reader)
+                val = obj.reader.getNumBatches;
+            else
+                val = min([obj.num_batches_limit, obj.reader.getNumBatches]);
+            end
             
         end
         
@@ -266,7 +281,11 @@ classdef Analysis < file.AstroData
         
         function val = thisFilename(obj)
             
-            val = obj.reader.prev_filename;
+            if isempty(obj.reader)
+                val = '';
+            else
+                val = obj.reader.prev_filename;
+            end
             
         end
         
@@ -282,13 +301,21 @@ classdef Analysis < file.AstroData
         
         function val = get.average_width(obj)
             
-            val = (obj.model_psf.maj_axis+obj.model_psf.min_axis)/2;
+            if isempty(obj.model_psf)
+                val = [];
+            else
+                val = (obj.model_psf.maj_axis+obj.model_psf.min_axis)/2;
+            end
             
         end
         
         function val = get.average_offsets(obj)
             
-            val = [obj.phot_stack.average_offset_x obj.phot_stack.average_offset_y];
+            if isempty(obj.phot_stack)
+                val = [];
+            else
+                val = [obj.phot_stack.average_offset_x obj.phot_stack.average_offset_y];
+            end
             
         end
         
@@ -613,6 +640,8 @@ classdef Analysis < file.AstroData
             if obj.use_fits_save
                 obj.analysisSaveFITS;
             end
+            
+            obj.analysisDisplayGUI;
             
         end
         

@@ -243,7 +243,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
                 obj.filter_obj = head.Filter(obj.FILTER);
                 obj.ephem = head.Ephemeris;
                 obj.WCS = head.WorldCoordinates;
-                obj.cat = head.Catalog;
+                obj.cat = head.Catalog(obj);
                 
                 obj.FOCLEN = obj.FOCLEN; % this should fill the values for SCALE and F_RATIO
                 

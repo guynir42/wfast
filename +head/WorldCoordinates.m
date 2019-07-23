@@ -23,6 +23,15 @@ classdef WorldCoordinates < handle
         CD = []; % rotation matrix
         PV = []; % values of the polynomials needed for TPV transformation. Column 1 is for X, column 2 is for Y
         
+        RA_deg_center;
+        DE_deg_center;
+        
+    end
+    
+    properties(Dependent=true)
+        
+        rotation;
+        
     end
     
     properties % switches/controls
@@ -31,14 +40,6 @@ classdef WorldCoordinates < handle
         max_pv_indices = 40;
         
         debug_bit = 0;
-        
-    end
-    
-    properties(Dependent=true)
-        
-        rotation;
-        RA_deg_center;
-        DE_deg_center;
         
     end
     
@@ -86,26 +87,26 @@ classdef WorldCoordinates < handle
             
         end
         
-        function val = get.RA_deg_center(obj)
-            
-            if isempty(obj.PV) || isempty(obj.CRVAL)
-                val = [];
-            else
-                val = obj.CRVAL(1) - obj.PV(1,1);
-            end
-            
-        end
-        
-        function val = get.DE_deg_center(obj)
-            
-            if isempty(obj.PV) || isempty(obj.CRVAL)
-                val = [];
-            else
-                val = obj.CRVAL(2) - obj.PV(1,2);
-            end
-            
-        end
-        
+%         function val = get.RA_deg_center(obj)
+%             
+%             if isempty(obj.PV) || isempty(obj.CRVAL)
+%                 val = [];
+%             else
+%                 val = obj.CRVAL(1) - obj.PV(1,1);
+%             end
+%             
+%         end
+%         
+%         function val = get.DE_deg_center(obj)
+%             
+%             if isempty(obj.PV) || isempty(obj.CRVAL)
+%                 val = [];
+%             else
+%                 val = obj.CRVAL(2) - obj.PV(1,2);
+%             end
+%             
+%         end
+%         
     end
     
     methods % setters
@@ -159,6 +160,11 @@ classdef WorldCoordinates < handle
                 end
             
             end
+            
+            vec = obj.xy2coo(obj.CRPIX(1), obj.CRPIX(2));
+            
+            obj.RA_deg_center = vec(1);
+            obj.DE_deg_center = vec(2);
             
         end
         

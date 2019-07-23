@@ -29,7 +29,8 @@ classdef Catalog < handle
         
         threshold = 10; % used by mextractor to find stars
         mag_limit = 15;
-        flip = [1 1;1 -1;-1 1;-1 -1]; 
+%         flip = [1 1;1 -1;-1 1;-1 -1]; 
+        flip = [-1 1];
         
         debug_bit = 0;
         
@@ -54,6 +55,9 @@ classdef Catalog < handle
             if ~isempty(varargin) && isa(varargin{1}, 'head.Catalog')
                 if obj.debug_bit, fprintf('Catalog copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
+            elseif ~isempty(varargin) && isa(varargin{1}, 'head.Parameters')
+                if obj.debug_bit, fprintf('Catalog (pars) constructor v%4.2f\n', obj.version); end
+                obj.pars = varargin{1};
             else
                 if obj.debug_bit, fprintf('Catalog constructor v%4.2f\n', obj.version); end
             
@@ -202,7 +206,7 @@ classdef Catalog < handle
             
             [~,S] = astrometry(S, 'RA', obj.RA, 'Dec', obj.DE, 'Scale', obj.plate_scale,...
                 'Flip', obj.flip, 'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', [3000 3000], 'ApplyPM', false, ...
-                'MinRot', -25, 'MaxRot', 25);
+                'MinRot', -20, 'MaxRot', 20);
             
             % update RA/Dec in catalog according to WCS
             obj.mextractor_sim = update_coordinates(S);
@@ -247,6 +251,43 @@ classdef Catalog < handle
             
             obj.data = T;
 
+        end
+        
+        function idx = findOutburst(obj)
+            
+            [~, idx] = max(obj.data{:,'Mag_G'}-obj.data{:,'MAG_PSF'});
+            
+        end
+        
+        function idx = findOccultation(obj)
+            
+            [~, idx] = min(obj.data{:,'Mag_G'}-obj.data{:,'MAG_PSF'});
+            
+        end
+        
+        function idx = findNearestObject(obj, RA, Dec)
+            
+            if nargin<2 || isempty(RA)
+                RA = obj.pars.RA_DEG;
+            end
+            
+            if nargin<3 || isempty(Dec)
+                Dec = obj.pars.DEC_DEG;
+            end
+            
+            if ischar(RA)
+                RA = head.Ephemeris.hour2deg(RA);
+            end
+            
+            if ischar(Dec)
+                Dec = head.Ephemeris.sex2deg(Dec);
+            end
+            
+            delta_RA = (RA-obj.data{:,'RA'}).^2;
+            delta_Dec = (Dec-obj.data{:,'Dec'}).^2;
+            
+            [~, idx] = min(delta_RA+delta_Dec); 
+            
         end
         
     end
