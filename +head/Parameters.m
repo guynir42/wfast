@@ -444,7 +444,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
             
         end
         
-        
         function val = get.RA(obj)
             
             val = obj.ephem.RA;

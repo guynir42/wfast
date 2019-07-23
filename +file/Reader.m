@@ -71,8 +71,6 @@ classdef Reader < file.AstroData
     
         latest_input@util.text.InputVars;
         
-        filenames; % cell array of file names that match
-        
     end
     
     properties % object
@@ -106,6 +104,8 @@ classdef Reader < file.AstroData
 %         psf_sampling; % if loaded PSFs need to be binned (this is the binning factor)
 %         
 %         fluxes;
+        
+        filenames; % cell array of file names that match
         
         input_filename = '';
         

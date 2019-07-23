@@ -314,9 +314,28 @@ function file_handle = saveProperty(file_handle, name, value, input)
         
     elseif iscell(value)
         
-        if input.debug_bit, disp(['prop: "' name '" is cell array. Writing as as separate attributes/datasets...']); end
+%         if input.debug_bit, disp(['prop: "' name '" is cell array. Writing as as separate attributes/datasets...']); end
         
-        file_handle = saveCell(file_handle, name, value, input);
+        if isempty(value)
+            if input.debug_bit, disp(['prop: "' name '" is empty. Writing as attribute...']); end
+            saveString(file_handle, name, '{}', input);
+        elseif isvector(value) && (length(value)<=input.att_length ||  util.text.cs(input.format, 'hdf5', 'h5', 'h5z', 'struct', 'cell'))
+            if input.debug_bit, disp(['prop: "' name '" is a short 1D cell array. Writing as individual attributes...']); end
+            file_handle = saveCell(file_handle, name, value, input);
+        else
+            if input.debug_bit
+                fprintf('prop: "%s" is a 2D cell array or a 1D cell array longer than %d. Writing data size only. \n', name, input.att_length);
+                if iscellstr(value)
+                    class_str = 'String Cell';
+                else
+                    class_str = 'Cell';
+                end
+                
+                saveString(file_handle, name, sprintf('{%s %s}', util.text.print_vec(size(value), 'x'), class_str), input);
+                
+            end
+            
+        end
         
     elseif isnumeric(value)
         
