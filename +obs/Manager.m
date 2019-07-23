@@ -476,7 +476,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 obj.checker.update; % go over all sensors and only tell them to collect data. It's reported back in t2
                 
-                obj.sync.update;
+                obj.updateCameraComputer;
                 
                 if ~isempty(obj.gui) && obj.gui.check
                     obj.gui.update;
@@ -628,8 +628,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             if ~isempty(obj.gui) && obj.gui.check
                 obj.gui.update;
             end
-            
-            obj.updateCameraComputer;
             
         end
         

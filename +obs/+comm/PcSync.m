@@ -361,6 +361,7 @@ classdef PcSync < handle
                 if obj.debug_bit>1, disp('Received an empty variable'); end
             elseif strcmp(rx_or_tx, 'tx') && ischar(variable)
                 if ~strcmp(obj.checksum, variable)
+                    fprintf('Time: %s | message length= %d | pipe: %s\n', util.text.time2str(datetime('now', 'TimeZone', 'UTC')), length(data_temp), rx_or_tx); 
                     warning('Checksum for latest transmission was %s, received confirmation checksum: %s', obj.checksum, variable)
                 end
                 obj.status = 1;
