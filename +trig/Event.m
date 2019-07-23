@@ -331,7 +331,7 @@ classdef Event < handle
             if nnz(Nidx)>=obj.max_num_nans && ~all(Nidx) % if all frames have NaN offsets (i.e., forced photometry), it is ok. If some of them do, it is bad shape
                 obj.keep = 0;
                 obj.is_nan_offsets = 1;
-                obj.addNote(sprintf('offsets with %d NaNs', NN));
+                obj.addNote(sprintf('offsets with %d NaNs', nnz(Nidx)));
             end
             
             corr = obj.correlation(obj.backgrounds_at_star);
@@ -506,14 +506,10 @@ classdef Event < handle
             lh.FontSize = input.font_size-4;
             lh.NumColumns = 2;
 
-            if isempty(obj.notes)
-                note_str = '';
-            else
-                note_str = [', ' obj.notes];
-            end
-
-            util.plot.inner_title(sprintf('id: %d | star: %d | batches: %d-%d | event S/N= %4.2f | star S/N= %4.2f%s', ...
-                obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.star_snr, note_str),...
+            title(input.ax, obj.notes);
+            
+            util.plot.inner_title(sprintf('id: %d | star: %d | batches: %d-%d | event S/N= %4.2f | star S/N= %4.2f', ...
+                obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.star_snr),...
                 'ax', input.ax, 'Position', 'NorthWest', 'FontSize', input.font_size);
             
             input.ax.YLim(2) = max(abs(input.ax.YLim));
