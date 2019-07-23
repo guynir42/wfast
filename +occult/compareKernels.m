@@ -21,8 +21,8 @@ function snr_frac = compareKernels(this_kernel, that_kernel, full_xcorr)
         full_xcorr = 1;
     end
 
-    f1 = this_kernel - 1;
-    f2 = that_kernel - 1;
+    f1 = this_kernel;
+    f2 = that_kernel;
 
     % now the normalized kernels
     k1 = f1./sqrt(sum(f1.^2));

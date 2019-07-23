@@ -4,7 +4,7 @@ classdef Finder < handle
         
         gui@trig.gui.FinderGUI;
         hist_fig;
-        bank@occult.FilterBank;
+        bank@occult.ShuffleBank;
         
     end
     
@@ -13,7 +13,6 @@ classdef Finder < handle
         pars@head.Parameters;
         
         cal@trig.Calibrator;
-        filt@trig.Filter;
         all_events@trig.Event;
         new_events@trig.Event;
         last_events@trig.Event;
@@ -121,8 +120,7 @@ classdef Finder < handle
                 if obj.debug_bit, fprintf('Finder constructor v%4.2f\n', obj.version); end
             
                 obj.cal = trig.Calibrator;
-                obj.filt = trig.Filter;
-                
+                                
             end
             
         end
@@ -141,7 +139,6 @@ classdef Finder < handle
             obj.black_list_batches = [];
             
             obj.cal.reset;
-            obj.filt.reset;
             
             obj.prev_fluxes = [];
             obj.prev_errors = [];
@@ -166,6 +163,13 @@ classdef Finder < handle
             obj.star_hours_lost = 0;
             obj.snr_values = [];
             
+            obj.display_event_idx = [];
+            
+            if ~isempty(obj.gui) && obj.gui.check
+                delete(obj.gui.panel_image.Children);
+                obj.gui.update;
+            end
+            
             obj.clear;
             
         end
@@ -189,7 +193,7 @@ classdef Finder < handle
             obj.filename = [];
             
             obj.cal.clear;
-            obj.filt.clear;
+            obj.bank.clear;
             
         end
         
@@ -307,7 +311,13 @@ classdef Finder < handle
         function setupKernels(obj)
             
             if isempty(obj.bank)
-                obj.bank = occult.FilterBank;
+                f = fullfile(getenv('DATA', '/WFAST/saved/filter_bank.mat'));
+                if exist(f, 'file')
+                    load(f, 'bank');
+                    obj.bank = bank;
+                else
+                    error('Cannot load kernels from ShuffleBank object'); 
+                end
             end
             
             % some easy parameters
@@ -320,9 +330,11 @@ classdef Finder < handle
 %             obj.filt.kernels = obj.bank.lc.flux - 1;
             
             % consider changing the default parameters of bank
-            obj.bank.makeBank;
-            obj.filt.kernels = single(reshape(obj.bank.bank-1, [size(obj.bank.bank,1), obj.bank.num_pars]));
+%             obj.bank.makeBank;
+%             obj.filt.kernels = single(reshape(obj.bank.bank-1, [size(obj.bank.bank,1), obj.bank.num_pars]));
             
+            
+
         end
         
         function input(obj, varargin)
@@ -387,7 +399,7 @@ classdef Finder < handle
                 if obj.debug_bit>1, fprintf('Calibration time: %f seconds.\n', toc(t)); end
                 
                 t = tic;
-                obj.filt.input(obj.cal.fluxes_detrended, obj.cal.stds_detrended, obj.cal.timestamps); 
+                obj.bank.input(obj.cal.fluxes_detrended, obj.cal.stds_detrended, obj.cal.timestamps); % use the filter bank on the fluxes
                 if obj.debug_bit>1, fprintf('Filtering time: %f seconds.\n', toc(t)); end
                 
                 t = tic;
@@ -434,7 +446,7 @@ classdef Finder < handle
             
             obj.new_events = trig.Event.empty;
             
-            ff = obj.filt.fluxes_filtered; % dim 1 is time, dim 2 is kernels, dim 3 is stars
+            ff = obj.bank.fluxes_filtered; % dim 1 is time, dim 2 is kernels, dim 3 is stars
             
             good_stars = obj.cal.star_snrs>obj.min_star_snr;
             
@@ -467,13 +479,13 @@ classdef Finder < handle
                 
                 ev.star_indices = find(max(abs(ff(ev.time_indices, ev.kern_index, :)))>obj.getStarThresh);
                 
-                ev.timestamps = obj.filt.timestamps;
+                ev.timestamps = obj.bank.timestamps;
                 ev.time_step = obj.dt;
-                ev.duration =  obj.dt + obj.filt.timestamps(ev.time_indices(end))-obj.filt.timestamps(ev.time_indices(1));
+                ev.duration =  obj.dt + obj.bank.timestamps(ev.time_indices(end))-obj.bank.timestamps(ev.time_indices(1));
                 
-                ev.flux_filtered = obj.filt.fluxes_filtered(:,ev.kern_index,ev.star_index);
-%                 ev.flux_raw_all = permute(obj.filt.fluxes, [1,3,2]);
-%                 ev.stds_raw_all = permute(obj.filt.stds, [1,3,2]);
+                ev.flux_filtered = obj.bank.fluxes_filtered(:,ev.kern_index,ev.star_index);
+%                 ev.flux_raw_all = permute(obj.bank.fluxes, [1,3,2]);
+%                 ev.stds_raw_all = permute(obj.bank.stds, [1,3,2]);
                 ev.flux_detrended = obj.cal.fluxes_detrended(:,ev.star_index); 
                 ev.std_flux = std(ev.flux_detrended, [], 'omitnan');
                 ev.flux_raw_all = obj.cal.fluxes;
@@ -541,10 +553,10 @@ classdef Finder < handle
                 ev.serial = length(obj.all_events) + ii; % just keep a running index
                 
                 % fluxes and timestamps
-                ev.is_positive = obj.filt.fluxes_filtered(ev.time_index, ev.kern_index, ev.star_index)>0;
+                ev.is_positive = obj.bank.fluxes_filtered(ev.time_index, ev.kern_index, ev.star_index)>0;
                 
                 ev.peak_timestamp = ev.timestamps(ev.time_index);
-                ev.best_kernel = obj.filt.kernels(:,ev.kern_index);
+                ev.best_kernel = obj.bank.kernels(:,ev.kern_index);
                 
                 ev.threshold = obj.threshold;
                 ev.used_background_sub = input.used_background_sub;
