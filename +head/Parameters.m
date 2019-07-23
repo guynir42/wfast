@@ -133,6 +133,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         OBSDEC;
         OBSRA_DEG;
         OBSDEC_DEG;
+        FIELDROT; % rotation of field vs. celestial north
         
         % given by scheduler
         RA; % for the center of the image
@@ -241,6 +242,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
                 
                 obj.filter_obj = head.Filter(obj.FILTER);
                 obj.ephem = head.Ephemeris;
+                obj.WCS = head.WorldCoordinates;
+                obj.cat = head.Catalog;
                 
                 obj.FOCLEN = obj.FOCLEN; % this should fill the values for SCALE and F_RATIO
                 
@@ -426,20 +429,31 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         
         function val = get.OBSRA_DEG(obj)
             
-            if isempty(obj.WCS) || isempty(obj.WCS.CRVAL)
+            if isempty(obj.WCS);
                 val = [];
             else
-                val = obj.WCS.CRVAL(1);
+                val = obj.WCS.RA_deg_center;
             end
             
         end
         
         function val = get.OBSDEC_DEG(obj)
             
-            if isempty(obj.WCS) || isempty(obj.WCS.CRVAL)
+            if isempty(obj.WCS)
                 val = [];
             else
-                val = obj.WCS.CRVAL(2);
+                val = obj.WCS.DE_deg_center;
+            end
+            
+        end
+        
+        function val = get.FIELDROT(obj)
+            
+            
+            if isempty(obj.WCS)
+                val = [];
+            else
+                val = obj.WCS.rotation;
             end
             
         end

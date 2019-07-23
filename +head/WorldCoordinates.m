@@ -30,13 +30,15 @@ classdef WorldCoordinates < handle
         use_tpv = 1;
         max_pv_indices = 40;
         
-        debug_bit = 1;
+        debug_bit = 0;
         
     end
     
     properties(Dependent=true)
         
-        
+        rotation;
+        RA_deg_center;
+        DE_deg_center;
         
     end
     
@@ -73,6 +75,36 @@ classdef WorldCoordinates < handle
     end
     
     methods % getters
+        
+        function val = get.rotation(obj)
+            
+            if isempty(obj.PV)
+                val = [];
+            else
+                val = acotd(obj.PV(2,1)./obj.PV(3,1));
+            end
+            
+        end
+        
+        function val = get.RA_deg_center(obj)
+            
+            if isempty(obj.PV) || isempty(obj.CRVAL)
+                val = [];
+            else
+                val = obj.CRVAL(1) - obj.PV(1,1);
+            end
+            
+        end
+        
+        function val = get.DE_deg_center(obj)
+            
+            if isempty(obj.PV) || isempty(obj.CRVAL)
+                val = [];
+            else
+                val = obj.CRVAL(2) - obj.PV(1,2);
+            end
+            
+        end
         
     end
     
@@ -118,10 +150,10 @@ classdef WorldCoordinates < handle
             
                 for jj = 1:obj.max_pv_indices
 
-                    idx = find(pv.Ind(:,1)==ii & pv.Ind(:,2)==jj);
+                    idx = find(pv.Ind(:,1)==ii & pv.Ind(:,2)==jj-1);
                     
                     if ~isempty(idx)
-                        obj.PV(jj+1,ii) = pv.KeyVal{idx(1)};
+                        obj.PV(jj,ii) = pv.KeyVal{idx(1)};
                     end
                     
                 end
@@ -256,87 +288,89 @@ classdef WorldCoordinates < handle
         CD2_1;
         CD2_2;
         
-        PV1_1
-        PV1_2
-        PV1_3
-        PV1_4
-        PV1_5
-        PV1_6
-        PV1_7
-        PV1_8
-        PV1_9
-        PV1_10
-        PV1_11
-        PV1_12
-        PV1_13
-        PV1_14
-        PV1_15
-        PV1_16
-        PV1_17
-        PV1_18
-        PV1_19
-        PV1_20
-        PV1_21
-        PV1_22
-        PV1_23
-        PV1_24
-        PV1_25
-        PV1_26
-        PV1_27
-        PV1_28
-        PV1_29
-        PV1_30
-        PV1_31
-        PV1_32
-        PV1_33
-        PV1_34
-        PV1_35
-        PV1_36
-        PV1_37
-        PV1_38
-        PV1_39
-        PV1_40
+        PV1_0;
+        PV1_1;
+        PV1_2;
+        PV1_3;
+        PV1_4;
+        PV1_5;
+        PV1_6;
+        PV1_7;
+        PV1_8;
+        PV1_9;
+        PV1_10;
+        PV1_11;
+        PV1_12;
+        PV1_13;
+        PV1_14;
+        PV1_15;
+        PV1_16;
+        PV1_17;
+        PV1_18;
+        PV1_19;
+        PV1_20;
+        PV1_21;
+        PV1_22;
+        PV1_23;
+        PV1_24;
+        PV1_25;
+        PV1_26;
+        PV1_27;
+        PV1_28;
+        PV1_29;
+        PV1_30;
+        PV1_31;
+        PV1_32;
+        PV1_33;
+        PV1_34;
+        PV1_35;
+        PV1_36;
+        PV1_37;
+        PV1_38;
+        PV1_39;
+        PV1_40;
 
-        PV2_1
-        PV2_2
-        PV2_3
-        PV2_4
-        PV2_5
-        PV2_6
-        PV2_7
-        PV2_8
-        PV2_9
-        PV2_10
-        PV2_11
-        PV2_12
-        PV2_13
-        PV2_14
-        PV2_15
-        PV2_16
-        PV2_17
-        PV2_18
-        PV2_19
-        PV2_20
-        PV2_21
-        PV2_22
-        PV2_23
-        PV2_24
-        PV2_25
-        PV2_26
-        PV2_27
-        PV2_28
-        PV2_29
-        PV2_30
-        PV2_31
-        PV2_32
-        PV2_33
-        PV2_34
-        PV2_35
-        PV2_36
-        PV2_37
-        PV2_38
-        PV2_39
-        PV2_40
+        PV2_0;
+        PV2_1;
+        PV2_2;
+        PV2_3;
+        PV2_4;
+        PV2_5;
+        PV2_6;
+        PV2_7;
+        PV2_8;
+        PV2_9;
+        PV2_10;
+        PV2_11;
+        PV2_12;
+        PV2_13;
+        PV2_14;
+        PV2_15;
+        PV2_16;
+        PV2_17;
+        PV2_18;
+        PV2_19;
+        PV2_20;
+        PV2_21;
+        PV2_22;
+        PV2_23;
+        PV2_24;
+        PV2_25;
+        PV2_26;
+        PV2_27;
+        PV2_28;
+        PV2_29;
+        PV2_30;
+        PV2_31;
+        PV2_32;
+        PV2_33;
+        PV2_34;
+        PV2_35;
+        PV2_36;
+        PV2_37;
+        PV2_38;
+        PV2_39;
+        PV2_40;
         
     end
     
@@ -347,88 +381,90 @@ classdef WorldCoordinates < handle
         function val = get.CD2_1(obj), val = obj.CD(1,2); end
         function val = get.CD2_2(obj), val = obj.CD(2,2); end
         
-        function val = get.PV1_1(obj), val = obj.PV(1,1); end
-        function val = get.PV1_2(obj), val = obj.PV(2,1); end
-        function val = get.PV1_3(obj), val = obj.PV(3,1); end
-        function val = get.PV1_4(obj), val = obj.PV(4,1); end
-        function val = get.PV1_5(obj), val = obj.PV(5,1); end
-        function val = get.PV1_6(obj), val = obj.PV(6,1); end
-        function val = get.PV1_7(obj), val = obj.PV(7,1); end
-        function val = get.PV1_8(obj), val = obj.PV(8,1); end
-        function val = get.PV1_9(obj), val = obj.PV(9,1); end
-        function val = get.PV1_10(obj), val = obj.PV(10,1); end
-        function val = get.PV1_11(obj), val = obj.PV(11,1); end
-        function val = get.PV1_12(obj), val = obj.PV(12,1); end
-        function val = get.PV1_13(obj), val = obj.PV(13,1); end
-        function val = get.PV1_14(obj), val = obj.PV(14,1); end
-        function val = get.PV1_15(obj), val = obj.PV(15,1); end
-        function val = get.PV1_16(obj), val = obj.PV(16,1); end
-        function val = get.PV1_17(obj), val = obj.PV(17,1); end
-        function val = get.PV1_18(obj), val = obj.PV(18,1); end
-        function val = get.PV1_19(obj), val = obj.PV(19,1); end
-        function val = get.PV1_20(obj), val = obj.PV(20,1); end
-        function val = get.PV1_21(obj), val = obj.PV(21,1); end
-        function val = get.PV1_22(obj), val = obj.PV(22,1); end
-        function val = get.PV1_23(obj), val = obj.PV(23,1); end
-        function val = get.PV1_24(obj), val = obj.PV(24,1); end
-        function val = get.PV1_25(obj), val = obj.PV(25,1); end
-        function val = get.PV1_26(obj), val = obj.PV(26,1); end
-        function val = get.PV1_27(obj), val = obj.PV(27,1); end
-        function val = get.PV1_28(obj), val = obj.PV(28,1); end
-        function val = get.PV1_29(obj), val = obj.PV(29,1); end
-        function val = get.PV1_30(obj), val = obj.PV(30,1); end
-        function val = get.PV1_31(obj), val = obj.PV(31,1); end
-        function val = get.PV1_32(obj), val = obj.PV(32,1); end
-        function val = get.PV1_33(obj), val = obj.PV(33,1); end
-        function val = get.PV1_34(obj), val = obj.PV(34,1); end
-        function val = get.PV1_35(obj), val = obj.PV(35,1); end
-        function val = get.PV1_36(obj), val = obj.PV(36,1); end
-        function val = get.PV1_37(obj), val = obj.PV(37,1); end
-        function val = get.PV1_38(obj), val = obj.PV(38,1); end
-        function val = get.PV1_39(obj), val = obj.PV(39,1); end
+        
+        function val = get.PV1_0(obj), val = obj.PV(1,1); end
+        function val = get.PV1_1(obj), val = obj.PV(2,1); end
+        function val = get.PV1_2(obj), val = obj.PV(3,1); end
+        function val = get.PV1_3(obj), val = obj.PV(4,1); end
+        function val = get.PV1_4(obj), val = obj.PV(5,1); end
+        function val = get.PV1_5(obj), val = obj.PV(6,1); end
+        function val = get.PV1_6(obj), val = obj.PV(7,1); end
+        function val = get.PV1_7(obj), val = obj.PV(8,1); end
+        function val = get.PV1_8(obj), val = obj.PV(9,1); end
+        function val = get.PV1_9(obj), val = obj.PV(10,1); end
+        function val = get.PV1_10(obj), val = obj.PV(11,1); end
+        function val = get.PV1_11(obj), val = obj.PV(12,1); end
+        function val = get.PV1_12(obj), val = obj.PV(13,1); end
+        function val = get.PV1_13(obj), val = obj.PV(14,1); end
+        function val = get.PV1_14(obj), val = obj.PV(15,1); end
+        function val = get.PV1_15(obj), val = obj.PV(16,1); end
+        function val = get.PV1_16(obj), val = obj.PV(17,1); end
+        function val = get.PV1_17(obj), val = obj.PV(18,1); end
+        function val = get.PV1_18(obj), val = obj.PV(19,1); end
+        function val = get.PV1_19(obj), val = obj.PV(20,1); end
+        function val = get.PV1_20(obj), val = obj.PV(21,1); end
+        function val = get.PV1_21(obj), val = obj.PV(22,1); end
+        function val = get.PV1_22(obj), val = obj.PV(23,1); end
+        function val = get.PV1_23(obj), val = obj.PV(24,1); end
+        function val = get.PV1_24(obj), val = obj.PV(25,1); end
+        function val = get.PV1_25(obj), val = obj.PV(26,1); end
+        function val = get.PV1_26(obj), val = obj.PV(27,1); end
+        function val = get.PV1_27(obj), val = obj.PV(28,1); end
+        function val = get.PV1_28(obj), val = obj.PV(29,1); end
+        function val = get.PV1_29(obj), val = obj.PV(30,1); end
+        function val = get.PV1_30(obj), val = obj.PV(31,1); end
+        function val = get.PV1_31(obj), val = obj.PV(32,1); end
+        function val = get.PV1_32(obj), val = obj.PV(33,1); end
+        function val = get.PV1_33(obj), val = obj.PV(34,1); end
+        function val = get.PV1_34(obj), val = obj.PV(35,1); end
+        function val = get.PV1_35(obj), val = obj.PV(36,1); end
+        function val = get.PV1_36(obj), val = obj.PV(37,1); end
+        function val = get.PV1_37(obj), val = obj.PV(38,1); end
+        function val = get.PV1_38(obj), val = obj.PV(39,1); end
+        function val = get.PV1_39(obj), val = obj.PV(40,1); end
         function val = get.PV1_40(obj), val = obj.PV(40,1); end
 
-        function val = get.PV2_1(obj), val = obj.PV(1,2); end
-        function val = get.PV2_2(obj), val = obj.PV(2,2); end
-        function val = get.PV2_3(obj), val = obj.PV(3,2); end
-        function val = get.PV2_4(obj), val = obj.PV(4,2); end
-        function val = get.PV2_5(obj), val = obj.PV(5,2); end
-        function val = get.PV2_6(obj), val = obj.PV(6,2); end
-        function val = get.PV2_7(obj), val = obj.PV(7,2); end
-        function val = get.PV2_8(obj), val = obj.PV(8,2); end
-        function val = get.PV2_9(obj), val = obj.PV(9,2); end
-        function val = get.PV2_10(obj), val = obj.PV(10,2); end
-        function val = get.PV2_11(obj), val = obj.PV(11,2); end
-        function val = get.PV2_12(obj), val = obj.PV(12,2); end
-        function val = get.PV2_13(obj), val = obj.PV(13,2); end
-        function val = get.PV2_14(obj), val = obj.PV(14,2); end
-        function val = get.PV2_15(obj), val = obj.PV(15,2); end
-        function val = get.PV2_16(obj), val = obj.PV(16,2); end
-        function val = get.PV2_17(obj), val = obj.PV(17,2); end
-        function val = get.PV2_18(obj), val = obj.PV(18,2); end
-        function val = get.PV2_19(obj), val = obj.PV(19,2); end
-        function val = get.PV2_20(obj), val = obj.PV(20,2); end
-        function val = get.PV2_21(obj), val = obj.PV(21,2); end
-        function val = get.PV2_22(obj), val = obj.PV(22,2); end
-        function val = get.PV2_23(obj), val = obj.PV(23,2); end
-        function val = get.PV2_24(obj), val = obj.PV(24,2); end
-        function val = get.PV2_25(obj), val = obj.PV(25,2); end
-        function val = get.PV2_26(obj), val = obj.PV(26,2); end
-        function val = get.PV2_27(obj), val = obj.PV(27,2); end
-        function val = get.PV2_28(obj), val = obj.PV(28,2); end
-        function val = get.PV2_29(obj), val = obj.PV(29,2); end
-        function val = get.PV2_30(obj), val = obj.PV(30,2); end
-        function val = get.PV2_31(obj), val = obj.PV(31,2); end
-        function val = get.PV2_32(obj), val = obj.PV(32,2); end
-        function val = get.PV2_33(obj), val = obj.PV(33,2); end
-        function val = get.PV2_34(obj), val = obj.PV(34,2); end
-        function val = get.PV2_35(obj), val = obj.PV(35,2); end
-        function val = get.PV2_36(obj), val = obj.PV(36,2); end
-        function val = get.PV2_37(obj), val = obj.PV(37,2); end
-        function val = get.PV2_38(obj), val = obj.PV(38,2); end
-        function val = get.PV2_39(obj), val = obj.PV(39,2); end
-        function val = get.PV2_40(obj), val = obj.PV(40,2); end
-        
+        function val = get.PV2_0(obj), val = obj.PV(1,2); end
+        function val = get.PV2_1(obj), val = obj.PV(2,2); end
+        function val = get.PV2_2(obj), val = obj.PV(3,2); end
+        function val = get.PV2_3(obj), val = obj.PV(4,2); end
+        function val = get.PV2_4(obj), val = obj.PV(5,2); end
+        function val = get.PV2_5(obj), val = obj.PV(6,2); end
+        function val = get.PV2_6(obj), val = obj.PV(7,2); end
+        function val = get.PV2_7(obj), val = obj.PV(8,2); end
+        function val = get.PV2_8(obj), val = obj.PV(9,2); end
+        function val = get.PV2_9(obj), val = obj.PV(10,2); end
+        function val = get.PV2_10(obj), val = obj.PV(11,2); end
+        function val = get.PV2_11(obj), val = obj.PV(12,2); end
+        function val = get.PV2_12(obj), val = obj.PV(13,2); end
+        function val = get.PV2_13(obj), val = obj.PV(14,2); end
+        function val = get.PV2_14(obj), val = obj.PV(15,2); end
+        function val = get.PV2_15(obj), val = obj.PV(16,2); end
+        function val = get.PV2_16(obj), val = obj.PV(17,2); end
+        function val = get.PV2_17(obj), val = obj.PV(18,2); end
+        function val = get.PV2_18(obj), val = obj.PV(19,2); end
+        function val = get.PV2_19(obj), val = obj.PV(20,2); end
+        function val = get.PV2_20(obj), val = obj.PV(21,2); end
+        function val = get.PV2_21(obj), val = obj.PV(22,2); end
+        function val = get.PV2_22(obj), val = obj.PV(23,2); end
+        function val = get.PV2_23(obj), val = obj.PV(24,2); end
+        function val = get.PV2_24(obj), val = obj.PV(25,2); end
+        function val = get.PV2_25(obj), val = obj.PV(26,2); end
+        function val = get.PV2_26(obj), val = obj.PV(27,2); end
+        function val = get.PV2_27(obj), val = obj.PV(28,2); end
+        function val = get.PV2_28(obj), val = obj.PV(29,2); end
+        function val = get.PV2_29(obj), val = obj.PV(30,2); end
+        function val = get.PV2_30(obj), val = obj.PV(31,2); end
+        function val = get.PV2_31(obj), val = obj.PV(32,2); end
+        function val = get.PV2_32(obj), val = obj.PV(33,2); end
+        function val = get.PV2_33(obj), val = obj.PV(34,2); end
+        function val = get.PV2_34(obj), val = obj.PV(35,2); end
+        function val = get.PV2_35(obj), val = obj.PV(36,2); end
+        function val = get.PV2_36(obj), val = obj.PV(37,2); end
+        function val = get.PV2_37(obj), val = obj.PV(38,2); end
+        function val = get.PV2_38(obj), val = obj.PV(39,2); end
+        function val = get.PV2_39(obj), val = obj.PV(40,2); end
+                
     end
     
 end

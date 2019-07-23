@@ -31,7 +31,7 @@ classdef Catalog < handle
         mag_limit = 15;
         flip = [1 1;1 -1;-1 1;-1 -1]; 
         
-        debug_bit = 1;
+        debug_bit = 0;
         
     end
     
