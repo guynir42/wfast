@@ -256,7 +256,12 @@ classdef Finder < handle
             if isempty(obj.pars)
                 val = '';
             else
-                val = sprintf('date: %s', obj.pars.STARTTIME(1:10)); % need to expand this...
+                if isempty(obj.pars.STARTTIME)
+                    date_str = '';
+                else
+                    date_str = obj.pars.STARTTIME(1:10);
+                end
+                val = sprintf('date: %s', date_str); % need to expand this...
             end
             
         end
