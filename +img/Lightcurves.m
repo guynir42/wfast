@@ -422,10 +422,14 @@ classdef Lightcurves < handle
             
         end
         
-        function saveAsMAT(obj, filename, star_indices)
+        function saveAsMAT(obj, filename, star_indices, frame_indices)
             
             if nargin<3 || isempty(star_indices)
                 star_indices = [];
+            end
+            
+            if nargin<4 || isempty(frame_indices)
+                frame_indices = [];
             end
             
             timestamps = obj.timestamps;
@@ -451,7 +455,36 @@ classdef Lightcurves < handle
                 widths = obj.widths(:,star_indices);
                 bad_pixels = obj.bad_pixels(:,star_indices);
             end
-            save(filename, 'timestamps', 'fluxes', 'errors', 'areas', 'backgrounds', 'variances', 'centroids_x', 'centroids_y', 'widths', 'bad_pixels');
+            
+            if ~isempty(frame_indices)
+                
+                fluxes = fluxes(frame_indices,:);
+                errors = errors(frame_indices,:);
+                areas = areas(frame_indices,:);
+                backgrounds = backgrounds(frame_indices,:);
+                variances = variances(frame_indices,:);
+                centroids_x = centroids_x(frame_indices,:);
+                centroids_y = centroids_y(frame_indices,:);
+                widths = widths(frame_indices,:);
+                bad_pixels = bad_pixels(frame_indices,:);
+                
+                timestamps = timestamps(frame_indices,:);
+            
+            end
+            
+            readme = 'Some info about the data stored in this file:';
+            readme = sprintf('%s\n *fluxes: the actual lightcurves, dim 1 is %d frames and dim 2 is %d stars',readme, size(fluxes,1), size(fluxes,2));
+            readme = sprintf('%s\n *errors: calculated from the variance map and source intensity. ', readme); 
+            readme = sprintf('%s\n *areas: size of aperture, removing bad pixels and so on.', readme);
+            readme = sprintf('%s\n *backgrounds: measured intensity, per pixel, in the annulus.', readme);
+            readme = sprintf('%s\n *variances: measured noise variance, per pixel, in the annulus.', readme);
+            readme = sprintf('%s\n *centroids_x/y: position within image (in pixels)', readme);
+            readme = sprintf('%s\n *widths: calculated using the 2nd moment, averaging the minor and major axis', readme);
+            readme = sprintf('%s\n *bad_pixels: number of bad pixels in the aperture area.', readme);
+            readme = sprintf('%s\n *timestamps: a column vector with %d elements, with the relative time of each frame', readme, size(timestamps, 1));
+            
+            save(filename, 'timestamps', 'fluxes', 'errors', 'areas', 'backgrounds', 'variances',...
+                'centroids_x', 'centroids_y', 'widths', 'bad_pixels', 'readme');
             
         end
         
