@@ -28,7 +28,7 @@ classdef ShuffleBank < handle
         bank; % a 2D map, with lightcurves in 1st dimension, and parameters in 2nd
         pars; % a struct vector, one struct per lightcurve, with R,r,b,v values
         
-        test_snrs; 
+        snrs_tested; 
         
     end
     
@@ -135,7 +135,7 @@ classdef ShuffleBank < handle
                 error('Need to first fill the filter bank before running a test. Try using "run"...');
             end
             
-            obj.test_snrs = NaN(input.number,1);
+            obj.snrs_tested = NaN(input.number,1);
             
             obj.prog.start(input.number);
             
@@ -149,7 +149,7 @@ classdef ShuffleBank < handle
                 
                 snr = occult.compareKernels(obj.gen.lc.flux, obj.bank);
                 
-                obj.test_snrs(ii) = max(snr);
+                obj.snrs_tested(ii) = max(snr);
                 
                 if max(snr)<obj.threshold
                     if obj.debug_bit, fprintf('Kernel test failed with S/N= %4.2f | R= %4.2f | r= %4.2f | b= %4.2f | v= %5.3f\n', max(snr), obj.gen.R, obj.gen.r, obj.gen.b, obj.gen.v); end

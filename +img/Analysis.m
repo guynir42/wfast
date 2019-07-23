@@ -458,7 +458,11 @@ classdef Analysis < file.AstroData
                 try obj.audio.playTakeForever; catch ME, warning(ME.getReport); end
             end
             
-            obj.prog.start(obj.num_batches);
+            if obj.batch_counter==0
+                obj.prog.reset(obj.num_batches);
+            end
+            
+            obj.prog.unpause;
             
         end
         
