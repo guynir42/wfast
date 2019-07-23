@@ -1471,13 +1471,6 @@ classdef Acquisition < file.AstroData
 
                 obj.calcStack;
                 
-%                 obj.images = obj.src.images;
-%                 obj.timestamps = obj.src.timestamps;
-%                 obj.stack = sum(obj.src.images,3);
-%                 obj.num_sum = size(obj.src.images,3);
-% 
-%                 obj.stack_proc = obj.cal.input(obj.stack, 'sum', obj.num_sum); % stack after calibration
-
                 check = 1;
                 obj.is_running_single = 0;
                 
@@ -1486,16 +1479,6 @@ classdef Acquisition < file.AstroData
                 obj.is_running_single = 0;
                 rethrow(ME);
             end
-            
-%             cleanup = onCleanup(@obj.finishup);
-%             obj.startup('num_batches', 1, 'start_index', 1, 'use_save', 0, 'use_audio', 0, 'use_progress', 0);
-%             
-%             try 
-%                 obj.batch;
-%             catch ME
-%                 obj.log.error(ME.getReport);
-%                 rethrow(ME);
-%             end
             
         end
         
@@ -1573,8 +1556,6 @@ classdef Acquisition < file.AstroData
         
         function findStars(obj)
             
-%             disp('findStars');
-            
             S = obj.stack_proc;
 
             if obj.use_remove_saturated
@@ -1621,7 +1602,7 @@ classdef Acquisition < file.AstroData
             
             obj.pars.cat.input(obj.stack_proc);
             
-            T = obj.pars.data;
+            T = obj.pars.cat.data;
             
             if obj.min_star_temp
                 T = T(T{:,'Teff'}>=obj.min_star_temp,:); % select only stars with temperature above minimal level (hotter stars have smaller angular scale)
@@ -1640,6 +1621,8 @@ classdef Acquisition < file.AstroData
             
             obj.magnitudes = T{:,'Mag_G'};
             obj.coordinates = [T.RA T.Dec];
+            
+            obj.object_idx = obj.pars.cat.findNearestObject;
             
         end
         
@@ -1796,25 +1779,16 @@ classdef Acquisition < file.AstroData
             end
             
             try 
-            obj.single;
-            obj.findStars;
-            obj.show;
-            obj.is_running = 0;
-             
+                
+                obj.single;
+                obj.findStars;
+                obj.show;
+                obj.is_running = 0;
+
             catch ME
                 obj.is_running = 0;
                 rethrow(ME);
             end
-            
-%             if ~isempty(varargin) && isa(varargin{1}, 'util.text.InputVars')
-%                 input = varargin{1};
-%                 input.scan_vars(varargin{2:end});
-%             else
-%                 input = obj.makeInputVars('num_batches', 1, 'batch_size', 1, 'expT', 1, 'num_stars', 0, ...
-%                     'use_save', 0, 'use_audio', 0, varargin{:});
-%             end
-%             
-%             obj.run(input); % take the same run-loop but with different input parameters
             
         end
         

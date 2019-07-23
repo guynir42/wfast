@@ -15,8 +15,10 @@ classdef WorldCoordinates < handle
         LONPOLE = NaN;
         LATPOLE = NaN;
         EQUINOX = NaN;
-        CTYPE = {'RA---TPV'  'DEC--TPV'};
-        CUNIT = {'deg'  'deg'};
+        CTYPE1 = 'RA---TPV';
+        CTYPE2 = 'DEC--TPV';
+        CUNIT1 = 'deg';
+        CUNIT2 = 'deg';
         CRPIX = []; % pixel position of transformation anchor 
         CRVAL = []; % RA/Dec position of transformation anchor 
         CDELT = []; % shift between anchors
@@ -135,6 +137,16 @@ classdef WorldCoordinates < handle
                 
             end
             
+            if ~isempty(w.CTYPE) && iscell(w.CTYPE)
+                obj.CTYPE1 = w.CTYPE{1};
+                obj.CTYPE2 = w.CTYPE{2};
+            end
+            
+            if ~isempty(w.CUNIT) && iscell(w.CUNIT)
+                obj.CUNIT1 = w.CUNIT{1};
+                obj.CUNIT2 = w.CUNIT{2};
+            end
+            
             if isfield(w, 'tpv')
                 obj.parsePVstruct(w.tpv);
             elseif isfield(w, 'PV')
@@ -188,7 +200,7 @@ classdef WorldCoordinates < handle
             
             if obj.use_tpv
             
-                if all(~cellfun(@isempty, strfind(obj.CTYPE, 'TPV')))
+                if all(~cellfun(@isempty, strfind(obj.CTYPE1, 'TPV')))
 
                     R  = sqrt(Xout.^2 + Yout.^2); % units of degrees
             
@@ -200,7 +212,7 @@ classdef WorldCoordinates < handle
                     Yout = sum(obj.PV(:,2).*Xout.^Ypowers(:,1).*Yout.^Ypowers(:,2).*R.^Ypowers(:,3), 1, 'omitnan');
 
                 else
-                    error('Unknown CTYPE "%s". Use tpv instead...', obj.CTYPE{1});
+                    error('Unknown CTYPE1 "%s". Use tpv instead...', obj.CTYPE1);
                 end
 
             end

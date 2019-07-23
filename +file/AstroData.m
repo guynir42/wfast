@@ -21,6 +21,8 @@ classdef AstroData < dynamicprops
         coordinates; % match each star/cutout position with RA/DEC (in degrees)
         magnitudes; % each star's magnitude (from catalog)
         temperatures; % each star's temperature in K (from catalog)
+        object_idx; % what is the index of the object closest to the coordinates given
+        
         
         fluxes; % amount of light (total) in each cutout
         
