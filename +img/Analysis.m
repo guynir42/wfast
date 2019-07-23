@@ -75,6 +75,9 @@ classdef Analysis < file.AstroData
         use_background_cutouts = 1; % subtract b/g from the cutouts (and stack cutouts!)
         use_refine_bg = 0; % need to figure out exactly how to do this
         
+        use_check_flux = 1;
+        
+        use_cutouts = 1;
         use_photometry = 1;
         use_psf_model = 1;
         use_event_finding = 1;
@@ -83,6 +86,8 @@ classdef Analysis < file.AstroData
         use_fits_flip = 0;
         use_fits_roi = 0;
         fits_roi = [];
+        
+        max_failed_batches = 3; % if star flux is lost for more than this number of batches, quit the run
         
         min_star_temp; % when using MAAT astrometry, select only stars above this effective temperature
         
@@ -107,6 +112,8 @@ classdef Analysis < file.AstroData
     
     properties(Hidden=true)
        
+        failed_batch_counter = 0;
+        
         % these are used for backward compatibility with older versions of 
         % img.Clipper that made a slightly different cutout based on the 
         % same positions. This affects ONLY the cutting of CALIBRATION! 
@@ -195,6 +202,8 @@ classdef Analysis < file.AstroData
             
             obj.analysis_dir_save = 0;
             obj.analysis_dir_log = 0;
+            
+            obj.failed_batch_counter = 0;
             
         end
         
@@ -521,7 +530,7 @@ classdef Analysis < file.AstroData
             for ii = obj.batch_counter+1:obj.num_batches
                 
                 if obj.brake_bit
-                    return; % skip the saving of events/lightcurves
+                    break;
                 end
                 
                 obj.batch;
@@ -556,18 +565,54 @@ classdef Analysis < file.AstroData
                 
             end
             
-            % only do this if all batches were processed
-            if obj.analysis_dir_save
-                obj.saveResults(log_dir);
-            end
-            
-            if obj.analysis_dir_log
-                obj.saveSummary(log_dir);
+            % Skip this part in case the run is stopped mid way (e.g., by user input, but not by detecting flux is lost)
+            if obj.batch_counter>=obj.num_batches || obj.failed_batch_counter>obj.max_failed_batches
+                
+                if obj.analysis_dir_save
+                    obj.saveResults(log_dir);
+                end
+
+                if obj.analysis_dir_log
+                    obj.saveSummary(log_dir);
+                end
+                
             end
             
         end
         
         function batch(obj)
+            
+            obj.getData;
+            
+            obj.analysisStack;
+            
+            if obj.use_cutouts
+               
+                obj.analysisCutouts;
+            
+                if obj.use_photometry
+
+                    obj.analysisPhotometry;
+
+                    if obj.use_psf_model
+                        obj.analysisModelPSF;
+                    end
+
+                    if obj.use_event_finding
+                        obj.analysisEventFinding;
+                    end
+
+                end
+
+            end
+            
+            if obj.use_fits_save
+                obj.analysisSaveFITS;
+            end
+            
+        end
+        
+        function getData(obj)
             
             %%%%%%%%%%%%%%%%%%%%% GET DATA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -627,6 +672,10 @@ classdef Analysis < file.AstroData
             
             if obj.debug_bit>1, fprintf('Time to get data: %f seconds\n', toc(t)); end
             
+        end
+        
+        function analysisStack(obj)
+            
             %%%%%%%%%%%%%%%%%%%%% STACK ANALYSIS %%%%%%%%%%%%%%%%%%%%%%%%%%
             
             t = tic;
@@ -668,12 +717,30 @@ classdef Analysis < file.AstroData
             
             obj.phot_stack.input(obj.stack_cutouts_sub, 'positions', obj.clip.positions); % run photometry on the stack to verify flux and adjust positions
             
-            if isempty(obj.cutouts) && ~isempty(obj.images)
+            obj.flux_buf.input(obj.phot_stack.fluxes);% store the latest fluxes from the stack cutouts (to verify we didn't lose the stars)
+            
+            if isempty(obj.cutouts) && ~isempty(obj.images) % only if we have images and not pre-cut cutouts
                 obj.adjustPositions; % got a chance to realign the positions before making cutouts from raw images
+            end
+            
+            if obj.use_check_flux % check if fluxes are still visible
+                if obj.checkFluxes % if yes, reset the counter
+                    obj.failed_batch_counter = 0;
+                else % if not, check if this is happening many times in a row
+                    obj.failed_batch_counter = obj.failed_batch_counter + 1;
+                    if obj.failed_batch_counter>obj.max_failed_batches
+                        if obj.debug_bit, fprintf('Cannot find stars %d times in a row. Quiting run...\n', obj.failed_batch_counter ); end
+                        obj.brake_bit = 1; % finish this batch and then quit the run
+                    end
+                end
             end
             
             if obj.debug_bit>1, fprintf('Time for stack analysis: %f seconds\n', toc(t)); end
             
+        end
+           
+        function analysisCutouts(obj)
+        
             %%%%%%%%%%%%%%%%%%%%% CUTOUT ANALYSIS %%%%%%%%%%%%%%%%%%%%%%%%%
             
             t = tic;
@@ -707,103 +774,108 @@ classdef Analysis < file.AstroData
             
             if obj.debug_bit>1, fprintf('Time for cutouts: %f seconds\n', toc(t)); end
             
+        end
+           
+        function analysisPhotometry(obj)
+        
             %%%%%%%%%%%%%%%%%%%%% PHOTOMETRY ANALYSIS %%%%%%%%%%%%%%%%%%%%%
 
-            if obj.use_photometry
+            t = tic;
 
-                t = tic;
+            obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps, ...
+                'positions', obj.positions, 'variance', single(2.5)); % need to add the sky background too
 
-                obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps, ...
-                    'positions', obj.positions, 'variance', single(2.5)); % need to add the sky background too
+            obj.lightcurves.getData(obj.phot);
+            if obj.lightcurves.gui.check, obj.lightcurves.gui.update; end
 
-                obj.lightcurves.getData(obj.phot);
-                if obj.lightcurves.gui.check, obj.lightcurves.gui.update; end
-
-                if obj.debug_bit>1, fprintf('Time for photometry: %f seconds\n', toc(t)); end
-
-            end
+            if obj.debug_bit>1, fprintf('Time for photometry: %f seconds\n', toc(t)); end
+            
+        end
+        
+        function analysisModelPSF(obj)
             
             %%%%%%%%%%%%%%%%%%%%% PSF modeling %%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
-            if obj.use_psf_model
+            t = tic;
 
-                t = tic;
+            obj.model_psf.input(obj.cutouts_sub, obj.phot.offsets_x, obj.phot.offsets_y);
 
-                obj.model_psf.input(obj.cutouts_sub, obj.phot.offsets_x, obj.phot.offsets_y);
+            obj.FWHM = util.img.fwhm(obj.model_psf.stack);
 
-                obj.FWHM = util.img.fwhm(obj.model_psf.stack);
-
-                if obj.debug_bit>1, fprintf('Time for PSF model: %f seconds\n', toc(t)); end
-
-            end
+            if obj.debug_bit>1, fprintf('Time for PSF model: %f seconds\n', toc(t)); end
             
+        end
+           
+        function analysisEventFinding(obj)
+        
             %%%%%%%%%%%%%%%%%%%%% Event finding %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
-            if obj.use_event_finding
+            t = tic;
 
-                t = tic;
+            f = obj.phot.fluxes;
+            e = obj.phot.errors;
+            a = obj.phot.areas;
+            b = obj.phot.backgrounds;
+            v = obj.phot.variances;
+            x = obj.phot.offsets_x;
+            y = obj.phot.offsets_y;
+            w = obj.phot.widths;
+            p = obj.phot.bad_pixels;
+            phot_pars = obj.phot.pars_struct; % maybe also give this to model_psf??
 
-                f = obj.phot.fluxes;
-                e = obj.phot.errors;
-                a = obj.phot.areas;
-                b = obj.phot.backgrounds;
-                v = obj.phot.variances;
-                x = obj.phot.offsets_x;
-                y = obj.phot.offsets_y;
-                w = obj.phot.widths;
-                p = obj.phot.bad_pixels;
-                phot_pars = obj.phot.pars_struct; % maybe also give this to model_psf??
+            r = [];
+            g = [];
 
-                r = [];
-                g = [];
+            if obj.phot.use_gaussian
+                g = obj.phot.gauss_sigma;
+            elseif obj.phot.use_aperture
 
-                if obj.phot.use_gaussian
-                    g = obj.phot.gauss_sigma;
-                elseif obj.phot.use_aperture
-
-                    r = obj.phot.aperture;
-                end
-
-                obj.finder.input(f, e, a, b, v, x, y, w, p, r, g, ...
-                    obj.timestamps, obj.cutouts_proc, obj.positions, obj.stack_proc, ...
-                    obj.batch_counter+1, 'filename', obj.thisFilename, ...
-                    't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp,...
-                    'used_background', obj.phot.use_backgrounds, 'pars', phot_pars);
-
-                if obj.debug_bit>1, fprintf('Time to find events: %f seconds\n', toc(t)); end
-
+                r = obj.phot.aperture;
             end
+
+            obj.finder.input(f, e, a, b, v, x, y, w, p, r, g, ...
+                obj.timestamps, obj.cutouts_proc, obj.positions, obj.stack_proc, ...
+                obj.batch_counter+1, 'filename', obj.thisFilename, ...
+                't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp,...
+                'used_background', obj.phot.use_backgrounds, 'pars', phot_pars);
+
+            if obj.debug_bit>1, fprintf('Time to find events: %f seconds\n', toc(t)); end
+
+        end
+        
+        function analysisSaveFITS(obj)
             
             %%%%%%%%%%%%%%%%%%%% save FITS files of stacks %%%%%%%%%%%%%%%%
             
-            if obj.use_fits_save
-                
-                [d, f] = fileparts(obj.thisFilename);
-                
-                d = strrep(d, ' (Weizmann Institute)', '');
-                
-                d = fullfile(d, 'FITS/');
-                
-                if ~exist(d, 'dir')
-                    mkdir(d);
-                end
-                
-                fullname = fullfile(d,[f,'.fits']);
-                fprintf('Saving "stack_proc" in FITS file: %s\n', fullname);
-                
-                I = double(obj.stack_proc);
-                if obj.use_fits_flip
-                    I = rot90(I,2);
-                end
-                
-                if obj.use_fits_roi && ~isempty(obj.fits_roi)
-                    I = I(obj.fits_roi(1):obj.fits_roi(1)+obj.fits_roi(3)-1,obj.fits_roi(2):obj.fits_roi(2)+obj.fits_roi(4)-1);
-                end
-                
-                fitswrite(I, fullname); 
-                obj.pars.writeFITS(fullname, [], obj.num_sum);
-                
+            [d, f] = fileparts(obj.thisFilename);
+
+            d = strrep(d, ' (Weizmann Institute)', '');
+
+            d = fullfile(d, 'FITS/');
+
+            if ~exist(d, 'dir')
+                mkdir(d);
             end
+
+            fullname = fullfile(d,[f,'.fits']);
+            fprintf('Saving "stack_proc" in FITS file: %s\n', fullname);
+
+            I = double(obj.stack_proc);
+            if obj.use_fits_flip
+                I = rot90(I,2);
+            end
+
+            if obj.use_fits_roi && ~isempty(obj.fits_roi)
+                I = I(obj.fits_roi(1):obj.fits_roi(1)+obj.fits_roi(3)-1,obj.fits_roi(2):obj.fits_roi(2)+obj.fits_roi(4)-1);
+            end
+
+            fitswrite(I, fullname); 
+            obj.pars.writeFITS(fullname, [], obj.num_sum);
+
+            
+        end
+        
+        function analysisDisplayGUI(obj)
             
             %%%%%%%%%%%%%%%%%%%% Update GUI and show stuff %%%%%%%%%%%%%%%%
             
@@ -840,9 +912,6 @@ classdef Analysis < file.AstroData
             if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
 
             obj.checkRealign;
-            
-            % store the latest fluxes from the stack cutouts
-            obj.flux_buf.input(obj.phot_stack.fluxes);
 
             obj.clip.positions = double(obj.clip.positions + obj.average_offsets);
             
@@ -852,13 +921,15 @@ classdef Analysis < file.AstroData
             
         end
         
-        function checkRealign(obj)
+        function val = checkFluxes(obj)
             
             if size(obj.flux_buf.data, 2)~=size(obj.phot_stack.fluxes,2)
                 obj.flux_buf.reset;
             end
             
-            if ~is_empty(obj.flux_buf) % check that stars are still aligned properly... 
+            if ~is_empty(obj.flux_buf)
+                val = 1;
+            else
                 
                 mean_fluxes = obj.flux_buf.mean;
                 mean_fluxes(mean_fluxes<=0) = NaN;
@@ -867,23 +938,29 @@ classdef Analysis < file.AstroData
                 new_fluxes(isnan(mean_fluxes)) = [];
                 mean_fluxes(isnan(mean_fluxes)) = [];
 
-                % maybe 0.5 is arbitrary and should be turned into parameters?
-                if sum(new_fluxes<0.5*mean_fluxes)>0.5*numel(mean_fluxes) % lost half the flux in more than half the stars...
+                flux_lost = sum(new_fluxes<0.5*mean_fluxes)>0.5*numel(mean_fluxes) % lost half the flux in more than half the stars...
+                % want to add more tests...?
 
-                    disp('Lost star positions, using quick_align');
-                    
-                    [~,shift] = util.img.quick_align(obj.stack_proc, obj.ref_stack);
-                    obj.clip.positions = double(obj.ref_positions + flip(shift));
-                    
-                    obj.stack_cutouts = obj.clip.input(obj.stack_proc);
-
-                    obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.positions); % run photometry on the stack to verify flux and adjust positions
-                    if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
-                    
-                end
-
-                % add second test and maybe quit the run if it fails...
+                val = ~flux_lost;
                 
+            end
+            
+        end
+        
+        function checkRealign(obj)
+            
+            if obj.checkFluxes
+                
+                disp('Lost star positions, using quick_align');
+
+                [~,shift] = util.img.quick_align(obj.stack_proc, obj.ref_stack);
+                obj.clip.positions = double(obj.ref_positions + flip(shift));
+
+                obj.stack_cutouts = obj.clip.input(obj.stack_proc);
+
+                obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.positions); % run photometry on the stack to verify flux and adjust positions
+                if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
+
             end
             
         end

@@ -262,7 +262,7 @@ classdef FilterBank < handle
                 obj.gen.lc.pars = obj.randomPars;
                 obj.gen.getLightCurves;
                 
-                snr = util.stat.maxnd(obj.compareKernels(obj.gen.lc.flux, flat_bank, full_xcorr));
+                snr = util.stat.maxnd(occult.compareKernels(obj.gen.lc.flux, flat_bank, full_xcorr));
                 
                 if snr<0.9
                     fprintf('S/N = %f | R= %f | r= %f | b= %f | v= %f\n', snr, obj.gen.R, obj.gen.r, obj.gen.b, obj.gen.v);
@@ -327,7 +327,7 @@ classdef FilterBank < handle
                 end
 
                 new_lc = obj.bank(:, neigh_idx(1), neigh_idx(2), neigh_idx(3), neigh_idx(4));
-                loss = obj.compareKernels(core_lc, new_lc);
+                loss = occult.compareKernels(core_lc, new_lc);
                 
                 h = plot(ax, obj.timestamps, new_lc, ':');
                 h.DisplayName = sprintf('R(%d) | r(%d) | b(%d) | v(%d) | loss= %f', neigh_idx(1), neigh_idx(2), neigh_idx(3), neigh_idx(4), loss);
