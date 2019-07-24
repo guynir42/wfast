@@ -311,7 +311,7 @@ classdef Finder < handle
         function setupKernels(obj)
             
             if isempty(obj.bank)
-                f = fullfile(getenv('DATA', '/WFAST/saved/filter_bank.mat'));
+                f = fullfile(getenv('DATA'), '/WFAST/saved/FilterBankShuffle.mat');
                 if exist(f, 'file')
                     load(f, 'bank');
                     obj.bank = bank;

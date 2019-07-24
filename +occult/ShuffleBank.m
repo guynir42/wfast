@@ -146,7 +146,7 @@ classdef ShuffleBank < handle
                 obj.gen.getLightCurves;
                 
                 if isempty(obj.kernels)
-                    obj.kernels = obj.gen.lc.flux - 1;
+                    obj.kernels = single(obj.gen.lc.flux - 1);
                     obj.pars = struct('R', obj.gen.R, 'r', obj.gen.r, 'b', obj.gen.b, 'v', obj.gen.v, 'norm', sqrt(sum(obj.kernels(:,1).^2)));
                     obj.time_axis = obj.gen.lc.time;
                 else
@@ -155,7 +155,7 @@ classdef ShuffleBank < handle
                     
                     if max(snr)<obj.threshold
                         if obj.debug_bit>1, fprintf('Adding new kernel with R= %4.2f | r= %4.2f | b= %4.2f | v= %5.3f\n', obj.gen.R, obj.gen.r, obj.gen.b, obj.gen.v); end
-                        obj.kernels = horzcat(obj.kernels, obj.gen.lc.flux - 1);
+                        obj.kernels = horzcat(obj.kernels, single(obj.gen.lc.flux - 1));
                         obj.pars = horzcat(obj.pars, struct('R', obj.gen.R, 'r', obj.gen.r, 'b', obj.gen.b, 'v', obj.gen.v, 'norm', sqrt(sum(obj.kernels(:,end).^2)))); 
                         obj.kernels(:,end) = obj.kernels(:,end)./obj.pars(end).norm;
                         counter = 0; % popcorn method
@@ -197,7 +197,7 @@ classdef ShuffleBank < handle
                 obj.gen.v = obj.v_range(1) + rand.*(obj.v_range(2)-obj.v_range(1));
                 obj.gen.getLightCurves;
                 
-                snr = occult.compareKernels(obj.gen.lc.flux-1, obj.kernels);
+                snr = occult.compareKernels(single(obj.gen.lc.flux-1), obj.kernels);
                 
                 obj.snrs_tested(ii) = max(snr);
                 
@@ -238,7 +238,7 @@ classdef ShuffleBank < handle
             
             obj.timestamps = input.times;
             
-            obj.fluxes_filtered = util.vec.convolution(obj.kernels, obj.fluxes-1)./obj.stds;
+            obj.fluxes_filtered = util.vec.convolution(obj.kernels, obj.fluxes)./obj.stds;
             
         end
         
