@@ -484,7 +484,7 @@ classdef Lightcurves < handle
             readme = sprintf('%s\n *timestamps: a column vector with %d elements, with the relative time of each frame', readme, size(timestamps, 1));
             
             save(filename, 'timestamps', 'fluxes', 'errors', 'areas', 'backgrounds', 'variances',...
-                'centroids_x', 'centroids_y', 'widths', 'bad_pixels', 'readme');
+                'centroids_x', 'centroids_y', 'widths', 'bad_pixels', 'readme', '-v7.3');
             
         end
         

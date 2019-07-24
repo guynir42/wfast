@@ -434,7 +434,7 @@ classdef Analysis < file.AstroData
             obj.lightcurves.saveAsMAT(fullfile(dirname, ['lightcurves_' name]));
             
             finder = obj.finder;
-            save(fullfile(dirname, ['finder_' name]), 'finder');
+            save(fullfile(dirname, ['finder_' name]), 'finder', '-v7.3');
             
         end
         
