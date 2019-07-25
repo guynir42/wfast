@@ -13,9 +13,12 @@ classdef Finder < handle
         pars@head.Parameters;
         
         cal@trig.Calibrator;
+        
         all_events@trig.Event;
         new_events@trig.Event;
         last_events@trig.Event;
+        
+        var_buf@util.vec.CircularBuffer;
         
         phot_pars; % a struct with some housekeeping about how the photometry was done
         
@@ -84,6 +87,8 @@ classdef Finder < handle
         max_num_nans = 1;
         max_corr = 0.75;
         
+        use_var_buf = 1; % use PSD tracking! 
+        
         use_conserve_memory = 1;
         
         frame_rate = 25; % if timestamps are not given explicitely
@@ -120,7 +125,9 @@ classdef Finder < handle
                 if obj.debug_bit, fprintf('Finder constructor v%4.2f\n', obj.version); end
             
                 obj.cal = trig.Calibrator;
-                                
+                
+                obj.var_buf = util.vec.CircularBuffer;
+                
             end
             
         end
@@ -139,6 +146,7 @@ classdef Finder < handle
             obj.black_list_batches = [];
             
             obj.cal.reset;
+            obj.var_buf.reset;
             
             obj.prev_fluxes = [];
             obj.prev_errors = [];
@@ -440,6 +448,10 @@ classdef Finder < handle
             obj.prev_batch_index = obj.batch_index;
             obj.prev_filename = obj.filename;
             
+            if ~isempty(obj.bank.fluxes_filtered)
+                obj.var_buf.input(var(obj.bank.fluxes_filtered, [], 1, 'omitnan')); % PSD tracking: keep a running buffer of the variance of previous filter results
+            end
+            
         end
         
         function findEvents(obj)
@@ -447,6 +459,10 @@ classdef Finder < handle
             obj.new_events = trig.Event.empty;
             
             ff = obj.bank.fluxes_filtered; % dim 1 is time, dim 2 is kernels, dim 3 is stars
+            
+            if obj.use_var_buf && ~obj.var_buf.is_empty
+                ff = ff./sqrt(obj.var_buf.mean);
+            end
             
             good_stars = obj.cal.star_snrs>obj.min_star_snr;
             
@@ -483,7 +499,9 @@ classdef Finder < handle
                 ev.time_step = obj.dt;
                 ev.duration =  obj.dt + obj.bank.timestamps(ev.time_indices(end))-obj.bank.timestamps(ev.time_indices(1));
                 
-                ev.flux_filtered = obj.bank.fluxes_filtered(:,ev.kern_index,ev.star_index);
+                ev.flux_filtered = ff(:,ev.kern_index, ev.star_index);
+                ev.previous_std = sqrt(obj.var_buf.mean(1, ev.kern_index, ev.star_index));
+                
 %                 ev.flux_raw_all = permute(obj.bank.fluxes, [1,3,2]);
 %                 ev.stds_raw_all = permute(obj.bank.stds, [1,3,2]);
                 ev.flux_detrended = obj.cal.fluxes_detrended(:,ev.star_index); 

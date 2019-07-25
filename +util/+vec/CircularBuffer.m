@@ -17,6 +17,9 @@ classdef CircularBuffer < dynamicprops
         data;
         data_ordered;
         
+        mean;
+        median;
+        
     end
         
     properties(Hidden=true)
@@ -126,13 +129,13 @@ classdef CircularBuffer < dynamicprops
             
         end
         
-        function val = mean(obj)
+        function val = get.mean(obj)
             
             val = mean(obj.data, 1, 'omitnan');
             
         end
         
-        function val = median(obj)
+        function val = get.median(obj)
             
             val = median(obj.data, 1, 'omitnan');
             

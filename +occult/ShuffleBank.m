@@ -148,6 +148,7 @@ classdef ShuffleBank < handle
                 if isempty(obj.kernels)
                     obj.kernels = single(obj.gen.lc.flux - 1);
                     obj.pars = struct('R', obj.gen.R, 'r', obj.gen.r, 'b', obj.gen.b, 'v', obj.gen.v, 'norm', sqrt(sum(obj.kernels(:,1).^2)));
+                    obj.kernels = obj.kernels./obj.pars.norm;
                     obj.time_axis = obj.gen.lc.time;
                 else
                     snr = occult.compareKernels(obj.gen.lc.flux, obj.kernels);

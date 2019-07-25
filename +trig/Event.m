@@ -43,6 +43,7 @@ classdef Event < handle
         flux_detrended; % flux of the best star after removing slow changes (trends)
         std_flux; % noise level of the detrended flux
         flux_fitted; % best fit flux model (to be filled later, adding a occult.Parameters object)
+        previous_std; % average rms of previous batches
         
         time_index; % index in the 2-batch time window where the maximum value occured
         kern_index; % index of the best kernel
