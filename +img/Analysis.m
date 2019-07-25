@@ -82,6 +82,8 @@ classdef Analysis < file.AstroData
         use_psf_model = 1;
         use_event_finding = 1;
         
+        use_auto_load_cal = 1;
+        
         use_fits_save = 0;
         use_fits_flip = 0;
         use_fits_roi = 0;
@@ -515,15 +517,41 @@ classdef Analysis < file.AstroData
         
         function obj = run(obj, varargin)
             
-            if ~obj.cal.checkDark
-                error('Cannot start a new run without loading darks into calibration object!');
-            end
-            
             input = util.text.InputVars;
             input.input_var('reset', 0); % reset the object before running (i.e., start a new run)
             input.input_var('logging', []); % create log files in the analysis folder
             input.input_var('save', []); % save the events and lightcurves from this run
             input.scan_vars(varargin{:});
+            
+            if obj.use_auto_load_cal
+                
+                date = datetime.empty;
+                
+                base_dir = obj.reader.current_dir;
+                
+                for ii = 1:3
+                    [base_dir, end_dir] = fileparts(base_dir);
+                    
+                    if isempty(end_dir), break; end
+                    
+                    [idx1,idx2] = regexp(end_dir, '\d{4}-\d{2}-\d{2}');
+                    if isempty(idx1), continue; end
+                    
+                    date = datetime(end_dir(idx1:idx2));
+                    
+                    if isempty(base_dir), break; end
+                    
+                end
+                
+                if ~isempty(date)
+                    obj.cal.loadByDate(datestr(date, 'yyyy-mm-dd'), 0); % last argument is to NOT reload if date is consistent
+                end
+                
+            end
+            
+            if ~obj.cal.checkDark
+                error('Cannot start a new run without loading darks into calibration object!');
+            end
             
             if input.reset
                 obj.reset;
