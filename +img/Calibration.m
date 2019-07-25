@@ -121,10 +121,6 @@ classdef Calibration < handle
     
     properties % switches and controls
         
-        % switches for generating dark/flat
-        use_median = 0;
-        
-        % switches for calibrating images
         use_flat = 1; % when calibrating images, choose if to divide by flat
         use_single = 1; % output everything in single precision... 
         
@@ -218,6 +214,7 @@ classdef Calibration < handle
             obj.dark_mean = [];
             obj.dark_var = [];
             obj.dark_mask = [];
+            obj.date_dark = '';
             
         end
         
@@ -233,6 +230,7 @@ classdef Calibration < handle
             obj.flat_field = [];
             obj.flat_mean = [];
             obj.flat_var = [];
+            obj.date_flat = '';
             
         end
         
@@ -713,19 +711,23 @@ classdef Calibration < handle
             
             current_frames = size(images,3);
             
-            % dark mean
-            if obj.use_median
-                d_sum = current_frames.*double(median(images,3));
+            if obj.use_single
+                d_sum = util.stat.sum_single(images);
             else
                 d_sum = sum(images,3);
             end
-            
+
             obj.dark_mean = runningMean(obj.dark_mean, obj.num_darks, d_sum, current_frames);
             
             % dark variance
-            d_var = var(double(images), [], 3)*current_frames;
+            if obj.use_single
+                d_var = util.stat.sum_single((single(images)-d_sum/current_frames).^2);
+            else
+                d_var = var(double(images), [], 3)*current_frames;
+            end
+            
             obj.dark_var = runningMean(obj.dark_var, obj.num_darks, d_var, current_frames);
-                        
+            
             % number of darks
             obj.num_darks = runningSum(obj.num_darks, current_frames);
                         
@@ -741,10 +743,14 @@ classdef Calibration < handle
                 return;
             end
             
-            images = double(images);
+            if obj.use_single
+                images = single(images);
+            else
+                images = double(images);
+            end
             
             if ~isempty(obj.dark_mean) % subtract darks if available
-                images = bsxfun(@minus, images, obj.dark_mean);
+                images = images - obj.dark_mean;
             end
                         
             current_frames = size(images,3);
@@ -757,9 +763,9 @@ classdef Calibration < handle
             norms = util.stat.mean2(images);
             
             % flat mean
-            f_sum = sum(images,3);
+            f_sum = sum(images,3, 'omitnan');
             f_sum(mask) = 0; % maybe leave it as NaNs? or put in the mean values?
-            obj.flat_mean = runningMean(obj.flat_mean, obj.num_flats, f_sum, current_frames);            
+            obj.flat_mean = runningMean(obj.flat_mean, obj.num_flats, f_sum, current_frames); 
                         
             if obj.use_calc_gain % NOT FINISHED:
                 
@@ -776,7 +782,7 @@ classdef Calibration < handle
             end
                         
             % the flat field is the flat mean, normalized
-            f_field = sum(bsxfun(@rdivide, images, norms),3); % normalize to the mean of each image
+            f_field = sum(images./norms, 3, 'omitnan'); % normalize to the mean of each image
             f_field(mask) = current_frames;
             
             obj.flat_field = runningMean(obj.flat_field, obj.num_flats, f_field, current_frames);
@@ -1255,15 +1261,29 @@ classdef Calibration < handle
     methods % save and load
         
         function save(obj, filename, directory)
-            
-            import util.text.sa;
-            
+
+            if isempty(obj.date_flat) || isempty(obj.date_dark)
+                error('Must provide dates for calibration files: "date_dark" and "date_flat"');
+            end
+
+            date = datetime(obj.date_flat); 
+            date2 = datetime(obj.date_dark);
+
+            if date<date2
+                error('Date of dark (%s) is later than date of flat (%s)', obj.date_flat, obj.date_dark)
+            end
+
             if nargin<2 || isempty(filename)
-                filename = 'calibration.mat';
+                
+                filename = sprintf('calibration_%s.mat', datestr(date, 'yyyy-mm-dd'));
+                
             end
             
             if nargin<3 || isempty(directory)
-                directory = [];
+                directory = fullfile(getenv('DATA'), 'WFAST/calibration');
+                if ~exist(directory, 'dir')
+                    mkdir(directory);
+                end
             end
             
             % don't need to save the loaded dark/flat files
@@ -1272,25 +1292,18 @@ classdef Calibration < handle
             obj.clip.clear;
             deflate = 1;
             
-            if isempty(directory)
-                if isempty(obj.reader_dark) && isempty(obj.reader_flat)
-                    util.oop.save(obj, filename, 'name', 'cal', 'deflate', deflate);
-                else
-                    if ~isempty(obj.reader_dark)
-                        if obj.debug_bit, disp(['saving calibration data to: ' sa(obj.reader_dark.dir.pwd, filename)]); end
-                        util.oop.save(obj, sa(obj.reader_dark.dir.pwd, filename), 'name', 'cal', 'deflate', deflate);
-                    end
-                    
-                    if ~isempty(obj.reader_flat)
-                        if obj.debug_bit, disp(['saving calibration data to: ' sa(obj.reader_flat.dir.pwd, filename)]); end
-                        util.oop.save(obj, sa(obj.reader_flat.dir.pwd, filename), 'name', 'cal', 'deflate', deflate);
-                    end
-                    
-                end
-                
-            else
-                util.oop.save(obj, sa(directory, filename), 'name', 'cal', 'deflate', deflate);
+            if ~isempty(obj.reader_dark)
+                if obj.debug_bit, disp(['saving calibration data to: ' fullfile(obj.reader_dark.dir.pwd, filename)]); end
+                util.oop.save(obj, fullfile(obj.reader_dark.dir.pwd, filename), 'name', 'cal', 'deflate', deflate);
             end
+            
+            if ~isempty(obj.reader_flat)
+                if obj.debug_bit, disp(['saving calibration data to: ' fullfile(obj.reader_flat.dir.pwd, filename)]); end
+                util.oop.save(obj, fullfile(obj.reader_flat.dir.pwd, filename), 'name', 'cal', 'deflate', deflate);
+            end
+            
+            if obj.debug_bit, disp(['saving calibration data to: ' fullfile(directory, filename)]); end
+            util.oop.save(obj, fullfile(directory, filename), 'name', 'cal', 'deflate', deflate);
             
         end
            
@@ -1316,41 +1329,117 @@ classdef Calibration < handle
            
         end
         
+        function loadByDate(obj, date, force_reload)
+            
+            if nargin<2 || isempty(date)
+                error('Must supply a valid "date" argument!');
+            end
+            
+            if nargin<3 || isempty(force_reload)
+                force_reload = 0;
+            end
+            
+            if isa(date, 'datetime')
+                % pass
+            elseif ischar(date)
+                if length(date)<10 
+                    error('Date string must be formatted as YYYY-MM-DD');
+                end
+                
+                date = datetime(date(1:10));
+                
+            else
+                error('Must supply a valid date, as datetime object or as a string');
+            end
+            
+            % scan all available calibration files... 
+            dir = fullfile(getenv('DATA'), '/WFAST/calibration');
+            
+            if ~exist(dir, 'dir')
+                error('Cannot find calibration folder: %s', dir);
+            end
+            
+            d = util.sys.WorkingDirectory(dir);
+            
+            fullfiles = d.match('calibration*.mat');
+            files = {};
+            date_cal = datetime.empty;
+            
+            if isempty(fullfiles)
+                error('No files found in calibration directory %s', dir);
+            end
+            
+            for ii = 1:length(fullfiles)
+                
+                [~,fn,ext] = fileparts(fullfiles{ii});
+                files{ii} = [fn ext];
+                
+                [idx1,idx2] = regexp(files{ii},'\d{4}-\d{2}-\d{2}'); % find the date in the filename
+                
+                if isempty(idx1)
+                    date_cal(ii) = NaT;
+                else
+                    date_cal(ii) = datetime(files{ii}(idx1:idx2));
+                end
+                
+            end
+            
+            deltas = days(date-date_cal); % days that passed between requested date and calibration time
+            deltas(deltas<0)=NaN; % remove folders where calibration is taken AFTER the requested date
+            
+            if all(isnan(deltas))
+                error('Cannot find any files in directory: %s matching the pattern *YYYY-MM-DD*', dir);
+            end
+            
+            [min_days,idx] = min(deltas); % find closest calibration file that occured BEFORE requested date
+            
+            if obj.debug_bit, fprintf('Found calibration file from %d days before requested date: %s\n', min_days, files{idx}); end
+            
+            if force_reload==0 && strcmp(obj.date_flat, datestr(date_cal(idx), 'yyyy-mm-dd')) % we already have this calibration file loaded...
+                return;
+            else
+                obj.load(fullfiles{idx});
+            end
+            
+        end
+        
         function load(obj, filename, directory)
-                    
-            import util.text.sa;
             
             if nargin<2 || isempty(filename)
-                filename = 'calibration.mat';
+                filename = '';
             end
             
             if nargin<3 || isempty(directory)
-                directory = [];
+                directory = '';
             end            
             
             fullname = '';
             
-            if ~isempty(directory)
-                fullname = util.text.sa(directory, filename);             
+            if isempty(directory) && ~isempty(filename)
+                fullname = filename;
+            elseif ~isempty(directory)
+                fullname = fullfile(directory, filename);
             else
                 if isempty(fullname) && ~isempty(obj.reader_flat)
-                    f_temp = sa(obj.reader_flat.dir.pwd, filename);
-                    if ~isempty(f_temp) && exist(f_temp, 'file')
-                        fullname = f_temp;
+%                     f_temp = fullfile(obj.reader_flat.dir.pwd, filename);
+                    f_temp = util.sys.match_files('calibration*.mat', obj.reader_flat.dir.cwd);
+                    if ~isempty(f_temp) && exist(f_temp{end}, 'file')
+                        fullname = f_temp{end};
                     end
                 end
                 
                 if isempty(fullname) && ~isempty(obj.reader_dark)
-                    f_temp = sa(obj.reader_dark.dir.pwd, filename);
-                    if ~isempty(f_temp) && exist(f_temp, 'file')
-                        fullname = f_temp;
+%                     f_temp = fullfile(obj.reader_dark.dir.pwd, filename);
+                    f_temp = util.sys.match_files('calibration*.mat', obj.reader_dark.dir.cwd);
+                    if ~isempty(f_temp) && exist(f_temp{end}, 'file')
+                        fullname = f_temp{end};
                     end
                 end
                 
             end
             
             if isempty(fullname) || ~exist(fullname, 'file')
-                disp('cannot find calibration file.');
+                fprintf('cannot find calibration file "%s"\n', fullname);
             else
                 if obj.debug_bit, disp(['Loading calibration from ' fullname]); end
 %                 util.oop.copy_props(obj, util.oop.load(f_temp, 'classname', 'img.Calibration', 'name', 'cal'),1);
@@ -1380,6 +1469,14 @@ classdef Calibration < handle
                 
             end
             
+            if isempty(obj.audio)
+                obj.audio = util.sys.AudioControl;
+            end
+            
+            if isempty(obj.prog)
+                obj.prog = util.sys.ProgressBar;
+            end
+            
         end
         
         function load_browse(obj)
@@ -1397,17 +1494,9 @@ classdef Calibration < handle
             if ischar(filename) && ischar(directory)
                 [~, filename, ext] = fileparts(filename);
                 if isempty(ext)
-                    filename = [filename '.h5'];
+                    filename = [filename '.mat'];
                 end
                 obj.load(filename, directory);
-            end
-           
-            if isempty(obj.audio)
-                obj.audio = util.sys.AudioControl;
-            end
-            
-            if isempty(obj.prog)
-                obj.prog = util.sys.ProgressBar;
             end
             
         end
