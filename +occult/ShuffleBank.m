@@ -151,7 +151,7 @@ classdef ShuffleBank < handle
                     obj.kernels = obj.kernels./obj.pars.norm;
                     obj.time_axis = obj.gen.lc.time;
                 else
-                    snr = occult.compareKernels(obj.gen.lc.flux, obj.kernels);
+                    snr = occult.compareKernels(single(obj.gen.lc.flux-1), obj.kernels);
                     counter = counter + 1;
                     
                     if max(snr)<obj.threshold
