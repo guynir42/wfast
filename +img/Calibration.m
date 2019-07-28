@@ -709,11 +709,11 @@ classdef Calibration < handle
                 error(['size mismatch. size(images)= ' num2str(size(images)) ' | height= ' num2str(obj.height) ' | width= ' num2str(obj.width)])
             end
             
-            current_frames = size(images,3);
-            
             if obj.use_single
+                current_frames = single(size(images,3));
                 d_sum = util.stat.sum_single(images);
             else
+                current_frames = size(images,3);
                 d_sum = sum(images,3);
             end
 
@@ -745,16 +745,16 @@ classdef Calibration < handle
             
             if obj.use_single
                 images = single(images);
+                current_frames = single(size(images,3));
             else
                 images = double(images);
+                current_frames = size(images,3);
             end
             
             if ~isempty(obj.dark_mean) % subtract darks if available
                 images = images - obj.dark_mean;
             end
                         
-            current_frames = size(images,3);
-            
             mask = obj.dark_mask;
             mask_3d = repmat(mask, [1 1 current_frames]); % make mask 3D matrix
 
@@ -827,10 +827,10 @@ classdef Calibration < handle
 
                     if cs(obj.mode, 'dark')
                         obj.addDark(reader.images);
-                        obj.date_dark = reader.t_start(1:10);
+                        obj.date_dark = obj.getDateFromReader(reader);
                     elseif cs(obj.mode, 'flat')
                         obj.addFlat(reader.images);
-                        obj.date_flat = reader.t_start(1:10);
+                        obj.date_flat = obj.getDateFromReader(reader);
                     else
                         error(['unknown calibration mode: ' obj.mode]);
                     end
@@ -858,7 +858,7 @@ classdef Calibration < handle
                 obj.brake_bit = 1;
                 obj.mode = '';
                 
-                if obj.autosave
+                if obj.autosave && obj.checkFlat % only save calibration files with flats
                     obj.save;
                 end
 
@@ -1256,6 +1256,27 @@ classdef Calibration < handle
             end
         end
         
+        function val = getDateFromReader(obj, reader)
+            
+            if isempty(reader) || ~isa(reader, 'file.Reader')
+                error('Must supply a valid img.Reader object!');
+            end
+            
+            if ~isempty(reader.t_start)
+                val = reader.t_start(1:10);
+            elseif ~isempty(reader.pars) && ~isempty(reader.pars.RUNSTART)
+                val = reader.pars.RUNSTART(1:10);
+            elseif ~isempty(reader.pars) && ~isempty(reader.pars.STARTTIME)
+                val = reader.pars.STARTTIME(1:10);
+            elseif ~isempty(reader.pars) && ~isempty(reader.pars.run_start_datetime)
+                val = reader.pars.run_start_datetime(1:10);
+            else
+                warning('Cannot retreive date from reader!');
+                val = '';
+            end
+            
+        end
+        
     end
     
     methods % save and load
@@ -1449,12 +1470,14 @@ classdef Calibration < handle
                 obj.num_darks = temp.num_darks;
                 obj.dark_mean = temp.dark_mean;
                 obj.dark_var = temp.dark_var;
+                obj.date_dark = temp.date_dark;
                 
                 obj.num_flats = temp.num_flats;
                 obj.flat_field = temp.flat_field;
                 obj.flat_mean = temp.flat_mean;
                 obj.flat_var = temp.flat_var;
-
+                obj.date_flat = temp.date_flat;
+                
                 obj.flat_pixel_mean = temp.flat_pixel_mean;
                 obj.flat_pixel_var = temp.flat_pixel_var;
                 obj.pixel_gain = temp.pixel_gain;
