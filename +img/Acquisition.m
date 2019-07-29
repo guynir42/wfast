@@ -295,6 +295,8 @@ classdef Acquisition < file.AstroData
                 
                 util.oop.save_defaults(obj); % make sure each default_XXX property is updated with the current XXX property value. 
                 
+                obj.stash_parameters;
+                
             end
             
         end
@@ -1235,12 +1237,13 @@ classdef Acquisition < file.AstroData
                     return;
                 end
 
+                input = obj.makeInputVars(varargin{:});
+                obj.stash_parameters(input);
+                
                 if ~isempty(obj.gui) && obj.gui.check
                     obj.gui.update;
                 end
                 
-                input = obj.makeInputVars(varargin{:});
-            
                 if input.log_level
                     obj.log.input('Starting a new run with Acquisition.'); % maybe add some more info here...?
                 end
@@ -1248,8 +1251,6 @@ classdef Acquisition < file.AstroData
                 if ~obj.cal.checkDark
                     error('Cannot start a new run without loading darks into calibration object!');
                 end
-
-                obj.stash_parameters(input);
                 
                 if obj.getTimeLeft>3600*10
                     error('Run scheduled to take %4.2f hours with these parameter... aborting!', obj.getTimeLeft/3600); 
