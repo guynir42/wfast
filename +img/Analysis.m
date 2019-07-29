@@ -5,6 +5,9 @@ classdef Analysis < file.AstroData
         gui;
         audio@util.sys.AudioControl;
         
+        pool; 
+        futures; 
+        
         aux_figure;
         
     end
@@ -77,6 +80,7 @@ classdef Analysis < file.AstroData
         
         use_check_flux = 1;
         
+        use_astrometry = 1;
         use_cutouts = 1;
         use_photometry = 1;
         use_psf_model = 1;
@@ -167,7 +171,7 @@ classdef Analysis < file.AstroData
                 obj.model_psf = img.ModelPSF;
                 
                 obj.finder = trig.Finder;
-                obj.finder.setupKernels;
+                obj.finder.loadFilterBank;
                 
                 obj.prog = util.sys.ProgressBar;
                 obj.audio = util.sys.AudioControl;
@@ -422,7 +426,7 @@ classdef Analysis < file.AstroData
             if size(obj.fluxes,2)>=100, f(3) = obj.fluxes(1,100); end
             
             fprintf(fid, 'Batch: %04d, ObsDate: %s, Flux: [%6.3f %6.3f %6.3f], Events S/N: [%s], ReadDate: %s\n',...
-                obj.batch_counter, obs_date, f(1), f(2), f(3), ev_str, read_date);
+                obj.batch_counter+1, obs_date, f(1), f(2), f(3), ev_str, read_date);
             
         end
         
@@ -456,18 +460,18 @@ classdef Analysis < file.AstroData
 
                 v = abs(obj.finder.snr_values);
 
-                fprintf(fid, 'S/N for all batches distrubuted: min= %f median= %f max= %f\n',...
-                    min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
+                fprintf(fid, 'S/N for all %d batches is distrubuted: min= %f median= %f max= %f\n',...
+                    numel(v), min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
 
                 v = abs([obj.finder.all_events.snr]);
 
-                fprintf(fid, 'S/N for all triggered events distrubuted: min= %f median= %f max= %f\n',...
-                    min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
+                fprintf(fid, 'S/N for all %d triggered events is distrubuted: min= %f median= %f max= %f\n',...
+                    numel(v), min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
 
                 v = abs([obj.finder.kept_events.snr]);
 
-                fprintf(fid, 'S/N for all kept events distrubuted: min= %f median= %f max= %f\n',...
-                    min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
+                fprintf(fid, 'S/N for all %d kept events is distrubuted: min= %f median= %f max= %f\n',...
+                    numel(v), min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
 
                 fprintf(fid, 'Number of events: total= %d | kept= %d\n', length(obj.finder.all_events), length(obj.finder.kept_events));
             
@@ -515,6 +519,50 @@ classdef Analysis < file.AstroData
             
         end
         
+        function async_run(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('reset', 0); % reset the object before running (i.e., start a new run)
+            input.input_var('logging', []); % create log files in the analysis folder
+            input.input_var('save', []); % save the events and lightcurves from this run
+            input.input_var('worker', []); % index of worker/future you want to use
+            input.scan_vars(varargin{:});
+            
+            if isempty(input.worker)
+                input.worker = obj.findWorker;
+            end
+            
+            obj.futures{input.worker} = parfeval(obj.pool, @obj.run, 1, 'reset', input.reset, 'logging', input.logging, 'save', input.save); 
+            
+        end
+        
+        function idx = findWorker(obj, varargin)
+            
+            if isempty(gcp('nocreate'))
+                obj.pool = parpool;
+                obj.pool.IdleTimeout = 360;
+            end
+            
+            N = obj.pool.NumWorkers; 
+            
+            idx = [];
+            
+            for ii = 1:N
+                
+                if length(obj.futures)<ii || ~isvalid(obj.futures{ii}) || strcmp(obj.futures{ii}.State, 'finished')
+                    idx = ii;
+                    return;
+                end
+                
+            end
+            
+            if ii==N
+                error('Cannot find a free worker to run analysis...');
+            end
+            
+            
+        end
+        
         function obj = run(obj, varargin)
             
             input = util.text.InputVars;
@@ -530,6 +578,7 @@ classdef Analysis < file.AstroData
                 base_dir = obj.reader.current_dir;
                 
                 for ii = 1:3
+                    
                     [base_dir, end_dir] = fileparts(base_dir);
                     
                     if isempty(end_dir), break; end
@@ -644,6 +693,17 @@ classdef Analysis < file.AstroData
             obj.getData;
             
             obj.analysisStack;
+            
+            ast = obj.use_astrometry;
+            if isempty(ast) && isempty(obj.pars.cat.data) % automatically determine if we need to run astrometry
+                ast = 1;
+            else
+                ast = obj.use_astrometry;
+            end
+            
+            if ast && obj.batch_counter==0
+                obj.analysisAstrometry;
+            end
             
             if obj.use_cutouts
                
@@ -799,7 +859,23 @@ classdef Analysis < file.AstroData
             if obj.debug_bit>1, fprintf('Time for stack analysis: %f seconds\n', toc(t)); end
             
         end
-           
+        
+        function analysisAstrometry(obj)
+            
+            %%%%%%%%%%%%%%%%%%%%% ASTROMETRY ANALYSIS %%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            t = tic;
+            
+            try
+                obj.pars.cat.input(obj.stack_proc);
+            catch ME
+                warning(ME.getReport);
+            end
+            
+            if obj.debug_bit>1, fprintf('Time for astrometry: %f seconds\n', toc(t)); end
+            
+        end
+        
         function analysisCutouts(obj)
         
             %%%%%%%%%%%%%%%%%%%%% CUTOUT ANALYSIS %%%%%%%%%%%%%%%%%%%%%%%%%
@@ -872,7 +948,7 @@ classdef Analysis < file.AstroData
             %%%%%%%%%%%%%%%%%%%%% Event finding %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
             t = tic;
-
+            
             f = obj.phot.fluxes;
             e = obj.phot.errors;
             a = obj.phot.areas;

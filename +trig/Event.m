@@ -507,7 +507,7 @@ classdef Event < handle
             lh.FontSize = input.font_size-4;
             lh.NumColumns = 2;
 
-            title(input.ax, obj.notes);
+            title(input.ax, obj.notes, 'FontSize', input.font_size);
             
             util.plot.inner_title(sprintf('id: %d | star: %d | batches: %d-%d | event S/N= %4.2f | star S/N= %4.2f', ...
                 obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.star_snr),...

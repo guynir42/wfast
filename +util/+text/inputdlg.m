@@ -1,6 +1,5 @@
-
 function [R] = inputdlg(str,value)
-% Improved input dialog. Usage: inputdlg(str, value=5)
+% Usage: inputdlg(str, value=5)
 % Displays an input dialog with question text "str" and default value 5.
 % User may hit return after entering info.
 % 

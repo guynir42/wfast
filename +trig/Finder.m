@@ -201,7 +201,9 @@ classdef Finder < handle
             obj.filename = [];
             
             obj.cal.clear;
-            obj.bank.clear;
+            if ~isempty(obj.bank)
+                obj.bank.clear;
+            end
             
         end
         
@@ -316,32 +318,15 @@ classdef Finder < handle
     
     methods % calculations
         
-        function setupKernels(obj)
-            
-            if isempty(obj.bank)
-                f = fullfile(getenv('DATA'), '/WFAST/saved/FilterBankShuffle.mat');
-                if exist(f, 'file')
-                    load(f, 'bank');
-                    obj.bank = bank;
-                else
-                    error('Cannot load kernels from ShuffleBank object'); 
-                end
+        function loadFilterBank(obj)
+
+            f = fullfile(getenv('DATA'), '/WFAST/saved/FilterBankShuffle.mat');
+            if exist(f, 'file')
+                load(f, 'bank');
+                obj.bank = bank;
+            else
+                error('Cannot load kernels from ShuffleBank object'); 
             end
-            
-            % some easy parameters
-%             obj.bank.R = 0;
-%             obj.bank.r = 1;
-%             obj.bank.b = 0;
-%             obj.bank.v = 5:5:30;
-%             
-%             obj.bank.getLightCurves;
-%             obj.filt.kernels = obj.bank.lc.flux - 1;
-            
-            % consider changing the default parameters of bank
-%             obj.bank.makeBank;
-%             obj.filt.kernels = single(reshape(obj.bank.bank-1, [size(obj.bank.bank,1), obj.bank.num_pars]));
-            
-            
 
         end
         
@@ -371,6 +356,10 @@ classdef Finder < handle
             input.input_var('used_background_sub', []); 
             input.input_var('phot_pars', [], 'pars_struct');
             input.scan_vars(varargin{:});
+            
+            if isempty(obj.bank)
+                obj.loadFilterBank;
+            end
             
             obj.clear;
             

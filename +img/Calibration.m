@@ -1271,7 +1271,7 @@ classdef Calibration < handle
             elseif ~isempty(reader.pars) && ~isempty(reader.pars.run_start_datetime)
                 val = reader.pars.run_start_datetime(1:10);
             else
-                warning('Cannot retreive date from reader!');
+                warning('Cannot retrieve date from reader!');
                 val = '';
             end
             

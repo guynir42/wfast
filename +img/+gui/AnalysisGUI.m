@@ -8,12 +8,14 @@ classdef AnalysisGUI < handle
              
         buttons = {};
         
-        font_size = 13;
+        font_size = 12;
         big_font_size = 16;
-        edit_font_size = 11;
-        small_font_size = 10;
+        edit_font_size = 10;
+        small_font_size = 8;
         
         color_on = [0 0.3 1];
+        
+        dialog_fig;
         
         debug_bit = 1;
         
@@ -97,22 +99,29 @@ classdef AnalysisGUI < handle
             
             N = 13; pos = pos - N;
             
-            obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'controls', 1); % last input is for vertical (default)
+            obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left 0.25 N/N_left], 'controls', 1); % last input is for vertical (default)
             obj.panel_controls.number = N;
             obj.panel_controls.addButton('button_browse', 'chooseDir', 'push', 'browse', '', '', 0.5, '', '', 'Choose a folder to analize'); 
-            obj.panel_controls.addButton('button_', '', 'custom', ' ', '', '', 0.5, '', '', '');
+            obj.panel_controls.addButton('button_async_run', 'async_run', 'custom', 'run async', '', '', 0.5, '', '', 'Run the current object in a parallel worker');
             obj.panel_controls.addButton('button_reset', 'reset', 'push', 'RESET', '', '', 0.5, '', '', 'Start a new run by reseting all events and lightcurves');
             obj.panel_controls.addButton('input_num_batches', 'num_batches', 'input', 'Nbatch= ', '', 'small', 0.5, '', '', 'Maximum batches, limited by user input or by number of files in reader'); 
             obj.panel_controls.addButton('button_bg_stack', 'use_background_stack', 'toggle', 'b/g stack off', 'b/g stack on', 'small', 0.5, obj.color_on, '', 'Subtract background from stack images');
             obj.panel_controls.addButton('button_bg_cutouts', 'use_background_cutouts', 'toggle', 'b/g cutouts off', 'b/g cutouts on', 'small', 0.5, obj.color_on, '', 'Subtract background from cutouts');
+            obj.panel_controls.addButton('button_astrometry', 'use_astrometry', 'auto', 'astrometry', '', 'small', 0.5, obj.color_on, '', 'Use mextractor, astrometry and match resulting stars to GAIA');             obj.panel_controls.addButton('button_cutouts', 'use_cutouts', 'toggle', 'no cutouts', 'with cutouts', 'small', 0.5, obj.color_on, '', 'Run cutouts analysis'); 
+            obj.panel_controls.addButton('button_photometry', 'use_photometry', 'toggle', 'no photometry', 'with photometry', 'small', 0.5, obj.color_on, '', 'Run photometry on cutotus'); 
+            obj.panel_controls.addButton('button_psf_model', 'use_psf_model', 'toggle', 'no PSF modeling', 'with PSF modeling', 'small', 0.5, obj.color_on, '', 'Calculate the model PSF from all cutouts.'); 
+            obj.panel_controls.addButton('button_events', 'use_event_finding', 'toggle', 'no event search', 'use event search', 'small', 0.5, obj.color_on, '', 'Run event search using match filtering of lightcurves'); 
+            obj.panel_controls.addButton('button_auto_load_cal', 'use_auto_load_cal', 'toggle', 'no load cal', 'auto load cal', 'small', 0.5, obj.color_on, '', 'Always test for most relevant calibration file when starting a new run'); 
             obj.panel_controls.margin = [0.03 0.01];
             obj.panel_controls.make;
+            
+            obj.panel_controls.button_async_run.Callback = @obj.callback_async_run;
             
             %%%%%%%%%%% panel contrast %%%%%%%%%%%%%%%
             
             N = 5; pos = pos - N;
             
-            obj.panel_contrast = util.plot.ContrastLimits(obj.axes_image, obj.fig.fig, [0 pos/N_left 0.2 5/N_left], 1, [0.01 0.01]); % 4th input is for vertical (default), 5th is margin
+            obj.panel_contrast = util.plot.ContrastLimits(obj.axes_image, obj.fig.fig, [0 pos/N_left 0.25 5/N_left], 1, [0.01 0.01]); % 4th input is for vertical (default), 5th is margin
             obj.panel_contrast.font_size = obj.font_size;
             obj.panel_contrast.big_font_size = obj.big_font_size;
             obj.panel_contrast.small_font_size = obj.small_font_size;
@@ -122,7 +131,7 @@ classdef AnalysisGUI < handle
             
             N = 2; pos = pos - N;
             
-            obj.panel_close = uipanel('Position', [0 pos 0.2 N/N_left]);
+            obj.panel_close = uipanel('Position', [0 pos 0.25 N/N_left]);
             obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1]+[0.1 0.1 -0.2 -0.2], obj.owner, '', 'custom', 'CLOSE');
             obj.button_close.Callback = @obj.callback_close;
             
@@ -171,7 +180,7 @@ classdef AnalysisGUI < handle
             %%%%%%%%%%% panel progres %%%%%%%%%%%%%%%%
             
             N = 1; pos = pos - N;
-            obj.panel_progress = GraphicPanel(obj.owner, [0.2 pos/N_middle 0.6 N/N_middle]);
+            obj.panel_progress = GraphicPanel(obj.owner, [0.25 pos/N_middle 0.55 N/N_middle]);
             obj.panel_progress.addButton('button_progress', '', 'custom', ' ', '', 'small');
             obj.panel_progress.margin = [0.0 0.0];
             obj.panel_progress.make;
@@ -179,7 +188,7 @@ classdef AnalysisGUI < handle
             %%%%%%%%%%% panel info %%%%%%%%%%%%%%%%%%%
             
             N = 3; pos = pos - N;
-            obj.panel_info = GraphicPanel(obj.owner, [0.2 pos/N_middle 0.6 N/N_middle], '', 1); 
+            obj.panel_info = GraphicPanel(obj.owner, [0.25 pos/N_middle 0.55 N/N_middle], '', 1); 
             obj.panel_info.addButton('button_directory', 'directory', 'info', ' ', '', 'small');
             obj.panel_info.addButton('button_filename', 'filename', 'info', ' ', '', 'small');
             obj.panel_info.addButton('button_fwhm', 'FWHM', 'info', 'FWHM= ', 'pix', '', 0.5); 
@@ -191,7 +200,7 @@ classdef AnalysisGUI < handle
             
             N = 14; pos = pos - N;
             
-            obj.panel_image = uipanel('Title', '', 'Position', [0.2 pos/N_middle 0.6 N/N_middle]);
+            obj.panel_image = uipanel('Title', '', 'Position', [0.25 pos/N_middle 0.55 N/N_middle]);
                         
             obj.makeAxes;
             
@@ -210,7 +219,7 @@ classdef AnalysisGUI < handle
             
             N = 2; pos = pos - N;
             
-            obj.panel_run = GraphicPanel(obj.owner, [0.2 pos/N_middle 0.6 N/N_middle]);
+            obj.panel_run = GraphicPanel(obj.owner, [0.25 pos/N_middle 0.55 N/N_middle]);
             
             obj.panel_run.addButton('button_run', '', 'custom', 'RUN', '', 'big');
             obj.panel_run.margin = [0.02 0.1];
@@ -284,7 +293,92 @@ classdef AnalysisGUI < handle
             obj.update;
             
         end
-             
+        
+        function callback_async_run(obj, ~, ~)
+            
+            delete(obj.dialog_fig);
+            
+            margin = 0.05;
+            pos_x = margin;
+            pos_y = 0.25;
+            width = 0.28;
+            height = 0.15;
+            font_size = 14;
+            
+            idx = obj.owner.findWorker;
+            
+            log_time = datetime('now', 'TimeZone', 'UTC');
+            log_dir = fullfile(obj.owner.reader.dir.pwd, ['analysis_' char(log_time, 'yyyy-MM-dd')]);
+            
+            obj.dialog_fig = figure('units','pixels', 'position',[150 500 350 200], 'menubar','none', 'numbertitle','off', 'name', 'verify parallel run', 'resize','off');
+            
+            if isempty(idx)
+                str = 'Cannot find a free worker to run analysis!';
+                ok = 0;
+            elseif exist(log_dir, 'dir')
+                str = 'Analysis folder already exists!'; 
+                ok = 0;
+            else
+                str = sprintf('Starting a new run in worker %d!', idx);
+                ok = 1;
+            end
+            
+            button_text = uicontrol('Style', 'text', 'String', str, ... 
+                'Units', 'Normalized', 'Position', [0 0.8 1 0.15], 'Parent', obj.dialog_fig,...
+                'HorizontalAlignment', 'center', 'FontSize', 14);
+            
+            button_folder = uicontrol('Style', 'text', 'String', sprintf('Folder: %s', obj.owner.reader.dir.two_tail), ... 
+                'Units', 'Normalized', 'Position', [0 0.65 1 0.15], 'Parent', obj.dialog_fig,...
+                'HorizontalAlignment', 'center', 'FontSize', 14);
+            
+            button_cancel = uicontrol('Parent', obj.dialog_fig, 'Style', 'pushbutton', 'String', 'Cancel', ...
+                'Units', 'Normalized', 'Position', [margin, margin, width, height], 'FontSize', font_size, ...
+                'Callback', @(~, ~, ~) delete(obj.dialog_fig)); 
+            
+            uicontrol(button_cancel);
+            
+            if ok
+            
+                pos_y = button_folder.Position(2) - height; 
+
+                button_reset = uicontrol('Parent', obj.dialog_fig, 'Style', 'checkbox', 'String', 'reset', 'Value', 1, ...
+                    'Units', 'Normalized', 'Position', [pos_x pos_y width height], 'FontSize', font_size, ...
+                    'Tooltip', 'Use this to make sure Analysis object is "reset" before starting the async-run');
+
+                pos_y = pos_y - height;
+
+                button_logging = uicontrol('Parent', obj.dialog_fig, 'Style', 'checkbox', 'String', 'logging', 'Value', 1, ...
+                    'Units', 'Normalized', 'Position', [pos_x pos_y width height], 'FontSize', font_size,...
+                    'Tooltip', 'Use this to produce text file outputs during the async-run');
+
+                pos_y = pos_y - height;
+
+                button_save = uicontrol('Parent', obj.dialog_fig, 'Style', 'checkbox', 'String', 'save', 'Value', 1, ...
+                    'Units', 'Normalized', 'Position', [pos_x pos_y width height], 'FontSize', font_size, ...
+                    'Tooltip', 'Use this to save MAT files of the event Finder and Lightcurve objects');
+
+                pos_y = pos_y - height;
+
+                button_run = uicontrol('Parent', obj.dialog_fig, 'Style', 'pushbutton', 'String', 'Run', ...
+                    'Units', 'Normalized', 'Position', [1-margin-width, margin, width, height], 'FontSize', font_size, ...
+                    'Callback', @func); 
+
+                uicontrol(button_run);
+
+            end
+            
+            function func(~,~)
+                
+                fprintf('Running analysis on separate worker. reset: %d, logging: %d, save: %d\n', button_reset.Value, button_logging.Value, button_save.Value);
+                
+                obj.owner.async_run('reset', button_reset.Value, 'logging', button_logging.Value, 'save', button_save.Value);
+                
+                delete(obj.dialog_fig);
+
+            end
+            
+        end
+        
         function callback_close(obj, ~, ~)
            
             if obj.debug_bit, disp('callback: close'); end
