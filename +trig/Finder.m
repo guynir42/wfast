@@ -821,12 +821,15 @@ classdef Finder < handle
                     end
                 end
                 
-                % loop back around...
-                for ii = obj.num_events:-1:obj.display_event_idx
-                    if obj.all_events(ii).keep
-                        obj.display_event_idx = ii;
-                        break;
+                if ii==1 % loop back around...
+                
+                    for ii = obj.num_events:-1:obj.display_event_idx
+                        if obj.all_events(ii).keep
+                            obj.display_event_idx = ii;
+                            break;
+                        end
                     end
+
                 end
                 
             end
@@ -870,14 +873,17 @@ classdef Finder < handle
                     end
                 end
                 
-                % loop back around...
-                for ii = 1:obj.display_event_idx
-                    if obj.all_events(ii).keep
-                        obj.display_event_idx = ii;
-                        break;
+                if ii==obj.num_events % loop back around...
+                
+                    for ii = 1:obj.display_event_idx
+                        if obj.all_events(ii).keep
+                            obj.display_event_idx = ii;
+                            break;
+                        end
                     end
+
                 end
-            
+                
             end
 
             if ~isempty(obj.gui) && obj.gui.check

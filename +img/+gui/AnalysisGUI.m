@@ -272,7 +272,7 @@ classdef AnalysisGUI < handle
             obj.panel_contrast.update;
             
             if ~isempty(obj.owner.stack_proc)
-                obj.owner.show;
+                obj.owner.show('axes', obj.axes_image);
             end
             
         end
