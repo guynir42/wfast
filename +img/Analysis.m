@@ -95,10 +95,9 @@ classdef Analysis < file.AstroData
         
         max_failed_batches = 3; % if star flux is lost for more than this number of batches, quit the run
         
-        min_star_temp; % when using MAAT astrometry, select only stars above this effective temperature
-        
         use_audio = 0;
         
+        use_display_flip = 0;
         display_num_rect_stars = 30;
         
         brake_bit = 1;
@@ -492,6 +491,14 @@ classdef Analysis < file.AstroData
         
         function startup(obj)
             
+            if isempty(obj.use_astrometry) || obj.use_astrometry==0 % in case use_astrometry==1 we will redo the astrometry anyway
+                % try to get the catalog file
+                filename = fullfile(obj.reader.dir.pwd, 'catalog.mat');
+                if exist(filename, 'file')
+                    obj.pars.cat.loadMAT(filename)
+                end
+            end
+            
             obj.brake_bit = 0;
             
             if obj.use_audio
@@ -670,10 +677,6 @@ classdef Analysis < file.AstroData
                 
                 obj.prog.showif(ii);
                 
-                if ~isempty(obj.gui) && obj.gui.check
-                    obj.gui.update; 
-                end
-
                 drawnow;
                 
                 obj.batch_counter = obj.batch_counter + 1;
@@ -700,17 +703,6 @@ classdef Analysis < file.AstroData
             obj.getData;
             
             obj.analysisStack;
-            
-            ast = obj.use_astrometry;
-            if isempty(ast) && isempty(obj.pars.cat.data) % automatically determine if we need to run astrometry
-                ast = 1;
-            else
-                ast = obj.use_astrometry;
-            end
-            
-            if ast && obj.batch_counter==0
-                obj.analysisAstrometry;
-            end
             
             if obj.use_cutouts
                
@@ -815,6 +807,10 @@ classdef Analysis < file.AstroData
                 obj.stack_proc = obj.cal.input(obj.stack, 'sum', obj.num_sum);
             end
             
+            if isempty(obj.use_astrometry) || obj.use_astrometry
+                obj.analysisAstrometry;
+            end
+            
             if isempty(obj.positions)
                 obj.findStars;
             end
@@ -877,12 +873,46 @@ classdef Analysis < file.AstroData
             %%%%%%%%%%%%%%%%%%%%% ASTROMETRY ANALYSIS %%%%%%%%%%%%%%%%%%%%%%%%%
             
             t = tic;
-            
-            try
-                obj.pars.cat.input(obj.stack_proc);
-            catch ME
-                warning(ME.getReport);
+           
+            ast = obj.use_astrometry;
+            if isempty(ast) && isempty(obj.pars.cat.data) % automatically determine if we need to run astrometry
+                ast = 1;
+            else
+                ast = obj.use_astrometry;
             end
+            
+            if ast && obj.batch_counter==0 % I could replace batch_counter with a testing if data is not empty, but if astrometry fails it will keep re-failing each batch
+                
+                try
+                    obj.pars.cat.input(obj.stack_proc);
+                catch ME
+                    warning(ME.getReport);
+                end
+
+                if ~isempty(obj.pars.cat.data) % successfully filled the catalog
+
+                    obj.pars.cat.num_stars = obj.num_stars;
+                    obj.pars.cat.findStars(obj.positions); 
+                    
+                    obj.positions = obj.pars.cat.positions;
+                    obj.magnitudes = obj.pars.cat.magnitudes;
+                    obj.coordinates = obj.pars.cat.coordinates;
+                    obj.temperatures = obj.pars.cat.temperatures; 
+
+                end
+                
+                filename = fullfile(obj.reader.dir.pwd, 'catalog.mat');
+                
+                if isempty(obj.use_astrometry)
+                    if ~exist(filename, 'file') % in auto-mode, only save if there was no catalog file
+                        obj.pars.cat.saveMAT(filename);
+                    end
+                elseif obj.use_astrometry % in force-astrometry mode must update the catalog file
+                    obj.pars.cat.saveMAT(filename);
+                end
+
+            end
+            
             
             if obj.debug_bit>1, fprintf('Time for astrometry: %f seconds\n', toc(t)); end
             
@@ -1029,9 +1059,9 @@ classdef Analysis < file.AstroData
             %%%%%%%%%%%%%%%%%%%% Update GUI and show stuff %%%%%%%%%%%%%%%%
             
             if ~isempty(obj.gui) && obj.gui.check
-                obj.show('ax', obj.gui.axes_image);
+                obj.gui.update; 
             end
-            
+
             if ~isempty(obj.finder.gui) && obj.finder.gui.check
                 obj.finder.showLatest(obj.finder.gui.panel_image);
             elseif ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
@@ -1207,7 +1237,7 @@ classdef Analysis < file.AstroData
 
         end
         
-        function findStarsMAAT(obj)
+        function findStarsMAAT(obj) % to be depricated! 
             
             if isempty(which('mextractor'))
                 error('Cannot load the MAAT package. Make sure it is on the path...');
@@ -1243,10 +1273,16 @@ classdef Analysis < file.AstroData
                 input.ax = gca;
             end
             
-            util.plot.setImage(obj.stack_proc, input.ax);
+            I = obj.stack_proc;
+            
+            if obj.use_display_flip
+                I = rot90(I,2);
+            end
+            
+            util.plot.setImage(I, input.ax);
 
-            obj.clip.showRectangles('color', 'black', 'ax', input.ax, 'delete', 1, 'text', 1, 'num', obj.display_num_rect_stars);
-            obj.clip_bg.showRectangles('color', 'red', 'ax', input.ax, 'delete', 0, 'text', 0);
+            obj.clip.showRectangles('color', 'black', 'ax', input.ax, 'delete', 1, 'text', 1, 'num', obj.display_num_rect_stars, 'flip', obj.use_display_flip);
+            obj.clip_bg.showRectangles('color', 'red', 'ax', input.ax, 'delete', 0, 'text', 0, 'flip', obj.use_display_flip);
             
         end
         

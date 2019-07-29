@@ -1101,18 +1101,18 @@ classdef Calibration < handle
             
             %%%%%%%%%%%%%%%%% SUBTRACT DARK %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
-            I = bsxfun(@minus, I, D); % subtract the mean dark image
+            I = I - D; % subtract the mean dark image
             
             %%%%%%%%%%%%%%%%% DIVIDE BY FLAT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
             if input.flat && obj.checkFlat
-                I = bsxfun(@rdivide, I, F);
+                I =I./F;
             end
                         
             %%%%%%%%%%%%%%%%% SUBTRACT MEDIAN %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                         
             if input.median
-                I = bsxfun(@minus, I, util.stat.median2(I));
+                I = I - util.stat.median2(I);
             end
             
             %%%%%%%%%%%%%%%%% DIVIDE BY GAIN %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

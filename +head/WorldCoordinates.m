@@ -200,7 +200,7 @@ classdef WorldCoordinates < handle
             
             if obj.use_tpv
             
-                if all(~cellfun(@isempty, strfind(obj.CTYPE1, 'TPV')))
+                if ~isempty(strfind(obj.CTYPE1, 'TPV')) && ~isempty(strfind(obj.CTYPE2, 'TPV'))
 
                     R  = sqrt(Xout.^2 + Yout.^2); % units of degrees
             

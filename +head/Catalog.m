@@ -19,6 +19,11 @@ classdef Catalog < handle
         
         image; % input image or stack
         
+        positions;
+        magnitudes;
+        coordinates;
+        temperatures;
+        
         FWHM; % from mextractor
         width; % equivalent to 1st moment (=FWHM/2.355)
         seeing; % arcsec
@@ -29,10 +34,12 @@ classdef Catalog < handle
         
         threshold = 10; % used by mextractor to find stars
         mag_limit = 15;
+        min_star_temp;
+        num_stars;
 %         flip = [1 1;1 -1;-1 1;-1 -1]; 
         flip = [-1 1];
         
-        debug_bit = 0;
+        debug_bit = 1;
         
     end
     
@@ -56,10 +63,10 @@ classdef Catalog < handle
                 if obj.debug_bit, fprintf('Catalog copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             elseif ~isempty(varargin) && isa(varargin{1}, 'head.Parameters')
-                if obj.debug_bit, fprintf('Catalog (pars) constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Catalog (pars) constructor v%4.2f\n', obj.version); end
                 obj.pars = varargin{1};
             else
-                if obj.debug_bit, fprintf('Catalog constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Catalog constructor v%4.2f\n', obj.version); end
             
             end
             
@@ -133,6 +140,8 @@ classdef Catalog < handle
         
         function S = runMextractor(obj, I)
             
+            if obj.debug_bit, disp('Running mextractor on input image...'); end
+            
             if isempty(which('mextractor'))
                 error('Cannot load the MAAT package. Make sure it is on the path...');
             end
@@ -172,6 +181,8 @@ classdef Catalog < handle
         end
         
         function SS = runAstrometry(obj, S, RA, Dec, plate_scale)
+            
+            if obj.debug_bit, disp('Running astrometry on SIM image...'); end
             
             if isempty(which('astrometry'))
                 error('Cannot load the MAAT package. Make sure it is on the path...');
@@ -230,8 +241,8 @@ classdef Catalog < handle
             
             T = array2table([SS.Cat, S.Cat], 'VariableNames', [SS.ColCell, S.ColCell]);
             
-            T = T(~isnan(T{:,1}),:);
-             
+%             T = T(~isnan(T{:,1}),:);
+
             [~, idx] = unique(T{:,1:2}, 'rows');
             T = T(idx,:);
 
@@ -293,6 +304,109 @@ classdef Catalog < handle
             
         end
         
+        function idx = findNearestXY(obj, pos_xy, min_radius)
+            
+            if nargin<3 || isempty(min_radius)
+                min_radius = 3; % minimal distance in pixels to give a match
+            end
+            
+%             T = sortrows(obj.data, 'Mag_G'); % sort stars from brightest to faintest
+
+            T = obj.data(:,{'Mag_G', 'XWIN_IMAGE', 'YWIN_IMAGE'}); 
+            
+            T = [T table((1:height(T))')]; % add original indices
+            
+            T.Properties.VariableNames{end} = 'idx';
+            
+            T = sortrows(T, 'Mag_G'); % now arranged from brightest to dimmest, keeping the original indices
+            
+            idx = NaN(size(pos_xy,1),1);
+            
+            for ii = 1:size(pos_xy,1)
+                
+                for jj = 1:height(T)
+                    
+                    dx = (pos_xy(ii,1)-T{jj,'XWIN_IMAGE'}).^2;
+                    dy = (pos_xy(ii,2)-T{jj,'YWIN_IMAGE'}).^2;
+                    dr = sqrt(dx+dy);
+                    
+                    if dr<=min_radius
+                        idx(ii) = T{jj,'idx'}; % get the table index
+                        T(jj,:) = [];
+                        if obj.debug_bit>1, fprintf('ii= %04d | dr= %f\n', ii, dr); end
+                        break;
+                    end
+                    
+                end
+                
+                if jj==height(T)
+                    if obj.debug_bit>1, fprintf('ii = %04d | Could not find match!\n', ii); end
+                end
+                
+            end
+            
+        end
+        
+        function findStars(obj, pos_xy, min_radius)
+            
+            if obj.debug_bit, disp('Finding stars and matching them to catalog...'); end
+            
+            if nargin<2 || isempty(pos_xy)
+                pos_xy = []; % if not given, just look for stars on your own
+            end
+            
+            if nargin<3 || isempty(min_radius)
+                min_radius = []; % minimal distance in pixels to give a match
+            end
+            
+            if isempty(obj.data)
+                error('Cannot find stars without a catalog. Try using input(..) or load(..)'); 
+            end
+            
+            T = obj.data;
+            
+            obj.positions = pos_xy;
+            
+            if isempty(obj.positions)
+
+                if ~isempty(obj.min_star_temp)
+                    T = T(T{:,'Teff'}>=obj.min_star_temp,:); % select only stars with temperature above minimal level (hotter stars have smaller angular scale)
+                end
+
+                % add other limitations on the stars chosen! 
+
+                T = sortrows(T, 'Mag_G'); % sort stars from brightest to faintest
+                
+                if ~isempty(obj.num_stars)
+                    idx = 1:min(obj.num_stars, height(T)); 
+                else
+                    idx = 1:height(T);
+                end
+
+                obj.positions = T{idx,{'XPEAK_IMAGE', 'YPEAK_IMAGE'}};
+                obj.magnitudes = T{idx,'Mag_G'};
+                obj.coordinates = T{idx,{'RA','Dec'}};
+                obj.temperatures = T{idx, 'Teff'};
+                % any other data worth taking from catalog?
+
+            else
+
+                % NOTE: this option takes a list of positions and ignores
+                % limitations such as mag_limit, min_temp and num_stars
+                
+                idx = obj.findNearestXY(obj.positions, min_radius);
+
+                T{end+1,:} = NaN; % last row is all NaN's, for mis-matched stars
+                idx(isnan(idx)) = height(T);
+
+                obj.magnitudes = T{idx,'Mag_G'};
+                obj.coordinates = T{idx,{'RA','Dec'}};
+                obj.temperatures = T{idx, 'Teff'};
+
+            end
+            
+        end
+        
     end
     
     methods % utilities
@@ -303,8 +417,32 @@ classdef Catalog < handle
             MatchedCat = obj.catalog_matched;
             WCS = obj.wcs_object;
             CatTable = obj.data;
+            positions = obj.positions;
+            magnitudes = obj.magnitudes;
+            coordinates = obj.coordinates;
+            temperatures = obj.temperatures;
             
-            save(filename, 'Sim', 'MatchedCat', 'WCS', 'CatTable', '-v7.3');
+            if obj.debug_bit, disp(['Saving catalog file to ' filename]); end
+            
+            save(filename, 'Sim', 'MatchedCat', 'WCS', 'CatTable', 'positions', 'magnitudes', 'coordinates', 'temperatures', '-v7.3');
+            
+        end
+        
+        function loadMAT(obj, filename)
+            
+            if obj.debug_bit, disp(['Loading catalog file from ' filename]); end
+            
+            load(filename);
+            
+            if exist('Sim', 'var'), obj.mextractor_sim = Sim; end
+            if exist('MatchedCat', 'var'), obj.catalog_matched = MatchedCat; end
+            if exits('WCS', 'var'), obj.wcs_object = WCS; end
+            if exist('CatTable', 'var'), obj.data = CatTable; end
+            if exist('positions', 'var'), obj.positions = positions; end
+            if exist('magnitudes', 'var'), obj.magnitudes = magnitudes; end
+            if exist('coordinates', 'var'), obj.coordinates = coordinates; end
+            if exist('temperatures', 'var'), obj.temperatures = temperatures; end
+            
             
         end
         

@@ -40,6 +40,7 @@ classdef AnalysisGUI < handle
         panel_image;
         button_reset_axes;
         button_batch_counter;
+        button_flip; 
         input_num_rect;
         axes_image;
     
@@ -215,6 +216,7 @@ classdef AnalysisGUI < handle
             obj.button_reset_axes.Callback = @obj.makeAxes;
             obj.button_reset_axes.Tooltip = 'Create a new image axis, zoomed out and with default contrast limits'; 
             
+            obj.button_flip = GraphicButton(obj.panel_image, [0.85 0.00 0.15 0.05], obj.owner, 'use_display_flip', 'toggle', 'no flip', 'flip on');
             
             %%%%%%%%%%% panel run/stop %%%%%%%%%%%%%%%
             
@@ -268,6 +270,10 @@ classdef AnalysisGUI < handle
             end
             
             obj.panel_contrast.update;
+            
+            if ~isempty(obj.owner.stack_proc)
+                obj.owner.show;
+            end
             
         end
                         
@@ -371,11 +377,15 @@ classdef AnalysisGUI < handle
             
             function func(~,~)
                 
-                delete(obj.dialog_fig);
-
-                fprintf('Running analysis on separate worker. reset: %d, logging: %d, save: %d\n', button_reset.Value, button_logging.Value, button_save.Value);
+                reset = button_reset.Value;
+                logging = button_logging.Value;
+                save = button_save.Value;
                 
-                obj.owner.async_run('reset', button_reset.Value, 'logging', button_logging.Value, 'save', button_save.Value);
+                delete(obj.dialog_fig);
+                
+                fprintf('Running analysis on separate worker. reset: %d, logging: %d, save: %d\n', reset, logging, save);
+                
+                obj.owner.async_run('reset', reset, 'logging', logging, 'save', save);
                 
             end
             
