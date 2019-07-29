@@ -305,6 +305,7 @@ classdef AnalysisGUI < handle
             width = 0.28;
             height = 0.15;
             font_size = 14;
+            font_size_small = 12;
             
             idx = obj.owner.findWorker;
             
@@ -330,7 +331,7 @@ classdef AnalysisGUI < handle
             
             button_folder = uicontrol('Style', 'text', 'String', sprintf('Folder: %s', obj.owner.reader.dir.two_tail), ... 
                 'Units', 'Normalized', 'Position', [0 0.65 1 0.15], 'Parent', obj.dialog_fig,...
-                'HorizontalAlignment', 'center', 'FontSize', 14);
+                'HorizontalAlignment', 'center', 'FontSize', font_size_small);
             
             button_cancel = uicontrol('Parent', obj.dialog_fig, 'Style', 'pushbutton', 'String', 'Cancel', ...
                 'Units', 'Normalized', 'Position', [margin, margin, width, height], 'FontSize', font_size, ...
@@ -370,12 +371,12 @@ classdef AnalysisGUI < handle
             
             function func(~,~)
                 
+                delete(obj.dialog_fig);
+
                 fprintf('Running analysis on separate worker. reset: %d, logging: %d, save: %d\n', button_reset.Value, button_logging.Value, button_save.Value);
                 
                 obj.owner.async_run('reset', button_reset.Value, 'logging', button_logging.Value, 'save', button_save.Value);
                 
-                delete(obj.dialog_fig);
-
             end
             
         end
