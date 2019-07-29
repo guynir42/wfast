@@ -201,8 +201,11 @@ classdef Catalog < handle
                 plate_scale = obj.plate_scale; % will use default value if no pars object is found
             end
             
-            try addpath(fullfile(getenv('DATA'), 'GAIA\DR2')); end
-            try addpath(fullfile(fileparts(getenv('DATA')), 'DATA_ALL\GAIA\DR2')); end
+            if exist(fullfile(getenv('DATA'), 'GAIA\DR2'), 'dir')
+                addpath(fullfile(getenv('DATA'), 'GAIA\DR2'));
+            elseif exist(fullfile(fileparts(getenv('DATA')), 'DATA_ALL\GAIA\DR2'))
+                addpath(fullfile(fileparts(getenv('DATA')), 'DATA_ALL\GAIA\DR2'));
+            end
             
             [~,S] = astrometry(S, 'RA', obj.RA, 'Dec', obj.DE, 'Scale', obj.plate_scale,...
                 'Flip', obj.flip, 'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', [3000 3000], 'ApplyPM', false, ...
@@ -287,6 +290,21 @@ classdef Catalog < handle
             delta_Dec = (Dec-obj.data{:,'Dec'}).^2;
             
             [~, idx] = min(delta_RA+delta_Dec); 
+            
+        end
+        
+    end
+    
+    methods % utilities
+        
+        function saveMAT(obj, filename)
+            
+            Sim = obj.mextractor_sim;
+            MatchedCat = obj.catalog_matched;
+            WCS = obj.wcs_object;
+            CatTable = obj.data;
+            
+            save(filename, 'Sim', 'MatchedCat', 'WCS', 'CatTable', '-v7.3');
             
         end
         

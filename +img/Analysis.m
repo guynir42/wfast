@@ -80,7 +80,7 @@ classdef Analysis < file.AstroData
         
         use_check_flux = 1;
         
-        use_astrometry = 1;
+        use_astrometry = 0;
         use_cutouts = 1;
         use_photometry = 1;
         use_psf_model = 1;
@@ -118,6 +118,9 @@ classdef Analysis < file.AstroData
     
     properties(Hidden=true)
        
+        ref_stack; % for quick align
+        ref_positions; 
+        
         failed_batch_counter = 0;
         
         % these are used for backward compatibility with older versions of 
@@ -205,11 +208,15 @@ classdef Analysis < file.AstroData
             obj.clear;
             
             obj.prev_stack = [];
+            obj.ref_stack = [];
+            obj.ref_positions = [];
             
             obj.analysis_dir_save = 0;
             obj.analysis_dir_log = 0;
             
             obj.failed_batch_counter = 0;
+            
+            obj.clear;
             
         end
         
@@ -836,6 +843,11 @@ classdef Analysis < file.AstroData
                 obj.stack_cutouts_sub = obj.stack_cutouts;
             end
             
+            if obj.batch_counter==0
+                obj.ref_stack = obj.stack_proc;
+                obj.ref_positions = obj.positions;
+            end
+            
             obj.phot_stack.input(obj.stack_cutouts_sub, 'positions', obj.clip.positions); % run photometry on the stack to verify flux and adjust positions
             
             obj.flux_buf.input(obj.phot_stack.fluxes);% store the latest fluxes from the stack cutouts (to verify we didn't lose the stars)
@@ -1075,7 +1087,7 @@ classdef Analysis < file.AstroData
                 new_fluxes(isnan(mean_fluxes)) = [];
                 mean_fluxes(isnan(mean_fluxes)) = [];
 
-                flux_lost = sum(new_fluxes<0.5*mean_fluxes)>0.5*numel(mean_fluxes) % lost half the flux in more than half the stars...
+                flux_lost = sum(new_fluxes<0.5*mean_fluxes)>0.5*numel(mean_fluxes); % lost half the flux in more than half the stars...
                 % want to add more tests...?
 
                 val = ~flux_lost;
@@ -1086,7 +1098,7 @@ classdef Analysis < file.AstroData
         
         function checkRealign(obj)
             
-            if obj.checkFluxes
+            if ~obj.checkFluxes
                 
                 disp('Lost star positions, using quick_align');
 

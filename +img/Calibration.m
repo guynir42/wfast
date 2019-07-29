@@ -1405,11 +1405,15 @@ classdef Calibration < handle
                 
             end
             
+            if all(isnat(date_cal))
+                error('Cannot find any files in directory: %s matching the pattern *YYYY-MM-DD*', dir);
+            end
+            
             deltas = days(date-date_cal); % days that passed between requested date and calibration time
             deltas(deltas<0)=NaN; % remove folders where calibration is taken AFTER the requested date
             
             if all(isnan(deltas))
-                error('Cannot find any files in directory: %s matching the pattern *YYYY-MM-DD*', dir);
+                error('Cannot find any calibration files after this date: %s', datestr(date, 'yyyy-mm-dd'));
             end
             
             [min_days,idx] = min(deltas); % find closest calibration file that occured BEFORE requested date
