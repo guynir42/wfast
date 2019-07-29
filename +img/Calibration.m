@@ -1511,19 +1511,25 @@ classdef Calibration < handle
             import util.text.sa;
             
             if ~isempty(obj.reader_flat)
-                [filename, directory] = uigetfile('', 'Load calibration file', sa(obj.reader_flat.dir.pwd, 'calibration.h5'));
+                [filename, directory] = uigetfile('', 'Load calibration file', sa(obj.reader_flat.dir.pwd, 'calibration.mat'));
             elseif ~isempty(obj.reader_dark)
-                [filename, directory] = uigetfile('', 'Load calibration file', sa(obj.reader_dark.dir.pwd, 'calibration.h5'));
+                [filename, directory] = uigetfile('', 'Load calibration file', sa(obj.reader_dark.dir.pwd, 'calibration.mat'));
             else                
                 [filename, directory] = uigetfile('', 'Load calibration file', 'calibration.h5');
             end
             
             if ischar(filename) && ischar(directory)
+                
                 [~, filename, ext] = fileparts(filename);
+                
                 if isempty(ext)
                     filename = [filename '.mat'];
+                else
+                    filename = [filename, ext];
                 end
+                
                 obj.load(filename, directory);
+                
             end
             
         end
