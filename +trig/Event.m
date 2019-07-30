@@ -12,30 +12,17 @@ classdef Event < handle
         
     end
     
+    properties(Dependent=true)
+        
+        cutouts;
+        positions;
+        stack;
+        batch_index;
+        filename;
+        
+    end
+    
     properties % inputs/outputs
-        
-        serial; % which event in the run (including unkept events)
-        
-        notes = ''; % why this event was not kept
-        keep = 1; % only keep the "real" events that are not duplicates
-        is_real = 1; % can still be a duplicate
-        is_duplicate = 0; % has a better event in the other batch
-        is_offset = 0; % the star's position offset is too big to be a real event
-        is_global = 0; % this event is triggered on many stars at the same time, suggesting a non-astronomical event
-        is_cosmic_ray = 0; % cosmic ray
-        is_artefact = 0; % some other sort of image artefact
-        is_bad_batch = 0; % this batch is noisy and has lots of events
-        is_bad_star = 0; % this star is constantly triggering (black listed)
-        is_corr_bg = 0; % if there is strong anti-correlation to background
-        is_corr_area = 0; % if there is strong correlation to aperture area
-        is_nan_flux = 0; % this event has too many NaN values in the raw flux around the peak
-        is_nan_offsets = 0; % this event has too many NaN values in the offsets of x or y around the peak
-        is_simulated = 0; % we've added this event on purpose
-        is_forced = 0; % we've forced the system to trigger on a subtrheshold event
-        % ...
-        
-        snr; % trigger value
-        is_positive; % is the filter-response positive (typically for occultations)
         
         timestamps; % all timestamps for the 2-batch window
         flux_raw_all; % all the fluxes in the 2-batch window *
@@ -43,7 +30,11 @@ classdef Event < handle
         flux_detrended; % flux of the best star after removing slow changes (trends)
         std_flux; % noise level of the detrended flux
         flux_fitted; % best fit flux model (to be filled later, adding a occult.Parameters object)
-        previous_std; % average rms of previous batches
+        
+        % NOTE: these can be absolute thresholds (positive) or relative to threshold (negative). 
+        time_range_thresh; % all times around the peak (for same star/kernel) above this threshold are also part of the event
+        kern_range_thresh; % any kernels in the time range above this threshold are also included in the event
+        star_range_thresh; % any stars in the time range above this threshold are also included in the event
         
         time_index; % index in the 2-batch time window where the maximum value occured
         kern_index; % index of the best kernel
@@ -55,17 +46,55 @@ classdef Event < handle
         
         peak_timestamp; % timestamp for time_index
         best_kernel; % full kernel that goes with kern_index
-        time_step;
+
         duration;
         star_snr;
         
-        threshold; % trigger threshold used (in S/N units)
-        used_background_sub; % did the photometery object use local (e.g., annulus) b/g subtraction?
+        which_batch = 'first'; % can be "first" or "second", depending on where is the peak in the 2-batch window
         
-        % NOTE: these can be absolute thresholds (positive) or relative to threshold (negative). 
-        time_range_thresh; % all times around the peak (for same star/kernel) above this threshold are also part of the event
-        kern_range_thresh; % any kernels in the time range above this threshold are also included in the event
-        star_range_thresh; % any stars in the time range above this threshold are also included in the event
+        serial; % which event in the run (including unkept events)
+        
+        snr; % trigger value (after adjusting for "previous_std")
+        threshold; % trigger threshold used (in S/N units)
+        previous_std; % average rms of previous batches
+        is_positive; % is the filter-response positive (typically for occultations)
+        
+        notes = ''; % why this event was not kept
+        keep = 1; % only keep the "real" events that are not duplicates
+        
+    end
+    
+    properties % switches/controls
+        
+        max_corr;
+        max_num_nans;
+        
+        debug_bit = 1;
+        
+    end
+    
+    properties(Hidden=true)
+       
+        % many many options for being not-real 
+        is_duplicate = 0; % has a better event in the other batch
+        is_offset = 0; % the star's position offset is too big to be a real event
+        is_global = 0; % this event is triggered on many stars at the same time, suggesting a non-astronomical event
+        is_cosmic_ray = 0; % cosmic ray
+        is_artefact = 0; % some other sort of image artefact
+        is_bad_batch = 0; % this batch is noisy and has lots of events
+        is_bad_star = 0; % this star is constantly triggering (black listed)
+        is_corr_offsets = 0; % if there is strong correlation to star offsets in the cutout 
+        is_corr_bg = 0; % if there is strong anti-correlation to background
+        is_corr_area = 0; % if there is strong correlation to aperture area
+        is_nan_flux = 0; % this event has too many NaN values in the raw flux around the peak
+        is_nan_offsets = 0; % this event has too many NaN values in the offsets of x or y around the peak
+        is_simulated = 0; % we've added this event on purpose
+        is_forced = 0; % we've forced the system to trigger on a subtrheshold event
+        % ...
+        
+        % additional housekeeping info
+        used_background_sub; % did the photometery object use local (e.g., annulus) b/g subtraction?
+        time_step;
         
         % The following are additional metadata collected by Photometry class
         % "at_peak" means values for all stars at the time of event peak (row vector)
@@ -111,31 +140,7 @@ classdef Event < handle
         aperture; % aperture radius used by photometry (empty if not using aperture photometry)
         gauss_sigma; % gaussian width used by photometry (empty if not using PSF photometry)
         
-        which_batch = 'first'; % can be "first" or "second", depending on where is the peak in the 2-batch window
-        
-    end
-    
-    properties % switches/controls
-        
-        max_corr;
-        max_num_nans;
-        
-        debug_bit = 1;
-        
-    end
-    
-    properties(Dependent=true)
-        
-        cutouts;
-        positions;
-        stack;
-        batch_index;
-        filename;
-        
-    end
-    
-    properties(Hidden=true)
-        
+        % these are chosen based on "which_batch"
         cutouts_first;
         cutouts_second;
         positions_first;
@@ -150,7 +155,7 @@ classdef Event < handle
         t_end;
         t_end_stamp;
         
-        version = 1.02;
+        version = 1.03;
         
     end
     
@@ -328,6 +333,7 @@ classdef Event < handle
                 obj.addNote(sprintf('flux with %d NaNs', NN));
             end
             
+            % check if there are too many NaNs in the offsets
             Nidx = isnan(obj.offsets_x_at_star) | isnan(obj.offsets_y_at_star); 
             if nnz(Nidx)>=obj.max_num_nans && ~all(Nidx) % if all frames have NaN offsets (i.e., forced photometry), it is ok. If some of them do, it is bad shape
                 obj.keep = 0;
@@ -335,6 +341,23 @@ classdef Event < handle
                 obj.addNote(sprintf('offsets with %d NaNs', nnz(Nidx)));
             end
             
+            % check for correlation with offsets_x (negative or positive)
+            corr = obj.correlation(obj.offsets_x_at_star);
+            if abs(corr)>obj.max_corr
+                obj.keep = 0;
+                obj.is_corr_offsets = 1;
+                obj.addNote(sprintf('signal is correlated with offsets_x at a %f level', corr));
+            end
+            
+            % check for correlation with offsets_y (negative or positive)
+            corr = obj.correlation(obj.offsets_y_at_star);
+            if abs(corr)>obj.max_corr
+                obj.keep = 0;
+                obj.is_corr_offsets = 1;
+                obj.addNote(sprintf('signal is correlated with offsets_y at a %f level', corr));
+            end
+            
+            % check for negative correlation with the background
             corr = obj.correlation(obj.backgrounds_at_star);
             if corr<-obj.max_corr
                 obj.keep = 0;
@@ -342,6 +365,7 @@ classdef Event < handle
                 obj.addNote(sprintf('signal is anti correlated with background at a %f level', corr));
             end
             
+            % check for correlation with area
             corr = obj.correlation(obj.areas_at_star);
             if corr>obj.max_corr
                 obj.keep = 0;
@@ -355,8 +379,19 @@ classdef Event < handle
         end
         
         function val = correlation(obj, vector)
+            
             f = obj.flux_detrended;
             t = obj.time_indices;
+            
+            f_temp = f;
+            f_temp(t) = NaN;
+            Mf = mean(f_temp, 'omitnan'); % get the mean outside the event
+            f = f - Mf;
+            
+            v_temp = vector;
+            v_temp(t) = NaN;
+            Mv = mean(v_temp, 'omitnan'); % get the mean outside the event
+            vector = vector - Mv;
             
             val = sum(f(t).*vector(t), 'omitnan')./sqrt(sum(f(t).^2, 'omitnan').*sum(vector(t).^2, 'omitnan'));
             
