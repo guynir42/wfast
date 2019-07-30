@@ -49,6 +49,9 @@ classdef Event < handle
 
         duration;
         star_snr;
+        magnitude;
+        RA;
+        Dec;
         
         which_batch = 'first'; % can be "first" or "second", depending on where is the peak in the 2-batch window
         

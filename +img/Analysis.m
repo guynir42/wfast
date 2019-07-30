@@ -466,17 +466,17 @@ classdef Analysis < file.AstroData
 
                 v = abs(obj.finder.snr_values);
 
-                fprintf(fid, 'S/N for all %d batches is distrubuted: min= %f median= %f max= %f\n',...
+                fprintf(fid, 'S/N for the last %d batches is distrubuted: min= %f median= %f max= %f\n',...
                     numel(v), min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
 
                 v = abs([obj.finder.all_events.snr]);
 
-                fprintf(fid, 'S/N for all %d triggered events is distrubuted: min= %f median= %f max= %f\n',...
+                fprintf(fid, 'S/N for %d triggered events is distrubuted: min= %f median= %f max= %f\n',...
                     numel(v), min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
 
                 v = abs([obj.finder.kept_events.snr]);
 
-                fprintf(fid, 'S/N for all %d kept events is distrubuted: min= %f median= %f max= %f\n',...
+                fprintf(fid, 'S/N for %d kept events is distrubuted: min= %f median= %f max= %f\n',...
                     numel(v), min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
 
                 fprintf(fid, 'Number of events: total= %d | kept= %d\n', length(obj.finder.all_events), length(obj.finder.kept_events));
