@@ -11,6 +11,7 @@ classdef Finder < handle
     properties % objects
         
         pars@head.Parameters;
+        cat@head.Catalog;
         
         cal@trig.Calibrator;
         
@@ -637,6 +638,19 @@ classdef Finder < handle
                 
                 ev.max_num_nans = obj.max_num_nans;
                 ev.max_corr = obj.max_corr;
+                
+                if ~isempty(obj.cat) && ~isempty(obj.cat.data)
+                    
+                    if ~isempty(obj.cat.magnitudes) 
+                        ev.magnitude = magnitudes(ev.star_index); 
+                    end
+                    
+                    if ~isempty(obj.cat.coordinates)
+                        ev.RA = head.Ephemeris.deg2hour(obj.cat.coordinates(ev.star_index, 1));
+                        ev.Dec = head.Ephemeris.deg2sex(obj.cat.coordinates(ev.star_index, 2));
+                    end
+                    
+                end
                 
                 % any other info that needs to be saved along with the event object?
                 % ...

@@ -62,6 +62,7 @@ function file_handle = save(obj, filename, varargin)
         input.input_var('name', inputname(1));
         input.input_var('hidden', 0, 'use_hidden', 5);
         input.input_var('dependent', 1, 'use_dependent', 5);
+        input.input_var('table_full', 0); 
         input.input_var('debug_bit', 0);
         input.input_var('handle_list', {});
 
@@ -219,17 +220,17 @@ function file_handle = save(obj, filename, varargin)
                 value = obj.(name);
                 p = findprop(obj, name);
                
-                if isobject(value) && p.Transient==0 && ~isa(value, 'datetime') && ~isa(value, 'containers.Map') && length(value)<2 && isempty(checkList(value, input.handle_list))
+                if isobject(value) && p.Transient==0 && ~isa(value, 'table') && ~isa(value, 'datetime') && ~isa(value, 'containers.Map') && length(value)<2 && isempty(checkList(value, input.handle_list))
                     
                     if input.debug_bit, disp(['prop: "' name '" now saved as object...       **********************']); end
                     
                     file_handle = util.oop.save(value, file_handle, input, 'name', name, 'location', this_location);
                 
-                elseif isa(value, 'datetime') || isa(value, 'containers.Map')
+                elseif isa(value, 'datetime') || isa(value, 'containers.Map') || isa(value, 'table')
                     continue;
-                elseif isobject(value) && p.Transient==0 && length(value)>1
+                elseif isobject(value) && p.Transient==0 && numel(value)>1
                     
-                    for jj = 1:length(value)
+                    for jj = 1:numel(value)
                         
                         if ~isa(value(jj), 'datetime') && ~isa(value(jj), 'containers.Map') && isempty(checkList(value(jj), input.handle_list))
                         
@@ -386,7 +387,7 @@ function file_handle = saveProperty(file_handle, name, value, input)
         end
         
     elseif isobject(value)
-                
+        
         if input.debug_bit, disp(['prop: "' name '" is an object... placing link.']); end
         file_handle = saveObject(file_handle, name, value, input);
         
@@ -604,6 +605,9 @@ function file_handle = saveObject(file_handle, name, value, input)
         elseif isa(value, 'containers.Map')
             saveCell(file_handle, [name '.keys'], value.keys, input);
             saveCell(file_handle, [name '.values'], value.values, input);
+        elseif isa(value, 'table')
+            % need to write a HDF5 table...
+            fprintf('Writing tables into HDF5 is not yet supported... while trying to write "%s"\n', name);
         else
         
             if isempty(link_address) % check if we need to save a copy of this object
@@ -627,6 +631,11 @@ function file_handle = saveObject(file_handle, name, value, input)
         elseif isa(value, 'containers.Map')
             saveCell(file_handle, [name '.keys'], value.keys, input);
             saveCell(file_handle, [name '.values'], value.values, input);
+        elseif isa(value, 'table')
+            fprintf(file_handle, '%25s: [%s %s]\n', name, util.text.print_vec(size_vec, 'x'), class(value));
+            rows = 10; 
+            if input.table_full, rows = []; end
+            fprintf(file_handle, '%s', util.text.print_table(value, 'num_rows', rows, 'indent', 5));
         elseif ~isempty(link_address)
             fprintf(file_handle, '%25s: [%s %s] (link: %s)\n', name, util.text.print_vec(size_vec, 'x'), class(value), link_address); % link back to existing location
         else

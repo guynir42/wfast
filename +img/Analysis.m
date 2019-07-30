@@ -15,6 +15,7 @@ classdef Analysis < file.AstroData
     properties % objects
         
         pars@head.Parameters;
+        cat@head.Catalog;
         reader@file.Reader;
         cal@img.Calibration;
         clip@img.Clipper;
@@ -176,6 +177,8 @@ classdef Analysis < file.AstroData
                 obj.audio = util.sys.AudioControl;
                 
                 obj.pars = head.Parameters; % this also gives "pars" to all sub-objects
+                obj.cat = head.Catalog(obj.pars);
+                obj.finder.cat = obj.cat;
                 
                 util.oop.save_defaults(obj); % make sure each default_XXX property is updated with the current XXX property value. 
                 
@@ -492,7 +495,7 @@ classdef Analysis < file.AstroData
                 % try to get the catalog file
                 filename = fullfile(obj.reader.dir.pwd, 'catalog.mat');
                 if exist(filename, 'file')
-                    obj.pars.cat.loadMAT(filename)
+                    obj.cat.loadMAT(filename)
                 end
             end
             
@@ -889,7 +892,7 @@ classdef Analysis < file.AstroData
             t = tic;
            
             ast = obj.use_astrometry;
-            if isempty(ast) && isempty(obj.pars.cat.data) % automatically determine if we need to run astrometry
+            if isempty(ast) && isempty(obj.cat.data) % automatically determine if we need to run astrometry
                 ast = 1;
             else
                 ast = obj.use_astrometry;
@@ -898,33 +901,36 @@ classdef Analysis < file.AstroData
             if ast && obj.batch_counter==0 % I could replace batch_counter with a testing if data is not empty, but if astrometry fails it will keep re-failing each batch
                 
                 try
-                    obj.pars.cat.input(obj.stack_proc);
+                    obj.cat.input(obj.stack_proc);
                 catch ME
                     warning(ME.getReport);
                 end
 
-                if ~isempty(obj.pars.cat.data) % successfully filled the catalog
+                if ~isempty(obj.cat.data) % successfully filled the catalog
 
-                    obj.pars.cat.num_stars = obj.num_stars;
-                    obj.pars.cat.findStars(obj.positions); 
+                    obj.cat.num_stars = obj.num_stars;
+                    obj.cat.findStars(obj.positions); 
                     
-                    obj.positions = obj.pars.cat.positions;
-                    obj.magnitudes = obj.pars.cat.magnitudes;
-                    obj.coordinates = obj.pars.cat.coordinates;
-                    obj.temperatures = obj.pars.cat.temperatures; 
-
+                    obj.positions = obj.cat.positions;
+                    
                 end
                 
                 filename = fullfile(obj.reader.dir.pwd, 'catalog.mat');
                 
                 if isempty(obj.use_astrometry)
                     if ~exist(filename, 'file') % in auto-mode, only save if there was no catalog file
-                        obj.pars.cat.saveMAT(filename);
+                        obj.cat.saveMAT(filename);
                     end
                 elseif obj.use_astrometry % in force-astrometry mode must update the catalog file
-                    obj.pars.cat.saveMAT(filename);
+                    obj.cat.saveMAT(filename);
                 end
-
+                
+            end
+            
+            if ~isempty(obj.cat.data)
+                obj.magnitudes = obj.cat.magnitudes;
+                obj.coordinates = obj.cat.coordinates;
+                obj.temperatures = obj.cat.temperatures; 
             end
             
             if obj.debug_bit>1, fprintf('Time for astrometry: %f seconds\n', toc(t)); end
@@ -1119,7 +1125,7 @@ classdef Analysis < file.AstroData
                 obj.flux_buf.reset;
             end
             
-            if ~is_empty(obj.flux_buf)
+            if is_empty(obj.flux_buf)
                 val = 1;
             else
                 

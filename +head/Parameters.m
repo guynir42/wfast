@@ -7,7 +7,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         
         gui@head.gui.ParsGUI;
         
-        cat@head.Catalog; % this is transient right now because I don't know how to save tables (yet)
+%         cat@head.Catalog; % this is transient right now because I don't know how to save tables (yet)
         
     end
 
@@ -224,7 +224,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
     methods % constructor
        
         function obj = Parameters(other)
-                                 
+            
             if nargin>0 && isa(other, 'head.Parameters')
                 
                 if obj.debug_bit, fprintf('Parameters copy-constructor v%4.2f\n', obj.version); end
@@ -243,7 +243,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
                 obj.filter_obj = head.Filter(obj.FILTER);
                 obj.ephem = head.Ephemeris;
                 obj.WCS = head.WorldCoordinates;
-                obj.cat = head.Catalog(obj);
+%                 obj.cat = head.Catalog(obj);
                 
                 obj.FOCLEN = obj.FOCLEN; % this should fill the values for SCALE and F_RATIO
                 

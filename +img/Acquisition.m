@@ -15,6 +15,7 @@ classdef Acquisition < file.AstroData
         
         % general objects
         pars@head.Parameters;
+        cat@head.Catalog;
         
         % input objects
 %         cam@obs.cam.CameraControl;
@@ -297,6 +298,7 @@ classdef Acquisition < file.AstroData
                 obj.setupDefaults;
                 
                 obj.pars = head.Parameters; % this also gives "pars" to all sub-objects
+                obj.cat = head.Catalog;
                 
                 util.oop.save_defaults(obj); % make sure each default_XXX property is updated with the current XXX property value. 
                 
@@ -1604,9 +1606,9 @@ classdef Acquisition < file.AstroData
              
             % add additional tests to remove irrelvant stars
             
-            obj.pars.cat.input(obj.stack_proc);
+            obj.cat.input(obj.stack_proc);
             
-            T = obj.pars.cat.data;
+            T = obj.cat.data;
             
             if obj.min_star_temp
                 T = T(T{:,'Teff'}>=obj.min_star_temp,:); % select only stars with temperature above minimal level (hotter stars have smaller angular scale)
@@ -1626,7 +1628,7 @@ classdef Acquisition < file.AstroData
             obj.magnitudes = T{:,'Mag_G'};
             obj.coordinates = [T.RA T.Dec];
             
-            obj.object_idx = obj.pars.cat.findNearestObject;
+            obj.object_idx = obj.cat.findNearestObject;
             
         end
         
@@ -1636,7 +1638,7 @@ classdef Acquisition < file.AstroData
                 obj.flux_buf.reset;
             end
             
-            if ~is_empty(obj.flux_buf)
+            if is_empty(obj.flux_buf)
                 val = 1;
             else
                 
@@ -1990,6 +1992,8 @@ classdef Acquisition < file.AstroData
             
             obj.clip.reset; % don't save these star positions! 
             obj.positions = [];
+            
+            obj.reset; 
             
         end
         
