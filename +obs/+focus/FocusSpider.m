@@ -159,13 +159,13 @@ classdef FocusSpider < handle
                 warning(['cannot set position to ' num2str(val) ' it is below min_pos= ' num2str(obj.min_pos)]);
                 val = obj.min_pos;
             end
-%             
+            
             p = obj.pos;
-%             dp = val-p;
+            dp = val-p;
             
             for ii = 1:obj.num_act
-%                 obj.actuators(ii).rel_move(dp);
-                obj.actuators(ii).move(val);
+                obj.actuators(ii).rel_move(dp);
+%                 obj.actuators(ii).move(val);
             end
             
         end

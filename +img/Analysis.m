@@ -60,8 +60,6 @@ classdef Analysis < file.AstroData
         
         prev_stack;
         
-        num_stars_found;
-        
         FWHM; % latest measured full width half maximum
         
         batch_counter = 0;
@@ -79,6 +77,7 @@ classdef Analysis < file.AstroData
         use_refine_bg = 0; % need to figure out exactly how to do this
         
         use_check_flux = 1;
+        max_failed_batches = 3; % if star flux is lost for more than this number of batches, quit the run
         
         use_astrometry = 0;
         use_cutouts = 1;
@@ -92,8 +91,6 @@ classdef Analysis < file.AstroData
         use_fits_flip = 0;
         use_fits_roi = 0;
         fits_roi = [];
-        
-        max_failed_batches = 3; % if star flux is lost for more than this number of batches, quit the run
         
         use_audio = 0;
         
@@ -135,7 +132,7 @@ classdef Analysis < file.AstroData
         prev_average_width;
         
         num_batches_limit;
-        version = 1.01;
+        version = 1.02;
         
     end
     
@@ -746,17 +743,17 @@ classdef Analysis < file.AstroData
             if isempty(obj.images) && isempty(obj.stack)
                 disp(['empty batch in filename: ' obj.thisFilename]);
                 return;
-            elseif ~isempty(obj.images)
+            elseif ~isempty(obj.images) % we got images, need to produce cutouts, stack and positions outselves
+                
                 obj.num_sum = size(obj.images,3);
                 obj.stack = util.stat.sum_single(obj.images); % sum along the 3rd dimension directly into single precision
                 obj.positions = obj.clip.positions;
                 obj.positions_bg = obj.clip_bg.positions;
-            elseif ~isempty(obj.stack)
+                
+            elseif ~isempty(obj.stack) % got stack (and assume we got cutouts and positions, too)
                 
                 obj.clip.positions = obj.positions;
                 obj.clip.cut_size = size(obj.cutouts,1);
-                
-                obj.num_stars_found = size(obj.positions,1);
                 
                 if ~isempty(obj.positions_bg)
                     obj.clip_bg.positions = obj.positions_bg;
@@ -790,6 +787,23 @@ classdef Analysis < file.AstroData
                 obj.positions_bg = obj.clip_bg.positions;
             end
             
+            if ~isempty(obj.num_stars) && ~isinf(obj.num_stars) && obj.num_stars<size(obj.cutouts,4) % use a smaller number of stars than we got
+                
+                if ~isempty(obj.positions)
+                    obj.positions = obj.positions(1:obj.num_stars,:);
+                    obj.clip.positions = obj.positions;
+                end
+                
+                if ~isempty(obj.cutouts) 
+                    obj.cutouts = obj.cutouts(:,:,:,1:obj.num_stars);
+                end
+                
+                if ~isempty(obj.stack_cutouts)
+                    obj.stack_cutouts = obj.stack_cutouts(:,:,:,1:obj.num_stars);
+                end
+                
+            end
+            
             if obj.debug_bit>1, fprintf('Time to get data: %f seconds\n', toc(t)); end
             
         end
@@ -811,7 +825,7 @@ classdef Analysis < file.AstroData
                 obj.analysisAstrometry;
             end
             
-            if isempty(obj.positions)
+            if isempty(obj.positions) % if astrometry failed or was not used, we need to get positions somehow
                 obj.findStars;
             end
 
@@ -846,8 +860,6 @@ classdef Analysis < file.AstroData
             
             obj.phot_stack.input(obj.stack_cutouts_sub, 'positions', obj.clip.positions); % run photometry on the stack to verify flux and adjust positions
             
-            obj.flux_buf.input(obj.phot_stack.fluxes);% store the latest fluxes from the stack cutouts (to verify we didn't lose the stars)
-            
             if isempty(obj.cutouts) && ~isempty(obj.images) % only if we have images and not pre-cut cutouts
                 obj.adjustPositions; % got a chance to realign the positions before making cutouts from raw images
             end
@@ -863,6 +875,8 @@ classdef Analysis < file.AstroData
                     end
                 end
             end
+            
+            obj.flux_buf.input(obj.phot_stack.fluxes);% store the latest fluxes from the stack cutouts (to verify we didn't lose the stars)
             
             if obj.debug_bit>1, fprintf('Time for stack analysis: %f seconds\n', toc(t)); end
             
@@ -912,7 +926,6 @@ classdef Analysis < file.AstroData
                 end
 
             end
-            
             
             if obj.debug_bit>1, fprintf('Time for astrometry: %f seconds\n', toc(t)); end
             

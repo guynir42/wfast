@@ -92,6 +92,9 @@ classdef Acquisition < file.AstroData
         
         use_model_psf = 1;
         
+        use_check_flux = 1;
+        max_failed_batches = 3; % if star flux is lost for more than this number of batches, quit the run
+        
         use_save = false; % must change this when we are ready to really start
         use_triggered_save = false;
         
@@ -167,6 +170,8 @@ classdef Acquisition < file.AstroData
         brake_bit = 1; % when this is set to 1 (using the GUI, for example), the run stops. 
         is_running = 0; % when this is 1, cannot start a new run or anything
         is_running_single = 0; % when this is 1, cannot start a new run or anything
+        
+        failed_batch_counter = 0;
         
         default_saturation_value;
         
@@ -345,6 +350,8 @@ classdef Acquisition < file.AstroData
             obj.batch_counter = 0;
             obj.start_index = 1;
             obj.positions = [];
+            
+            obj.failed_batch_counter = 0;
             
             obj.sync.outgoing.RA_rate_delta = 0;
             obj.sync.outgoing.DE_rate_delta = 0;
@@ -1508,10 +1515,6 @@ classdef Acquisition < file.AstroData
 
             end
             
-%             if obj.batch_counter==0
-%                 obj.findStars; % this replaces the clipper findStars with somethinig better, or just runs it explicitely... 
-%             end
-            
             if ~isempty(obj.positions) % if no positions are known just skip this part
                 
                 obj.stack_cutouts = obj.clip.input(obj.stack_proc);  
@@ -1627,13 +1630,15 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function checkRealign(obj)
+        function val = checkFluxes(obj)
             
             if size(obj.flux_buf.data, 2)~=size(obj.phot_stack.fluxes,2)
                 obj.flux_buf.reset;
             end
             
-            if ~is_empty(obj.flux_buf) % check that stars are still aligned properly... 
+            if ~is_empty(obj.flux_buf)
+                val = 1;
+            else
                 
                 mean_fluxes = obj.flux_buf.mean;
                 mean_fluxes(mean_fluxes<=0) = NaN;
@@ -1642,24 +1647,61 @@ classdef Acquisition < file.AstroData
                 new_fluxes(isnan(mean_fluxes)) = [];
                 mean_fluxes(isnan(mean_fluxes)) = [];
 
-                % maybe 0.5 is arbitrary and should be turned into parameters?
-                if sum(new_fluxes<0.5*mean_fluxes)>0.5*numel(mean_fluxes) % lost half the flux in more than half the stars...
+                flux_lost = sum(new_fluxes<0.5*mean_fluxes)>0.5*numel(mean_fluxes); % lost half the flux in more than half the stars...
+                % want to add more tests...?
 
-                    disp('Lost star positions, using quick_align');
+                val = ~flux_lost;
+                
+            end
+            
+        end
+        
+        function checkRealign(obj)
+            
+            if size(obj.flux_buf.data, 2)~=size(obj.phot_stack.fluxes,2)
+                obj.flux_buf.reset;
+            end
+            
+            if obj.checkFluxes % check that stars are still aligned properly... 
+                
+                if obj.use_sync, obj.sync.outgoing.stars_visible = 0;  end
+                
+            else
+                
+                if obj.debug_bit, disp('Lost star positions, using quick_align'); end
                     
-                    [~,shift] = util.img.quick_align(obj.stack_proc, obj.ref_stack);
-                    obj.clip.positions = double(obj.ref_positions + flip(shift));
+                [~,shift] = util.img.quick_align(obj.stack_proc, obj.ref_stack);
+                obj.clip.positions = double(obj.ref_positions + flip(shift));
+
+                % this shift should also be reported back to mount controller? 
+
+                obj.stack_cutouts = obj.clip.input(obj.stack_proc);
+
+                obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.positions); % run photometry on the stack to verify flux and adjust positions
+                if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
+
+                % second test, after quick_align, to verify the stars are back!
+                if obj.checkFluxes
                     
-                    % this shift should also be reported back to mount controller? 
-
-                    obj.stack_cutouts = obj.clip.input(obj.stack_proc);
-
-                    obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.positions); % run photometry on the stack to verify flux and adjust positions
-                    if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
+                    obj.failed_batch_counter = 0;
+                    
+                    if obj.use_sync, obj.sync.outgoing.stars_visible = 1;  end
+                    
+                else
+                    
+                    obj.failed_batch_counter = obj.failed_batch_counter + 1;
+                    
+                    if obj.failed_batch_counter>obj.max_failed_batches
+                        
+                        fprintf('Cannot find stars %d times in a row. Quiting run...\n', obj.failed_batch_counter);
+                        
+                        obj.brake_bit = 1; % finish this batch and then quit the run
+                        
+                        if obj.use_sync, obj.sync.outgoing.stars_visible = 0;  end
+                        
+                    end
                     
                 end
-
-                % add second test and maybe quit the run if it fails...
                 
             end
             
