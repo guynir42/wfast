@@ -349,7 +349,7 @@ classdef Event < handle
             if abs(corr)>obj.max_corr
                 obj.keep = 0;
                 obj.is_corr_offsets = 1;
-                obj.addNote(sprintf('signal is correlated with offsets_x at a %f level', corr));
+                obj.addNote(sprintf('signal is correlated with offsets x at a %f level', corr));
             end
             
             % check for correlation with offsets_y (negative or positive)
@@ -357,7 +357,7 @@ classdef Event < handle
             if abs(corr)>obj.max_corr
                 obj.keep = 0;
                 obj.is_corr_offsets = 1;
-                obj.addNote(sprintf('signal is correlated with offsets_y at a %f level', corr));
+                obj.addNote(sprintf('signal is correlated with offsets y at a %f level', corr));
             end
             
             % check for negative correlation with the background

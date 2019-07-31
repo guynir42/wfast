@@ -19,6 +19,8 @@ function values_conv = convolution(kernels, values, varargin)
 %            If the calculation requires more than this, it is done in a 
 %            very slow loop... 
 
+    if nargin==0, help('util.vec.convolution'); return; end
+
     input = util.text.InputVars;
     input.input_var('cross', 0, 'conj'); 
     input.input_var('crop', 'same'); 
@@ -26,52 +28,119 @@ function values_conv = convolution(kernels, values, varargin)
     input.input_var('mem_max', 10, 'memory max', 'memory limit'); 
     input.scan_vars(varargin{:});
     
-    L = size(kernels,1) + size(values,1) - 1; % length of dim1 for both kernels and values
-            
+    Sv = size(values);
     Sk = size(kernels);
     
-    k = util.img.pad2size(kernels, [L Sk(2:end)]);
+    D = max(length(Sv), length(Sk)); % largest dimension of both inputs
+    Sk = [Sk, ones(1,D-length(Sk))];
+    Sv = [Sv, ones(1,D-length(Sv))];
     
+    L = Sk(1) + Sv(1) - 1; % adjusted length of dim1 for both kernels and values
+    
+    Sk_adj = Sk;
+    Sk_adj(1) = L;
+    Sv_adj = Sv;
+    Sv_adj(1) = L;
+    
+    matched_dims = Sk_adj==1 | Sv_adj==1 | Sk_adj==Sv_adj; % each dimension must be either scalar, or the same size
+    
+    if ~all(matched_dims)
+        error('Size mismatch between "kernels" (%s) and "values" (%s)', util.text.print_vec(Sk, 'x'), util.text.print_vec(Sv, 'x'));
+    end
+
+    S_out = max(Sv,Sk); % the size of the output (dim1 of this may change in the end when we crop it)
+    S_out(1) = L;
+    
+    %%%%%%%%%%%%% finsihed verifying sizes, can start calculations %%%%%%%%%%%%%%%
+    
+    k = util.img.pad2size(kernels, Sk_adj);
     kernels_fft = fft(k);
     
     if input.cross
         kernels_fft = conj(kernels_fft);
     end
 
-    Sf = size(values);
-
     % if values ends up having many dimensions (above 4) we will need to patch the pad2size function 
-    f = util.img.pad2size(values, [L Sf(2:end)]); % keep all dimensions of values except the first, which is padded
+    v = util.img.pad2size(values, Sv_adj); % keep all dimensions of values except the first, which is padded
     
-    values_fft = fft(f);
+    values_fft = fft(v);
 
-    M = L*size(kernels_fft,2)*size(values_fft,3)*4/1024^3;
-    
-    if input.debug_bit>1, disp(['memory usage: ' num2str(M) ' GBs']); end
-
-    if M<input.mem_max
-        values_conv = real(fftshift(ifft(kernels_fft.*values_fft),1));
+    if isa(values, 'single') && isa(kernels, 'single')
+        bytes = 4;
     else
-        error('Memory required is too large: %f GBs. Use "mem_max" to set it higher...', M);
-%         % maybe add preallocation? 
-%         for ii = 1:size(values_fft,3)
-%             values_conv(:,:,ii) = real(fftshift(ifft(kernels_fft.*values_fft(:,:,ii)),1));
-%         end
+        bytes = 8;
+    end
+    
+    memory_needed = prod(S_out)*bytes*2/1024^3; % factor of 2 is for complex numbers in the FFT
+    
+    if input.debug_bit
+        fprintf('Memory requirements for output array size [%s] is %4.1fGb\n', util.text.print_vec(S_out, 'x'), memory_needed);
+    end 
+    
+    try
+        if memory_needed>input.mem_max
+            if input.debug_bit, disp('Memory required is too large. Using a loop instead!'); end
+            values_conv = fft_in_a_loop(kernels_fft, values_fft, S_out, Sk, Sv);
+        else
+            values_conv = real(fftshift(ifft(kernels_fft.*values_fft),1)); % just do the whole thing at once
+        end
+    catch ME
+        if strcmp(ME.message, 'Out of memory. Type "help memory" for your options.')
+            disp('Out of memory error... Using a loop instead!');
+            values_conv = fft_in_a_loop(kernels_fft, values_fft, S_out, Sk, Sv);
+        else
+            rethrow(ME);
+        end
+        
     end
 
+    %%%%%%%%%%%%%% Just crop it to the correct output size %%%%%%%%%%%%%%%%
+    
     if util.text.cs(input.crop, 'same')
-        values_conv = util.img.crop2size(values_conv, [Sf(1), Sk(2), Sf(3:end)]); % crop back to original dimensions...
+        S_out(1) = Sv(1);
+        values_conv = util.img.crop2size(values_conv, S_out); % crop back to original dimensions...
     elseif util.text.cs(input.crop, 'valid')
-        
-        S = size(values_conv);
-        S(1) = length(values)-length(kernels)+1;
-        values_conv = util.img.crop2size(values_conv, S);
-%         values_conv = values_conv(1:S(1), :, :,:);
+        S_out(1) = Sv(1) - Sk + 1;
+        values_conv = util.img.crop2size(values_conv, S_out);
     elseif util.text.cs(input.crop, 'full')
         % pass
     else
         error('Unknown "crop" value "%s". Try "same" or "valid" or "full".', input.crop);
     end
+    
+end
 
+function M = fft_in_a_loop(kernels_fft, values_fft, S_out, Sk, Sv)
+
+    accessor = repmat({':'}, [1,length(S_out)]); % a cell array that looks like {':',':',':'}
+    accessor_v = accessor;
+    accessor_k = accessor;
+    accessor_out = accessor;
+
+    loop_idx = find(S_out(2:end)>1, 1, 'last')+1; % the last non-singleton dimension is split up into a loop
+
+    M = zeros(S_out);
+
+    for ii = 1:S_out(loop_idx)
+
+%         fprintf('ii= %d\n', ii);
+        
+        if Sk(loop_idx)>1 % kernels are non-singleton in this dimension
+            accessor_k{loop_idx} = ii; % now it looks like {':',ii,':',':'}
+        end
+
+        if Sv(loop_idx)>1 % values are non-singleton in this dimension
+            accessor_v{loop_idx} = ii; % now it looks like {':',ii,':',':'}
+        end
+
+        accessor_out{loop_idx} = ii; 
+
+        M(accessor_out{:}) = real(fftshift(ifft(kernels_fft(accessor_k{:}).*values_fft(accessor_v{:})),1));
+
+    end
 
 end
+
+
+
+
