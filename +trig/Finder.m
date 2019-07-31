@@ -90,6 +90,8 @@ classdef Finder < handle
         
         use_var_buf = 1; % use PSD tracking! 
         
+        num_hits_black_list = 4;
+        
         use_conserve_memory = 1;
         
         frame_rate = 25; % if timestamps are not given explicitely
@@ -701,13 +703,13 @@ classdef Finder < handle
             stars = [obj.all_events.star_index];
             if ~isempty(stars)
                 [N,E] = histcounts(stars, 'BinWidth', 1, 'BinLimits', [1 max(stars)]);
-                obj.black_list_stars = [obj.black_list_stars E(N>5)];
+                obj.black_list_stars = [obj.black_list_stars E(N>=obj.num_hits_black_list)];
             end
             
             batches = [obj.all_events.batch_index];
             if ~isempty(batches)
                 [N,E] = histcounts(batches, 'BinWidth', 1, 'BinLimits', [1 max(batches)]);
-                obj.black_list_batches = [obj.black_list_batches E(N>5)];
+                obj.black_list_batches = [obj.black_list_batches E(N>=obj.num_hits_black_list)];
             end
             
             for ii = 1:length(obj.all_events)

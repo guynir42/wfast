@@ -7,6 +7,7 @@ classdef Analysis < file.AstroData
         
         pool; 
         futures; 
+        futures_dir;
         
         aux_figure;
         
@@ -404,7 +405,11 @@ classdef Analysis < file.AstroData
             
         end
         
-        function write_log(obj, filename)
+        function write_log(obj, filename, str)
+            
+            if nargin<3 || isempty(str)
+                str = '';
+            end
             
             fid = fopen(filename, 'at');
             on_cleanup = onCleanup(@() fclose(fid));
@@ -412,28 +417,34 @@ classdef Analysis < file.AstroData
             obs_date = obj.pars.STARTTIME;
             read_date = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
             
-            ev_str = '';
             
-            for ii = 1:length(obj.finder.last_events)
-                
-                if obj.finder.last_events(ii).keep
-                    star_str = '*';
-                else
-                    star_str = '';
+            if isempty(str)
+                ev_str = '';
+
+                for ii = 1:length(obj.finder.last_events)
+
+                    if obj.finder.last_events(ii).keep
+                        star_str = '*';
+                    else
+                        star_str = '';
+                    end
+
+                    ev_str = sprintf('%s%4.2f%s ', ev_str, obj.finder.last_events(ii).snr, star_str);
+
                 end
-                
-                ev_str = sprintf('%s%4.2f%s ', ev_str, obj.finder.last_events(ii).snr, star_str);
-                
+
+                f = [0 0 0];
+                if ~isempty(obj.fluxes), f(1) = obj.fluxes(1,1); end
+                if size(obj.fluxes,2)>=10, f(2) = obj.fluxes(1,10); end
+                if size(obj.fluxes,2)>=100, f(3) = obj.fluxes(1,100); end
+
+                fprintf(fid, 'Batch: %04d, ObsDate: %s, Flux: [%6.3f %6.3f %6.3f], Events S/N: [%s], ReadDate: %s\n',...
+                    obj.batch_counter+1, obs_date, f(1), f(2), f(3), ev_str, read_date);
+            
+            else
+                fprintf(fid, '%s: %s\n', read_date, str);
             end
-            
-            f = [0 0 0];
-            if ~isempty(obj.fluxes), f(1) = obj.fluxes(1,1); end
-            if size(obj.fluxes,2)>=10, f(2) = obj.fluxes(1,10); end
-            if size(obj.fluxes,2)>=100, f(3) = obj.fluxes(1,100); end
-            
-            fprintf(fid, 'Batch: %04d, ObsDate: %s, Flux: [%6.3f %6.3f %6.3f], Events S/N: [%s], ReadDate: %s\n',...
-                obj.batch_counter+1, obs_date, f(1), f(2), f(3), ev_str, read_date);
-            
+                
         end
         
         function saveResults(obj, dirname, varargin)
@@ -481,6 +492,33 @@ classdef Analysis < file.AstroData
 
                 fprintf(fid, 'Number of events: total= %d | kept= %d\n', length(obj.finder.all_events), length(obj.finder.kept_events));
             
+            end
+            
+        end
+        
+        function print_futures(obj)
+            
+            for ii = 1:length(obj.futures)
+                
+                if ~isempty(obj.futures{ii}) && isa(obj.futures{ii}, 'parallel.Future') && isvalid(obj.futures{ii})
+                
+                    fprintf('Future{%d}: State= %14s | Error= %d | runtime= %9s', ii, obj.futures{ii}.State, ~isempty(obj.futures{ii}.Error), char(datetime('now', 'timezone', 'local')-obj.futures{ii}.StartDateTime));
+                
+                    if length(obj.futures_dir)>=ii && ~isempty(obj.futures_dir{ii})
+                        fprintf(' | dir= %s', obj.futures_dir{ii});
+                    end
+                    
+                    if strcmp(obj.futures{ii}.State, 'running')
+                        fprintf('  <-----(running)---- \n');
+                    elseif ~isempty(obj.futures{ii}.Error)
+                        fprintf('      !!! Error !!! \n');
+                    else
+                        fprintf('\n');
+                    end
+                end
+                
+                
+                
             end
             
         end
@@ -547,6 +585,7 @@ classdef Analysis < file.AstroData
             end
             
             obj.futures{input.worker} = parfeval(obj.pool, @obj.run, 1, 'reset', input.reset, 'logging', input.logging, 'save', input.save); 
+            obj.futures_dir{input.worker} = obj.reader.dir.two_tail;
             
         end
         
@@ -579,11 +618,38 @@ classdef Analysis < file.AstroData
         
         function obj = run(obj, varargin)
             
+            try
+            
             input = util.text.InputVars;
             input.input_var('reset', 0); % reset the object before running (i.e., start a new run)
             input.input_var('logging', []); % create log files in the analysis folder
             input.input_var('save', []); % save the events and lightcurves from this run
             input.scan_vars(varargin{:});
+            
+            if input.reset
+                obj.reset;
+            end
+            
+            % update hidden variables in case we use GUI to stop then continue this run
+            if ~isempty(input.logging), obj.analysis_dir_log = input.logging; end            
+            if ~isempty(input.save), obj.analysis_dir_save = input.save; end
+            
+            if obj.analysis_dir_log || obj.analysis_dir_save
+                
+                log_time = datetime('now', 'TimeZone', 'UTC');
+                log_dir = fullfile(obj.reader.dir.pwd, ['analysis_' char(log_time, 'yyyy-MM-dd')]);
+                log_name = fullfile(log_dir, 'analysis_log.txt');
+                log_obj = fullfile(log_dir, 'analysis_parameters.txt');
+                
+                if obj.batch_counter==0
+                    if exist(log_dir, 'dir')
+                        error('Folder %s already exists! Is this run already being processed?', log_dir);
+                    else
+                        mkdir(log_dir);
+                    end
+                end
+                
+            end
             
             if obj.use_auto_load_cal
                 
@@ -591,7 +657,7 @@ classdef Analysis < file.AstroData
                 
                 base_dir = obj.reader.current_dir;
                 
-                for ii = 1:3
+                for ii = 1:3 % try to figure out this run's own date
                     
                     [base_dir, end_dir] = fileparts(base_dir);
                     
@@ -614,36 +680,6 @@ classdef Analysis < file.AstroData
             
             if ~obj.cal.checkDark
                 error('Cannot start a new run without loading darks into calibration object!');
-            end
-            
-            if input.reset
-                obj.reset;
-            end
-            
-            % update hidden variables in case we use GUI to stop then continue this run
-            if ~isempty(input.logging)
-                obj.analysis_dir_log = input.logging;
-            end
-            
-            if ~isempty(input.save)
-                obj.analysis_dir_save = input.save;
-            end
-            
-            if obj.analysis_dir_log || obj.analysis_dir_save
-                
-                log_time = datetime('now', 'TimeZone', 'UTC');
-                log_dir = fullfile(obj.reader.dir.pwd, ['analysis_' char(log_time, 'yyyy-MM-dd')]);
-                log_name = fullfile(log_dir, 'analysis_log.txt');
-                log_obj = fullfile(log_dir, 'analysis_parameters.txt');
-                
-                if obj.batch_counter==0
-                    if exist(log_dir, 'dir')
-                        error('Folder %s already exists! Is this run already being processed?', log_dir);
-                    else
-                        mkdir(log_dir);
-                    end
-                end
-                
             end
             
             cleanup = onCleanup(@() obj.finishup);
@@ -694,6 +730,15 @@ classdef Analysis < file.AstroData
                     obj.saveSummary(log_dir);
                 end
                 
+            end
+            
+            catch ME
+                
+                if obj.analysis_dir_log
+                    obj.write_log(log_name, ME.getReport);
+                end
+                
+                rethrow(ME);
             end
             
         end

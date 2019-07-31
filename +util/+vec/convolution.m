@@ -85,7 +85,7 @@ function values_conv = convolution(kernels, values, varargin)
             values_conv = real(fftshift(ifft(kernels_fft.*values_fft),1)); % just do the whole thing at once
         end
     catch ME
-        if strcmp(ME.message, 'Out of memory. Type "help memory" for your options.')
+        if strcmp(ME.identifier, 'MATLAB:nomem')
             disp('Out of memory error... Using a loop instead!');
             values_conv = fft_in_a_loop(kernels_fft, values_fft, S_out, Sk, Sv);
         else
