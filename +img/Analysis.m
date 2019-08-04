@@ -502,7 +502,13 @@ classdef Analysis < file.AstroData
                 
                 if ~isempty(obj.futures{ii}) && isa(obj.futures{ii}, 'parallel.Future') && isvalid(obj.futures{ii})
                 
-                    fprintf('Future{%d}: State= %14s | Error= %d | runtime= %9s', ii, obj.futures{ii}.State, ~isempty(obj.futures{ii}.Error), char(datetime('now', 'timezone', 'local')-obj.futures{ii}.StartDateTime));
+                    asterisk = ' ';
+                    if obj.futures{ii}.Read==0
+                        asterisk = '*';
+                    end
+                    
+                    fprintf('Future{%2d}: State= %14s%s | Error= %d | runtime= %9s', ii, obj.futures{ii}.State, asterisk, ~isempty(obj.futures{ii}.Error),...
+                        char(obj.futures{ii}.FinishDateTime-obj.futures{ii}.StartDateTime));
                 
                     if length(obj.futures_dir)>=ii && ~isempty(obj.futures_dir{ii})
                         fprintf(' | dir= %s', obj.futures_dir{ii});
@@ -870,7 +876,11 @@ classdef Analysis < file.AstroData
             end
             
             if isempty(obj.use_astrometry) || obj.use_astrometry
-                obj.analysisAstrometry;
+                try
+                    obj.analysisAstrometry;
+                catch ME
+                    warning(ME.getReport); % non essential to  successfully running the data analysis
+                end
             end
             
             if isempty(obj.positions) % if astrometry failed or was not used, we need to get positions somehow

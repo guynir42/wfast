@@ -317,6 +317,15 @@ classdef Finder < handle
     
     methods % setters
         
+        function set.display_event_idx(obj, val)
+            
+            obj.display_event_idx = val;
+            if ~isempty(obj.display_event_idx) && ~isempty(obj.gui) && obj.gui.check
+                obj.all_events(obj.display_event_idx).show('parent', obj.gui.panel_image);
+            end
+
+        end
+        
     end
     
     methods % calculations
@@ -489,10 +498,18 @@ classdef Finder < handle
                 
                 ev.timestamps = obj.bank.timestamps;
                 ev.time_step = obj.dt;
-                ev.duration =  obj.dt + obj.bank.timestamps(ev.time_indices(end))-obj.bank.timestamps(ev.time_indices(1));
+                
+                if isempty(ev.time_indices)
+                    warning('time_indices for latest event are empty!')
+                    ev.duration = 0;
+                else
+                    ev.duration =  obj.dt + obj.bank.timestamps(ev.time_indices(end))-obj.bank.timestamps(ev.time_indices(1));
+                end
                 
                 ev.flux_filtered = ff(:,ev.kern_index, ev.star_index);
-                ev.previous_std = sqrt(obj.var_buf.mean(1, ev.kern_index, ev.star_index));
+                if ~is_empty(obj.var_buf)
+                    ev.previous_std = sqrt(obj.var_buf.mean(1, ev.kern_index, ev.star_index));
+                end
                 
 %                 ev.flux_raw_all = permute(obj.bank.fluxes, [1,3,2]);
 %                 ev.stds_raw_all = permute(obj.bank.stds, [1,3,2]);
@@ -717,13 +734,13 @@ classdef Finder < handle
                 if ismember(obj.all_events(ii).star_index, obj.black_list_stars)
                     obj.all_events(ii).keep = 0;
                     obj.all_events(ii).is_bad_star = 1;
-                    obj.all_events(ii).addNote(sprintf('%s, star %d is on black list', obj.all_events(ii).notes, obj.all_events(ii).star_index));
+                    obj.all_events(ii).addNote(sprintf('star %d is on black list', obj.all_events(ii).star_index));
                 end
                 
                 if ismember(obj.all_events(ii).batch_index, obj.black_list_stars)
                     obj.all_events(ii).keep = 0;
                     obj.all_events(ii).is_bad_batch = 1;
-                    obj.all_events(ii).addNote(sprintf('%s, batch %d is on black list', obj.all_events(ii).notes, obj.all_events(ii).batch_index));
+                    obj.all_events(ii).addNote(sprintf('batch %d is on black list', obj.all_events(ii).batch_index));
                 end
                 
             end
@@ -817,29 +834,31 @@ classdef Finder < handle
             end
             
             if isempty(obj.display_event_idx)
-                obj.display_event_idx = 1;
+                idx = 1;
+            else
+                idx = obj.display_event_idx;
             end
             
-            obj.display_event_idx = obj.display_event_idx - 1;
+            idx = idx - 1;
             
-            if obj.display_event_idx<1
-                obj.display_event_idx = obj.num_events;
+            if idx<1
+                idx = obj.num_events;
             end
             
             if obj.use_display_kept_events
                 
-                for ii = obj.display_event_idx:-1:1
+                for ii = idx:-1:1
                     if obj.all_events(ii).keep
-                        obj.display_event_idx = ii;
+                        idx = ii;
                         break;
                     end
                 end
                 
                 if ii==1 % loop back around...
                 
-                    for ii = obj.num_events:-1:obj.display_event_idx
+                    for ii = obj.num_events:-1:idx
                         if obj.all_events(ii).keep
-                            obj.display_event_idx = ii;
+                            idx = ii;
                             break;
                         end
                     end
@@ -848,9 +867,7 @@ classdef Finder < handle
                 
             end
             
-            if ~isempty(obj.gui) && obj.gui.check
-                obj.all_events(obj.display_event_idx).show('parent', obj.gui.panel_image);
-            end
+            obj.display_event_idx = idx; % this also calls "show" from the setter
             
         end
         
@@ -869,29 +886,31 @@ classdef Finder < handle
             end
             
             if isempty(obj.display_event_idx)
-                obj.display_event_idx = 0;
+                idx = 0;
+            else
+                idx = obj.display_event_idx;
             end
             
-            obj.display_event_idx = obj.display_event_idx + 1;
+            idx = idx + 1;
             
-            if obj.display_event_idx>obj.num_events
-                obj.display_event_idx = 1;
+            if idx>obj.num_events
+                idx = 1;
             end
             
             if obj.use_display_kept_events
                 
-                for ii = obj.display_event_idx:obj.num_events
+                for ii = idx:obj.num_events
                     if obj.all_events(ii).keep
-                        obj.display_event_idx = ii;
+                        idx = ii;
                         break;
                     end
                 end
                 
                 if ii==obj.num_events % loop back around...
                 
-                    for ii = 1:obj.display_event_idx
+                    for ii = 1:idx
                         if obj.all_events(ii).keep
-                            obj.display_event_idx = ii;
+                            idx = ii;
                             break;
                         end
                     end
@@ -900,9 +919,7 @@ classdef Finder < handle
                 
             end
 
-            if ~isempty(obj.gui) && obj.gui.check
-                obj.all_events(obj.display_event_idx).show('parent', obj.gui.panel_image);
-            end
+            obj.display_event_idx = idx; % this also calls "show" via the setter
             
         end
         
