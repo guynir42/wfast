@@ -231,6 +231,8 @@ classdef ShuffleBank < handle
                 obj.fluxes = input.flux;
             end
             
+            obj.fluxes = fillmissing(obj.fluxes, 'spline'); 
+            
             if size(input.stds,2)>1
                 obj.stds = permute(input.stds, [1,3,2]);
             else

@@ -955,12 +955,8 @@ classdef Analysis < file.AstroData
             
             if ast && obj.batch_counter==0 % I could replace batch_counter with a testing if data is not empty, but if astrometry fails it will keep re-failing each batch
                 
-                try
-                    obj.cat.input(obj.stack_proc);
-                catch ME
-                    warning(ME.getReport);
-                end
-
+                obj.cat.input(obj.stack_proc);
+                
                 if ~isempty(obj.cat.data) % successfully filled the catalog
 
                     obj.cat.num_stars = obj.num_stars;
@@ -972,12 +968,14 @@ classdef Analysis < file.AstroData
                 
                 filename = fullfile(obj.reader.dir.pwd, 'catalog.mat');
                 
-                if isempty(obj.use_astrometry)
-                    if ~exist(filename, 'file') % in auto-mode, only save if there was no catalog file
+                if ~isempty(obj.cat.data)
+                    if isempty(obj.use_astrometry)
+                        if ~exist(filename, 'file') % in auto-mode, only save if there was no catalog file
+                            obj.cat.saveMAT(filename);
+                        end
+                    elseif obj.use_astrometry % in force-astrometry mode must update the catalog file
                         obj.cat.saveMAT(filename);
                     end
-                elseif obj.use_astrometry % in force-astrometry mode must update the catalog file
-                    obj.cat.saveMAT(filename);
                 end
                 
             end

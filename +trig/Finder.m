@@ -461,6 +461,10 @@ classdef Finder < handle
             
             ff = obj.bank.fluxes_filtered; % dim 1 is time, dim 2 is kernels, dim 3 is stars
             
+            if nnz(~isnan(ff))==0
+                error('Input fluxes are all NaN!');
+            end
+            
             if obj.use_var_buf && ~obj.var_buf.is_empty
                 ff = ff./sqrt(obj.var_buf.mean);
             end
@@ -481,49 +485,49 @@ classdef Finder < handle
                 
                 [mx, idx] = util.stat.maxnd(abs(ff.*util.vec.topages(good_stars))); % note we are triggering on negative and positive events
                 
-                if mx<obj.threshold, break; end 
+                if mx>=obj.threshold
                 
-                ev = trig.Event;
-                ev.snr = mx; % note this is positive even for negative filter responses! 
-                
-                ev.time_index = idx(1); 
-                ev.kern_index = idx(2);
-                ev.star_index = idx(3);
-                
-                ev.time_indices = obj.findTimeRange(ff, ev.time_index, ev.star_index); % find continuous area that is above time_range_thresh
-                
-                ev.kern_indices = find(max(abs(ff(ev.time_indices, :, ev.star_index)))>obj.getKernThresh);
-                
-                ev.star_indices = find(max(abs(ff(ev.time_indices, ev.kern_index, :)))>obj.getStarThresh);
-                
-                ev.timestamps = obj.bank.timestamps;
-                ev.time_step = obj.dt;
-                
-                if isempty(ev.time_indices)
-                    warning('time_indices for latest event are empty!')
-                    ev.duration = 0;
-                else
-                    ev.duration =  obj.dt + obj.bank.timestamps(ev.time_indices(end))-obj.bank.timestamps(ev.time_indices(1));
+                    ev = trig.Event;
+                    ev.snr = mx; % note this is positive even for negative filter responses! 
+
+                    ev.time_index = idx(1); 
+                    ev.kern_index = idx(2);
+                    ev.star_index = idx(3);
+
+                    ev.time_indices = obj.findTimeRange(ff, ev.time_index, ev.star_index); % find continuous area that is above time_range_thresh
+
+                    ev.kern_indices = find(max(abs(ff(ev.time_indices, :, ev.star_index)))>obj.getKernThresh);
+
+                    ev.star_indices = find(max(abs(ff(ev.time_indices, ev.kern_index, :)))>obj.getStarThresh);
+
+                    ev.timestamps = obj.bank.timestamps;
+                    ev.time_step = obj.dt;
+
+                    if isempty(ev.time_indices)
+                        warning('time_indices for latest event are empty!')
+                        ev.duration = 0;
+                    else
+                        ev.duration =  obj.dt + obj.bank.timestamps(ev.time_indices(end))-obj.bank.timestamps(ev.time_indices(1));
+                    end
+
+                    ev.flux_filtered = ff(:,ev.kern_index, ev.star_index);
+                    if ~is_empty(obj.var_buf)
+                        ev.previous_std = sqrt(obj.var_buf.mean(1, ev.kern_index, ev.star_index));
+                    end
+
+                    ev.flux_detrended = obj.cal.fluxes_detrended(:,ev.star_index); 
+                    ev.std_flux = std(ev.flux_detrended, [], 'omitnan');
+                    ev.flux_raw_all = obj.cal.fluxes;
+                    % somewhere around here we MUST make use of the flux errors
+
+                    obj.new_events(end+1) = ev; % add this event to the list
+
+                    obj.coverage_lost = obj.coverage_lost + ev.duration; % how much time is "zeroed out"
+                    obj.star_hours_lost = obj.star_hours_lost + (ev.duration)*sum(good_stars)/3600;
+
+                    ff(ev.time_indices, :, :) = 0; % don't look at the same region twice
+
                 end
-                
-                ev.flux_filtered = ff(:,ev.kern_index, ev.star_index);
-                if ~is_empty(obj.var_buf)
-                    ev.previous_std = sqrt(obj.var_buf.mean(1, ev.kern_index, ev.star_index));
-                end
-                
-%                 ev.flux_raw_all = permute(obj.bank.fluxes, [1,3,2]);
-%                 ev.stds_raw_all = permute(obj.bank.stds, [1,3,2]);
-                ev.flux_detrended = obj.cal.fluxes_detrended(:,ev.star_index); 
-                ev.std_flux = std(ev.flux_detrended, [], 'omitnan');
-                ev.flux_raw_all = obj.cal.fluxes;
-                % somewhere around here we MUST make use of the flux errors
-                
-                obj.new_events(end+1) = ev; % add this event to the list
-                
-                obj.coverage_lost = obj.coverage_lost + ev.duration; % how much time is "zeroed out"
-                obj.star_hours_lost = obj.star_hours_lost + (ev.duration)*sum(good_stars)/3600;
-                
-                ff(ev.time_indices, :, :) = 0; % don't look at the same region twice
                 
             end
             
@@ -533,7 +537,7 @@ classdef Finder < handle
         end
         
         function time_range = findTimeRange(obj, ff, time_index, star_index)
-
+            
             N = size(ff,1); % time length
             
             thresh = obj.getTimeThresh;
