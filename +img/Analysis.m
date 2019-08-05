@@ -507,8 +507,14 @@ classdef Analysis < file.AstroData
                         asterisk = '*';
                     end
                     
+                    finish_datetime = obj.futures{ii}.FinishDateTime;
+                    if isempty(finish_datetime)
+                        finish_datetime = datetime('now', 'TimeZone', 'Local');
+                        asterisk = ' ';
+                    end
+                    
                     fprintf('Future{%2d}: State= %14s%s | Error= %d | runtime= %9s', ii, obj.futures{ii}.State, asterisk, ~isempty(obj.futures{ii}.Error),...
-                        char(obj.futures{ii}.FinishDateTime-obj.futures{ii}.StartDateTime));
+                        char(finish_datetime-obj.futures{ii}.StartDateTime));
                 
                     if length(obj.futures_dir)>=ii && ~isempty(obj.futures_dir{ii})
                         fprintf(' | dir= %s', obj.futures_dir{ii});
