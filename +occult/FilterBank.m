@@ -29,6 +29,10 @@ classdef FilterBank < handle
         bank; % a 5D map, with lightcurves in 1st dimension, and parameters in the rest... 
         snr_map; % a 4D map, for each parameter combination, what is the minimal S/N with all its neighbors. 
         
+        sim_snr; % simulation result S/N after dividing by star S/N (5D matrix with zero where there was no detection)
+        filtered_bank; % all templates, after filtering them with all kernels for event finding
+        filtered_index; % auxiliary index to tell where we are in the last 4 dimensions of "filtered_bank"
+        
     end
     
     properties % switches/controls
@@ -81,11 +85,8 @@ classdef FilterBank < handle
         
         function reset(obj)
             
-            obj.gen.reset;
-            
-            obj.bank = [];
-            obj.timestamps = [];
             obj.snr_map = [];
+            obj.sim_snr = [];
             
         end
         
@@ -121,6 +122,22 @@ classdef FilterBank < handle
             
         end
         
+        function val = sim_pars(obj)
+            
+            if isempty(obj.filtered_index) || obj.filtered_index==0
+                val = [];
+            else
+                
+                S = size(obj.bank);
+                S = S(2:end);
+                [R,r,b,v] = ind2sub(S,obj.filtered_index);
+
+                val = struct('R', obj.R_list(R), 'r', obj.r_list(r), 'b', obj.b_list(b), 'v', obj.v_list(v), 'W', obj.W, 'T', obj.T, 'f', obj.f); 
+
+            end
+            
+        end
+        
     end
     
     methods % setters
@@ -150,7 +167,7 @@ classdef FilterBank < handle
                             obj.gen.v = obj.v_list(mm);
                             
                             obj.gen.getLightCurves;
-                            obj.bank(:,ii,jj,kk,mm) = obj.gen.lc.flux;
+                            obj.bank(:,ii,jj,kk,mm) = single(obj.gen.lc.flux);
                             
                         end % for mm (v_list)
                         
@@ -291,6 +308,35 @@ classdef FilterBank < handle
             
             vec = obj.v_list;
             pars.v = rand*(max(vec)-min(vec))+min(vec);
+            
+        end
+        
+        function score = calcMinStarSNR(obj, varargin)
+            
+            if isempty(obj.bank)
+                error('Must fill the filter bank first!');
+            end
+            
+            obj.prog.start(length(obj.R_list));
+            
+            % because loops in matlab are fun! 
+            for ii = 1:length(obj.R_list)
+                
+                for jj = 1:length(obj.r_list)
+                    
+                    for kk = 1:length(obj.b_list)
+                        
+                        for mm = 1:length(obj.v_list)
+                            
+                        end % for mm (v_list)
+                        
+                    end % for kk (b_list)
+                    
+                end % for jj (r_list)
+                
+                obj.prog.show(ii);
+                
+            end % for ii (R_list)
             
         end
         

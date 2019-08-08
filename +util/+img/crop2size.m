@@ -1,13 +1,17 @@
 function [M_out, gap] = crop2size(M_in, size_needed)
 % usage: [M_out, gap] =crop2size(M_in, size_needed)
 % crops the given array M_in to size size_needed, leaving it in the middle. 
-% Won't grow the array. Can handle 3D matrices.
+% Won't grow the array. Can handle up to 5D matrices.
 
     if nargin==0, help('util.img.crop2size'); return; end
 
     if isempty(size_needed)
         M_out = M_in;
         return;
+    end
+    
+    if ndims(M_in)>6
+        error('This function treats up to 6D matrices. If you want more dimensions some coding is needed!'); 
     end
     
     size_needed = util.vec.imsize(size_needed);
@@ -24,7 +28,7 @@ function [M_out, gap] = crop2size(M_in, size_needed)
         x1 = 1+ceil(gap(2));
         x2 = S_in(2)-floor(gap(2));
         
-        M_out = M_in(y1:y2,x1:x2,:,:);
+        M_out = M_in(y1:y2,x1:x2,:,:,:,:);
         
         gap = ceil(gap);
         

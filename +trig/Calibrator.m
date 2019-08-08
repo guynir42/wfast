@@ -22,6 +22,7 @@ classdef Calibrator < handle
         fluxes_global_cal;
         fluxes_global_cal_no_outliers;
         
+        stars_mean;
         star_snrs;
         
         a_pars;
@@ -153,7 +154,8 @@ classdef Calibrator < handle
                 
             end
             
-            obj.star_snrs = mean(obj.fluxes_no_outliers, 'omitnan')./obj.stds_detrended;
+            obj.stars_mean = mean(obj.fluxes_no_outliers, 'omitnan');
+            obj.star_snrs = obj.stars_mean./obj.stds_detrended;
             
         end
         

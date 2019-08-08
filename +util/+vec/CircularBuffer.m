@@ -10,15 +10,17 @@ classdef CircularBuffer < dynamicprops
         
         titles = {};
         
+        mean; % lazy loaded
+        median; % lazy loaded
+        
     end
     
     properties(Dependent=true)
         
+        Nfilled; % size of useful part of raw_data
+        
         data;
         data_ordered;
-        
-        mean;
-        median;
         
     end
         
@@ -40,6 +42,10 @@ classdef CircularBuffer < dynamicprops
             obj.N = input.N;
             
         end
+    
+    end
+    
+    methods % resetters
         
         function reset(obj, N)
             
@@ -54,47 +60,9 @@ classdef CircularBuffer < dynamicprops
             
         end
         
-        function input(obj, matrix)
-            
-            if size(matrix,1)>1
-                error('Must give a matrix with scalar first dimension. Instead got size(matrix)= %s', util.text.print_vec(size(matrix)));
-            end
-            
-            if ~isempty(obj.size_vec) && length(obj.size_vec)>1
-                if length(obj.size_vec)~=ndims(matrix)
-                    error('Must input a matrix with %d dimensions...', length(obj.size_vec));
-                end
-                
-                s = size(matrix);
-                if any(obj.size_vec(2:end)~=s(2:end))
-                    error('Size mismatch: size(data)= %d %d, size(matrix)= %d %d', obj.size_vec, size(matrix));
-                end
-                
-            end
-            
-            if isempty(obj.raw_data)
-            
-                d = ndims(matrix); % number of dimensions of input matrix 
-                vec = [obj.N ones(1,d-1)];
-                obj.raw_data = repmat(matrix, vec);
-                obj.idx = 1;
-                obj.counter = 1;
-                obj.size_vec = size(matrix);
-                obj.size_vec(1) = obj.N;
-                
-            else
-                
-                obj.idx = obj.idx + 1;
-                if obj.idx>obj.N
-                    obj.idx = 1;
-                end
-                obj.counter = obj.counter + 1;
-                vec = obj.dots_cell(ndims(matrix));
-                obj.raw_data(vec{:}) = matrix;
-                
-            end
-            
-        end
+    end 
+    
+    methods % getters
         
         function val = dots_cell(obj, num_dims)
             
@@ -104,6 +72,12 @@ classdef CircularBuffer < dynamicprops
                 [val{2:num_dims}] = deal(':');
             end
                 
+        end
+        
+        function val = get.Nfilled(obj)
+            
+            val = min(obj.counter, obj.N);
+            
         end
         
         function val = get.data(obj)
@@ -131,19 +105,21 @@ classdef CircularBuffer < dynamicprops
         
         function val = get.mean(obj)
             
-            val = mean(obj.data, 1, 'omitnan');
+            if isempty(obj.mean)
+                obj.mean = mean(obj.data, 1, 'omitnan');
+            end
+            
+            val = obj.mean;
             
         end
         
         function val = get.median(obj)
             
-            val = median(obj.data, 1, 'omitnan');
+            if isempty(obj.median)
+                obj.median = median(obj.data, 1, 'omitnan');
+            end
             
-        end
-        
-        function set.data(obj, val)
-            
-            obj.raw_data = val;
+            val = obj.median;
             
         end
         
@@ -189,6 +165,72 @@ classdef CircularBuffer < dynamicprops
             
             if nargout>0
                 str_out = str;
+            end
+            
+        end
+        
+    end 
+    
+    methods % setters
+       
+        function set.raw_data(obj, val)
+            
+            disp('here')
+            obj.mean = [];
+            obj.median = [];
+            
+            obj.raw_data = val;
+            
+        end
+        
+        function set.data(obj, val)
+            
+            obj.raw_data = val;
+            
+        end
+         
+    end
+    
+    methods % calculations
+        
+        function input(obj, matrix)
+            
+            if size(matrix,1)>1
+                error('Must give a matrix with scalar first dimension. Instead got size(matrix)= %s', util.text.print_vec(size(matrix)));
+            end
+            
+            if ~isempty(obj.size_vec) && length(obj.size_vec)>1
+                if length(obj.size_vec)~=ndims(matrix)
+                    error('Must input a matrix with %d dimensions...', length(obj.size_vec));
+                end
+                
+                s = size(matrix);
+                if any(obj.size_vec(2:end)~=s(2:end))
+                    error('Size mismatch: size(data)= %d %d, size(matrix)= %d %d', obj.size_vec, size(matrix));
+                end
+                
+            end
+            
+            if isempty(obj.raw_data)
+            
+                d = ndims(matrix); % number of dimensions of input matrix 
+                vec = [obj.N ones(1,d-1)];
+                obj.raw_data = repmat(matrix, vec);
+                obj.idx = 1;
+                obj.counter = 1;
+                obj.size_vec = size(matrix);
+                obj.size_vec(1) = obj.N;
+                
+            else
+                
+                obj.idx = obj.idx + 1;
+                if obj.idx>obj.N
+                    obj.idx = 1;
+                end
+                obj.counter = obj.counter + 1;
+                vec = obj.dots_cell(ndims(matrix));
+                obj.raw_data(vec{:}) = matrix;
+                
             end
             
         end

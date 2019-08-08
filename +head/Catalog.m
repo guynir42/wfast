@@ -436,7 +436,7 @@ classdef Catalog < handle
             
             if exist('Sim', 'var'), obj.mextractor_sim = Sim; end
             if exist('MatchedCat', 'var'), obj.catalog_matched = MatchedCat; end
-            if exits('WCS', 'var'), obj.wcs_object = WCS; end
+            if exist('WCS', 'var'), obj.wcs_object = WCS; end
             if exist('CatTable', 'var'), obj.data = CatTable; end
             if exist('positions', 'var'), obj.positions = positions; end
             if exist('magnitudes', 'var'), obj.magnitudes = magnitudes; end
