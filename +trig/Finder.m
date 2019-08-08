@@ -193,7 +193,10 @@ classdef Finder < handle
             end
             
             obj.sim_events = {};
-            obj.sim_bank.reset;
+            
+            if ~isempty(obj.sim_bank)
+                obj.sim_bank.reset;
+            end
             
             obj.clear;
             
@@ -827,16 +830,18 @@ classdef Finder < handle
                 ev.gauss_sigma = obj.gauss_sigma;
                 
                 if isempty(sim_pars)
-                    ev.cutouts_first = obj.prev_cutouts(:,:,:,ev.star_index);
-                    ev.cutouts_second = obj.cutouts(:,:,:,ev.star_index);
-                    ev.positions_first = obj.prev_positions;
-                    ev.positions_second = obj.positions;
-                    ev.stack_first = obj.prev_stack;
-                    ev.stack_second = obj.stack;
+                    if ~isempty(obj.prev_cutouts), ev.cutouts_first = obj.prev_cutouts(:,:,:,ev.star_index); end
+                    if ~isempty(obj.cutouts), ev.cutouts_second = obj.cutouts(:,:,:,ev.star_index); end
+                    if ~isempty(obj.prev_positions), ev.positions_first = obj.prev_positions; end
+                    if ~isempty(obj.positions), ev.positions_second = obj.positions; end
+                    if ~isempty(obj.prev_stack), ev.stack_first = obj.prev_stack; end
+                    if ~isempty(obj.stack), ev.stack_second = obj.stack; end
+                    
                     ev.batch_index_first = obj.prev_batch_index;
                     ev.batch_index_second = obj.batch_index;
                     ev.filename_first = obj.prev_filename;
                     ev.filename_second = obj.filename;
+                    
                 end
                 
                 ev.sim_pars = sim_pars;

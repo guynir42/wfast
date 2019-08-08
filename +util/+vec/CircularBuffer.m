@@ -131,7 +131,8 @@ classdef CircularBuffer < dynamicprops
         
         function val = is_empty(obj)
             
-            val = isempty(obj.data);
+%             val = isempty(obj.data);
+            val = obj.Nfilled==0;
             
         end
         
@@ -175,7 +176,6 @@ classdef CircularBuffer < dynamicprops
        
         function set.raw_data(obj, val)
             
-            disp('here')
             obj.mean = [];
             obj.median = [];
             
