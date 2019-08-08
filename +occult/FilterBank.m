@@ -27,12 +27,19 @@ classdef FilterBank < handle
         % outputs:
         timestamps; % a 1D time axis for all LCs
         bank; % a 5D map, with lightcurves in 1st dimension, and parameters in the rest... 
-        snr_map; % a 4D map, for each parameter combination, what is the minimal S/N with all its neighbors. 
         
-        sim_snr; % simulation result S/N after dividing by star S/N (5D matrix with zero where there was no detection)
         filtered_bank; % all templates, after filtering them with all kernels for event finding
         filtered_index; % auxiliary index to tell where we are in the last 4 dimensions of "filtered_bank"
         
+        snr_analytical; % a 4D map, for each parameter combination, what is the minimal S/N with all its neighbors. 
+        snr_sim_full; % simulation result S/N after dividing by star S/N (2D matrix with zero where there was no detection)
+        
+    end
+    
+    properties(Dependent=true)
+        
+        snr_simulated; % a 4D map, for each parameter combination, the S/N for detection on real data (the median of "snr_sim_full" reshaped to 4D). 
+
     end
     
     properties % switches/controls
@@ -41,15 +48,9 @@ classdef FilterBank < handle
         
     end
     
-    properties(Dependent=true)
-        
-        
-        
-    end
-    
     properties(Hidden=true)
        
-        version = 1.00;
+        version = 1.01;
         
     end
     
@@ -85,8 +86,8 @@ classdef FilterBank < handle
         
         function reset(obj)
             
-            obj.snr_map = [];
-            obj.sim_snr = [];
+            obj.snr_analytical = [];
+            obj.snr_sim_full = [];
             
         end
         
@@ -138,6 +139,15 @@ classdef FilterBank < handle
             
         end
         
+        function val = get.snr_simulated(obj)
+           
+            val = median(obj.snr_sim_full,1,'omitnan');
+            
+            val = reshape(val, [length(obj.R_list), length(obj.r_list),...
+                length(obj.b_list), length(obj.v_list)]);
+             
+        end
+        
     end
     
     methods % setters
@@ -187,7 +197,7 @@ classdef FilterBank < handle
             
             obj.prog.start(length(obj.R_list));
             
-            obj.snr_map = [];
+            obj.snr_analytical = [];
             
             NL = obj.getNeighborsList;
             
@@ -220,9 +230,9 @@ classdef FilterBank < handle
                             end
                             
                             if isempty(values)
-                                obj.snr_map(ii,jj,kk,mm) = NaN;
+                                obj.snr_analytical(ii,jj,kk,mm) = NaN;
                             else
-                                obj.snr_map(ii,jj,kk,mm) = max(values);
+                                obj.snr_analytical(ii,jj,kk,mm) = max(values);
                             end
                             
                         end % for mm (v_list)
@@ -340,6 +350,15 @@ classdef FilterBank < handle
             
         end
         
+        function findAnalyticalSNR(obj)
+            
+            f = single(obj.bank-1); % "raw" lightcurves (not including noise)
+            k = f./sqrt(sum(f.^2)); % kernels as they would be used by the filtering code
+
+            obj.snr_analytical = max(util.vec.convolution(k,f)); 
+            
+        end
+        
     end
     
     methods % plotting tools / GUI
@@ -385,6 +404,133 @@ classdef FilterBank < handle
             hl = legend(ax, 'Location', 'best');
             
             hl.FontSize = 10;
+            
+        end
+        
+        function showSNR(obj, varargin)
+            
+            import util.text.cs;
+            
+            input = util.text.InputVars;
+            input.input_var('parent', []);
+            input.input_var('data', 'analytical'); % can also choose "simulated"
+            input.input_var('mode', 'contour'); % can also choose "heat"
+            input.input_var('star', 10, 'star_snr');
+            input.input_var('intervals', 10:5:40);
+            input.input_var('threshold', 7.5);
+            input.input_var('font_size', 22);
+            input.scan_vars(varargin{:});
+            
+            if isnumeric(input.data)
+                snr = input.data;
+            elseif cs(input.data, 'analytical')
+                snr = obj.snr_analytical;
+            elseif cs(input.data, 'simulated')
+                snr = obj.snr_simulated;
+            else
+                error('Input "data" as numeric S/N matrix or choose "analytical" or "simulated" options'); 
+            end
+                
+            if isempty(snr)
+                error('S/N data is empty!');
+            end
+            
+            if isempty(input.parent)
+                input.parent = gcf;
+            end
+            
+            delete(input.parent.Children);
+            
+            snr = permute(snr, [3,2,1,4]); % now snr has order: b,r,R,v (for better plotting)
+
+            NR = length(obj.R_list);
+            Nv = length(obj.v_list);
+            
+            margin = 0.02;
+            
+            x_start = 0.1;
+            x_step = (1-x_start)/Nv;
+            
+            y_start = 0.1;
+            y_step = (1-y_start)/NR;
+            
+            ax = {};
+            counter = 1;
+
+            ypos = y_start;
+
+            for ii = 1:NR
+
+                xpos = x_start;
+
+                for jj = 1:Nv
+
+                    ax{counter} = axes('Parent', input.parent, 'Position', [xpos ypos, x_step-margin, y_step-margin]);
+
+                    if cs(input.mode, 'contour')
+                        
+                        contour(obj.r_list, obj.b_list, snr(:,:,ii,jj)*input.star, input.intervals, 'k', 'ShowText', 'on');
+                        
+                        ax{counter}.NextPlot = 'add';
+                        
+                        if input.threshold>0
+                            contour(obj.r_list, obj.b_list, snr(:,:,ii,jj)*input.star, input.threshold.*[1 1], 'k--', 'ShowText', 'on');
+                        end
+                        
+                        ax{counter}.NextPlot = 'replace';
+                        
+                    elseif cs(input.mode, 'heatmap')
+                        util.plot.show(snr(:,:,ii,jj)*input.star, 'xvalues', obj.r_list, 'yvalues', obj.b_list, 'fancy', 'off');
+                    else
+                        error('Unknown mode option "%s". Choose "contour" or "heatmap"', input.mode);
+                    end
+                        
+                    if ii==1
+                        ax{counter}.XTick = obj.r_list;
+                        vec = ax{counter}.XTick;
+                        for k = 1:length(vec)
+                            if k==2 || k==length(vec)-2 || k==floor(length(vec)/2)
+                                ax{counter}.XTickLabels{k} = num2str(vec(k));
+                            else
+                                ax{counter}.XTickLabels{k} = '';
+                            end
+                            grid on
+                        end
+                        xlabel(ax{counter}, 'occulter radius');
+                    else            
+                        ax{counter}.XTick = [];
+                    end
+
+                    if jj==1
+                        ax{counter}.YTick = obj.b_list(1:end-1);
+                        ylabel(ax{counter}, ['impact ' char(10) ' parameter']);
+                    else
+                        ax{counter}.YTick = [];
+                    end
+
+                    if jj==Nv && cs(input.mode, 'heatmap') 
+                        
+                        colorbar(ax{counter}, 'on');
+                        drawnow;
+                        ax{counter}.Position(3) = ax{counter-1}.Position(3);
+                        ax{counter}.Position(4) = ax{counter-1}.Position(4);
+                        
+                    end
+                    
+                    ax{counter}.FontSize = input.font_size;
+                    h = util.plot.inner_title(ax{counter}, sprintf('R= %4.2f | v= %d', obj.R_list(ii), obj.v_list(jj)), ...
+                        'Position', 'NorthWest', 'Color', 'black', 'FontSize', input.font_size-4); 
+
+                    counter = counter + 1;
+
+                    xpos = xpos + x_step;
+
+                end
+                
+                ypos = ypos + y_step;
+
+            end
+
             
         end
         

@@ -330,6 +330,10 @@ classdef Finder < handle
             
         end
         
+        function val = getSimulatedSNR(obj)
+           
+        end
+        
     end
     
     methods % setters
@@ -523,7 +527,7 @@ classdef Finder < handle
                     
                     end
                     
-                    obj.sim_bank.sim_snr(end+1,:) = snr_vec;
+                    obj.sim_bank.snr_sim_full(end+1,:) = snr_vec;
                     
                 else
                     

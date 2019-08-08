@@ -535,6 +535,26 @@ classdef Analysis < file.AstroData
             
         end
         
+        function pars = calcSkyParameters(obj) % take the stack photometery (and possible the catalog) and calculate seeing, background and zeropoint
+            
+            if isempty(obj.phot_stack) % any other tests??
+                pars = [];
+            else
+                
+                pars = struct;
+                pars.seeing = median(obj.phot_stack.widths,1,'omitnan').*obj.pars.SCALE.*2.355;
+                pars.background = median(obj.phot_stack.backgrounds,1,'omitnan');
+                
+                if ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) % this is a fairly good indicator that mextractor/astrometry worked
+                    
+                    pars.zero_point = median(10.^(0.4.*obj.magnitudes)./obj.phot_stack.fluxes ,1,'omitnan');
+                    
+                end
+                
+            end
+            
+        end
+        
     end
     
     methods % calculations
