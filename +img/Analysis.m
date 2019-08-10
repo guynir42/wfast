@@ -542,12 +542,18 @@ classdef Analysis < file.AstroData
             else
                 
                 pars = struct;
-                pars.seeing = median(obj.phot_stack.widths,1,'omitnan').*obj.pars.SCALE.*2.355;
-                pars.background = median(obj.phot_stack.backgrounds,1,'omitnan');
+                pars.seeing = median(obj.phot_stack.widths,2,'omitnan').*obj.pars.SCALE.*2.355;
+                pars.background = median(obj.phot_stack.backgrounds,2,'omitnan');
                 
                 if ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) % this is a fairly good indicator that mextractor/astrometry worked
                     
-                    pars.zero_point = median(10.^(0.4.*obj.magnitudes)./obj.phot_stack.fluxes ,1,'omitnan');
+                    pars.zero_point = median(obj.phot_stack.fluxes.*10.^(0.4.*obj.cat.magnitudes') ,2,'omitnan');
+                    
+                    if is_full(obj.flux_buf)
+                        star_snr = obj.flux_buf.mean./sqrt(obj.flux_buf.var); 
+                        limiting_mags = obj.cat.magnitudes' + 2.5*log10(star_snr./50);
+                        pars.limiting_mag = median(limiting_mags, 2, 'omitnan');
+                    end
                     
                 end
                 

@@ -12,6 +12,7 @@ classdef CircularBuffer < dynamicprops
         
         mean; % lazy loaded
         median; % lazy loaded
+        var; % lazy loaded
         
     end
     
@@ -30,7 +31,7 @@ classdef CircularBuffer < dynamicprops
         
     end
     
-    methods
+    methods % constructor
         
         function obj = CircularBuffer(varargin)
             
@@ -123,6 +124,16 @@ classdef CircularBuffer < dynamicprops
             
         end
         
+        function val = get.var(obj)
+            
+            if isempty(obj.var)
+                obj.var = var(obj.data, [], 1, 'omitnan');
+            end
+            
+            val = obj.var;
+            
+        end
+        
         function val = is_full(obj)
             
             val = obj.counter>=obj.N;
@@ -178,6 +189,7 @@ classdef CircularBuffer < dynamicprops
             
             obj.mean = [];
             obj.median = [];
+            obj.var = [];
             
             obj.raw_data = val;
             
