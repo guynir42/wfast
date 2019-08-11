@@ -23,6 +23,8 @@ classdef Finder < handle
         
         phot_pars; % a struct with some housekeeping about how the photometry was done
         
+        prog@util.sys.ProgressBar;
+        
         sim_bank@occult.FilterBank;
         sim_events = {};
         
@@ -141,6 +143,8 @@ classdef Finder < handle
                 obj.cal = trig.Calibrator;
                 
                 obj.var_buf = util.vec.CircularBuffer;
+                
+                obj.prog = util.sys.ProgressBar;
                 
             end
             
@@ -328,10 +332,6 @@ classdef Finder < handle
             
             val = '';
             
-        end
-        
-        function val = getSimulatedSNR(obj)
-           
         end
         
     end
@@ -972,6 +972,36 @@ classdef Finder < handle
             end
             
             save(filename, 'events');
+            
+        end
+        
+        function obj = runSimulations(obj, lightcurve_filename, varargin)
+            
+            if isempty(lightcurve_filename) || ~exist(lightcurve_filename, 'file')
+                error('Must supply a valid "lightcurve" MAT file. ');
+            end
+            
+            input = util.text.InputVars;
+            input.input_var('batch_size', 100);
+            % ... add more parameters
+            input.scan_vars(varargin{:}); 
+            
+            L = load(lightcurve_filename);
+            
+            N = size(L.fluxes,1);
+            
+            obj.reset;
+            obj.use_sim = 1;
+            
+            obj.prog.start(N);
+            
+            for idx = 1:input.batch_size:N
+                
+                obj.input('lightcurves', L, 'length', input.batch_size, 'index', idx);
+                
+                obj.prog.showif(idx);
+                
+            end
             
         end
         

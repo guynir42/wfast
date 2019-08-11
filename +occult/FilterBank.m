@@ -141,11 +141,16 @@ classdef FilterBank < handle
         
         function val = get.snr_simulated(obj)
            
-            val = median(obj.snr_sim_full,1,'omitnan');
+            if isempty(obj.snr_sim_full)
+                val = [];
+            else
+                
+                val = median(obj.snr_sim_full,1,'omitnan');
+
+                val = reshape(val, [length(obj.R_list), length(obj.r_list), length(obj.b_list), length(obj.v_list)]);
+                
+            end
             
-            val = reshape(val, [length(obj.R_list), length(obj.r_list),...
-                length(obj.b_list), length(obj.v_list)]);
-             
         end
         
     end
