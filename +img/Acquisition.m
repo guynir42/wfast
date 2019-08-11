@@ -297,8 +297,9 @@ classdef Acquisition < file.AstroData
                 
                 obj.setupDefaults;
                 
-                obj.pars = head.Parameters; % this also gives "pars" to all sub-objects
                 obj.cat = head.Catalog;
+                
+                obj.pars = head.Parameters; % this also gives "pars" to all sub-objects
                 
                 util.oop.save_defaults(obj); % make sure each default_XXX property is updated with the current XXX property value. 
                 
