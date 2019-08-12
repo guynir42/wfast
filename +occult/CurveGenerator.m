@@ -531,7 +531,7 @@ classdef CurveGenerator < handle
     
     methods % source matrix stuff
         
-        function flux_out = makeNonPointSource(obj, flux, star_R, varargin)
+        function [flux_out, flux_map_conv] = makeNonPointSource(obj, flux, star_R, varargin)
            
             % allows star_R to be a vector
             % Makes an image of the shadow around the occultation center, 
@@ -556,11 +556,17 @@ classdef CurveGenerator < handle
             input.input_var('show', false);
             input.input_var('ax', [], 'axis', 'axes');
             input.input_var('delay', 0.3);
+            input.input_var('width', []);
             input.scan_vars(varargin{:});
             
             star_pix_radius = star_R./(obj.source_a_axis(2)-obj.source_a_axis(1)); % the scaling between points in a_axis
             
-            width = ceil(max(2*star_pix_radius)); % need a wider image of the center of the shadow pattern to do the convolution
+            if isempty(input.width)
+                width = ceil(max(2*star_pix_radius)); % need a wider image of the center of the shadow pattern to do the convolution
+            else
+                width = input.width;
+            end 
+                
             height = length(obj.source_a_axis); % 
             
             x_c = floor(width/2)+1;
@@ -570,7 +576,7 @@ classdef CurveGenerator < handle
             
             d = sqrt((x-x_c).^2 + (y-y_c).^2); % distances from center of occultation
 
-            fluxmap = flux(floor(d)+1); % transform the input flux into a 2D map
+            flux_map = flux(floor(d)+1); % transform the input flux into a 2D map
             
             for ii = 1:length(star_R)
                
@@ -582,12 +588,13 @@ classdef CurveGenerator < handle
                         star = util.img.ellipse(star_pix_radius(ii), 'norm', 1); 
                     end
 
-                    flux_map_conv = util.img.conv_f(star, fluxmap, 'crop', 'same', 'conj', 1);
+                    flux_map_conv = util.img.conv_f(star, flux_map, 'crop', 'same', 'conj', 1);
 
                     flux_conv = flux_map_conv(y_c:end-y_c,x_c); 
                     
                 else
                     flux_conv = flux;
+                    flux_map_conv = flux_map;
                 end
                 
                 flux_out(:,:,ii) = [flux_conv; ones(size(flux,1)-size(flux_conv,1),1)];

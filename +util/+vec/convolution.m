@@ -51,6 +51,9 @@ function values_conv = convolution(kernels, values, varargin)
     S_out = max(Sv,Sk); % the size of the output (dim1 of this may change in the end when we crop it)
     S_out(1) = L;
     
+    if nnz(isnan(kernels)), warning('Input "kernels" has NaN values!'); end
+    if nnz(isnan(values)), warning('Input "values" has NaN values!'); end
+    
     %%%%%%%%%%%%% finsihed verifying sizes, can start calculations %%%%%%%%%%%%%%%
     
     k = util.img.pad2size(kernels, Sk_adj);
@@ -119,7 +122,11 @@ function M = fft_in_a_loop(kernels_fft, values_fft, S_out, Sk, Sv)
 
     loop_idx = find(S_out(2:end)>1, 1, 'last')+1; % the last non-singleton dimension is split up into a loop
 
-    M = zeros(S_out);
+    if isa(kernels_fft, 'single') && isa(values_fft, 'single')
+        M = zeros(S_out, 'single');
+    else
+        M = zeros(S_out);
+    end
 
     for ii = 1:S_out(loop_idx)
 

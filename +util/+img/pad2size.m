@@ -18,8 +18,8 @@ function M_out = pad2size(M_in, size_needed, pad_value)
         return;
     end
     
-    if ndims(M_in)>4
-        error('This function treats up to 4D matrices. If you want more dimensions some coding is needed!'); 
+    if ndims(M_in)>6
+        error('This function treats up to 6D matrices. If you want more dimensions some coding is needed!'); 
     end
     
     S_in = size(M_in);
@@ -28,11 +28,11 @@ function M_out = pad2size(M_in, size_needed, pad_value)
     if size_needed(1)>S_in(1) || size_needed(2)>S_in(2)
         
         if pad_value==0
-            M_out = zeros(max(size_needed(1), S_in(1)), max(size_needed(2), S_in(2)), size(M_in,3), size(M_in,4), 'like', M_in);
+            M_out = zeros(max(size_needed(1), S_in(1)), max(size_needed(2), S_in(2)), size(M_in,3), size(M_in,4), size(M_in,5), size(M_in,6), 'like', M_in);
         elseif isnan(pad_value)
-            M_out = nan(max(size_needed(1), S_in(1)), max(size_needed(2), S_in(2)), size(M_in,3), size(M_in,4), 'like', M_in);
+            M_out = nan(max(size_needed(1), S_in(1)), max(size_needed(2), S_in(2)), size(M_in,3), size(M_in,4), size(M_in,5), size(M_in,6), 'like', M_in);
         elseif isnumeric(pad_value)
-            M_out = pad_value.*ones(max(size_needed(1), S_in(1)), max(size_needed(2), S_in(2)), size(M_in,3), size(M_in,4), 'like', M_in);
+            M_out = pad_value.*ones(max(size_needed(1), S_in(1)), max(size_needed(2), S_in(2)), size(M_in,3), size(M_in,4), size(M_in,5), size(M_in,6), 'like', M_in);
         else
             error('"pad_value" must be numeric or NaN!');
         end
@@ -44,10 +44,11 @@ function M_out = pad2size(M_in, size_needed, pad_value)
         x1 = 1+ceil(gap(2));
         x2 = size_needed(2)-floor(gap(2));
         
-        M_out(y1:y2, x1:x2,:,:) = M_in;
+        M_out(y1:y2, x1:x2,:,:,:,:) = M_in;
         
     else
         M_out = M_in;
     end
     
 end
+

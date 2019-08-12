@@ -103,9 +103,9 @@ function h_out = inner_title(varargin)
     
     h = text(x_pos, y_pos, str, 'Units', 'Normalized', 'HorizontalAlignment', alignment, 'FontSize', 16, 'FontWeight', 'Bold', arguments{:});
     
-    if cs(pos, 'left')
+    if cs(pos, 'left', 'west')
         h.Rotation = 90;
-    elseif cs(pos, 'right')
+    elseif cs(pos, 'right', 'east')
         h.Rotation = 90;
     end
     

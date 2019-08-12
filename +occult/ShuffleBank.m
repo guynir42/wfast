@@ -1,6 +1,6 @@
 classdef ShuffleBank < handle
 
-    properties(Transient=true)
+    properties(Transient=true, Hidden=true)
         
         gen@occult.CurveGenerator;
         prog@util.sys.ProgressBar;
@@ -230,6 +230,10 @@ classdef ShuffleBank < handle
             else
                 obj.fluxes = input.flux;
             end
+            
+            obj.fluxes = fillmissing(obj.fluxes, 'spline'); 
+            
+            obj.fluxes(:,1,squeeze(all(isnan(obj.fluxes)))) = 0;
             
             if size(input.stds,2)>1
                 obj.stds = permute(input.stds, [1,3,2]);

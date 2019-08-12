@@ -81,7 +81,7 @@ classdef WorldCoordinates < handle
         
         function val = get.rotation(obj)
             
-            if isempty(obj.PV)
+            if isempty(obj.PV) || size(obj.PV,1)<3
                 val = [];
             else
                 val = acotd(obj.PV(2,1)./obj.PV(3,1));
@@ -346,7 +346,6 @@ classdef WorldCoordinates < handle
         PV1_37;
         PV1_38;
         PV1_39;
-        PV1_40;
 
         PV2_0;
         PV2_1;
@@ -388,101 +387,98 @@ classdef WorldCoordinates < handle
         PV2_37;
         PV2_38;
         PV2_39;
-        PV2_40;
         
     end
     
     methods % getters for bullshit dependent properties
         
-        function val = get.CD1_1(obj), val = obj.CD(1,1); end
-        function val = get.CD1_2(obj), val = obj.CD(2,1); end
-        function val = get.CD2_1(obj), val = obj.CD(1,2); end
-        function val = get.CD2_2(obj), val = obj.CD(2,2); end
+        function val = get.CD1_1(obj), if ~isempty(obj.CD), val = obj.CD(1,1); else, val = []; end; end
+        function val = get.CD1_2(obj), if size(obj.CD,1)>1, val = obj.CD(2,1); else, val = []; end; end
+        function val = get.CD2_1(obj), if size(obj.CD,2)>1, val = obj.CD(1,2); else, val = []; end; end
+        function val = get.CD2_2(obj), if numel(obj.CD)>3, val = obj.CD(2,2); else, val = []; end; end
         
-        
-        function val = get.PV1_0(obj), val = obj.PV(1,1); end
-        function val = get.PV1_1(obj), val = obj.PV(2,1); end
-        function val = get.PV1_2(obj), val = obj.PV(3,1); end
-        function val = get.PV1_3(obj), val = obj.PV(4,1); end
-        function val = get.PV1_4(obj), val = obj.PV(5,1); end
-        function val = get.PV1_5(obj), val = obj.PV(6,1); end
-        function val = get.PV1_6(obj), val = obj.PV(7,1); end
-        function val = get.PV1_7(obj), val = obj.PV(8,1); end
-        function val = get.PV1_8(obj), val = obj.PV(9,1); end
-        function val = get.PV1_9(obj), val = obj.PV(10,1); end
-        function val = get.PV1_10(obj), val = obj.PV(11,1); end
-        function val = get.PV1_11(obj), val = obj.PV(12,1); end
-        function val = get.PV1_12(obj), val = obj.PV(13,1); end
-        function val = get.PV1_13(obj), val = obj.PV(14,1); end
-        function val = get.PV1_14(obj), val = obj.PV(15,1); end
-        function val = get.PV1_15(obj), val = obj.PV(16,1); end
-        function val = get.PV1_16(obj), val = obj.PV(17,1); end
-        function val = get.PV1_17(obj), val = obj.PV(18,1); end
-        function val = get.PV1_18(obj), val = obj.PV(19,1); end
-        function val = get.PV1_19(obj), val = obj.PV(20,1); end
-        function val = get.PV1_20(obj), val = obj.PV(21,1); end
-        function val = get.PV1_21(obj), val = obj.PV(22,1); end
-        function val = get.PV1_22(obj), val = obj.PV(23,1); end
-        function val = get.PV1_23(obj), val = obj.PV(24,1); end
-        function val = get.PV1_24(obj), val = obj.PV(25,1); end
-        function val = get.PV1_25(obj), val = obj.PV(26,1); end
-        function val = get.PV1_26(obj), val = obj.PV(27,1); end
-        function val = get.PV1_27(obj), val = obj.PV(28,1); end
-        function val = get.PV1_28(obj), val = obj.PV(29,1); end
-        function val = get.PV1_29(obj), val = obj.PV(30,1); end
-        function val = get.PV1_30(obj), val = obj.PV(31,1); end
-        function val = get.PV1_31(obj), val = obj.PV(32,1); end
-        function val = get.PV1_32(obj), val = obj.PV(33,1); end
-        function val = get.PV1_33(obj), val = obj.PV(34,1); end
-        function val = get.PV1_34(obj), val = obj.PV(35,1); end
-        function val = get.PV1_35(obj), val = obj.PV(36,1); end
-        function val = get.PV1_36(obj), val = obj.PV(37,1); end
-        function val = get.PV1_37(obj), val = obj.PV(38,1); end
-        function val = get.PV1_38(obj), val = obj.PV(39,1); end
-        function val = get.PV1_39(obj), val = obj.PV(40,1); end
-        function val = get.PV1_40(obj), val = obj.PV(40,1); end
+        function val = get.PV1_0(obj), if size(obj.PV,1)>0, val = obj.PV(1,1); else, val = []; end; end
+        function val = get.PV1_1(obj), if size(obj.PV,1)>1, val = obj.PV(2,1); else, val = []; end; end
+        function val = get.PV1_2(obj), if size(obj.PV,1)>2, val = obj.PV(3,1); else, val = []; end; end
+        function val = get.PV1_3(obj), if size(obj.PV,1)>3, val = obj.PV(4,1); else, val = []; end; end
+        function val = get.PV1_4(obj), if size(obj.PV,1)>4, val = obj.PV(5,1); else, val = []; end; end
+        function val = get.PV1_5(obj), if size(obj.PV,1)>5, val = obj.PV(6,1); else, val = []; end; end
+        function val = get.PV1_6(obj), if size(obj.PV,1)>6, val = obj.PV(7,1); else, val = []; end; end
+        function val = get.PV1_7(obj), if size(obj.PV,1)>7, val = obj.PV(8,1); else, val = []; end; end
+        function val = get.PV1_8(obj), if size(obj.PV,1)>8, val = obj.PV(9,1); else, val = []; end; end
+        function val = get.PV1_9(obj), if size(obj.PV,1)>9, val = obj.PV(10,1); else, val = []; end; end
+        function val = get.PV1_10(obj), if size(obj.PV,1)>10, val = obj.PV(11,1); else, val = []; end; end
+        function val = get.PV1_11(obj), if size(obj.PV,1)>11, val = obj.PV(12,1); else, val = []; end; end
+        function val = get.PV1_12(obj), if size(obj.PV,1)>12, val = obj.PV(13,1); else, val = []; end; end
+        function val = get.PV1_13(obj), if size(obj.PV,1)>13, val = obj.PV(14,1); else, val = []; end; end
+        function val = get.PV1_14(obj), if size(obj.PV,1)>14, val = obj.PV(15,1); else, val = []; end; end
+        function val = get.PV1_15(obj), if size(obj.PV,1)>15, val = obj.PV(16,1); else, val = []; end; end
+        function val = get.PV1_16(obj), if size(obj.PV,1)>16, val = obj.PV(17,1); else, val = []; end; end
+        function val = get.PV1_17(obj), if size(obj.PV,1)>17, val = obj.PV(18,1); else, val = []; end; end
+        function val = get.PV1_18(obj), if size(obj.PV,1)>18, val = obj.PV(19,1); else, val = []; end; end
+        function val = get.PV1_19(obj), if size(obj.PV,1)>19, val = obj.PV(20,1); else, val = []; end; end
+        function val = get.PV1_20(obj), if size(obj.PV,1)>20, val = obj.PV(21,1); else, val = []; end; end
+        function val = get.PV1_21(obj), if size(obj.PV,1)>21, val = obj.PV(22,1); else, val = []; end; end
+        function val = get.PV1_22(obj), if size(obj.PV,1)>22, val = obj.PV(23,1); else, val = []; end; end
+        function val = get.PV1_23(obj), if size(obj.PV,1)>23, val = obj.PV(24,1); else, val = []; end; end
+        function val = get.PV1_24(obj), if size(obj.PV,1)>24, val = obj.PV(25,1); else, val = []; end; end
+        function val = get.PV1_25(obj), if size(obj.PV,1)>25, val = obj.PV(26,1); else, val = []; end; end
+        function val = get.PV1_26(obj), if size(obj.PV,1)>26, val = obj.PV(27,1); else, val = []; end; end
+        function val = get.PV1_27(obj), if size(obj.PV,1)>27, val = obj.PV(28,1); else, val = []; end; end
+        function val = get.PV1_28(obj), if size(obj.PV,1)>28, val = obj.PV(29,1); else, val = []; end; end
+        function val = get.PV1_29(obj), if size(obj.PV,1)>29, val = obj.PV(30,1); else, val = []; end; end
+        function val = get.PV1_30(obj), if size(obj.PV,1)>30, val = obj.PV(31,1); else, val = []; end; end
+        function val = get.PV1_31(obj), if size(obj.PV,1)>31, val = obj.PV(32,1); else, val = []; end; end
+        function val = get.PV1_32(obj), if size(obj.PV,1)>32, val = obj.PV(33,1); else, val = []; end; end
+        function val = get.PV1_33(obj), if size(obj.PV,1)>33, val = obj.PV(34,1); else, val = []; end; end
+        function val = get.PV1_34(obj), if size(obj.PV,1)>34, val = obj.PV(35,1); else, val = []; end; end
+        function val = get.PV1_35(obj), if size(obj.PV,1)>35, val = obj.PV(36,1); else, val = []; end; end
+        function val = get.PV1_36(obj), if size(obj.PV,1)>36, val = obj.PV(37,1); else, val = []; end; end
+        function val = get.PV1_37(obj), if size(obj.PV,1)>37, val = obj.PV(38,1); else, val = []; end; end
+        function val = get.PV1_38(obj), if size(obj.PV,1)>38, val = obj.PV(39,1); else, val = []; end; end
+        function val = get.PV1_39(obj), if size(obj.PV,1)>39, val = obj.PV(40,1); else, val = []; end; end
 
-        function val = get.PV2_0(obj), val = obj.PV(1,2); end
-        function val = get.PV2_1(obj), val = obj.PV(2,2); end
-        function val = get.PV2_2(obj), val = obj.PV(3,2); end
-        function val = get.PV2_3(obj), val = obj.PV(4,2); end
-        function val = get.PV2_4(obj), val = obj.PV(5,2); end
-        function val = get.PV2_5(obj), val = obj.PV(6,2); end
-        function val = get.PV2_6(obj), val = obj.PV(7,2); end
-        function val = get.PV2_7(obj), val = obj.PV(8,2); end
-        function val = get.PV2_8(obj), val = obj.PV(9,2); end
-        function val = get.PV2_9(obj), val = obj.PV(10,2); end
-        function val = get.PV2_10(obj), val = obj.PV(11,2); end
-        function val = get.PV2_11(obj), val = obj.PV(12,2); end
-        function val = get.PV2_12(obj), val = obj.PV(13,2); end
-        function val = get.PV2_13(obj), val = obj.PV(14,2); end
-        function val = get.PV2_14(obj), val = obj.PV(15,2); end
-        function val = get.PV2_15(obj), val = obj.PV(16,2); end
-        function val = get.PV2_16(obj), val = obj.PV(17,2); end
-        function val = get.PV2_17(obj), val = obj.PV(18,2); end
-        function val = get.PV2_18(obj), val = obj.PV(19,2); end
-        function val = get.PV2_19(obj), val = obj.PV(20,2); end
-        function val = get.PV2_20(obj), val = obj.PV(21,2); end
-        function val = get.PV2_21(obj), val = obj.PV(22,2); end
-        function val = get.PV2_22(obj), val = obj.PV(23,2); end
-        function val = get.PV2_23(obj), val = obj.PV(24,2); end
-        function val = get.PV2_24(obj), val = obj.PV(25,2); end
-        function val = get.PV2_25(obj), val = obj.PV(26,2); end
-        function val = get.PV2_26(obj), val = obj.PV(27,2); end
-        function val = get.PV2_27(obj), val = obj.PV(28,2); end
-        function val = get.PV2_28(obj), val = obj.PV(29,2); end
-        function val = get.PV2_29(obj), val = obj.PV(30,2); end
-        function val = get.PV2_30(obj), val = obj.PV(31,2); end
-        function val = get.PV2_31(obj), val = obj.PV(32,2); end
-        function val = get.PV2_32(obj), val = obj.PV(33,2); end
-        function val = get.PV2_33(obj), val = obj.PV(34,2); end
-        function val = get.PV2_34(obj), val = obj.PV(35,2); end
-        function val = get.PV2_35(obj), val = obj.PV(36,2); end
-        function val = get.PV2_36(obj), val = obj.PV(37,2); end
-        function val = get.PV2_37(obj), val = obj.PV(38,2); end
-        function val = get.PV2_38(obj), val = obj.PV(39,2); end
-        function val = get.PV2_39(obj), val = obj.PV(40,2); end
-                
+        function val = get.PV2_0(obj), if size(obj.PV,1)>0, val = obj.PV(1,2); else, val = []; end; end
+        function val = get.PV2_1(obj), if size(obj.PV,1)>1, val = obj.PV(2,2); else, val = []; end; end
+        function val = get.PV2_2(obj), if size(obj.PV,1)>2, val = obj.PV(3,2); else, val = []; end; end
+        function val = get.PV2_3(obj), if size(obj.PV,1)>3, val = obj.PV(4,2); else, val = []; end; end
+        function val = get.PV2_4(obj), if size(obj.PV,1)>4, val = obj.PV(5,2); else, val = []; end; end
+        function val = get.PV2_5(obj), if size(obj.PV,1)>5, val = obj.PV(6,2); else, val = []; end; end
+        function val = get.PV2_6(obj), if size(obj.PV,1)>6, val = obj.PV(7,2); else, val = []; end; end
+        function val = get.PV2_7(obj), if size(obj.PV,1)>7, val = obj.PV(8,2); else, val = []; end; end
+        function val = get.PV2_8(obj), if size(obj.PV,1)>8, val = obj.PV(9,2); else, val = []; end; end
+        function val = get.PV2_9(obj), if size(obj.PV,1)>9, val = obj.PV(10,2); else, val = []; end; end
+        function val = get.PV2_10(obj), if size(obj.PV,1)>10, val = obj.PV(11,2); else, val = []; end; end
+        function val = get.PV2_11(obj), if size(obj.PV,1)>11, val = obj.PV(12,2); else, val = []; end; end
+        function val = get.PV2_12(obj), if size(obj.PV,1)>12, val = obj.PV(13,2); else, val = []; end; end
+        function val = get.PV2_13(obj), if size(obj.PV,1)>13, val = obj.PV(14,2); else, val = []; end; end
+        function val = get.PV2_14(obj), if size(obj.PV,1)>14, val = obj.PV(15,2); else, val = []; end; end
+        function val = get.PV2_15(obj), if size(obj.PV,1)>15, val = obj.PV(16,2); else, val = []; end; end
+        function val = get.PV2_16(obj), if size(obj.PV,1)>16, val = obj.PV(17,2); else, val = []; end; end
+        function val = get.PV2_17(obj), if size(obj.PV,1)>17, val = obj.PV(18,2); else, val = []; end; end
+        function val = get.PV2_18(obj), if size(obj.PV,1)>18, val = obj.PV(19,2); else, val = []; end; end
+        function val = get.PV2_19(obj), if size(obj.PV,1)>19, val = obj.PV(20,2); else, val = []; end; end
+        function val = get.PV2_20(obj), if size(obj.PV,1)>20, val = obj.PV(21,2); else, val = []; end; end
+        function val = get.PV2_21(obj), if size(obj.PV,1)>21, val = obj.PV(22,2); else, val = []; end; end
+        function val = get.PV2_22(obj), if size(obj.PV,1)>22, val = obj.PV(23,2); else, val = []; end; end
+        function val = get.PV2_23(obj), if size(obj.PV,1)>23, val = obj.PV(24,2); else, val = []; end; end
+        function val = get.PV2_24(obj), if size(obj.PV,1)>24, val = obj.PV(25,2); else, val = []; end; end
+        function val = get.PV2_25(obj), if size(obj.PV,1)>25, val = obj.PV(26,2); else, val = []; end; end
+        function val = get.PV2_26(obj), if size(obj.PV,1)>26, val = obj.PV(27,2); else, val = []; end; end
+        function val = get.PV2_27(obj), if size(obj.PV,1)>27, val = obj.PV(28,2); else, val = []; end; end
+        function val = get.PV2_28(obj), if size(obj.PV,1)>28, val = obj.PV(29,2); else, val = []; end; end
+        function val = get.PV2_29(obj), if size(obj.PV,1)>29, val = obj.PV(30,2); else, val = []; end; end
+        function val = get.PV2_30(obj), if size(obj.PV,1)>30, val = obj.PV(31,2); else, val = []; end; end
+        function val = get.PV2_31(obj), if size(obj.PV,1)>31, val = obj.PV(32,2); else, val = []; end; end
+        function val = get.PV2_32(obj), if size(obj.PV,1)>32, val = obj.PV(33,2); else, val = []; end; end
+        function val = get.PV2_33(obj), if size(obj.PV,1)>33, val = obj.PV(34,2); else, val = []; end; end
+        function val = get.PV2_34(obj), if size(obj.PV,1)>34, val = obj.PV(35,2); else, val = []; end; end
+        function val = get.PV2_35(obj), if size(obj.PV,1)>35, val = obj.PV(36,2); else, val = []; end; end
+        function val = get.PV2_36(obj), if size(obj.PV,1)>36, val = obj.PV(37,2); else, val = []; end; end
+        function val = get.PV2_37(obj), if size(obj.PV,1)>37, val = obj.PV(38,2); else, val = []; end; end
+        function val = get.PV2_38(obj), if size(obj.PV,1)>38, val = obj.PV(39,2); else, val = []; end; end
+        function val = get.PV2_39(obj), if size(obj.PV,1)>39, val = obj.PV(40,2); else, val = []; end; end
+                     
     end
     
 end

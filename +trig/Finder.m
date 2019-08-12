@@ -23,6 +23,11 @@ classdef Finder < handle
         
         phot_pars; % a struct with some housekeeping about how the photometry was done
         
+        prog@util.sys.ProgressBar;
+        
+        sim_bank@occult.FilterBank;
+        sim_events = {};
+        
     end
     
     properties % inputs/outputs
@@ -94,6 +99,8 @@ classdef Finder < handle
         
         use_conserve_memory = 1;
         
+        use_sim = 0; % run simulation on incoming data... 
+        
         frame_rate = 25; % if timestamps are not given explicitely
         
         display_event_idx = [];
@@ -113,7 +120,13 @@ classdef Finder < handle
     
     properties(Hidden=true)
        
-        version = 1.01;
+        t_end;
+        t_end_stamp;
+        used_background_sub;
+        aperture;
+        gauss_sigma;
+        
+        version = 1.02;
         
     end
     
@@ -130,6 +143,8 @@ classdef Finder < handle
                 obj.cal = trig.Calibrator;
                 
                 obj.var_buf = util.vec.CircularBuffer;
+                
+                obj.prog = util.sys.ProgressBar;
                 
             end
             
@@ -179,6 +194,12 @@ classdef Finder < handle
             if ~isempty(obj.gui) && obj.gui.check
                 delete(obj.gui.panel_image.Children);
                 obj.gui.update;
+            end
+            
+            obj.sim_events = {};
+            
+            if ~isempty(obj.sim_bank)
+                obj.sim_bank.reset;
             end
             
             obj.clear;
@@ -367,10 +388,60 @@ classdef Finder < handle
             input.input_var('t_end_stamp', [], 8);
             input.input_var('used_background_sub', []); 
             input.input_var('phot_pars', [], 'pars_struct');
+            input.input_var('lightcurves', []);
+            input.input_var('index', []);
+            input.input_var('length', 100);
             input.scan_vars(varargin{:});
             
             if isempty(obj.bank)
                 obj.loadFilterBank;
+            end
+            
+            if obj.use_sim
+                
+                if isempty(obj.sim_bank)
+                    obj.sim_bank = occult.FilterBank;
+                end
+                
+                if isempty(obj.sim_bank.bank)
+                    obj.sim_bank.makeBank;
+                end
+                
+                if isempty(obj.sim_bank.filtered_bank) || numel(obj.sim_bank.filtered_bank)~=numel(obj.bank.kernels)*obj.sim_bank.num_pars
+                    
+                    if obj.debug_bit, fprintf('Cross filtering all kernels in ShuffleBank (%d) with all templates in FilterBank (%d)...', size(obj.bank.kernels,2), obj.sim_bank.num_pars); end
+                    
+                    obj.sim_bank.filtered_bank = util.vec.convolution(obj.bank.kernels, permute(obj.sim_bank.bank-1, [1,6,2,3,4,5])); 
+                    
+                end
+                
+            end
+            
+            if ~isempty(input.lightcurves) && ~isempty(input.index) && ~isempty(input.length) % parse a "lightcurve" struct/object
+                
+                input.fluxes = input.lightcurves.fluxes(input.index:input.index+input.length-1, :);
+                input.errors= input.lightcurves.errors(input.index:input.index+input.length-1, :);
+                input.areas = input.lightcurves.areas(input.index:input.index+input.length-1, :);
+                input.backgrounds = input.lightcurves.backgrounds(input.index:input.index+input.length-1, :);
+                input.variances = input.lightcurves.variances(input.index:input.index+input.length-1, :);
+                
+                if isfield(input.lightcurves, 'offsets_x') && ~isempty(input.lightcurves.offsets_x)
+                    input.offsets_x = input.lightcurves.offsets_x(input.index:input.index+input.length-1, :);
+                else % reconstruct the offsets from centroids by assuming a constant base-pixel for the whole batch... 
+                    input.offsets_x = input.lightcurves.centroids_x(input.index:input.index+input.length-1, :)...
+                        - round(median(input.lightcurves.centroids_x(input.index:input.index+input.length-1, :), 'omitnan'));
+                end
+                
+                if isfield(input.lightcurves, 'offsets_y') && ~isempty(input.lightcurves.offsets_y)
+                    input.offsets_y = input.lightcurves.offsets_y(input.index:input.index+input.length-1, :);
+                else % reconstruct the offsets from centroids by assuming a constant base-pixel for the whole batch... 
+                    input.offsets_y = input.lightcurves.centroids_y(input.index:input.index+input.length-1, :)...
+                        - round(median(input.lightcurves.centroids_y(input.index:input.index+input.length-1, :), 'omitnan')); 
+                end
+                    
+                input.widths = input.lightcurves.widths(input.index:input.index+input.length-1, :);
+                input.bad_pixels = input.lightcurves.bad_pixels(input.index:input.index+input.length-1, :);
+                
             end
             
             obj.clear;
@@ -391,6 +462,11 @@ classdef Finder < handle
             obj.batch_index = input.batch_index;
             obj.filename = input.filename;
             obj.phot_pars = input.phot_pars;
+            obj.t_end = input.t_end;
+            obj.t_end_stamp = input.t_end_stamp;
+            obj.aperture = input.aperture;
+            obj.gauss_sigma = input.gauss_sigma;
+            obj.used_background_sub = input.used_background_sub;
             
             if all(obj.timestamps==0)
 %                 obj.timestamps = []; % in case we didn't properly store the times
@@ -401,34 +477,66 @@ classdef Finder < handle
                 end
             end
             
+            %%%%%%%%%%%%%%% done parsing inputs %%%%%%%%%%%%%%%%%%%%%%%
+            
             if ~isempty(obj.prev_fluxes) % skip first batch! 
             
                 t = tic;
                 obj.cal.input(vertcat(obj.prev_fluxes, obj.fluxes), vertcat(obj.prev_errors, obj.errors), vertcat(obj.prev_timestamps, obj.timestamps)); 
-                if obj.debug_bit>1, fprintf('Calibration time: %f seconds.\n', toc(t)); end
+                if obj.debug_bit>2, fprintf('Calibration time: %f seconds.\n', toc(t)); end
                 
                 t = tic;
                 obj.bank.input(obj.cal.fluxes_detrended, obj.cal.stds_detrended, obj.cal.timestamps); % use the filter bank on the fluxes
-                if obj.debug_bit>1, fprintf('Filtering time: %f seconds.\n', toc(t)); end
+
+                if nnz(~isnan(obj.bank.fluxes_filtered))==0
+                    error('Filtered fluxes in ShuffleBank are all NaN!');
+                end
                 
-                t = tic;
-                obj.findEvents;
-                if obj.debug_bit>1, fprintf('Triggering time: %f seconds.\n', toc(t)); end
+                if obj.debug_bit>2, fprintf('Filtering time: %f seconds.\n', toc(t)); end
                 
-                t = tic;
-                obj.storeEventHousekeeping(input); % add some data from this batch to the triggered events
+                if obj.use_sim
+                    
+                    obj.sim_bank.filtered_index = 0; % start by running events without any added occultations
+                    
+                    snr_vec = zeros(1,obj.sim_bank.num_pars);
+                    
+                    for ii = 1:1+obj.sim_bank.num_pars
+                        
+                        obj.findEvents;
+                        
+                        if obj.sim_bank.filtered_index==0
+                            obj.last_events = obj.new_events;
+                            obj.all_events = [obj.all_events obj.new_events];
+                        else % store new events in different bins for different simulation parameters
+%                             if length(obj.sim_events)<obj.sim_bank.filtered_index || isempty(obj.sim_events{obj.sim_bank.filtered_index})
+%                                 obj.sim_events{obj.sim_bank.filtered_index} = obj.new_events;
+%                             else
+%                                 obj.sim_events{obj.sim_bank.filtered_index} = [obj.sim_events{obj.sim_bank.filtered_index} obj.new_events];
+%                             end
+                        end
+                        
+                        if obj.sim_bank.filtered_index>0
+                            if ~isempty(obj.new_events)
+                                [mx1, idx] = max([obj.new_events.snr]); % find the best event (if there are more than one)
+                                mx2 = obj.new_events(idx).star_snr;
+                                snr_vec(obj.sim_bank.filtered_index) = mx1/mx2; % save the normalized S/N
+                            end
+                        end
+                        
+                        obj.sim_bank.filtered_index = obj.sim_bank.filtered_index + 1; % each time the index points at a different template to add
+                    
+                    end
+                    
+                    obj.sim_bank.snr_sim_full(end+1,:) = snr_vec;
+                    
+                else
+                    
+                    obj.findEvents; % just find real events! 
+                    obj.last_events = obj.new_events;
+                    obj.all_events = [obj.all_events obj.new_events];
+                    
+                end
                 
-                obj.checkEvents; % make sure we aren't taking events that already exist
-            
-                obj.last_events = obj.new_events;
-                obj.all_events = [obj.all_events obj.new_events];
-                obj.new_events = trig.Event.empty;
-            
-                if obj.debug_bit>1, fprintf('Housekeeping time: %f seconds.\n', toc(t)); end
-            
-                t = tic;
-                
-                if obj.debug_bit>1, fprintf('Checking time: %f seconds.\n', toc(t)); end
                 
             end
             
@@ -458,82 +566,163 @@ classdef Finder < handle
         function findEvents(obj)
             
             obj.new_events = trig.Event.empty;
-            
+           
             ff = obj.bank.fluxes_filtered; % dim 1 is time, dim 2 is kernels, dim 3 is stars
             
-            if obj.use_var_buf && ~obj.var_buf.is_empty
-                ff = ff./sqrt(obj.var_buf.mean);
-            end
-            
             good_stars = obj.cal.star_snrs>obj.min_star_snr;
-            
-            [~,idx] = util.stat.maxnd(abs(ff.*util.vec.topages(good_stars))); % only get the best S/N for first batch (for record keeping)
-            
-            if isempty(idx)
-                return; % this can happen if all stars are below the S/N threshold
+            if all(~good_stars)
+                return;
             end
             
-            obj.snr_values(end+1) = ff(idx(1),idx(2),idx(3));
+            t = tic; 
+            
+            if obj.use_sim && obj.sim_bank.filtered_index>0
+                
+                t_sim = tic;
+                
+                for ii = 1:1e6
+                    star_index_sim = randi(size(ff,3)); % random choice of star
+                    if good_stars(star_index_sim), break; end % repick a new star if this one is low S/N
+                end
+                
+                if obj.debug_bit>1 
+                    s = obj.sim_bank.sim_pars;
+                    fprintf('Adding flux with R= %4.2f, r= %4.2f, b= %4.2f, v= %4.2f to flux of star %d!\n', s.R, s.r, s.b, s.v, star_index_sim);
+                end
+                
+                % add the occultation on top of the data!
+                ff_sim = util.img.pad2size(obj.sim_bank.filtered_bank(:,:,obj.sim_bank.filtered_index), size(ff)); 
+                ff_sim = ff_sim.*obj.cal.star_snrs(star_index_sim); 
+                max_shift = size(ff,1)-5;
+                shift_frames = randi(max_shift)-floor(max_shift/2); % shift by a random number of frames
+                ff_sim = util.img.shift(ff_sim, 0, shift_frames, 0);
+                ff = ff(:,:,star_index_sim) + ff_sim;
+                
+                
+                if obj.debug_bit>3, fprintf('Adding simulated template time: %f seconds.\n', toc(t_sim)); end
+
+            else
+                star_index_sim = []; % this indicates we are not running sim! 
+            end
+            
+            if obj.use_var_buf && ~obj.var_buf.is_empty
+     
+                t_psd = tic;
+
+                if isempty(star_index_sim)
+                    real_rms = sqrt(obj.var_buf.mean);
+                else
+                    real_rms = sqrt(obj.var_buf.mean(:,:,star_index_sim));
+                end
+                
+                ff = ff./real_rms;
+                
+                if obj.debug_bit>3, fprintf('PSD drift correction time: %f seconds.\n', toc(t_psd)); end
+
+            end
             
             obj.dt = median(diff(obj.timestamps));
             
             for ii = 1:obj.max_events
                 
-                [mx, idx] = util.stat.maxnd(abs(ff.*util.vec.topages(good_stars))); % note we are triggering on negative and positive events
+                t_max = tic;
                 
-                if mx<obj.threshold, break; end 
-                
-                ev = trig.Event;
-                ev.snr = mx; % note this is positive even for negative filter responses! 
-                
-                ev.time_index = idx(1); 
-                ev.kern_index = idx(2);
-                ev.star_index = idx(3);
-                
-                ev.time_indices = obj.findTimeRange(ff, ev.time_index, ev.star_index); % find continuous area that is above time_range_thresh
-                
-                ev.kern_indices = find(max(abs(ff(ev.time_indices, :, ev.star_index)))>obj.getKernThresh);
-                
-                ev.star_indices = find(max(abs(ff(ev.time_indices, ev.kern_index, :)))>obj.getStarThresh);
-                
-                ev.timestamps = obj.bank.timestamps;
-                ev.time_step = obj.dt;
-                
-                if isempty(ev.time_indices)
-                    warning('time_indices for latest event are empty!')
-                    ev.duration = 0;
+                if isempty(star_index_sim)
+                    [mx, idx] = util.stat.maxnd(abs(ff.*util.vec.topages(good_stars))); % note we are triggering on negative and positive events
                 else
-                    ev.duration =  obj.dt + obj.bank.timestamps(ev.time_indices(end))-obj.bank.timestamps(ev.time_indices(1));
+                    [mx, idx] = util.stat.max2(abs(ff)); % scan only the star we added simulation to
+                    idx(3) = 1; % in sim-mode we only scan a 2D ff matrix, but we need to index into it as a 3D matrix later on...  
                 end
                 
-                ev.flux_filtered = ff(:,ev.kern_index, ev.star_index);
-                if ~is_empty(obj.var_buf)
-                    ev.previous_std = sqrt(obj.var_buf.mean(1, ev.kern_index, ev.star_index));
+                if obj.debug_bit>3, fprintf('Find max time: %f seconds.\n', toc(t_max)); end
+
+                if ii==1
+                    if isempty(star_index_sim) % only store S/N values when not in sim-mode
+                        obj.snr_values(end+1) = ff(idx(1),idx(2),idx(3));
+                    end
                 end
                 
-%                 ev.flux_raw_all = permute(obj.bank.fluxes, [1,3,2]);
-%                 ev.stds_raw_all = permute(obj.bank.stds, [1,3,2]);
-                ev.flux_detrended = obj.cal.fluxes_detrended(:,ev.star_index); 
-                ev.std_flux = std(ev.flux_detrended, [], 'omitnan');
-                ev.flux_raw_all = obj.cal.fluxes;
-                % somewhere around here we MUST make use of the flux errors
+                if mx>=obj.threshold
                 
-                obj.new_events(end+1) = ev; % add this event to the list
-                
-                obj.coverage_lost = obj.coverage_lost + ev.duration; % how much time is "zeroed out"
-                obj.star_hours_lost = obj.star_hours_lost + (ev.duration)*sum(good_stars)/3600;
-                
-                ff(ev.time_indices, :, :) = 0; % don't look at the same region twice
+                    t_ev = tic;
+                    
+                    ev = trig.Event;
+                    ev.snr = mx; % note this is positive even for negative filter responses! 
+
+                    ev.time_index = idx(1); 
+                    ev.kern_index = idx(2);
+                    
+                    if isempty(star_index_sim) % (note: in sim mode, idx(3)==1 by definition, but star_index is not!)
+                        ev.star_index = idx(3);
+                    else
+                        ev.star_index = star_index_sim;
+                    end
+
+                    ev.time_indices = obj.findTimeRange(ff, idx(1), idx(3)); % find continuous area that is above time_range_thresh
+
+                    ev.kern_indices = find(max(abs(ff(ev.time_indices, :, idx(3))))>obj.getKernThresh);
+
+                    ev.star_indices = find(max(abs(ff(ev.time_indices, idx(2), :)))>obj.getStarThresh);
+
+                    ev.timestamps = obj.bank.timestamps;
+                    ev.time_step = obj.dt;
+
+                    if isempty(ev.time_indices)
+                        warning('time_indices for latest event are empty!')
+                        ev.duration = 0;
+                    else
+                        ev.duration =  obj.dt + obj.bank.timestamps(ev.time_indices(end))-obj.bank.timestamps(ev.time_indices(1));
+                    end
+
+                    ev.flux_filtered = ff(:,idx(2),idx(3));
+                    if obj.use_var_buf && ~is_empty(obj.var_buf)
+                        ev.previous_std = sqrt(obj.var_buf.mean(1,ev.kern_index, ev.star_index));
+                    end
+
+                    ev.flux_detrended = obj.cal.fluxes_detrended(:,ev.star_index); 
+                    ev.std_flux = std(ev.flux_detrended, [], 'omitnan');
+                    ev.flux_raw_all = obj.cal.fluxes;
+                    % somewhere around here we MUST make use of the flux errors
+
+                    obj.new_events(end+1) = ev; % add this event to the list
+
+                    if ~obj.use_sim || obj.sim_bank.filtered_index==0 % only store star hours when not in sim-mode
+                        obj.coverage_lost = obj.coverage_lost + ev.duration; % how much time is "zeroed out"
+                        obj.star_hours_lost = obj.star_hours_lost + (ev.duration)*sum(good_stars)/3600;
+                    end
+                    
+                    if obj.debug_bit>3, fprintf('New event time: %f seconds.\n', toc(t_ev)); end
+            
+                    ff(ev.time_indices, :, :) = 0; % don't look at the same region twice
+            
+                else
+                    break;
+                end
                 
             end
             
-            obj.coverage_total = obj.coverage_total + obj.timestamps(end) - obj.timestamps(1) + obj.dt;
-            obj.star_hours_total = obj.star_hours_total + (obj.timestamps(end) - obj.timestamps(1) + obj.dt)*sum(good_stars)/3600;
+            if isempty(star_index_sim) % only store star hours when not in sim-mode
+                obj.coverage_total = obj.coverage_total + obj.timestamps(end) - obj.timestamps(1) + obj.dt;
+                obj.star_hours_total = obj.star_hours_total + (obj.timestamps(end) - obj.timestamps(1) + obj.dt)*sum(good_stars)/3600;
+                sim_pars = [];
+            else
+                sim_pars = obj.sim_bank.sim_pars;
+            end
             
+            if obj.debug_bit>2, fprintf('Triggering time: %f seconds.\n', toc(t)); end
+
+            obj.storeEventHousekeeping(sim_pars); % add some data from this batch to the triggered events
+            
+            if ~obj.use_sim || obj.sim_bank.filtered_index==0 % don't check for duplicates in sim-mode
+                obj.checkEvents; % check each event by itself + make sure we aren't taking events that already exist
+            else
+                for ii = 1:length(obj.new_events), obj.new_events(ii).self_check; end % only check the events with internal checks
+            end
+
         end
         
         function time_range = findTimeRange(obj, ff, time_index, star_index)
-
+            
             N = size(ff,1); % time length
             
             thresh = obj.getTimeThresh;
@@ -571,7 +760,13 @@ classdef Finder < handle
 
         end
         
-        function storeEventHousekeeping(obj, input) % store all the additional metadata about this event
+        function storeEventHousekeeping(obj, sim_pars) % store all the additional metadata about this event
+            
+            if nargin<2 || isempty(sim_pars)
+                sim_pars = [];
+            end
+            
+            t = tic;
             
             for ii = 1:length(obj.new_events)
                 
@@ -586,7 +781,7 @@ classdef Finder < handle
                 ev.best_kernel = obj.bank.kernels(:,ev.kern_index);
                 
                 ev.threshold = obj.threshold;
-                ev.used_background_sub = input.used_background_sub;
+                ev.used_background_sub = obj.used_background_sub;
                 ev.time_range_thresh = obj.time_range_thresh;
                 ev.kern_range_thresh = obj.kern_range_thresh;
                 ev.star_range_thresh = obj.star_range_thresh;
@@ -599,58 +794,65 @@ classdef Finder < handle
                 ev.areas_time_average = mean(a, 1, 'omitnan');
                 ev.areas_star_average = mean(a, 2, 'omitnan');
                 
-                b = vertcat(obj.prev_backgrounds, input.backgrounds);
+                b = vertcat(obj.prev_backgrounds, obj.backgrounds);
                 ev.backgrounds_at_peak = b(ev.frame_index, :);
                 ev.backgrounds_at_star = b(:, ev.star_index);
                 ev.backgrounds_time_average = mean(b, 1, 'omitnan');
                 ev.backgrounds_star_average = mean(b, 2, 'omitnan');
                 
-                v = vertcat(obj.prev_variances, input.variances);
+                v = vertcat(obj.prev_variances, obj.variances);
                 ev.variances_at_peak = v(ev.frame_index, :);
                 ev.variances_at_star = v(:, ev.star_index);
                 ev.variances_time_average = mean(v, 1, 'omitnan');
                 ev.variances_star_average = mean(v, 2, 'omitnan');
                 
-                dx = vertcat(obj.prev_offsets_x, input.offsets_x);
+                dx = vertcat(obj.prev_offsets_x, obj.offsets_x);
                 ev.offsets_x_at_peak = dx(ev.frame_index, :);
                 ev.offsets_x_at_star = dx(:, ev.star_index);
                 ev.offsets_x_time_average = mean(dx, 1, 'omitnan');
                 ev.offsets_x_star_average = mean(dx, 2, 'omitnan');
                 
-                dy = vertcat(obj.prev_offsets_y, input.offsets_y);
+                dy = vertcat(obj.prev_offsets_y, obj.offsets_y);
                 ev.offsets_y_at_peak = dy(ev.frame_index, :);
                 ev.offsets_y_at_star = dy(:, ev.star_index);
                 ev.offsets_y_time_average = mean(dy, 1, 'omitnan');
                 ev.offsets_y_star_average = mean(dy, 2, 'omitnan');
                 
-                w = vertcat(obj.prev_widths, input.widths);
+                w = vertcat(obj.prev_widths, obj.widths);
                 ev.widths_at_peak = w(ev.frame_index, :);
                 ev.widths_at_star = w(:, ev.star_index);
                 ev.widths_time_average = mean(w, 1, 'omitnan');
                 ev.widths_star_average = mean(w, 2, 'omitnan');
                 
-                p = vertcat(obj.prev_bad_pixels, input.bad_pixels);
+                p = vertcat(obj.prev_bad_pixels, obj.bad_pixels);
                 ev.bad_pixels_at_peak = p(ev.frame_index, :);
                 ev.bad_pixels_at_star = p(:, ev.star_index);
                 ev.bad_pixels_time_average = mean(p, 1, 'omitnan');
                 ev.bad_pixels_star_average = mean(p, 2, 'omitnan');
                 
-                ev.aperture = input.aperture;
-                ev.gauss_sigma = input.gauss_sigma;
+                ev.aperture = obj.aperture;
+                ev.gauss_sigma = obj.gauss_sigma;
                 
-                ev.cutouts_first = obj.prev_cutouts(:,:,:,ev.star_index);
-                ev.cutouts_second = input.cutouts(:,:,:,ev.star_index);
-                ev.positions_first = obj.prev_positions;
-                ev.positions_second = input.positions;
-                ev.stack_first = obj.prev_stack;
-                ev.stack_second = input.stack;
-                ev.batch_index_first = obj.prev_batch_index;
-                ev.batch_index_second = input.batch_index;
-                ev.filename_first = obj.prev_filename;
-                ev.filename_second = input.filename;
-                if ischar(input.t_end) && isnumeric(input.t_end_stamp)
-                    ev.t_end = input.t_end;
-                    ev.t_end_stamp = input.t_end_stamp;
+                if isempty(sim_pars)
+                    if ~isempty(obj.prev_cutouts), ev.cutouts_first = obj.prev_cutouts(:,:,:,ev.star_index); end
+                    if ~isempty(obj.cutouts), ev.cutouts_second = obj.cutouts(:,:,:,ev.star_index); end
+                    if ~isempty(obj.prev_positions), ev.positions_first = obj.prev_positions; end
+                    if ~isempty(obj.positions), ev.positions_second = obj.positions; end
+                    if ~isempty(obj.prev_stack), ev.stack_first = obj.prev_stack; end
+                    if ~isempty(obj.stack), ev.stack_second = obj.stack; end
+                    
+                    ev.batch_index_first = obj.prev_batch_index;
+                    ev.batch_index_second = obj.batch_index;
+                    ev.filename_first = obj.prev_filename;
+                    ev.filename_second = obj.filename;
+                    
+                end
+                
+                ev.sim_pars = sim_pars;
+                
+                if ischar(obj.t_end) && isnumeric(obj.t_end_stamp)
+                    ev.t_end = obj.t_end;
+                    ev.t_end_stamp = obj.t_end_stamp;
                 end
                 
                 ev.phot_pars = obj.phot_pars;
@@ -675,7 +877,9 @@ classdef Finder < handle
                 % ...
                 
             end
-        
+            
+            if obj.debug_bit>2, fprintf('Housekeeping time: %f seconds.\n', toc(t)); end
+
         end
         
         function checkEvents(obj)
@@ -709,7 +913,7 @@ classdef Finder < handle
                 
             end
             
-            if obj.debug_bit>1, fprintf('runtime "check_new_events": %f seconds\n', toc(t)); end
+            if obj.debug_bit>2, fprintf('runtime "check_new_events": %f seconds\n', toc(t)); end
             
         end
         
@@ -753,7 +957,7 @@ classdef Finder < handle
                 end
             end
             
-            if obj.debug_bit>1, fprintf('runtime "finishup": %f seconds\n', toc(t)); end
+            if obj.debug_bit>2, fprintf('runtime "finishup": %f seconds\n', toc(t)); end
             
         end
         
@@ -768,6 +972,36 @@ classdef Finder < handle
             end
             
             save(filename, 'events');
+            
+        end
+        
+        function obj = runSimulations(obj, lightcurve_filename, varargin)
+            
+            if isempty(lightcurve_filename) || ~exist(lightcurve_filename, 'file')
+                error('Must supply a valid "lightcurve" MAT file. ');
+            end
+            
+            input = util.text.InputVars;
+            input.input_var('batch_size', 100);
+            % ... add more parameters
+            input.scan_vars(varargin{:}); 
+            
+            L = load(lightcurve_filename);
+            
+            N = size(L.fluxes,1);
+            
+            obj.reset;
+            obj.use_sim = 1;
+            
+            obj.prog.start(N);
+            
+            for idx = 1:input.batch_size:N
+                
+                obj.input('lightcurves', L, 'length', input.batch_size, 'index', idx);
+                
+                obj.prog.showif(idx);
+                
+            end
             
         end
         
@@ -960,6 +1194,10 @@ classdef Finder < handle
                 obj.show(parent);
             end
             
+            
+        end
+        
+        function showSimulatedSNR(obj, varargin)
             
         end
         

@@ -10,15 +10,18 @@ classdef CircularBuffer < dynamicprops
         
         titles = {};
         
+        mean; % lazy loaded
+        median; % lazy loaded
+        var; % lazy loaded
+        
     end
     
     properties(Dependent=true)
         
+        Nfilled; % size of useful part of raw_data
+        
         data;
         data_ordered;
-        
-        mean;
-        median;
         
     end
         
@@ -28,7 +31,7 @@ classdef CircularBuffer < dynamicprops
         
     end
     
-    methods
+    methods % constructor
         
         function obj = CircularBuffer(varargin)
             
@@ -40,6 +43,10 @@ classdef CircularBuffer < dynamicprops
             obj.N = input.N;
             
         end
+    
+    end
+    
+    methods % resetters
         
         function reset(obj, N)
             
@@ -53,6 +60,150 @@ classdef CircularBuffer < dynamicprops
             obj.size_vec = [];
             
         end
+        
+    end 
+    
+    methods % getters
+        
+        function val = dots_cell(obj, num_dims)
+            
+            val{1} = obj.idx;
+            
+            if num_dims>1
+                [val{2:num_dims}] = deal(':');
+            end
+                
+        end
+        
+        function val = get.Nfilled(obj)
+            
+            val = min(obj.counter, obj.N);
+            
+        end
+        
+        function val = get.data(obj)
+            
+            if isempty(obj.raw_data)
+                val = [];
+            else
+                vec = obj.dots_cell(length(obj.size_vec));
+                vec{1} = 1:min(obj.N, obj.counter);
+                val = obj.raw_data(vec{:});
+            end
+            
+        end
+        
+        function val = get.data_ordered(obj)
+            
+            if obj.idx<1
+                val = [];
+                return;
+            end
+            
+            val = vertcat(obj.data(obj.idx:end,:), obj.data(1:obj.idx-1,:));
+            
+        end
+        
+        function val = get.mean(obj)
+            
+            if isempty(obj.mean)
+                obj.mean = mean(obj.data, 1, 'omitnan');
+            end
+            
+            val = obj.mean;
+            
+        end
+        
+        function val = get.median(obj)
+            
+            if isempty(obj.median)
+                obj.median = median(obj.data, 1, 'omitnan');
+            end
+            
+            val = obj.median;
+            
+        end
+        
+        function val = get.var(obj)
+            
+            if isempty(obj.var)
+                obj.var = var(obj.data, [], 1, 'omitnan');
+            end
+            
+            val = obj.var;
+            
+        end
+        
+        function val = is_full(obj)
+            
+            val = obj.counter>=obj.N;
+            
+        end
+        
+        function val = is_empty(obj)
+            
+%             val = isempty(obj.data);
+            val = obj.Nfilled==0;
+            
+        end
+        
+        function str_out = printout(obj)
+            
+            str = '';
+            
+            if ~isempty(obj.titles)
+                
+                for ii = 1:length(obj.titles)
+                    str = [str sprintf('% 12s ', obj.titles{ii})];
+                end
+                
+                str = [str '\n'];
+                
+            end
+            
+            for ii = 1:size(obj.data, 1)
+                
+                for jj = 1:size(obj.data,2)
+                
+                    str = [str sprintf('% 12.10g ', obj.data(ii,jj))];
+                    
+                end
+                
+                str = [str '\n'];
+                
+            end
+            
+            fprintf(str);
+            
+            if nargout>0
+                str_out = str;
+            end
+            
+        end
+        
+    end 
+    
+    methods % setters
+       
+        function set.raw_data(obj, val)
+            
+            obj.mean = [];
+            obj.median = [];
+            obj.var = [];
+            
+            obj.raw_data = val;
+            
+        end
+        
+        function set.data(obj, val)
+            
+            obj.raw_data = val;
+            
+        end
+         
+    end
+    
+    methods % calculations
         
         function input(obj, matrix)
             
@@ -92,103 +243,6 @@ classdef CircularBuffer < dynamicprops
                 vec = obj.dots_cell(ndims(matrix));
                 obj.raw_data(vec{:}) = matrix;
                 
-            end
-            
-        end
-        
-        function val = dots_cell(obj, num_dims)
-            
-            val{1} = obj.idx;
-            
-            if num_dims>1
-                [val{2:num_dims}] = deal(':');
-            end
-                
-        end
-        
-        function val = get.data(obj)
-            
-            if isempty(obj.raw_data)
-                val = [];
-            else
-                vec = obj.dots_cell(length(obj.size_vec));
-                vec{1} = 1:min(obj.N, obj.counter);
-                val = obj.raw_data(vec{:});
-            end
-            
-        end
-        
-        function val = get.data_ordered(obj)
-            
-            if obj.idx<1
-                val = [];
-                return;
-            end
-            
-            val = vertcat(obj.data(obj.idx:end,:), obj.data(1:obj.idx-1,:));
-            
-        end
-        
-        function val = get.mean(obj)
-            
-            val = mean(obj.data, 1, 'omitnan');
-            
-        end
-        
-        function val = get.median(obj)
-            
-            val = median(obj.data, 1, 'omitnan');
-            
-        end
-        
-        function set.data(obj, val)
-            
-            obj.raw_data = val;
-            
-        end
-        
-        function val = is_full(obj)
-            
-            val = obj.counter>=obj.N;
-            
-        end
-        
-        function val = is_empty(obj)
-            
-            val = isempty(obj.data);
-            
-        end
-        
-        function str_out = printout(obj)
-            
-            str = '';
-            
-            if ~isempty(obj.titles)
-                
-                for ii = 1:length(obj.titles)
-                    str = [str sprintf('% 12s ', obj.titles{ii})];
-                end
-                
-                str = [str '\n'];
-                
-            end
-            
-            for ii = 1:size(obj.data, 1)
-                
-                for jj = 1:size(obj.data,2)
-                
-                    str = [str sprintf('% 12.10g ', obj.data(ii,jj))];
-                    
-                end
-                
-                str = [str '\n'];
-                
-            end
-            
-            fprintf(str);
-            
-            if nargout>0
-                str_out = str;
             end
             
         end

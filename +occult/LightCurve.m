@@ -366,7 +366,11 @@ classdef LightCurve < handle
                 input.ax.ColorOrderIndex = ii;
                 
                 h = plot(input.ax, obj.time, obj.flux(:,ii), '-');
-                h.DisplayName = sprintf('R= %4.2f | r= %4.2f | b= %4.2f | v= %4.1f | t= %4.2f', obj.pars.R(ii), obj.pars.r(ii), obj.pars.b(ii), obj.pars.v(ii), obj.pars.t(ii));
+                if all(obj.pars.t==0)
+                    h.DisplayName = sprintf('R= %4.2f | r= %4.2f | b= %4.2f | v= %4.1f', obj.pars.R(ii), obj.pars.r(ii), obj.pars.b(ii), obj.pars.v(ii));
+                else
+                    h.DisplayName = sprintf('R= %4.2f | r= %4.2f | b= %4.2f | v= %4.1f | t= %4.2f', obj.pars.R(ii), obj.pars.r(ii), obj.pars.b(ii), obj.pars.v(ii), obj.pars.t(ii));
+                end
                 
                 color = h.Color;
                 
@@ -378,7 +382,7 @@ classdef LightCurve < handle
                 
             end
             
-            title(input.ax, sprintf('LC: T= %dms | f= %4.1fHz, W= %4.2f s', 1000.*obj.pars.T, obj.pars.f, obj.pars.W));
+            title(input.ax, sprintf('LC: T= %dms | f= %4.1fHz, W= %4.2f s', obj.pars.T, obj.pars.f, obj.pars.W));
             xlabel(input.ax, 'time [seconds]');
             ylabel(input.ax, 'intensity (normalized)');
             

@@ -507,8 +507,14 @@ classdef Analysis < file.AstroData
                         asterisk = '*';
                     end
                     
+                    finish_datetime = obj.futures{ii}.FinishDateTime;
+                    if isempty(finish_datetime)
+                        finish_datetime = datetime('now', 'TimeZone', 'Local');
+                        asterisk = ' ';
+                    end
+                    
                     fprintf('Future{%2d}: State= %14s%s | Error= %d | runtime= %9s', ii, obj.futures{ii}.State, asterisk, ~isempty(obj.futures{ii}.Error),...
-                        char(obj.futures{ii}.FinishDateTime-obj.futures{ii}.StartDateTime));
+                        char(finish_datetime-obj.futures{ii}.StartDateTime));
                 
                     if length(obj.futures_dir)>=ii && ~isempty(obj.futures_dir{ii})
                         fprintf(' | dir= %s', obj.futures_dir{ii});
@@ -524,6 +530,32 @@ classdef Analysis < file.AstroData
                 end
                 
                 
+                
+            end
+            
+        end
+        
+        function pars = calcSkyParameters(obj) % take the stack photometery (and possible the catalog) and calculate seeing, background and zeropoint
+            
+            if isempty(obj.phot_stack) % any other tests??
+                pars = [];
+            else
+                
+                pars = struct;
+                pars.seeing = median(obj.phot_stack.widths,2,'omitnan').*obj.pars.SCALE.*2.355;
+                pars.background = median(obj.phot_stack.backgrounds,2,'omitnan');
+                
+                if ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) % this is a fairly good indicator that mextractor/astrometry worked
+                    
+                    pars.zero_point = median(obj.phot_stack.fluxes.*10.^(0.4.*obj.cat.magnitudes') ,2,'omitnan');
+                    
+                    if is_full(obj.flux_buf)
+                        star_snr = obj.flux_buf.mean./sqrt(obj.flux_buf.var); 
+                        limiting_mags = obj.cat.magnitudes' + 2.5*log10(star_snr./50);
+                        pars.limiting_mag = median(limiting_mags, 2, 'omitnan');
+                    end
+                    
+                end
                 
             end
             
@@ -955,12 +987,8 @@ classdef Analysis < file.AstroData
             
             if ast && obj.batch_counter==0 % I could replace batch_counter with a testing if data is not empty, but if astrometry fails it will keep re-failing each batch
                 
-                try
-                    obj.cat.input(obj.stack_proc);
-                catch ME
-                    warning(ME.getReport);
-                end
-
+                obj.cat.input(obj.stack_proc);
+                
                 if ~isempty(obj.cat.data) % successfully filled the catalog
 
                     obj.cat.num_stars = obj.num_stars;
@@ -972,12 +1000,14 @@ classdef Analysis < file.AstroData
                 
                 filename = fullfile(obj.reader.dir.pwd, 'catalog.mat');
                 
-                if isempty(obj.use_astrometry)
-                    if ~exist(filename, 'file') % in auto-mode, only save if there was no catalog file
+                if ~isempty(obj.cat.data)
+                    if isempty(obj.use_astrometry)
+                        if ~exist(filename, 'file') % in auto-mode, only save if there was no catalog file
+                            obj.cat.saveMAT(filename);
+                        end
+                    elseif obj.use_astrometry % in force-astrometry mode must update the catalog file
                         obj.cat.saveMAT(filename);
                     end
-                elseif obj.use_astrometry % in force-astrometry mode must update the catalog file
-                    obj.cat.saveMAT(filename);
                 end
                 
             end

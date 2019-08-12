@@ -10,6 +10,10 @@ classdef Event < handle
         
         phot_pars; % a struct with some housekeeping about how the photometry was done
         
+        fit_pars; % fit to the occultation parameters
+        
+        sim_pars; % if simulated, this should contain the fit parameters...
+        
     end
     
     properties(Dependent=true)
@@ -167,10 +171,10 @@ classdef Event < handle
         function obj = Event(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'trig.Event')
-                if obj.debug_bit, fprintf('Event copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Event copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('Event constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Event constructor v%4.2f\n', obj.version); end
             
             end
             
