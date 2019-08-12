@@ -327,8 +327,8 @@ classdef ScopeAssistant < handle
                     obj.telescope.stop;
 
                     if obj.log_message_sent==0
-                        disp('Arduino sending stop signal to telescope!');
                         obj.telescope.log.input(['Arduino stopped telescope at angle ALT: ' num2str(obj.ALT) ' degrees...']);
+                        fprintf('%s: Arduino sending stop signal to telescope!\n', obj.telescope.log.report(1:8));
                         obj.log_message_sent = 1;
                     end
 

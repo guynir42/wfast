@@ -696,7 +696,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 obj.sync.outgoing.stop_camera = 1;
             else
-                obj.sync.outgoing.stop_camera = 0;
+%                 obj.sync.outgoing.stop_camera = 0;
             end
             
             

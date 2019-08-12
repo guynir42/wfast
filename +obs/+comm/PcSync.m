@@ -29,7 +29,7 @@ classdef PcSync < handle
     
     properties % switches/controls
         
-        remote_ip = '192.168.1.100';
+        remote_ip = '192.168.1.110';
         remote_port_rx = 4012;
         remote_port_tx = 4013;
         role = '';
@@ -49,8 +49,8 @@ classdef PcSync < handle
         raw_data_rx_temp; % for broken up incoming messages
         raw_data_tx_temp;
         
-        default_client_remote_ip = '192.168.1.101';
-        default_server_remote_ip = '192.168.1.100';
+        default_client_remote_ip = '192.168.1.107';
+        default_server_remote_ip = '192.168.1.110';
         
         default_server_remote_port_rx = 4012;
         default_server_remote_port_tx = 4013;

@@ -132,6 +132,10 @@ classdef WindETH < handle
             %V=fread(obj.hndl);
             % for query see Papouch s.r.o Spinel in AD4xxx manual: pp 10-11
             obj.reply = query(obj.hndl, sprintf('*B1MR0\r'));
+            
+            if isempty(obj.reply)
+                error('Cannot get a reply from WindETH');
+            end
                         
             % single measurment command
 %             HexCommand = ['2A';'61';'00';'06';'31';'02';'51';'00';'EA';'0D'];

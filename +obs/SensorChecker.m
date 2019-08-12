@@ -297,7 +297,12 @@ classdef SensorChecker < handle
             
             for ii = 1:length(obj.sensors)
                 if ismethod(obj.sensors{ii}, 'update')
-                    obj.sensors{ii}.update;
+                    try
+                        obj.sensors{ii}.update;
+                    catch ME
+                        obj.sensors{ii}.connect;
+                        warning(ME.getReport);
+                    end
                 end
             end
              

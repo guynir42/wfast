@@ -26,6 +26,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 
     properties(Transient=true)
         
+        gui@obs.mount.gui.ASAGUI;
+        
     end
     
     properties % objects
@@ -40,6 +42,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         timer; % timer object
         
+        guiding_history@util.vec.CircularBuffer;
+        
         log@util.sys.Logger; % keep track of all commands and errors
         
     end
@@ -51,8 +55,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
     end
     
     properties % switches/controls
-        
-        limit_alt = 15; % degrees above horizon where telescope is not allowed to go
         
         use_guiding = 1;
         use_accelerometer = 1; % make constant checks for altitude outside of the mounts own sensors
@@ -68,8 +70,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
     
     properties(Dependent=true)
         
+        
+        limit_alt; % degrees above horizon where telescope is not allowed to go
+        limit_flip; % degrees beyond meridian where telescope can go before needing to flip
+        
         % these are parameters of the target object
         % they are kept in the Ephemeris class
+        objName;
         objRA_deg; 
         objDEC_deg;
         
@@ -124,6 +131,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 if obj.debug_bit, fprintf('ASA constructor v%4.2f\n', obj.version); end
             
             end
+            
+            obj.guiding_history = util.vec.CircularBuffer;
             
             obj.log = util.sys.Logger('ASA_mount', obj);
             
@@ -300,6 +309,28 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
     end
     
     methods % getters
+        
+        function val = get.limit_alt(obj)
+            
+            val = obj.hndl.AltitudeLimit;
+            
+        end
+        
+        function val = get.limit_flip(obj)
+            
+            val = obj.hndl.MeridianFlipMaxAngle;
+            
+        end
+        
+        function val = get.objName(obj)
+            
+            if isempty(obj.sync) || isempty(obj.sync.outgoing) || ~isfield(obj.sync.outgoing, 'obj_name')
+                val = '';
+            else
+                val = obj.sync.outgoing.obj_name;
+            end
+            
+        end
         
         function val = get.objRA_deg(obj)
 
@@ -487,9 +518,35 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
+        function val = obj_pier_side(obj)
+            
+            val = '---'; % need to implement this! 
+            
+        end
+        
+        function val = tel_time_to_limit(obj)
+            
+            val = NaN; % need to implement this! 
+            
+        end
+        
+        function val = obj_time_to_limit(obj)
+            
+            val = NaN; % need to implement this! 
+            
+        end
+        
     end
     
     methods % setters
+        
+        function set.objName(obj, val)
+            
+            if ~isempty(obj.sync)
+                obj.sync.outgoing.obj_name = val;
+            end
+            
+        end
         
         function set.objRA(obj, val)
             
@@ -602,6 +659,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function inputTarget(obj, varargin)
             
+            if isempty(varargin) && isempty(obj.objName)
+                error('Must supply an object name or coordinates (or fill objName field)');
+            elseif isempty(varargin)
+                varargin{1} = obj.objName;
+            end
+            
             obj.object.input(varargin{:}); % Ephemeris now uses Eran's name resolver
             
         end
@@ -682,6 +745,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 obj.tracking = 1;
                 
                 if ~isempty(obj.sync)
+                    obj.sync.outgoing.stop_camera = 0; % need to tell cam-pc to start working! 
                     obj.updateCamera;
                     obj.sync.update;
                 end
@@ -692,6 +756,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     obj.sync.incoming = struct;
                 end
                 
+                obj.guiding_history.reset;
+                obj.guiding_history.N = 100; 
                 obj.resetRate;
                 
             catch ME
@@ -742,13 +808,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                         obj.sync.incoming.DE_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
                         obj.sync.outgoing.DE_rate = obj.rate_DE;
                     end
+                    
                 else
                     % what to do here? reconnect or leave that to t1?
                 end
                 
-%                 if ~isempty(obj.gui) && obj.gui.check
-%                     obj.gui.update;
-%                 end
+                if ~isempty(obj.rate_RA) && ~isempty(obj.rate_DE) 
+                    obj.guiding_history.input([obj.rate_RA, obj.rate_DE]);
+                end
+                
+                if ~isempty(obj.gui) && obj.gui.check
+                    obj.gui.update;
+                end
                 
             catch ME
                 obj.log.error(ME.getReport);
@@ -920,6 +991,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 obj.brake_bit = 1;
             
                 obj.hndl.AbortSlew;
+                obj.hndl.tracking = 0;
                 obj.resetRate;
                 
                 if ~isempty(obj.sync)
@@ -964,7 +1036,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             if obj.tracking==0 || abs(obj.objRA_deg-obj.telRA_deg)>1 % if mount stops tracking or is 4 time-minutes away from target RA, stop the camera (e.g., when reaching limit)
                 obj.sync.outgoing.stop_camera = 1;
             else
-                obj.sync.outgoing.stop_camera = 0;
+%                 obj.sync.outgoing.stop_camera = 0;
             end
             
         end
@@ -972,6 +1044,29 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
     end
     
     methods % plotting tools / GUI
+        
+        function makeGUI(obj)
+            
+            if isempty(obj.gui)
+                obj.gui = obs.mount.gui.ASAGUI(obj);
+            end
+            
+            obj.gui.make;
+            
+        end
+        
+        function plot_rate(obj, ax)
+            
+            if ~isempty(obj.guiding_history.data)
+                hold(ax, 'off');
+                plot(ax, obj.guiding_history.data_ordered(:,1), 'x');
+                hold(ax, 'on');
+                plot(ax, obj.guiding_history.data_ordered(:,2), '+');
+                ylabel(ax, 'rates');
+                hold(ax, 'off');
+            end
+            
+        end
         
     end    
     

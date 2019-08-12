@@ -529,6 +529,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
                 hours = num{1}(1);
                 degrees = hours*15;
+                s = sign(degrees);
+                degrees = abs(degrees);
                 
                 if length(num{1})>1
                     minutes = num{1}(2)*15;
@@ -543,6 +545,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 end
                 
                 val = degrees+minutes/60+seconds/3600;
+                val = val.*s;
                 
             end
             
@@ -608,13 +611,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 hours = hours(:,1);
             end
             
+            s = sign(hours);
+            hours = abs(hours);
             total_secs = hours*3600 + minutes*60 + seconds;
             
             hours   = floor(total_secs/3600);
             minutes = floor(mod(total_secs,3600)/60);
             seconds = mod(total_secs,60);
             
-            str = sprintf('%02d:%02d:%04.1f', hours, minutes, seconds);
+            if s>0
+                sign_str = '';
+            else
+                sign_str = '-';
+            end
+                
+            str = sprintf('%s%02d:%02d:%04.1f', sign_str, hours, minutes, seconds);
             
         end
         
