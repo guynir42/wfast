@@ -93,6 +93,7 @@ classdef Event < handle
         is_corr_offsets = 0; % if there is strong correlation to star offsets in the cutout 
         is_corr_bg = 0; % if there is strong anti-correlation to background
         is_corr_area = 0; % if there is strong correlation to aperture area
+        is_corr_width = 0; % if there is a strong correlation to PSF width
         is_nan_flux = 0; % this event has too many NaN values in the raw flux around the peak
         is_nan_offsets = 0; % this event has too many NaN values in the offsets of x or y around the peak
         is_simulated = 0; % we've added this event on purpose
@@ -378,6 +379,14 @@ classdef Event < handle
                 obj.keep = 0;
                 obj.is_corr_area = 1;
                 obj.addNote(sprintf('signal is correlated with aperture area at a %f level', corr));
+            end
+            
+            % check for correlation with area
+            corr = obj.correlation(obj.widths_at_star);
+            if abs(corr)>obj.max_corr
+                obj.keep = 0;
+                obj.is_corr_width = 1;
+                obj.addNote(sprintf('signal is correlated with PSF width at a %f level', corr));
             end
             
             % add any other checks you can think about

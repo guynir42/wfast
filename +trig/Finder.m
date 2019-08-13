@@ -73,7 +73,11 @@ classdef Finder < handle
         coverage_total;
         coverage_lost;
         star_hours_total;
+        star_hours_total_better;
+        star_hours_total_best;
         star_hours_lost;
+        star_hours_lost_better;
+        star_hours_lost_best;
         snr_values;
         
     end
@@ -105,7 +109,6 @@ classdef Finder < handle
         
         display_event_idx = [];
         use_display_kept_events = 0;
-        
         
         debug_bit = 1;
         
@@ -187,6 +190,10 @@ classdef Finder < handle
             obj.coverage_lost = 0;
             obj.star_hours_total = 0;
             obj.star_hours_lost = 0;
+            obj.star_hours_total_better = 0;
+            obj.star_hours_lost_better = 0;
+            obj.star_hours_total_best = 0;
+            obj.star_hours_lost_best = 0;
             obj.snr_values = [];
             
             obj.display_event_idx = [];
@@ -574,6 +581,9 @@ classdef Finder < handle
                 return;
             end
             
+            better_stars = obj.cal.star_snrs>obj.min_star_snr*2;
+            best_stars = obj.cal.star_snrs>obj.min_star_snr*4;
+            
             t = tic; 
             
             if obj.use_sim && obj.sim_bank.filtered_index>0
@@ -689,11 +699,13 @@ classdef Finder < handle
                     if ~obj.use_sim || obj.sim_bank.filtered_index==0 % only store star hours when not in sim-mode
                         obj.coverage_lost = obj.coverage_lost + ev.duration; % how much time is "zeroed out"
                         obj.star_hours_lost = obj.star_hours_lost + (ev.duration)*sum(good_stars)/3600;
+                        obj.star_hours_lost_better = obj.star_hours_lost + (ev.duration)*sum(better_stars)/3600;
+                        obj.star_hours_lost_best = obj.star_hours_lost + (ev.duration)*sum(best_stars)/3600;
                     end
                     
                     if obj.debug_bit>3, fprintf('New event time: %f seconds.\n', toc(t_ev)); end
             
-                    ff(ev.time_indices, :, :) = 0; % don't look at the same region twice
+                    ff(ev.time_indices, :, :) = NaN; % don't look at the same region twice
             
                 else
                     break;
@@ -704,6 +716,8 @@ classdef Finder < handle
             if isempty(star_index_sim) % only store star hours when not in sim-mode
                 obj.coverage_total = obj.coverage_total + obj.timestamps(end) - obj.timestamps(1) + obj.dt;
                 obj.star_hours_total = obj.star_hours_total + (obj.timestamps(end) - obj.timestamps(1) + obj.dt)*sum(good_stars)/3600;
+                obj.star_hours_total_better = obj.star_hours_total_better + (obj.timestamps(end) - obj.timestamps(1) + obj.dt)*sum(better_stars)/3600;
+                obj.star_hours_total_best = obj.star_hours_total_best + (obj.timestamps(end) - obj.timestamps(1) + obj.dt)*sum(best_stars)/3600;
                 sim_pars = [];
             else
                 sim_pars = obj.sim_bank.sim_pars;

@@ -70,14 +70,14 @@ classdef Star < matlab.mixin.Copyable
         function obj = Star(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'head.Star')
-                if obj.debug_bit, fprintf('Star copy-constructor v%4.2f\n', obj.version); end 
+                if obj.debug_bit>1, fprintf('Star copy-constructor v%4.2f\n', obj.version); end 
                 obj = util.oop.full_copy(varargin{1});
             elseif ~isempty(varargin) && isa(varargin{1}, 'head.Parameters')
-                if obj.debug_bit, fprintf('Star constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Star constructor v%4.2f\n', obj.version); end
                 obj.pars = varargin{1};
                 if length(varargin)>1, obj.parse(varargin{2:end}); end
             else
-                if obj.debug_bit, fprintf('Star constructor v%4.2f\n', obj.version); end                
+                if obj.debug_bit>1, fprintf('Star constructor v%4.2f\n', obj.version); end                
                 obj.parse(varargin{:});
             end
             

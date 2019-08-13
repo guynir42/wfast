@@ -25,6 +25,11 @@ classdef Analysis < file.AstroData
         phot@img.Photometry;
         phot_stack@img.Photometry;
         flux_buf@util.vec.CircularBuffer;
+        mean_buf@util.vec.CircularBuffer;
+        var_buf@util.vec.CircularBuffer;
+        back_buf@util.vec.CircularBuffer;
+        width_buf@util.vec.CircularBuffer;
+        
 %         light_original@img.Lightcurves;
 %         light_basic@img.Lightcurves;
         lightcurves@img.Lightcurves;
@@ -35,6 +40,8 @@ classdef Analysis < file.AstroData
         model_psf@img.ModelPSF;
         
         finder@trig.Finder;
+        
+        sky_pars;
         
         prog@util.sys.ProgressBar;
         
@@ -163,6 +170,10 @@ classdef Analysis < file.AstroData
                 
                 obj.phot_stack = img.Photometry;
                 obj.flux_buf = util.vec.CircularBuffer;
+                obj.mean_buf = util.vec.CircularBuffer;
+                obj.var_buf = util.vec.CircularBuffer;
+                obj.back_buf = util.vec.CircularBuffer;
+                obj.width_buf = util.vec.CircularBuffer;
                 
 %                 obj.light_original = img.Lightcurves; 
 %                 obj.light_basic = img.Lightcurves; obj.light_basic.signal_method = 'square'; obj.light_basic.background_method = 'corners';
@@ -241,6 +252,9 @@ classdef Analysis < file.AstroData
             obj.stack_cutouts_sub = [];
             obj.stack_cutouts_bg = [];
             obj.stack_proc = [];
+            
+            obj.sky_pars = [];
+            
         end
         
     end
@@ -417,7 +431,6 @@ classdef Analysis < file.AstroData
             obs_date = obj.pars.STARTTIME;
             read_date = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
             
-            
             if isempty(str)
                 ev_str = '';
 
@@ -438,8 +451,12 @@ classdef Analysis < file.AstroData
                 if size(obj.fluxes,2)>=10, f(2) = obj.fluxes(1,10); end
                 if size(obj.fluxes,2)>=100, f(3) = obj.fluxes(1,100); end
 
-                fprintf(fid, 'Batch: %04d, ObsDate: %s, Flux: [%6.3f %6.3f %6.3f], Events S/N: [%s], ReadDate: %s\n',...
-                    obj.batch_counter+1, obs_date, f(1), f(2), f(3), ev_str, read_date);
+                fprintf(fid, 'Batch: %04d, ObsDate: %s, Flux: [% 9.1f % 8.1f % 7.1f]', obj.batch_counter+1, obs_date, f(1), f(2), f(3));
+                
+                fprintf(fid, ' | seeing: %4.2f" | back: %5.3f | zp: %6.4g | noise: %5.2f | lim. mag: %4.2f', ...
+                    obj.sky_pars.seeing, obj.sky_pars.background, obj.sky_pars.zero_point, obj.sky_pars.noise_level, obj.sky_pars.limiting_mag);
+                
+                fprintf(fid, ' | Events S/N: [%s], ReadDate: %s\n', ev_str, read_date);
             
             else
                 fprintf(fid, '%s: %s\n', read_date, str);
@@ -492,6 +509,15 @@ classdef Analysis < file.AstroData
 
                 fprintf(fid, 'Number of events: total= %d | kept= %d\n', length(obj.finder.all_events), length(obj.finder.kept_events));
             
+                fprintf(fid, 'Star hours above stellar S/N of %4.2f: total= %4.2f | lost= %4.2f | kept= %4.2f\n', obj.finder.min_star_snr, ...
+                    obj.finder.star_hours_total, obj.finder.star_hours_lost, obj.finder.star_hours_total-obj.finder.star_hours_lost);
+                
+                fprintf(fid, 'Star hours above stellar S/N of %4.2f: total= %4.2f | lost= %4.2f | kept= %4.2f\n', obj.finder.min_star_snr*2, ...
+                    obj.finder.star_hours_total_better, obj.finder.star_hours_lost_better, obj.finder.star_hours_total_better-obj.finder.star_hours_lost_better);
+                
+                fprintf(fid, 'Star hours above stellar S/N of %4.2f: total= %4.2f | lost= %4.2f | kept= %4.2f\n', obj.finder.min_star_snr*4, ...
+                    obj.finder.star_hours_total_best, obj.finder.star_hours_lost_best, obj.finder.star_hours_total_best-obj.finder.star_hours_lost_best);
+                
             end
             
         end
@@ -535,39 +561,13 @@ classdef Analysis < file.AstroData
             
         end
         
-        function pars = calcSkyParameters(obj) % take the stack photometery (and possible the catalog) and calculate seeing, background and zeropoint
-            
-            if isempty(obj.phot_stack) % any other tests??
-                pars = [];
-            else
-                
-                pars = struct;
-                pars.seeing = median(obj.phot_stack.widths,2,'omitnan').*obj.pars.SCALE.*2.355;
-                pars.background = median(obj.phot_stack.backgrounds,2,'omitnan');
-                
-                if ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) % this is a fairly good indicator that mextractor/astrometry worked
-                    
-                    pars.zero_point = median(obj.phot_stack.fluxes.*10.^(0.4.*obj.cat.magnitudes') ,2,'omitnan');
-                    
-                    if is_full(obj.flux_buf)
-                        star_snr = obj.flux_buf.mean./sqrt(obj.flux_buf.var); 
-                        limiting_mags = obj.cat.magnitudes' + 2.5*log10(star_snr./50);
-                        pars.limiting_mag = median(limiting_mags, 2, 'omitnan');
-                    end
-                    
-                end
-                
-            end
-            
-        end
-        
     end
     
     methods % calculations
         
         function startup(obj)
             
-            if isempty(obj.use_astrometry) || obj.use_astrometry==0 % in case use_astrometry==1 we will redo the astrometry anyway
+            if isempty(obj.cat.data) && (isempty(obj.use_astrometry) || obj.use_astrometry==0) % in case use_astrometry==1 we will redo the astrometry anyway
                 % try to get the catalog file
                 filename = fullfile(obj.reader.dir.pwd, 'catalog.mat');
                 if exist(filename, 'file')
@@ -914,7 +914,13 @@ classdef Analysis < file.AstroData
                     warning(ME.getReport); % non essential to  successfully running the data analysis
                 end
             end
-            
+           
+            if ~isempty(obj.cat) % other tests??
+                obj.magnitudes = obj.cat.magnitudes;
+                obj.temperatures = obj.cat.temperatures;
+                obj.coordinates = obj.cat.coordinates;
+            end
+
             if isempty(obj.positions) % if astrometry failed or was not used, we need to get positions somehow
                 obj.findStars;
             end
@@ -977,39 +983,48 @@ classdef Analysis < file.AstroData
             %%%%%%%%%%%%%%%%%%%%% ASTROMETRY ANALYSIS %%%%%%%%%%%%%%%%%%%%%%%%%
             
             t = tic;
-           
-            ast = obj.use_astrometry;
-            if isempty(ast) && isempty(obj.cat.data) % automatically determine if we need to run astrometry
-                ast = 1;
-            else
-                ast = obj.use_astrometry;
-            end
             
-            if ast && obj.batch_counter==0 % I could replace batch_counter with a testing if data is not empty, but if astrometry fails it will keep re-failing each batch
-                
-                obj.cat.input(obj.stack_proc);
-                
-                if ~isempty(obj.cat.data) % successfully filled the catalog
+            if obj.batch_counter==0
+            
+                ast = obj.use_astrometry;
 
-                    obj.cat.num_stars = obj.num_stars;
-                    obj.cat.findStars(obj.positions); 
-                    
-                    obj.positions = obj.cat.positions;
-                    
+                if isempty(obj.use_astrometry)  % automatically determine if we need to run astrometry
+                    if isempty(obj.cat.data) && isempty(obj.cat.success) % no astrometry was attempted
+                        ast = 1; % run astrometry 
+                    else
+                        ast = 0; % no need because either we have the data or the previous attempts have failed
+                    end
+                else
+                    ast = obj.use_astrometry;
                 end
-                
-                filename = fullfile(obj.reader.dir.pwd, 'catalog.mat');
-                
-                if ~isempty(obj.cat.data)
-                    if isempty(obj.use_astrometry)
-                        if ~exist(filename, 'file') % in auto-mode, only save if there was no catalog file
+
+                if ast 
+
+                    obj.cat.input(obj.stack_proc);
+
+                    if ~isempty(obj.cat.data) % successfully filled the catalog
+
+                        obj.cat.num_stars = obj.num_stars;
+                        obj.cat.findStars(obj.positions); 
+
+                        obj.positions = obj.cat.positions; % usually we will already have positions so this should do nothing (unless this analysis is on full frame rate images)
+
+                    end
+
+                    filename = fullfile(obj.reader.dir.pwd, 'catalog.mat');
+
+                    if ~isempty(obj.cat.data)
+                        if isempty(obj.use_astrometry)
+                            if ~exist(filename, 'file') % in auto-mode, only save if there was no catalog file
+                                obj.cat.saveMAT(filename);
+                            end
+                        elseif obj.use_astrometry % in force-astrometry mode must update the catalog file
                             obj.cat.saveMAT(filename);
                         end
-                    elseif obj.use_astrometry % in force-astrometry mode must update the catalog file
-                        obj.cat.saveMAT(filename);
                     end
+
                 end
-                
+
             end
             
             if ~isempty(obj.cat.data)
@@ -1053,7 +1068,12 @@ classdef Analysis < file.AstroData
                 % object (based on the stack). 
             end
             
-            obj.cutouts_sub = obj.cutouts_proc - B./obj.num_sum;
+            if obj.use_background_cutouts
+                obj.cutouts_sub = obj.cutouts_proc - B./obj.num_sum;
+            else
+                obj.cutouts_sub = obj.cutouts_proc;
+            end
+            
             
             if obj.debug_bit>1, fprintf('Time for cutouts: %f seconds\n', toc(t)); end
             
@@ -1072,6 +1092,80 @@ classdef Analysis < file.AstroData
             if obj.lightcurves.gui.check, obj.lightcurves.gui.update; end
 
             if obj.debug_bit>1, fprintf('Time for photometry: %f seconds\n', toc(t)); end
+            
+            t = tic;
+            
+            obj.mean_buf.input(mean(obj.phot.fluxes,1,'omitnan'));
+            obj.var_buf.input(var(obj.phot.fluxes,[],1,'omitnan'));
+            obj.back_buf.input(mean(obj.phot.backgrounds,1,'omitnan'));
+            obj.width_buf.input(mean(obj.phot.widths,1,'omitnan'));
+            
+            obj.calcSkyParameters;
+            
+            if obj.debug_bit>1, fprintf('Time to calculate sky parameters: %f seconds\n', toc(t)); end
+            
+        end
+        
+        function calcSkyParameters(obj) % take the stack photometery (and possible the catalog) and calculate seeing, background and zeropoint
+            
+            import util.stat.median2;
+            
+            if isempty(obj.mean_buf) % any other tests??
+                obj.sky_pars = [];
+            else
+                
+                obj.sky_pars = struct;
+%                 pars.seeing = median(obj.width_buf.median,2,'omitnan').*obj.pars.SCALE.*2.355;
+                obj.sky_pars.seeing = median2(obj.phot.widths).*obj.pars.SCALE.*2.355;
+%                 pars.background = median(obj.back_buf.median, 2,'omitnan');
+                obj.sky_pars.background = median2(obj.phot.backgrounds);
+                
+                if ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) % this is a fairly good indicator that mextractor/astrometry worked
+                    
+%                     S = double(obj.mean_buf.median)';
+%                     N = double(sqrt(obj.var_buf.median))';
+
+                    S = double(mean(obj.phot.fluxes, 1, 'omitnan'))';
+                    N = double(std(obj.phot.fluxes, [], 1, 'omitnan'))';
+                    
+%                     pars.zero_point = median(obj.mean_buf.median.*10.^(0.4.*obj.cat.magnitudes') ,2,'omitnan');
+                    obj.sky_pars.zero_point = median2(S*10.^(0.4.*obj.cat.magnitudes'));
+                    
+                    idx = ~isnan(S) & ~isnan(N) & S./N>3 & S./N<8; 
+                    S2 = S(idx);
+                    N2 = N(idx);
+
+                    if ~isempty(S)
+                        
+                        thresh = 5; % minimal S/N 
+                        
+                        fr = util.fit.polyfit(S2, N2.^2, 'order', 2, 'sigma', 2, 'iterations', 10); 
+                        obj.sky_pars.noise_level = sqrt(fr.coeffs(1));
+                        
+                        % solve the equation N(S) = c1 + c2*S + c3*S^2 == S/thresh
+                        a = fr.coeffs(3)-1./thresh.^2;
+                        b = fr.coeffs(2);
+                        c = fr.coeffs(1);
+                        
+                        s1 = (-b-sqrt(b.^2-4*a*c))./(2*a);
+                        s2 = (-b+sqrt(b.^2-4*a*c))./(2*a);
+                        
+                        obj.sky_pars.limiting_signal = min(s1,s2);
+                        if obj.sky_pars.limiting_signal<0
+                            obj.sky_pars.limiting_signal = max(s1,s2);
+                        end
+                        
+                        
+                        if ~isreal(obj.sky_pars.limiting_signal) || isnan(obj.sky_pars.limiting_signal) || obj.sky_pars.limiting_signal<0
+                            obj.sky_pars.limiting_mag = 2.5*log10(obj.sky_pars.zero_point./(obj.sky_pars.noise_level*thresh));
+                        else
+                            obj.sky_pars.limiting_mag = 2.5*log10(obj.sky_pars.zero_point./obj.sky_pars.limiting_signal);
+                        end
+                    end
+
+                end
+                
+            end
             
         end
         

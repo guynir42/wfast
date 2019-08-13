@@ -28,12 +28,14 @@ classdef Catalog < handle
         width; % equivalent to 1st moment (=FWHM/2.355)
         seeing; % arcsec
         
+        success; % fill this if astrometry is successfull or failed (empty means we didn't run it yet)
+        
     end
     
     properties % switches/controls
         
         threshold = 10; % used by mextractor to find stars
-        mag_limit = 15;
+        mag_limit = 18;
         min_star_temp;
         num_stars;
 %         flip = [1 1;1 -1;-1 1;-1 -1]; 
@@ -120,6 +122,8 @@ classdef Catalog < handle
         
         function input(obj, Im)
             
+            obj.success = 0; % change to 1 after all functions return normally 
+            
             obj.image = Im;
             
             obj.runMextractor;
@@ -135,6 +139,8 @@ classdef Catalog < handle
                 obj.pars.WCS.input(obj.wcs_object); % make sure the WCS object is updated too
                 
             end
+            
+            obj.success = 1;
             
         end
         

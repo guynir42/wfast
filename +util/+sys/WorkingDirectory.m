@@ -88,7 +88,7 @@ classdef WorkingDirectory < handle
                 if ~strcmp(d(ii).name,'.') && ~strcmp(d(ii).name,'..')
                     
                     if d(ii).isdir
-                        util.text.cprintf('Magenta', '%-60s %-15s \n', d(ii).name, d(ii).date);
+                        fprintf('%-60s %-15s \n', d(ii).name, d(ii).date);
                     elseif d(ii).bytes>1024^3
                         fprintf('%-60s %-15s %15f Gbs\n', d(ii).name, d(ii).date, d(ii).bytes/1024^3);
                     elseif d(ii).bytes>1024^2
@@ -158,13 +158,67 @@ classdef WorkingDirectory < handle
             directory = obj.check_dir(directory);
             
             assert(~isempty(directory), ['no such directory: ' directory]);
-                        
-%             list = util.sys.getfiles(expr, 0, 'glob', directory);
-
+            
             list = dir(util.text.sa(directory, expr));
             folders = {list.folder}';
             names = {list.name}';
             idx = ~[list.isdir]';
+            
+            list = strcat(folders(idx), '/', names(idx));
+            
+        end
+        
+        function list = match_folders(obj, expr, directory)
+            
+            if nargin<2 
+                expr = '';
+            end
+            
+            if nargin<3 || isempty(directory)
+                directory = obj.cwd;
+            end
+                        
+            directory = obj.check_dir(directory);
+            
+            assert(~isempty(directory), ['no such directory: ' directory]);
+            
+            list = dir(util.text.sa(directory, expr));
+            folders = {list.folder}';
+            names = {list.name}';
+            idx = [list.isdir]';
+            
+            list = strcat(folders(idx), '/', names(idx));
+            
+        end
+        
+        function list = regexp(obj, expr, directory, files_or_dirs)
+            
+            if nargin<2 
+                expr = '';
+            end
+            
+            if nargin<3 || isempty(directory)
+                directory = obj.cwd;
+            end
+                   
+            if nargin<4 || isempty(files_or_dirs)
+                files_or_dirs = '';
+            end
+            
+            directory = obj.check_dir(directory);
+            
+            assert(~isempty(directory), ['no such directory: ' directory]);
+            
+            list = dir(directory);
+            folders = {list.folder}';
+            names = {list.name}';
+            idx = ~cellfun(@isempty, regexp(names, expr)); 
+            
+            if ~isempty(files_or_dirs) && util.text.cs(files_or_dirs, 'files')
+                idx = idx & ~[list.isdir]';
+            elseif ~isempty(files_or_dirs) && util.text.cs(files_or_dirs, 'dirs', 'directories', 'folders')
+                idx = idx & [list.isdir]';
+            end
             
             list = strcat(folders(idx), '/', names(idx));
             
