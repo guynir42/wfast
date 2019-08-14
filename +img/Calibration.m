@@ -1353,7 +1353,7 @@ classdef Calibration < handle
         function loadByDate(obj, date, force_reload)
             
             if nargin<2 || isempty(date)
-                error('Must supply a valid "date" argument!');
+                date = datestr(datetime('now', 'TimeZone', 'UTC'), 'yyyy-mm-dd'); 
             end
             
             if nargin<3 || isempty(force_reload)

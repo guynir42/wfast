@@ -34,8 +34,8 @@ classdef Catalog < handle
     
     properties % switches/controls
         
-        threshold = 10; % used by mextractor to find stars
-        mag_limit = 18;
+        threshold = 5; % used by mextractor to find stars
+        mag_limit = 20;
         min_star_temp;
         num_stars;
 %         flip = [1 1;1 -1;-1 1;-1 -1]; 

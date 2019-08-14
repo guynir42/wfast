@@ -94,6 +94,8 @@ classdef Acquisition < file.AstroData
         use_model_psf = 1;
         
         use_check_flux = 1;
+        lost_stars_fraction = 0.3;
+        lost_flux_threshold = 0.3;
         max_failed_batches = 3; % if star flux is lost for more than this number of batches, quit the run
         
         use_save = false; % must change this when we are ready to really start
@@ -1138,6 +1140,7 @@ classdef Acquisition < file.AstroData
             
             try 
                 
+                drawnow;
                 s = obj.sync.incoming;
                 
                 list = head.Parameters.makeSyncList; 
@@ -1279,13 +1282,16 @@ classdef Acquisition < file.AstroData
 
                 end
                 
+                obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
+                
                 if isempty(obj.positions)
                     if obj.debug_bit, disp('Positions field empty. Calling single then findStars'); end
                     obj.single;
                     obj.findStars;
                 end
                 
-                obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
+%                 obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
+                
                 obj.pars.RUNSTART = util.text.time2str(obj.pars.ephem.time);
                 
                 if obj.use_save
@@ -1651,7 +1657,7 @@ classdef Acquisition < file.AstroData
                 new_fluxes(isnan(mean_fluxes)) = [];
                 mean_fluxes(isnan(mean_fluxes)) = [];
 
-                flux_lost = sum(new_fluxes<0.5*mean_fluxes)>0.5*numel(mean_fluxes); % lost half the flux in more than half the stars...
+                flux_lost = nnz(new_fluxes<obj.lost_flux_threshold*mean_fluxes)>obj.lost_stars_fraction*numel(mean_fluxes); % lost <fraction> of the flux in more than <fraction> of the stars...
                 % want to add more tests...?
 
                 val = ~flux_lost;
@@ -1668,7 +1674,7 @@ classdef Acquisition < file.AstroData
             
             if obj.checkFluxes % check that stars are still aligned properly... 
                 
-                if obj.use_sync, obj.sync.outgoing.stars_visible = 0;  end
+                if obj.use_sync, obj.sync.outgoing.stars_visible = 1;  end
                 
             else
                 
