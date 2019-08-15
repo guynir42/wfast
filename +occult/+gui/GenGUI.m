@@ -300,7 +300,8 @@ classdef GenGUI < handle
                 obj.owner.R = vec(ii);
                 obj.update;
                 delay = max([0 obj.total_delay-obj.owner.runtime_get]); 
-                pause(delay)
+                pause(delay);
+                drawnow;
             
             end
             
@@ -326,7 +327,8 @@ classdef GenGUI < handle
                 obj.owner.r = vec(ii);
                 obj.update;
                 delay = max([0 obj.total_delay-obj.owner.runtime_get]); 
-                pause(delay)
+                pause(delay);
+                drawnow;
             
             end
             
@@ -352,8 +354,9 @@ classdef GenGUI < handle
                 obj.owner.b = vec(ii);
                 obj.update;
                 delay = max([0 obj.total_delay-obj.owner.runtime_get]); 
-                pause(delay)
-            
+                pause(delay);
+                drawnow;
+                
             end
             
         end
@@ -378,7 +381,8 @@ classdef GenGUI < handle
                 obj.owner.v = vec(ii);
                 obj.update;
                 delay = max([0 obj.total_delay-obj.owner.runtime_get]); 
-                pause(delay)
+                pause(delay);
+                drawnow;
             
             end
             
@@ -404,7 +408,8 @@ classdef GenGUI < handle
                 obj.owner.t = vec(ii);
                 obj.update;
                 delay = max([0 obj.total_delay-obj.owner.runtime_get]); 
-                pause(delay)
+                pause(delay);
+                drawnow;
             
             end
             
@@ -462,7 +467,7 @@ classdef GenGUI < handle
         
         function callback_stop(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: reset r'); end
+            if obj.debug_bit, disp('callback: stop'); end
             
             obj.brake_bit = 1;
             drawnow;
