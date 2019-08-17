@@ -78,6 +78,7 @@ classdef Acquisition < file.AstroData
         use_refine_bg = 0;
         
         % these swithces determine how stars are picked when run begins
+        detect_thresh = 10; % minimal S/N of the stack stars for selecting cutouts
         use_remove_bad_pixels = true;
         use_remove_saturated = false; % remove all stars with any pixels about saturation value
         saturation_value = 50000; % consider any pixels above this to be saturated
@@ -1587,8 +1588,8 @@ classdef Acquisition < file.AstroData
             elseif obj.use_mextractor
                 obj.findStarsMAAT;
             elseif obj.use_quick_find_stars
-                T = util.img.quick_find_stars(S, 'psf', obj.getWidthEstimate, 'number', obj.num_stars,...
-                    'dilate', obj.cut_size-5, 'saturation', obj.saturation_value.*obj.num_sum, 'unflagged', 1); 
+                T = util.img.quick_find_stars(S, 'psf', obj.getWidthEstimate, 'number', obj.num_stars, 'sigma', obj.detect_thresh, ...
+                    'dilate', obj.cut_size-5, 'saturation', obj.saturation_value.*obj.num_sum, 'edges', obj.avoid_edges, 'unflagged', 1); 
                 if isempty(T)
                     error('Could not find any stars using quick_find_stars!');
                 end
@@ -1614,6 +1615,7 @@ classdef Acquisition < file.AstroData
              
             % add additional tests to remove irrelvant stars
             
+            obj.threshold = obj.detect_thresh;
             obj.cat.input(obj.stack_proc);
             
             T = obj.cat.data;
