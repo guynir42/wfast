@@ -78,6 +78,30 @@ classdef Catalog < handle
     
     methods % reset/clear
         
+        function reset(obj)
+            
+        obj.positions = [];
+        obj.magnitudes = [];
+        obj.coordinates = [];
+        obj.temperatures = [];
+        
+        obj.FWHM = [];
+        obj.width = [];
+        obj.seeing = [];
+        
+        obj.success = []; 
+        
+            
+            obj.clear;
+            
+        end
+        
+        function clear(obj)
+            
+            obj.image = [];
+            
+        end
+        
     end
     
     methods % getters

@@ -453,8 +453,12 @@ classdef Analysis < file.AstroData
 
                 fprintf(fid, 'Batch: %04d, ObsDate: %s, Flux: [% 9.1f % 8.1f % 7.1f]', obj.batch_counter+1, obs_date, f(1), f(2), f(3));
                 
-                fprintf(fid, ' | seeing: %4.2f" | back: %5.3f | zp: %6.4g | noise: %5.2f | lim. mag: %4.2f', ...
-                    obj.sky_pars.seeing, obj.sky_pars.background, obj.sky_pars.zero_point, obj.sky_pars.noise_level, obj.sky_pars.limiting_mag);
+                if isfield(obj.sky_pars, 'zero_point'), zp = obj.sky_pars.zero_point; else, zp = NaN; end
+%                 if isfield(obj.sky_pars, 'noise_level'), nl = obj.sky_pars.noise_level; else, nl = NaN; end
+                if isfield(obj.sky_pars, 'limiting_mag'), lm = obj.sky_pars.limiting_mag; else, lm = NaN; end
+                
+                fprintf(fid, ' | seeing: %4.2f" | back: %5.3f | area: %4.2f | zp: %6.4g | lim. mag: %4.2f', ...
+                    obj.sky_pars.seeing, obj.sky_pars.background, obj.sky_pars.area, zp, lm);
                 
                 fprintf(fid, ' | Events S/N: [%s], ReadDate: %s\n', ev_str, read_date);
             
@@ -658,118 +662,122 @@ classdef Analysis < file.AstroData
             
             try
             
-            input = util.text.InputVars;
-            input.input_var('reset', 0); % reset the object before running (i.e., start a new run)
-            input.input_var('logging', []); % create log files in the analysis folder
-            input.input_var('save', []); % save the events and lightcurves from this run
-            input.scan_vars(varargin{:});
-            
-            if input.reset
-                obj.reset;
-            end
-            
-            % update hidden variables in case we use GUI to stop then continue this run
-            if ~isempty(input.logging), obj.analysis_dir_log = input.logging; end            
-            if ~isempty(input.save), obj.analysis_dir_save = input.save; end
-            
-            if obj.analysis_dir_log || obj.analysis_dir_save
-                
-                log_time = datetime('now', 'TimeZone', 'UTC');
-                log_dir = fullfile(obj.reader.dir.pwd, ['analysis_' char(log_time, 'yyyy-MM-dd')]);
-                log_name = fullfile(log_dir, 'analysis_log.txt');
-                log_obj = fullfile(log_dir, 'analysis_parameters.txt');
-                
-                if obj.batch_counter==0
-                    if exist(log_dir, 'dir')
-                        error('Folder %s already exists! Is this run already being processed?', log_dir);
-                    else
-                        mkdir(log_dir);
-                    end
-                end
-                
-            end
-            
-            if obj.use_auto_load_cal
-                
-                date = datetime.empty;
-                
-                base_dir = obj.reader.current_dir;
-                
-                for ii = 1:3 % try to figure out this run's own date
-                    
-                    [base_dir, end_dir] = fileparts(base_dir);
-                    
-                    if isempty(end_dir), break; end
-                    
-                    [idx1,idx2] = regexp(end_dir, '\d{4}-\d{2}-\d{2}');
-                    if isempty(idx1), continue; end
-                    
-                    date = datetime(end_dir(idx1:idx2));
-                    
-                    if isempty(base_dir), break; end
-                    
-                end
-                
-                if ~isempty(date)
-                    obj.cal.loadByDate(datestr(date, 'yyyy-mm-dd'), 0); % last argument is to NOT reload if date is consistent
-                end
-                
-            end
-            
-            if ~obj.cal.checkDark
-                error('Cannot start a new run without loading darks into calibration object!');
-            end
-            
-            cleanup = onCleanup(@() obj.finishup);
-            obj.startup;
-            
-            for ii = obj.batch_counter+1:obj.num_batches
-                
-                if obj.brake_bit
-                    break;
-                end
-                
-                obj.batch;
-                
-                if obj.analysis_dir_log
-                    obj.write_log(log_name);
-                    if ~exist(log_obj, 'file')
-                        util.oop.save(obj, log_obj, 'hidden', 1); 
-                    end
-                end
-                
-                if ~isempty(obj.func)
-                    
-                    if isa(obj.func, 'function_handle')
-                        feval(obj.func, obj);
-                    elseif iscell(obj.func)
-                        for jj = 1:length(obj.func)
-                            feval(obj.func{jj}, obj);
-                        end
-                    end
-                end
-                
-                obj.prog.showif(ii);
-                
-                drawnow;
-                
-                obj.batch_counter = obj.batch_counter + 1;
-                
-            end
-            
-            % Skip this part in case the run is stopped mid way (e.g., by user input, but not by detecting flux is lost)
-            if obj.batch_counter>=obj.num_batches || obj.failed_batch_counter>obj.max_failed_batches
-                
-                if obj.analysis_dir_save
-                    obj.saveResults(log_dir);
+                input = util.text.InputVars;
+                input.input_var('reset', 0); % reset the object before running (i.e., start a new run)
+                input.input_var('logging', []); % create log files in the analysis folder
+                input.input_var('save', []); % save the events and lightcurves from this run
+                input.input_var('overwrite', 0); % if true, will quietly delete previous analysis folder from current date (otherwise, throws an error)
+                input.scan_vars(varargin{:});
+
+                if input.reset
+                    obj.reset;
                 end
 
-                if obj.analysis_dir_log
-                    obj.saveSummary(log_dir);
+                if obj.use_auto_load_cal
+
+                    date = datetime.empty;
+
+                    base_dir = obj.reader.current_dir;
+
+                    for ii = 1:3 % try to figure out this run's own date
+
+                        [base_dir, end_dir] = fileparts(base_dir);
+
+                        if isempty(end_dir), break; end
+
+                        [idx1,idx2] = regexp(end_dir, '\d{4}-\d{2}-\d{2}');
+                        if isempty(idx1), continue; end
+
+                        date = datetime(end_dir(idx1:idx2));
+
+                        if isempty(base_dir), break; end
+
+                    end
+
+                    if ~isempty(date)
+                        obj.cal.loadByDate(datestr(date, 'yyyy-mm-dd'), 0); % last argument is to NOT reload if date is consistent
+                    end
+
                 end
-                
-            end
-            
+
+                if ~obj.cal.checkDark
+                    error('Cannot start a new run without loading darks into calibration object!');
+                end
+
+                % update hidden variables in case we use GUI to stop then continue this run
+                if ~isempty(input.logging), obj.analysis_dir_log = input.logging; end            
+                if ~isempty(input.save), obj.analysis_dir_save = input.save; end
+
+                if obj.analysis_dir_log || obj.analysis_dir_save
+
+                    log_time = datetime('now', 'TimeZone', 'UTC');
+                    log_dir = fullfile(obj.reader.dir.pwd, ['analysis_' char(log_time, 'yyyy-MM-dd')]);
+                    log_name = fullfile(log_dir, 'analysis_log.txt');
+                    log_obj = fullfile(log_dir, 'analysis_parameters.txt');
+
+                    if obj.batch_counter==0
+                        if exist(log_dir, 'dir') && input.overwrite==0
+                            error('Folder %s already exists! Is this run already being processed?', log_dir);
+                        elseif exist(log_dir, 'dir') && input.overwrite
+                            rmdir(log_dir, 's'); 
+                            mkdir(log_dir);
+                        else
+                            mkdir(log_dir);
+                        end
+                    end
+
+                end
+
+                cleanup = onCleanup(@() obj.finishup);
+                obj.startup;
+
+                for ii = obj.batch_counter+1:obj.num_batches
+
+                    if obj.brake_bit
+                        break;
+                    end
+
+                    obj.batch;
+
+                    if obj.analysis_dir_log
+                        obj.write_log(log_name);
+                        if ~exist(log_obj, 'file')
+                            util.oop.save(obj, log_obj, 'hidden', 1); 
+                        end
+                    end
+
+                    if ~isempty(obj.func)
+
+                        if isa(obj.func, 'function_handle')
+                            feval(obj.func, obj);
+                        elseif iscell(obj.func)
+                            for jj = 1:length(obj.func)
+                                feval(obj.func{jj}, obj);
+                            end
+                        end
+                    end
+
+                    obj.prog.showif(ii);
+
+                    drawnow;
+
+                    obj.batch_counter = obj.batch_counter + 1;
+
+                end
+
+                % Skip this part in case the run is stopped mid way (e.g., by user input, but not by detecting flux is lost)
+                if obj.batch_counter>=obj.num_batches || obj.failed_batch_counter>obj.max_failed_batches
+
+                    if obj.analysis_dir_save
+                        obj.saveResults(log_dir);
+                    end
+
+                    if obj.analysis_dir_log
+                        obj.saveSummary(log_dir);
+                    end
+
+                end
+
             catch ME
                 
                 if obj.analysis_dir_log
@@ -1106,7 +1114,7 @@ classdef Analysis < file.AstroData
             
         end
         
-        function calcSkyParameters(obj) % take the stack photometery (and possible the catalog) and calculate seeing, background and zeropoint
+        function calcSkyParameters(obj) % take the photometery (and possible the catalog) and calculate seeing, background and zeropoint
             
             import util.stat.median2;
             
@@ -1119,49 +1127,80 @@ classdef Analysis < file.AstroData
                 obj.sky_pars.seeing = median2(obj.phot.widths).*obj.pars.SCALE.*2.355;
 %                 pars.background = median(obj.back_buf.median, 2,'omitnan');
                 obj.sky_pars.background = median2(obj.phot.backgrounds);
+                obj.sky_pars.area = median2(obj.phot.areas);
                 
                 if ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) % this is a fairly good indicator that mextractor/astrometry worked
                     
 %                     S = double(obj.mean_buf.median)';
 %                     N = double(sqrt(obj.var_buf.median))';
 
-                    S = double(mean(obj.phot.fluxes, 1, 'omitnan'))';
-                    N = double(std(obj.phot.fluxes, [], 1, 'omitnan'))';
+                    S = mean(obj.phot.fluxes, 1, 'omitnan')'; % signal
+                    N = std(obj.phot.fluxes, [], 1, 'omitnan')'; % noise
+                    M = obj.cat.magnitudes; % mag
                     
 %                     pars.zero_point = median(obj.mean_buf.median.*10.^(0.4.*obj.cat.magnitudes') ,2,'omitnan');
-                    obj.sky_pars.zero_point = median2(S*10.^(0.4.*obj.cat.magnitudes'));
+                    obj.sky_pars.zero_point = median2(S*10.^(0.4.*M'));
                     
-                    idx = ~isnan(S) & ~isnan(N) & S./N>3 & S./N<8; 
+                    thresh = 5; % minimal S/N
+                    
+                    idx = ~isnan(S) & ~isnan(N) & S./N>1.5; 
                     S2 = S(idx);
                     N2 = N(idx);
-
-                    if ~isempty(S)
-                        
-                        thresh = 5; % minimal S/N 
-                        
-                        fr = util.fit.polyfit(S2, N2.^2, 'order', 2, 'sigma', 2, 'iterations', 10); 
-                        obj.sky_pars.noise_level = sqrt(fr.coeffs(1));
-                        
-                        % solve the equation N(S) = c1 + c2*S + c3*S^2 == S/thresh
-                        a = fr.coeffs(3)-1./thresh.^2;
-                        b = fr.coeffs(2);
-                        c = fr.coeffs(1);
-                        
-                        s1 = (-b-sqrt(b.^2-4*a*c))./(2*a);
-                        s2 = (-b+sqrt(b.^2-4*a*c))./(2*a);
-                        
-                        obj.sky_pars.limiting_signal = min(s1,s2);
-                        if obj.sky_pars.limiting_signal<0
-                            obj.sky_pars.limiting_signal = max(s1,s2);
-                        end
-                        
-                        
-                        if ~isreal(obj.sky_pars.limiting_signal) || isnan(obj.sky_pars.limiting_signal) || obj.sky_pars.limiting_signal<0
-                            obj.sky_pars.limiting_mag = 2.5*log10(obj.sky_pars.zero_point./(obj.sky_pars.noise_level*thresh));
-                        else
-                            obj.sky_pars.limiting_mag = 2.5*log10(obj.sky_pars.zero_point./obj.sky_pars.limiting_signal);
-                        end
+                    M2 = M(idx);
+                    
+                    T = table(-2.5*log10(S2./obj.sky_pars.zero_point), S2./N2, M2, 'VariableNames', {'Measured_mag', 'SNR', 'GAIA_mag'});
+                    T2 = util.vec.bin_table_stats(T, 30);
+                    T2 = T2(T2.N>=5,:);
+                    fr = util.fit.polyfit(T2.SNR_nanmedian, T2.Measured_mag_nanmedian, 'order', 2);
+                    
+                    obj.sky_pars.limiting_mag = fr.coeffs(1)+fr.coeffs(2).*thresh+fr.coeffs(3)*thresh.^2;
+                    
+                    if ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
+                        delete(obj.aux_figure.Children);
+                        ax = axes('Parent', obj.aux_figure);
+                        x_extrap = min(fr.x):-0.1:0;
+                        y_extrap = fr.coeffs(1)+fr.coeffs(2).*x_extrap + fr.coeffs(3).*x_extrap.^2;
+                        x_th = thresh;
+                        y_th = fr.coeffs(1)+fr.coeffs(2).*x_th + fr.coeffs(3).*x_th.^2;
+                        plot(ax, T2.SNR_nanmedian, T2.Measured_mag_nanmedian, 'p', fr.x, fr.ym, 'r-', ...
+                            x_extrap, y_extrap, 'r:', x_th, y_th, 'k+');
+                        xlabel(ax, 'measured flux/rms, binned'); 
+                        ylabel(ax, 'measured magnitude, binned'); 
+                        drawnow;
                     end
+                    
+                    
+%                     M_adj = M2 + 2.5*log10(S2./N2./thresh); % adjust each star's magnitude by how much it is brighter/dimmer than the threshold
+%                     obj.sky_pars.limiting_mag = median(M_adj, 'omitnan');
+                    
+%                     idx = ~isnan(S) & ~isnan(N) & S./N>1.5 & S./N<8; 
+%                     S2 = S(idx);
+%                     N2 = N(idx);
+% 
+%                     if numel(S2)>10
+%                         
+%                         fr = util.fit.polyfit(S2, N2.^2, 'order', 2, 'sigma', 2, 'iterations', 10); 
+%                         obj.sky_pars.noise_level = sqrt(fr.coeffs(1));
+%                         
+%                         % solve the equation N(S) = c1 + c2*S + c3*S^2 == S/thresh
+%                         a = fr.coeffs(3)-1./thresh.^2;
+%                         b = fr.coeffs(2);
+%                         c = fr.coeffs(1);
+%                         
+%                         s1 = (-b-sqrt(b.^2-4*a*c))./(2*a);
+%                         s2 = (-b+sqrt(b.^2-4*a*c))./(2*a);
+%                         
+%                         obj.sky_pars.limiting_signal = min(s1,s2);
+%                         if obj.sky_pars.limiting_signal<0
+%                             obj.sky_pars.limiting_signal = max(s1,s2);
+%                         end
+%                         
+%                         if ~isreal(obj.sky_pars.limiting_signal) || isnan(obj.sky_pars.limiting_signal) || obj.sky_pars.limiting_signal<0
+%                             obj.sky_pars.limiting_mag = 2.5*log10(obj.sky_pars.zero_point./(obj.sky_pars.noise_level*thresh));
+%                         else
+%                             obj.sky_pars.limiting_mag = 2.5*log10(obj.sky_pars.zero_point./obj.sky_pars.limiting_signal);
+%                         end
+%                     end
 
                 end
                 
@@ -1262,8 +1301,8 @@ classdef Analysis < file.AstroData
 
             if ~isempty(obj.finder.gui) && obj.finder.gui.check
                 obj.finder.showLatest(obj.finder.gui.panel_image);
-            elseif ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
-                obj.finder.showLatest(obj.aux_figure);
+%             elseif ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
+%                 obj.finder.showLatest(obj.aux_figure);
             end
             
             drawnow;

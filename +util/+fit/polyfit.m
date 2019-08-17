@@ -131,6 +131,10 @@ function results = polyfit(x,y,varargin)
                 
             end
             
+            if nnz(bad_idx)==0 % further iterations don't change the values in xtemp/ytemp
+                break;
+            end
+            
         end
         
     end
