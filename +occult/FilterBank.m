@@ -423,7 +423,7 @@ classdef FilterBank < handle
             input.input_var('star', 10, 'star_snr');
             input.input_var('intervals', 10:5:40);
             input.input_var('threshold', 7.5);
-            input.input_var('font_size', 22);
+            input.input_var('font_size', 20);
             input.scan_vars(varargin{:});
             
             if isnumeric(input.data)
@@ -453,10 +453,10 @@ classdef FilterBank < handle
             
             margin = 0.02;
             
-            x_start = 0.1;
+            x_start = 0.07;
             x_step = (1-x_start)/Nv;
             
-            y_start = 0.1;
+            y_start = 0.15;
             y_step = (1-y_start)/NR;
             
             ax = {};
@@ -489,28 +489,45 @@ classdef FilterBank < handle
                     else
                         error('Unknown mode option "%s". Choose "contour" or "heatmap"', input.mode);
                     end
-                        
-                    if ii==1
-                        ax{counter}.XTick = obj.r_list;
-                        vec = ax{counter}.XTick;
-                        for k = 1:length(vec)
-                            if k==2 || k==length(vec)-2 || k==floor(length(vec)/2)
-                                ax{counter}.XTickLabels{k} = num2str(vec(k));
-                            else
-                                ax{counter}.XTickLabels{k} = '';
-                            end
-                            grid on
-                        end
-                        xlabel(ax{counter}, 'occulter radius');
-                    else            
-                        ax{counter}.XTick = [];
-                    end
 
+                    ax{counter}.XTick = [0.5 1 1.5 2];
+                    
+                    vec = ax{counter}.XTick;
+                    
+                    for k = 1:length(vec)
+                        if ii==1 && vec(k)<2
+                            ax{counter}.XTickLabels{k} = num2str(vec(k));
+                        else
+                            ax{counter}.XTickLabels{k} = '';
+                        end
+
+                        ax{counter}.XAxis.MinorTick = 'on';
+
+                        grid(ax{counter}, 'on');
+
+                    end
+                    
+                    if ii==1, xlabel(ax{counter}, 'radius'); end
+
+                    ax{counter}.YTick = [0 0.5 1 1.5 2];
+                    
+                    vec = ax{counter}.YTick;
+                    
+                    for k = 1:length(vec)
+                        if jj==1 && (ii==1 || vec(k)>0) % && ( ii==NR || vec(k)<2 ) && ( ii==1 || vec(k)>0 )
+                            ax{counter}.YTickLabels{k} = num2str(vec(k));
+                        else
+                            ax{counter}.YTickLabels{k} = '';
+                        end
+
+                        ax{counter}.YAxis.MinorTick = 'on';
+
+                        grid(ax{counter}, 'on');
+
+                    end
+                    
                     if jj==1
-                        ax{counter}.YTick = obj.b_list(1:end-1);
-                        ylabel(ax{counter}, ['impact ' char(10) ' parameter']);
-                    else
-                        ax{counter}.YTick = [];
+                        ylabel(ax{counter}, 'impact par.');
                     end
 
                     if jj==Nv && cs(input.mode, 'heatmap') 
