@@ -36,6 +36,9 @@ classdef Catalog < handle
         
         threshold = 5; % used by mextractor to find stars
         mag_limit = 20;
+        
+        avoid_edges = 50; % how many pixels away from edge of image (need image to know the size!)
+        
         min_star_temp;
         num_stars;
 %         flip = [1 1;1 -1;-1 1;-1 -1]; 
@@ -403,6 +406,15 @@ classdef Catalog < handle
                     T = T(T{:,'Teff'}>=obj.min_star_temp,:); % select only stars with temperature above minimal level (hotter stars have smaller angular scale)
                 end
 
+                if obj.avoid_edges>0
+                    
+                    x_ok = T.XPEAK_IMAGE>1+obj.avoid_edges & T.XPEAK_IMAGE<size(obj.image,2)-obj.avoid_edges;
+                    y_ok = T.YPEAK_IMAGE>1+obj.avoid_edges & T.YPEAK_IMAGE<size(obj.image,1)-obj.avoid_edges;
+                   
+                    T = T(x_ok & y_ok,:); 
+                    
+                end
+                
                 % add other limitations on the stars chosen! 
 
                 T = sortrows(T, 'Mag_G'); % sort stars from brightest to faintest
