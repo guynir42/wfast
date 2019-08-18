@@ -644,7 +644,8 @@ classdef Analysis < file.AstroData
             
             for ii = 1:N
                 
-                if length(obj.futures)<ii || ~isvalid(obj.futures{ii}) || strcmp(obj.futures{ii}.State, 'finished')
+                if length(obj.futures)<ii || ~isa(obj.futures{ii}, 'parallel.Future') || ~isvalid(obj.futures{ii})...
+                        || ( strcmp(obj.futures{ii}.State, 'finished') && obj.futures{ii}.Read==1)
                     idx = ii;
                     return;
                 end

@@ -318,25 +318,36 @@ classdef AnalysisGUI < handle
             log_time = datetime('now', 'TimeZone', 'UTC');
             log_dir = fullfile(obj.owner.reader.dir.pwd, ['analysis_' char(log_time, 'yyyy-MM-dd')]);
             
-            obj.dialog_fig = figure('units','pixels', 'position',[150 500 350 200], 'menubar','none', 'numbertitle','off', 'name', 'verify parallel run', 'resize','off');
+            obj.dialog_fig = figure('units','pixels', 'position',[150 500 500 300], 'menubar','none', 'numbertitle','off', 'name', 'verify parallel run', 'resize','on');
             
             if isempty(idx)
                 str = 'Cannot find a free worker to run analysis!';
                 ok = 0;
-            elseif exist(log_dir, 'dir')
-                str = 'Analysis folder already exists!'; 
-                ok = 0;
+%             elseif exist(log_dir, 'dir')
+%                 str = 'Analysis folder already exists!'; 
+%                 ok = 0;
             else
                 str = sprintf('Starting a new run in worker %d!', idx);
                 ok = 1;
             end
             
             button_text = uicontrol('Style', 'text', 'String', str, ... 
-                'Units', 'Normalized', 'Position', [0 0.8 1 0.15], 'Parent', obj.dialog_fig,...
+                'Units', 'Normalized', 'Position', [0 0.9 1 0.1], 'Parent', obj.dialog_fig,...
                 'HorizontalAlignment', 'center', 'FontSize', 14);
             
             button_folder = uicontrol('Style', 'text', 'String', sprintf('Folder: %s', obj.owner.reader.dir.two_tail), ... 
-                'Units', 'Normalized', 'Position', [0 0.65 1 0.15], 'Parent', obj.dialog_fig,...
+                'Units', 'Normalized', 'Position', [0 0.8 1 0.1], 'Parent', obj.dialog_fig,...
+                'HorizontalAlignment', 'center', 'FontSize', font_size_small);
+            
+            if exist(log_dir, 'dir')
+                str = 'Analysis folder already exists!'; 
+            % ... any other warnings? 
+            else
+                str =  '';
+            end
+            
+            button_warning = uicontrol('Style', 'text', 'String', str, ... 
+                'Units', 'Normalized', 'Position', [0 0.7 1 0.1], 'Parent', obj.dialog_fig,...
                 'HorizontalAlignment', 'center', 'FontSize', font_size_small);
             
             button_cancel = uicontrol('Parent', obj.dialog_fig, 'Style', 'pushbutton', 'String', 'Cancel', ...
@@ -347,7 +358,9 @@ classdef AnalysisGUI < handle
             
             if ok
             
-                pos_y = button_folder.Position(2) - height; 
+                % first column of buttons
+                
+                pos_y = button_warning.Position(2) - height; 
 
                 button_reset = uicontrol('Parent', obj.dialog_fig, 'Style', 'checkbox', 'String', 'reset', 'Value', 1, ...
                     'Units', 'Normalized', 'Position', [pos_x pos_y width height], 'FontSize', font_size, ...
@@ -371,7 +384,16 @@ classdef AnalysisGUI < handle
                     'Units', 'Normalized', 'Position', [1-margin-width, margin, width, height], 'FontSize', font_size, ...
                     'Callback', @func); 
 
-                uicontrol(button_run);
+                % second column of buttons
+                pos_x = pos_x + margin + width;
+                pos_y = button_warning.Position(2) - height;
+                
+                button_overwrite = uicontrol('Parent', obj.dialog_fig, 'Style', 'checkbox', 'String', 'overwrite', 'Value', 0, ...
+                    'Units', 'Normalized', 'Position', [pos_x pos_y width height], 'FontSize', font_size, ...
+                    'Tooltip', 'Use this to overwrite existing analysis folder (careful: another analysis may be ongoing!)');
+
+                
+                uicontrol(button_run); % bring the selection to "run" button
 
             end
             
@@ -380,12 +402,21 @@ classdef AnalysisGUI < handle
                 reset = button_reset.Value;
                 logging = button_logging.Value;
                 save = button_save.Value;
+                over = button_overwrite.Value;
                 
                 delete(obj.dialog_fig);
                 
-                fprintf('Running analysis on separate worker. reset: %d, logging: %d, save: %d\n', reset, logging, save);
+                if over==0 && exist(log_dir, 'dir')
+                    
+                    fprintf('Folder "%s " already exists!\n', log_dir);
+                    
+                else
                 
-                obj.owner.async_run('reset', reset, 'logging', logging, 'save', save);
+                    fprintf('Running analysis on separate worker. reset: %d, logging: %d, save: %d, overwrite: %d\n', reset, logging, save, over);
+                
+                    obj.owner.async_run('reset', reset, 'logging', logging, 'save', save, 'overwrite', over);
+                    
+                end
                 
             end
             
