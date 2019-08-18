@@ -10,8 +10,8 @@ classdef AnalysisGUI < handle
         
         font_size = 12;
         big_font_size = 16;
-        edit_font_size = 10;
-        small_font_size = 8;
+        edit_font_size = 11;
+        small_font_size = 10;
         
         color_on = [0 0.3 1];
         
@@ -50,7 +50,7 @@ classdef AnalysisGUI < handle
     
     properties (Hidden=true)
               
-        version = 1.00;
+        version = 1.01;
         
     end
             
@@ -193,8 +193,11 @@ classdef AnalysisGUI < handle
             obj.panel_info = GraphicPanel(obj.owner, [0.25 pos/N_middle 0.55 N/N_middle], '', 1); 
             obj.panel_info.addButton('button_directory', 'directory', 'info', ' ', '', 'small');
             obj.panel_info.addButton('button_filename', 'filename', 'info', ' ', '', 'small');
-            obj.panel_info.addButton('button_fwhm', 'FWHM', 'info', 'FWHM= ', 'pix', '', 0.5); 
-            obj.panel_info.addButton('button_seeing', 'seeing', 'info', 'seeing= ', '"', '', 0.5);
+%             obj.panel_info.addButton('button_fwhm', 'FWHM', 'info', 'FWHM= ', 'pix', '', 0.2); 
+            obj.panel_info.addButton('button_seeing', 'seeing', 'info', 'seeing= ', '"', 'edit', 0.2);
+            obj.panel_info.addButton('button_RA', 'pars.RA', 'info', 'RA= ', '', 'edit', 0.2); 
+            obj.panel_info.addButton('button_DE', 'pars.DEC', 'info', 'DE= ', '', 'edit', 0.2); 
+            obj.panel_info.addButton('button_exptime', 'pars.EXPTIME', 'info', 'EXPTIME= ', 's', 'edit', 0.2); 
             obj.panel_info.margin = 0.00;
             obj.panel_info.make;
             
@@ -275,6 +278,12 @@ classdef AnalysisGUI < handle
                 obj.owner.show('axes', obj.axes_image);
             end
             
+            if obj.owner.pars.EXPTIME>=0.1
+                obj.panel_info.button_exptime.BackgroundColor = 'red';
+            else
+                obj.panel_info.button_exptime.BackgroundColor = util.plot.GraphicButton.defaultColor;
+            end
+            
         end
                         
         function c = check(obj)
@@ -348,7 +357,7 @@ classdef AnalysisGUI < handle
             
             button_warning = uicontrol('Style', 'text', 'String', str, ... 
                 'Units', 'Normalized', 'Position', [0 0.7 1 0.1], 'Parent', obj.dialog_fig,...
-                'HorizontalAlignment', 'center', 'FontSize', font_size_small);
+                'HorizontalAlignment', 'center', 'FontSize', font_size_small, 'ForegroundColor', 'red');
             
             button_cancel = uicontrol('Parent', obj.dialog_fig, 'Style', 'pushbutton', 'String', 'Cancel', ...
                 'Units', 'Normalized', 'Position', [margin, margin, width, height], 'FontSize', font_size, ...

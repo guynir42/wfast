@@ -320,6 +320,24 @@ classdef GraphicButton < handle
     
     methods % update
         
+        function val = getVariable(obj)
+           
+            if isempty(obj.variable)
+                val = [];
+            else
+                
+                vars = split(obj.variable, '.');
+
+                for ii = 1:length(vars)
+                    S(ii) = struct('type', '.', 'subs', vars{ii});
+                end
+
+                val = subsref(obj.owner, S);
+                
+            end
+            
+        end
+        
         function update(obj)
             
             import util.text.cs;
@@ -336,7 +354,9 @@ classdef GraphicButton < handle
                 
             elseif cs(obj.type, 'toggle')
                 
-                if obj.owner.(obj.variable)
+                val = obj.getVariable;
+            
+                if val
                     obj.String = obj.str2;
                     if ~isempty(obj.color_on)
                         obj.control.ForegroundColor = obj.color_on;
@@ -356,17 +376,19 @@ classdef GraphicButton < handle
                 
             elseif cs(obj.type, 'auto')
                 
-                if isempty(obj.owner.(obj.variable))
+                val = obj.getVariable;
+            
+                if isempty(val)
                     obj.String = [obj.str1 ' auto'];
                     obj.control.ForegroundColor = 0.4*[1 1 1];
-                elseif obj.owner.(obj.variable)
+                elseif val
                     obj.String = [obj.str1 ' on'];
                     if ~isempty(obj.color_on)
                         obj.control.ForegroundColor = obj.color_on;
                     else
                         obj.control.ForegroundColor = 'black';
                     end
-                elseif ~obj.owner.(obj.variable)
+                elseif ~val
                     obj.String = [obj.str1 ' off'];
                     if ~isempty(obj.color_off)
                         obj.control.ForegroundColor = obj.color_off;
@@ -379,10 +401,12 @@ classdef GraphicButton < handle
                 
             elseif cs(obj.type, 'input', 'input text')
                 
+                val = obj.getVariable;
+            
                 if cs(obj.type, 'input text', 7)
-                    obj.String = [obj.str1 obj.owner.(obj.variable) obj.str2];
+                    obj.String = [obj.str1 val obj.str2];
                 else
-                    obj.String = [obj.str1 util.text.print_vec(obj.owner.(obj.variable)) obj.str2];
+                    obj.String = [obj.str1 util.text.print_vec(val) obj.str2];
                 end
                 
                 if isempty(obj.font_size)
@@ -393,8 +417,10 @@ classdef GraphicButton < handle
                 
             elseif cs(obj.type, 'info')
                 
+                val = obj.getVariable;
+            
                 obj.FontSize = obj.owner.(obj.self_name).([font_size 'font_size']);
-                obj.String = [obj.str1 num2str(obj.owner.(obj.variable)) obj.str2];
+                obj.String = [obj.str1 num2str(val) obj.str2];
                 
             elseif cs(obj.type, 'custom', 'input custom')
                 
@@ -410,18 +436,57 @@ classdef GraphicButton < handle
     
     methods % callback
         
+        function setVariable(obj, val)
+            
+            if isempty(obj.variable)
+                return;
+            else
+                
+                vars = split(obj.variable, '.');
+
+                for ii = 1:length(vars)
+                    S(ii) = struct('type', '.', 'subs', vars{ii});
+                end
+
+                obj.owner = subsasgn(obj.owner, S, val);
+            
+            end
+            
+        end
+        
         function callback_push(obj, ~, ~)
             
             if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable]); end
             
-            if isempty(obj.str2)
-                if ismethod(obj.owner, obj.variable)
-                    obj.owner.(obj.variable);
-                elseif isprop(obj.owner, obj.variable)
-                    obj.owner.(obj.variable).makeGUI;
-                end
+            if isempty(obj.variable)
+                % pass
             else
-                obj.owner.(obj.variable).(obj.str2);
+                
+                vars = split(obj.variable, '.');
+
+                for ii = 1:length(vars)
+                    S(ii) = struct('type', '.', 'subs', vars{ii});
+                end
+            
+                if isempty(obj.str2)
+                    if ismethod(obj.owner, obj.variable)
+                        subsref(obj.owner, S); 
+%                     obj.owner.(obj.variable);
+                    elseif isprop(obj.owner, obj.variable)
+                        val = subsref(obj.owner, S);
+                        if ismethod(val, 'makeGUI')
+                            S(end+1) = struct('type', '.', 'subs', 'makeGUI');
+                            subsref(obj.owner, S); 
+                        end
+                    end
+                else % if we are given str2 (input to function)
+
+                    S(end+1) = struct('type', '.', 'subs', obj.str2);
+                    subsref(obj.owner, S); 
+
+%                 obj.owner.(obj.variable).(obj.str2);
+                end
+
             end
             
             obj.owner.(obj.self_name).update;
@@ -431,8 +496,10 @@ classdef GraphicButton < handle
         function callback_toggle(obj, ~, ~)
             
             if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable]); end
-                
-            obj.owner.(obj.variable) = ~obj.owner.(obj.variable);
+            
+            val = obj.getVariable;
+            obj.setVariable(~val);
+%             obj.owner.(obj.variable) = ~obj.owner.(obj.variable);
             
             obj.owner.(obj.self_name).update;
             
@@ -441,13 +508,15 @@ classdef GraphicButton < handle
         function callback_auto(obj, ~, ~)
             
             if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable]); end
-                
-            if isempty(obj.owner.(obj.variable))
-                obj.owner.(obj.variable) = 0;
-            elseif obj.owner.(obj.variable)
-                obj.owner.(obj.variable) = [];
-            elseif ~obj.owner.(obj.variable)
-                obj.owner.(obj.variable) = 1;
+            
+            val = obj.getVariable;
+            
+            if isempty(val)
+                obj.setVariable(0);
+            elseif val
+                obj.setVariable([]);
+            elseif ~val
+                obj.setVariable(1);
             end
             
             obj.owner.(obj.self_name).update;
@@ -463,15 +532,15 @@ classdef GraphicButton < handle
             if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable '= ' num2str(value)]); end
             
             if isempty(value)
-                if isprop(obj.owner, ['default_' obj.variable])
-                    obj.owner.(obj.variable) = obj.owner.(['default_' obj.variable]);
-                elseif ismethod(obj.owner, ['default_' obj.variable])
-                    obj.owner.(obj.variable) = obj.owner.(['default_' obj.variable]);                
+                if isprop(obj.owner, ['default_' obj.variable]) || ismethod(obj.owner, ['default_' obj.variable])
+                    obj.setVariable(['default_' obj.variable]);
+%                     obj.owner.(obj.variable) = obj.owner.(['default_' obj.variable]);
                 else
                     obj.owner.(obj.variable) = [];
                 end
-            else                
-                obj.owner.(obj.variable) = value;
+            else  
+                obj.setVariable(value);
+%                 obj.owner.(obj.variable) = value;
             end
                         
             obj.owner.(obj.self_name).update;
@@ -487,15 +556,13 @@ classdef GraphicButton < handle
             if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable '= ' value]); end
             
             if isempty(value)
-                if isprop(obj.owner, ['default_' obj.variable])
-                    obj.owner.(obj.variable) = obj.owner.(['default_' obj.variable]);
-                elseif ismethod(obj.owner, ['default_' obj.variable])
-                    obj.owner.(obj.variable) = obj.owner.(['default_' obj.variable]);                
+                if isprop(obj.owner, ['default_' obj.variable]) || ismethod(obj.owner, ['default_' obj.variable])
+                    obj.setVariable(['default_' obj.variable]);
                 else
-                    obj.owner.(obj.variable) = '';
+                    obj.setVariable('');
                 end
             else                
-                obj.owner.(obj.variable) = value;
+                obj.setVariable(value);
             end
                         
             obj.owner.(obj.self_name).update;

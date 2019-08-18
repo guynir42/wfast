@@ -273,7 +273,7 @@ classdef Reader < file.AstroData
             obj.dataset_names.cutouts_proc = {'cutouts_proc', 'cutouts_cal'};
             obj.dataset_names.cutouts = [obj.dataset_names.cutouts, obj.dataset_names.cutouts_proc];
             
-            obj.dataset_names.positions = {'positions', 'cut_pos'};
+            obj.dataset_names.positions = {'positions'};
             obj.dataset_names.coordinates = {'coordinates'};
             obj.dataset_names.magnitudes = {'magnitudes'};
             obj.dataset_names.temperatures = {'temperatures'};
@@ -638,6 +638,8 @@ classdef Reader < file.AstroData
             
             obj.filenames = obj.dir.match(obj.glob_string);
             
+            obj.readPars; % load the parameters only for first file
+            
         end
         
         function advanceFile(obj)
@@ -844,22 +846,19 @@ classdef Reader < file.AstroData
                     elseif any(strcmp(data_name, obj.dataset_names.positions)) && all(data_size) % data_names.positions may be a cell array of different optional names
                         
                         loaded_positions = h5read(filename, sa('/', data_name)); % read the entire "positions" dataset, if it exists
-                        obj.positions = cat(3, obj.positions, loaded_positions);
+                        obj.positions = loaded_positions(:,:,end); % to handle cases where we accidentally saved coordinates and positions together... 
                         
                     elseif any(strcmp(data_name, obj.dataset_names.coordinates)) && all(data_size) % data_names.coordinates may be a cell array of different optional names
                         
-                        loaded_coordinates = h5read(filename, sa('/', data_name)); % read the entire "cordinates" dataset, if it exists
-                        obj.positions = cat(3, obj.coordinates, loaded_coordinates);
+                        obj.coordinates = h5read(filename, sa('/', data_name)); % read the entire "cordinates" dataset, if it exists
                         
                     elseif any(strcmp(data_name, obj.dataset_names.magnitudes)) && all(data_size) % data_names.magnitudes may be a cell array of different optional names
                         
-                        loaded_magnitudes = h5read(filename, sa('/', data_name)); % read the entire "magnitudes" dataset, if it exists
-                        obj.magnitudes = cat(3, obj.magnitudes, loaded_magnitudes);
+                        obj.magnitudes = h5read(filename, sa('/', data_name)); % read the entire "magnitudes" dataset, if it exists
                         
                     elseif any(strcmp(data_name, obj.dataset_names.temperatures)) && all(data_size) % data_names.temperatures may be a cell array of different optional names
                         
-                        loaded_temperatures = h5read(filename, sa('/', data_name)); % read the entire "temperatures" dataset, if it exists
-                        obj.temperatures = cat(3, obj.temperatures, loaded_temperatures);
+                        obj.temperatures = h5read(filename, sa('/', data_name)); % read the entire "temperatures" dataset, if it exists
                         
                     elseif any(strcmp(data_name, obj.dataset_names.stack)) && all(data_size)
                         
@@ -950,6 +949,13 @@ classdef Reader < file.AstroData
             else
                 error(['Filename ' obj.filenames{obj.this_file_index} ' has unknown format... use HDF5 or mat']);
             end
+        end
+        
+        function readPars(obj)
+            
+            loaded_pars = util.oop.load(obj.this_filename, 'location', '/pars', 'class', class(obj.pars));
+            util.oop.copy_props(obj.pars, loaded_pars);  % make a shallow copy (sub-objects are referenced, then loaded_pars is destroyed)
+            
         end
         
         function loadParsHDF5(obj, filename, loaded_pars, data_name, att_names)
