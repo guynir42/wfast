@@ -31,7 +31,11 @@ function val = fwhm(I, varargin)
             
             idx = find(values_interp<max(values_interp)/2, 1, 'first');
             
-            val(ii,jj) = radii_interp(idx);
+            if isempty(idx)
+                val(ii,jj) = NaN;
+            else
+                val(ii,jj) = radii_interp(idx);
+            end
             
 %             plot(radii, values, '-', radii_interp, values_interp, ':');
             

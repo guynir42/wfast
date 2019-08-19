@@ -619,6 +619,7 @@ classdef Analysis < file.AstroData
             input.input_var('reset', 0); % reset the object before running (i.e., start a new run)
             input.input_var('logging', []); % create log files in the analysis folder
             input.input_var('save', []); % save the events and lightcurves from this run
+            input.input_var('overwrite', 0); % delete the existing analysis folder without warning (make sure there is no ongoing analysis!)
             input.input_var('worker', []); % index of worker/future you want to use
             input.scan_vars(varargin{:});
             
@@ -626,7 +627,7 @@ classdef Analysis < file.AstroData
                 input.worker = obj.findWorker;
             end
             
-            obj.futures{input.worker} = parfeval(obj.pool, @obj.run, 1, 'reset', input.reset, 'logging', input.logging, 'save', input.save); 
+            obj.futures{input.worker} = parfeval(obj.pool, @obj.run, 1, 'reset', input.reset, 'logging', input.logging, 'save', input.save, 'overwrite', input.overwrite); 
             obj.futures_dir{input.worker} = obj.reader.dir.two_tail;
             
         end
@@ -715,7 +716,7 @@ classdef Analysis < file.AstroData
                     log_dir = fullfile(obj.reader.dir.pwd, ['analysis_' char(log_time, 'yyyy-MM-dd')]);
                     log_name = fullfile(log_dir, 'analysis_log.txt');
                     log_obj = fullfile(log_dir, 'analysis_parameters.txt');
-
+                    
                     if obj.batch_counter==0
                         if exist(log_dir, 'dir') && input.overwrite==0
                             error('Folder %s already exists! Is this run already being processed?', log_dir);
@@ -785,7 +786,24 @@ classdef Analysis < file.AstroData
                     obj.write_log(log_name, ME.getReport);
                 end
                 
-                rethrow(ME);
+                if obj.batch_counter>100 % if we managed to go through a big part of the run, might as well save the results
+                
+                    if obj.analysis_dir_save
+                        obj.saveResults(log_dir);
+                    end
+
+                    if obj.analysis_dir_log
+                        obj.saveSummary(log_dir);
+                    end
+                    
+                end
+                
+                if obj.batch_counter<obj.num_batches && obj.failed_batch_counter<obj.max_failed_batches
+                    rethrow(ME); % critical error in pipeline
+                else
+                    warning(ME.getReport); % minor error occured after pipeline is done
+                end
+                
             end
             
         end
