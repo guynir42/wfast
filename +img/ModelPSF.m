@@ -67,6 +67,32 @@ classdef ModelPSF < handle
     
     methods % reset/clear
         
+        function reset(obj)
+            
+            obj.clear;
+            
+        end
+        
+        function clear(obj)
+            
+            obj.offsets_x = [];
+            obj.offsets_y = [];
+            obj.cutouts = [];
+            obj.cutouts_shifted = [];
+            obj.stack = []; 
+            obj.mask = [];
+
+%             obj.fwhm = [];
+
+%             obj.m2x = [];
+%             obj.m2y = [];
+%             obj.mxy = [];
+%             obj.maj_axis = [];
+%             obj.min_axis = [];
+%             obj.angle = [];
+    
+        end
+        
     end
     
     methods % getters

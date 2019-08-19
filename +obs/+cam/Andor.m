@@ -787,6 +787,11 @@ classdef Andor < file.AstroData
                     
                     if obj.brake_bit, break; end
                     
+                    if ~obj.use_save && obj.num_batches>1 && ~obj.gui.check
+                        disp('Breaking out of live view!'); 
+                        break; % in case we are in live view and GUI is closed 
+                    end
+                    
                     obj.batch;
                     
                 end

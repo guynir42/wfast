@@ -43,6 +43,7 @@ classdef AcqGUI < handle
         
         button_show_what;
         button_flip;
+        button_num_stars;
         axes_image;
     
         panel_close;
@@ -288,6 +289,7 @@ classdef AcqGUI < handle
             obj.button_show_what.String = obj.owner.show_what_list;
             
             obj.button_flip = GraphicButton(obj.panel_image, [0.9 0.00 0.1 0.05], obj.owner, 'use_flip', 'toggle', 'flip', '', 'small');
+            obj.button_num_stars = GraphicButton(obj.panel_image, [0.9 0.05 0.1 0.05], obj.owner, 'display_num_rect_stars', 'input', 'rect= ', '', 'small');
             
             obj.button_reset_axes = GraphicButton(obj.panel_image, [0.9 0.95 0.1 0.05], obj.owner, '', 'custom','new axes');
             obj.button_reset_axes.Callback = @obj.makeAxes;

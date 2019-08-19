@@ -113,8 +113,8 @@ classdef Acquisition < file.AstroData
         use_show = true;
         
         show_what = 'images'; % can choose "images" or "stack"
-        num_display_stars = 30;
-        num_display_bg = 30;
+        display_num_rect_stars = 30;
+        display_num_rect_bg = 30;
         
         use_flip = 0; % flip view by 180 degrees (for meridien flip)
         
@@ -2190,8 +2190,8 @@ classdef Acquisition < file.AstroData
 
                 util.plot.setImage(I, input.ax);
 
-                obj.clip.showRectangles('num', obj.num_display_stars, 'color', 'black', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 1, 'text', 0);
-                obj.clip_bg.showRectangles('num', obj.num_display_bg, 'color', 'red', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 0, 'text', 0);
+                obj.clip.showRectangles('num', obj.display_num_rect_stars, 'color', 'black', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 1, 'text', 0);
+                obj.clip_bg.showRectangles('num', obj.display_num_rect_bg, 'color', 'red', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 0, 'text', 0);
 
             catch ME
                 warning(ME.getReport);

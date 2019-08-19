@@ -462,29 +462,14 @@ classdef GraphicButton < handle
                 % pass
             else
                 
-                vars = split(obj.variable, '.');
-
-                for ii = 1:length(vars)
-                    S(ii) = struct('type', '.', 'subs', vars{ii});
-                end
-            
                 if isempty(obj.str2)
                     if ismethod(obj.owner, obj.variable)
-                        subsref(obj.owner, S); 
-%                     obj.owner.(obj.variable);
-                    elseif isprop(obj.owner, obj.variable)
-                        val = subsref(obj.owner, S);
-                        if ismethod(val, 'makeGUI')
-                            S(end+1) = struct('type', '.', 'subs', 'makeGUI');
-                            subsref(obj.owner, S); 
-                        end
+                        obj.owner.(obj.variable);
+                    elseif isprop(obj.owner, obj.variable) && ismethod(obj.owner.(obj.variable), 'makeGUI')
+                        obj.owner.(obj.variable).makeGUI;
                     end
                 else % if we are given str2 (input to function)
-
-                    S(end+1) = struct('type', '.', 'subs', obj.str2);
-                    subsref(obj.owner, S); 
-
-%                 obj.owner.(obj.variable).(obj.str2);
+                    obj.owner.(obj.variable).(obj.str2);
                 end
 
             end

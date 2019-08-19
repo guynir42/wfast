@@ -637,8 +637,10 @@ classdef Reader < file.AstroData
         function loadFiles(obj)
             
             obj.filenames = obj.dir.match(obj.glob_string);
-            
-            obj.readPars; % load the parameters only for first file
+
+            if ~isempty(obj.filenames) && ~isempty(obj.filenames{1})
+                obj.readPars; % load the parameters only for first file
+            end
             
         end
         
@@ -953,7 +955,7 @@ classdef Reader < file.AstroData
         
         function readPars(obj)
             
-            loaded_pars = util.oop.load(obj.this_filename, 'location', '/pars', 'class', class(obj.pars));
+            loaded_pars = util.oop.load(obj.filenames{1}, 'location', '/pars', 'class', class(obj.pars));
             util.oop.copy_props(obj.pars, loaded_pars);  % make a shallow copy (sub-objects are referenced, then loaded_pars is destroyed)
             
         end
