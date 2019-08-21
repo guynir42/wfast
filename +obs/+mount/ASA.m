@@ -211,7 +211,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             if isempty(obj.ard) 
 
                 try
-                    obj.ard = obs.sens.ScopeAssistant;
+                    if isempty(obj.ard)
+                        obj.ard = obs.sens.ScopeAssistant;
+                    end
+                    
+                    obj.ard.connect;
+                    
                 catch ME
                     obj.use_accelerometer = 0;
                     warning(ME.getReport);
@@ -221,10 +226,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 
             if isempty(obj.ard.telescope)
                 obj.ard.telescope = obj;
-            end
-            
-            if obj.ard.is_connected==0
-                obj.ard.connect;
             end
             
             obj.ard.update;
@@ -687,6 +688,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function val = check_while_moving(obj)
             
             val = 0;
+            
             try 
                 
                 if obj.telALT<obj.limit_alt
@@ -1033,7 +1035,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             obj.sync.outgoing.TELRA_DEG = obj.telRA_deg;
             obj.sync.outgoing.TELDEC_DEG = obj.telDEC_deg;
             
-            if obj.tracking==0 || abs(obj.objRA_deg-obj.telRA_deg)>1 % if mount stops tracking or is 4 time-minutes away from target RA, stop the camera (e.g., when reaching limit)
+            if obj.tracking==0 || (~isempty(obj.objRA_deg) && abs(obj.objRA_deg-obj.telRA_deg)>1) % if mount stops tracking or is 4 time-minutes away from target RA, stop the camera (e.g., when reaching limit)
                 obj.sync.outgoing.stop_camera = 1;
             else
 %                 obj.sync.outgoing.stop_camera = 0;

@@ -88,6 +88,8 @@ classdef ScopeAssistant < handle
             
 %             obj.connectUSB(varargin{:});
 
+            obj.disconnect;
+
             disp('connecting arduino bluetooth');
 
             obj.connectBluetooth(varargin{:});

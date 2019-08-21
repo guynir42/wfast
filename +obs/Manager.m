@@ -440,6 +440,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     
     methods % setters
         
+        function set.sync(obj, val)
+            
+            obj.sync = val;
+            obj.mount.sync = val;
+            obj.dome.sync = val;
+            
+        end
+        
         function set.tracking(obj, val)
             
             obj.mount.tracking = val;

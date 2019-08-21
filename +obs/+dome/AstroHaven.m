@@ -24,6 +24,8 @@ classdef AstroHaven < handle
         acc_W@obs.sens.Accelerometer; % accelerometer for west shutter
         acc_E@obs.sens.Accelerometer; % accelerometer for east shutter
         
+        sync@obs.comm.PcSync;
+        
         log@util.sys.Logger;
         
     end
