@@ -1030,7 +1030,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             try
                
                 if obj.use_accelerometer
-                    obj.connectArduino;
+                    if obj.ard.status==0
+                        obj.connectArduino;
+                    end
                 end
                 
             catch ME
