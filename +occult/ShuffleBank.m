@@ -178,6 +178,7 @@ classdef ShuffleBank < handle
         function runTest(obj, varargin)
             
             input = util.text.InputVars;
+            input.use_ordered_numeric = 1;
             input.input_var('number', obj.test_number, 'N');
             input.input_var('threshold', obj.threshold);
             input.scan_vars(varargin{:});
@@ -198,7 +199,7 @@ classdef ShuffleBank < handle
                 obj.gen.v = obj.v_range(1) + rand.*(obj.v_range(2)-obj.v_range(1));
                 obj.gen.getLightCurves;
                 
-                snr = occult.compareKernels(single(obj.gen.lc.flux-1), obj.kernels);
+                snr = occult.compareKernels(obj.kernels, single(obj.gen.lc.flux-1));
                 
                 obj.snrs_tested(ii) = max(snr);
                 

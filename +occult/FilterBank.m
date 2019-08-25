@@ -31,7 +31,9 @@ classdef FilterBank < handle
         filtered_bank; % all templates, after filtering them with all kernels for event finding
         filtered_index; % auxiliary index to tell where we are in the last 4 dimensions of "filtered_bank"
         
-        snr_analytical; % a 4D map, for each parameter combination, what is the minimal S/N with all its neighbors. 
+        snr_neighbors; % a 4D map, for each parameter combination, what is the minimal S/N with all its neighbors. 
+        snr_self_test; % a 1D list of S/N results for self test
+        snr_analytical; % a 4D map for each kernel what is the detection S/N for a signal with the same parameters 
         snr_sim_full; % simulation result S/N after dividing by star S/N (2D matrix with zero where there was no detection)
         
     end
@@ -43,6 +45,8 @@ classdef FilterBank < handle
     end
     
     properties % switches/controls
+        
+        threshold = 0.95;
         
         debug_bit = 1;
         
@@ -198,7 +202,7 @@ classdef FilterBank < handle
             
         end
         
-        function checkBank(obj)
+        function checkNeighbors(obj)
             
             obj.prog.start(length(obj.R_list));
             
@@ -230,14 +234,14 @@ classdef FilterBank < handle
                                     continue;
                                 end
                                 
-                                values = [values obj.compareKernels(obj.bank(:,ii,jj,kk,mm), obj.bank(:,idx(1), idx(2), idx(3), idx(4)))];
+                                values = [values obj.compareKernels(single(obj.bank(:,ii,jj,kk,mm)-1), single(obj.bank(:,idx(1), idx(2), idx(3), idx(4))-1))];
                                 
                             end
                             
                             if isempty(values)
-                                obj.snr_analytical(ii,jj,kk,mm) = NaN;
+                                obj.snr_neighbors(ii,jj,kk,mm) = NaN;
                             else
-                                obj.snr_analytical(ii,jj,kk,mm) = max(values);
+                                obj.snr_neighbors(ii,jj,kk,mm) = max(values);
                             end
                             
                         end % for mm (v_list)
@@ -249,6 +253,37 @@ classdef FilterBank < handle
                 obj.prog.show(ii);
                 
             end % for ii (R_list) 
+            
+        end
+        
+        function checkMonteCarlo(obj, num_trials, full_xcorr)
+           
+            if nargin<3 || isempty(full_xcorr)
+                full_xcorr = 1;
+            end
+            
+            obj.prog.start(num_trials);
+            
+            obj.snr_self_test = NaN(num_trials,1);
+            
+            flat_bank = reshape(obj.bank, [size(obj.bank,1), obj.num_pars]);
+            
+            for ii = 1:num_trials
+                
+                obj.gen.lc.pars = obj.randomPars;
+                obj.gen.getLightCurves;
+                
+                snr = max(occult.compareKernels(single(flat_bank-1), single(obj.gen.lc.flux-1), full_xcorr));
+                
+                if snr<obj.threshold
+                    fprintf('S/N = %f | R= %f | r= %f | b= %f | v= %f\n', snr, obj.gen.R, obj.gen.r, obj.gen.b, obj.gen.v);
+                end
+                
+                obj.snr_self_test(ii) = snr;
+                
+                obj.prog.showif(ii);
+                
+            end
             
         end
         
@@ -277,37 +312,6 @@ classdef FilterBank < handle
             
         end
         
-        function values = monteCarloCheck(obj, num_trials, full_xcorr)
-           
-            if nargin<3 || isempty(full_xcorr)
-                full_xcorr = 1;
-            end
-            
-            obj.prog.start(num_trials);
-            
-            values = NaN(num_trials,1);
-            
-            flat_bank = reshape(obj.bank, [size(obj.bank,1), obj.num_pars]);
-            
-            for ii = 1:num_trials
-                
-                obj.gen.lc.pars = obj.randomPars;
-                obj.gen.getLightCurves;
-                
-                snr = util.stat.maxnd(occult.compareKernels(obj.gen.lc.flux, flat_bank, full_xcorr));
-                
-                if snr<0.9
-                    fprintf('S/N = %f | R= %f | r= %f | b= %f | v= %f\n', snr, obj.gen.R, obj.gen.r, obj.gen.b, obj.gen.v);
-                end
-                
-                values(ii) = snr;
-                
-                obj.prog.showif(ii);
-                
-            end
-            
-        end
-        
         function pars = randomPars(obj)
             
             pars = occult.Parameters;
@@ -326,7 +330,7 @@ classdef FilterBank < handle
             
         end
         
-        function score = calcMinStarSNR(obj, varargin)
+        function score = calcMinStarSNR(obj, varargin) % need to finish this! 
             
             if isempty(obj.bank)
                 error('Must fill the filter bank first!');
@@ -355,12 +359,45 @@ classdef FilterBank < handle
             
         end
         
-        function findAnalyticalSNR(obj)
+        function findAnalyticalSNR(obj, kernels)
+            
+            obj.snr_analytical = [];
             
             f = single(obj.bank-1); % "raw" lightcurves (not including noise)
-            k = f./sqrt(sum(f.^2)); % kernels as they would be used by the filtering code
+                
+            if nargin<2 || isempty(kernels)
+                
+                k = f./sqrt(sum(f.^2)); % kernels as they would be used by the filtering code
 
-            obj.snr_analytical = max(util.vec.convolution(k,f)); 
+                obj.snr_analytical = max(util.vec.convolution(k,f), 'conj', 1); 
+            
+            else
+                
+                k = kernels; 
+                k = k./sqrt(sum(kernels.^2));
+                
+                % because loops in matlab are fun! 
+                for ii = 1:length(obj.R_list)
+
+                    for jj = 1:length(obj.r_list)
+
+                        for kk = 1:length(obj.b_list)
+
+                            for mm = 1:length(obj.v_list)
+
+                                obj.snr_analytical(1,ii,jj,kk,mm) = util.stat.maxnd(util.vec.convolution(k,f(:,ii,jj,kk,mm), 'conj', 1)); 
+                                
+                            end % for mm (v_list)
+
+                        end % for kk (b_list)
+
+                    end % for jj (r_list)
+
+                end % for ii (R_list)
+
+            end
+                
+            obj.snr_analytical = permute(obj.snr_analytical, [2,3,4,5,1]);
             
         end
         

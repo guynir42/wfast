@@ -32,8 +32,9 @@ function snr_frac = compareKernels(this_kernel, that_kernel, full_xcorr)
         self_signal = sum(k1.*f1);
         cross_signal = sum(k2.*f1);
     else
-        self_signal = max(filter2(f1,k1));
-        cross_signal = max(filter2(f1,k2));
+%         self_signal = max(util.vec.convolution(k1, k1, 'conj',1));
+        self_signal = 1; % by definition of k
+        cross_signal = max(util.vec.convolution(k1, k2, 'conj', 1));
     end
 
     snr_frac = cross_signal./self_signal;
