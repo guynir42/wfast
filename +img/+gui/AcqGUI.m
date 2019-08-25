@@ -42,6 +42,7 @@ classdef AcqGUI < handle
         button_gb_left; 
         
         button_show_what;
+        button_src_status;
         button_flip;
         button_num_stars;
         axes_image;
@@ -288,6 +289,8 @@ classdef AcqGUI < handle
             obj.button_show_what.Callback = @obj.callback_show_what;
             obj.button_show_what.String = obj.owner.show_what_list;
             
+            obj.button_src_status = GraphicButton(obj.panel_image, [0 0.05 0.15 0.05], obj.owner, '', 'custom', '-', '', 'small');
+            
             obj.button_flip = GraphicButton(obj.panel_image, [0.9 0.00 0.1 0.05], obj.owner, 'use_flip', 'toggle', 'flip', '', 'small');
             obj.button_num_stars = GraphicButton(obj.panel_image, [0.9 0.05 0.1 0.05], obj.owner, 'display_num_rect_stars', 'input', 'rect= ', '', 'small');
             
@@ -435,6 +438,19 @@ classdef AcqGUI < handle
             
             if ~isempty(obj.owner.cam) && ~isempty(obj.owner.cam.focuser)
                 obj.panel_objects.button_focuser.String = sprintf('Focuser: %6.4f', obj.owner.cam.focuser.pos);
+            end
+            
+            if isa(obj.owner.src, 'obs.cam.Andor')
+                
+                if obj.owner.src.use_async
+                    obj.button_src_status.String = 'CAM-async';
+                    obj.button_src_status.BackgroundColor = util.plot.GraphicButton.defaultColor;
+                else
+                    obj.button_src_status.BackgroundColor = 'red';
+                end
+                
+            elseif isa(obj.owner.src, 'file.Reader')
+                obj.button_src_status.String = 'Reader';
             end
             
             if obj.owner.use_sync

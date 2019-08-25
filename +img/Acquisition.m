@@ -1317,6 +1317,7 @@ classdef Acquisition < file.AstroData
                 end
 
                 obj.src.startup('use_save', 0, obj.pass_source{:});
+%                 obj.src.startup('use_save', 0, 'async', 1, obj.pass_source{:});
 
                 if obj.use_progress
                     obj.prog.start(obj.num_batches);

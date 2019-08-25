@@ -964,15 +964,22 @@ classdef Finder < handle
             end
             
             if obj.use_conserve_memory
-                for ii = 1:length(obj.all_events)
-                    if obj.all_events(ii).keep==0
-                        obj.all_events(ii).clearImages;
-                    end
-                end
+                obj.conserveMemory;
             end
+            
             
             if obj.debug_bit>2, fprintf('runtime "finishup": %f seconds\n', toc(t)); end
             
+        end
+        
+        function conserveMemory(obj)
+            
+            for ii = 1:length(obj.all_events)
+                if obj.all_events(ii).keep==0
+                    obj.all_events(ii).clearImages;
+                end
+            end
+
         end
         
         function saveEvents(obj, filename)

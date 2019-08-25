@@ -365,6 +365,20 @@ classdef Event < handle
                 obj.addNote(sprintf('signal is correlated with offsets y at a %f level', corr));
             end
             
+            x = obj.offsets_x_at_star;
+            y = obj.offsets_y_at_star;
+            r = sqrt(x.^2+y.^2); 
+            
+            % check for correlation with size of offsets (x and y combined)
+            corr = obj.correlation(r);
+            if abs(corr)>obj.max_corr
+                obj.keep = 0;
+                obj.is_corr_offsets = 1;
+                obj.addNote(sprintf('signal is correlated with size of offsets at a %f level', corr));
+            end
+            
+            
+            
             % check for negative correlation with the background
             corr = obj.correlation(obj.backgrounds_at_star);
             if corr<-obj.max_corr

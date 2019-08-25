@@ -14,16 +14,21 @@ function values_conv = convolution(kernels, values, varargin)
 %  *crop: what is the final region of the result. 
 %         "same" (default) outputs the same size, "valid" gives only the 
 %         region the has full overlap, "full" gives the joint size with mutual padding.
+%  *normalize: Use this option to subtract the mean and divide by the std, 
+%              for "values", "kernels", or "both". 
 %  *debug_bit: Level of verbosity (default 0). 
 %  *mem_max: Maximum available memory (in GBs) for multiplying big matrices. 
 %            If the calculation requires more than this, it is done in a 
 %            very slow loop... 
+
+    import util.text.cs;
 
     if nargin==0, help('util.vec.convolution'); return; end
 
     input = util.text.InputVars;
     input.input_var('cross', 0, 'conj'); 
     input.input_var('crop', 'same'); 
+    input.input_var('normalize', '');
     input.input_var('debug_bit', 0); 
     input.input_var('mem_max', 10, 'memory max', 'memory limit'); 
     input.scan_vars(varargin{:});
@@ -56,7 +61,13 @@ function values_conv = convolution(kernels, values, varargin)
     
     %%%%%%%%%%%%% finsihed verifying sizes, can start calculations %%%%%%%%%%%%%%%
     
-    k = util.img.pad2size(kernels, Sk_adj);
+    k = kernels;
+    
+    if cs(input.normalize, 'kernels', 'both')
+        k = (k-nanmean(k))./nanstd(k);
+    end
+        
+    k = util.img.pad2size(k, Sk_adj);
     kernels_fft = fft(k);
     
     if input.cross
@@ -64,7 +75,14 @@ function values_conv = convolution(kernels, values, varargin)
     end
 
     % if values ends up having many dimensions (above 4) we will need to patch the pad2size function 
-    v = util.img.pad2size(values, Sv_adj); % keep all dimensions of values except the first, which is padded
+    
+    v = values;
+    
+    if cs(input.normalize, 'values', 'both')
+        v = (v-nanmean(v))./nanstd(v);
+    end
+    
+    v = util.img.pad2size(v, Sv_adj); % keep all dimensions of values except the first, which is padded
     
     values_fft = fft(v);
 
