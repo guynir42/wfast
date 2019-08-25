@@ -28,6 +28,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         gui@obs.mount.gui.ASAGUI;
         
+        audio@util.sys.AudioControl;
+        
     end
     
     properties % objects
@@ -211,12 +213,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             if isempty(obj.ard) 
 
                 try
-                    if isempty(obj.ard)
-                        obj.ard = obs.sens.ScopeAssistant;
-                    end
-                    
-                    obj.ard.connect;
-                    
+                    obj.ard = obs.sens.ScopeAssistant;
                 catch ME
                     obj.use_accelerometer = 0;
                     warning(ME.getReport);
@@ -228,6 +225,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 obj.ard.telescope = obj;
             end
             
+            obj.ard.connect;
+                    
             obj.ard.update;
             
         end
@@ -521,7 +520,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function val = obj_pier_side(obj)
             
-            val = '---'; % need to implement this! 
+            val = obj.hndl.DestinationSideOfPier(obj.objRA_deg/15, obj.objDEC_deg);
             
         end
         
@@ -681,6 +680,36 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 return;
             end
             
+            if obj.use_accelerometer
+                if obj.ard.status==0
+                    
+                    obj.ard.update;
+                    
+                    pause(0.1);
+                    
+                    if obj.ard.status==0
+                        obj.connectArduino;
+                    end
+                    
+                end
+                
+                if obj.ard.status==0
+                    error('Cannot slew without a responsive ScopeAssistant (arduino)');
+                end
+                
+            end
+            
+            try
+                if isempty(obj.audio)
+                    obj.audio = util.sys.AudioControl;
+                end
+                
+                obj.audio.playBlackAlert;
+                
+            catch ME
+                warning(ME.getReport);
+            end
+            
             val = 1;
             
         end
@@ -704,6 +733,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
+        function val = check_need_flip(obj)
+            
+            if strcmp(obj.obj_pier_side, 'pierUnknown')
+                error('Mount cannot find PierSide for this object!');
+            end
+            
+            val = ~strcmp(obj.pier_side, obj.obj_pier_side);
+            
+        end
+        
         function slew(obj, varargin)
             
             if isempty(obj.object.RA) || isempty(obj.object.DE) 
@@ -718,32 +757,22 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     error('Prechecks failed, aborting slew');
                 end
                 
+                if obj.check_need_flip
+                    
+                    if obj.telDE_deg<70
+                        obj.slewWithoutPrechecks(obj.hndl.RightAscension, 70); % do a preslew to dec +70 so we can make the flip! 
+                    end
+                    
+                    
+                    % other things to do before a flip...?
+                    
+                end
+                
                 ra_hours_Jnow = obj.object.RA_deg_now./15; % convert to hours! 
                 dec_deg_Jnow = obj.object.Dec_deg_now;
                 
-                obj.brake_bit = 0;
-                obj.hndl.SlewToCoordinatesAsync(ra_hours_Jnow, dec_deg_Jnow);
+                obj.slewWithoutPrechecks(ra_hours_Jnow, dec_deg_Jnow);
                 
-                for ii = 1:100000
-                    
-                    pause(0.01);
-                    
-                    if obj.brake_bit
-                        obj.stop;
-                        break;
-                    end
-                    
-                    if ~obj.check_while_moving
-                        obj.emergency_stop;
-                        break;
-                    end
-                    
-                    if obj.hndl.Slewing==0
-                        break;
-                    end
-                    
-                end
-            
                 obj.tracking = 1;
                 
                 if ~isempty(obj.sync)
@@ -762,11 +791,41 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 obj.guiding_history.N = 100; 
                 obj.resetRate;
                 
+                obj.audio.stop;
+                
             catch ME
                 obj.log.error(ME.getReport);
                 rethrow(ME);
             end
             
+        end
+        
+        function slewWithoutPrechecks(obj, ra_hours_Jnow, dec_deg_Jnow)
+            
+            obj.brake_bit = 0;
+            
+            obj.hndl.SlewToCoordinatesAsync(ra_hours_Jnow, dec_deg_Jnow);
+
+            for ii = 1:100000
+
+                pause(0.01);
+
+                if obj.brake_bit
+                    obj.stop;
+                    break;
+                end
+
+                if ~obj.check_while_moving
+                    obj.emergency_stop;
+                    break;
+                end
+
+                if obj.hndl.Slewing==0
+                    break;
+                end
+
+            end
+
         end
         
         function setup_timer(obj, ~, ~)
@@ -971,7 +1030,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             try
                
                 if obj.use_accelerometer
-                    obj.connectArduino;
+                    if obj.ard.status==0
+                        obj.connectArduino;
+                    end
                 end
                 
             catch ME

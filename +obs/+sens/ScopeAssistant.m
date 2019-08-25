@@ -39,6 +39,7 @@ classdef ScopeAssistant < handle
         alt_limit = 10;
         
         default_period = 0.1;
+        timeout = 5;
         
         status = 0;
         time;
@@ -122,6 +123,7 @@ classdef ScopeAssistant < handle
             
             % must be paired to the bluetooth device! 
             obj.hndl = Bluetooth(obj.bluetooth_name, 1); % second argument is channel==1
+            obj.hndl.Timeout = obj.timeout;
             
             if isempty(obj.bluetooth_id) || isnumeric(obj.bluetooth_id)
                 
@@ -287,6 +289,10 @@ classdef ScopeAssistant < handle
         end
         
         function setupTimer(obj, period)
+            
+            if nargin<2 || isempty(period)
+                period = obj.default_period;
+            end
             
             if ~strcmp(obj.hndl.Status, 'open')
                 error('Device is closed, use fopen or connect function');

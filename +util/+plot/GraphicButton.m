@@ -18,7 +18,7 @@ classdef GraphicButton < handle
         
         font_size = ''; % default is regular (large) font. Otherwise use 'edit' or 'small'. actual size is define by owner.(obj.self_name)
         
-        color_on; % apply this color when on
+        color_on = [0 0.3 1]; % apply this color when on
         color_off;
         
         margin;
@@ -518,7 +518,7 @@ classdef GraphicButton < handle
             
             if isempty(value)
                 if isprop(obj.owner, ['default_' obj.variable]) || ismethod(obj.owner, ['default_' obj.variable])
-                    obj.setVariable(['default_' obj.variable]);
+                    obj.setVariable(obj.owner.(['default_' obj.variable]));
 %                     obj.owner.(obj.variable) = obj.owner.(['default_' obj.variable]);
                 else
                     obj.owner.(obj.variable) = [];
