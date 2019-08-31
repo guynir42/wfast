@@ -937,13 +937,13 @@ classdef Finder < handle
             
             stars = [obj.all_events.star_index];
             if ~isempty(stars)
-                [N,E] = histcounts(stars, 'BinWidth', 1, 'BinLimits', [1 max(stars)]);
+                [N,E] = histcounts(stars, 'BinWidth', 1, 'BinLimits', [1 max(stars)+1]);
                 obj.black_list_stars = [obj.black_list_stars E(N>=obj.num_hits_black_list)];
             end
             
             batches = [obj.all_events.batch_index];
             if ~isempty(batches)
-                [N,E] = histcounts(batches, 'BinWidth', 1, 'BinLimits', [1 max(batches)]);
+                [N,E] = histcounts(batches, 'BinWidth', 1, 'BinLimits', [1 max(batches)+1]);
                 obj.black_list_batches = [obj.black_list_batches E(N>=obj.num_hits_black_list)];
             end
             
@@ -1170,8 +1170,8 @@ classdef Finder < handle
                 
                 for ii = idx:obj.num_events
                     if obj.all_events(ii).keep
-                        idx = ii;
-                        break;
+                        obj.display_event_idx = ii; % this also calls "show" via the setter
+                        return;
                     end
                 end
                 
@@ -1179,17 +1179,16 @@ classdef Finder < handle
                 
                     for ii = 1:idx
                         if obj.all_events(ii).keep
-                            idx = ii;
-                            break;
+                            obj.display_event_idx = ii; % this also calls "show" via the setter
+                            return;
                         end
                     end
 
                 end
-                
+            else
+                obj.display_event_idx = idx; % this also calls "show" via the setter
             end
 
-            obj.display_event_idx = idx; % this also calls "show" via the setter
-            
         end
         
         function histogram(obj, parent)
