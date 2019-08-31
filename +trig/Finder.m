@@ -1026,6 +1026,20 @@ classdef Finder < handle
             
         end
         
+        function loadOneEventMemory(obj, idx)
+            
+            if nargin<2 || isempty(idx)
+                idx = obj.display_event_idx;
+            end
+            
+            if isempty(idx)
+                return;
+            end
+            
+            obj.all_events(idx).reload_memory;
+            
+        end
+        
     end
     
     methods % plotting tools / GUI
