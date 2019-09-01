@@ -120,6 +120,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
     
     properties(Hidden=true)
        
+        was_tracking = 0;
         default_move_rate;
         
         version = 1.03;
@@ -556,6 +557,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             obj.object.RA = val; % note this is given in HOURS!
             obj.object.update;
+            obj.objName = '';
             
             try
                 obj.hndl.TargetRightAscension = obj.object.RA_deg/15; % also update the telescope's target field...
@@ -570,6 +572,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             obj.object.RA_deg = val;
             obj.object.update;
+            obj.objName = '';
             
             try
                 obj.hndl.TargetRightAscension = obj.object.RA_deg/15; % also update the telescope's target field...
@@ -584,6 +587,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             obj.object.Dec = val;
             obj.object.update;
+            obj.objName = '';
             
             try
                 obj.hndl.TargetDeclination = obj.object.Dec_deg;
@@ -595,6 +599,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             obj.object.Dec_deg = val;
             obj.object.update;
+            obj.objName = '';
             
             try
                 obj.hndl.TargetDeclination = obj.object.Dec_deg;
@@ -606,6 +611,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             obj.object.Dec_deg = val;
             obj.object.update;
+            obj.objName = '';
             
             try
                 obj.hndl.TargetDeclination = obj.object.Dec_deg;
@@ -616,6 +622,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function set.tracking(obj, val)
             
             try 
+                
+                obj.was_tracking = val;
                 
                 if obj.hndl.Tracking~=val
 
@@ -667,6 +675,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 error('Must supply an object name or coordinates (or fill objName field)');
             elseif isempty(varargin)
                 varargin{1} = obj.objName;
+            end
+            
+            if length(varargin)>=2
+                obj.objName = '';
             end
             
             obj.object.input(varargin{:}); % Ephemeris now uses Eran's name resolver
@@ -992,9 +1004,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
+        function syncToTarget(obj)
+            
+            obj.hndl.SyncToTarget;
+            
+        end
+        
         function park(obj)
             
             obj.hndl.Park;
+            obj.tracking = 0;
             
         end
         

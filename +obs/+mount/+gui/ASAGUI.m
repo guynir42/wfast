@@ -207,12 +207,12 @@ classdef ASAGUI < handle
             num_buttons = 6;
             obj.panel_arduino = GraphicPanel(obj.owner, [0.8 pos/N 0.2 4/N], 'arduino', 1); % last input is for vertical 
             obj.panel_arduino.number = num_buttons;
-            obj.panel_arduino.addButton('button_status', '', 'custom', 'Status= ', '', '', 0.5, '', '', 'Status of communication with arduino');
-            obj.panel_arduino.addButton('button_connect', '', 'custom', 'Connect', '', '', 0.5, '', '', 'Attempt to reconnect with arduino');
+            obj.panel_arduino.addButton('button_status', 'ard.status', 'info', 'Status= ', '', '', 0.5, '', '', 'Status of communication with arduino');
+            obj.panel_arduino.addButton('button_connect', 'connectArduino', 'push', 'Connect', '', '', 0.5, '', '', 'Attempt to reconnect with arduino');
             obj.panel_arduino.addButton('button_use_accel', 'use_accelerometer', 'toggle', 'accel. off ', 'use accel.', '', 0.5, obj.color_on, 'red', 'Use arduino accelerometer to stop telescope at low altitude');
-            obj.panel_arduino.addButton('button_angle', '', 'custom', 'ALT= ', '', 'small', 0.5, '', '', 'Current measured Altitude angle (degrees)');
+            obj.panel_arduino.addButton('button_angle', 'ard.ALT', 'info', 'ALT= ', '', 'small', 0.5, '', '', 'Current measured Altitude angle (degrees)');
             obj.panel_arduino.addButton('button_use_ultra', 'use_ultrasonic', 'toggle', 'ultra. off ', 'use ultra.', '', 0.5, obj.color_on, 'red', 'Use arduino ultrasonic sensor to warn agains obstacles in front of telescope');
-            obj.panel_arduino.addButton('button_distance', '', 'custom', 'dist= ', '', 'small', 0.5, '', '', 'Current measured distance to obstructions (cm)');
+            obj.panel_arduino.addButton('button_distance', 'ard.distance', 'info', 'dist= ', '', 'small', 0.5, '', '', 'Current measured distance to obstructions (cm)');
             obj.panel_arduino.margin = [0.02 0.02];
             obj.panel_arduino.make;
             
@@ -223,7 +223,7 @@ classdef ASAGUI < handle
             obj.panel_slew.number = 1;
             obj.panel_slew.addButton('button_slew', 'slew', 'push', 'Slew', '', '', 0.2, '', '', 'Immediately start moving telescope to given target');
             obj.panel_slew.addButton('button_stop', 'stop', 'push', 'STOP', '', '', 0.6, '', '', 'Stop current slew and reset guiding rates');
-            obj.panel_slew.addButton('button_sync', 'sync', 'push', 'Sync', '', '', 0.2, '', '', 'Sync current telescope position to current object');
+            obj.panel_slew.addButton('button_sync', 'syncToTarget', 'push', 'Sync', '', '', 0.2, '', '', 'Sync current telescope position to current object');
             obj.panel_slew.margin = [0.005 0.1];
             obj.panel_slew.make;
             
@@ -371,8 +371,10 @@ classdef ASAGUI < handle
             
             if obj.debug_bit>1, disp('Callback: stopping manual move'); end
             
-            obj.owner.hndl.MoveAxis(0,0);
-            obj.owner.hndl.MoveAxis(1,0);
+%             obj.owner.hndl.MoveAxis(0,0);
+%             obj.owner.hndl.MoveAxis(1,0);
+            obj.owner.hndl.AbortSlew;
+            obj.owner.hndl.Tracking = obj.owner.was_tracking; % go around the ASA.set.tracking function 
             
         end
         
@@ -380,20 +382,16 @@ classdef ASAGUI < handle
             
             if obj.debug_bit>1, disp('Callback: stopping manual move and closing GUI'); end
             
-            obj.owner.hndl.MoveAxis(0,0);
-            obj.owner.hndl.MoveAxis(1,0);
+%             obj.owner.hndl.MoveAxis(0,0);
+%             obj.owner.hndl.MoveAxis(1,0);
+            
+            obj.owner.hndl.AbortSlew;
+            obj.owner.hndl.Tracking = obj.owner.was_tracking; % go around the ASA.set.tracking function 
             
             delete(obj.fig.fig);
             
         end
-        
-        
-        function callback_button_down(obj, hndl, evnt)
-            
-            if obj.debug_bit, disp('Callback: button down'); end
-                        
-        end
-        
+                
         function callback_slew(obj, ~, ~)
             
             if obj.debug_bit, disp('Callback: slew'); end
