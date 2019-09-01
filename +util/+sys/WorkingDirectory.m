@@ -104,15 +104,19 @@ classdef WorkingDirectory < handle
                         
         end
         
-        function DN_out = dir(obj, directory)
+        function DN_out = dir(obj, directory, use_fullpath)
             
             if nargin<2 || isempty(directory)
                 directory = obj.cwd;
             end
             
+            if nargin<3 || isempty(use_fullpath)
+                use_fullpath = 0;
+            end
+            
             directory = obj.check_dir(directory);
   
-            DN = obj.dir_private(directory);
+            DN = obj.dir_private(directory, use_fullpath);
             
             if nargout==0
                 disp(DN);
@@ -122,21 +126,30 @@ classdef WorkingDirectory < handle
             
         end
         
-        function DN = dir_private(obj, directory)
+        function DN = dir_private(obj, directory, use_fullpath)
                         
             if nargin<2 || isempty(directory)
                 directory = obj.cwd;
             end
             
-            D = dir(directory);
-            N = {D.name}';
-            D = {D.isdir}';
+            if nargin<3 || isempty(use_fullpath)
+                use_fullpath = 0;
+            end
+            
+            list = dir(directory);
+            N = {list.name}';
+            D = [list.isdir]';
+            P = {list.folder}';
             DN = {}; % directory names
             
             for ii = 1:length(N)
                 
-                if D{ii}==1 && ~strcmp(N{ii}, '.') && ~strcmp(N{ii}, '..')
-                    DN{end+1} = N{ii};
+                if D(ii)==1 && ~strcmp(N{ii}, '.') && ~strcmp(N{ii}, '..')
+                    if use_fullpath
+                        DN{end+1} = fullfile(P{ii}, N{ii});
+                    else
+                        DN{end+1} = N{ii};
+                    end
                 end
                 
             end
@@ -224,17 +237,21 @@ classdef WorkingDirectory < handle
             
         end
         
-        function list = files(obj, directory)
+        function list = files(obj, directory, use_fullpath)
                         
             if nargin<2 || isempty(directory)
                 directory = obj.cwd;
+            end
+            
+            if nargin<3 || isempty(use_fullpath)
+                use_fullpath = 0;
             end
             
             directory = obj.check_dir(directory);
   
             assert(~isempty(directory), ['no such directory: ' directory]);
             
-            FL = obj.files_private(directory);
+            FL = obj.files_private(directory, use_fullpath);
             
             if nargout==0
                 disp(FL);
@@ -244,7 +261,7 @@ classdef WorkingDirectory < handle
             
         end
         
-        function list = fullnames(obj, directory)
+        function list = fullnames(obj, directory) % to be depricated! 
             
             list = obj.files;
             
@@ -254,26 +271,51 @@ classdef WorkingDirectory < handle
             
         end
         
-        function FL = files_private(obj, directory)
+        function FL = files_private(obj, directory, use_fullpath)
                         
             if nargin<2 || isempty(directory)
                 directory = obj.cwd;
             end
             
-            D = dir(directory);
-            N = {D.name}';
-            D = {D.isdir}';
+            if nargin<3 || isempty(use_fullpath)
+                use_fullpath = 0;
+            end
+            
+            list = dir(directory);
+            N = {list.name}';
+            D = [list.isdir]';
+            P = {list.folder}';
             FL = {}; % file list
             
             for ii = 1:length(N)
                 
-                if D{ii}==0 && ~strcmp(N{ii}, '.') && ~strcmp(N{ii}, '..')
-                    FL{end+1} = N{ii};
+                if D(ii)==0 && ~strcmp(N{ii}, '.') && ~strcmp(N{ii}, '..')
+                    if use_fullpath
+                        FL{end+1} = fullfile(P{ii}, N{ii});
+                    else
+                        FL{end+1} = N{ii};
+                    end
                 end
                 
             end
             
             FL = FL';
+            
+        end
+        
+        function list = walk(obj, directory)
+            
+            if nargin<2 || isempty(directory)
+                directory = obj.cwd;
+            end
+            
+            list{1} = directory;
+            
+            subfolders = obj.dir(directory, 1);
+            
+            for ii = 1:length(subfolders)
+                list = [list; obj.walk(subfolders{ii})];
+            end
             
         end
         
@@ -337,9 +379,9 @@ classdef WorkingDirectory < handle
                 
             end
             
-            if ~strcmp(next_dir(end), '/')
-                next_dir = [next_dir '/'];
-            end
+%             if ~strcmp(next_dir(end), '/')
+%                 next_dir = [next_dir '/'];
+%             end
             
             % if absolute path is used, it is easy...
             if strcmp(next_dir(1),'/') || ~isempty(regexp(next_dir, '^[A-Z]:', 'once'))
@@ -372,7 +414,7 @@ classdef WorkingDirectory < handle
                 end
                
             elseif strcmp(first_dir,'.')
-                % in this case do nothing...
+                CWD = pwd;
             else % if the first part is going down the tree
                 
                 DN = obj.dir_private(CWD);

@@ -128,6 +128,19 @@ classdef Analysis < file.AstroData
         
         failed_batch_counter = 0;
         
+        
+        use_cutouts_all = 0;
+        use_cutouts_all_proc = 1;
+        
+        cutouts_all;
+        positions_x_all;
+        positions_y_all;
+        
+        use_stack_all = 0;
+        use_stack_all_proc = 1;
+        stack_all;
+        
+        
         % these are used for backward compatibility with older versions of 
         % img.Clipper that made a slightly different cutout based on the 
         % same positions. This affects ONLY the cutting of CALIBRATION! 
@@ -226,6 +239,11 @@ classdef Analysis < file.AstroData
             obj.analysis_dir_log = 0;
             
             obj.failed_batch_counter = 0;
+            
+            obj.cutouts_all = [];
+            obj.positions_x_all = [];
+            obj.positions_y_all = [];
+            obj.stack_all = [];
             
             obj.clear;
             
@@ -564,6 +582,118 @@ classdef Analysis < file.AstroData
                 
                 
             end
+            
+        end
+        
+        function list = list_analysis_dirs(obj, directory)
+            
+            if nargin<2 || isempty(directory)
+                directory = fullfile(getenv('DATA'), 'WFAST'); 
+            end
+            
+            d = util.sys.WorkingDirectory(directory);
+            
+            full_list = d.walk; 
+            
+            idx = ~cellfun(@isempty, regexp(full_list, 'analysis_\d{4}-\d{2}-\d{2}$'));
+            
+            full_list = full_list(idx);
+            
+            list = {};
+            
+            prev_path = '';
+            prev_date = NaT;
+            
+            for ii = 1:length(full_list)
+                
+                [leading_path,analysis_dir] = fileparts(full_list{ii});
+                
+                date_new = datetime(analysis_dir(10:19), 'Format', 'yyyy-MM-dd');
+                
+                if strcmp(leading_path, prev_path) % if this analysis folder is for the same dataset as previous one
+                    if date_new>prev_date % update newer analysis folder
+                        list{end} = full_list{ii};
+                    end
+                else % new dataset, just add this analysis folder to end of list
+                    list{end+1} = full_list{ii};
+                end
+
+                prev_path = leading_path; 
+                prev_date = date_new;
+
+            end
+            
+            list = list';
+            
+        end
+        
+        function [star_hours, hour_dist] = summarize_star_hours(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('threshold', 5); 
+            input.input_var('directory', '');
+            input.scan_vars(varargin{:});
+            
+            list = obj.list_analysis_dirs(input.directory);
+            
+            hour_dist = [];
+            
+            d = util.sys.WorkingDirectory;
+            
+            for ii = 1:length(list)
+                
+                d.cd(list{ii});
+                filename = d.match('summary*');
+                
+                if ~isempty(filename)
+                    
+                    f = fopen(filename{1}, 'r');
+                    oc = onCleanup(@() fclose(f));
+                    
+                    if f<0
+                        continue;
+                    end
+                    
+                    for jj = 1:100
+                        
+                        line = fgetl(f);
+                        
+                        if isnumeric(line) && line<0
+                            fclose(f);
+                            break;
+                        end
+                        
+                        if ~isempty(regexpi(line, 'star hours'))
+                            
+                            c = util.text.extract_numbers(line);
+                            
+                            thresh = c{1}(1);
+                            hours = c{1}(end); 
+                            
+                            if isempty(hour_dist)
+                                hour_dist = [thresh hours];
+                                continue;
+                            end
+                            
+                            idx = hour_dist(:,1)==thresh;
+                            
+                            if any(idx)
+                                hour_dist(idx) = hour_dist(idx) + hours;
+                            else
+                                hour_dist = [hour_dist; thresh hours];
+                            end
+                            
+                        end
+                        
+                    end
+                    
+                end
+                                
+            end
+            
+            [mn,idx] = min(hours_dist(:,1)); 
+            
+            star_hours = hours_dist(idx,2); 
             
         end
         
@@ -1003,6 +1133,14 @@ classdef Analysis < file.AstroData
             
             obj.flux_buf.input(obj.phot_stack.fluxes);% store the latest fluxes from the stack cutouts (to verify we didn't lose the stars)
             
+            if obj.use_stack_all
+                if obj.use_stack_all_proc
+                    obj.stack_all = cat(3, obj.stack_all, obj.stack_proc);
+                else
+                    obj.stack_all = cat(3, obj.stack_all, obj.stack);
+                end
+            end
+            
             if obj.debug_bit>1, fprintf('Time for stack analysis: %f seconds\n', toc(t)); end
             
         end
@@ -1103,6 +1241,18 @@ classdef Analysis < file.AstroData
                 obj.cutouts_sub = obj.cutouts_proc;
             end
             
+            if obj.use_cutouts_all
+                
+                if obj.use_cutouts_all_proc
+                    obj.cutouts_all = cat(3, obj.cutouts_all, obj.cutouts_proc);
+                else
+                    obj.cutouts_all = cat(3, obj.cutouts_all, obj.cutouts);
+                end
+                
+                obj.positions_x_all = cat(1, obj.positions_x_all, obj.positions(:,1)');
+                obj.positions_y_all = cat(1, obj.positions_y_all, obj.positions(:,2)');
+                
+            end
             
             if obj.debug_bit>1, fprintf('Time for cutouts: %f seconds\n', toc(t)); end
             
