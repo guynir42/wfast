@@ -6,3 +6,5 @@ obj.*
 *.h5
 *.h5z
 *.m~
+*.png
+*.jpg

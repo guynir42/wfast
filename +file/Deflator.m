@@ -6,6 +6,8 @@ classdef Deflator < file.AstroData
         
         prog@util.sys.ProgressBar;
         
+        timer@timer;
+        
     end
     
     properties % objects and resources
@@ -30,6 +32,8 @@ classdef Deflator < file.AstroData
     end
     
     properties % switches and controls
+        
+        auto_deflate_destination = getenv('DATA_EXTRAS');
         
         use_auto_delete = 0;
         
@@ -352,6 +356,62 @@ classdef Deflator < file.AstroData
             obj.prog.finish;
             
             disp('done deflating files...');
+            
+        end
+        
+        function setup_timer(obj, hour) % sets up the deflator to automatically deflate latest files in DATA_TEMP at the given hour today (UTC!)
+            
+            if nargin<2 || isempty(hour)
+                hour = 5; % equal to 7 or 8am local time
+            end
+            
+            if isempty(getenv('DATA_TEMP')
+                warning('Cannot auto-deflate without environmental variable DATA_TEMP!');
+                return;
+            end
+            
+%             t = datetime('now', 'TimeZone', 'UTC');
+            
+            if isempty(obj.timer)
+                obj.timer = timer('Callback', @obj.callback_timer); 
+            end
+            
+            d = util.sys.date_dir;
+            
+            startat(obj.timer, [d(1:4), d(6:7), d(9:10), hour, 0 0];
+            
+        end
+        
+        function callback_timer(obj, ~, ~)
+            
+            disp('Running auto-deflate!');
+            
+            obj.makeGUI;
+            
+            d = util.sys.WorkingDirectory(getenv('DATA_TEMP')); 
+            list = d.dir('',1);
+            d.cd(list{end});
+            list = d.dir('',1);
+            
+            for ii = 1:length(list)
+                
+                
+                obj.src_dir.cd(list{ii});
+                
+                dest = fullfile(obj.auto_deflate_destination, obj.src_dir.tail);
+                
+                if ~exist(dest, 'dir')
+                    mkdir(dest);
+                end
+                
+                obj.out_dir.cd(dest);
+                
+                fprintf('\nSRC DIR: %s\n\nDEST DIR: %s\n\n', obj.src_dir.pwd, obj.out_dir.pwd);
+                
+                obj.run; 
+                
+            end
+            
             
         end
         
