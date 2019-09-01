@@ -62,6 +62,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         use_accelerometer = 1; % make constant checks for altitude outside of the mounts own sensors
         use_ultrasonic = 0; % make constant checks that there is nothing in front of the telescope
         
+        move_rate = 1; % manual slew rate in deg/sec
+        
         step_arcsec = 5; % not used yet
         
         brake_bit = 1; % when slewing, set this to 0. Interrupts may set it back to 1 to stop the slew. 
@@ -118,7 +120,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
     
     properties(Hidden=true)
        
-        version = 1.02;
+        default_move_rate;
+        
+        version = 1.03;
         
     end
     
@@ -989,6 +993,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         end
         
         function park(obj)
+            
+            obj.hndl.Park;
             
         end
         

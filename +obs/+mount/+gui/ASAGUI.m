@@ -72,7 +72,7 @@ classdef ASAGUI < handle
             
             obj.buttons = {};
             
-            obj.fig = util.plot.FigHandler('...');
+            obj.fig = util.plot.FigHandler('Mount ASA');
             obj.fig.clear;
             obj.fig.bottom = 5;
             obj.fig.height = 16;
@@ -153,10 +153,36 @@ classdef ASAGUI < handle
             
             num_buttons = 4;
             obj.panel_manual = GraphicPanel(obj.owner, [0.3 pos/N 0.3 num_buttons/N], 'manual move', 1); % last input is for vertical 
+            obj.panel_manual.addButton('button_NW', '', 'custom', 'NW', '', '', 1/3, '', '', 'Move the telescope to the North West');
+            obj.panel_manual.addButton('button_N', '', 'custom', 'N', '', '', 1/3, '', '', 'Move the telescope to the North');
+            obj.panel_manual.addButton('button_NE', '', 'custom', 'NE', '', '', 1/3, '', '', 'Move the telescope to the North East');
+            obj.panel_manual.addButton('button_W', '', 'custom', 'W', '', '', 1/3, '', '', 'Move the telescope to the West');
+            obj.panel_manual.addButton('input_rate', 'move_rate', 'input', ' ', 'deg/s', '', 1/3, '', '', 'Control the manual slew rate (deg/sec)');
+            obj.panel_manual.addButton('button_E', '', 'custom', 'E', '', '', 1/3, '', '', 'Move the telescope to the East');
+            obj.panel_manual.addButton('button_SW', '', 'custom', 'SW', '', '', 1/3, '', '', 'Move the telescope to the South West');
+            obj.panel_manual.addButton('button_S', '', 'custom', 'S', '', '', 1/3, '', '', 'Move the telescope to the South');
+            obj.panel_manual.addButton('button_SE', '', 'custom', 'SE', '', '', 1/3, '', '', 'Move the telescope to the South East');
             obj.panel_manual.number = num_buttons;
-            
+            obj.panel_manual.margin = [0.05 0.05];
             obj.panel_manual.make;
             
+            obj.panel_manual.button_NW.Enable = 'inactive';
+            obj.panel_manual.button_NW.control.ButtonDownFcn = @obj.callback_NW;
+            obj.panel_manual.button_N.Enable = 'inactive';
+            obj.panel_manual.button_N.control.ButtonDownFcn = @obj.callback_N;
+            obj.panel_manual.button_NE.Enable = 'inactive';
+            obj.panel_manual.button_NE.control.ButtonDownFcn = @obj.callback_NE;
+            obj.panel_manual.button_W.Enable = 'inactive';
+            obj.panel_manual.button_W.control.ButtonDownFcn = @obj.callback_W;
+            obj.panel_manual.button_E.Enable = 'inactive';
+            obj.panel_manual.button_E.control.ButtonDownFcn = @obj.callback_E;
+            obj.panel_manual.button_SW.Enable = 'inactive';
+            obj.panel_manual.button_SW.control.ButtonDownFcn = @obj.callback_SW;
+            obj.panel_manual.button_S.Enable = 'inactive';            
+            obj.panel_manual.button_S.control.ButtonDownFcn = @obj.callback_S;
+            obj.panel_manual.button_SE.Enable = 'inactive';
+            obj.panel_manual.button_SE.control.ButtonDownFcn = @obj.callback_SE;
+                        
             %%%%%%%%%%% panel limits %%%%%%%%%%%%%%%
             
             num_buttons = 1;
@@ -172,6 +198,7 @@ classdef ASAGUI < handle
             num_buttons = 3;
             obj.panel_engineering = GraphicPanel(obj.owner, [0.6 (pos)/N 0.2 num_buttons/N], 'engineering slews', 1); % last input is for vertical 
             obj.panel_engineering.number = num_buttons;
+            obj.panel_engineering.addButton('button_park', 'park', 'push', 'Park', '', '', [], '', '', 'Send the telescope to park 1 position'); 
             obj.panel_engineering.margin = [0.02 0.02];
             obj.panel_engineering.make;
             
@@ -201,6 +228,9 @@ classdef ASAGUI < handle
             obj.panel_slew.make;
             
             obj.panel_slew.button_slew.Callback = @obj.callback_slew;
+            
+            obj.fig.fig.WindowButtonUpFcn = @obj.callback_button_up;
+            obj.fig.fig.CloseRequestFcn = @obj.callback_close_fig;
             
             obj.update;
             
@@ -257,13 +287,112 @@ classdef ASAGUI < handle
                         
         function c = check(obj)
            
-            c = ~isempty(obj) && ~isempty(obj.panel_slew) && isvalid(obj.panel_slew);
+            c = ~isempty(obj) && ~isempty(obj.panel_slew) && isvalid(obj.panel_slew.panel);
             
         end
         
     end
                 
     methods % callbacks
+        
+        function callback_NW(obj, ~, ~)
+            
+            if obj.debug_bit>1, disp('Callback: moving NW'); end
+            
+            obj.owner.hndl.MoveAxis(0,obj.owner.move_rate);
+            obj.owner.hndl.MoveAxis(1,obj.owner.move_rate);
+            
+        end
+        
+        function callback_N(obj, ~, ~)
+            
+            if obj.debug_bit>1, disp('Callback: moving NW'); end
+            
+%             obj.owner.hndl.MoveAxis(0,obj.owner.move_rate);
+            obj.owner.hndl.MoveAxis(1,obj.owner.move_rate);
+            
+        end
+        
+        function callback_NE(obj, ~, ~)
+            
+            if obj.debug_bit>1, disp('Callback: moving NW'); end
+            
+            obj.owner.hndl.MoveAxis(0,-obj.owner.move_rate);
+            obj.owner.hndl.MoveAxis(1,obj.owner.move_rate);
+            
+        end
+        
+        function callback_W(obj, ~, ~)
+            
+            if obj.debug_bit>1, disp('Callback: moving NW'); end
+            
+            obj.owner.hndl.MoveAxis(0,obj.owner.move_rate);
+%             obj.owner.hndl.MoveAxis(1,obj.owner.move_rate);
+            
+        end
+        
+        function callback_E(obj, ~, ~)
+            
+            if obj.debug_bit>1, disp('Callback: moving NW'); end
+            
+            obj.owner.hndl.MoveAxis(0,-obj.owner.move_rate);
+%             obj.owner.hndl.MoveAxis(1,obj.owner.move_rate);
+            
+        end
+        
+        function callback_SW(obj, ~, ~)
+            
+            if obj.debug_bit>1, disp('Callback: moving NW'); end
+            
+            obj.owner.hndl.MoveAxis(0,obj.owner.move_rate);
+            obj.owner.hndl.MoveAxis(1,-obj.owner.move_rate);
+            
+        end
+        
+        function callback_S(obj, ~, ~)
+            
+            if obj.debug_bit>1, disp('Callback: moving NW'); end
+            
+%             obj.owner.hndl.MoveAxis(0,obj.owner.move_rate);
+            obj.owner.hndl.MoveAxis(1,-obj.owner.move_rate);
+            
+        end
+        
+        function callback_SE(obj, ~, ~)
+            
+            if obj.debug_bit>1, disp('Callback: moving NW'); end
+            
+            obj.owner.hndl.MoveAxis(0,-obj.owner.move_rate);
+            obj.owner.hndl.MoveAxis(1,-obj.owner.move_rate);
+            
+        end
+        
+        function callback_button_up(obj, ~, ~)
+            
+            if obj.debug_bit>1, disp('Callback: stopping manual move'); end
+            
+            obj.owner.hndl.MoveAxis(0,0);
+            obj.owner.hndl.MoveAxis(1,0);
+            
+        end
+        
+        function callback_close_fig(obj, ~, ~)
+            
+            if obj.debug_bit>1, disp('Callback: stopping manual move and closing GUI'); end
+            
+            obj.owner.hndl.MoveAxis(0,0);
+            obj.owner.hndl.MoveAxis(1,0);
+            
+            delete(obj.fig.fig);
+            
+        end
+        
+        
+        function callback_button_down(obj, hndl, evnt)
+            
+            if obj.debug_bit, disp('Callback: button down'); end
+                        
+        end
         
         function callback_slew(obj, ~, ~)
             
@@ -279,14 +408,6 @@ classdef ASAGUI < handle
             obj.owner.slew;
             
             obj.update;
-            
-        end
-        
-        function callback_close(obj, ~, ~)
-           
-            if obj.debug_bit, disp('callback: close'); end
-            
-            delete(obj.fig.fig);
             
         end
         
