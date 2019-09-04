@@ -2,6 +2,8 @@ function [Im_new_shifted, shift, confidence] = quick_align(Im_ref, Im_new, varar
     
     import util.img.pad2size;
     
+    if nargin==0, help('util.img.quick_align'); return; end
+    
     input = util.text.InputVars;
     input.input_var('static', false);
     input.input_var('flip', false);

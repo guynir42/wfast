@@ -33,6 +33,9 @@ classdef ModelPSF < handle
         use_mex = 1;
         radius = 5;
         
+        use_gaussian = 0;
+        gauss_sigma = 5;
+        
         debug_bit = 1;
         
     end
@@ -127,9 +130,9 @@ classdef ModelPSF < handle
                 obj.radius = input.radius;
             end
             dx = obj.offsets_x;
-            dx(isnan(dx)) = 0;
+%             dx(isnan(dx)) = 0;
             dy = obj.offsets_y;
-            dy(isnan(dy)) = 0;
+%             dy(isnan(dy)) = 0;
             
             if isempty(dx) || isempty(dy)
                 obj.cutouts_shifted = obj.cutouts;
@@ -144,7 +147,11 @@ classdef ModelPSF < handle
                 for ii = 1:size(obj.cutouts,3)
                     
                     for jj = 1:size(obj.cutouts,4)
-                        obj.cutouts_shifted(:,:,ii,jj) = util.img.imshift(obj.cutouts(:,:,ii,jj), -dy(ii,jj), -dx(ii,jj));
+                        if isnan(dx(ii,jj)) || isnan(dy(ii,jj))
+                            obj.cutouts_shifted(:,:,ii,jj) = NaN(size(cutouts,1),size(cutouts,2), 'like', cutouts);
+                        else
+                            obj.cutouts_shifted(:,:,ii,jj) = util.img.imshift(obj.cutouts(:,:,ii,jj), -dy(ii,jj), -dx(ii,jj));
+                        end
                     end
                     
                 end
@@ -159,6 +166,10 @@ classdef ModelPSF < handle
             import util.stat.sum2;
             
             obj.stack = sum(sum(obj.cutouts_shifted,3, 'omitnan'),4, 'omitnan');
+            
+            if obj.use_gaussian
+                obj.stack = obj.stack.*util.img.gaussian2(obj.gauss_sigma, 'size', [size(obj.cutouts,1),size(obj.cutouts,2)]); 
+            end
             
             obj.mask = util.img.ellipse('radius', obj.radius, 'size', [size(obj.cutouts,1), size(obj.cutouts,2)]);
             

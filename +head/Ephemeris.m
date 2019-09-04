@@ -529,7 +529,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
                 hours = num{1}(1);
                 degrees = hours*15;
-                s = sign(degrees);
+                
+                s = 1;
+                if degrees<0, s=-1; end
+                
                 degrees = abs(degrees);
                 
                 if length(num{1})>1
@@ -560,7 +563,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             else
             
                 degrees = num{1}(1);
-                s = sign(degrees);
+                s = 1;
+                if degrees<0, s=-1; end
+                
                 degrees = abs(degrees);
                 
                 if length(num{1})>1

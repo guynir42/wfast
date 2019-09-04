@@ -648,9 +648,10 @@ classdef Analysis < file.AstroData
                 if ~isempty(filename)
                     
                     f = fopen(filename{1}, 'r');
-                    oc = onCleanup(@() fclose(f));
+%                     oc = onCleanup(@() fclose(f));
                     
                     if f<0
+                        fclose(f);
                         continue;
                     end
                     
@@ -678,9 +679,9 @@ classdef Analysis < file.AstroData
                             idx = hour_dist(:,1)==thresh;
                             
                             if any(idx)
-                                hour_dist(idx) = hour_dist(idx) + hours;
+                                hour_dist(idx,2) = hour_dist(idx,2) + hours;
                             else
-                                hour_dist = [hour_dist; thresh hours];
+                                hour_dist(end+1,:) = [thresh hours];
                             end
                             
                         end
@@ -691,9 +692,9 @@ classdef Analysis < file.AstroData
                                 
             end
             
-            [mn,idx] = min(hours_dist(:,1)); 
+            [mn,idx] = min(hour_dist(:,1)); 
             
-            star_hours = hours_dist(idx,2); 
+            star_hours = hour_dist(idx,2); 
             
         end
         
