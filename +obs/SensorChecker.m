@@ -335,12 +335,13 @@ classdef SensorChecker < handle
                     new_val = sens.daylight;
                 end
                 
-                if sens.status==0
-                    new_val = NaN;
-                end
                 
                 if ~isempty(new_val)
                     
+                    if sens.status==0
+                        new_val = NaN;
+                    end
+                
                     val = [val new_val];
                     
                     new_str = sprintf('%s=%4.2f ', obj.getInstrID(sens), new_val);
@@ -389,12 +390,13 @@ classdef SensorChecker < handle
                 
                 end
                 
-                if sens.status==0
-                    new_val = NaN;
-                end
                 
                 if ~isempty(new_val)
                     
+                    if sens.status==0
+                        new_val = NaN;
+                    end
+                
                     val = [val new_val];
                     
                     new_str = sprintf('%s=%4.2f ', obj.getInstrID(sens), new_val);
@@ -447,11 +449,13 @@ classdef SensorChecker < handle
                     new_val = sens.Temp;
                 end
                 
-                if sens.status==0
-                    new_val = NaN;
-                end
+                
                 
                 if ~isempty(new_val)
+                    
+                    if sens.status==0
+                        new_val = NaN;
+                    end
                     
                     val = [val new_val];
                     
@@ -504,12 +508,12 @@ classdef SensorChecker < handle
                     new_val = sens.Wind;
                 end
                 
-                if sens.status==0
-                    new_val = NaN;
-                end
-                
                 if ~isempty(new_val)
                     
+                    if sens.status==0
+                        new_val = NaN;
+                    end
+                
                     val = [val new_val];
                     
                     new_str = sprintf('%s=%4.2f ', obj.getInstrID(sens), new_val);
@@ -562,11 +566,13 @@ classdef SensorChecker < handle
                     new_val = sens.WindDirection;
                 end
                 
-                if sens.status==0
-                    new_val = NaN;
-                end
+                
                 
                 if ~isempty(new_val)
+                    
+                    if sens.status==0
+                        new_val = NaN;
+                    end
                     
                     val = [val new_val];
                     
@@ -621,12 +627,12 @@ classdef SensorChecker < handle
                 
                 end
                 
-                if sens.status==0
-                    new_val = NaN;
-                end
-                
                 if ~isempty(new_val)
                     
+                    if sens.status==0
+                        new_val = NaN;
+                    end
+                
                     val = [val new_val];
                     
                     new_str = sprintf('%s=%4.2f ', obj.getInstrID(sens), new_val);
