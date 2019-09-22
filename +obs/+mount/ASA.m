@@ -30,6 +30,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         audio@util.sys.AudioControl;
         
+        prev_objects = {}; 
+        
     end
     
     properties % objects
@@ -122,6 +124,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
        
         was_tracking = 0;
         default_move_rate;
+        
+        num_prev_objects = 10; % how many prev_objects do we keep?
         
         version = 1.03;
         
@@ -308,6 +312,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function reset(obj)
             
             obj.object.reset;
+            
+        end
+        
+        function resetPrevObjects(obj)
+            
+            obj.prev_objects = {};
             
         end
         
@@ -525,7 +535,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function val = obj_pier_side(obj)
             
-            val = obj.hndl.DestinationSideOfPier(obj.objRA_deg/15, obj.objDEC_deg);
+            if isempty(obj.objRA_deg) || isempty(obj.objDEC_deg)
+                val = '';
+            else
+                val = obj.hndl.DestinationSideOfPier(obj.objRA_deg/15, obj.objDEC_deg);
+            end
             
         end
         
@@ -685,6 +699,27 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
+        function parseTargetString(obj, str)
+            
+            C = strip(strsplit(str, {'{','}',','}));
+            
+            C = C(~cellfun(@isempty,C));
+            
+            if length(C)==2
+                obj.objName = '';
+                obj.objRA = C{1};
+                obj.objDEC = C{2};
+            elseif length(C)==3
+                obj.objRA = C{2};
+                obj.objDEC = C{3};
+                obj.objName = C{1};
+            else
+                error('Wrong number of extracted strings (%d).', length(C));
+            end
+            
+            
+        end
+        
         function val = check_before_slew(obj)
             
             val = 0;
@@ -782,6 +817,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     
                     % other things to do before a flip...?
                     
+                end
+                
+                try % keep a history of all targets
+                    str = [obj.objName ' {' obj.objRA ',' obj.objDEC '}'];
+                    if isempty(obj.prev_objects) || all(~strcmp(str, obj.prev_objects))
+                        obj.prev_objects = [str obj.prev_objects];
+                        if length(obj.prev_objects)>obj.num_prev_objects
+                            obj.prev_objects = obj.prev_objects(1:obj.num_prev_objects);
+                        end
+                    end
+                catch ME
+                    rethrow(ME);
                 end
                 
                 ra_hours_Jnow = obj.object.RA_deg_now./15; % convert to hours! 
