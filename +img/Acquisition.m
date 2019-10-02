@@ -107,6 +107,8 @@ classdef Acquisition < file.AstroData
         use_sync_stop = 1; % if false, will not respect stop commands from Manager (via sync object)
         use_autoguide = 1; % if true, send back adjustments on drifts to telescope
         
+        use_autodeflate = 1;
+        
         camera_angle = 15; % degrees between image top and cardinal south/north (when after meridian)
         
         % display parameters
@@ -1173,6 +1175,14 @@ classdef Acquisition < file.AstroData
     
     methods % commands/calculations
         
+        function unlock(obj) % manually remove all locks left over from crashes in mid-recording. Make sure camera is really done! 
+            
+            obj.is_running_single = 0;
+            obj.is_running = 0;
+            obj.brake_bit = 1;
+            
+        end
+        
         function run(obj, varargin)
             
             if obj.is_running || obj.is_running_single
@@ -1274,7 +1284,7 @@ classdef Acquisition < file.AstroData
                 if obj.use_save && obj.getGbLeft>util.sys.disk_space(obj.buf.directory)
                     error('Run scheduled requires an estimated %5.2f Gb of storage. Only %5.2f Gb available on drive!', obj.getGbLeft, util.sys.disk_space(obj.buf.directory));
                 end
-                    
+                
                 if input.use_reset % this parameter is not saved in the object because we only use it here... 
                     
                     obj.reset;
@@ -1282,6 +1292,11 @@ classdef Acquisition < file.AstroData
                     if obj.debug_bit, disp(['Starting run "' input.run_name '" for ' num2str(input.num_batches) ' batches.']); end
 
                 end
+                
+                if obj.use_save && obj.use_autodeflate
+                    obj.deflator.setup_timer;
+                end
+                    
                 
                 obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
                 

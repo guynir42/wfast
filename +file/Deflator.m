@@ -365,20 +365,25 @@ classdef Deflator < file.AstroData
                 hour = 5; % equal to 7 or 8am local time
             end
             
-            if isempty(getenv('DATA_TEMP')
+            if isempty(getenv('DATA_TEMP'))
                 warning('Cannot auto-deflate without environmental variable DATA_TEMP!');
                 return;
             end
             
-%             t = datetime('now', 'TimeZone', 'UTC');
-            
-            if isempty(obj.timer)
-                obj.timer = timer('Callback', @obj.callback_timer); 
+            if ~isempty(obj.timer) && isvalid(obj.timer)
+                stop(obj.timer); 
+                delete(obj.timer);
             end
             
-            d = util.sys.date_dir;
+            obj.timer = timer('TimerFcn', @obj.callback_timer); 
+            obj.timer.Name = 'auto-deflate-timer';
+            obj.timer.BusyMode = 'queue';
             
-            startat(obj.timer, [d(1:4), d(6:7), d(9:10), hour, 0 0];
+            t = datetime(util.sys.date_dir);
+            
+            t = t + days(1); % deflate on the next morning!
+            
+            startat(obj.timer, [t.Year, t.Month, t.Day, hour, 0, 0]);
             
         end
         

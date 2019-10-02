@@ -213,6 +213,8 @@ classdef DeflatorGUI < handle
             
             if ~isempty(obj.def.reader.images)
                 util.plot.show(obj.def.reader.images(:,:,1,1), 'ax', obj.image_axes, 'autodyn', 'on');
+            elseif ~isempty(obj.def.reader.stack)
+                util.plot.show(obj.def.reader.stack, 'ax', obj.image_axes, 'autodyn', 'on');
             end
             
             drawnow;

@@ -64,6 +64,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         use_accelerometer = 1; % make constant checks for altitude outside of the mounts own sensors
         use_ultrasonic = 0; % make constant checks that there is nothing in front of the telescope
         
+        use_motor_toggle = 0; % when slewing is done, turn motor off then on again
+        
         move_rate = 1; % manual slew rate in deg/sec
         
         step_arcsec = 5; % not used yet
@@ -835,6 +837,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 dec_deg_Jnow = obj.object.Dec_deg_now;
                 
                 obj.slewWithoutPrechecks(ra_hours_Jnow, dec_deg_Jnow);
+                
+                if obj.use_motor_toggle
+                    
+                    obj.hndl.MotorOff; 
+                    
+                    pause(0.01);
+                    
+                    obj.hndl.MotorOn;
+                    
+                    obj.slewWithoutPrechecks(ra_hours_Jnow, dec_deg_Jnow);
+                    
+                end
                 
                 obj.tracking = 1;
                 
