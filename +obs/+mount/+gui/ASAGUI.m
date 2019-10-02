@@ -124,6 +124,7 @@ classdef ASAGUI < handle
             obj.panel_motion.addButton('button_tracking', 'tracking', 'toggle', '', '', '', 0.5, obj.color_on, 'red', 'telescope tracking');
             obj.panel_motion.addButton('button_guiding', 'use_guiding', 'toggle', 'guiding off', 'guiding on', '', 0.5, obj.color_on, 'red', 'Apply rate corrections based on inputs from camera');
             obj.panel_motion.addButton('button_reset_rates', 'resetRate', 'push', 'reset rates', '', '', 0.5, '', '', 'Reset guiding rates');
+            obj.panel_motion.addButton('button_motor_toggle', 'use_motor_toggle', 'toggle', 'no motor toggle', 'motor toggle','', 0.5, obj.color_on, 'red', 'Turn motors off then on when slew is done');
             obj.panel_motion.number = num_buttons;
             obj.panel_motion.margin = [0.02 0.02];
             obj.panel_motion.make;
