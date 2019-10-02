@@ -37,6 +37,7 @@ classdef AcqGUI < handle
         panel_info;
         panel_image;
         button_reset_axes;
+        button_unlock;
         button_batch_num;
         button_time_left;
         button_gb_left; 
@@ -296,6 +297,7 @@ classdef AcqGUI < handle
             
             obj.button_reset_axes = GraphicButton(obj.panel_image, [0.9 0.95 0.1 0.05], obj.owner, '', 'custom','new axes');
             obj.button_reset_axes.Callback = @obj.makeAxes;
+            obj.button_unlock = GraphicButton(obj.panel_image, [0.9 0.9 0.1 0.05], obj.owner, 'unlock', 'push', 'unlock');
             
             obj.button_batch_num.Tooltip = 'How many batches already taken in this run';
             obj.button_time_left.Tooltip = 'Estimate for remaining run time';
@@ -303,6 +305,7 @@ classdef AcqGUI < handle
             obj.button_show_what.Tooltip = 'Display images, stack, or stack processed (dark, flat, background removed)';
             obj.button_flip.Tooltip = 'Flip the image 180 degrees (for viewing beyond the meridian)';
             obj.button_reset_axes.Tooltip = 'Generate a new image axes with contrast and zoom initialized';
+            obj.button_unlock.Tooltip = 'Manually remove all locks left over from run-time errors. Make sure camera is stopped!!';
             
             obj.update;
             
