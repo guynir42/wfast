@@ -343,15 +343,13 @@ classdef Catalog < handle
                 min_radius = 3; % minimal distance in pixels to give a match
             end
             
-%             T = sortrows(obj.data, 'Mag_G'); % sort stars from brightest to faintest
-
-            T = obj.data(:,{'Mag_G', 'XWIN_IMAGE', 'YWIN_IMAGE'}); 
+            T = obj.data(:,{'Mag_BP', 'XWIN_IMAGE', 'YWIN_IMAGE'}); 
             
             T = [T table((1:height(T))')]; % add original indices
             
             T.Properties.VariableNames{end} = 'idx';
             
-            T = sortrows(T, 'Mag_G'); % now arranged from brightest to dimmest, keeping the original indices
+            T = sortrows(T, 'Mag_BP'); % now arranged from brightest to dimmest, keeping the original indices
             
             idx = NaN(size(pos_xy,1),1);
             
@@ -417,7 +415,7 @@ classdef Catalog < handle
                 
                 % add other limitations on the stars chosen! 
 
-                T = sortrows(T, 'Mag_G'); % sort stars from brightest to faintest
+                T = sortrows(T, 'Mag_BP'); % sort stars from brightest to faintest
                 
                 if ~isempty(obj.num_stars)
                     idx = 1:min(obj.num_stars, height(T)); 
@@ -426,7 +424,7 @@ classdef Catalog < handle
                 end
 
                 obj.positions = T{idx,{'XPEAK_IMAGE', 'YPEAK_IMAGE'}};
-                obj.magnitudes = T{idx,'Mag_G'};
+                obj.magnitudes = T{idx,'Mag_BP'};
                 obj.coordinates = T{idx,{'RA','Dec'}};
                 obj.temperatures = T{idx, 'Teff'};
                 % any other data worth taking from catalog?
@@ -491,6 +489,16 @@ classdef Catalog < handle
     end
     
     methods % plotting tools / GUI
+        
+        function plotStars(obj)
+           
+            % add varargin later
+            
+            plot(obj.data{:,'Mag_BP'}, obj.data{:,'MAG_PSF'}, 'p');
+            xlabel('GAIA Mag BP');
+            ylabel('Instrumental Mag');
+            
+        end
         
     end    
     
