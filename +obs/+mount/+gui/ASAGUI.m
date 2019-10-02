@@ -146,8 +146,14 @@ classdef ASAGUI < handle
             obj.panel_object.addButton('button_alt', 'objALT', 'info', 'ALT= ', '', '', 0.5, '', '', 'Calculated object Altitude'); 
             obj.panel_object.addButton('button_time', 'obj_time_to_limit', 'info', '', ' min. to limit', '', 0.5, '', '', 'Calculated time object has until reaching limit'); 
             obj.panel_object.addButton('button_pierside', 'obj_pier_side', 'info', '', '', '', 0.5); 
+            obj.panel_object.addButton('button_history_text', '', 'custom', 'Prev.Objects:', '', '', 0.7);
+            obj.panel_object.addButton('button_reset_prev', 'resetPrevObjects', 'push', 'reset', '', '', 0.3, '', '', 'Reset the history list of previous object'); 
+            obj.panel_object.addButton('button_prev_objects', '', 'custom', '', '', '', [], '', '', 'List the last objects that were used to for slew');
             obj.panel_object.margin = [0.02 0.02];
             obj.panel_object.make;
+            
+            obj.panel_object.button_prev_objects.control.Style = 'popupmenu';
+            obj.panel_object.button_prev_objects.Callback = @obj.callback_prev_objects;
             
             %%%%%%%%%%% panel manual %%%%%%%%%%%%%%%
             
@@ -269,6 +275,12 @@ classdef ASAGUI < handle
                 obj.panel_object.button_pierside.Tooltip = 'Unknown pier side. Must be an error'; 
             end
             
+            if isempty(obj.owner.prev_objects)
+                obj.panel_object.button_prev_objects.control.String = {' '};
+            else
+                obj.panel_object.button_prev_objects.control.String = obj.owner.prev_objects;
+            end
+            
             
             if strcmp(obj.owner.pier_side, obj.owner.obj_pier_side)
                 obj.panel_object.button_pierside.BackgroundColor = util.plot.GraphicButton.defaultColor;
@@ -294,6 +306,23 @@ classdef ASAGUI < handle
     end
                 
     methods % callbacks
+        
+        function callback_prev_objects(obj, hndl, ~)
+            
+            if obj.debug_bit>1, disp('Callback: prev_objects'); end
+
+            idx = hndl.Value;
+            
+            if ~isempty(idx) && ~isempty(hndl.String)
+                str = hndl.String{idx};
+                if ~isempty(strip(str))
+                    obj.owner.parseTargetString(str);
+                end
+            end
+            
+            obj.update;
+            
+        end
         
         function callback_NW(obj, ~, ~)
             

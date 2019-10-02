@@ -420,7 +420,13 @@ classdef GraphicButton < handle
                 val = obj.getVariable;
             
                 obj.FontSize = obj.owner.(obj.self_name).([font_size 'font_size']);
-                obj.String = [obj.str1 num2str(val) obj.str2];
+                if isempty(val)
+                    obj.String = [obj.str1 ' ' obj.str2];
+                elseif ischar(val) || isstring(val)
+                    obj.String = [obj.str1 ' ' val ' ' obj.str2];
+                else
+                    obj.String = [obj.str1 num2str(val) obj.str2];
+                end
                 
             elseif cs(obj.type, 'custom', 'input custom')
                 
