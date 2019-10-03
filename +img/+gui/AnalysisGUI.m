@@ -7,6 +7,7 @@ classdef AnalysisGUI < handle
         fig@util.plot.FigHandler;
              
         buttons = {};
+        menus = {};
         
         font_size = 12;
         big_font_size = 16;
@@ -22,6 +23,8 @@ classdef AnalysisGUI < handle
     end
     
     properties % gui stuff
+        
+        menu_options;
         
         panel_controls;
         
@@ -80,6 +83,7 @@ classdef AnalysisGUI < handle
             import util.plot.GraphicButton;
             import util.plot.GraphicPanel;
             import util.plot.ContrastLimits;
+            import util.plot.MenuItem;
             
             obj.buttons = {};
             
@@ -89,6 +93,15 @@ classdef AnalysisGUI < handle
             obj.fig.height = 16;
             obj.fig.width = 25;
             movegui(obj.fig.fig, 'center');
+            
+            %%%%%%%%%%%%%%%%%%% MENUS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            % MenuItem(parent, text, type, variable, tooltip, separator)
+            
+            obj.menu_options = MenuItem(obj, '&Options', 'menu'); 
+            obj.menu_options.addButton('button_astrometry', '&Astrometry', 'toggle', 'use_astrometry'); 
+            obj.menu_options.addButton('button_reset', '&Reset', 'push', 'reset'); 
+            obj.menu_options.addButton('input_num_batches', '&Num batches', 'input', 'num_batches', '', 1); 
             
             %%%%%%%%%%%%%%%%%%% LEFT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%%
             

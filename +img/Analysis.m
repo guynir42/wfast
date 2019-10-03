@@ -1320,6 +1320,10 @@ classdef Analysis < file.AstroData
                     N2 = N(idx);
                     M2 = M(idx);
                     
+                    if isempty(S2)
+                        return;
+                    end
+                    
                     T = table(-2.5*log10(S2./obj.sky_pars.zero_point), S2./N2, M2, 'VariableNames', {'Measured_mag', 'SNR', 'GAIA_mag'});
                     T2 = util.vec.bin_table_stats(T, 30);
                     T2 = T2(T2.N>=5,:);

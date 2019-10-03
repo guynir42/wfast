@@ -1,8 +1,10 @@
 function [D, PD, FD, shift, ratio] = subtract(varargin)
-
+% Usage: [D, PD, FD, shift, ratio] = subtract(M1,P1,M2,P2,F1=1,F2=1,sig1=1,sig2=1,align=0,match_flux=0)
     import util.img.pad2size;
     import util.fft.fftshift2;
 
+    if nargin==0, help('util.img.subtract'); return; end
+    
     input = util.text.InputVars;
     input.use_ordered_numeric = 1;
     input.input_var('M1', [], 'image1', 'ref_image');

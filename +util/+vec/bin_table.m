@@ -8,6 +8,11 @@ function [Tnew, edges] = bin_table(T, edges, varargin)
 
     if nargin==0, help('util.vec.bin_table'); return; end
     
+    if isempty(T)
+        Tnew = T;
+        return;
+    end
+    
     if nargin<2 || isempty(edges)
         edges = ceil(sqrt(height(T)));
     end
