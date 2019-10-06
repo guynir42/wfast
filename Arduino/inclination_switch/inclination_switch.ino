@@ -19,19 +19,23 @@
 #include "Ultrasonic.h"
 #include <SparkFun_ADXL345.h>         // SparkFun ADXL345 Library
 
-Parser parser("inclination", "InclinationSwitch v1.00");
+Parser parser("inclination", "InclinationSwitch v1.02");
+// v1.02 -- fixed bug with inversion and normally closed. 
+// v1.01 -- removed constant feedback through serial. Added ability to turn off switch for 20 minutes
 // v1.00 -- hard limit switch by measuring inclination 
 
 
 // define the accelerometer 
 // pinout MEGA2560: SCL->SCL and SDA->SDA and VCC to 3.3v and GND->GND)
-// pinout NANO328:  SCL->A5 and SDA->A4 and VCC to 3.3v and GND->GND)
-VoltagePin accVCC(19);
-GroundPin accGND(18);
+// pinout NANO328:  SCL->A5 (brown) and SDA->A4 (yellow) and VCC to 3.3v and GND->GND)
+// VoltagePin accVCC(19); // (red)
+// GroundPin accGND(18); // (black)
+
 ADXL345 adxl = ADXL345();             // USE FOR I2C COMMUNICATION
 int x, y, z; // acceleration values
 
-Timer timer; // timer if off by default, can activate it to get periodic status reports via serial
+Timer timer; // timer for checking the inclination state
+Timer timer2; // this one is used for turning off the switch for 20 minutes
 
 // relay setup (must connect VCC pin to board 5v pin and GND to GND pin)
 VoltagePin relay1(A1); // kill the telescope when under horizon
@@ -50,12 +54,14 @@ void setup() {
 
   Parser::debug_bit=0;
   Timer::debug_bit=0;
-//  parser.addCommand("measure", &measure);
+  parser.addCommand("measure", &measure);
   parser.addCommand("status", &statusReport);
-  parser.addCommand("timer", &setTimer);
-  parser.addCommand("duration", &setTimer);
-  parser.addCommand("interval", &setTimer);
-  parser.addCommand("period", &setTimer);
+   parser.addCommand("timer", &setTimer);
+//  parser.addCommand("duration", &setTimer);
+// parser.addCommand("interval", &setTimer);
+//parser.addCommand("period", &setTimer);
+  parser.addCommand("stop", &turn_off);
+  parser.addCommand("start", &turn_on);
 //  parser.addCommand("help", &help);
 
   timer.setInterval(0.01);
@@ -68,21 +74,15 @@ void setup() {
   // Higher Values = Wider Measurement Range
   // Lower Values = Greater Sensitivity
 
-  // relay1.timer.setMode(Timer::ON);
-  // relay2.timer.setMode(Timer::OFF);
-  // relay3.timer.setMode(Timer::OFF);
-  // relay4.timer.setMode(Timer::OFF);
+//  relay1.setInversion();
+//  relay2.setInversion();
+//  relay3.setInversion();
+//  relay4.setInversion();
 
-  // relay1.setMode(OutputPin::WATCH);
-  // relay2.setMode(OutputPin::WATCH);
-  // relay3.setMode(OutputPin::WATCH);
-  // relay4.setMode(OutputPin::WATCH);
+  timer2.setMode(Timer::ON);
 
-  relay1.setInversion();
-  relay2.setInversion();
-  relay3.setInversion();
-  relay4.setInversion();
-
+  Serial.println("Hi. This is bluetooth inclination meter on the W-FAST1 telescope!");
+  
 }
 
 void serialEvent() {
@@ -116,39 +116,37 @@ void loop() {
     float average=0;
     for(int i=0; i<10;i++) if(!isnan(projections[i])) average+=projections[i];
     average/=10;
-    
-    if(average<0){
-      relay1.setState(0); // vector is pointing down, kill the switch
-      snprintf(state,5,"down");
+
+    if(timer2.getState()){
+      if(average<0){
+        relay1.setState(0); // vector is pointing down, kill the switch
+        snprintf(state,5,"down");
+      }
+      else{
+        relay1.setState(1); // everything is ok, switch can turn on
+        snprintf(state,5,"up");
+      }
+      
+      timer.setupExpiration(); // reset the timer
+      timer2.setMode(Timer::ON); 
+      
     }
     else{
-      relay1.setState(1); // everything is ok, switch can turn on
-      snprintf(state,5,"up");
+      relay1.setState(1); // in override mode, temporarily always allow the relay to flow
+      
     }
-    
-    timer.setupExpiration(); // reset the timer
-
-    statusReport("");
+    // statusReport("");
     
   }
 
 }
 
 
-//void measure(char *arg){
-//
-//  Serial.print(x);
-//  Serial.print(", ");
-//  Serial.print(y);
-//  Serial.print(", ");
-//  Serial.print(z);
-//  Serial.print(", ");
-//  Serial.print(state);
-//  Serial.print(", t= ");
-//  if(timer.getMode()==Timer::OFF) Serial.println("0");
-//  else Serial.println(timer.getInterval());
-//  
-//}
+void measure(char *arg){
+
+  Serial.println(state);
+  
+}
 
 void statusReport(char *arg) {
 
@@ -195,6 +193,20 @@ void setTimer(char *arg){
     timer.setMode(Timer::OFF);
   }
   
+  
+}
+
+void turn_off(char *arg){
+
+  Serial.println("Turning off switcher for 20 minutes!");
+  timer2.setupCountdown(60*20);
+  
+}
+
+void turn_on(char *arg){
+
+  Serial.println("Turning on switcher!");
+  timer2.setMode(Timer::ON);
   
 }
 
