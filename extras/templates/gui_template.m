@@ -7,6 +7,10 @@ classdef objGUI < handle
         fig@util.plot.FigHandler;
              
         buttons = {};
+        menus = {};
+        
+        latest_error = '';
+        latest_warning = '';
         
         font_size = 12;
         big_font_size = 16;
@@ -72,6 +76,7 @@ classdef objGUI < handle
             import util.plot.ContrastLimits;
             
             obj.buttons = {};
+            obj.menus = {};
             
             obj.fig = util.plot.FigHandler('...');
             obj.fig.clear;
@@ -79,6 +84,15 @@ classdef objGUI < handle
             obj.fig.height = 16;
             obj.fig.width = 25;
             movegui(obj.fig.fig, 'center');
+            
+            
+            %%%%%%%%%%%%%%%%%%%%%%% MENUS %%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            % MenuItem(parent, text, type, variable, tooltip, separator)
+            % obj.addButton(text, type, variable, tooltip, separator)
+            % menu types: menu, toggle, push, input, input_text, info, custom
+            
+            
             
             N_left = 10; % number of buttons on left side
             
@@ -157,6 +171,10 @@ classdef objGUI < handle
            
             for ii = 1:length(obj.buttons)
                 obj.buttons{ii}.update;
+            end
+            
+            for ii = 1:length(obj.menus)
+                obj.menus{ii}.update;
             end
             
             obj.panel_contrast.update;

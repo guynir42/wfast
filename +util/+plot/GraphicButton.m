@@ -41,6 +41,7 @@ classdef GraphicButton < handle
         FontSize;
         Enable;
         BackgroundColor;
+        ForegroundColor;
         Tooltip;
         
     end
@@ -252,6 +253,12 @@ classdef GraphicButton < handle
             
         end
         
+        function val = get.ForegroundColor(obj)
+            
+            val = obj.control.ForegroundColor;
+            
+        end
+        
         function val = get.Tooltip(obj)
             
             val = obj.control.TooltipString;
@@ -307,6 +314,12 @@ classdef GraphicButton < handle
         function set.BackgroundColor(obj, val)
             
             obj.control.BackgroundColor= val;
+            
+        end
+        
+        function set.ForegroundColor(obj, val)
+            
+            obj.control.ForegroundColor= val;
             
         end
         
@@ -467,17 +480,36 @@ classdef GraphicButton < handle
             if isempty(obj.variable)
                 % pass
             else
+
+                if isprop(obj.owner.(obj.self_name), 'latest_error')
+                    obj.owner.(obj.self_name).latest_error = '';
+                end
                 
-                if isempty(obj.str2)
-                    if ismethod(obj.owner, obj.variable)
-                        obj.owner.(obj.variable);
-                    elseif isprop(obj.owner, obj.variable) && ismethod(obj.owner.(obj.variable), 'makeGUI')
-                        obj.owner.(obj.variable).makeGUI;
-                    end
-                else % if we are given str2 (input to function)
-                    obj.owner.(obj.variable).(obj.str2);
+                if isprop(obj.owner.(obj.self_name), 'latest_warning')
+                    obj.owner.(obj.self_name).latest_warning = '';
+                    lastwarn('');
                 end
 
+                try
+
+                    if isempty(obj.str2)
+                        if ismethod(obj.owner, obj.variable)
+                            obj.owner.(obj.variable);
+                        elseif isprop(obj.owner, obj.variable) && ismethod(obj.owner.(obj.variable), 'makeGUI')
+                            obj.owner.(obj.variable).makeGUI;
+                        end
+                    else % if we are given str2 (input to function)
+                        obj.owner.(obj.variable).(obj.str2);
+                    end
+
+                catch ME
+                    if isprop(obj.owner.(obj.self_name), 'latest_error')
+                        obj.owner.(obj.self_name).latest_error = util.text.eraseTags(ME.getReport());
+                    end
+                    obj.owner.(obj.self_name).update;
+                    rethrow(ME);
+                end
+            
             end
             
             obj.owner.(obj.self_name).update;
@@ -487,29 +519,67 @@ classdef GraphicButton < handle
         function callback_toggle(obj, ~, ~)
             
             if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable]); end
+
+            if isprop(obj.owner.(obj.self_name), 'latest_error')
+                obj.owner.(obj.self_name).latest_error = '';
+            end
+
+            if isprop(obj.owner.(obj.self_name), 'latest_warning')
+                obj.owner.(obj.self_name).latest_warning = '';
+                lastwarn('');
+            end
             
-            val = obj.getVariable;
-            obj.setVariable(~val);
-%             obj.owner.(obj.variable) = ~obj.owner.(obj.variable);
+            try
+
+                val = obj.getVariable;
+                obj.setVariable(~val);
+    %             obj.owner.(obj.variable) = ~obj.owner.(obj.variable);
+
+            catch ME
+                if isprop(obj.owner.(obj.self_name), 'latest_error')
+                    obj.owner.(obj.self_name).latest_error = util.text.eraseTags(ME.getReport());
+                end
+                obj.owner.(obj.self_name).update;
+                rethrow(ME);
+            end
             
             obj.owner.(obj.self_name).update;
-            
+
         end
         
         function callback_auto(obj, ~, ~)
             
             if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable]); end
             
-            val = obj.getVariable;
-            
-            if isempty(val)
-                obj.setVariable(0);
-            elseif val
-                obj.setVariable([]);
-            elseif ~val
-                obj.setVariable(1);
+            if isprop(obj.owner.(obj.self_name), 'latest_error')
+                obj.owner.(obj.self_name).latest_error = '';
+            end
+
+            if isprop(obj.owner.(obj.self_name), 'latest_warning')
+                obj.owner.(obj.self_name).latest_warning = '';
+                lastwarn('');
             end
             
+            try
+                
+                val = obj.getVariable;
+
+                if isempty(val)
+                    obj.setVariable(0);
+                elseif val
+                    obj.setVariable([]);
+                elseif ~val
+                    obj.setVariable(1);
+                end
+            
+            catch ME
+                if isprop(obj.owner.(obj.self_name), 'latest_error')
+                    obj.owner.(obj.self_name).latest_error = util.text.eraseTags(ME.getReport());
+                end
+                obj.owner.(obj.self_name).update;
+                rethrow(ME);
+            end
+                
             obj.owner.(obj.self_name).update;
             
         end
@@ -522,18 +592,36 @@ classdef GraphicButton < handle
             
             if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable '= ' num2str(value)]); end
             
-            if isempty(value)
-                if isprop(obj.owner, ['default_' obj.variable]) || ismethod(obj.owner, ['default_' obj.variable])
-                    obj.setVariable(obj.owner.(['default_' obj.variable]));
-%                     obj.owner.(obj.variable) = obj.owner.(['default_' obj.variable]);
-                else
-                    obj.owner.(obj.variable) = [];
-                end
-            else  
-                obj.setVariable(value);
-%                 obj.owner.(obj.variable) = value;
+            if isprop(obj.owner.(obj.self_name), 'latest_error')
+                obj.owner.(obj.self_name).latest_error = '';
             end
-                        
+
+            if isprop(obj.owner.(obj.self_name), 'latest_warning')
+                obj.owner.(obj.self_name).latest_warning = '';
+                lastwarn('');
+            end
+            
+            try
+                
+                if isempty(value)
+                    if isprop(obj.owner, ['default_' obj.variable]) || ismethod(obj.owner, ['default_' obj.variable])
+                        obj.setVariable(obj.owner.(['default_' obj.variable]));
+    %                     obj.owner.(obj.variable) = obj.owner.(['default_' obj.variable]);
+                    else
+                        obj.owner.(obj.variable) = [];
+                    end
+                else  
+                    obj.setVariable(value);
+    %                 obj.owner.(obj.variable) = value;
+                end
+
+            catch ME
+                if isprop(obj.owner.(obj.self_name), 'latest_error')
+                    obj.owner.(obj.self_name).latest_error = util.text.eraseTags(ME.getReport());
+                end
+                obj.owner.(obj.self_name).update;
+                rethrow(ME);
+            end     
             obj.owner.(obj.self_name).update;
             
         end
@@ -546,16 +634,35 @@ classdef GraphicButton < handle
             
             if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable '= ' value]); end
             
-            if isempty(value)
-                if isprop(obj.owner, ['default_' obj.variable]) || ismethod(obj.owner, ['default_' obj.variable])
-                    obj.setVariable(['default_' obj.variable]);
-                else
-                    obj.setVariable('');
-                end
-            else                
-                obj.setVariable(value);
+            if isprop(obj.owner.(obj.self_name), 'latest_error')
+                obj.owner.(obj.self_name).latest_error = '';
             end
-                        
+
+            if isprop(obj.owner.(obj.self_name), 'latest_warning')
+                obj.owner.(obj.self_name).latest_warning = '';
+                lastwarn('');
+            end
+            
+            try
+
+                if isempty(value)
+                    if isprop(obj.owner, ['default_' obj.variable]) || ismethod(obj.owner, ['default_' obj.variable])
+                        obj.setVariable(['default_' obj.variable]);
+                    else
+                        obj.setVariable('');
+                    end
+                else                
+                    obj.setVariable(value);
+                end
+                  
+            catch ME
+                if isprop(obj.owner.(obj.self_name), 'latest_error')
+                    obj.owner.(obj.self_name).latest_error = util.text.eraseTags(ME.getReport());
+                    obj.owner.(obj.self_name).update;
+                end
+                rethrow(ME);
+            end     
+                  
             obj.owner.(obj.self_name).update;
             
         end

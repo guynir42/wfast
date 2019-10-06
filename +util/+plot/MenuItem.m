@@ -61,7 +61,13 @@ classdef MenuItem < dynamicprops
         
         function val = get.Text(obj)
            
-            val = obj.hndl.Text;
+            if isprop(obj.hndl, 'Text')
+                val = obj.hndl.Text;
+            elseif isprop(obj.hndl, 'Label')
+                val = obj.hndl.Label;
+            else
+                error('Object handle does not have a "Text" or a "Label" property!');
+            end
             
         end
         
@@ -73,7 +79,13 @@ classdef MenuItem < dynamicprops
         
         function val = get.Callback(obj)
            
-            val = obj.hndl.MenuSelectedFcn;
+            if isprop(obj.hndl, 'MenuSelectedFcn')
+                val = obj.hndl.MenuSelectedFcn;
+            elseif isprop(obj.hndl, 'Callback')
+                val = obj.hndl.Callback;
+            else
+                error('Object handle does not have a "MenuSelectedFcn" or a "ButtonDownFcn"'); 
+            end
             
         end
         
@@ -157,7 +169,13 @@ classdef MenuItem < dynamicprops
         
         function set.Text(obj, val)
             
-            obj.hndl.Text = val;
+            if isprop(obj.hndl, 'Text')
+                obj.hndl.Text = val;
+            elseif isprop(obj.hndl, 'Label')
+                obj.hndl.Label = val;
+            else
+                error('Object handle does not have a "Text" or a "Label" property!');
+            end
             
         end
         
@@ -169,7 +187,13 @@ classdef MenuItem < dynamicprops
         
         function set.Callback(obj, val)
             
-            obj.hndl.MenuSelectedFcn = val;
+            if isprop(obj.hndl, 'MenuSelectedFcn')
+                obj.hndl.MenuSelectedFcn = val;
+            elseif isprop(obj.hndl, 'Callback')
+                obj.hndl.Callback = val;
+            else
+                error('Object handle does not have a "MenuSelectedFcn" or a "ButtonDownFcn"'); 
+            end
             
         end
         
@@ -299,10 +323,11 @@ classdef MenuItem < dynamicprops
                 obj.Callback = @obj.callback_toggle;
             elseif cs(obj.type, 'push')
                 obj.Callback = @obj.callback_push;
-            elseif cs(obj.type, 'input_text')
-                obj.Callback = @obj.callback_input_text;
             elseif cs(obj.type, 'input')
                 obj.Callback = @obj.callback_input;
+                obj.str_format = obj.Text; % the text field is used as the string format...
+            elseif cs(obj.type, 'input_text')
+                obj.Callback = @obj.callback_input_text;
                 obj.str_format = obj.Text; % the text field is used as the string format...
             elseif cs(obj.type, 'info')
                 obj.Callback = '';
@@ -358,10 +383,10 @@ classdef MenuItem < dynamicprops
                 % pass
             elseif cs(obj.type, 'toggle')
                 obj.Value = obj.owner.(obj.variable);
-            elseif cs(obj.type, 'input', 'info')
+            elseif cs(obj.type, 'input', 'input_text', 'info')
                 obj.Text = obj.getFormattedVariable; 
-            elseif cs(obj.type, 'input_text')
-                obj.Text = obj.getVariable;
+%             elseif cs(obj.type, 'input_text')
+%                 obj.Text = obj.getVariable;
             else
                 error('Unknown menu item type "%s". Use "menu", "toggle", "push", "input", "input_text", "info" or "custom".', obj.type);
             end
@@ -371,21 +396,27 @@ classdef MenuItem < dynamicprops
         function str = getFormattedVariable(obj)
             
             val = obj.owner.(obj.variable);
+            
             if ischar(val)
-                str = val;
+%                 str = val;
             elseif isempty(val)
-                str = '[empty]';
+                val = '[empty]';
             elseif isnumeric(val)
-                str = num2str(val);
+                
+%                 str = num2str(val);
             else
-                str = class(val);
+                val = class(val);
             end
                 
             if ~isempty(obj.str_format)
-                if isempty(strfind(obj.str_format, '%s'))
-                    str = sprintf([obj.str_format ': %s'], str);
+                if isempty(strfind(obj.str_format, '%'))
+                    if isnumeric(val)
+                        str = sprintf([obj.str_format ': %s'], num2str(val));
+                    else
+                        str = sprintf([obj.str_format ': %s'], val);
+                    end
                 else
-                    str = sprintf(obj.str_format, str);
+                    str = sprintf(obj.str_format, val); % I'm going to assume the string format has the proper format specifier
                 end
             end
             
@@ -393,7 +424,7 @@ classdef MenuItem < dynamicprops
         
         function callback_toggle(obj, ~, ~)
             
-            if obj.debug_bit, fprintf('Callback from menu: toggle %s', obj.Text); end
+            if obj.debug_bit, fprintf('Callback from menu: toggle %s\n', obj.Text); end
             
             current_value = obj.getVariable;
             
@@ -409,7 +440,7 @@ classdef MenuItem < dynamicprops
         
         function callback_push(obj, ~, ~)
             
-            if obj.debug_bit, fprintf('Callback from menu: push %s', obj.Text); end
+            if obj.debug_bit, fprintf('Callback from menu: push %s\n', obj.Text); end
             
             % add option for sub-object commands (e.g., variable=some_object.func)
             
@@ -425,7 +456,7 @@ classdef MenuItem < dynamicprops
         
         function callback_input(obj, ~, ~)
             
-            if obj.debug_bit, fprintf('Callback from menu: input %s', obj.Text); end
+            if obj.debug_bit, fprintf('Callback from menu: input %s\n', obj.Text); end
             
             val = util.text.inputdlg(['Input new value of ' obj.variable], obj.getVariable);
             
@@ -441,7 +472,7 @@ classdef MenuItem < dynamicprops
         
         function callback_input_text(obj, ~, ~)
             
-            if obj.debug_bit, fprintf('Callback from menu: input %s', obj.Text); end
+            if obj.debug_bit, fprintf('Callback from menu: input %s\n', obj.Text); end
             
             val = util.text.inputdlg(['Input new value of ' obj.variable], obj.getVariable);
             

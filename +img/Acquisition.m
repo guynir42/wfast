@@ -74,6 +74,9 @@ classdef Acquisition < file.AstroData
         
         start_index; % if non empty, use this number as initial index for run (e.g., to continue from where we stopped)
         
+        total_runtime;
+        runtime_units = 'minutes';
+        
         use_background = 1;
         use_refine_bg = 0;
         
@@ -195,6 +198,15 @@ classdef Acquisition < file.AstroData
         default_num_backgrounds;
         default_cut_size_bg;
         
+        
+        slow_mode_expT = 3;
+        slow_mode_frame_rate = 1/3; % try 0.03 if 1/3 doesn't work...
+        slow_mode_batch_size = 1;
+        
+        fast_mode_expT = 0.03;
+        fast_mode_frame_rate = 25;
+        fast_mode_batch_size = 100;
+        
         start_index_;
         use_background_;
         use_refine_bg_;
@@ -221,6 +233,7 @@ classdef Acquisition < file.AstroData
 
         run_name_;
         batch_size_;
+        total_runtime_;
         num_batches_;
         frame_rate_;
         expT_;
@@ -236,7 +249,7 @@ classdef Acquisition < file.AstroData
         
         show_what_list = {'images', 'stack', 'stack_proc'};
         
-        version = 1.05;
+        version = 1.06;
         
     end
     
@@ -440,10 +453,10 @@ classdef Acquisition < file.AstroData
         
         function val = getFrameRateEstimate(obj)
             
-            if ~isempty(obj.frame_rate_average)
-                val = obj.frame_rate_average;
-            elseif ~isempty(obj.frame_rate) && ~isnan(obj.frame_rate)
+            if ~isempty(obj.frame_rate) && ~isnan(obj.frame_rate)
                 val = obj.frame_rate;
+            elseif ~isempty(obj.frame_rate_average)
+                val = obj.frame_rate_average;
             else
                 val = [];
             end
@@ -456,6 +469,26 @@ classdef Acquisition < file.AstroData
                 val = [];
             else
                 val = (obj.num_batches-obj.batch_counter).*obj.batch_size./obj.getFrameRateEstimate;
+            end
+            
+        end
+        
+        function val = convertRuntimeToSeconds(obj)
+            
+            import util.text.cs;
+            
+            if cs(obj.runtime_units, 'seconds')
+                val = 1;
+            elseif cs(obj.runtime_units, 'minutes')
+                val = 60;
+            elseif cs(obj.runtime_units, 'hours')
+                val = 3600;
+            elseif cs(obj.runtime_units, 'batches')
+                val = obj.batch_size./obj.getFrameRateEstimate;
+            elseif cs(obj.runtime_units, 'frames')
+                val = 1./obj.getFrameRateEstimate;
+            else
+                error('Unknown runtime units "%s". Use seconds, minutes, hours, batches or frames', obj.runtime_units);
             end
             
         end
@@ -499,6 +532,73 @@ classdef Acquisition < file.AstroData
         function val = getGbLeft(obj)
             
             val = obj.getGbPerBatch.*(obj.num_batches-obj.batch_counter);
+            
+        end
+        
+        function val = info_short(obj)
+            
+            val = sprintf('N= %d/%d batches | time left: %s | disk needed= %5.2f GB | frame rate= %4.2f Hz', ...
+                obj.batch_counter, obj.num_batches, obj.getTimeLeftHMS, obj.getGbLeft, obj.frame_rate_average);
+            
+        end
+        
+        function val = info_long(obj)
+            
+            val = sprintf('Observation parameters\n--------------------------------------');
+            
+            if ~isempty(obj.pars)
+                
+                val = sprintf('%s\n object: %s', val, obj.pars.OBJECT);
+                
+                val = sprintf('%s\n RA:    %s hours\n Dec: %s deg', val, obj.pars.RA, obj.pars.Dec);
+            
+                val = sprintf('%s\n--------------------------------------', val);
+            end
+            
+            val = sprintf('%s\n exp. time= %4.2f s \n frame rate= %4.2f Hz', val, obj.expT, obj.frame_rate);
+            
+            val = sprintf('%s\n num. batches= %d \n batch size= %d frames', val, obj.num_batches, obj.batch_size);
+            
+            val = sprintf('%s\n num. stars= %d / %d ', val, obj.num_stars_found, obj.num_stars);
+            
+            val = sprintf('%s\n cutout size= %dx%d pix \n edges= %d pix', val, obj.cut_size, obj.cut_size, obj.avoid_edges);
+            
+            val = sprintf('%s\n num.backgrounds= %d \n b/g cut. size= %dx%d pix', val, obj.num_backgrounds, obj.cut_size_bg, obj.cut_size_bg);
+            
+            val = sprintf('%s\n--------------------------------------', val);
+            
+            if ~isempty(obj.pars) && ~isempty(obj.pars.SCALE)
+                val = sprintf('%s\n seeing= %4.2f"', val, obj.average_width.*obj.pars.SCALE.*2.355);
+            end
+            
+            val = sprintf('%s\n PSF widths= %4.2f / %4.2f pix', val, obj.minor_axis, obj.major_axis);
+            
+            val = sprintf('%s\n PSF angle= %4.2f deg', val, obj.model_psf.angle);
+            
+            if length(obj.average_offsets)==2
+                val = sprintf('%s\n dx/dy= %4.2f / %4.2f pix', val, obj.average_offsets(2), obj.average_offsets(1));
+            end
+            
+            val = sprintf('%s\n mean flux= %.1f', val, obj.average_flux);
+            val = sprintf('%s\n mean background= %.1f', val, obj.average_background);
+            
+            val = sprintf('%s\n focus point= %5.3f', val, obj.cam.focuser.pos);
+            
+            val = sprintf('%s\n--------------------------------------', val);
+            
+            val = sprintf('%s\n sensor temperature= %4.2f', val, obj.sensor_temperature);
+            
+            if isa(obj.src, 'obs.cam.Andor')
+
+                if obj.src.use_async
+                    val = sprintf('%s\n source: CAM-async', val);
+                else
+                    val = sprintf('%s\n source: CAM-sync', val);
+                end
+                
+            elseif isa(obj.src, 'file.Reader')
+                val = sprintf('%s\n source: reader', val);
+            end
             
         end
         
@@ -697,6 +797,24 @@ classdef Acquisition < file.AstroData
             
         end
         
+        function val = is_slow_mode(obj)
+            
+            val = true;
+            val = val && ~isempty(obj.expT) && obj.expT==obj.slow_mode_expT;
+            val = val && ~isempty(obj.frame_rate) && obj.frame_rate==obj.slow_mode_frame_rate;
+            val = val && ~isempty(obj.batch_size) && obj.batch_size==obj.slow_mode_batch_size;
+            
+        end
+        
+        function val = is_fast_mode(obj)
+            
+            val = true;
+            val = val && ~isempty(obj.expT) && obj.expT==obj.fast_mode_expT;
+            val = val && ~isempty(obj.frame_rate) && obj.frame_rate==obj.fast_mode_frame_rate;
+            val = val && ~isempty(obj.batch_size) && obj.batch_size==obj.fast_mode_batch_size;
+            
+        end
+        
     end
     
     methods % setters
@@ -734,6 +852,14 @@ classdef Acquisition < file.AstroData
             if ~isempty(obj.pars)
                 obj.pars.target_name = val;
             end
+            
+        end
+        
+        function set.total_runtime(obj, val)
+            
+            obj.total_runtime = val;
+            
+            obj.num_batches = ceil(obj.total_runtime.*obj.convertRuntimeToSeconds.*obj.getFrameRateEstimate./obj.batch_size);
             
         end
         
@@ -893,6 +1019,7 @@ classdef Acquisition < file.AstroData
                 input.input_var('expT', [], 'T', 'exposure time');
                 input.input_var('frame_rate', []); 
                 input.input_var('num_batches', [], 'Nbatches');
+                input.input_var('total_runtime', [], 'runtime');
                 input.input_var('batch_size', [], 'frames');
                 input.input_var('num_stars', [], 'Nstars');
                 input.input_var('cut_size', []);
@@ -935,6 +1062,7 @@ classdef Acquisition < file.AstroData
             
             obj.run_name_ = obj.run_name;
             obj.batch_size_ = obj.batch_size;
+            obj.total_runtime_ = obj.total_runtime;
             obj.num_batches_ = obj.num_batches;
             obj.frame_rate_ = obj.frame_rate;
             obj.expT_ = obj.expT;
@@ -987,6 +1115,7 @@ classdef Acquisition < file.AstroData
             
             obj.run_name = obj.run_name_;
             obj.batch_size = obj.batch_size_;
+            obj.total_runtime = obj.total_runtime_;
             obj.num_batches = obj.num_batches_;
             obj.frame_rate = obj.frame_rate_;
             obj.expT = obj.expT_;
@@ -1265,6 +1394,10 @@ classdef Acquisition < file.AstroData
                 input = obj.makeInputVars(varargin{:});
                 obj.stash_parameters(input);
                 
+%                 if ~isempty(obj.total_runtime)
+%                     obj.num_batches = ceil(obj.total_runtime.*obj.convertRuntimeToSeconds.*obj.getFrameRateEstimate./obj.batch_size);
+%                 end
+                
                 if ~isempty(obj.gui) && obj.gui.check
                     obj.gui.update;
                 end
@@ -1281,7 +1414,7 @@ classdef Acquisition < file.AstroData
                     error('Run scheduled to take %4.2f hours with these parameter... aborting!', obj.getTimeLeft/3600); 
                 end
                 
-                if obj.use_save && obj.getGbLeft>util.sys.disk_space(obj.buf.directory)
+                if obj.use_save && obj.getGbLeft>util.sys.disk_space(obj.buf.directory)*10 % only throw an error if the required disk space is way too big! 
                     error('Run scheduled requires an estimated %5.2f Gb of storage. Only %5.2f Gb available on drive!', obj.getGbLeft, util.sys.disk_space(obj.buf.directory));
                 end
                 
@@ -1631,7 +1764,7 @@ classdef Acquisition < file.AstroData
              
             % add additional tests to remove irrelvant stars
             
-            obj.threshold = obj.detect_thresh;
+            obj.cat.threshold = obj.detect_thresh;
             obj.cat.input(obj.stack_proc);
             
             T = obj.cat.data;
@@ -1833,6 +1966,22 @@ classdef Acquisition < file.AstroData
             else
                 error('Unknown ROI position "%s". Use "center", "none", "NorthEast" etc...', position);
             end
+            
+        end
+        
+        function setupSlowMode(obj)
+            
+            obj.expT = obj.slow_mode_expT;
+            obj.frame_rate = obj.slow_mode_frame_rate;
+            obj.batch_size = obj.slow_mode_batch_size;
+            
+        end
+        
+        function setupFastMode(obj)
+            
+            obj.expT = obj.fast_mode_expT;
+            obj.frame_rate = obj.fast_mode_frame_rate;
+            obj.batch_size = obj.fast_mode_batch_size;
             
         end
         
