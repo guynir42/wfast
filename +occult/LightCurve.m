@@ -326,6 +326,7 @@ classdef LightCurve < handle
             input.input_var('N', obj.num_display, 'number parameters', 'num pars');
             input.input_var('noise', []);
             input.input_var('ax', [], 'axis', 'axes');
+            input.input_var('line_width', 1.5); 
             input.input_var('hold', false); 
             input.input_var('legend', false);
             input.scan_vars(varargin{:});
@@ -365,7 +366,7 @@ classdef LightCurve < handle
                 
                 input.ax.ColorOrderIndex = ii;
                 
-                h = plot(input.ax, obj.time, obj.flux(:,ii), '-');
+                h = plot(input.ax, obj.time, obj.flux(:,ii), '-', 'LineWidth', input.line_width);
                 if all(obj.pars.t==0)
                     h.DisplayName = sprintf('R= %4.2f | r= %4.2f | b= %4.2f | v= %4.1f', obj.pars.R(ii), obj.pars.r(ii), obj.pars.b(ii), obj.pars.v(ii));
                 else
@@ -375,7 +376,7 @@ classdef LightCurve < handle
                 color = h.Color;
                 
                 for jj = 1:N3
-                    h = plot(input.ax, obj.time, obj.flux_noisy(:,ii,jj), ':');
+                    h = plot(input.ax, obj.time, obj.flux_noisy(:,ii,jj), ':', 'LineWidth', input.line_width);
                     h.Color = color;
                     h.HandleVisibility = 'off';
                 end
@@ -393,6 +394,8 @@ classdef LightCurve < handle
             if input.legend
                 legend(input.ax, 'Location', 'SouthEast');
             end
+            
+            input.ax.Box = 'on';
             
         end
         
