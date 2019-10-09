@@ -326,7 +326,7 @@ classdef LightCurve < handle
             input.input_var('N', obj.num_display, 'number parameters', 'num pars');
             input.input_var('noise', []);
             input.input_var('ax', [], 'axis', 'axes');
-            input.input_var('line_width', 1.5); 
+            input.input_var('width', 2, 'line width');
             input.input_var('hold', false); 
             input.input_var('legend', false);
             input.scan_vars(varargin{:});
@@ -365,10 +365,13 @@ classdef LightCurve < handle
             for ii = 1:N2
                 
                 input.ax.ColorOrderIndex = ii;
-                
-                h = plot(input.ax, obj.time, obj.flux(:,ii), '-', 'LineWidth', input.line_width);
-                if all(obj.pars.t==0)
+                h = plot(input.ax, obj.time, obj.flux(:,ii), '-', 'LineWidth', input.width);
+                if all(obj.pars.t==0) && all(obj.pars.R==0)
+                    h.DisplayName = sprintf('r= %4.2f | b= %4.2f | v= %4.1f', obj.pars.r(ii), obj.pars.b(ii), obj.pars.v(ii));
+                elseif all(obj.pars.t==0)
                     h.DisplayName = sprintf('R= %4.2f | r= %4.2f | b= %4.2f | v= %4.1f', obj.pars.R(ii), obj.pars.r(ii), obj.pars.b(ii), obj.pars.v(ii));
+                elseif all(obj.pars.R==0)
+                    h.DisplayName = sprintf('r= %4.2f | b= %4.2f | v= %4.1f | t= %4.2f', obj.pars.r(ii), obj.pars.b(ii), obj.pars.v(ii), obj.pars.t(ii));
                 else
                     h.DisplayName = sprintf('R= %4.2f | r= %4.2f | b= %4.2f | v= %4.1f | t= %4.2f', obj.pars.R(ii), obj.pars.r(ii), obj.pars.b(ii), obj.pars.v(ii), obj.pars.t(ii));
                 end
@@ -384,8 +387,8 @@ classdef LightCurve < handle
             end
             
             title(input.ax, sprintf('LC: T= %dms | f= %4.1fHz, W= %4.2f s', obj.pars.T, obj.pars.f, obj.pars.W));
-            xlabel(input.ax, 'time [seconds]');
-            ylabel(input.ax, 'intensity (normalized)');
+            xlabel(input.ax, 'Time [seconds]');
+            ylabel(input.ax, 'Intensity (normalized)');
             
 %             legend(input.ax, leg_str, 'Location','SouthWest');
             

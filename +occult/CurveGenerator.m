@@ -73,6 +73,8 @@ classdef CurveGenerator < handle
     
     properties % switches/controls
         
+        use_binary = 0;
+        
         debug_bit = 1;
         
     end
@@ -89,12 +91,15 @@ classdef CurveGenerator < handle
         core_flux_R_axis;
         core_flux_pairwise;
         
-        version = 1.00;
+        version = 1.02;
         
     end
     
     properties (Dependent = true, AbortSet=true)
         
+        y; % radius ratio between primary and secondary objects
+        d; % distance between primary and secondary objects (FSU)
+        th; % angle between line connecting binary components and direction of velocity (deg)
         R; % radius of b/g star, projected onto distance of occulter (FSU)
         r; % radius of occulter (FSU) 
         b; % impact parameter (FSU)
@@ -170,6 +175,24 @@ classdef CurveGenerator < handle
     end
     
     methods % getters
+        
+        function val = get.y(obj)
+            
+            val = obj.lc.pars.y;
+            
+        end
+        
+        function val = get.d(obj)
+            
+            val = obj.lc.pars.d;
+            
+        end
+        
+        function val = get.th(obj)
+           
+            val = obj.lc.pars.th;
+            
+        end
         
         function val = get.R(obj)
             
@@ -409,6 +432,24 @@ classdef CurveGenerator < handle
     
     methods % setters
         
+        function set.y(obj, y)
+           
+            obj.lc.pars.y = y;
+            
+        end
+        
+        function set.d(obj, d)
+           
+            obj.lc.pars.d = d;
+            
+        end
+        
+        function set.th(obj, th)
+           
+            obj.lc.pars.th = th;
+            
+        end
+        
         function set.R(obj, R)
            
             obj.lc.pars.R = R;
@@ -530,6 +571,16 @@ classdef CurveGenerator < handle
     end
     
     methods % source matrix stuff
+        
+        function makeAmplitudeMap(obj)
+            
+            if obj.use_binary
+                
+            else
+                
+            end
+            
+        end
         
         function [flux_out, flux_map_conv] = makeNonPointSource(obj, flux, star_R, varargin)
            
@@ -929,6 +980,129 @@ classdef CurveGenerator < handle
             end
             
             obj.gui.make;
+            
+        end
+        
+        function showExamples(obj)
+            
+            f0 = util.plot.FigHandler('example lightcurves');
+            f0.clear;
+            f0.width = 30;
+            f0.height = 14;
+            ax = axes('Parent', f0.fig);
+            
+            cla(ax);
+            
+            obj.R = 0;
+            obj.r = 0.5:0.5:1.5;
+            obj.b = 0.5;
+            obj.v = [3 10 30];
+            obj.t = 0;
+            
+            obj.getLightCurves;
+            
+            obj.lc.plot('width', 3);
+            
+            legend(ax, 'Location', 'SouthEast');
+            
+%             xlabel(ax, 'Distance from center of star (FSU)'); 
+%             ylabel(ax, 'Intensity (normalized)');
+            
+            ax.XLim = [-1.0 1.5];
+
+            ax.FontSize = 28;
+            
+        end
+        
+        function showHighResolution(obj)
+            
+            f0 = util.plot.FigHandler('high resolution');
+            f0.clear;
+            f0.width = 30;
+            f0.height = 14;
+            ax = axes('Parent', f0.fig);
+            
+            cla(ax);
+            
+            obj.R = 0;
+            obj.r = 0.5:0.5:1.5;
+            obj.b = 0;
+            obj.v = 10;
+            obj.t = 0;
+            
+            obj.getLightCurves;
+            
+            ax.NextPlot = 'replace';
+            
+            plot(ax, obj.source_a_axis, obj.core_flux(:,1), '-', 'LineWidth', 3, 'DisplayName', 'r=0.5'); 
+            
+            ax.NextPlot = 'add';
+            
+            plot(ax, obj.source_a_axis, obj.core_flux(:,2), '--', 'LineWidth', 3, 'DisplayName', 'r=1.0'); 
+            plot(ax, obj.source_a_axis, obj.core_flux(:,3), ':', 'LineWidth', 3, 'DisplayName', 'r=1.5'); 
+            
+            ax.NextPlot = 'replace';
+            legend(ax, 'Location', 'SouthEast');
+            
+            xlabel(ax, 'Distance from center of star (FSU)'); 
+            ylabel(ax, 'Intensity (normalized)');
+            
+            ax.FontSize = 28;
+            
+            
+        end
+        
+        function showBandwidthComparison(obj)
+            
+            f0 = util.plot.FigHandler('bandwidth comparison');
+            f0.clear;
+            f0.width = 30;
+            f0.height = 14;
+            ax = axes('Parent', f0.fig);
+            
+            cla(ax);
+            ax.NextPlot = 'replace';
+            
+            obj.R = 0.0;
+            obj.r = 1.0;
+            obj.b = 1.0;
+            obj.v = 10;
+            obj.t = 0;
+            
+            obj.getLightCurves;
+            h = plot(ax, obj.lc.time, mean(obj.lc.flux,2), '-k', 'LineWidth', 3);
+            h.DisplayName = 'Monochrome: 550nm, R=0.0';
+            
+            ax.NextPlot = 'add';
+            
+            obj.R = 0.5;
+            
+            obj.getLightCurves;
+            h = plot(ax, obj.lc.time, mean(obj.lc.flux,2), '-r', 'LineWidth', 3);
+            h.DisplayName = 'Monochrome: 550nm, R=0.5';
+            
+            obj.R = 0.0;
+            obj.r = 0.86:0.01:1.14;
+            obj.b = 0.86:0.01:1.14;
+            obj.v = (0.86:0.01:1.14)*10;
+            
+            obj.getLightCurves;
+            h = plot(ax, obj.lc.time, mean(obj.lc.flux,2), ':k', 'LineWidth', 3);
+            h.DisplayName = 'Broadband 400-600nm, R=0.0';
+            
+            obj.R = 0.5;
+            
+            obj.getLightCurves;
+            h = plot(ax, obj.lc.time, mean(obj.lc.flux,2), '--b', 'LineWidth', 3);
+            h.DisplayName = 'Broadband 400-600nm, R=0.5';
+            
+            ax.NextPlot = 'replace';
+            ax.XLim = [-0.5,1.0];
+            ax.YLim = [0.2 1.25];
+            xlabel(ax, 'Time [seconds]');
+            ylabel(ax, 'Intensity (normalized)');
+            legend(ax, 'Location', 'SouthEast');
+            ax.FontSize = 28;
             
         end
         
