@@ -55,6 +55,8 @@ classdef Parameters < handle
     properties(Dependent=true)
         
         % these depend on the longest parameter vector
+        y; % radius ratio of primary to secondary
+        
         R; % radius of b/g star, projected onto distance of occulter (FSU)
         r; % radius of occulter (FSU)
         b; % impact parameter (FSU)
