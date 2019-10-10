@@ -379,7 +379,7 @@ classdef LightCurve < handle
                 color = h.Color;
                 
                 for jj = 1:N3
-                    h = plot(input.ax, obj.time, obj.flux_noisy(:,ii,jj), ':', 'LineWidth', input.line_width);
+                    h = plot(input.ax, obj.time, obj.flux_noisy(:,ii,jj), ':', 'LineWidth', input.width);
                     h.Color = color;
                     h.HandleVisibility = 'off';
                 end

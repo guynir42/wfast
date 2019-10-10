@@ -73,6 +73,7 @@ classdef CurveGenerator < handle
     
     properties % switches/controls
         
+        use_single = 1;
         use_binary = 0;
         
         rho_range = [0 10]; 
@@ -93,10 +94,20 @@ classdef CurveGenerator < handle
     
     properties (Hidden = true)
         
+        rho_axis;
         previous_amplitude_primary; % keep a copy of the last amplitude vector for a given radius
         previous_radius_primary; % what was the occulter radius for that amplitude vector
         previous_amplitude_secondary; % keep a copy of the last amplitude vector for a given radius of the secondary
         previous_radius_secondary; % what was the occulter radius for that amplitude vector
+        
+        previous_amplitude_map; % amplitude map for primary & companion from last calculation
+        previous_x_steps; % keep the x axis (in FSU)
+        previous_y_steps; % keep the y axis (in FSU)
+        previous_amp_parameters; % a vector that includes r, r2, d, and th
+        previous_used_binary; % keep track of if we used binary
+        
+        previous_intensity_map; % after convolving with finite-size star
+        previous_int_parameters; % a vector that includes r, r2, d, th, and R
         
         source_matrix; % interferometric matrix (in r and a and R)
         source_r_axis; % radius of the occulter (FSU)
@@ -114,11 +125,11 @@ classdef CurveGenerator < handle
     
     properties (Dependent = true, AbortSet=true)
         
-        y; % radius ratio between primary and secondary objects
+        r; % radius of occulter (FSU) 
+        r2; % radius ratio between primary and secondary objects
         d; % distance between primary and secondary objects (FSU)
         th; % angle between line connecting binary components and direction of velocity (deg)
         R; % radius of b/g star, projected onto distance of occulter (FSU)
-        r; % radius of occulter (FSU) 
         b; % impact parameter (FSU)
         v; % velocity relative to us (FSU/sec)
         t; % time offset from closest approach (milliseconds)
@@ -202,9 +213,15 @@ classdef CurveGenerator < handle
     
     methods % getters
         
-        function val = get.y(obj)
+        function val = get.r(obj)
             
-            val = obj.lc.pars.y;
+            val = obj.lc.pars.r;
+            
+        end
+        
+        function val = get.r2(obj)
+            
+            val = obj.lc.pars.r2;
             
         end
         
@@ -223,12 +240,6 @@ classdef CurveGenerator < handle
         function val = get.R(obj)
             
             val = obj.lc.pars.R;
-            
-        end
-        
-        function val = get.r(obj)
-            
-            val = obj.lc.pars.r;
             
         end
         
@@ -466,6 +477,7 @@ classdef CurveGenerator < handle
             
             if ~all(val==obj.rho_range)
                 obj.rho_range = val;
+                obj.rho_axis = [];
                 obj.resetPrevVectors;
             end
             
@@ -475,14 +487,25 @@ classdef CurveGenerator < handle
             
             if val~=obj.rho_step
                 obj.rho_step = val;
+                obj.rho_axis = [];
                 obj.resetPrevVectors;
             end
         
         end
         
-        function set.y(obj, y)
+        function set.r(obj, r)
+            
+            obj.lc.pars.r = r;
+            
+%             if obj.lc.is_updated==0
+%                 obj.getLightCurves;
+%             end
+            
+        end
+        
+        function set.r2(obj, r2)
            
-            obj.lc.pars.y = y;
+            obj.lc.pars.r2 = r2;
             
         end
         
@@ -501,16 +524,6 @@ classdef CurveGenerator < handle
         function set.R(obj, R)
            
             obj.lc.pars.R = R;
-            
-%             if obj.lc.is_updated==0
-%                 obj.getLightCurves;
-%             end
-            
-        end
-        
-        function set.r(obj, r)
-            
-            obj.lc.pars.r = r;
             
 %             if obj.lc.is_updated==0
 %                 obj.getLightCurves;
@@ -619,89 +632,6 @@ classdef CurveGenerator < handle
     end
     
     methods % source matrix stuff
-        
-        function val = makeAmplitudeVector(obj, r_list, secondary) % integrate the function from Roques' paper to get amplitude 1D vector per r
-            
-            if isempty(r_list)
-                return;
-            end
-            
-            if nargin<3 || isempty(secondary)
-                secondary = 0;
-            end
-            
-            if any(r_list>obj.r_range(2) | r_list<obj.r_range(1))
-                error('Out of range values of r!');
-            end
-            
-            rho_axis = (obj.rho_range(1):obj.rho_step:obj.rho_range(2))';
-            
-            func = @(R) exp(0.5.*1i.*pi.*R.^2).*besselj(0,pi.*rho_axis.*R).*R; % this functional shape is going to be numerically integrated
-            
-            val = complex(ones(length(rho_axis), length(r_list), 'single'));
-            
-            for ii = 1:length(r_list)
-                
-                % first try to lazy load the amp_vec from previous calculations
-                if secondary==0 && ~isempty(obj.previous_radius_primary) && r_list(ii)==obj.previous_radius_primary
-                    amp_vec = obj.previous_amplitude_primary;
-                elseif secondary && ~isempty(obj.previous_radius_secondary) && r_list(ii)==obj.previous_radius_secondary
-                    amp_vec = obj.previous_amplitude_secondary;
-                else % if the radius doesn't fit, calculate it using the integral function
-                    
-                    integ = integral(func, 0, r_list(ii), 'ArrayValued', true);
-                    amp_vec = 1 + 1i.*pi.*exp(0.5.*1i.*pi.*rho_axis.^2).*integ;
-                    if secondary==0
-                        obj.previous_radius_primary = r_list(ii);
-                        obj.previous_amplitude_primary = amp_vec;
-                    else
-                        obj.previous_radius_secondary = r_list(ii);
-                        obj.previous_amplitude_secondary = amp_vec;
-                    end
-                    
-                end
-                
-                val(:,ii) = amp_vec;
-                 
-            end
-            
-        end
-        
-        function val = makeAmplitudeMap(obj, amp_vectors, r_list, y_list, d_list, th_list) % take the amp_vectors and make them into 2D amplitude maps
-            
-            if isempty(amp_vectors)
-                return;
-            end
-            
-%             rho_axis = (obj.rho_range(1):obj.rho_step:obj.rho_range(2))';
-%             rho_ax2 = -3:obj.rho_step:3;
-%             
-%             [X, Y] = meshgrid(rho_axis, rho_ax2);
-
-%             N = ceil(obj.rho_range(2)./obj.rho_step)+1;
-            N = size(amp_vectors,1);
-
-            [X,Y] = meshgrid(1:N, -ceil(3./obj.rho_step):ceil(3./obj.rho_step)); 
-            
-            idx = round(sqrt(X.^2+Y.^2)); 
-            idx(idx>N) = N;
-            
-            M = complex(ones(size(X,1), size(X,2), length(r_list), 'single')); 
-            
-            for ii = 1:length(r_list)
-            
-                v = amp_vectors(:,ii);
-                M(:,:,ii) = v(idx); 
-
-                if obj.use_binary
-
-                end
-
-            end
-            
-            val = M;
-            
-        end
         
         function [flux_out, flux_map_conv] = makeNonPointSource(obj, flux, star_R, varargin)
            
@@ -915,6 +845,215 @@ classdef CurveGenerator < handle
     
     methods % generating methods
         
+        function amp_vec = makeAmplitudeVector(obj, r, secondary) % integrate the function from Roques' paper to get amplitude 1D vector
+            
+            if nargin<3 || isempty(secondary)
+                secondary = 0;
+            end
+            
+            if  r<obj.r_range(1) || r>obj.r_range(2)
+                error('Out of range value of r= %f!', r);
+            end
+            
+            if isempty(obj.rho_axis)
+                obj.rho_axis = (obj.rho_range(1):obj.rho_step:obj.rho_range(2))';
+            end
+            
+            func = @(R) exp(0.5.*1i.*pi.*R.^2).*besselj(0,pi.*obj.rho_axis.*R).*R; % this functional shape is going to be numerically integrated
+            
+            % first try to lazy load the amp_vec from previous calculations
+            if secondary==0 && ~isempty(obj.previous_radius_primary) && r==obj.previous_radius_primary
+                amp_vec = obj.previous_amplitude_primary;
+            elseif secondary && ~isempty(obj.previous_radius_secondary) && r==obj.previous_radius_secondary
+                amp_vec = obj.previous_amplitude_secondary;
+            else % if the radius doesn't fit, calculate it using the integral function
+
+                integ = integral(func, 0, r, 'ArrayValued', true);
+                amp_vec = 1 + 1i.*pi.*exp(0.5.*1i.*pi.*obj.rho_axis.^2).*integ;
+                
+                if secondary==0
+                    obj.previous_radius_primary = r;
+                    obj.previous_amplitude_primary = amp_vec;
+                else
+                    obj.previous_radius_secondary = r;
+                    obj.previous_amplitude_secondary = amp_vec;
+                end
+
+            end
+
+            if obj.use_single
+                amp_vec = single(amp_vec);
+            end
+            
+        end
+        
+        function [A, x_steps, y_steps] = makeAmplitudeMap(obj, r, r2, d, th) % take the amp_vector and turn it into a 2D amplitude map
+                
+            if nargin<3 || isempty(r2)
+                r2 = 0;
+            end
+            
+            if nargin<4 || isempty(d)
+                d = 0;
+            end
+            
+            if nargin<5 || isempty(th)
+                th = 0;
+            end
+            
+            amp_vector = obj.makeAmplitudeVector(r);
+            
+            if ~isempty(obj.previous_amplitude_map) && ~isempty(obj.previous_amp_parameters) &&...
+                    all(obj.previous_amp_parameters==[r,r2,d,th]) && obj.previous_used_binary==obj.use_binary
+                
+                A = obj.previous_amplitude_map;
+                x_steps = obj.previous_x_steps;
+                y_steps = obj.previous_y_steps;
+                
+            else
+                
+                N = size(amp_vector,1);
+                margin1 = ceil(obj.R_range(2)./obj.rho_step); % include enough margin to convolve with a wide star
+                margin2 = ceil((obj.R_range(2)+obj.b_range(2))./obj.rho_step); % include enough margin to convolve and to have impact parameter
+                [X,Y] = meshgrid(-margin1:margin2, -margin1:N); 
+
+                idx = round(sqrt(X.^2+Y.^2)); 
+                idx2 = idx;
+                idx2(idx>N) = N;
+                idx2(idx<1) = 1;
+
+    %             A = complex(ones(size(X,1), size(X,2), 'single')); 
+
+                A = amp_vector(idx2).*(idx<=N) + (idx>N); 
+
+                if obj.use_binary && r2>0 && d>0 % add a second occulter
+
+                    amp_vector2 = obj.makeAmplitudeVector(r2, 1); % the second argument is used to cache/recover the amp_vector for the binary
+
+                    dX = d.*sind(th)./obj.rho_step;
+                    dY = d.*cosd(th)./obj.rho_step;
+
+                    % new definitions for idx!
+                    idx = round(sqrt((X-dX).^2+(Y-dY).^2)); 
+                    idx2 = idx;
+                    idx2(idx>N) = N;
+                    idx2(idx<1) = 1;
+
+                    A2 = amp_vector2(idx2).*(idx<=N) + (idx>N); 
+
+                    A = A + A2 - 1; % coherent sum (i.e., adding the complex values!)
+
+                end
+                
+                x_steps = X(1,:);
+                y_steps = Y(:,1);
+                
+                obj.previous_amplitude_map = A;
+                obj.previous_x_steps = x_steps;
+                obj.previous_y_steps = y_steps;
+                obj.previous_amp_parameters=[r,r2,d,th];
+                obj.previous_used_binary = obj.use_binary;
+                
+            end
+            
+            
+            
+        end
+        
+        function [I, x_steps, y_steps] = makeIntensityMap(obj, r, R, r2, d, th)
+            
+            if nargin<3 || isempty(R)
+                R = 0;
+            end
+            
+            if nargin<4 || isempty(r2)
+                r2 = 0;
+            end
+            
+            if nargin<5 || isempty(d)
+                d = 0;
+            end
+            
+            if nargin<6 || isempty(th)
+                th = 0;
+            end
+            
+            if ~isempty(obj.previous_intensity_map) && ~isempty(obj.previous_int_parameters) &&...
+                    all(obj.previous_int_parameters==[r,r2,d,th,R]) && obj.previous_used_binary==obj.use_binary
+            
+                I = obj.previous_intensity_map;
+                x_steps = obj.previous_x_steps;
+                y_steps = obj.previous_y_steps;
+                
+            else
+                
+                [A, x_steps, y_steps] = obj.makeAmplitudeMap(r, r2, d, th);
+
+                I = abs(A); 
+
+                if R>0
+
+                    S = util.img.ellipse(R./obj.rho_step); % circle the size of the star
+                    % add limb darkening here...
+
+                    I = util.img.conv_f(S, I, 'crop', 'same', 'conj', 1); 
+
+                end
+                
+                obj.previous_intensity_map = I;
+                obj.previous_int_parameters = [r,r2,d,th,R];
+                obj.previous_used_binary = obj.use_binary;
+                
+            end
+            
+        end
+        
+        function new_lc = getLightCurves(obj, varargin)
+            
+            t_run = tic;
+            
+            obj.lc.pars.parse(varargin{:});
+            
+            % time axis, start & end points:
+            t_start = (-obj.W/2:1/obj.f:obj.W/2); % row vector
+            t_end = t_start + obj.T/1000; % convert T to seconds! 
+            
+            fluxes = ones(length(t_start), length(obj.r), 'single');
+            
+            for ii = 1:length(obj.r)
+                
+                [I, x_steps, y_steps] = obj.makeIntensityMap(obj.r(ii), obj.R(ii), obj.r2(ii), obj.d(ii), obj.th(ii));
+                
+                [~, x0_idx] = min(abs(obj.b(ii)-x_steps.*obj.rho_step)); % find the index of x closest to the impact parameter we want
+                [~, y0_idx] = min(abs(y_steps)); % find the index of y closest to zero
+                
+                high_res_lc = [I(end:-1:y0_idx+1,x0_idx); I(y0_idx:end,x0_idx)]; % a cut through the 2D map and the reflection
+                rho = [-y_steps(end:-1:y0_idx+1); y_steps(y0_idx:end)].*obj.rho_step; % the same reflection in the y axis, translated to (FSU)
+                
+                % add the time shift and multiply by velocity, get coordinates in FSU
+                rho0 = (t_start - obj.t(ii)./1000).*obj.v(ii);
+                rho1 = (t_end - obj.t(ii)./1000).*obj.v(ii); 
+                
+                % now downsample this:
+                f = nansum(high_res_lc.*(rho>=rho0 & rho<rho1))./nansum(rho>=rho0 & rho<rho1);
+                f(isnan(f)) = 1;
+                fluxes(:,ii) = f';
+                
+            end
+            
+            obj.lc.flux = fluxes; 
+            obj.lc.time = t_start; % update timestamps
+            obj.lc.is_updated = 1; 
+            
+            if nargout>0
+                new_lc = occult.LightCurve(obj.lc);
+            end
+            
+            obj.runtime_get = toc(t_run);
+            
+        end
+        
+        % old methods below, can't handle binary KBOs
         function [core_flux, r_values, R_values] = makeCoreCurves(obj, r_values, R_values, pairwise) % interpolate the source matrix at locations given by r_values and R_values
             % interpolates the source matrix to produce core_lcs, a 2D
             % matrix where dim1 is time (or "a") axis for a b=0 occultation
@@ -1033,7 +1172,7 @@ classdef CurveGenerator < handle
             
         end
         
-        function new_lc = getLightCurves(obj, varargin)
+        function new_lc = getLightCurvesOld(obj, varargin)
             
             t_run = tic;
             
@@ -1101,6 +1240,46 @@ classdef CurveGenerator < handle
             end
             
             obj.gui.make;
+            
+        end
+        
+        function plot(obj, varargin)
+            
+            if ~isempty(obj.gui) && obj.gui.check
+                ax = obj.gui.axes_image;
+            else
+                ax = gca;
+            end
+            
+            obj.lc.plot('ax', ax, varargin{:});
+            
+        end
+        
+        function showMap(obj)
+            
+            if ~isempty(obj.gui) && obj.gui.check
+                ax = obj.gui.axes_image;
+            else
+                ax = gca;
+            end
+            
+            util.plot.show(obj.previous_intensity_map', 'ax', ax, ...
+                'xvalues', obj.previous_y_steps.*obj.rho_step,...
+                'yvalues', obj.previous_x_steps.*obj.rho_step);
+            
+            title(ax, '');
+            
+            ax.NextPlot = 'add';
+            
+            for ii = 1:min(5,length(obj.b))
+                h = plot(ax, obj.previous_y_steps.*obj.rho_step, obj.b(ii).*ones(length(obj.previous_y_steps),1), '--k');
+                h.DisplayName = sprintf('r= %4.2f | r2= %4.2f | d= %4.2f | th= %4.2f | b= %4.2f', ...
+                                                obj.r(ii), obj.r2(ii), obj.d(ii), obj.th(ii), obj.b(ii));
+            end
+            
+            legend(ax, 'Location', 'SouthEast');
+            
+            ax.NextPlot = 'replace';
             
         end
         

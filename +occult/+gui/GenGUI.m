@@ -350,7 +350,7 @@ classdef GenGUI < handle
                         
         function c = check(obj)
            
-            c = ~isempty(obj) && ~isempty(obj.panel_bottom) && isvalid(obj.panel_bottom);
+            c = ~isempty(obj) && ~isempty(obj.panel_bottom) && is_valid(obj.panel_bottom);
             
         end
         
