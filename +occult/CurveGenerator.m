@@ -75,11 +75,28 @@ classdef CurveGenerator < handle
         
         use_binary = 0;
         
+        rho_range = [0 10]; 
+        rho_step = 0.001;
+        
+        y_range = [0 1];
+        d_range = [0.1 3];
+        th_range = [0 180];
+        R_range = [0 1];
+        r_range = [0.1 3];
+        b_range = [0 4];
+        v_range = [3 30];
+        t_range = [-0.1 0.1];
+        
         debug_bit = 1;
         
     end
     
     properties (Hidden = true)
+        
+        previous_amplitude_primary; % keep a copy of the last amplitude vector for a given radius
+        previous_radius_primary; % what was the occulter radius for that amplitude vector
+        previous_amplitude_secondary; % keep a copy of the last amplitude vector for a given radius of the secondary
+        previous_radius_secondary; % what was the occulter radius for that amplitude vector
         
         source_matrix; % interferometric matrix (in r and a and R)
         source_r_axis; % radius of the occulter (FSU)
@@ -139,6 +156,15 @@ classdef CurveGenerator < handle
             
             obj.lc.reset;
             obj.runtime_get = 0;
+            
+        end
+        
+        function resetPrevVectors(obj)
+            
+            obj.previous_amplitude_primary = [];
+            obj.previous_amplitude_secondary = [];
+            obj.previous_radius_primary = [];
+            obj.previous_radius_secondary = [];
             
         end
         
@@ -432,6 +458,28 @@ classdef CurveGenerator < handle
     
     methods % setters
         
+        function set.rho_range(obj, val)
+            
+            if isscalar(val)
+                val = [0, val];
+            end
+            
+            if ~all(val==obj.rho_range)
+                obj.rho_range = val;
+                obj.resetPrevVectors;
+            end
+            
+        end
+        
+        function set.rho_step(obj, val)
+            
+            if val~=obj.rho_step
+                obj.rho_step = val;
+                obj.resetPrevVectors;
+            end
+        
+        end
+        
         function set.y(obj, y)
            
             obj.lc.pars.y = y;
@@ -572,13 +620,86 @@ classdef CurveGenerator < handle
     
     methods % source matrix stuff
         
-        function makeAmplitudeMap(obj)
+        function val = makeAmplitudeVector(obj, r_list, secondary) % integrate the function from Roques' paper to get amplitude 1D vector per r
             
-            if obj.use_binary
-                
-            else
-                
+            if isempty(r_list)
+                return;
             end
+            
+            if nargin<3 || isempty(secondary)
+                secondary = 0;
+            end
+            
+            if any(r_list>obj.r_range(2) | r_list<obj.r_range(1))
+                error('Out of range values of r!');
+            end
+            
+            rho_axis = (obj.rho_range(1):obj.rho_step:obj.rho_range(2))';
+            
+            func = @(R) exp(0.5.*1i.*pi.*R.^2).*besselj(0,pi.*rho_axis.*R).*R; % this functional shape is going to be numerically integrated
+            
+            val = complex(ones(length(rho_axis), length(r_list), 'single'));
+            
+            for ii = 1:length(r_list)
+                
+                % first try to lazy load the amp_vec from previous calculations
+                if secondary==0 && ~isempty(obj.previous_radius_primary) && r_list(ii)==obj.previous_radius_primary
+                    amp_vec = obj.previous_amplitude_primary;
+                elseif secondary && ~isempty(obj.previous_radius_secondary) && r_list(ii)==obj.previous_radius_secondary
+                    amp_vec = obj.previous_amplitude_secondary;
+                else % if the radius doesn't fit, calculate it using the integral function
+                    
+                    integ = integral(func, 0, r_list(ii), 'ArrayValued', true);
+                    amp_vec = 1 + 1i.*pi.*exp(0.5.*1i.*pi.*rho_axis.^2).*integ;
+                    if secondary==0
+                        obj.previous_radius_primary = r_list(ii);
+                        obj.previous_amplitude_primary = amp_vec;
+                    else
+                        obj.previous_radius_secondary = r_list(ii);
+                        obj.previous_amplitude_secondary = amp_vec;
+                    end
+                    
+                end
+                
+                val(:,ii) = amp_vec;
+                 
+            end
+            
+        end
+        
+        function val = makeAmplitudeMap(obj, amp_vectors, r_list, y_list, d_list, th_list) % take the amp_vectors and make them into 2D amplitude maps
+            
+            if isempty(amp_vectors)
+                return;
+            end
+            
+%             rho_axis = (obj.rho_range(1):obj.rho_step:obj.rho_range(2))';
+%             rho_ax2 = -3:obj.rho_step:3;
+%             
+%             [X, Y] = meshgrid(rho_axis, rho_ax2);
+
+%             N = ceil(obj.rho_range(2)./obj.rho_step)+1;
+            N = size(amp_vectors,1);
+
+            [X,Y] = meshgrid(1:N, -ceil(3./obj.rho_step):ceil(3./obj.rho_step)); 
+            
+            idx = round(sqrt(X.^2+Y.^2)); 
+            idx(idx>N) = N;
+            
+            M = complex(ones(size(X,1), size(X,2), length(r_list), 'single')); 
+            
+            for ii = 1:length(r_list)
+            
+                v = amp_vectors(:,ii);
+                M(:,:,ii) = v(idx); 
+
+                if obj.use_binary
+
+                end
+
+            end
+            
+            val = M;
             
         end
         

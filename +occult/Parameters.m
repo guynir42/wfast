@@ -56,7 +56,8 @@ classdef Parameters < handle
         
         % these depend on the longest parameter vector
         y; % radius ratio of primary to secondary
-        
+        d; % distance between primary and secondary (FSU)
+        th; % angle between line connecting primary/secondary and direction of motion
         R; % radius of b/g star, projected onto distance of occulter (FSU)
         r; % radius of occulter (FSU)
         b; % impact parameter (FSU)
@@ -83,12 +84,18 @@ classdef Parameters < handle
         Npars = 1; % length of longest parameter vector (from R,r,b,v,t)
         
         % these can be scalars or row vectors 
+        y_ = 0; % radius ratio of primary to secondary
+        d_ = 0; % distance between primary and secondary (FSU)
+        th_ = 0; % angle between line connecting primary/secondary and direction of motion
         R_ = 0; % radius of background star (FSU)
         r_ = 1; % radius of occulter (FSU)
         b_ = 0; % impact parameter (FSU)
         v_ = 10; % apparent velocity (FSU/sec)
         t_ = 0; % time of closest approach, mod the frame time 1/f (sec)
         
+        default_y;
+        default_d;
+        default_th;
         default_R;
         default_r;
         default_b;
@@ -100,7 +107,7 @@ classdef Parameters < handle
         default_snr;
         default_Niter;
         
-        version = 1.01;
+        version = 1.02;
         
     end
     
@@ -158,6 +165,36 @@ classdef Parameters < handle
                 val = val(1:obj.Npars);
             end
         
+        end
+        
+        function val = get.y(obj)
+            
+            if isempty(obj.y_)
+                val = obj.getPar(obj.default_y);
+            else
+                val = obj.getPar(obj.y_);
+            end
+            
+        end
+        
+        function val = get.d(obj)
+            
+            if isempty(obj.d_)
+                val = obj.getPar(obj.default_d);
+            else
+                val = obj.getPar(obj.d_);
+            end
+            
+        end
+        
+        function val = get.th(obj)
+            
+            if isempty(obj.th_)
+                val = obj.getPar(obj.default_th);
+            else
+                val = obj.getPar(obj.th_);
+            end
+            
         end
         
         function val = get.R(obj)
@@ -244,6 +281,60 @@ classdef Parameters < handle
     
     methods % setters
         
+        function set.y(obj, val)
+            
+            if numel(val)~=length(val)
+                error('Must input a scalar or a 1D vector as parameter');
+            end
+            
+            old_value = obj.y; % to check the new and old values are equal
+            
+            obj.y_ = val;
+            
+            obj.Npars = max([length(obj.y_) length(obj.d_) length(obj.th_) length(obj.R_), length(obj.r_), length(obj.b_), length(obj.v_), length(obj.t_)]);
+            
+            if ~isequal(obj.y, old_value)
+                obj.is_updated = 0;
+            end
+            
+        end
+        
+        function set.d(obj, val)
+            
+            if numel(val)~=length(val)
+                error('Must input a scalar or a 1D vector as parameter');
+            end
+            
+            old_value = obj.d; % to check the new and old values are equal
+            
+            obj.d_ = val;
+            
+            obj.Npars = max([length(obj.y_) length(obj.d_) length(obj.th_) length(obj.R_), length(obj.r_), length(obj.b_), length(obj.v_), length(obj.t_)]);
+            
+            if ~isequal(obj.d, old_value)
+                obj.is_updated = 0;
+            end
+            
+        end
+        
+        function set.th(obj, val)
+            
+            if numel(val)~=length(val)
+                error('Must input a scalar or a 1D vector as parameter');
+            end
+            
+            old_value = obj.th; % to check the new and old values are equal
+            
+            obj.th_ = val;
+            
+            obj.Npars = max([length(obj.y_) length(obj.d_) length(obj.th_) length(obj.R_), length(obj.r_), length(obj.b_), length(obj.v_), length(obj.t_)]);
+            
+            if ~isequal(obj.th, old_value)
+                obj.is_updated = 0;
+            end
+            
+        end
+        
         function set.R(obj, val)
             
             if numel(val)~=length(val)
@@ -254,7 +345,7 @@ classdef Parameters < handle
             
             obj.R_ = val;
             
-            obj.Npars = max([length(obj.R_), length(obj.r_), length(obj.b_), length(obj.v_), length(obj.t_)]);
+            obj.Npars = max([length(obj.y_) length(obj.d_) length(obj.th_) length(obj.R_), length(obj.r_), length(obj.b_), length(obj.v_), length(obj.t_)]);
             
             if ~isequal(obj.R, old_value)
                 obj.is_updated = 0;
@@ -272,7 +363,7 @@ classdef Parameters < handle
             
             obj.r_ = val;
             
-            obj.Npars = max([length(obj.R_), length(obj.r_), length(obj.b_), length(obj.v_), length(obj.t_)]);
+            obj.Npars = max([length(obj.y_) length(obj.d_) length(obj.th_) length(obj.R_), length(obj.r_), length(obj.b_), length(obj.v_), length(obj.t_)]);
             
             if ~isequal(obj.r, old_value)
                 obj.is_updated = 0;
@@ -290,7 +381,7 @@ classdef Parameters < handle
             
             obj.b_ = val;
             
-            obj.Npars = max([length(obj.R_), length(obj.r_), length(obj.b_), length(obj.v_), length(obj.t_)]);
+            obj.Npars = max([length(obj.y_) length(obj.d_) length(obj.th_) length(obj.R_), length(obj.r_), length(obj.b_), length(obj.v_), length(obj.t_)]);
             
             if ~isequal(obj.b, old_value)
                 obj.is_updated = 0;
@@ -308,7 +399,7 @@ classdef Parameters < handle
             
             obj.v_ = val;
             
-            obj.Npars = max([length(obj.R_), length(obj.r_), length(obj.b_), length(obj.v_), length(obj.t_)]);
+            obj.Npars = max([length(obj.y_) length(obj.d_) length(obj.th_) length(obj.R_), length(obj.r_), length(obj.b_), length(obj.v_), length(obj.t_)]);
             
             if ~isequal(obj.v, old_value)
                 obj.is_updated = 0;
@@ -326,7 +417,7 @@ classdef Parameters < handle
             
             obj.t_ = val;
             
-            obj.Npars = max([length(obj.R_), length(obj.r_), length(obj.b_), length(obj.v_), length(obj.t_)]);
+            obj.Npars = max([length(obj.y_) length(obj.d_) length(obj.th_) length(obj.R_), length(obj.r_), length(obj.b_), length(obj.v_), length(obj.t_)]);
             
             if ~isequal(obj.t, old_value)
                 obj.is_updated = 0;
