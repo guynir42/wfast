@@ -157,6 +157,14 @@ classdef GraphicPanel < dynamicprops
             
         end
         
+        function Enable(obj, val)
+            
+            for ii = 1:length(obj.buttons)
+                obj.buttons(ii).Enable = val;
+            end
+            
+        end
+        
     end    
     
 end

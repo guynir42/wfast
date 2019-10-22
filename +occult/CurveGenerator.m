@@ -73,20 +73,24 @@ classdef CurveGenerator < handle
     
     properties % switches/controls
         
+        use_source_matrix = 0;
         use_single = 1;
         use_binary = 0;
         
         rho_range = [0 10]; 
-        rho_step = 0.001;
+        rho_step = 0.01;
         
-        y_range = [0 1];
+        r_range = [0.1 3];
+        r2_range = [0 1];
         d_range = [0.1 3];
         th_range = [0 180];
         R_range = [0 1];
-        r_range = [0.1 3];
         b_range = [0 4];
         v_range = [3 30];
-        t_range = [-0.1 0.1];
+        t_range = [-100 100];
+        T_range = [1 1000];
+        f_range = [1 100];
+        W_range = [0.1 5];
         
         debug_bit = 1;
         
@@ -178,16 +182,34 @@ classdef CurveGenerator < handle
             obj.previous_radius_secondary = [];
             
         end
+                
+        function reset_r(obj)
+            
+            obj.r = obj.default_r;
+            
+        end
+        
+        function reset_r2(obj)
+            
+            obj.r2 = obj.default_r2;
+            
+        end
+        
+        function reset_d(obj)
+            
+            obj.d = obj.default_d;
+            
+        end
+        
+        function reset_th(obj)
+            
+            obj.th = obj.default_th;
+            
+        end
         
         function reset_R(obj)
             
             obj.R = obj.default_R;
-            
-        end
-        
-        function reset_r(obj)
-            
-            obj.r = obj.default_r;
             
         end
         
@@ -285,15 +307,33 @@ classdef CurveGenerator < handle
             
         end
         
-        function val = default_R(obj)
-            
-            val = obj.lc.pars.default_R;
-            
-        end
-        
         function val = default_r(obj)
             
             val = obj.lc.pars.default_r;
+            
+        end
+        
+        function val = default_r2(obj)
+            
+            val = obj.lc.pars.default_r2;
+            
+        end
+        
+        function val = default_d(obj)
+            
+            val = obj.lc.pars.default_d;
+            
+        end
+        
+        function val = default_th(obj)
+            
+            val = obj.lc.pars.default_th;
+            
+        end
+        
+        function val = default_R(obj)
+            
+            val = obj.lc.pars.default_R;
             
         end
         
@@ -347,97 +387,171 @@ classdef CurveGenerator < handle
         
         function val = max_r(obj)
             
-            val = max(obj.source_r_axis);
+            if obj.use_source_matrix
+                val = max(obj.source_r_axis);
+            else
+                val = obj.r_range(2);
+            end
+            
+        end
+        
+        function val = max_r2(obj)
+            
+            val = obj.r2_range(2);
+        
+        end
+        
+        function val = max_d(obj)
+            
+            val = obj.d_range(2);
+            
+        end
+        
+        function val = max_th(obj)
+            
+            val = obj.th_range(2);
             
         end
         
         function val = max_R(obj)
             
-            val = max(obj.source_R_axis);
+            if obj.use_source_matrix
+                val = max(obj.source_R_axis);
+            else
+                val = obj.R_range(2);
+            end
             
         end
         
         function val = max_b(obj)
             
-            val = 2.*obj.max_r;
+%             val = 2.*obj.max_r;
+
+            val = obj.b_range(2);
             
         end
         
         function val = max_v(obj)
             
-            val = 40;
+%             val = 40;
+            
+            val = obj.v_range(2);
             
         end
         
         function val = max_t(obj)
             
-            val = 100;
+%             val = 100;
             
+            val = obj.t_range(2);
+
         end
         
         function val = max_T(obj)
             
-            val = 1000;
+%             val = 1000;
+            
+            val = obj.T_range(2);
             
         end
         
         function val = max_f(obj)
             
-            val = 100;
+%             val = 100;
+
+            val = obj.f_range(2);
             
         end
         
         function val = max_W(obj)
             
-            val = 5;
+%             val = 5;
+            
+            val = obj.W_range(2);
             
         end
         
         function val = min_r(obj)
             
-            val = min(obj.source_r_axis);
+            if obj.use_source_matrix
+                val = min(obj.source_r_axis);
+            else
+                val = obj.r_range(1);
+            end
+            
+        end
+        
+        function val = min_r2(obj)
+            
+            val = obj.r2_range(1);
+            
+        end
+        
+        function val = min_d(obj)
+            
+            val = obj.d_range(1);
+            
+        end
+        
+        function val = min_th(obj)
+            
+            val = obj.th_range(1);
             
         end
         
         function val = min_R(obj)
             
-            val = 0;
+%             val = 0;
+            
+            val = obj.R_range(1);
             
         end
         
         function val = min_b(obj)
             
-            val = 0;
+%             val = 0;
+            
+            val = obj.b_range(1);
             
         end
         
         function val = min_v(obj)
             
-            val = 3;
+%             val = 3;
+            
+            val = obj.v_range(1);
             
         end
         
         function val = min_t(obj)
             
-            val = -100;
+%             val = -100;
+            
+            val = obj.t_range(1);
             
         end
         
         function val = min_T(obj)
             
-            val = 1;
+%             val = 1;
+            
+            val = obj.T_range(1);
             
         end
         
         function val = min_f(obj)
             
-            val = 1;
+%             val = 1;
+            
+            val = obj.f_range(1);
             
         end
         
         function val = min_W(obj)
             
-            val = 0.1;
+%             val = 0.1;
+            
+            val = obj.W_range(1);
             
         end
         
@@ -598,6 +712,24 @@ classdef CurveGenerator < handle
 %             if obj.lc.is_noise_updated==0
 %                 obj.generateNoise;
 %             end
+            
+        end
+        
+        function set.use_source_matrix(obj, val)
+            
+            if obj.use_source_matrix~=val
+                obj.use_source_matrix = val;
+                obj.lc.is_updated = 0;
+            end
+            
+        end
+        
+        function set.use_binary(obj, val)
+            
+            if obj.use_binary~=val
+                obj.use_binary = val;
+                obj.lc.is_updated = 0;
+            end
             
         end
         
@@ -841,6 +973,181 @@ classdef CurveGenerator < handle
                         
         end
            
+        function [core_flux, r_values, R_values] = makeCoreCurves(obj, r_values, R_values, pairwise) % interpolate the source matrix at locations given by r_values and R_values
+            % interpolates the source matrix to produce core_lcs, a 2D
+            % matrix where dim1 is time (or "a") axis for a b=0 occultation
+            % at high resolution, and dim2 is for the different
+            % combinations of r and R given as inputs. 
+            %
+            % As always, the inputs must be scalars or equal length
+            % vectors (we now accept matrices, but they will be linearized)
+            % For repeating pairs of R and r, only the unique combinations
+            % are returned. the function getCoreCurves will rebuild the
+            % full number of curves as requested by the list of parameters.
+            %
+            % The output is a flat list containing the core lightcurves
+            
+            if nargin<2 || isempty(r_values)
+                r_values = obj.lc.pars.default_r;
+            end
+            
+            if nargin<3 || isempty(R_values)
+                R_values = obj.lc.pars.default_R;
+            end
+            
+            if nargin<4 || isempty(pairwise)
+                pairwise = 0;
+            end
+            
+            t_run = tic;
+            
+            if pairwise
+                
+                r_values = util.vec.torow(r_values(:)); % requested values
+                if isscalar(r_values), r_values = repmat(r_values, [1, length(R_values)]); end
+                
+                R_values = util.vec.torow(R_values(:)); % requested values
+                if isscalar(R_values), R_values = repmat(R_values, [1, length(r_values)]); end
+                
+                if length(r_values)~=length(R_values) 
+                    error('Size mismatch: length(r_values)= %d | length(R_values)= %d', length(r_values), length(R_values));
+                end
+                
+            else
+                r_values = util.vec.torow(unique(r_values(:))); % requested values
+                R_values = util.vec.torow(unique(R_values(:))); % requested values
+            end
+            
+            r_axis = util.vec.torow(obj.source_r_axis); % available values
+            R_axis = util.vec.torow(obj.source_R_axis); % available values
+            
+            % lazy load the core LCs
+            if isequal(obj.core_flux_r_axis, r_values) && isequal(obj.core_flux_R_axis, R_values) && pairwise==obj.core_flux_pairwise
+           
+                if obj.debug_bit>1, disp('lazy loading the core lightcurves!'); end
+                
+                core_flux = obj.core_flux;
+                return;
+           
+            end
+            
+            r_indices = sum(r_values>r_axis') + 1;
+            
+            % make sure r values stay inside the source matrix boundary
+            r_indices(r_indices<1) = 1;
+            r_indices(r_indices>length(r_axis)) = length(r_axis);
+            r_indices_low = r_indices-1;
+            r_indices_low(r_indices_low<1) = 1;
+            
+            R_indices = sum(R_values>R_axis') + 1;
+
+            % make sure R values stay inside the source matrix boundary
+            R_indices(R_indices<1) = 1;
+            R_indices(R_indices>length(R_axis)) = length(R_axis);
+            R_indices_low = R_indices-1;
+            R_indices_low(R_indices_low<1) = 1;
+            
+            if pairwise
+                % get the linearized index (2D instead of 3D) from source matrix
+                lin_indices = r_indices + (R_indices-1)*size(obj.source_matrix,2);
+                lin_indices_low_r = r_indices_low + (R_indices-1)*size(obj.source_matrix,2);
+                lin_indices_low_R = r_indices + (R_indices_low-1)*size(obj.source_matrix,2);
+                lin_indices_low_low = r_indices_low + (R_indices_low-1)*size(obj.source_matrix,2);
+
+                % lightcurve from above and below the required values
+                C_above_above = obj.source_matrix(:,lin_indices);
+                C_below_above = obj.source_matrix(:,lin_indices_low_r);
+                C_above_below = obj.source_matrix(:,lin_indices_low_R);
+                C_below_below = obj.source_matrix(:,lin_indices_low_low);
+            else
+                C_above_above = obj.source_matrix(:,r_indices,R_indices);
+                C_below_above = obj.source_matrix(:,r_indices_low,R_indices);
+                C_above_below = obj.source_matrix(:,r_indices,R_indices_low);
+                C_below_below = obj.source_matrix(:,r_indices_low,R_indices_low);
+            end
+            
+            % distance of the requested values from the lower axis values
+            r_ratios = (r_values-r_axis(r_indices_low))./(r_axis(r_indices)-r_axis(r_indices_low));
+            r_ratios(isnan(r_ratios)) = 0;
+            
+            R_ratios = (R_values-R_axis(R_indices_low))./(R_axis(R_indices)-R_axis(R_indices_low));
+            R_ratios(isnan(R_ratios)) = 0;
+            
+            if ~pairwise
+                R_ratios = util.vec.topages(R_ratios);
+            end
+            
+            core_flux = C_above_above.*r_ratios.*R_ratios + C_below_above.*(1-r_ratios).*R_ratios + ...
+                C_above_below.*r_ratios.*(1-R_ratios) + C_below_below.*(1-r_ratios).*(1-R_ratios);
+            
+            core_flux(isnan(core_flux)) = 1;
+
+            obj.core_flux = core_flux;
+            obj.core_flux_R_axis = R_values;
+            obj.core_flux_r_axis = r_values;
+            obj.core_flux_pairwise = pairwise;
+            
+            obj.runtime_core = toc(t_run);
+            
+        end
+        
+        function new_lc = getLightCurvesFromSource(obj, varargin)
+            
+            t_run = tic;
+            
+            obj.lc.pars.parse(varargin{:});
+            
+            obj.makeCoreCurves(obj.lc.pars.r, obj.lc.pars.R, true); % the last input is for "pairwise". We need to improve this to be "unique" also
+            
+            % uniform time axes (starting points and end points)
+            t_start = (-obj.W/2:1/obj.f:obj.W/2)';
+            t_end = t_start + obj.T/1000; % convert T to seconds! 
+            
+            % these are 2D matrices with "time" axis on dim 1 and par axis on dim 2
+            % This assumes each column is a line going through the shadow with different b,v,t and all have the same T,f,W
+            a_start = sqrt(obj.b.^2 + (obj.v.*(t_start-obj.t/1000)).^2); % convert t to seconds!
+            a_end = sqrt(obj.b.^2 + (obj.v.*(t_end-obj.t/1000)).^2); % convert t to seconds!
+            
+            % turn these into dim2 and dim3 matrices
+            a_start = permute(a_start, [3,2,1]);
+            a_end = permute(a_end, [3,2,1]);
+            
+            % assume we can't hit "true" values on both of these
+            a_points1 = obj.source_a_axis>=a_start & obj.source_a_axis<=a_end; % if a_start is smaller than a_end we get some values
+            a_points2 = obj.source_a_axis>=a_end & obj.source_a_axis<=a_start; % if a_end is smaller than a_start we get the other values
+            a_points = a_points1 | a_points2; % combine the two cases. Should be 3D logical matrix 
+            a_points_out = a_start>max(obj.source_a_axis); % points that have very large a values are out of range
+            
+            fluxes = obj.core_flux.*a_points; % get the flux values for each exposure (each "page"), zero outside integration bounds.
+            
+            fluxes = sum(fluxes, 1)./sum(a_points,1); % integrate over "time" axis and normalize by number of points in the integration (NaNs for no points)
+            
+            fluxes(a_points_out) = 1;
+
+            fluxes = permute(fluxes, [3,2,1]); % switch dim 3 (frame number) to dim 1 (time)
+            
+            fluxes = fillmissing(fluxes, 'linear'); 
+            
+            obj.lc.flux = fluxes; 
+            obj.lc.time = t_start; % update timestamps
+            obj.lc.is_updated = 1; 
+            
+            if nargout>0
+                new_lc = occult.LightCurve(obj.lc);
+            end
+            
+            obj.runtime_get = toc(t_run);
+            
+        end
+        
+        function generateNoise(obj, varargin) 
+            
+            % add optional noise generators
+            
+            obj.lc.generateNoise(varargin{:});
+            
+        end
+        
     end
     
     methods % generating methods
@@ -989,7 +1296,7 @@ classdef CurveGenerator < handle
                 
                 [A, x_steps, y_steps] = obj.makeAmplitudeMap(r, r2, d, th);
 
-                I = abs(A); 
+                I = A.*conj(A); 
 
                 if R>0
 
@@ -1012,220 +1319,53 @@ classdef CurveGenerator < handle
             
             t_run = tic;
             
-            obj.lc.pars.parse(varargin{:});
-            
-            % time axis, start & end points:
-            t_start = (-obj.W/2:1/obj.f:obj.W/2); % row vector
-            t_end = t_start + obj.T/1000; % convert T to seconds! 
-            
-            fluxes = ones(length(t_start), length(obj.r), 'single');
-            
-            for ii = 1:length(obj.r)
+            if obj.use_source_matrix
                 
-                [I, x_steps, y_steps] = obj.makeIntensityMap(obj.r(ii), obj.R(ii), obj.r2(ii), obj.d(ii), obj.th(ii));
+                obj.getLightCurvesFromSource(varargin{:});
                 
-                [~, x0_idx] = min(abs(obj.b(ii)-x_steps.*obj.rho_step)); % find the index of x closest to the impact parameter we want
-                [~, y0_idx] = min(abs(y_steps)); % find the index of y closest to zero
-                
-                high_res_lc = [I(end:-1:y0_idx+1,x0_idx); I(y0_idx:end,x0_idx)]; % a cut through the 2D map and the reflection
-                rho = [-y_steps(end:-1:y0_idx+1); y_steps(y0_idx:end)].*obj.rho_step; % the same reflection in the y axis, translated to (FSU)
-                
-                % add the time shift and multiply by velocity, get coordinates in FSU
-                rho0 = (t_start - obj.t(ii)./1000).*obj.v(ii);
-                rho1 = (t_end - obj.t(ii)./1000).*obj.v(ii); 
-                
-                % now downsample this:
-                f = nansum(high_res_lc.*(rho>=rho0 & rho<rho1))./nansum(rho>=rho0 & rho<rho1);
-                f(isnan(f)) = 1;
-                fluxes(:,ii) = f';
-                
-            end
+            else
             
-            obj.lc.flux = fluxes; 
-            obj.lc.time = t_start; % update timestamps
-            obj.lc.is_updated = 1; 
-            
-            if nargout>0
-                new_lc = occult.LightCurve(obj.lc);
-            end
-            
-            obj.runtime_get = toc(t_run);
-            
-        end
-        
-        % old methods below, can't handle binary KBOs
-        function [core_flux, r_values, R_values] = makeCoreCurves(obj, r_values, R_values, pairwise) % interpolate the source matrix at locations given by r_values and R_values
-            % interpolates the source matrix to produce core_lcs, a 2D
-            % matrix where dim1 is time (or "a") axis for a b=0 occultation
-            % at high resolution, and dim2 is for the different
-            % combinations of r and R given as inputs. 
-            %
-            % As always, the inputs must be scalars or equal length
-            % vectors (we now accept matrices, but they will be linearized)
-            % For repeating pairs of R and r, only the unique combinations
-            % are returned. the function getCoreCurves will rebuild the
-            % full number of curves as requested by the list of parameters.
-            %
-            % The output is a flat list containing the core lightcurves
-            
-            if nargin<2 || isempty(r_values)
-                r_values = obj.lc.pars.default_r;
-            end
-            
-            if nargin<3 || isempty(R_values)
-                R_values = obj.lc.pars.default_R;
-            end
-            
-            if nargin<4 || isempty(pairwise)
-                pairwise = 0;
-            end
-            
-            t_run = tic;
-            
-            if pairwise
-                
-                r_values = util.vec.torow(r_values(:)); % requested values
-                if isscalar(r_values), r_values = repmat(r_values, [1, length(R_values)]); end
-                
-                R_values = util.vec.torow(R_values(:)); % requested values
-                if isscalar(R_values), R_values = repmat(R_values, [1, length(r_values)]); end
-                
-                if length(r_values)~=length(R_values) 
-                    error('Size mismatch: length(r_values)= %d | length(R_values)= %d', length(r_values), length(R_values));
+                obj.lc.pars.parse(varargin{:});
+
+                % time axis, start & end points:
+                t_start = (-obj.W/2:1/obj.f:obj.W/2); % row vector
+                t_end = t_start + obj.T/1000; % convert T to seconds! 
+
+                fluxes = ones(length(t_start), length(obj.r), 'single');
+
+                for ii = 1:length(obj.r)
+
+                    [I, x_steps, y_steps] = obj.makeIntensityMap(obj.r(ii), obj.R(ii), obj.r2(ii), obj.d(ii), obj.th(ii));
+
+                    [~, x0_idx] = min(abs(obj.b(ii)-x_steps.*obj.rho_step)); % find the index of x closest to the impact parameter we want
+                    [~, y0_idx] = min(abs(y_steps)); % find the index of y closest to zero
+
+                    high_res_lc = [I(end:-1:y0_idx+1,x0_idx); I(y0_idx:end,x0_idx)]; % a cut through the 2D map and the reflection
+                    rho = [-y_steps(end:-1:y0_idx+1); y_steps(y0_idx:end)].*obj.rho_step; % the same reflection in the y axis, translated to (FSU)
+
+                    % add the time shift and multiply by velocity, get coordinates in FSU
+                    rho0 = (t_start - obj.t(ii)./1000).*obj.v(ii);
+                    rho1 = (t_end - obj.t(ii)./1000).*obj.v(ii); 
+
+                    % now downsample this:
+                    f = nansum(high_res_lc.*(rho>=rho0 & rho<rho1))./nansum(rho>=rho0 & rho<rho1);
+                    f(isnan(f)) = 1;
+                    fluxes(:,ii) = f';
+
                 end
-                
-            else
-                r_values = util.vec.torow(unique(r_values(:))); % requested values
-                R_values = util.vec.torow(unique(R_values(:))); % requested values
-            end
-            
-            r_axis = util.vec.torow(obj.source_r_axis); % available values
-            R_axis = util.vec.torow(obj.source_R_axis); % available values
-            
-            % lazy load the core LCs
-            if isequal(obj.core_flux_r_axis, r_values) && isequal(obj.core_flux_R_axis, R_values) && pairwise==obj.core_flux_pairwise
-           
-                if obj.debug_bit>1, disp('lazy loading the core lightcurves!'); end
-                
-                core_flux = obj.core_flux;
-                return;
-           
-            end
-            
-            r_indices = sum(r_values>r_axis') + 1;
-            
-            % make sure r values stay inside the source matrix boundary
-            r_indices(r_indices<1) = 1;
-            r_indices(r_indices>length(r_axis)) = length(r_axis);
-            r_indices_low = r_indices-1;
-            r_indices_low(r_indices_low<1) = 1;
-            
-            R_indices = sum(R_values>R_axis') + 1;
 
-            % make sure R values stay inside the source matrix boundary
-            R_indices(R_indices<1) = 1;
-            R_indices(R_indices>length(R_axis)) = length(R_axis);
-            R_indices_low = R_indices-1;
-            R_indices_low(R_indices_low<1) = 1;
-            
-            if pairwise
-                % get the linearized index (2D instead of 3D) from source matrix
-                lin_indices = r_indices + (R_indices-1)*size(obj.source_matrix,2);
-                lin_indices_low_r = r_indices_low + (R_indices-1)*size(obj.source_matrix,2);
-                lin_indices_low_R = r_indices + (R_indices_low-1)*size(obj.source_matrix,2);
-                lin_indices_low_low = r_indices_low + (R_indices_low-1)*size(obj.source_matrix,2);
+                obj.lc.flux = fluxes; 
+                obj.lc.time = t_start; % update timestamps
+                obj.lc.is_updated = 1; 
 
-                % lightcurve from above and below the required values
-                C_above_above = obj.source_matrix(:,lin_indices);
-                C_below_above = obj.source_matrix(:,lin_indices_low_r);
-                C_above_below = obj.source_matrix(:,lin_indices_low_R);
-                C_below_below = obj.source_matrix(:,lin_indices_low_low);
-            else
-                C_above_above = obj.source_matrix(:,r_indices,R_indices);
-                C_below_above = obj.source_matrix(:,r_indices_low,R_indices);
-                C_above_below = obj.source_matrix(:,r_indices,R_indices_low);
-                C_below_below = obj.source_matrix(:,r_indices_low,R_indices_low);
+
             end
-            
-            % distance of the requested values from the lower axis values
-            r_ratios = (r_values-r_axis(r_indices_low))./(r_axis(r_indices)-r_axis(r_indices_low));
-            r_ratios(isnan(r_ratios)) = 0;
-            
-            R_ratios = (R_values-R_axis(R_indices_low))./(R_axis(R_indices)-R_axis(R_indices_low));
-            R_ratios(isnan(R_ratios)) = 0;
-            
-            if ~pairwise
-                R_ratios = util.vec.topages(R_ratios);
-            end
-            
-            core_flux = C_above_above.*r_ratios.*R_ratios + C_below_above.*(1-r_ratios).*R_ratios + ...
-                C_above_below.*r_ratios.*(1-R_ratios) + C_below_below.*(1-r_ratios).*(1-R_ratios);
-            
-            core_flux(isnan(core_flux)) = 1;
 
-            obj.core_flux = core_flux;
-            obj.core_flux_R_axis = R_values;
-            obj.core_flux_r_axis = r_values;
-            obj.core_flux_pairwise = pairwise;
-            
-            obj.runtime_core = toc(t_run);
-            
-        end
-        
-        function new_lc = getLightCurvesOld(obj, varargin)
-            
-            t_run = tic;
-            
-            obj.lc.pars.parse(varargin{:});
-            
-            obj.makeCoreCurves(obj.lc.pars.r, obj.lc.pars.R, true); % the last input is for "pairwise". We need to improve this to be "unique" also
-            
-            % uniform time axes (starting points and end points)
-            t_start = (-obj.W/2:1/obj.f:obj.W/2)';
-            t_end = t_start + obj.T/1000; % convert T to seconds! 
-            
-            % these are 2D matrices with "time" axis on dim 1 and par axis on dim 2
-            % This assumes each column is a line going through the shadow with different b,v,t and all have the same T,f,W
-            a_start = sqrt(obj.b.^2 + (obj.v.*(t_start-obj.t/1000)).^2); % convert t to seconds!
-            a_end = sqrt(obj.b.^2 + (obj.v.*(t_end-obj.t/1000)).^2); % convert t to seconds!
-            
-            % turn these into dim2 and dim3 matrices
-            a_start = permute(a_start, [3,2,1]);
-            a_end = permute(a_end, [3,2,1]);
-            
-            % assume we can't hit "true" values on both of these
-            a_points1 = obj.source_a_axis>=a_start & obj.source_a_axis<=a_end; % if a_start is smaller than a_end we get some values
-            a_points2 = obj.source_a_axis>=a_end & obj.source_a_axis<=a_start; % if a_end is smaller than a_start we get the other values
-            a_points = a_points1 | a_points2; % combine the two cases. Should be 3D logical matrix 
-            a_points_out = a_start>max(obj.source_a_axis); % points that have very large a values are out of range
-            
-            fluxes = obj.core_flux.*a_points; % get the flux values for each exposure (each "page"), zero outside integration bounds.
-            
-            fluxes = sum(fluxes, 1)./sum(a_points,1); % integrate over "time" axis and normalize by number of points in the integration (NaNs for no points)
-            
-            fluxes(a_points_out) = 1;
-
-            fluxes = permute(fluxes, [3,2,1]); % switch dim 3 (frame number) to dim 1 (time)
-            
-            fluxes = fillmissing(fluxes, 'linear'); 
-            
-            obj.lc.flux = fluxes; 
-            obj.lc.time = t_start; % update timestamps
-            obj.lc.is_updated = 1; 
-            
             if nargout>0
                 new_lc = occult.LightCurve(obj.lc);
             end
             
             obj.runtime_get = toc(t_run);
-            
-        end
-        
-        function generateNoise(obj, varargin) 
-            
-            % add optional noise generators
-            
-            obj.lc.generateNoise(varargin{:});
             
         end
         

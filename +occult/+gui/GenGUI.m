@@ -9,12 +9,15 @@ classdef GenGUI < handle
         buttons = {};
         
         font_size = 14;
+        big_font_size = 18;
         edit_font_size = 12;
         small_font_size = 10;
         
         color_on = [0 0.3 1]; % apply this color when on
         
         total_delay = 0.05;
+        
+        show_what = 'lightcurve';
         
         brake_bit = 1;
         
@@ -24,8 +27,14 @@ classdef GenGUI < handle
     
     properties % gui stuff
         
-        panel_R;
+        panel_controls;
+        
         panel_r;
+        panel_r2;
+        panel_d;
+        panel_th;
+        
+        panel_R;
         panel_b;
         panel_v;
         panel_t;
@@ -38,12 +47,10 @@ classdef GenGUI < handle
         
         panel_image;
         button_reset_axes;
+        button_show_what;
         axes_image;
         
         panel_bottom;
-%         button_stop;
-%         button_close;
-%         button_reset;
         
     end
     
@@ -85,33 +92,25 @@ classdef GenGUI < handle
             
             obj.fig.clear;
             obj.fig.bottom = 5;
-            obj.fig.height = 16;
+            obj.fig.height = 20;
             obj.fig.width = 25;
             movegui(obj.fig.fig, 'center');
             
-            N = 15;
+            N = 20;
+            
+            %%%%%%%%%%% control panel %%%%%%%%%%%%%%%%
+            
+            obj.panel_controls = GraphicPanel(obj.owner, [0/5, 3/N 1/5 6/N], 'controls'); 
+            obj.panel_controls.number = 6;
+            obj.panel_controls.addButton('button_source', 'use_source_matrix', 'toggle', 'new method', 'source matrix', '', [], '', '', 'Use the old (and fast) source matrix or use the new method that allows binary KBOs'); 
+            obj.panel_controls.addButton('button_binary', 'use_binary', 'toggle', 'no binary', 'use binary', '', [], obj.color_on, '', 'Add the secondary component to the occultation. Only works in "new method"'); 
+            obj.panel_controls.addButton('input_rho_step', 'rho_step', 'input', 'rho_step= ', '', '', [], '', '', 'Resolution step for new method: how many samples per FSU'); 
+            obj.panel_controls.make;
+            
             
             %%%%%%%%%%% parameters panels %%%%%%%%%%%%
             
-            obj.panel_R = GraphicPanel(obj.owner, [0/5 2/N 1/5 3/N], '', 1);
-            obj.panel_R.addButton('text', '', 'custom', 'stellar radius'); 
-            obj.panel_R.addButton('reset', 'reset_R', 'push', util.text.unicode('recycle'), '', '', 0.15, '', '', 'Reset R to the default value');
-            obj.panel_R.addButton('value', 'R', 'input', 'R= ', '', '', 0.85, '', '', 'Input a value for R, the stellar radius');
-            obj.panel_R.addButton('play', '', 'custom', util.text.unicode('play'), '', '', 0.15, '', '', 'Play an animation scanning through the range of parameter values');
-            obj.panel_R.addButton('slider', '', 'custom', '', '', '', 0.85, '', '', 'Change the value of R, the stellar radius');
-            obj.panel_R.margin = [0.01 0.05];
-            obj.panel_R.make;
-            
-            obj.panel_R.text.Enable = 'inactive';
-            obj.panel_R.play.Callback = @obj.callback_play_R;
-            obj.panel_R.slider.control.Style = 'slider';
-            obj.panel_R.slider.control.Min = obj.owner.min_R;
-            obj.panel_R.slider.control.Max = obj.owner.max_R;
-            obj.panel_R.slider.control.Value = obj.owner.R(1);
-            obj.panel_R.slider.control.SliderStep = [0.01 0.1]./(obj.owner.max_R-obj.owner.min_R);
-            obj.panel_R.slider.Callback = @obj.callback_slide_R;
-            
-            obj.panel_r = GraphicPanel(obj.owner, [1/5 2/N 1/5 3/N], '', 1);
+            obj.panel_r = GraphicPanel(obj.owner, [1/5 6/N 1/5 3/N], '', 1);
             obj.panel_r.addButton('text', '', 'custom', 'occulter radius'); 
             obj.panel_r.addButton('reset', 'reset_r', 'push', util.text.unicode('recycle'), '', '', 0.15, '', '', 'Reset r to the default value');
             obj.panel_r.addButton('value', 'r', 'input', 'r= ', '', '', 0.85, '', '', 'Input a value for r, the occulter radius');
@@ -129,7 +128,79 @@ classdef GenGUI < handle
             obj.panel_r.slider.control.SliderStep = [0.01 0.1]./(obj.owner.max_r-obj.owner.min_r);
             obj.panel_r.slider.Callback = @obj.callback_slide_r;
             
-            obj.panel_b = GraphicPanel(obj.owner, [2/5 2/N 1/5 3/N], '', 1);
+            obj.panel_r2 = GraphicPanel(obj.owner, [2/5 6/N 1/5 3/N], '', 1);
+            obj.panel_r2.addButton('text', '', 'custom', 'companion radius'); 
+            obj.panel_r2.addButton('reset', 'reset_r2', 'push', util.text.unicode('recycle'), '', '', 0.15, '', '', 'Reset r2 to the default value');
+            obj.panel_r2.addButton('value', 'r2', 'input', 'r_comp= ', '', '', 0.85, '', '', 'Input a value for r2, the companion radius (binary mode only)');
+            obj.panel_r2.addButton('play', '', 'custom', util.text.unicode('play'), '', '', 0.15, '', '', 'Play an animation scanning through the range of parameter values');
+            obj.panel_r2.addButton('slider', '', 'custom', '', '', '', 0.85, '', '', 'Change the value of r2, the companion radius (binary mode only)');
+            obj.panel_r2.margin = [0.01 0.05];
+            obj.panel_r2.make;
+            
+            obj.panel_r2.text.Enable = 'inactive';
+            obj.panel_r2.play.Callback = @obj.callback_play_r2;
+            obj.panel_r2.slider.control.Style = 'slider';
+            obj.panel_r2.slider.control.Min = obj.owner.min_r2;
+            obj.panel_r2.slider.control.Max = obj.owner.max_r2;
+            obj.panel_r2.slider.control.Value = obj.owner.r2(1);
+            obj.panel_r2.slider.control.SliderStep = [0.01 0.1]./(obj.owner.max_r2-obj.owner.min_r2);
+            obj.panel_r2.slider.Callback = @obj.callback_slide_r2;
+            
+            obj.panel_d = GraphicPanel(obj.owner, [3/5 6/N 1/5 3/N], '', 1);
+            obj.panel_d.addButton('text', '', 'custom', 'binary separation'); 
+            obj.panel_d.addButton('reset', 'reset_d', 'push', util.text.unicode('recycle'), '', '', 0.15, '', '', 'Reset d to the default value');
+            obj.panel_d.addButton('value', 'd', 'input', 'd= ', '', '', 0.85, '', '', 'Input a value for d, the binary separation (binary mode only)');
+            obj.panel_d.addButton('play', '', 'custom', util.text.unicode('play'), '', '', 0.15, '', '', 'Play an animation scanning through the range of parameter values');
+            obj.panel_d.addButton('slider', '', 'custom', '', '', '', 0.85, '', '', 'Change the value of d, the binary separation (binary mode only)');
+            obj.panel_d.margin = [0.01 0.05];
+            obj.panel_d.make;
+            
+            obj.panel_d.text.Enable = 'inactive';
+            obj.panel_d.play.Callback = @obj.callback_play_d;
+            obj.panel_d.slider.control.Style = 'slider';
+            obj.panel_d.slider.control.Min = obj.owner.min_d;
+            obj.panel_d.slider.control.Max = obj.owner.max_d;
+            obj.panel_d.slider.control.Value = obj.owner.d(1);
+            obj.panel_d.slider.control.SliderStep = [0.01 0.1]./(obj.owner.max_d-obj.owner.min_d);
+            obj.panel_d.slider.Callback = @obj.callback_slide_d;
+            
+            obj.panel_th = GraphicPanel(obj.owner, [4/5 6/N 1/5 3/N], '', 1);
+            obj.panel_th.addButton('text', '', 'custom', 'position angle'); 
+            obj.panel_th.addButton('reset', 'reset_th', 'push', util.text.unicode('recycle'), '', '', 0.15, '', '', 'Reset th to the default value');
+            obj.panel_th.addButton('value', 'th', 'input', 'th= ', '', '', 0.85, '', '', 'Input a value for th, the binary position angle (binary mode only)');
+            obj.panel_th.addButton('play', '', 'custom', util.text.unicode('play'), '', '', 0.15, '', '', 'Play an animation scanning through the range of parameter values');
+            obj.panel_th.addButton('slider', '', 'custom', '', '', '', 0.85, '', '', 'Change the value of th, the binary position angle (binary mode only)');
+            obj.panel_th.margin = [0.01 0.05];
+            obj.panel_th.make;
+            
+            obj.panel_th.text.Enable = 'inactive';
+            obj.panel_th.play.Callback = @obj.callback_play_th;
+            obj.panel_th.slider.control.Style = 'slider';
+            obj.panel_th.slider.control.Min = obj.owner.min_th;
+            obj.panel_th.slider.control.Max = obj.owner.max_th;
+            obj.panel_th.slider.control.Value = obj.owner.th(1);
+            obj.panel_th.slider.control.SliderStep = [0.01 0.1]./(obj.owner.max_th-obj.owner.min_th);
+            obj.panel_th.slider.Callback = @obj.callback_slide_th;
+            
+            obj.panel_R = GraphicPanel(obj.owner, [1/5 3/N 1/5 3/N], '', 1);
+            obj.panel_R.addButton('text', '', 'custom', 'stellar radius'); 
+            obj.panel_R.addButton('reset', 'reset_R', 'push', util.text.unicode('recycle'), '', '', 0.15, '', '', 'Reset R to the default value');
+            obj.panel_R.addButton('value', 'R', 'input', 'R= ', '', '', 0.85, '', '', 'Input a value for R, the stellar radius');
+            obj.panel_R.addButton('play', '', 'custom', util.text.unicode('play'), '', '', 0.15, '', '', 'Play an animation scanning through the range of parameter values');
+            obj.panel_R.addButton('slider', '', 'custom', '', '', '', 0.85, '', '', 'Change the value of R, the stellar radius');
+            obj.panel_R.margin = [0.01 0.05];
+            obj.panel_R.make;
+            
+            obj.panel_R.text.Enable = 'inactive';
+            obj.panel_R.play.Callback = @obj.callback_play_R;
+            obj.panel_R.slider.control.Style = 'slider';
+            obj.panel_R.slider.control.Min = obj.owner.min_R;
+            obj.panel_R.slider.control.Max = obj.owner.max_R;
+            obj.panel_R.slider.control.Value = obj.owner.R(1);
+            obj.panel_R.slider.control.SliderStep = [0.01 0.1]./(obj.owner.max_R-obj.owner.min_R);
+            obj.panel_R.slider.Callback = @obj.callback_slide_R;
+            
+            obj.panel_b = GraphicPanel(obj.owner, [2/5 3/N 1/5 3/N], '', 1);
             obj.panel_b.addButton('text', '', 'custom', 'impact parameter'); 
             obj.panel_b.addButton('reset', 'reset_b', 'push', util.text.unicode('recycle'), '', '', 0.15, '', '', 'Reset b to the default value');
             obj.panel_b.addButton('value', 'b', 'input', 'b= ', '', '', 0.85, '', '', 'Input a value for b, the impact parameter');
@@ -147,7 +218,7 @@ classdef GenGUI < handle
             obj.panel_b.slider.control.SliderStep = [0.01 0.1]./(obj.owner.max_b-obj.owner.min_b)*2;
             obj.panel_b.slider.Callback = @obj.callback_slide_b;
             
-            obj.panel_v = GraphicPanel(obj.owner, [3/5 2/N 1/5 3/N], '', 1);
+            obj.panel_v = GraphicPanel(obj.owner, [3/5 3/N 1/5 3/N], '', 1);
             obj.panel_v.addButton('text', '', 'custom', 'velocity'); 
             obj.panel_v.addButton('reset', 'reset_v', 'push', util.text.unicode('recycle'), '', '', 0.15, '', '', 'Reset v to the default value');
             obj.panel_v.addButton('value', 'v', 'input', 'v= ', '', '', 0.85, '', '', 'Input a value for v, the occulter velocity');
@@ -165,7 +236,7 @@ classdef GenGUI < handle
             obj.panel_v.slider.control.SliderStep = [0.01 0.1]./(obj.owner.max_v-obj.owner.min_v)*100;
             obj.panel_v.slider.Callback = @obj.callback_slide_v;
             
-            obj.panel_t = GraphicPanel(obj.owner, [4/5 2/N 1/5 3/N], '', 1);
+            obj.panel_t = GraphicPanel(obj.owner, [4/5 3/N 1/5 3/N], '', 1);
             obj.panel_t.addButton('text', '', 'custom', 'crossing time'); 
             obj.panel_t.addButton('reset', 'reset_t', 'push', util.text.unicode('recycle'), '', '', 0.15, '', '', 'Reset t to the default value');
             obj.panel_t.addButton('value', 't', 'input', 't= ', 'ms', '', 0.85, '', '', 'Input a value for t, the subframe occultation crossing time');
@@ -181,15 +252,15 @@ classdef GenGUI < handle
             obj.panel_t.slider.control.Min = obj.owner.min_t;
             obj.panel_t.slider.control.Max = obj.owner.max_t;
             obj.panel_t.slider.control.Value = obj.owner.t(1);
-            range = obj.panel_t.slider.control.Max - obj.panel_t.slider.control.Min;
+
             obj.panel_t.slider.control.SliderStep = [0.01 0.1]./(obj.owner.max_t-obj.owner.min_t)*100;
             obj.panel_t.slider.Callback = @obj.callback_slide_t;
             
             %%%%%%%%%%% panel noise %%%%%%%%%%%%%%%%%%
             
-            obj.panel_noise = GraphicPanel(obj.owner, [0/3 1/N 1/3 1/N], 'noise', 0);
-            obj.panel_noise.addButton('generate', '', 'custom', obj.random_dice, '', '', [], '', '', 'Generate new random noise samples');
-            obj.panel_noise.addButton('snr', 'snr', 'input', 's= ', '', 'small', [], '', '', 'Star S/N (flux over rms), determines noise amplitude'); 
+            obj.panel_noise = GraphicPanel(obj.owner, [0/3 1/N 1/3 2/N], 'noise', 0);
+            obj.panel_noise.addButton('generate', '', 'custom', obj.random_dice, '', 'big', [], '', '', 'Generate new random noise samples');
+            obj.panel_noise.addButton('snr', 'snr', 'input', 's= ', '', '', [], '', '', 'Star S/N (flux over rms), determines noise amplitude'); 
             obj.panel_noise.addButton('number', 'num_noise_iterations', 'input', 'N= ', '', '', [], '', '', 'How many noise iterations should be generated');
             obj.panel_noise.margin = [0.02 0.01];
             obj.panel_noise.make; 
@@ -198,7 +269,7 @@ classdef GenGUI < handle
             
             %%%%%%%%%%% panel scalars %%%%%%%%%%%%%%%%
             
-            obj.panel_scalars = GraphicPanel(obj.owner, [1/3 1/N 1/3 1/N], 'scalars', 0);
+            obj.panel_scalars = GraphicPanel(obj.owner, [1/3 1/N 1/3 2/N], 'scalars', 0);
             obj.panel_scalars.addButton('T', 'T', 'input', 'T= ', 'ms', '', [], '', '', 'Exposure time (ms)');
             obj.panel_scalars.addButton('f', 'f', 'input', 'f= ', 'Hz', '', [], '', '', 'Frame rate (Hz)');
             obj.panel_scalars.addButton('W', 'W', 'input', 'W= ', 's', '', [], '', '', 'Time window for lightcurve (seconds)');
@@ -207,7 +278,7 @@ classdef GenGUI < handle
             
             %%%%%%%%%%% panel display %%%%%%%%%%%%%%%%
             
-            obj.panel_display = GraphicPanel(obj.owner, [2/3 1/N 1/3 1/N], 'display', 0);
+            obj.panel_display = GraphicPanel(obj.owner, [2/3 1/N 1/3 2/N], 'display', 0);
             obj.panel_display.addButton('num_display', 'num_display', 'input', 'Nlcs= ', '', '', [], '', '', 'Max number of lightcuves to display');
             obj.panel_display.addButton('num_display_noise', 'num_display_noise', 'input', 'Nnoise= ', '', '', [], '', '', 'Max number of noise iterations to display, per lightcurve');
             obj.panel_display.addButton('show_noise', 'show_noise', 'toggle', 'noise', 'noise', '', 1, obj.color_on, 'black', 'Turn on/off display of noise');
@@ -216,13 +287,17 @@ classdef GenGUI < handle
             
             %%%%%%%%%%% panel image %%%%%%%%%%%%%%%%%%
             
-            obj.panel_image = uipanel('Title', '', 'Position', [0 5/N 1 (N-5)/N]);
+            obj.panel_image = uipanel('Title', '', 'Position', [0 9/N 1 (N-9)/N]);
                         
             obj.makeAxes;
             
-            obj.button_reset_axes = GraphicButton(obj.panel_image, [0.9 0.95 0.1 0.05], obj.owner, '', 'custom','new axes');
+            obj.button_reset_axes = GraphicButton(obj.panel_image, [0.9 0.93 0.1 0.07], obj.owner, '', 'custom','new axes');
             obj.button_reset_axes.Callback = @obj.makeAxes;
             obj.button_reset_axes.Tooltip = 'Make a new axes';
+            obj.button_show_what = GraphicButton(obj.panel_image, [0.0 0.93 0.1 0.07], obj.owner, '', 'custom', ''); 
+            obj.button_show_what.Callback = @obj.callback_show_what;
+            obj.button_show_what.control.Style = 'popupmenu';
+            obj.button_show_what.control.String = {'lightcurve', 'map'};
             
             %%%%%%%%%%% panel bottom %%%%%%%%%%%%%%%%%
             
@@ -281,47 +356,80 @@ classdef GenGUI < handle
                 obj.owner.generateNoise;
             end
             
-            obj.owner.lc.plot('ax', obj.axes_image);
-            title(obj.axes_image, '');
-            xlabel(obj.axes_image, '');
-            ylabel(obj.axes_image, '');
-            xtickformat(obj.axes_image, '%gs');
-            obj.axes_image.YLim = [0 1.35];
-            obj.axes_image.XLim = [-0.6.*obj.owner.W, 0.6.*obj.owner.W];
+            if util.text.cs(obj.show_what, 'lightcurve')
+
+                obj.owner.lc.plot('ax', obj.axes_image);
+                title(obj.axes_image, '');
+                xlabel(obj.axes_image, '');
+                ylabel(obj.axes_image, '');
+                xtickformat(obj.axes_image, '%gs');
+%                 obj.axes_image.YLim = [0 util.stat.max2(obj.owner.lc.flux)*1.1];
+                obj.axes_image.YLim = [0 2];
+                obj.axes_image.XLim = [-0.6.*obj.owner.W, 0.6.*obj.owner.W];
+
+            elseif util.text.cs(obj.show_what, 'map')
+                obj.owner.showMap;
+            else
+                error('Unknown "show_what" option: "%s". Use "lightcurve" or "map"', obj.show_what);
+            end
             
             text(-1.2, 0.2, sprintf('runtime= %5.3fs', obj.owner.runtime_get), 'FontSize', obj.font_size);
+            
+            if isscalar(obj.owner.r) || all(obj.owner.r==obj.owner.r(1))
+                obj.panel_r.slider.Value = obj.owner.r(1);
+                obj.panel_r.value.String = ['r= ' num2str(obj.owner.r(1))];
+            end
+            
+            if isscalar(obj.owner.r2) || all(obj.owner.r2==obj.owner.r2(1))
+                obj.panel_r2.slider.Value = obj.owner.r2(1);
+                obj.panel_r2.value.String = ['r_comp= ' num2str(obj.owner.r2(1))];
+            end
+            
+            if isscalar(obj.owner.d) || all(obj.owner.d==obj.owner.d(1))
+                obj.panel_d.slider.Value = obj.owner.d(1);
+                obj.panel_d.value.String = ['d= ' num2str(obj.owner.d(1))];
+            end
+            
+            if isscalar(obj.owner.th) || all(obj.owner.th==obj.owner.th(1))
+                obj.panel_th.slider.Value = obj.owner.th(1);
+                obj.panel_th.value.String = ['th= ' num2str(obj.owner.th(1))];
+            end
             
             if isscalar(obj.owner.R) || all(obj.owner.R==obj.owner.R(1))
                 obj.panel_R.slider.Value = obj.owner.R(1);
                 obj.panel_R.value.String = ['R= ' num2str(obj.owner.R(1))];
             end
             
-            if isscalar(obj.owner.r) || all(obj.owner.r==obj.owner.r(1))
-                obj.panel_r.slider.Value = obj.owner.r(1);
-                obj.panel_r.value.String = ['r= ' num2str(obj.owner.r(1))];
-            end
             if isscalar(obj.owner.b) || all(obj.owner.b==obj.owner.b(1))
                 obj.panel_b.slider.Value = obj.owner.b(1);
                 obj.panel_b.value.String = ['b= ' num2str(obj.owner.b(1))];
             end
+            
             if isscalar(obj.owner.v) || all(obj.owner.v==obj.owner.v(1))
                 obj.panel_v.slider.Value = obj.owner.v(1);
                 obj.panel_v.value.String = ['v= ' num2str(obj.owner.v(1))];
             end
+            
             if isscalar(obj.owner.t) || all(obj.owner.t==obj.owner.t(1))
                 obj.panel_t.slider.Value = obj.owner.t(1);
                 obj.panel_t.value.String = ['t= ' num2str(obj.owner.t(1))];
             end
             
             if obj.brake_bit
-                obj.panel_R.play.String = util.text.unicode('play');
                 obj.panel_r.play.String = util.text.unicode('play');
+                obj.panel_r2.play.String = util.text.unicode('play');
+                obj.panel_d.play.String = util.text.unicode('play');
+                obj.panel_th.play.String = util.text.unicode('play');
+                obj.panel_R.play.String = util.text.unicode('play');
                 obj.panel_b.play.String = util.text.unicode('play');
                 obj.panel_v.play.String = util.text.unicode('play');
                 obj.panel_t.play.String = util.text.unicode('play');
             else
-                obj.panel_R.play.String = util.text.unicode('stop');
                 obj.panel_r.play.String = util.text.unicode('stop');
+                obj.panel_r2.play.String = util.text.unicode('stop');
+                obj.panel_d.play.String = util.text.unicode('stop');
+                obj.panel_th.play.String = util.text.unicode('stop');
+                obj.panel_R.play.String = util.text.unicode('stop');
                 obj.panel_b.play.String = util.text.unicode('stop');
                 obj.panel_v.play.String = util.text.unicode('stop');
                 obj.panel_t.play.String = util.text.unicode('stop');
@@ -358,49 +466,6 @@ classdef GenGUI < handle
                 
     methods % callbacks
         
-        function callback_play_R(obj, ~, ~)
-            
-            if obj.debug_bit, disp('callback: play R'); end
-            
-            if obj.brake_bit==0
-                
-                obj.brake_bit = 1;
-                obj.update;
-                
-            else
-                
-                val = obj.panel_R.slider.Value;
-                mn = obj.panel_R.slider.control.Min;
-                mx = obj.panel_R.slider.control.Max;
-                if val==mx
-                    val = mn;
-                end
-                
-                step = obj.panel_R.slider.control.SliderStep(1)*(mx-mn);
-
-                vec = val:step:mx;
-
-                obj.brake_bit = 0;
-
-                for ii = 1:length(vec)
-
-                    if obj.brake_bit, break; end
-
-                    obj.owner.R = vec(ii);
-                    obj.update;
-                    delay = max([0 obj.total_delay-obj.owner.runtime_get]); 
-                    pause(delay);
-                    drawnow;
-
-                end
-
-                obj.brake_bit = 1;
-                
-                obj.update;
-                
-            end
-                
-        end
         
         function callback_play_r(obj, ~, ~)
             
@@ -444,6 +509,182 @@ classdef GenGUI < handle
                 
             end
             
+        end
+        
+        function callback_play_r2(obj, ~, ~)
+            
+            if obj.debug_bit, disp('callback: play r2'); end
+            
+            if obj.brake_bit==0
+                
+                obj.brake_bit = 1;
+                obj.update;
+                
+            else
+                
+                val = obj.panel_r2.slider.Value;
+                mn = obj.panel_r2.slider.control.Min;
+                mx = obj.panel_r2.slider.control.Max;
+                if val==mx
+                    val = mn;
+                end
+                
+                step = obj.panel_r2.slider.control.SliderStep(1)*(mx-mn);
+
+                vec = val:step:mx;
+
+                obj.brake_bit = 0;
+
+                for ii = 1:length(vec)
+
+                    if obj.brake_bit, break; end
+
+                    obj.owner.r2 = vec(ii);
+                    obj.update;
+                    delay = max([0 obj.total_delay-obj.owner.runtime_get]); 
+                    pause(delay);
+                    drawnow;
+
+                end
+
+                obj.brake_bit = 1;
+                
+                obj.update;
+                
+            end
+                
+        end
+        
+        function callback_play_d(obj, ~, ~)
+            
+            if obj.debug_bit, disp('callback: play d'); end
+            
+            if obj.brake_bit==0
+                
+                obj.brake_bit = 1;
+                obj.update;
+                
+            else
+                
+                val = obj.panel_d.slider.Value;
+                mn = obj.panel_d.slider.control.Min;
+                mx = obj.panel_d.slider.control.Max;
+                if val==mx
+                    val = mn;
+                end
+                
+                step = obj.panel_d.slider.control.SliderStep(1)*(mx-mn);
+
+                vec = val:step:mx;
+
+                obj.brake_bit = 0;
+
+                for ii = 1:length(vec)
+
+                    if obj.brake_bit, break; end
+
+                    obj.owner.d = vec(ii);
+                    obj.update;
+                    delay = max([0 obj.total_delay-obj.owner.runtime_get]); 
+                    pause(delay);
+                    drawnow;
+
+                end
+
+                obj.brake_bit = 1;
+                
+                obj.update;
+                
+            end
+                
+        end
+        
+        function callback_play_th(obj, ~, ~)
+            
+            if obj.debug_bit, disp('callback: play th'); end
+            
+            if obj.brake_bit==0
+                
+                obj.brake_bit = 1;
+                obj.update;
+                
+            else
+                
+                val = obj.panel_th.slider.Value;
+                mn = obj.panel_th.slider.control.Min;
+                mx = obj.panel_th.slider.control.Max;
+                if val==mx
+                    val = mn;
+                end
+                
+                step = obj.panel_th.slider.control.SliderStep(1)*(mx-mn);
+
+                vec = val:step:mx;
+
+                obj.brake_bit = 0;
+
+                for ii = 1:length(vec)
+
+                    if obj.brake_bit, break; end
+
+                    obj.owner.th = vec(ii);
+                    obj.update;
+                    delay = max([0 obj.total_delay-obj.owner.runtime_get]); 
+                    pause(delay);
+                    drawnow;
+
+                end
+
+                obj.brake_bit = 1;
+                
+                obj.update;
+                
+            end
+                
+        end
+        
+        function callback_play_R(obj, ~, ~)
+            
+            if obj.debug_bit, disp('callback: play R'); end
+            
+            if obj.brake_bit==0
+                
+                obj.brake_bit = 1;
+                obj.update;
+                
+            else
+                
+                val = obj.panel_R.slider.Value;
+                mn = obj.panel_R.slider.control.Min;
+                mx = obj.panel_R.slider.control.Max;
+                if val==mx
+                    val = mn;
+                end
+                
+                step = obj.panel_R.slider.control.SliderStep(1)*(mx-mn);
+
+                vec = val:step:mx;
+
+                obj.brake_bit = 0;
+
+                for ii = 1:length(vec)
+
+                    if obj.brake_bit, break; end
+
+                    obj.owner.R = vec(ii);
+                    obj.update;
+                    delay = max([0 obj.total_delay-obj.owner.runtime_get]); 
+                    pause(delay);
+                    drawnow;
+
+                end
+
+                obj.brake_bit = 1;
+                
+                obj.update;
+                
+            end
+                
         end
         
         function callback_play_b(obj, ~, ~)
@@ -578,21 +819,51 @@ classdef GenGUI < handle
             
         end
         
-        function callback_slide_R(obj, hndl, ~)
-            
-            if obj.debug_bit, disp('callback: slide R'); end
-            
-            obj.owner.R = hndl.Value;
-            
-            obj.update;
-            
-        end
-        
         function callback_slide_r(obj, hndl, ~)
             
             if obj.debug_bit, disp('callback: slide r'); end
             
             obj.owner.r = hndl.Value;
+            
+            obj.update;
+            
+        end
+        
+        function callback_slide_r2(obj, hndl, ~)
+            
+            if obj.debug_bit, disp('callback: slide r2'); end
+            
+            obj.owner.r2 = hndl.Value;
+            
+            obj.update;
+            
+        end
+        
+        function callback_slide_d(obj, hndl, ~)
+            
+            if obj.debug_bit, disp('callback: slide d'); end
+            
+            obj.owner.d = hndl.Value;
+            
+            obj.update;
+            
+        end
+        
+        function callback_slide_th(obj, hndl, ~)
+            
+            if obj.debug_bit, disp('callback: slide th'); end
+            
+            obj.owner.th = hndl.Value;
+            
+            obj.update;
+            
+        end
+        
+        function callback_slide_R(obj, hndl, ~)
+            
+            if obj.debug_bit, disp('callback: slide R'); end
+            
+            obj.owner.R = hndl.Value;
             
             obj.update;
             
@@ -623,6 +894,16 @@ classdef GenGUI < handle
             if obj.debug_bit, disp('callback: slide t'); end
             
             obj.owner.t = hndl.Value;
+            
+            obj.update;
+            
+        end
+        
+        function callback_show_what(obj, hndl, ~)
+           
+            if obj.debug_bit, disp('Callback: show what'); end
+            
+            obj.show_what = hndl.String{hndl.Value};
             
             obj.update;
             

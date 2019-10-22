@@ -50,6 +50,9 @@ classdef Parameters < handle
         is_updated = 0;
         is_noise_updated = 0;
         
+        chi2;
+        likelihood;
+        
     end
     
     properties(Dependent=true)
@@ -86,7 +89,7 @@ classdef Parameters < handle
         % these can be scalars or row vectors 
         r_ = 1; % radius of occulter (FSU)
         r2_ = 0; % radius secondary occulter
-        d_ = 0; % distance between primary and secondary (FSU)
+        d_ = 1; % distance between primary and secondary (FSU)
         th_ = 0; % angle between line connecting primary/secondary and direction of motion
         R_ = 0; % radius of background star (FSU)
         b_ = 0; % impact parameter (FSU)
@@ -281,6 +284,24 @@ classdef Parameters < handle
     
     methods % setters
         
+        function set.r(obj, val)
+            
+            if numel(val)~=length(val)
+                error('Must input a scalar or a 1D vector as parameter');
+            end
+            
+            old_value = obj.r; % to check the new and old values are equal
+            
+            obj.r_ = val;
+            
+            obj.Npars = max([length(obj.r_), length(obj.r2_) length(obj.d_) length(obj.th_) length(obj.R_), length(obj.b_), length(obj.v_), length(obj.t_)]);
+            
+            if ~isequal(obj.r, old_value)
+                obj.is_updated = 0;
+            end
+            
+        end
+        
         function set.r2(obj, val)
             
             if numel(val)~=length(val)
@@ -348,24 +369,6 @@ classdef Parameters < handle
             obj.Npars = max([length(obj.r_), length(obj.r2_) length(obj.d_) length(obj.th_) length(obj.R_), length(obj.b_), length(obj.v_), length(obj.t_)]);
             
             if ~isequal(obj.R, old_value)
-                obj.is_updated = 0;
-            end
-            
-        end
-        
-        function set.r(obj, val)
-            
-            if numel(val)~=length(val)
-                error('Must input a scalar or a 1D vector as parameter');
-            end
-            
-            old_value = obj.r; % to check the new and old values are equal
-            
-            obj.r_ = val;
-            
-            obj.Npars = max([length(obj.r_), length(obj.r2_) length(obj.d_) length(obj.th_) length(obj.R_), length(obj.b_), length(obj.v_), length(obj.t_)]);
-            
-            if ~isequal(obj.r, old_value)
                 obj.is_updated = 0;
             end
             
@@ -518,6 +521,36 @@ classdef Parameters < handle
         function parse(obj, varargin)
             
            
+        end
+        
+        function copy_from(obj, other)
+            
+            if isempty(other)
+                error('Got empty input!');
+            end
+            
+            if ~isa(other, 'occult.Parameters')
+                error('Must input an "occult.Parameters" object. Got "%s" instead...', class(other));
+            end
+            
+            obj.r = other.r;
+            obj.r2 = other.r2;
+            obj.d = other.d;
+            obj.th = other.th;
+            obj.R = other.R;
+            obj.b = other.b;
+            obj.v = other.v;
+            obj.t = other.t;
+            obj.T = other.T;
+            obj.f = other.f;
+            obj.W = other.W;
+            
+            obj.snr = other.snr;
+            obj.Niter = other.Niter;
+            
+            obj.chi2 = other.chi2;
+            obj.likelihood = other.likelihood;
+            
         end
         
         function makeSpectrum(obj, varargin)

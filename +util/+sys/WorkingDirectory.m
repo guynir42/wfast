@@ -422,7 +422,7 @@ classdef WorkingDirectory < handle
                 found = '';
                                 
                 for ii = 1:length(DN)
-                    if strcmp([DN{ii} '/'], first_dir)
+                    if strcmp(DN{ii}, first_dir)
                         found = first_dir;
                         break;
                     end

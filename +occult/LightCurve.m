@@ -390,6 +390,8 @@ classdef LightCurve < handle
             xlabel(input.ax, 'Time [seconds]');
             ylabel(input.ax, 'Intensity (normalized)');
             
+            input.ax.YDir = 'normal';
+            
 %             legend(input.ax, leg_str, 'Location','SouthWest');
             
             input.ax.NextPlot = hold_state;
@@ -405,3 +407,4 @@ classdef LightCurve < handle
     end
     
 end
+
