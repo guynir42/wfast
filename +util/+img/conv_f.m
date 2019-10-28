@@ -146,6 +146,10 @@ function M_out = conv_f(kernel, image, varargin)
             % do nothing
         elseif cs(crop, 'same')
             M_out = crop2size(M_out, SI);
+        elseif cs(crop, 'valid')
+            M_out = crop2size(M_out, SI-SK+1);
+        else
+            error('Unkown crop option "%s". Use "full", "same" or "valid"...', crop);
         end
     
     end

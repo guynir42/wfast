@@ -16,7 +16,7 @@ classdef GenGUI < handle
         color_on = [0 0.3 1]; % apply this color when on
         
         total_delay = 0.05;
-        
+        use_uniform_limits = 1;
         show_what = 'lightcurve';
         
         brake_bit = 1;
@@ -48,6 +48,7 @@ classdef GenGUI < handle
         panel_image;
         button_reset_axes;
         button_show_what;
+        button_limits;
         axes_image;
         
         panel_bottom;
@@ -298,6 +299,8 @@ classdef GenGUI < handle
             obj.button_show_what.Callback = @obj.callback_show_what;
             obj.button_show_what.control.Style = 'popupmenu';
             obj.button_show_what.control.String = {'lightcurve', 'map'};
+            obj.button_limits = GraphicButton(obj.panel_image, [0.0 0.0 0.1 0.07], obj.owner, '', 'custom', 'auto limits', 'uinform limits', 'small'); 
+            obj.button_limits.Callback = @obj.callback_limits;
             
             %%%%%%%%%%% panel bottom %%%%%%%%%%%%%%%%%
             
@@ -357,29 +360,51 @@ classdef GenGUI < handle
             end
             
             if util.text.cs(obj.show_what, 'lightcurve')
-
+                
+                obj.makeAxes;
                 obj.owner.lc.plot('ax', obj.axes_image);
                 title(obj.axes_image, '');
                 xlabel(obj.axes_image, '');
                 ylabel(obj.axes_image, '');
                 xtickformat(obj.axes_image, '%gs');
-%                 obj.axes_image.YLim = [0 util.stat.max2(obj.owner.lc.flux)*1.1];
-                obj.axes_image.YLim = [0 2];
+                
+                if obj.use_uniform_limits
+                    
+                    obj.axes_image.YLim = [0 2];
+                    
+                    obj.button_limits.String = 'uniform limits';
+                    
+                    text(-obj.owner.W/2, 0.3, sprintf('runtime= %5.3fs', obj.owner.runtime_get), 'FontSize', obj.font_size);
+            
+                else
+                    
+                    obj.axes_image.YLim(1) = min(obj.owner.lc.flux(:)).*0.9;
+                    obj.axes_image.YLim(2) = max(obj.owner.lc.flux(:)).*1.1;
+                    
+                    obj.button_limits.String = 'auto limits';
+                    
+                    text(-obj.owner.W/2, (1+obj.axes_image.YLim(1))/2, sprintf('runtime= %5.3fs', obj.owner.runtime_get), 'FontSize', obj.font_size);
+            
+                end
+                    
                 obj.axes_image.XLim = [-0.6.*obj.owner.W, 0.6.*obj.owner.W];
 
             elseif util.text.cs(obj.show_what, 'map')
+                
+                obj.makeAxes;
                 obj.owner.showMap;
+                
+                text(obj.axes_image.XLim(1)/2, obj.axes_image.YLim(2)/2, sprintf('runtime= %5.3fs', obj.owner.runtime_get), 'FontSize', obj.font_size);
+                
             else
                 error('Unknown "show_what" option: "%s". Use "lightcurve" or "map"', obj.show_what);
             end
-            
-            text(-1.2, 0.2, sprintf('runtime= %5.3fs', obj.owner.runtime_get), 'FontSize', obj.font_size);
             
             if isscalar(obj.owner.r) || all(obj.owner.r==obj.owner.r(1))
                 obj.panel_r.slider.Value = obj.owner.r(1);
                 obj.panel_r.value.String = ['r= ' num2str(obj.owner.r(1))];
             end
-            
+                        
             if isscalar(obj.owner.r2) || all(obj.owner.r2==obj.owner.r2(1))
                 obj.panel_r2.slider.Value = obj.owner.r2(1);
                 obj.panel_r2.value.String = ['r_comp= ' num2str(obj.owner.r2(1))];
@@ -435,6 +460,24 @@ classdef GenGUI < handle
                 obj.panel_t.play.String = util.text.unicode('stop');
             end
             
+            obj.panel_r.slider.control.Min = obj.owner.r_range(1);
+            obj.panel_r2.slider.control.Min = obj.owner.r2_range(1);
+            obj.panel_d.slider.control.Min = obj.owner.d_range(1);
+            obj.panel_th.slider.control.Min = obj.owner.th_range(1);
+            obj.panel_R.slider.control.Min = obj.owner.R_range(1);
+            obj.panel_b.slider.control.Min = obj.owner.b_range(1);
+            obj.panel_v.slider.control.Min = obj.owner.v_range(1);
+            obj.panel_t.slider.control.Min = obj.owner.t_range(1);
+            
+            obj.panel_r.slider.control.Max = obj.owner.r_range(2);
+            obj.panel_r2.slider.control.Max = obj.owner.r2_range(2);
+            obj.panel_d.slider.control.Max = obj.owner.d_range(2);
+            obj.panel_th.slider.control.Max = obj.owner.th_range(2);
+            obj.panel_R.slider.control.Max = obj.owner.R_range(2);
+            obj.panel_b.slider.control.Max = obj.owner.b_range(2);
+            obj.panel_v.slider.control.Max = obj.owner.v_range(2);
+            obj.panel_t.slider.control.Max = obj.owner.t_range(2);
+            
             h = legend(obj.axes_image, 'Location', 'Southeast');
             h.FontSize = 10;
             
@@ -465,7 +508,6 @@ classdef GenGUI < handle
     end
                 
     methods % callbacks
-        
         
         function callback_play_r(obj, ~, ~)
             
@@ -904,6 +946,16 @@ classdef GenGUI < handle
             if obj.debug_bit, disp('Callback: show what'); end
             
             obj.show_what = hndl.String{hndl.Value};
+            
+            obj.update;
+            
+        end
+        
+        function callback_limits(obj, ~, ~)
+            
+            if obj.debug_bit, disp('Callback: limits'); end
+            
+            obj.use_uniform_limits = ~obj.use_uniform_limits;
             
             obj.update;
             

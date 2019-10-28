@@ -157,6 +157,9 @@ classdef LightCurve < handle
             if isempty(obj.noise) || isempty(obj.flux)
                 val = [];
             else
+                if size(obj.flux,1)~=size(obj.noise,1) || size(obj.flux,2)~=size(obj.noise,2)
+                    obj.generateNoise;
+                end
                 val = obj.flux + obj.noise;
             end
             

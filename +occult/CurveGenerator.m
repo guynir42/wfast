@@ -86,7 +86,7 @@ classdef CurveGenerator < handle
         th_range = [0 180];
         R_range = [0 1];
         b_range = [0 4];
-        v_range = [3 30];
+        v_range = [1 30];
         t_range = [-100 100];
         T_range = [1 1000];
         f_range = [1 100];
@@ -687,31 +687,25 @@ classdef CurveGenerator < handle
         
         function set.f(obj, f)
             
-            obj.lc.pars.f = f;
-            
-%             if obj.lc.is_updated==0
-%                 obj.getLightCurves;
-%             end
+            if obj.lc.pars.f~=f
+                obj.lc.pars.f = f;
+%                 obj.generateNoise;
+            end
             
         end
         
         function set.W(obj, W)
             
-            obj.lc.pars.W = W;
-            
-%             if obj.lc.is_updated==0
-%                 obj.getLightCurves;
-%             end
+            if obj.lc.pars.W~=W
+                obj.lc.pars.W = W;
+%                 obj.generateNoise;
+            end
             
         end
                 
         function set.snr(obj, s)
             
             obj.lc.pars.snr = s;
-            
-%             if obj.lc.is_noise_updated==0
-%                 obj.generateNoise;
-%             end
             
         end
         
@@ -736,10 +730,6 @@ classdef CurveGenerator < handle
         function set.num_noise_iterations(obj, val)
             
             obj.lc.pars.Niter = val;
-            
-%             if obj.lc.is_noise_updated==0
-%                 obj.generateNoise;
-%             end
             
         end
         
@@ -1140,14 +1130,6 @@ classdef CurveGenerator < handle
             
         end
         
-        function generateNoise(obj, varargin) 
-            
-            % add optional noise generators
-            
-            obj.lc.generateNoise(varargin{:});
-            
-        end
-        
     end
     
     methods % generating methods
@@ -1220,9 +1202,9 @@ classdef CurveGenerator < handle
             else
                 
                 N = size(amp_vector,1);
-                margin1 = ceil(obj.R_range(2)./obj.rho_step); % include enough margin to convolve with a wide star
-                margin2 = ceil((obj.R_range(2)+obj.b_range(2))./obj.rho_step); % include enough margin to convolve and to have impact parameter
-                [X,Y] = meshgrid(-margin1:margin2, -margin1:N); 
+                margin1 = 2*ceil(obj.R_range(2)./obj.rho_step); % include enough margin to convolve with a wide star
+                margin2 = 2*ceil((obj.R_range(2)+obj.b_range(2))./obj.rho_step); % include enough margin to convolve and to have impact parameter
+                [X,Y] = meshgrid(-margin1:margin2, -margin1:max(N, margin1)); 
 
                 idx = round(sqrt(X.^2+Y.^2)); 
                 idx2 = idx;
@@ -1300,10 +1282,12 @@ classdef CurveGenerator < handle
 
                 if R>0
 
-                    S = util.img.ellipse(R./obj.rho_step); % circle the size of the star
+                    S = util.img.ellipse(R./obj.rho_step, 'norm', 1); % circle the size of the star
                     % add limb darkening here...
 
-                    I = util.img.conv_f(S, I, 'crop', 'same', 'conj', 1); 
+%                     I = util.img.conv_f(S, I, 'crop', 'same', 'conj', 1); 
+                    I = util.img.conv_f(S, I, 'crop', 'valid', 'conj', 1); 
+                    I = util.img.pad2size(I, size(A), 1); 
 
                 end
                 
@@ -1366,6 +1350,16 @@ classdef CurveGenerator < handle
             end
             
             obj.runtime_get = toc(t_run);
+            
+        end
+        
+        function generateNoise(obj, varargin) 
+            
+            % add optional noise generators
+            
+            disp('making new noise');
+            
+            obj.lc.generateNoise(varargin{:});
             
         end
         
