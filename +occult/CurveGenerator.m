@@ -76,6 +76,7 @@ classdef CurveGenerator < handle
         use_source_matrix = 0;
         use_single = 1;
         use_binary = 0;
+        use_geometric = 0;
         
         rho_range = [0 10]; 
         rho_step = 0.01;
@@ -98,6 +99,9 @@ classdef CurveGenerator < handle
     
     properties (Hidden = true)
         
+        geometric_limit_r = 2;
+        geometric_limit_R = 2;
+        
         rho_axis;
         previous_amplitude_primary; % keep a copy of the last amplitude vector for a given radius
         previous_radius_primary; % what was the occulter radius for that amplitude vector
@@ -105,13 +109,12 @@ classdef CurveGenerator < handle
         previous_radius_secondary; % what was the occulter radius for that amplitude vector
         
         previous_amplitude_map; % amplitude map for primary & companion from last calculation
+        previous_intensity_map; % after convolving with finite-size star
         previous_x_steps; % keep the x axis (in FSU)
         previous_y_steps; % keep the y axis (in FSU)
-        previous_amp_parameters; % a vector that includes r, r2, d, and th
+        previous_parameters; % a vector that includes r, r2, d, and th
         previous_used_binary; % keep track of if we used binary
-        
-        previous_intensity_map; % after convolving with finite-size star
-        previous_int_parameters; % a vector that includes r, r2, d, th, and R
+        previous_used_geometric; % keep track of if we used geometric approximation
         
         source_matrix; % interferometric matrix (in r and a and R)
         source_r_axis; % radius of the occulter (FSU)
@@ -727,6 +730,15 @@ classdef CurveGenerator < handle
             
         end
         
+        function set.use_geometric(obj, val)
+            
+            if obj.use_geometric~=val
+                obj.use_geometric = val;
+                obj.lc.is_updated = 0;
+            end
+            
+        end
+        
         function set.num_noise_iterations(obj, val)
             
             obj.lc.pars.Niter = val;
@@ -1176,7 +1188,7 @@ classdef CurveGenerator < handle
             
         end
         
-        function [A, x_steps, y_steps] = makeAmplitudeMap(obj, r, r2, d, th) % take the amp_vector and turn it into a 2D amplitude map
+        function [A, x_steps, y_steps] = makeAmplitudeMap(obj, r, r2, d, th, R) % take the amp_vector and turn it into a 2D amplitude map
                 
             if nargin<3 || isempty(r2)
                 r2 = 0;
@@ -1190,10 +1202,10 @@ classdef CurveGenerator < handle
                 th = 0;
             end
             
-            amp_vector = obj.makeAmplitudeVector(r);
-            
-            if ~isempty(obj.previous_amplitude_map) && ~isempty(obj.previous_amp_parameters) &&...
-                    all(obj.previous_amp_parameters==[r,r2,d,th]) && obj.previous_used_binary==obj.use_binary
+            if ~isempty(obj.previous_amplitude_map) && ~isempty(obj.previous_parameters) &&...
+                    all(obj.previous_parameters==[r,r2,d,th,R]) &&...
+                    obj.previous_used_binary==obj.use_binary &&...
+                    obj.previous_used_geometric==obj.use_geometric
                 
                 A = obj.previous_amplitude_map;
                 x_steps = obj.previous_x_steps;
@@ -1201,19 +1213,27 @@ classdef CurveGenerator < handle
                 
             else
                 
+                amp_vector = obj.makeAmplitudeVector(r);
+            
                 N = size(amp_vector,1);
-                margin1 = 2*ceil(obj.R_range(2)./obj.rho_step); % include enough margin to convolve with a wide star
-                margin2 = 2*ceil((obj.R_range(2)+obj.b_range(2))./obj.rho_step); % include enough margin to convolve and to have impact parameter
+                margin1 = 2*ceil(R./obj.rho_step); % include enough margin to convolve with a wide star
+                margin2 = 2*ceil((R+obj.b_range(2))./obj.rho_step); % include enough margin to convolve and to have impact parameter
                 [X,Y] = meshgrid(-margin1:margin2, -margin1:max(N, margin1)); 
+                
+                % note this does not apply to binaries!
+                if obj.use_geometric && (r>obj.geometric_limit_r || R>obj.geometric_limit_R) && (obj.use_binary==0 || r2<=0 || d<=0) % use geometric approximation...
+%                     disp('geometric');
+                    A = single(X.^2+Y.^2 > (r./obj.rho_step).^2); % just a geometric shadow
+                else
+                    
+                    idx = round(sqrt(X.^2+Y.^2));
+                    idx2 = idx;
+                    idx2(idx>N) = N;
+                    idx2(idx<1) = 1;
 
-                idx = round(sqrt(X.^2+Y.^2)); 
-                idx2 = idx;
-                idx2(idx>N) = N;
-                idx2(idx<1) = 1;
-
-    %             A = complex(ones(size(X,1), size(X,2), 'single')); 
-
-                A = amp_vector(idx2).*(idx<=N) + (idx>N); 
+                    A = amp_vector(idx2).*(idx<=N) + (idx>N); 
+                    
+                end
 
                 if obj.use_binary && r2>0 && d>0 % add a second occulter
 
@@ -1240,8 +1260,9 @@ classdef CurveGenerator < handle
                 obj.previous_amplitude_map = A;
                 obj.previous_x_steps = x_steps;
                 obj.previous_y_steps = y_steps;
-                obj.previous_amp_parameters=[r,r2,d,th];
+                obj.previous_parameters=[r,r2,d,th,R];
                 obj.previous_used_binary = obj.use_binary;
+                obj.previous_used_geometric = obj.use_geometric;
                 
             end
             
@@ -1267,8 +1288,8 @@ classdef CurveGenerator < handle
                 th = 0;
             end
             
-            if ~isempty(obj.previous_intensity_map) && ~isempty(obj.previous_int_parameters) &&...
-                    all(obj.previous_int_parameters==[r,r2,d,th,R]) && obj.previous_used_binary==obj.use_binary
+            if ~isempty(obj.previous_intensity_map) && ~isempty(obj.previous_parameters) &&...
+                    all(obj.previous_parameters==[r,r2,d,th,R]) && obj.previous_used_binary==obj.use_binary
             
                 I = obj.previous_intensity_map;
                 x_steps = obj.previous_x_steps;
@@ -1276,7 +1297,7 @@ classdef CurveGenerator < handle
                 
             else
                 
-                [A, x_steps, y_steps] = obj.makeAmplitudeMap(r, r2, d, th);
+                [A, x_steps, y_steps] = obj.makeAmplitudeMap(r, r2, d, th, R);
 
                 I = A.*conj(A); 
 
@@ -1292,7 +1313,7 @@ classdef CurveGenerator < handle
                 end
                 
                 obj.previous_intensity_map = I;
-                obj.previous_int_parameters = [r,r2,d,th,R];
+                obj.previous_parameters = [r,r2,d,th,R];
                 obj.previous_used_binary = obj.use_binary;
                 
             end
@@ -1310,7 +1331,7 @@ classdef CurveGenerator < handle
             else
             
                 obj.lc.pars.parse(varargin{:});
-
+                
                 % time axis, start & end points:
                 t_start = (-obj.W/2:1/obj.f:obj.W/2); % row vector
                 t_end = t_start + obj.T/1000; % convert T to seconds! 
@@ -1357,10 +1378,40 @@ classdef CurveGenerator < handle
             
             % add optional noise generators
             
-            disp('making new noise');
-            
             obj.lc.generateNoise(varargin{:});
             
+        end
+        
+    end
+    
+    methods % additional calculations
+        
+        function val = detectionSNR(obj, varargin)
+            
+            % later add the ability to parse parameters
+            
+            obj.getLightCurves;
+            f = obj.lc.flux - 1; 
+            
+            val = sqrt(sum(f.^2)).*obj.snr;
+            
+            
+        end
+        
+        function val = detectionSNR_geometric(obj)
+            
+            % geometrical calculation for overlap between small and big circle
+            
+            val_R_bigger = (obj.r./obj.R).^2.*obj.snr.*sqrt(obj.f./obj.v).*2.*sqrt(obj.R.^2-obj.b.^2)./sqrt(2.*sqrt(obj.R.^2-obj.b.^2)-3./4.*obj.r);
+            val_r_bigger = (obj.R./obj.r).^2.*obj.snr.*sqrt(obj.f./obj.v).*2.*sqrt(obj.r.^2-obj.b.^2)./sqrt(2.*sqrt(obj.r.^2-obj.b.^2)-3./4.*obj.R);
+            val_b_bigger = 0; % just being lazy since this includes some non-zero values on the edges, but the will be pretty small
+            
+            val = val_R_bigger.*double(obj.R-obj.r>=obj.b) + ... % star is the big circle
+                   val_r_bigger.*double(obj.r-obj.R>=obj.b) + ... % occulter is the big circle
+                   val_b_bigger.*double(abs(obj.r-obj.R)<obj.b); % small circle is almost or completely outside of big circle
+            
+%             val = abs(val);
+           
         end
         
     end
