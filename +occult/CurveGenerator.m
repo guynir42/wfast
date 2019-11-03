@@ -99,8 +99,8 @@ classdef CurveGenerator < handle
     
     properties (Hidden = true)
         
-        geometric_limit_r = 2;
-        geometric_limit_R = 2;
+        geometric_limit_r = 1;
+        geometric_limit_R = 3;
         
         rho_axis;
         previous_amplitude_primary; % keep a copy of the last amplitude vector for a given radius
@@ -114,7 +114,6 @@ classdef CurveGenerator < handle
         previous_y_steps; % keep the y axis (in FSU)
         previous_parameters; % a vector that includes r, r2, d, and th
         previous_used_binary; % keep track of if we used binary
-        previous_used_geometric; % keep track of if we used geometric approximation
         
         source_matrix; % interferometric matrix (in r and a and R)
         source_r_axis; % radius of the occulter (FSU)
@@ -1204,9 +1203,8 @@ classdef CurveGenerator < handle
             
             if ~isempty(obj.previous_amplitude_map) && ~isempty(obj.previous_parameters) &&...
                     all(obj.previous_parameters==[r,r2,d,th,R]) &&...
-                    obj.previous_used_binary==obj.use_binary &&...
-                    obj.previous_used_geometric==obj.use_geometric
-                
+                    obj.previous_used_binary==obj.use_binary 
+                    
                 A = obj.previous_amplitude_map;
                 x_steps = obj.previous_x_steps;
                 y_steps = obj.previous_y_steps;
@@ -1219,22 +1217,14 @@ classdef CurveGenerator < handle
                 margin1 = 2*ceil(R./obj.rho_step); % include enough margin to convolve with a wide star
                 margin2 = 2*ceil((R+obj.b_range(2))./obj.rho_step); % include enough margin to convolve and to have impact parameter
                 [X,Y] = meshgrid(-margin1:margin2, -margin1:max(N, margin1)); 
+                    
+                idx = round(sqrt(X.^2+Y.^2));
+                idx2 = idx;
+                idx2(idx>N) = N;
+                idx2(idx<1) = 1;
+
+                A = amp_vector(idx2).*(idx<=N) + (idx>N); 
                 
-                % note this does not apply to binaries!
-                if obj.use_geometric && (r>obj.geometric_limit_r || R>obj.geometric_limit_R) && (obj.use_binary==0 || r2<=0 || d<=0) % use geometric approximation...
-%                     disp('geometric');
-                    A = single(X.^2+Y.^2 > (r./obj.rho_step).^2); % just a geometric shadow
-                else
-                    
-                    idx = round(sqrt(X.^2+Y.^2));
-                    idx2 = idx;
-                    idx2(idx>N) = N;
-                    idx2(idx<1) = 1;
-
-                    A = amp_vector(idx2).*(idx<=N) + (idx>N); 
-                    
-                end
-
                 if obj.use_binary && r2>0 && d>0 % add a second occulter
 
                     amp_vector2 = obj.makeAmplitudeVector(r2, 1); % the second argument is used to cache/recover the amp_vector for the binary
@@ -1262,7 +1252,6 @@ classdef CurveGenerator < handle
                 obj.previous_y_steps = y_steps;
                 obj.previous_parameters=[r,r2,d,th,R];
                 obj.previous_used_binary = obj.use_binary;
-                obj.previous_used_geometric = obj.use_geometric;
                 
             end
             
@@ -1339,15 +1328,25 @@ classdef CurveGenerator < handle
                 fluxes = ones(length(t_start), length(obj.r), 'single');
 
                 for ii = 1:length(obj.r)
+                    % these sort-of arbitrary conditions allow for smooth transitions between geometric approx. S/N and diffractive S/N
+                    if obj.use_geometric && obj.R(ii)>obj.geometric_limit_R && obj.r(ii)>=obj.geometric_limit_r
+                        
+                        high_res_lc = obj.geometricLightcurve(obj.r(ii), obj.R(ii), obj.b(ii)); 
+                        high_res_lc = [flip(high_res_lc); high_res_lc(2:end)];
+                        rho = [-flip(obj.rho_axis); obj.rho_axis(2:end)];
+                        
+                    else % use full diffractive calculation
+                    
+                        [I, x_steps, y_steps] = obj.makeIntensityMap(obj.r(ii), obj.R(ii), obj.r2(ii), obj.d(ii), obj.th(ii));
 
-                    [I, x_steps, y_steps] = obj.makeIntensityMap(obj.r(ii), obj.R(ii), obj.r2(ii), obj.d(ii), obj.th(ii));
+                        [~, x0_idx] = min(abs(obj.b(ii)-x_steps.*obj.rho_step)); % find the index of x closest to the impact parameter we want
+                        [~, y0_idx] = min(abs(y_steps)); % find the index of y closest to zero
 
-                    [~, x0_idx] = min(abs(obj.b(ii)-x_steps.*obj.rho_step)); % find the index of x closest to the impact parameter we want
-                    [~, y0_idx] = min(abs(y_steps)); % find the index of y closest to zero
+                        high_res_lc = [I(end:-1:y0_idx+1,x0_idx); I(y0_idx:end,x0_idx)]; % a cut through the 2D map and the reflection
+                        rho = [-y_steps(end:-1:y0_idx+1); y_steps(y0_idx:end)].*obj.rho_step; % the same reflection in the y axis, translated to (FSU)
 
-                    high_res_lc = [I(end:-1:y0_idx+1,x0_idx); I(y0_idx:end,x0_idx)]; % a cut through the 2D map and the reflection
-                    rho = [-y_steps(end:-1:y0_idx+1); y_steps(y0_idx:end)].*obj.rho_step; % the same reflection in the y axis, translated to (FSU)
-
+                    end
+                    
                     % add the time shift and multiply by velocity, get coordinates in FSU
                     rho0 = (t_start - obj.t(ii)./1000).*obj.v(ii);
                     rho1 = (t_end - obj.t(ii)./1000).*obj.v(ii); 
@@ -1374,6 +1373,37 @@ classdef CurveGenerator < handle
             
         end
         
+        function flux = geometricLightcurve(obj, r, R, b)
+        % Right now this only handles scalar r, R and b
+        % Reference: http://mathworld.wolfram.com/Circle-CircleIntersection.html
+        %
+            
+            if isempty(obj.rho_axis)
+                obj.rho_axis = (obj.rho_range(1):obj.rho_step:obj.rho_range(2))';
+            end
+            
+            d = sqrt((b.^2+obj.rho_axis.^2)); % distance between center of star and occulter, for each step in rho_axis
+            
+            % if there is full overlap
+            if r>R
+                A_overlap = 1;
+            else
+                A_overlap = r.^2./R.^2;
+            end
+                       
+            % if there is only partial overlap
+            A_lens = r.^2.*acos((d.^2 + r.^2 - R.^2)./(2.*d.*r)) + R.^2.*acos((d.^2 - r.^2 + R.^2)./(2.*d.*R)) - ...
+                0.5.*sqrt( (-d + r + R).*(d + r - R).*(d - r + R).*(d + r + R) );
+            
+            A_lens = real(A_lens)./(pi.*R.^2);
+            
+            % if d>=R+r then there is no overlap and now area is occulted! 
+
+            A = A_overlap.*single(d<=abs(R-r)) + A_lens.*single((d>abs(R-r)) & (d<R+r));
+            flux = 1 - A; 
+            
+        end
+        
         function generateNoise(obj, varargin) 
             
             % add optional noise generators
@@ -1396,22 +1426,6 @@ classdef CurveGenerator < handle
             val = sqrt(sum(f.^2)).*obj.snr;
             
             
-        end
-        
-        function val = detectionSNR_geometric(obj)
-            
-            % geometrical calculation for overlap between small and big circle
-            
-            val_R_bigger = (obj.r./obj.R).^2.*obj.snr.*sqrt(obj.f./obj.v).*2.*sqrt(obj.R.^2-obj.b.^2)./sqrt(2.*sqrt(obj.R.^2-obj.b.^2)-3./4.*obj.r);
-            val_r_bigger = (obj.R./obj.r).^2.*obj.snr.*sqrt(obj.f./obj.v).*2.*sqrt(obj.r.^2-obj.b.^2)./sqrt(2.*sqrt(obj.r.^2-obj.b.^2)-3./4.*obj.R);
-            val_b_bigger = 0; % just being lazy since this includes some non-zero values on the edges, but the will be pretty small
-            
-            val = val_R_bigger.*double(obj.R-obj.r>=obj.b) + ... % star is the big circle
-                   val_r_bigger.*double(obj.r-obj.R>=obj.b) + ... % occulter is the big circle
-                   val_b_bigger.*double(abs(obj.r-obj.R)<obj.b); % small circle is almost or completely outside of big circle
-            
-%             val = abs(val);
-           
         end
         
     end

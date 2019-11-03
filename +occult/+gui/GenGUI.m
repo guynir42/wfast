@@ -377,7 +377,8 @@ classdef GenGUI < handle
                     obj.button_limits.String = 'uniform limits';
                     
                     text(-obj.owner.W/2, 0.3, sprintf('runtime= %5.3fs', obj.owner.runtime_get), 'FontSize', obj.font_size);
-            
+                    text( obj.owner.W/2, 0.3, sprintf('S/N= %5.3fs', obj.owner.detectionSNR), 'FontSize', obj.font_size, obj.font_size, 'HorizontalAlignment', 'right');
+
                 else
                     
                     obj.axes_image.YLim(1) = min(obj.owner.lc.flux(:)).*0.9;
@@ -386,7 +387,8 @@ classdef GenGUI < handle
                     obj.button_limits.String = 'auto limits';
                     
                     text(-obj.owner.W/2, (1+obj.axes_image.YLim(1))/2, sprintf('runtime= %5.3fs', obj.owner.runtime_get), 'FontSize', obj.font_size);
-            
+                    text( obj.owner.W/2, (1+obj.axes_image.YLim(1))/2, sprintf('S/N= %5.3fs', obj.owner.detectionSNR), 'FontSize', obj.font_size, 'HorizontalAlignment', 'right');
+
                 end
                     
                 obj.axes_image.XLim = [-0.6.*obj.owner.W, 0.6.*obj.owner.W];
@@ -397,6 +399,7 @@ classdef GenGUI < handle
                 obj.owner.showMap;
                 
                 text(obj.axes_image.XLim(1)/2, obj.axes_image.YLim(2)/2, sprintf('runtime= %5.3fs', obj.owner.runtime_get), 'FontSize', obj.font_size);
+                text(obj.axes_image.XLim(1)/2, obj.axes_image.YLim(2)/1.5, sprintf('S/N= %5.3fs', obj.owner.detectionSNR), 'FontSize', obj.font_size);
                 
             else
                 error('Unknown "show_what" option: "%s". Use "lightcurve" or "map"', obj.show_what);

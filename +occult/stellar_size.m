@@ -1,11 +1,11 @@
-function R_FSU = stellar_size(mag, temp, wavelength, distance)
+function R_FSU = stellar_size(mag, temp, distance, wavelength)
     
-    if nargin<3 || isempty(wavelength)
-        wavelength = 550; % nm
+    if nargin<3 || isempty(distance)
+        distance = 40; % AU
     end
     
-    if nargin<4 || isempty(distance)
-        distance = 40; % AU
+    if nargin<4 || isempty(wavelength)
+        wavelength = 550; % nm
     end
     
     % sun is used as reference:
