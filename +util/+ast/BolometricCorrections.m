@@ -22,6 +22,7 @@ classdef BolometricCorrections < handle
         function makeSourceMatrix(obj, filter1, filter2, filter_system, mag_system)
             
             import AstroUtil.spec.blackbody_mag_c;
+            addpath(fullfile(util.def.data_folder));
             
             if nargin<4 || isempty(filter_system)
                 filter_system = 'GAIA';
