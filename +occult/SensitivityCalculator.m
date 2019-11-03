@@ -71,6 +71,27 @@ classdef SensitivityCalculator < handle
     
     methods % getters
         
+        function val = FSU_km(obj, distance_au)
+            
+            if nargin<2 || isempty(distance_au)
+                distance_au = 40;
+            end
+            
+            val = sqrt(obj.lambda.*1e-12.*(distance_au.*150e6)/2);
+            
+        end
+        
+        function val = FSU_deg(obj, distance_au)
+            
+            
+            if nargin<2 || isempty(distance_au)
+                distance_au = 40;
+            end
+            
+            val = sqrt(obj.lambda.*1e-12./(distance_au.*150e6)/2).*180./pi;
+            
+        end
+        
     end
     
     methods % setters

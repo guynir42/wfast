@@ -377,7 +377,7 @@ classdef GenGUI < handle
                     obj.button_limits.String = 'uniform limits';
                     
                     text(-obj.owner.W/2, 0.3, sprintf('runtime= %5.3fs', obj.owner.runtime_get), 'FontSize', obj.font_size);
-                    text( obj.owner.W/2, 0.3, sprintf('S/N= %5.3fs', obj.owner.detectionSNR), 'FontSize', obj.font_size, obj.font_size, 'HorizontalAlignment', 'right');
+                    text( obj.owner.W/2, 0.3, sprintf('S/N= %5.3fs', obj.owner.detectionSNR), 'FontSize', obj.font_size, 'HorizontalAlignment', 'right');
 
                 else
                     
