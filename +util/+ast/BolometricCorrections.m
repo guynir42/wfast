@@ -54,7 +54,7 @@ classdef BolometricCorrections < handle
                 
             tic;
             
-            obj.temp_vec = 500:10:50000;
+            obj.temp_vec = (500:10:50000)';
             
             obj.color_vec = zeros(length(obj.temp_vec),1);
             
@@ -70,6 +70,10 @@ classdef BolometricCorrections < handle
         end
         
         function val = getTemp(obj, color)
+            
+            if isempty(obj.color_vec) || isempty(obj.temp_vec)
+                obj.makeSourceMatrix(obj.filter1, obj.filter2);
+            end
             
             val = interp1(obj.color_vec, obj.temp_vec, color);
             
