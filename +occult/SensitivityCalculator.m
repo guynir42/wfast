@@ -243,7 +243,7 @@ classdef SensitivityCalculator < handle
             input.input_var('color', 'black'); 
             input.input_var('ax', [], 'axes', 'axis');
             input.input_var('add', [], 'hold');
-            input.input_var('log', [], 'log scale');
+            input.input_var('log', 1, 'log scale');
             input.scan_vars(varargin{:});
             
             if isempty(input.ax)
@@ -289,6 +289,8 @@ classdef SensitivityCalculator < handle
 
             input.ax.NextPlot = holding_pattern;
 
+            input.ax.XLim = [1 10];
+            
             if nargout>0
                 h_line = h1;
             end

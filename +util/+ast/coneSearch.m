@@ -15,6 +15,8 @@ function CatTable = coneSearch(RA, Dec, varargin)
 %                so it doesn't need to be regenerated each time (which is 
 %                somewhat expensive as it needs to create the lookup table).
 %
+%   -Mag limit: Discard all stars dimmer than the magnitude limit. Must
+%               define at least filter1 or filter2 (or both). 
 % 
 
     input = util.text.InputVars;
@@ -25,6 +27,7 @@ function CatTable = coneSearch(RA, Dec, varargin)
     input.input_var('filter1', 'BP');
     input.input_var('filter2', 'RP');
     input.input_var('filter_system', 'GAIA'); 
+    input.input_var('mag_limit', []); 
     input.scan_vars(varargin{:});
 
     if strcmpi(input.source, 'GAIADR2')
@@ -42,6 +45,13 @@ function CatTable = coneSearch(RA, Dec, varargin)
     [Cat, cols] = catsHTM.cone_search(input.source, RA, Dec, input.radius);
 
     CatTable = array2table(Cat, 'VariableNames', cols); 
+    
+    CatTable = CatTable(~isnan(CatTable{:,['Mag_' input.filter1]}),:);
+    
+    if ~isempty(input.mag_limit)
+        CatTable = CatTable(CatTable{:,['Mag_' input.filter1]}<input.mag_limit,:);
+        CatTable = CatTable(CatTable{:,['Mag_' input.filter2]}<input.mag_limit,:);
+    end
     
     if isa(input.bolometric, 'util.ast.BolometricCorrections')
         bc = input.bolometric; % get the object from outside
