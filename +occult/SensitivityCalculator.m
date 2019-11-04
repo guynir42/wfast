@@ -6,6 +6,7 @@ classdef SensitivityCalculator < handle
     
     properties % objects
         
+        cat; % table with the cone search results
         bc@util.ast.BolometricCorrections;
         
     end
@@ -141,12 +142,12 @@ classdef SensitivityCalculator < handle
                 obj.bc = util.ast.BolometricCorrections;
             end
             
-            T = util.ast.coneSearch(varargin{:}, 'bolometric', obj.bc);
+            obj.cat = util.ast.coneSearch(varargin{:}, 'bolometric', obj.bc);
             
-            T(isnan(T{:, 'bol_mag'}),:) = []; % get rid of stars with NaN values 
+            obj.cat(isnan(obj.cat{:, 'bol_mag'}),:) = []; % get rid of stars with NaN values 
             
-            obj.bol_mag = T.bol_mag;
-            obj.bol_temp = T.bol_temp;
+            obj.bol_mag = obj.cat.bol_mag;
+            obj.bol_temp = obj.cat.bol_temp;
             
         end
         
