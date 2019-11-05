@@ -240,7 +240,7 @@ classdef SensitivityCalculator < handle
             input.input_var('q', 3); 
             input.input_var('line_width', 3); 
             input.input_var('line_style', '-'); 
-            input.input_var('color', 'black'); 
+            input.input_var('color', 0.5.*[1 1 1]); 
             input.input_var('ax', [], 'axes', 'axis');
             input.input_var('add', [], 'hold');
             input.input_var('log', 1, 'log scale');
