@@ -52,6 +52,7 @@ classdef Parameters < handle
         
         chi2;
         likelihood;
+        counts = 1;
         
     end
     

@@ -1,5 +1,5 @@
 function snr_frac = compareKernels(this_kernel, that_kernel, full_xcorr)
-% Usage: snr_frac = compareKernels(this_kernel, that_kernel, full_xcorr)
+% Usage: snr_frac = compareKernels(this_kernel, that_kernel, full_xcorr=1)
 % Calculate the fraction of S/N that remains when using the wrong kernel 
 % (argument 2, "that_kernel") instead of filtering with the right kernel 
 % (argument 1, "this_kerenl"). In both cases the S/N is calculated for an 

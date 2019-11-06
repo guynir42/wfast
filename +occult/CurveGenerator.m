@@ -1216,8 +1216,8 @@ classdef CurveGenerator < handle
                 N = size(amp_vector,1);
                 margin1 = 2*ceil(R./obj.rho_step); % include enough margin to convolve with a wide star
                 margin2 = 2*ceil((R+obj.b_range(2))./obj.rho_step); % include enough margin to convolve and to have impact parameter
-                [X,Y] = meshgrid(-margin1:margin2, -margin1:max(N, margin1)); 
-                    
+                [X,Y] = meshgrid(-margin1:margin2, -max(N, margin1):max(N, margin1)); 
+                
                 idx = round(sqrt(X.^2+Y.^2));
                 idx2 = idx;
                 idx2(idx>N) = N;
@@ -1334,16 +1334,18 @@ classdef CurveGenerator < handle
                         high_res_lc = obj.geometricLightcurve(obj.r(ii), obj.R(ii), obj.b(ii)); 
                         high_res_lc = [flip(high_res_lc); high_res_lc(2:end)];
                         rho = [-flip(obj.rho_axis); obj.rho_axis(2:end)];
-                        
+
                     else % use full diffractive calculation
                     
                         [I, x_steps, y_steps] = obj.makeIntensityMap(obj.r(ii), obj.R(ii), obj.r2(ii), obj.d(ii), obj.th(ii));
 
                         [~, x0_idx] = min(abs(obj.b(ii)-x_steps.*obj.rho_step)); % find the index of x closest to the impact parameter we want
-                        [~, y0_idx] = min(abs(y_steps)); % find the index of y closest to zero
+%                         [~, y0_idx] = min(abs(y_steps)); % find the index of y closest to zero
 
-                        high_res_lc = [I(end:-1:y0_idx+1,x0_idx); I(y0_idx:end,x0_idx)]; % a cut through the 2D map and the reflection
-                        rho = [-y_steps(end:-1:y0_idx+1); y_steps(y0_idx:end)].*obj.rho_step; % the same reflection in the y axis, translated to (FSU)
+%                         high_res_lc = [I(end:-1:y0_idx+1,x0_idx); I(y0_idx:end,x0_idx)]; % a cut through the 2D map and the reflection
+%                         rho = [-y_steps(end:-1:y0_idx+1); y_steps(y0_idx:end)].*obj.rho_step; % the same reflection in the y axis, translated to (FSU)
+                        high_res_lc = I(:,x0_idx); 
+                        rho = y_steps.*obj.rho_step;
 
                     end
                     

@@ -12,7 +12,8 @@ function h = stretchy_panel(varargin)
     
     h1 = uipanel('Parent', input.parent, 'Position', input.position); % can we just pass the varargin directly?
     h1.SizeChangedFcn = {@callback, input.ratio};
-    
+    h1.BorderType = 'none';
+    h1.BackgroundColor = [1 1 1];
     h = uipanel('Parent', h1, 'Units', 'Pixels');
     
     callback(h1,[],input.ratio);

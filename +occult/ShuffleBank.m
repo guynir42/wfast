@@ -218,7 +218,7 @@ classdef ShuffleBank < handle
             input = util.text.InputVars;
             input.use_ordered_numeric = 1;
             input.input_var('flux', [], 'fluxes');
-            input.input_var('stds', []);
+            input.input_var('stds', 0.1);
             input.input_var('times', [], 'timestamps');
             input.scan_vars(varargin{:});
             

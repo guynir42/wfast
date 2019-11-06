@@ -21,6 +21,9 @@ classdef MCMC < handle
         input_flux; % the input lightcurve to be matched
         input_errors; % the rms error on the given flux
         
+        num_successes = 0;
+        num_failures = 0;
+        
         runtime = 0;
         
     end
@@ -31,7 +34,7 @@ classdef MCMC < handle
         num_steps = 1000; 
         num_burned = 100; 
         
-        step_size = 0.01;
+        step_size = 0.1;
         
         default_error = 0.1; % if input lightcurves don't have any errors per sample, use this instead... 
         
@@ -48,8 +51,8 @@ classdef MCMC < handle
     end
     
     properties(Hidden=true)
-       
-        version = 1.00;
+
+        version = 1.01;
         
     end
     
@@ -77,6 +80,9 @@ classdef MCMC < handle
         function reset(obj)
             
             obj.points = occult.Parameters.empty;
+
+            obj.num_successes = 0;
+            obj.num_failures = 0;
             
             obj.runtime = 0;
             
@@ -94,6 +100,14 @@ classdef MCMC < handle
     
     methods % calculations
         
+        function useSimulatedInput(obj, varargin)
+            
+            obj.gen.getLightCurves;
+            obj.input_flux = obj.gen.lc.flux;
+            
+            
+        end
+        
         function startup(obj)
             
             if length(obj.gen.r)>1
@@ -106,7 +120,7 @@ classdef MCMC < handle
             
         end
         
-        function initial_point(obj)
+        function gotoInitialPoint(obj)
             
             for ii = 1:length(obj.par_list)
                 
@@ -129,10 +143,10 @@ classdef MCMC < handle
                 end
                 
             end
-                
+            
         end
         
-        function step(obj)
+        function takeStep(obj)
             
             for ii = 1:length(obj.par_list)
                 
@@ -232,10 +246,23 @@ classdef MCMC < handle
             
         end
         
-        function run(obj)
+        function run(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('plot', true);
+            input.input_var('ax', [], 'axes', 'axis');
+            input.scan_vars(varargin{:});
             
             obj.reset;
             obj.startup;
+            
+            if input.plot
+                
+                if isempty(input.ax)
+                    input.ax = gca;
+                end
+                
+            end
             
             t = tic;
             
@@ -243,8 +270,8 @@ classdef MCMC < handle
             
             for ii = 1:obj.num_chains
                 
-                obj.initial_point;
-                obj.gen.getLightCurves;                
+                obj.gotoInitialPoint;
+                obj.gen.getLightCurves;
                 obj.calcLikelihood; % get the first point likelihood/chi2
                 
                 obj.points(1,ii).copy_from(obj.gen.lc.pars); % automatically accept first point... 
@@ -253,7 +280,7 @@ classdef MCMC < handle
                     
                     obj.prog.showif((ii-1)*obj.num_steps + jj);
                     
-                    obj.step; % move the generator to a nearby random point
+                    obj.takeStep; % move the generator to a nearby random point
                     
                     obj.gen.getLightCurves;
                     obj.calcLikelihood;
@@ -261,9 +288,13 @@ classdef MCMC < handle
                     ratio = obj.gen.lc.pars.likelihood./obj.points(jj-1,ii).likelihood;
                     
                     if rand<=ratio % if ratio is big, we are likely to take the new point
+                        obj.num_successes = obj.num_successes + 1;
                         obj.points(jj,ii).copy_from(obj.gen.lc.pars);
+                        obj.points(jj,ii).counts = 1;
                     else % point is rejected, repeat the previous point
+                        obj.num_failures = obj.num_failures + 1;
                         obj.points(jj,ii).copy_from(obj.points(jj-1,ii));
+                        obj.points(jj,ii).counts = obj.points(jj-1,ii).counts + 1;
                     end
                     
                 end
@@ -280,7 +311,74 @@ classdef MCMC < handle
         
         function plot(obj, varargin)
             
+            input = util.text.InputVars;
+            input.input_var('ax', [], 'axes', 'axis');
+            input.input_var('pars', []); 
+            input.scan_vars(varargin{:});
+                        
+            if isempty(input.ax)
+                input.ax = gca;
+            end
             
+            if isempty(input.pars)
+                input.pars = obj.par_list(1:min(3,length(obj.par_list)));
+            end
+            
+            if ischar(input.pars)
+                input.pars = {input.pars};
+            end
+            
+            p1 = [obj.points.(input.pars{1})];
+            p1 = reshape(p1, [obj.num_steps, obj.num_chains]);
+            s = [obj.points.counts];
+            s = reshape(s, [obj.num_steps, obj.num_chains]);
+            
+            if length(input.pars)==1
+                histogram(input.ax, p1);
+                
+            elseif length(input.pars)==2
+                
+                p2 = [obj.points.(input.pars{2})];
+                p2 = reshape(p2, [obj.num_steps, obj.num_chains]);
+                p2 = p2(obj.num_burned:end,:);
+                
+                plot(input.ax, p1, p2, '.');
+                
+                ylabel(input.ax, input.pars{2});
+                input.ax.YLim = obj.gen.([input.pars{2} '_range']);
+                
+            elseif length(input.pars)==3
+                
+                p2 = [obj.points.(input.pars{2})];
+                p2 = reshape(p2, [obj.num_steps, obj.num_chains]);
+                
+                p3 = [obj.points.(input.pars{3})];
+                p3 = reshape(p3, [obj.num_steps, obj.num_chains]);
+                
+                holding_pattern = input.ax.NextPlot;
+                
+                scatter3(input.ax, p1(obj.num_burned:end,1), p2(obj.num_burned:end,1), p3(obj.num_burned:end,1), 20+s(obj.num_burned:end,1), '.');
+                
+                input.ax.NextPlot = 'add';
+                
+                for ii = 2:size(p1,2)
+                    scatter3(input.ax, p1(obj.num_burned:end,ii), p2(obj.num_burned:end,ii), p3(obj.num_burned:end,ii), 20+s(obj.num_burned:end,ii), '.');
+                end
+                
+                input.ax.NextPlot = holding_pattern;
+                
+                ylabel(input.ax, input.pars{2});
+                zlabel(input.ax, input.pars{3});
+                
+                input.ax.YLim = obj.gen.([input.pars{2} '_range']);
+                input.ax.ZLim = obj.gen.([input.pars{3} '_range']);
+                
+            end
+        
+            xlabel(input.ax, input.pars{1});
+            input.ax.FontSize = 24;
+            
+            input.ax.XLim = obj.gen.([input.pars{1} '_range']);
             
         end
         
