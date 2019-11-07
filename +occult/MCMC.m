@@ -242,7 +242,7 @@ classdef MCMC < handle
             chi2 = nansum(((f1-f2)./e).^2); 
             
             obj.gen.lc.pars.chi2 = chi2;
-            obj.gen.lc.pars.likelihood = chi2cdf(chi2, length(f1)-length(obj.par_list), 'upper'); % do we need to subtract these parameters from the dof??
+            obj.gen.lc.pars.likelihood = chi2cdf(chi2, nnz(isnan(f1))-length(obj.par_list), 'upper'); % do we need to subtract these parameters from the dof??
             
         end
         

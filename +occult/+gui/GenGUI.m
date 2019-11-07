@@ -106,6 +106,7 @@ classdef GenGUI < handle
             obj.panel_controls.addButton('button_source', 'use_source_matrix', 'toggle', 'new method', 'source matrix', '', [], '', '', 'Use the old (and fast) source matrix or use the new method that allows binary KBOs'); 
             obj.panel_controls.addButton('button_binary', 'use_binary', 'toggle', 'no binary', 'use binary', '', [], obj.color_on, '', 'Add the secondary component to the occultation. Only works in "new method"'); 
             obj.panel_controls.addButton('button_geometric', 'use_geometric', 'toggle', 'no geometric', 'use geometric', '', [], obj.color_on, '', 'Use geometric approximation for high r and R values. Only works in "new method"'); 
+            obj.panel_controls.addButton('button_clipping', 'use_clipping', 'toggle', 'no clipping', 'use clipping', '', [], obj.color_on, '', 'Replace edges of lightcurve where the signal is negligible with NaNs');
             obj.panel_controls.addButton('input_rho_step', 'rho_step', 'input', 'rho_step= ', '', '', [], '', '', 'Resolution step for new method: how many samples per FSU'); 
             
             obj.panel_controls.make;

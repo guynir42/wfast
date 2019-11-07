@@ -77,6 +77,7 @@ classdef CurveGenerator < handle
         use_single = 1;
         use_binary = 0;
         use_geometric = 0;
+        use_clipping = 0;
         
         rho_range = [0 10]; 
         rho_step = 0.01;
@@ -738,6 +739,15 @@ classdef CurveGenerator < handle
             
         end
         
+        function set.use_clipping(obj, val)
+            
+            if obj.use_clipping~=val
+                obj.use_clipping = val;
+                obj.lc.is_updated = 0;
+            end
+            
+        end
+        
         function set.num_noise_iterations(obj, val)
             
             obj.lc.pars.Niter = val;
@@ -1358,6 +1368,19 @@ classdef CurveGenerator < handle
                     f(isnan(f)) = 1;
                     fluxes(:,ii) = f';
 
+                    if obj.use_clipping
+                        
+                        idx1 = find(abs(fluxes(:,ii)-1)>1e-3, 1, 'first'); 
+                        idx1 = max(0,idx1-3);
+                        
+                        idx2 = find(abs(fluxes(:,ii)-1)>1e-3, 1, 'last'); 
+                        idx2 = min(size(fluxes,1)+1,idx2+3);
+                        
+                        fluxes(1:idx1,ii) = NaN;
+                        fluxes(idx2:end,ii) = NaN;
+                        
+                    end
+
                 end
 
                 obj.lc.flux = fluxes; 
@@ -1425,7 +1448,7 @@ classdef CurveGenerator < handle
             obj.getLightCurves;
             f = obj.lc.flux - 1; 
             
-            val = sqrt(sum(f.^2)).*obj.snr;
+            val = sqrt(nansum(f.^2)).*obj.snr;
             
             
         end
