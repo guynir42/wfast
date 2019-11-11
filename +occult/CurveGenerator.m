@@ -871,7 +871,7 @@ classdef CurveGenerator < handle
             end
             
             if nargin<3 || isempty(R_axis)
-                R_axis = 0:0.01:0.5;
+                R_axis = 0:0.01:2;
             end
             
             if nargin<4 || isempty(a_axis)
@@ -908,6 +908,9 @@ classdef CurveGenerator < handle
            
             make_t = tic;
             
+            prog = util.sys.ProgressBar;
+            prog.start(Nr);
+            
             for ii = 1:Nr
                 
                 integ = integral(func, 0, r_axis(ii), 'ArrayValued', true);
@@ -921,19 +924,17 @@ classdef CurveGenerator < handle
                 M(:,ii,2:NR) = obj.makeNonPointSource(M_temp, R_axis(2:NR));
                 
                 if obj.debug_bit
-                    
-                    ratio = ii/Nr;
-                    time_elap = toc(make_t);
-                    time_est = time_elap/ratio;
-                    
-                    fprintf('r= %6.4f | t= %27s / %27s   (%2d%%)\n', r_axis(ii), gtools.secs2hms(time_elap), util.text.secs2hms(time_est), floor(100*ratio));
-                    
+                    prog.showif(ii); 
                 end
                     
             end
             
             obj.source_matrix = M;
 
+            if obj.debug_bit
+                prog.finish; 
+            end
+            
             run_time = toc(make_t);
             
             disp(['interferometric source matrix is calculated. runtime= ' util.text.secs2hms(run_time)]);
