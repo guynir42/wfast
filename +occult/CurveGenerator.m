@@ -1618,7 +1618,7 @@ classdef CurveGenerator < handle
             obj.R = 0.5;
             
             obj.getLightCurves;
-            h = plot(ax, obj.lc.time, mean(obj.lc.flux,2), '--b', 'LineWidth', 3);
+            h = plot(ax, obj.lc.time, mean(obj.lc.flux,2), '--g', 'LineWidth', 3);
             h.DisplayName = 'Broadband 400-600nm, R=0.5';
             
             ax.NextPlot = 'replace';

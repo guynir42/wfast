@@ -19,6 +19,8 @@ function CatTable = coneSearch(RA, Dec, varargin)
 %               define at least filter1 or filter2 (or both). 
 % 
 
+    if nargin==0, help('util.ast.coneSearch'); return; end
+
     input = util.text.InputVars;
     input.use_ordered_numeric = 1;
     input.input_var('radius', 100); 
