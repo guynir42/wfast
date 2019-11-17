@@ -952,7 +952,7 @@ classdef CurveGenerator < handle
             a_axis = obj.source_a_axis;
             R_axis = obj.source_R_axis;
                         
-            save(filename, 'matrix', 'r_axis','a_axis', 'R_axis');
+            save(filename, 'matrix', 'r_axis','a_axis', 'R_axis', '-v7.3');
             
         end
         
