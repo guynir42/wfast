@@ -424,7 +424,7 @@ classdef Calibration < handle
         
         function val = roi_x2(obj)
             
-            val = obj.ROI(2)+obj.ROI(4);
+            val = obj.ROI(2)+obj.ROI(4)-1;
             
         end
         
@@ -436,7 +436,7 @@ classdef Calibration < handle
         
         function val = roi_y2(obj)
             
-            val = obj.ROI(1)+obj.ROI(3);
+            val = obj.ROI(1)+obj.ROI(3)-1;
             
         end
         

@@ -35,9 +35,12 @@ classdef Catalog < handle
     properties % switches/controls
         
         threshold = 5; % used by mextractor to find stars
-        mag_limit = 20;
+        mag_limit = 17;
         
         avoid_edges = 50; % how many pixels away from edge of image (need image to know the size!)
+        
+        use_matched_only = 1; % only keep stars that are matched to a proper GAIA star
+        use_psf_width = 1; % only keep stars that have the best response to the correct PSF width
         
         min_star_temp;
         num_stars;
@@ -199,10 +202,12 @@ classdef Catalog < handle
             else
                 evalc('S = mextractor(S, ''Thresh'', obj.threshold)');
             end
-
-            SN = S.Cat(:,find(strcmp(S.ColCell, 'SN')));
-            SN2 = S.Cat(:,find(strcmp(S.ColCell, 'SN_UNF')));
-            S.Cat = S.Cat(SN>SN2-2,:);
+            
+            if obj.use_psf_width
+                SN = S.Cat(:,find(strcmp(S.ColCell, 'SN')));
+                SN2 = S.Cat(:,find(strcmp(S.ColCell, 'SN_UNF')));
+                S.Cat = S.Cat(SN>SN2-2,:);
+            end
             
             [~,HWHM]=S.curve_growth_psf;
             obj.FWHM = 2.*HWHM; % pixels
@@ -296,7 +301,11 @@ classdef Catalog < handle
                 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', ...
                 '', '', 'arcsec'}; % input units for all variables
             
-            obj.data = T;
+            if obj.use_matched_only
+                obj.data = T(~isnan(T.Mag_BP),:); 
+            else                
+                obj.data = T;
+            end
 
         end
         
