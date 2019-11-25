@@ -24,7 +24,7 @@ class Photometry{
 	public:
 	
 	float *cutouts=0; // the input matrix on which we calculate everything (dim 1&2 are y&x, dim 3 is frame number, dim 4 is star number)
-	mwSize *dims=0; // array with the sizes of cutouts
+	mwSize dims[4]={0}; // array with the sizes of cutouts
 	mwSize ndims=0; // number of dimensions of cutouts
 	int num_cutouts=0;  // number of cutouts (dim 3 times dim 4)
 	int N=0; // number of pixels in each cutout (dim 1 times dim 2)
@@ -38,18 +38,23 @@ class Photometry{
 	float *X=0; // grid points not including shifts. 
 	float *Y=0; // grid points not including shifts. 
 	
-	int num_shifts=0; // number of shifts we need to cover all possible star positions (i.e., the length of dx and dy)
+	int resolution=1; // how many different aperture/gaussian shifts we want in each pixel
+	mwSize shift_dims[2]={0}; // dimensions of shift matrices dx/dy	
+	int num_shifts=0; // number of shifts we need to cover all possible star positions (i.e., the length of dx and dy, shift_dims[0]*shift_dims[1])
 	float *dx=0; // list of offsets in x for the center of the mask
 	float *dy=0; // list of offsets in y for the center of the mask
-		
+	
 	float *apertures=0; // 3D matrix of apertures used for forced photometry, one for each dx/dy shift
+	std::vector<int> *forced_indices=0; // array of length "num_shifts" of index vectors telling what part of each matrix to sum in forced photometry
 	double radius=5; // the default radius used for forced photometry (pixels)
 
 	float *wedding_cakes=0; // 4D matrix of aperture+annuli for the wedding cake photometry
+	std::vector<int> *wedding_cake_indices=0; // array of length "num_shifts" of index vectors telling what part of each matrix to sum in wedding cake photometry
 	int num_radii=0; // how many different aperture arrays do we have for the wedding cake
 	double *ap_radii=0; // radii of different apertures, given in pixel units
 	
 	float *annulus=0; // 3D matrix of the annulus used for all kinds of photometry, one for each dx/dy shift
+	std::vector<int> *annulus_indices=0; // array of length "num_shifts" of index vectors telling what part of each matrix to sum in annulus calculation
 	double inner_radius=0; // of the annulus (pixels)
 	double outer_radius=0; // of the annulus (pixels)
 
@@ -57,7 +62,7 @@ class Photometry{
 	double gauss_sigma=2; // the width of the gaussian (in pixels)
 	
 	// output arrays are defined here (in C++)
-	mwSize output_size[2]={0,0}; // the same as dim 3 and dim 4 of cutouts
+	mwSize output_size[2]={0}; // the same as dim 3 and dim 4 of cutouts
 	float **output_raw=0;
 	float **output_forced=0;
 	float **output_wedding_cake=0;
@@ -67,19 +72,27 @@ class Photometry{
 	// function prototypes (implementation at the end)
 	Photometry();
 	~Photometry();
-	void clear(); // make sure all the output arrays are NaN before filling them
 	void parseInputs(int nrhs, const mxArray *prhs[]);
+	void clear(); // make sure all the output arrays are NaN before filling them
 	
 	void makeArrays(); // create all the required memory if it isn't already allocated, make all the required masks
+	void makeAllOutputs(); // generate all the output matrices needed
 	void allocateOutputArray(float **output, int num_fluxes); // allocate memory for a set of outputs: flux, error, area, background, variance, offset_x/y, width, bad_pixels, flag
 	void initializeOutputArray(float **output, int num_fluxes); // re-use memory but make sure it is intialized to NaN first
+	
 	void makeMasks(); // make a bank of masks to be used for different shifts and types of photometry
+	void meshgrid(float *x, float *y, mwSize *dims, double resolution=1);  // fill the two matrices with dimensions "dims" with centered grid points (use resolution>1 to divide each pixel into multiple shifts)
+	void makeApertureMask(float *array, float dx, float dy, double radius);
+	void makeAnnulusMask(float *array, float dx, float dy, double radius1, double radius2);
+	void makeGaussianMask(float *array, float dx, float dy);
+	
 	void deleteArrays(); // get rid of all the masks and output arrays (when destroying this object)
-	void deleteOutputArray(float **output); // go over and deallocate the memory for all the outputs
+	void deleteAllOutputs(); // get rid of output arrays only
+	void deleteOutputArray(float **output); // go over and deallocate the memory for one of the outputs
 	void deleteMasks(); // go over and deallocate the memory for all the masks
-	void circle_mask(float *array, float dx, float dy, double radius);
-	void annulus_mask(float *array, float dx, float dy, double radius1, double radius2);
-	void gaussian_mask(float *array, float dx, float dy);
+	void deleteApertureMask();
+	void deleteAnnulusMask();
+	void deleteGaussianMask(); 
 	
 	void run(float **output);
 	void run_idx(int start_idx, int end_idx, float **output); // use this to run only a subset of the cutouts (for multithreading)
@@ -170,15 +183,30 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 
 	if(mxIsClass(prhs[0], "single")==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotFloat", "Input 1 to photometry is not a single/float array...");
 	cutouts=(float*) mxGetData(prhs[0]);
-	dims=(mwSize*)mxGetDimensions(prhs[0]);
+	mwSize *new_dims=(mwSize*)mxGetDimensions(prhs[0]);
 	ndims=mxGetNumberOfDimensions(prhs[0]);	
 	N=dims[0]*dims[1]; // dims[0] is the height while dims[1] is the width
 	
+	if(new_dims[0]!=dims[0] || new_dims[1]!=dims[1]){ 
+		deleteArrays(); 
+		for(int j=0;j<ndims; j++) dims[j]=new_dims[j];
+	}
+	
+	mwSize new_output_size[2]={0};
 	// size of non-empty output is [size(cutouts,3), size(cutouts,4)]
-	if(ndims>2) output_size[0]=dims[2];
-	else output_size[0]=1;
-	if(ndims>3) output_size[1]=dims[3];
-	else output_size[1]=1;
+	if(ndims>2) new_output_size[0]=dims[2];
+	else new_output_size[0]=1;
+	if(ndims>3) new_output_size[1]=dims[3];
+	else new_output_size[1]=1;
+	
+	if(new_output_size[0]!=output_size[0] || new_output_size[1]!=output_size[1]){
+		
+		deleteArrays(); 
+		output_size[0]=new_output_size[0];
+		output_size[1]=new_output_size[1];
+		
+	}
+	
 	num_cutouts=output_size[0]*output_size[1]; // how many values in each of the above arrays... 
 	
 	for(int i=1;i<nrhs;i+=2){ // parse varargin
@@ -194,16 +222,41 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 
 			if(val==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
 			if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
-			ap_radii=(double*) mxGetData(val);
-			num_radii=mxGetNumberOfElements(val);
-			radius=ap_radii[num_radii-1]; // by default we use the biggest wedding cake radius as the forced photometry radius!
 			
+			// temporary values
+			double *new_ap_radii=(double*) mxGetData(val);
+			int new_num_radii=mxGetNumberOfElements(val);
+			
+			if(new_num_radii!=num_radii){
+				deleteOutputArray(output_wedding_cake); 
+				deleteApertureMask();
+				num_radii=new_num_radii;
+				if(ap_radii) delete(ap_radii); 
+				ap_radii=new double[num_radii]; 
+				for(int j=0;j<num_radii; j++) ap_radii[j]=new_radius[j]; 
+			}
+			else{
+				for(int j=0;j<num_radii; j++){
+					if(new_ap_radii[j]!=ap_radii[j]) deleteApertureMask(); 
+					ap_radii[j]=new_ap_radii[j];
+				}
+			}
+			
+			radius=ap_radii[num_radii-1]; // by default we use the biggest wedding cake radius as the forced photometry radius!
+
 		}
 		else if(cs(key, "gaussian", "sigma", "gauss_sigma")){
 			
 			if(val==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
 			if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not a numeric scalar...", i+2);
-			gauss_sigma=mxGetScalar(val);
+			double new_gauss_sigma=mxGetScalar(val);
+			
+			if(new_gauss_sigma!=gauss_sigma){
+				
+				deleteGaussianMask();
+				gauss_sigma=new_gauss_sigma;
+				
+			}
 			
 		}
 		else if(cs(key, "annulus")){
@@ -212,10 +265,22 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
 			
 			int num=mxGetNumberOfElements(val);
-			double *annuli=(double*) mxGetData(val);
-			if(num>0) inner_radius=annuli[0];
-			if(num>1) outer_radius=annuli[1];
-			else outer_radius=0;
+			double *new_annuli=(double*) mxGetData(val);
+			
+			if(num>0 && inner_radius!=new_annuli[0]){
+				deleteAnnulusMask();
+				inner_radius=new_annuli[0];
+			}
+			
+			if(num>1 && outer_radius!=new_annuli[1]){
+				
+				outer_radius=new_annuli[1];
+			} 
+			else if(outer_radius!=0){ 
+				deleteAnnulusMask();
+				outer_radius=0;
+			}
+			else outer_radius=0; 
 			
 		}
 		else if(cs("key", "gain_scalar")){
@@ -223,6 +288,19 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			if(mxIsEmpty(val)) continue;
 			if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericSingle", "Input %d to photometry is not a numeric scalar!", i+2);
 			gain_scalar=mxGetScalar(val);
+			
+		}
+		else if(cs("key", "resolution")){
+			if(val==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			if(mxIsEmpty(val)) continue;
+			if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericSingle", "Input %d to photometry is not a numeric scalar!", i+2);
+			int new_resolution=(int) mxGetScalar(val);
+			
+			if(new_resolution!=resolution){
+				deleteGrids(); 
+				resolution=new_resolution;
+			}
+			
 			
 		}
 		else if(cs(key, "debug_bit")){
@@ -254,7 +332,40 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 	
 }
 
+// INITIALIZATIONS
+
+void Photometry::clear(){ // make sure all the output arrays are NaN before filling them
+
+	// to be added later...
+
+}
+
 void Photometry::makeArrays(){ // generate all the one-time arrays in memory
+	
+	makeAllOutputs();
+	makeGrids();
+	makeMasks(); 
+	
+}
+
+void makeGrids(){
+	
+	if(X==0) X=new double[N];
+	if(Y==0) Y=new double[N];
+
+	meshgrid(X,Y); // make the static grid points
+	
+	for(int j=0;j<2;j++) shift_dims[j]=dims[j]*resolution;
+	num_shifts=shift_dims[0]*shift_dims[1]; 
+	
+	if(dx==0) dx=new double[num_shifts];
+	if(dy==0) dy=new double[num_shifts];
+	
+	meshgrid(dx, dy, resolution);
+	
+}
+
+void Photometry::makeAllOutputs(){ // generate all the output matrices needed
 	
 	if(output_raw) initializeOutputArray(output_raw);
 	else allocateOutputArray(output_raw);
@@ -262,7 +373,7 @@ void Photometry::makeArrays(){ // generate all the one-time arrays in memory
 	if(output_forced) initializeOutputArray(output_forced);
 	else allocateOutputArray(output_forced);
 	
-	if(output_wedding_cake) initializeOutputArray(output_wedding_cake);
+	if(output_wedding_cake) initializeOutputArray(output_wedding_cake, num_radii);
 	else allocateOutputArray(output_wedding_cake);
 	
 	if(output_gaussian) initializeOutputArray(output_gaussian);
@@ -270,14 +381,123 @@ void Photometry::makeArrays(){ // generate all the one-time arrays in memory
 		
 }
 
-void Photometry::initializeOutputArray(float **output){ // clear the content of existing memory for flux, background etc...
+void Photometry::allocateOutputArray(float **output, int num_fluxes){ // create new memory for flux, background etc...
+
+}
+
+void Photometry::initializeOutputArray(float **output, int num_fluxes){ // clear the content of existing memory for flux, background etc...
 
 	
 
 }
 
-void Photometry::allocateOutputArray(float **output){ // create new memory for flux, background etc...
+void Photometry::makeMasks(){ // make a bank of masks to be used for different shifts and types of photometry
 
+	
+
+}
+
+void meshgrid(float *x, float *y, mwSize *dims, double resolution){ // fill the two matrices with dimensions "dims" with centered grid points (use resolution>1 to divide each pixel into multiple shifts)
+	
+	N=dims[0]*dims[1];
+	
+	for(int i=0;i<N;i++){ // meshgrid
+		
+		X[i]=(float)(i/dims[0])-dims[1]/2;
+		X[i]*=step;
+		Y[i]=(float)(i%dims[0])-dims[0]/2;
+		Y[i]*=step;
+		
+	}
+	
+}
+
+void Photometry::makeApertureMask(float *array, float dx, float dy, double radius){ // make the aperture mask for e.g., forced photometry, with shift dx/dy
+	
+	for(int i=0;i<N;i++){
+		
+		float r=(float) sqrt(pow(X[i]-dx,2)+pow(Y[i]-dy,2));
+		
+		array[i]=radius+0.5-r;
+		if(array[i]<1) array[i]=0;
+		else if(array[i]>1) array[i]=1;
+		
+	}
+}
+
+void Photometry::makeAnnulusMask(float *array, float dx, float dy, double radius1, double radius2){ // make a mask for the background annulus or wedding cake photometry
+	
+	if(radius2<=0) radius2=1e10; // replace for Inf
+	
+	for(int i=0;i<N;i++){
+		
+		float r=(float) sqrt(pow(X[i]-dx,2)+pow(Y[i]-dy,2));
+		
+		if (r>radius1 && r<radius2)	array[i]=1;
+		else array[i]=0; 
+		
+	}
+	
+}
+
+void Photometry::makeGaussianMask(float *array, float dx, float dy){ // make a gaussian weighted mask with shift dx/dy
+	
+	for(int i=0;i<N;i++){
+		
+		float r=(float) sqrt(pow(X[i]-dx,2)+pow(Y[i]-dy,2));
+		
+		array[i]=exp(-0.5*pow(r/gauss_sigma,2));
+		
+	}
+	
+	
+}
+
+// CLEANUP and DELETION
+
+void Photometry::deleteArrays(){ // get rid of all the masks and output arrays (when destroying this object)
+
+	deleteAllOutputs();
+	deleteMasks();
+
+}
+
+void Photometry::deleteGrids(){
+	
+	
+	
+}
+
+void Photometry::deleteAllOutputs(){ // get rid of output arrays only
+
+	deleteOutputArray(output_raw);
+	deleteOutputArray(output_forced);
+	deleteOutputArray(output_wedding_cake);
+	deleteOutputArray(output_gaussian);
+
+}
+
+void Photometry::deleteOutputArray(float **output){ // go over and deallocate the memory for one of the outputs
+
+}
+
+void Photometry::deleteMasks(){ // go over and deallocate the memory for all the masks
+
+}
+
+void Photometry::deleteApertureMask(){
+	
+	
+}
+
+void Photometry::deleteAnnulusMask(){
+	
+	
+}
+
+void Photometry::deleteGaussianMask(){
+	
+	
 }
 
 void Photometry::run(float **output){ // run photometry on all cutouts! the results are put into various sub-arrays of "output"
@@ -398,46 +618,7 @@ float Photometry::getWidthFromMoments(float m2x, float m2y, float mxy){ // calcu
 
 }
 
-void Photometry::circle_mask(float *array, float dx, float dy, double radius){ // make the aperture mask for e.g., forced photometry, with shift dx/dy
-	
-	for(int i=0;i<N;i++){
-		
-		float r=(float) sqrt(pow(X[i]-dx,2)+pow(Y[i]-dy,2));
-		
-		array[i]=radius+0.5-r;
-		if(array[i]<1) array[i]=0;
-		else if(array[i]>1) array[i]=1;
-		
-	}
-}
-
-void Photometry::annulus_mask(float *array, float dx, float dy, double radius1, double radius2){ // make a mask for the background annulus or wedding cake photometry
-	
-	if(radius2<=0) radius2=1e10; // replace for Inf
-	
-	for(int i=0;i<N;i++){
-		
-		float r=(float) sqrt(pow(X[i]-dx,2)+pow(Y[i]-dy,2));
-		
-		if (r>radius1 && r<radius2)	array[i]=1;
-		else array[i]=0; 
-		
-	}
-	
-}
-
-void Photometry::gaussian_mask(float *array, float dx, float dy){ // make a gaussian weighted mask with shift dx/dy
-	
-	for(int i=0;i<N;i++){
-		
-		float r=(float) sqrt(pow(X[i]-dx,2)+pow(Y[i]-dy,2));
-		
-		array[i]=exp(-0.5*pow(r/gauss_sigma,2));
-		
-	}
-	
-	
-}
+// AVERAGES
 
 float Photometry::getAverageWidth(float **output){ // calculate the average width from all the good measurements in this output type
 
@@ -463,6 +644,8 @@ float Photometry::getAverageOffsetY(float **output){ // to be implemented!
 	return 0;
 
 }
+
+// STATISTICS
 
 float Photometry::sumArrays(const float *array1){ // just the sum of all non-NaN pixels in this array
 	
@@ -507,6 +690,8 @@ float Photometry::sumArrays(const float *array1, const float *array2, const floa
 	return S;
 	
 }
+
+// UTILITIES
 
 bool Photometry::isAllNaNs(const float *array){ // check if an array has all NaN values
 	
