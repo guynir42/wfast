@@ -9,6 +9,8 @@
 #include <thread>
 #include <chrono>
 #include <algorithm> 
+#include <iostream>
+#include <fstream>
 
 #define STRLN 64 // maximum string length (for copying)
 #define NUM_DATA_TYPES 10 // flux, area, error, background, variance, offset_x, offset_y, width, bad_pixels, flag
@@ -18,8 +20,6 @@ bool cs(const char *keyword, const char *compare_str, int num_letters=3);
 bool cs(const char *keyword, const char *str1, const char *str2, int num_letters=3);
 bool cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters=3);
 bool parse_bool(mxArray *value);
-
-// Usage: [flux, error, area, background, variance, offset_x, offset_y, width] = photometry(cutouts, varargin)
 
 class Photometry{
 	
@@ -88,8 +88,6 @@ class Photometry{
 	mxArray *outputArraysStruct(); // add a struct with the actual masks and grid arrays
 	mxArray *outputIndicesVectors(std::vector<int> *vectors, int num_radii=1); // produce a cell array with size num_shifts*num_radii (default=1), each with the list of indices for that mask
 	
-	void clear(); // make sure all the output arrays are NaN before filling them
-	
 	void makeArrays(); // create all the required memory if it isn't already allocated, make all the required masks
 	void makeAllOutputs(); // generate all the output matrices needed
 	void allocateOutputArray(float **&output, int num_fluxes=1); // allocate memory for a set of outputs: flux, area, error, background, variance, offset_x/y, width, bad_pixels, flag
@@ -114,18 +112,18 @@ class Photometry{
 	void run();
 	void run_idx(int start_idx, int end_idx); // use this to run only a subset of the cutouts (for multithreading)
 	void calculate(int j); // do the actual work on some cutout array
+	void runForced(); // run all cutouts using forced photometry 
+	void runForced_idx(int start_idx, int end_idx, int shift_idx); // run just a subset of the cutouts (for multithreading)
+	void calculateForced(int j, int idx); // run a specific cutouts (index j) with the precalculated shift (index idx)
 	int getShiftIndex(float x, float y); // find the index closest to the specific shift value x and y in the shift matrices (dx and dy)
-	float getError(float variance, float reduced_flux); // calculate the best estimate for the noise, including background noise, source noise, and scintillation
-	void runForced(); 
-	void runForced_idx(int start_idx, int end_idx);
-	void calculateForced(int j); 
+	float getError(float reduced_flux, float aperture_variance, float background_variance); // calculate the best estimate for the noise, including background noise, source noise, and scintillation
 	bool checkMoments(float offset_x, float offset_y, float width); // returns 1 if there is a problem with the offsets or width
 
 	// make averages over the results
 	float getWidthFromMoments(float m2x, float m2y, float mxy); // from the eigenvalues of the 2nd moments
-	float getAverageWidth(float **output);
-	float getAverageOffsetX(float **output);	
-	float getAverageOffsetY(float **output);
+	float getAverageWidth(float **output); // get the "flux weighted" average width on all non NaN, non flagged cutouts
+	float getAverageOffsetX(float **output); // get the "flux weighted" average offset_x on all non NaN, non flagged cutouts
+	float getAverageOffsetY(float **output); // get the "flux weighted" average offset_y on all non NaN, non flagged cutouts
 	
 	// the sum of the product of array1...
 	int countNaNs(const float *array); 
@@ -153,5 +151,19 @@ class Photometry{
 	void printMatrix(const float *array, const char *name);
 
 };
+
+// each output 2D array is defined in this order:
+const char Photometry::data_types[NUM_DATA_TYPES][STRLN]={"flux", "area", "error", "background", "variance", "offset_x", "offset_y", "width", "bad_pixels", "flag"};
+
+#define IDX_FLUX 0
+#define IDX_AREA 1
+#define IDX_ERR 2
+#define IDX_BG 3
+#define IDX_VAR 4
+#define IDX_DX 5
+#define IDX_DY 6
+#define IDX_WD 7
+#define IDX_BAD 8
+#define IDX_FLAG 9
 
 #endif
