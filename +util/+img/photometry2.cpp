@@ -30,22 +30,26 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	
 	photometry.run();
 
-	char *field_names[6];
-	for(int i=0;i<6;i++) field_names[i]=(char*) mxMalloc(STRLN);
+	// float x=-2.2;
+	// float y=0.1;
+	// int idx=photometry.getShiftIndex(x,y); 
+	// printf("x= %f | y= %f | idx= %d | dx= %f | dy=%f\n", x, y, idx, photometry.dx[idx], photometry.dy[idx]); 
+	
+	char *field_names[5];
+	for(int i=0;i<5;i++) field_names[i]=(char*) mxMalloc(STRLN);
 	
 	snprintf(field_names[0], STRLN, "raw_photometry"); 
 	snprintf(field_names[1], STRLN, "forced_photometry"); 
 	snprintf(field_names[2], STRLN, "apertures_photometry"); 
 	snprintf(field_names[3], STRLN, "gaussian_photometry"); 
 	snprintf(field_names[4], STRLN, "parameters"); 
-	snprintf(field_names[5], STRLN, "arrays"); 
 	
 	plhs[0]=mxCreateStructMatrix(1,1,5, (const char**) field_names); 
 	
 	mxSetFieldByNumber(plhs[0], 0, 0, photometry.outputStruct(photometry.output_raw)); 
-	mxSetFieldByNumber(plhs[0], 0, 1, photometry.outputStruct(photometry.output_forced)); 
-	mxSetFieldByNumber(plhs[0], 0, 2, photometry.outputStruct(photometry.output_apertures, photometry.num_radii)); 
-	mxSetFieldByNumber(plhs[0], 0, 3, photometry.outputStruct(photometry.output_gaussian)); 
+	if(photometry.use_forced) mxSetFieldByNumber(plhs[0], 0, 1, photometry.outputStruct(photometry.output_forced)); 
+	if(photometry.use_apertures) mxSetFieldByNumber(plhs[0], 0, 2, photometry.outputStruct(photometry.output_apertures, photometry.num_radii)); 
+	if(photometry.use_gaussian) mxSetFieldByNumber(plhs[0], 0, 3, photometry.outputStruct(photometry.output_gaussian)); 
 	mxSetFieldByNumber(plhs[0], 0, 4, photometry.outputMetadataStruct());
 	
 	if(nlhs>1) plhs[1]=photometry.outputArraysStruct();
@@ -106,6 +110,7 @@ mxArray *Photometry::outputMetadataStruct(){ // add a struct with some of the pa
 	field_names_vector.push_back("annulus_radii");
 	field_names_vector.push_back("forced_radius");
 	field_names_vector.push_back("gauss_sigma");
+	field_names_vector.push_back("iterations"); 
 	field_names_vector.push_back("gain");
 	field_names_vector.push_back("shift_resolution");
 	
@@ -116,38 +121,42 @@ mxArray *Photometry::outputMetadataStruct(){ // add a struct with some of the pa
 	
 	delete(field_names);
 	
+	int num=0;
 	mxArray *array=0;
 	array=mxCreateNumericMatrix(1,4,mxDOUBLE_CLASS, mxREAL);
 	double *dbl_ptr=mxGetPr(array);
 	for(int i=0;i<4;i++) dbl_ptr[i]=(double) dims[i];
-	mxSetFieldByNumber(struct_array, 0, 0, array);
+	mxSetFieldByNumber(struct_array, 0, num++, array);
 	
 	const char *cutouts_class[1]={"single"};
 	array=mxCreateCharMatrixFromStrings(1, cutouts_class);
-	mxSetFieldByNumber(struct_array, 0, 1, array);
+	mxSetFieldByNumber(struct_array, 0, num++, array);
 	
 	array=mxCreateNumericMatrix(1, num_radii, mxDOUBLE_CLASS, mxREAL);
 	dbl_ptr=mxGetPr(array);
 	for(int i=0;i<num_radii;i++) dbl_ptr[i]=ap_radii[i];
-	mxSetFieldByNumber(struct_array, 0, 2, array);
+	mxSetFieldByNumber(struct_array, 0, num++, array);
 	
 	array=mxCreateNumericMatrix(1, 2, mxDOUBLE_CLASS, mxREAL);
 	dbl_ptr=mxGetPr(array);
 	dbl_ptr[0]=inner_radius;
 	dbl_ptr[1]=outer_radius;
-	mxSetFieldByNumber(struct_array, 0, 3, array);
+	mxSetFieldByNumber(struct_array, 0, num++, array);
 		
 	array=mxCreateDoubleScalar(forced_radius);
-	mxSetFieldByNumber(struct_array, 0, 4, array);
+	mxSetFieldByNumber(struct_array, 0, num++, array);
 	
 	array=mxCreateDoubleScalar(gauss_sigma);
-	mxSetFieldByNumber(struct_array, 0, 5, array);
+	mxSetFieldByNumber(struct_array, 0, num++, array);
+	
+	array=mxCreateDoubleScalar(num_iterations);
+	mxSetFieldByNumber(struct_array, 0, num++, array);
 	
 	array=mxCreateDoubleScalar(gain);
-	mxSetFieldByNumber(struct_array, 0, 6, array);
+	mxSetFieldByNumber(struct_array, 0, num++, array);
 	
 	array=mxCreateDoubleScalar(resolution);
-	mxSetFieldByNumber(struct_array, 0, 7, array);
+	mxSetFieldByNumber(struct_array, 0, num++, array);
 	
 	
 	return struct_array; 
@@ -263,26 +272,35 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 	mwSize *new_dims=(mwSize*)mxGetDimensions(prhs[0]);
 	ndims=(int) mxGetNumberOfDimensions(prhs[0]);	
 	
+	printf("old dims= %d %d %d %d\n", dims[0], dims[1], dims[2], dims[3]);
+	printf("new dims= %d %d %d %d\n", new_dims[0], new_dims[1], new_dims[2], new_dims[3]);
+	
 	if(new_dims[0]!=dims[0] || new_dims[1]!=dims[1]){ 
 		deleteArrays(); 
-		for(int j=0;j<ndims; j++) dims[j]=new_dims[j];
+		for(int j=0;j<2; j++) dims[j]=new_dims[j];
 		N=(int) (dims[0]*dims[1]); // dims[0] is the height while dims[1] is the width
 	}
 	
-	mwSize new_output_size[2]={0};
-	// size of non-empty output is [size(cutouts,3), size(cutouts,4)]
-	if(ndims>2) new_output_size[0]=dims[2];
-	else new_output_size[0]=1;
-	if(ndims>3) new_output_size[1]=dims[3];
-	else new_output_size[1]=1;
-	
-	if(new_output_size[0]!=output_size[0] || new_output_size[1]!=output_size[1]){
-		
-		deleteArrays(); 
-		output_size[0]=new_output_size[0];
-		output_size[1]=new_output_size[1];
-		
+	if(ndims>2 && new_dims[2]!=dims[2]){
+		deleteOutputs();
+		dims[2]=new_dims[2];		
 	}
+	else if(ndims<=2 && dims[2]!=1){
+		deleteOutputs();
+		dims[2]=1;
+	}
+	
+	if(ndims>3 && new_dims[3]!=dims[3]){
+		deleteOutputs();
+		dims[3]=new_dims[3];		
+	}
+	else if(ndims<=3 && dims[3]!=1){
+		deleteOutputs();
+		dims[3]=1;
+	}
+	
+	output_size[0]=dims[2];
+	output_size[1]=dims[3];
 	
 	num_cutouts=(int) (output_size[0]*output_size[1]); // how many values in each of the above arrays... 
 	
@@ -342,22 +360,36 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
 			
 			int num=(int) mxGetNumberOfElements(val);
-			double *new_annuli=(double*) mxGetData(val);
 			
-			if(num>0 && inner_radius!=new_annuli[0]){
-				deleteAnnulusMasks();
-				inner_radius=new_annuli[0];
-			}
-			
-			if(num>1 && outer_radius!=new_annuli[1]){
+			if(mxIsScalar(val)==0){ // we got multiple inputs for annulus
+							
+				double *new_annuli=mxGetPr(val);
 				
-				outer_radius=new_annuli[1];
-			} 
-			else if(outer_radius!=0){ 
-				deleteAnnulusMasks();
-				outer_radius=0;
+				if(inner_radius!=new_annuli[0]){
+					deleteAnnulusMasks();
+					inner_radius=new_annuli[0];
+				}
+				
+				if(outer_radius!=new_annuli[1]){
+					deleteAnnulusMasks();
+					outer_radius=new_annuli[1];
+				} 
 			}
-			else outer_radius=0; 
+			else{ // if no second input is given, assume it is 0 (=infinity)
+				
+				double new_annulus=mxGetScalar(val);
+				
+				if(inner_radius!=new_annulus){
+					deleteAnnulusMasks();
+					inner_radius=new_annulus;
+				}
+				
+				if(outer_radius!=0){
+					deleteAnnulusMasks();
+					outer_radius=0;
+				}
+				
+			}
 			
 		}
 		else if(cs("key", "gain")){
@@ -365,6 +397,13 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			if(mxIsEmpty(val)) continue;
 			if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericSingle", "Input %d to photometry is not a numeric scalar!", i+2);
 			gain=mxGetScalar(val);
+			
+		}
+		else if(cs("key", "scintillation_fraction")){
+			if(val==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			if(mxIsEmpty(val)) continue;
+			if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericSingle", "Input %d to photometry is not a numeric scalar!", i+2);
+			scintillation_fraction=mxGetScalar(val);
 			
 		}
 		else if(cs(key, "resolution")){
@@ -380,14 +419,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			}
 			
 		}
-		else if(cs(key, "debug_bit")){
-			if(val==0 || mxIsEmpty(val)) debug_bit=1; // if no input, assume positive
-			else{
-				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
-				debug_bit=(int) mxGetScalar(val);
-			}
-			
-		}
+		
 		else if(cs(key, "threads")){
 			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
 			else{
@@ -396,7 +428,54 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			}
 			
 		}
-		
+		else if(cs(key, "iterations", "num_iterations", "number_iterations")){
+			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
+			else{
+				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
+				num_iterations=(int) mxGetScalar(val);
+			}
+			
+		}
+		else if(cs(key, "use_centering_aperture")){
+			if(val==0 || mxIsEmpty(val)) use_centering_aperture=1; // if no input, assume positive
+			else{
+				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
+				use_centering_aperture=parse_bool(val);
+			}
+			
+		}
+		else if(cs(key, "use_gaussian")){
+			if(val==0 || mxIsEmpty(val)) use_gaussian=1; // if no input, assume positive
+			else{
+				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
+				use_gaussian=parse_bool(val);
+			}
+			
+		}
+		else if(cs(key, "use_apertures")){
+			if(val==0 || mxIsEmpty(val)) use_apertures=1; // if no input, assume positive
+			else{
+				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
+				use_apertures=parse_bool(val);
+			}
+			
+		}
+		else if(cs(key, "use_forced")){
+			if(val==0 || mxIsEmpty(val)) use_forced=1; // if no input, assume positive
+			else{
+				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
+				use_forced=parse_bool(val);
+			}
+			
+		}
+		else if(cs(key, "debug_bit")){
+			if(val==0 || mxIsEmpty(val)) debug_bit=1; // if no input, assume positive
+			else{
+				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
+				debug_bit=(int) mxGetScalar(val);
+			}
+			
+		}
 	}
 	
 	
@@ -434,7 +513,7 @@ void Photometry::makeGrids(){ // make the X/Y coordinate grid and the dx/dy poss
 
 	meshgrid(X,Y, dims); // make the static grid points
 	
-	for(int j=0;j<2;j++) shift_dims[j]=dims[j]*resolution;
+	for(int j=0;j<2;j++) shift_dims[j]=(dims[j]-1)*resolution+1; // add "resolution"-1 number of points between each existing point
 	num_shifts=(int) (shift_dims[0]*shift_dims[1]); 
 	
 	dx=new float[num_shifts];
@@ -460,19 +539,25 @@ void Photometry::meshgrid(float *x, float *y, mwSize *dims, int resolution){ // 
 }
 
 void Photometry::makeAllOutputs(){ // generate all the output matrices needed
+	 
+	if(output_raw==0) allocateOutputArray(output_raw);
+	initializeOutputArray(output_raw);
 	
-	if(output_raw) initializeOutputArray(output_raw);
-	else allocateOutputArray(output_raw);
+	if(output_forced==0) allocateOutputArray(output_forced);	
+	initializeOutputArray(output_forced);
 	
-	if(output_forced) initializeOutputArray(output_forced);
-	else allocateOutputArray(output_forced);
+	if(output_apertures==0) allocateOutputArray(output_apertures, num_radii);
+	initializeOutputArray(output_apertures, num_radii);
 	
-	if(output_apertures) initializeOutputArray(output_apertures, num_radii);
-	else allocateOutputArray(output_apertures, num_radii);
+	if(output_gaussian==0) allocateOutputArray(output_gaussian); 
+	initializeOutputArray(output_gaussian);
 	
-	if(output_gaussian) initializeOutputArray(output_gaussian);
-	else allocateOutputArray(output_gaussian); 
-		
+	if(best_offset_x==0) best_offset_x=new float[num_cutouts]; 
+	for(int j=0; j<num_cutouts; j++) best_offset_x[j]=NAN;
+	
+	if(best_offset_y==0) best_offset_y=new float[num_cutouts]; 
+	for(int j=0; j<num_cutouts; j++) best_offset_y[j]=NAN;
+	
 }
 
 void Photometry::allocateOutputArray(float **&output, int num_fluxes){ // create new memory for flux, background etc...
@@ -484,8 +569,16 @@ void Photometry::allocateOutputArray(float **&output, int num_fluxes){ // create
 
 void Photometry::initializeOutputArray(float **output, int num_fluxes){ // clear the content of existing memory for flux, background etc...
 
-	
+	for(int i=0;i<NUM_DATA_TYPES; i++){
 
+		for(int k=0;k<num_fluxes; k++){
+			
+			for(int j=0;j<num_cutouts; j++) output[i][k*num_cutouts+j]=0;
+			
+		}
+		
+	}
+	
 }
 
 void Photometry::makeMasks(){ // make a bank of masks to be used for different shifts and types of photometry
@@ -541,14 +634,17 @@ void Photometry::makeAnnulusMasks(){ // make a mask for the background annulus f
 	annulii=new float[N*num_shifts]; 
 	annulus_indices=new std::vector<int>[num_shifts]; // keep a running list of all the annulus indices for quick summing
 	
+	float r1=inner_radius;
+	float r2=outer_radius;
+	if(r2<r1) r2=1e10; // replace for infinity
+	
 	for(int j=0; j<num_shifts;j++){ // go over the different shifts
 	
 		for(int i=0;i<N;i++){ // go over the pixels in each mask
 			
 			float r=(float) sqrt(pow(X[i]-dx[j],2)+pow(Y[i]-dy[j],2));
-			
 			float value=0;
-			if(r>=inner_radius && r<outer_radius) value=1;
+			if(r>=r1 && r<r2) value=1;
 			annulii[j*N + i] = value;
 			
 			if(value>0) annulus_indices[j].push_back(i); // keep a running list of all the annulus indices for quick summing			
@@ -581,6 +677,8 @@ void Photometry::makeGaussianMasks(){ // make a gaussian weighted mask for each 
 
 void Photometry::deleteArrays(){ // get rid of all the masks and output arrays (when destroying this object)
 
+	// printf("deleting arrays...\n");
+
 	deleteOutputs();
 	deleteMasks();
 	deleteGrids();
@@ -598,14 +696,32 @@ void Photometry::deleteGrids(){ // get rid of the meshgrid arrays
 
 void Photometry::deleteOutputs(){ // get rid of output arrays only
 
+	// printf("deleting outputs...\n");
+
 	deleteOutputArray(output_raw);
 	deleteOutputArray(output_forced);
 	deleteOutputArray(output_apertures);
 	deleteOutputArray(output_gaussian);
+	
+	if(best_offset_x){ delete[](best_offset_x); best_offset_x=0;}
+	if(best_offset_y){ delete[](best_offset_y); best_offset_y=0;}
 
 }
 
-void Photometry::deleteOutputArray(float **output){ // go over and deallocate the memory for one of the outputs
+void Photometry::deleteOutputArray(float **&output){ // go over and deallocate the memory for one of the outputs
+	
+	if(output){
+		
+		for(int i=0;i<NUM_DATA_TYPES;i++){
+			
+			delete[](output[i]);
+					
+		}
+		
+		delete[](output); 
+		output=0;
+		
+	}
 
 }
 
@@ -691,8 +807,8 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 	
 	float **output=output_raw; // make sure to get pointers to the raw output data	
 	float *flux=output[0];
-	float *error=output[1];
-	float *area=output[2];
+	float *area=output[1];
+	float *error=output[2];
 	float *background=output[3];
 	float *variance=output[4];
 	float *offset_x=output[5];
@@ -701,7 +817,7 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 	float *bad_pixels=output[8];
 	float *flag=output[9];
 	
-	bad_pixels[j]=countNaNs(image);
+	bad_pixels[j]=(float) countNaNs(image);
 	
 	if(bad_pixels[j]==N){ // image is all NaN!
 		
@@ -730,30 +846,133 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 	}
 	
 	flux[j]=sumArrays(image); // simple raw photometry! 
+	
 	area[j]=N-bad_pixels[j]; 
 	
-	// error[j]
-	// background[j]
-	// variance[j]
+	int idx=getShiftIndex(0,0); // for the first order, raw photometry estimate of the background, use centered annulus
+	int annulus_pixels=countNonNaNsIndices(image, annulus_indices, idx); // how many non-NaN do we have in this annulus?
+	
+	//background[j]=sumIndices(image, annulus_indices, idx)/annulus_pixels; // claculate the sum of values in the annulus, divided by number of pixels
+	background[j]=medianIndices(image, annulus_indices, idx); 
+	variance[j]=sumIndices(image, background[j], image, background[j], annulus_indices, idx)/annulus_pixels; // subtract the average b/g then take the square, and sum all the values (then divide by number of pixels)
+	
+	error[j]=getError(variance[j], flux[j]-area[j]*background[j]); 
 	
 	// first moments:
-	float m1x=sumArrays(image, X);
-	float m1y=sumArrays(image, Y);
-
+	float norm=flux[j]-area[j]*background[j];
+	float m1x=sumArrays(image, background[j], X)/norm;
+	float m1y=sumArrays(image, background[j], Y)/norm;
+	
 	offset_x[j]=m1x;
 	offset_y[j]=m1y;
-	
+
 	// second moments
-	float m2x=sumArrays(image, X, m1x, X, m1x); // I*(X-m1x)^2
-	float m2y=sumArrays(image, Y, m1y, Y, m1y); // I*(Y-m1y)^2
-	float mxy=sumArrays(image, X, m1x, Y, m1y); // I*(X-m1x)*(Y-m1y)
+	float m2x=sumArrays(image, background[j], X, m1x, X, m1x)/norm; // I*(X-m1x)^2
+	float m2y=sumArrays(image, background[j], Y, m1y, Y, m1y)/norm; // I*(Y-m1y)^2
+	float mxy=sumArrays(image, background[j], X, m1x, Y, m1y)/norm; // I*(X-m1x)*(Y-m1y)
 	
 	width[j]=getWidthFromMoments(m2x, m2y, mxy); 
 	
 	flag[j]=checkMoments(offset_x[j], offset_y[j], width[j]); 
 	
-	// start doing the gaussian photometry! 
+	// keep track of the best estimate offsets
+	best_offset_x[j]=offset_x[j];
+	best_offset_y[j]=offset_y[j];
 	
+	if(use_centering_aperture){ // do one iteration with large aperture to improve centroid positions
+		
+		idx=getShiftIndex(best_offset_x[j],best_offset_y[j]); // the updated centroid
+
+		annulus_pixels=countNonNaNsIndices(image, annulus_indices, idx); // how many non-NaN do we have in this annulus?
+
+		float B=sumIndices(image, annulus_indices, idx)/annulus_pixels; // temporary background value
+		float F=sumIndices(image, forced_indices, idx); 
+		int   A=countNonNaNsIndices(image, forced_indices, idx);
+
+		m1x=sumIndices(image, B, X, forced_indices, idx)/(F-B*A); // the weighted centroid only on the selected pixels
+		m1y=sumIndices(image, B, Y, forced_indices, idx)/(F-B*A); // the weighted centroid only on the selected pixels
+		
+		// keep track of the best estimate offsets
+		best_offset_x[j]=m1x;
+		best_offset_y[j]=m1y;
+		
+	} // finished centering aperture
+	
+	if(use_gaussian){// do gaussian photometry! 
+		
+		output=output_gaussian; // make sure to get pointers to the gaussian output data	
+		flux=output[0];
+		area=output[1];
+		error=output[2];
+		background=output[3];
+		variance=output[4];
+		offset_x=output[5];
+		offset_y=output[6];
+		width=output[7];
+		bad_pixels=output[8];
+		flag=output[9];
+		
+		for(int k=0; k<num_iterations; k++){
+			
+			idx=getShiftIndex(best_offset_x[j],best_offset_y[j]); // the updated centroid
+			annulus_pixels=countNonNaNsIndices(image, annulus_indices, idx); // how many non-NaN do we have in this annulus?
+			area[j]=sumArrays(&gaussians[idx*N]); 
+			flux[j]=sumArrays(image, &gaussians[idx*N]);
+			background[j]=sumIndices(image, annulus_indices, idx)/annulus_pixels; 	
+			norm=flux[j]-area[j]*background[j];
+			m1x=sumArrays(image, background[j], X, &gaussians[idx*N])/norm;
+			m1y=sumArrays(image, background[j], Y, &gaussians[idx*N])/norm;
+			offset_x[j]=m1x;
+			offset_y[j]=m1y;
+			best_offset_x[j]=m1x;
+			best_offset_y[j]=m1y;
+			
+		}// for k (iterations)
+		
+		// only get the variance/error/width after choosing the best spot
+		variance[j]=sumIndices(image, background[j], image, background[j], annulus_indices, idx)/annulus_pixels; // subtract the average b/g then take the square, and sum all the values (then divide by number of pixels)
+		error[j]=getError(variance[j], flux[j]-background[j]); 
+		
+		m2x=sumArrays(image, background[j], X, m1x, X, m1x, &gaussians[idx*N])/norm;
+		m2y=sumArrays(image, background[j], Y, m1y, Y, m1y, &gaussians[idx*N])/norm;
+		mxy=sumArrays(image, background[j], X, m1x, Y, m1y, &gaussians[idx*N])/norm;
+		
+		width[j]=getWidthFromMoments(m2x, m2y, mxy); 
+		
+		flag[j]=checkMoments(offset_x[j], offset_y[j], width[j]); 
+
+	} // finished doing gaussian photometry
+	
+	if(use_apertures){ // do multi-aperture photometry (wedding cake)
+	
+	}
+	
+	// forced photometry must be done after all of these are done! 
+	
+}
+
+int Photometry::getShiftIndex(float x, float y){ // find the index closest to the specific shift value x and y in the shift matrices (dx and dy)
+	
+	// first make sure there are not shifts that are too big or too small
+	if(x<dx[0]) x=dx[0];
+	if(y<dy[0]) y=dy[0];
+	if(x>dx[num_shifts-1]) x=dx[num_shifts-1];
+	if(y>dy[num_shifts-1]) y=dy[num_shifts-1];
+	
+	// replace NaN values with zero (I don't have a better idea but this should be rare)
+	if(x!=x) x=0;
+	if(y!=y) y=0; 
+	
+	int idx_x=(int) round(resolution*x+shift_dims[1]/2);
+	int idx_y=(int) round(resolution*y+shift_dims[0]/2);
+	
+	return (int) (idx_x*shift_dims[0]+idx_y); 
+	
+}
+
+float Photometry::getError(float variance, float reduced_flux){ // calculate the best estimate for the noise, including background noise, source noise, and scintillation
+	
+	return 0; 
 	
 }
 
@@ -778,7 +997,7 @@ bool Photometry::checkMoments(float offset_x, float offset_y, float width){ // r
 	if(offset_y>dims[0]/2) return 1;
 	if(width>dims[0]/2 || width>dims[1]/2) return 1;
 	if(width<0) return 1;
-	if(isnan(offset_x) || isnan(offset_y) || isnan(width)) return 1;
+	if(offset_x!=offset_x || offset_y!=offset_y || width!=width) return 1;
 	
 	return 0; // if all checks are not triggered, return with the ok flag
 	
@@ -828,11 +1047,11 @@ float Photometry::getAverageOffsetY(float **output){ // to be implemented!
 
 // ARRAY ARITHMETIC
 
-bool Photometry::countNaNs(const float *array){ // check if an array has all NaN values
+int Photometry::countNaNs(const float *array){ // check if an array has all NaN values
 	
 	int num_nans=0;
 	
-	for(int i=0;i<N; i++) if(array[i]!=array[i]) { num_nans++; }
+	for(int i=0;i<N; i++) if(array[i]!=array[i]) { num_nans++; } // NOTE: the array[i]!=array[i] test is much MUCH faster than testing isnan(array[i]) or even _isnanf(array[i]). 
 		
 	return num_nans;
 	
@@ -842,7 +1061,7 @@ float Photometry::sumArrays(const float *array1){ // just the sum of all non-NaN
 	
 	float S=0;
 	
-	for(int i=0;i<N;i++) if(array1[i]!=array1[i]) S+=array1[i];
+	for(int i=0;i<N;i++) if(array1[i]==array1[i]) S+=array1[i];
 	
 	return S;
 	
@@ -855,7 +1074,7 @@ float Photometry::sumArrays(const float *array1, const float *array2){ // sum of
 	for(int i=0;i<N;i++) 
 		// if(_isnanf(array1[i])==0 && _isnanf(array2[i])==0) 
 		//if(_isnanf(array1[i])==0) 
-		if(array1[i]!=array1[i])
+		if(array1[i]==array1[i])
 			S+=array1[i]*array2[i];
 	
 	return S;
@@ -866,7 +1085,7 @@ float Photometry::sumArrays(const float *array1, float offset1, const float *arr
 	
 	float S=0;
 	
-	for(int i=0;i<N;i++) if(array1[i]!=array1[i]) S+=(array1[i]-offset1)*array2[i];
+	for(int i=0;i<N;i++) if(array1[i]==array1[i]) S+=(array1[i]-offset1)*array2[i];
 	
 	return S;
 	
@@ -877,8 +1096,20 @@ float Photometry::sumArrays(const float *array1, const float *array2, const floa
 	float S=0;
 	
 	for(int i=0;i<N;i++) 
-		if(array1[i]!=array1[i])
+		if(array1[i]==array1[i])
 			S+=array1[i]*array2[i]*array3[i];
+	
+	return S;
+	
+}
+
+float Photometry::sumArrays(const float *array1, float offset1, const float *array2, const float *array3){ // sum of all non-NaN values of array1*array2*array3
+	
+	float S=0;
+	
+	for(int i=0;i<N;i++) 
+		if(array1[i]==array1[i])
+			S+=(array1[i]-offset1)*array2[i]*array3[i];
 	
 	return S;
 	
@@ -891,8 +1122,22 @@ float Photometry::sumArrays(const float *array1, const float *array2, float offs
 	for(int i=0;i<N;i++) 
 		//if(_isnanf(array1[i])==0 && _isnanf(array2[i])==0 && _isnanf(array3[i])==0) 
 		//if(_isnanf(array1[i]))
-		if(array1[i]!=array1[i])
+		if(array1[i]==array1[i])
 			S+=array1[i]*(array2[i]-offset2)*(array3[i]-offset3);
+	
+	return S;
+	
+}
+
+float Photometry::sumArrays(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3){ // sum of all non-NaN values of array1*array2*array3
+	
+	float S=0;
+	
+	for(int i=0;i<N;i++) 
+		//if(_isnanf(array1[i])==0 && _isnanf(array2[i])==0 && _isnanf(array3[i])==0) 
+		//if(_isnanf(array1[i]))
+		if(array1[i]==array1[i])
+			S+=(array1[i]-offset1)*(array2[i]-offset2)*(array3[i]-offset3);
 	
 	return S;
 	
@@ -904,7 +1149,7 @@ float Photometry::sumArrays(const float *array1, const float *array2, const floa
 	
 	for(int i=0;i<N;i++) 
 		// if(_isnanf(array1[i])==0 && _isnanf(array2[i])==0 && _isnanf(array3[i])==0 && _isnanf(array4[i])==0) 
-		if(array1[i]!=array1[i])
+		if(array1[i]==array1[i])
 			S+=array1[i]*array2[i]*array3[i]*array4[i];
 	
 	return S;
@@ -917,11 +1162,133 @@ float Photometry::sumArrays(const float *array1, float offset1, const float *arr
 	
 	for(int i=0;i<N;i++) 
 		// if(_isnanf(array1[i])==0 && _isnanf(array2[i])==0 && _isnanf(array3[i])==0 && _isnanf(array4[i])==0) 
-		if(array1[i]!=array1[i])
+		if(array1[i]==array1[i])
 			S+=(array1[i]-offset1)*(array2[i]-offset2)*(array3[i]-offset3)*array4[i];
 	
 	return S;
 	
+}
+
+int Photometry::countNonNaNsIndices(const float *array1, const std::vector<int> *vector, int idx){ // sum the number of non-NaN values in array1 on the indices in vector[idx]
+
+	int num=0;
+	
+	for(int i=0; i<vector[idx].size(); i++){
+		
+		float value=array1[vector[idx][i]]; 
+		
+		if(value==value) num++;
+		
+	}
+
+	return num;
+
+}
+
+float Photometry::sumIndices(const float *array1, const std::vector<int> *vector, int idx){ // sum the values of array1 on the indices in vector[idx]
+	
+	float sum=0;
+
+	for(int i=0; i<vector[idx].size(); i++){
+		
+		float value=array1[vector[idx][i]]; 
+		
+		if(value==value) sum+=value;
+		
+	}
+
+	return sum;
+	
+}
+
+float Photometry::sumIndices(const float *array1, const float *array2, const std::vector<int> *vector, int idx){
+	
+	
+	float sum=0;
+	
+	for(int i=0; i<vector[idx].size(); i++){
+		
+		float value1=array1[vector[idx][i]]; 
+		float value2=array2[vector[idx][i]];
+
+		if(value1==value1) sum+=value1*value2;
+		
+	}
+
+	return sum;
+	
+}
+
+float Photometry::sumIndices(const float *array1, float offset1, const float *array2, const std::vector<int> *vector, int idx){
+	
+	
+	float sum=0;
+	
+	for(int i=0; i<vector[idx].size(); i++){
+		
+		float value1=array1[vector[idx][i]]-offset1; 
+		float value2=array2[vector[idx][i]];
+		if(value1==value1) sum+=value1*value2;
+		
+	}
+
+	return sum;
+	
+}
+
+float Photometry::sumIndices(const float *array1, float offset1, const float *array2, float offset2, const std::vector<int> *vector, int idx){
+	
+	
+	float sum=0;
+	
+	for(int i=0; i<vector[idx].size(); i++){
+		
+		float value1=array1[vector[idx][i]]-offset1; 
+		float value2=array2[vector[idx][i]]-offset2;
+		if(value1==value1) sum+=value1*value2;
+		
+	}
+
+	return sum;
+	
+}
+
+float Photometry::sumIndices(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3, const std::vector<int> *vector, int idx){
+	
+	float sum=0;
+		
+	for(int i=0; i<vector[idx].size(); i++){
+		
+		float value1=array1[vector[idx][i]]-offset1; 
+		float value2=array2[vector[idx][i]]-offset2; 
+		float value3=array3[vector[idx][i]]-offset3; 
+		
+		if(value1==value1) sum+=value1*value2*value3;
+		
+	}
+
+	return sum;
+	
+}
+	
+float Photometry::medianIndices(const float *array, const std::vector<int> *vector, int idx){ // find the median of the array points indicated by vector[idx]
+	
+	std::vector<float> values=std::vector<float>(); // an empty vector 
+	
+	for(int i=0;i<vector[idx].size(); i++) if(array[i]==array[i]) values.push_back(array[vector[idx][i]]); 
+	
+	std::sort(values.begin(), values.end()); 
+	
+	if(values.size()%2==1){ // odd number (pick middle value)
+		
+		return values[values.size()/2];
+		
+	}
+	else{ // even number (take average of two middle values)
+		
+		return (values[values.size()/2] + values[values.size()/2+1])/2;
+		
+	}
 }
 
 // UTILITIES

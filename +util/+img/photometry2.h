@@ -8,6 +8,7 @@
 #include <cctype>
 #include <thread>
 #include <chrono>
+#include <algorithm> 
 
 #define STRLN 64 // maximum string length (for copying)
 #define NUM_DATA_TYPES 10 // flux, area, error, background, variance, offset_x, offset_y, width, bad_pixels, flag
@@ -23,7 +24,7 @@ bool parse_bool(mxArray *value);
 class Photometry{
 	
 	public:
-	
+		
 	float *cutouts=0; // the input matrix on which we calculate everything (dim 1&2 are y&x, dim 3 is frame number, dim 4 is star number)
 	mwSize dims[4]={0}; // array with the sizes of cutouts
 	mwSize ndims=0; // number of dimensions of cutouts
@@ -31,7 +32,13 @@ class Photometry{
 	int N=0; // number of pixels in each cutout (dim 1 times dim 2)
 	
 	double gain=1; // calculate the source noise using the gain
+	double scintillation_fraction=0; // use this to add the estimated scintillation noise (in fractions of the reduced flux)
 	int num_threads=1; // for future use with built-in multithreading
+	int num_iterations=2; // how many iterations of repositioning should we do
+	bool use_centering_aperture=1; // run one level of aperture photometry (centroids only) before the first gaussian iterations
+	bool use_gaussian=1; // decide if you want to use gaussians photometry at all
+	bool use_apertures=1; // decide if you want to use aperture photometry (wedding cake)
+	bool use_forced=1; // decide if you want to use forced photometry after finding the best offsets
 	
 	int debug_bit=0;
 	
@@ -68,6 +75,8 @@ class Photometry{
 	float **output_forced=0;
 	float **output_apertures=0;
 	float **output_gaussian=0;
+	float *best_offset_x=0;
+	float *best_offset_y=0;
 	const static char data_types[NUM_DATA_TYPES][STRLN]; // this holds strings containing: flux, error, area, background, variance, offset_x, offset_y, width, bad_pixels, flag
 	
 	// function prototypes (implementation at the end)
@@ -96,7 +105,7 @@ class Photometry{
 	void deleteArrays(); // get rid of all the masks and output arrays (when destroying this object)
 	void deleteGrids(); // get rid of the grid matrices
 	void deleteOutputs(); // get rid of output arrays only
-	void deleteOutputArray(float **output); // go over and deallocate the memory for one of the outputs
+	void deleteOutputArray(float **&output); // go over and deallocate the memory for one of the outputs
 	void deleteMasks(); // go over and deallocate the memory for all the masks
 	void deleteApertureMasks();
 	void deleteAnnulusMasks();
@@ -105,6 +114,8 @@ class Photometry{
 	void run();
 	void run_idx(int start_idx, int end_idx); // use this to run only a subset of the cutouts (for multithreading)
 	void calculate(int j); // do the actual work on some cutout array
+	int getShiftIndex(float x, float y); // find the index closest to the specific shift value x and y in the shift matrices (dx and dy)
+	float getError(float variance, float reduced_flux); // calculate the best estimate for the noise, including background noise, source noise, and scintillation
 	void runForced(); 
 	void runForced_idx(int start_idx, int end_idx);
 	void calculateForced(int j); 
@@ -117,14 +128,25 @@ class Photometry{
 	float getAverageOffsetY(float **output);
 	
 	// the sum of the product of array1...
-	bool countNaNs(const float *array); 
+	int countNaNs(const float *array); 
 	float sumArrays(const float *array1);
 	float sumArrays(const float *array1, const float *array2);
 	float sumArrays(const float *array1, float offset1, const float *array2);
 	float sumArrays(const float *array1, const float *array2, const float *array3);
-	float sumArrays(const float *array1, const float *array2, float offset2, const float *array3, float offset3);
+	float sumArrays(const float *array1, float offset1, const float *array2, const float *array3);
+	float sumArrays(const float *array1, const float *array2, float offset2, const float *array3, float offset3);	
+	float sumArrays(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3);
 	float sumArrays(const float *array1, const float *array2, const float *array3, const float *array4);
 	float sumArrays(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3, const float *array4);
+
+	int countNonNaNsIndices(const float *array1, const std::vector<int> *vector, int idx); // sum the number of non-NaN values in array1 on the indices in vector[idx]
+	float sumIndices(const float *array1, const std::vector<int> *vector, int idx); // sum the values of array1 on the indices in vector[idx]
+	float sumIndices(const float *array1, float offset1, const std::vector<int> *vector, int idx); 
+	float sumIndices(const float *array1, const float *array2, const std::vector<int> *vector, int idx);
+	float sumIndices(const float *array1, float offset1, const float *array2, const std::vector<int> *vector, int idx);
+	float sumIndices(const float *array1, float offset1, const float *array2, float offset2, const std::vector<int> *vector, int idx);
+	float sumIndices(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3, const std::vector<int> *vector, int idx);
+	float medianIndices(const float *array, const std::vector<int> *vector, int idx); // find the median of the array points indicated by vector[idx]
 	
 	// print on screen
 	void printMatrix(const int *array, const char *name);
