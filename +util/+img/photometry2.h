@@ -9,11 +9,25 @@
 #include <thread>
 #include <chrono>
 #include <algorithm> 
-#include <iostream>
-#include <fstream>
 
 #define STRLN 64 // maximum string length (for copying)
 #define NUM_DATA_TYPES 10 // flux, area, error, background, variance, offset_x, offset_y, width, bad_pixels, flag
+
+/*
+
+Usage: [outputs, arrays] = photometry2(cutouts, varargin)
+Optional arguments: 
+
+
+For more information about how to use this function, see photometry2.m
+
+Updates:
+
+Original code by Guy Nir Nov 2019
+
+Additional developer notes after the header
+
+*/
 
 // utility functions to compare strings
 bool cs(const char *keyword, const char *compare_str, int num_letters=3);
@@ -59,7 +73,7 @@ class Photometry{
 	float *apertures=0; // 4D matrix of aperture+annuli for the wedding cake photometry
 	std::vector<int> *aperture_indices=0; // array of length "num_shifts" of index vectors telling what part of each matrix to sum in wedding cake photometry
 	int num_radii=0; // how many different aperture arrays do we have for the wedding cake
-	double *ap_radii=0; // radii of different apertures, given in pixel units
+	double *ap_radii=0; // radii of different apertures, given in pixel units (default is 3,5,7, given in the constructor)
 	
 	float *annulii=0; // 3D matrix of the annulus used for all kinds of photometry, one for each dx/dy shift
 	std::vector<int> *annulus_indices=0; // array of length "num_shifts" of index vectors telling what part of each matrix to sum in annulus calculation
@@ -167,3 +181,24 @@ const char Photometry::data_types[NUM_DATA_TYPES][STRLN]={"flux", "area", "error
 #define IDX_FLAG 9
 
 #endif
+
+/*
+Additional developer notes:
+This code has been optimized so it can run live on W-FAST, 
+producing photometry live for thousands of stars, on a 100
+frames every 4 seconds. 
+To that end it uses some nasty programming tricks I will 
+try to outline here.
+*Preallocating everything in a global object:
+
+*Keeping indices of each mask:
+
+*Dividing the work to units of single cutouts:
+
+*Using value==value to check if a pixel is NaN:
+
+*Using the results of one aperture to calculate the next (bigger) one: 
+
+*
+
+*/

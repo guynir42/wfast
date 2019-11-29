@@ -10,12 +10,11 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	// check inputs!
 	if (nrhs==0){
 		
-		std::ifstream f("photometry2.m");
-
-		if (f.is_open())
-			std::cout << f.rdbuf();
-		
+		const char *string[1]={"util.img.photometry2"};
+		mxArray *array[1]={mxCreateCharMatrixFromStrings(1, string)};
+		mexCallMATLAB(0,0,1,array,"help"); 
 		return;
+		
 	}
 	
 	// read the input data and parameters
@@ -35,27 +34,23 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	// int idx=photometry.getShiftIndex(x,y); 
 	// printf("x= %f | y= %f | idx= %d | dx= %f | dy=%f\n", x, y, idx, photometry.dx[idx], photometry.dy[idx]); 
 	
-	if(nlhs>0){ // in any case (except debugging) this would be true... but I want to see how much time this takes up
-		
-		char *field_names[5];
-		for(int i=0;i<5;i++) field_names[i]=(char*) mxMalloc(STRLN);
-		
-		snprintf(field_names[0], STRLN, "raw_photometry"); 
-		snprintf(field_names[1], STRLN, "forced_photometry"); 
-		snprintf(field_names[2], STRLN, "apertures_photometry"); 
-		snprintf(field_names[3], STRLN, "gaussian_photometry"); 
-		snprintf(field_names[4], STRLN, "parameters"); 
-		
-		plhs[0]=mxCreateStructMatrix(1,1,5, (const char**) field_names); 
-		
-		mxSetFieldByNumber(plhs[0], 0, 0, photometry.outputStruct(photometry.output_raw)); 
-		if(photometry.use_forced) mxSetFieldByNumber(plhs[0], 0, 1, photometry.outputStruct(photometry.output_forced)); 
-		if(photometry.use_apertures) mxSetFieldByNumber(plhs[0], 0, 2, photometry.outputStruct(photometry.output_apertures, photometry.num_radii)); 
-		if(photometry.use_gaussian) mxSetFieldByNumber(plhs[0], 0, 3, photometry.outputStruct(photometry.output_gaussian)); 
-		mxSetFieldByNumber(plhs[0], 0, 4, photometry.outputMetadataStruct());
-		
-	}
+	char *field_names[5];
+	for(int i=0;i<5;i++) field_names[i]=(char*) mxMalloc(STRLN);
 	
+	snprintf(field_names[0], STRLN, "raw_photometry"); 
+	snprintf(field_names[1], STRLN, "forced_photometry"); 
+	snprintf(field_names[2], STRLN, "apertures_photometry"); 
+	snprintf(field_names[3], STRLN, "gaussian_photometry"); 
+	snprintf(field_names[4], STRLN, "parameters"); 
+	
+	plhs[0]=mxCreateStructMatrix(1,1,5, (const char**) field_names); 
+	
+	mxSetFieldByNumber(plhs[0], 0, 0, photometry.outputStruct(photometry.output_raw)); 
+	if(photometry.use_forced) mxSetFieldByNumber(plhs[0], 0, 1, photometry.outputStruct(photometry.output_forced)); 
+	if(photometry.use_apertures) mxSetFieldByNumber(plhs[0], 0, 2, photometry.outputStruct(photometry.output_apertures, photometry.num_radii)); 
+	if(photometry.use_gaussian) mxSetFieldByNumber(plhs[0], 0, 3, photometry.outputStruct(photometry.output_gaussian)); 
+	mxSetFieldByNumber(plhs[0], 0, 4, photometry.outputMetadataStruct());
+
 	if(nlhs>1) plhs[1]=photometry.outputArraysStruct();
 	
 }
@@ -65,8 +60,8 @@ Photometry::Photometry(){ // class constructor
 	// start by initializing any default arrays we may have
 	ap_radii=new double[3];
 	ap_radii[0]=3;
-	ap_radii[1]=4;
-	ap_radii[2]=5; 
+	ap_radii[1]=5;
+	ap_radii[2]=7; 
 	num_radii=3; 
 
 }
@@ -425,7 +420,6 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			}
 			
 		}
-		
 		else if(cs(key, "threads")){
 			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
 			else{
@@ -1164,7 +1158,10 @@ int Photometry::getShiftIndex(float x, float y){ // find the index closest to th
 
 float Photometry::getError(float reduced_flux, float aperture_variance, float background_variance){ // calculate the best estimate for the noise, including background noise, source noise, and scintillation
 	
-	return sqrt(reduced_flux*gain+aperture_variance+background_variance); 
+	return sqrt(pow(reduced_flux,2)*scintillation_fraction + 
+	            reduced_flux*gain + 
+				aperture_variance + 
+				background_variance); 
 	
 }
 
