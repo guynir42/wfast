@@ -19,7 +19,8 @@
 #include "Ultrasonic.h"
 #include <SparkFun_ADXL345.h>         // SparkFun ADXL345 Library
 
-Parser parser("inclination", "InclinationSwitch v1.02");
+Parser parser("inclination", "InclinationSwitch v1.03");
+// v1.03 -- invert the relay pin, add indication LED on pin 13 and ground pin on A0
 // v1.02 -- fixed bug with inversion and normally closed. 
 // v1.01 -- removed constant feedback through serial. Added ability to turn off switch for 20 minutes
 // v1.00 -- hard limit switch by measuring inclination 
@@ -36,6 +37,10 @@ int x, y, z; // acceleration values
 
 Timer timer; // timer for checking the inclination state
 Timer timer2; // this one is used for turning off the switch for 20 minutes
+
+GroundPin sensorGND(A0); // just more convinient as it's close to v3.3
+
+VoltagePin led(13); // indication light! 
 
 // relay setup (must connect VCC pin to board 5v pin and GND to GND pin)
 VoltagePin relay1(A1); // kill the telescope when under horizon
@@ -56,7 +61,7 @@ void setup() {
   Timer::debug_bit=0;
   parser.addCommand("measure", &measure);
   parser.addCommand("status", &statusReport);
-   parser.addCommand("timer", &setTimer);
+  parser.addCommand("timer", &setTimer);
 //  parser.addCommand("duration", &setTimer);
 // parser.addCommand("interval", &setTimer);
 //parser.addCommand("period", &setTimer);
@@ -74,7 +79,7 @@ void setup() {
   // Higher Values = Wider Measurement Range
   // Lower Values = Greater Sensitivity
 
-//  relay1.setInversion();
+  relay1.setInversion();
 //  relay2.setInversion();
 //  relay3.setInversion();
 //  relay4.setInversion();
@@ -120,10 +125,12 @@ void loop() {
     if(timer2.getState()){
       if(average<0){
         relay1.setState(0); // vector is pointing down, kill the switch
+        led.setState(0); 
         snprintf(state,5,"down");
       }
       else{
         relay1.setState(1); // everything is ok, switch can turn on
+        led.setState(1); 
         snprintf(state,5,"up");
       }
       
@@ -133,6 +140,7 @@ void loop() {
     }
     else{
       relay1.setState(1); // in override mode, temporarily always allow the relay to flow
+      led.setState(1); 
       
     }
     // statusReport("");
