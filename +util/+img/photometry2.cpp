@@ -476,24 +476,38 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 		else if(cs(key, "use_gaussian")){
 			if(val==0 || mxIsEmpty(val)) use_gaussian=1; // if no input, assume positive
 			else{
-				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
-				use_gaussian=parse_bool(val);
+
+				bool value=0;
+				if(mxIsScalar(val) && (mxIsNumeric(val) || mxIsLogical(val))) value=(bool) mxGetScalar(val); 
+				else if(mxIsChar(val)) value=parse_bool(val); 
+				else mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry must be scalar or string", i+2);
+				use_gaussian=value;
+				
 			}
 			
 		}
 		else if(cs(key, "use_apertures")){
 			if(val==0 || mxIsEmpty(val)) use_apertures=1; // if no input, assume positive
 			else{
-				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
-				use_apertures=parse_bool(val);
+				
+				bool value=0;
+				if(mxIsScalar(val) && (mxIsNumeric(val) || mxIsLogical(val))) value=(bool) mxGetScalar(val); 
+				else if(mxIsChar(val)) value=parse_bool(val); 
+				else mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry must be scalar or string", i+2);
+				use_apertures=value;
+				
 			}
-			
 		}
 		else if(cs(key, "use_forced")){
 			if(val==0 || mxIsEmpty(val)) use_forced=1; // if no input, assume positive
 			else{
-				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
-				use_forced=parse_bool(val);
+				
+				bool value=0;
+				if(mxIsScalar(val) && (mxIsNumeric(val) || mxIsLogical(val))) value=(bool) mxGetScalar(val); 
+				else if(mxIsChar(val)) value=parse_bool(val); 
+				else mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry must be scalar or string", i+2);
+				use_forced=value;
+				
 			}
 			
 		}
@@ -1004,7 +1018,6 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 		
 		// get the background reading for all concentric apertures
 		idx=getShiftIndex(best_offset_x[j],best_offset_y[j]); // the updated centroid
-		idx=getShiftIndex(0,0); // debugging only!
 		
 		annulus_pixels=countNonNaNsIndices(image, annulus_indices, idx); // how many non-NaN do we have in this annulus?
 		background[j]=sumIndices(image, annulus_indices, idx)/annulus_pixels; 	
