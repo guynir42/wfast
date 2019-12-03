@@ -9,13 +9,13 @@
 % Input: a matrix of cutouts, must be single precision, 2-4 dimensional. 
 %        The 3rd dimension is the frame number, while the 4th dimension is
 %        the cutout/star number. It is better to use 1st and 2nd dimensions
-%        that are of equal size and odd-number of pixels. 
+%        that are of equal size with an odd number of pixels. 
 %
 % Output: Each type of photometry products are returned in a separate
 %         struct, where each field contains a matrix of results for each
 %         star and each cutout. 
 %         The different products are:
-%           *flux: not background subtracted! 
+%           *flux: not background subtracted! (see "background" below)
 %           *area: how many pixels in the aperture/PSF, removing bad pixels
 %           *error: estimate of the photometric error per sample. 
 %           *background: per pixel, to subtract do flux-area*background. 
@@ -23,14 +23,16 @@
 %           *offset_x/y: in pixels, relative to the center of the cutout. 
 %           *width: average 2nd moment of the PSF, equivalent to gaussian
 %                   "sigma" width parameter. 
-%           *bad_pixels: that are inside the effective aperture.
-%                        (what does this mean for gaussians?)
+%           *bad_pixels: that are inside the effective aperture
+%                        (for gaussian, it is the weighted sum).
 %           *flag: set to 1 if there is a problem with the centroids 
 %                  (e.g., negative width, very large offsets). 
+%
 %         In addition to the different photometry types we also get a
 %         structure with the input parameters (aperture radii etc). 
 %         It is useful to keep a copy of this structure for later reference
 %         when you want to document your results. 
+%         Also get a structure with the frame average offsets and widths. 
 %
 %         An optional second argument is a structure containing the arrays
 %         and index vectors used for the photometery. This is useful mostly
@@ -67,12 +69,16 @@
 %                 on different cutouts. For serious computers we should see
 %                 a speedup proportional to the number of threads for at
 %                 least threads<5. Default is 1 (no multithreading). 
-%       *iterations:
-%       *use_centering_aperture:
-%       *use_gaussian:
-%       *use_apertures:
-%       *use_forced: 
-%       *debug_bit: 
+%       *iterations: How many repositions of the gaussians are used on each
+%                    cutout before settling on the results. Default: 2.
+%       *use_centering_aperture: If true, use a an aperture at the position
+%                                from the raw photometery, just to get a
+%                                little better positioning before going on
+%                                to the more narrow gaussian photometry. 
+%       *use_gaussian: If falue, skip gaussians altogether (default true).
+%       *use_apertures: If false, skip aperture photometery (default true).
+%       *use_forced: If false, skip doing forced photometry. 
+%       *debug_bit: Level of verbosity of the code (default: 0). 
 %                    
 %
 %
@@ -95,6 +101,7 @@
 % annulus pixel values and not the mean). 
 %
 % To compile this function just do "mex photometry.cpp" (no prerequisits). 
+% Make sure you do this inside the correct directory (+util/+img). 
 %
 % Additional developer notes about the nitty gritty can be found at the end
 % of the header file photometry2.h. 

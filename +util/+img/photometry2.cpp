@@ -34,22 +34,24 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	// int idx=photometry.getShiftIndex(x,y); 
 	// printf("x= %f | y= %f | idx= %d | dx= %f | dy=%f\n", x, y, idx, photometry.dx[idx], photometry.dy[idx]); 
 	
-	char *field_names[5];
-	for(int i=0;i<5;i++) field_names[i]=(char*) mxMalloc(STRLN);
+	char *field_names[6];
+	for(int i=0;i<6;i++) field_names[i]=(char*) mxMalloc(STRLN);
 	
 	snprintf(field_names[0], STRLN, "raw_photometry"); 
 	snprintf(field_names[1], STRLN, "forced_photometry"); 
 	snprintf(field_names[2], STRLN, "apertures_photometry"); 
 	snprintf(field_names[3], STRLN, "gaussian_photometry"); 
-	snprintf(field_names[4], STRLN, "parameters"); 
+	snprintf(field_names[4], STRLN, "averages"); 
+	snprintf(field_names[5], STRLN, "parameters"); 
 	
-	plhs[0]=mxCreateStructMatrix(1,1,5, (const char**) field_names); 
+	plhs[0]=mxCreateStructMatrix(1,1,6, (const char**) field_names); 
 	
 	mxSetFieldByNumber(plhs[0], 0, 0, photometry.outputStruct(photometry.output_raw)); 
 	if(photometry.use_forced) mxSetFieldByNumber(plhs[0], 0, 1, photometry.outputStruct(photometry.output_forced)); 
 	if(photometry.use_apertures) mxSetFieldByNumber(plhs[0], 0, 2, photometry.outputStruct(photometry.output_apertures, photometry.num_radii)); 
 	if(photometry.use_gaussian) mxSetFieldByNumber(plhs[0], 0, 3, photometry.outputStruct(photometry.output_gaussian)); 
-	mxSetFieldByNumber(plhs[0], 0, 4, photometry.outputMetadataStruct());
+	mxSetFieldByNumber(plhs[0], 0, 4, photometry.outputAverages()); 
+	mxSetFieldByNumber(plhs[0], 0, 5, photometry.outputMetadataStruct());
 
 	if(nlhs>1) plhs[1]=photometry.outputArraysStruct();
 	
@@ -95,6 +97,33 @@ mxArray *Photometry::outputStruct(float **output, int num_fluxes){ // wrap up th
 		memcpy((float*)mxGetData(matrix), output[i], output_size[0]*output_size[1]*num_fluxes*sizeof(float));
 		mxSetFieldByNumber(struct_array, 0, i, matrix);
 	}
+	
+	return struct_array; 
+	
+}
+
+mxArray *Photometry::outputAverages(){ // add a struct with the average offsets and widths
+
+	char *field_names[3];
+	for(int i=0;i<3;i++) field_names[i]=(char*)mxMalloc(STRLN);
+	
+	snprintf(field_names[0], STRLN, "offset_x"); 
+	snprintf(field_names[1], STRLN, "offset_y"); 
+	snprintf(field_names[2], STRLN, "width"); 
+	
+	mxArray *struct_array=mxCreateStructMatrix(1,1,3, (const char**) field_names);
+	
+	mxArray *matrix_offset_x=mxCreateNumericMatrix(dims[2], dims[3], mxSINGLE_CLASS, mxREAL); 
+	memcpy((float*)mxGetData(matrix_offset_x), average_offset_x, num_cutouts*sizeof(float));
+	mxSetFieldByNumber(struct_array, 0, 0, matrix_offset_x);
+	
+	mxArray *matrix_offset_y=mxCreateNumericMatrix(dims[2], dims[3], mxSINGLE_CLASS, mxREAL); 
+	memcpy((float*)mxGetData(matrix_offset_y), average_offset_y, num_cutouts*sizeof(float));
+	mxSetFieldByNumber(struct_array, 0, 1, matrix_offset_y);
+	
+	mxArray *matrix_width=mxCreateNumericMatrix(dims[2], dims[3], mxSINGLE_CLASS, mxREAL); 
+	memcpy((float*)mxGetData(matrix_width), average_width, num_cutouts*sizeof(float));
+	mxSetFieldByNumber(struct_array, 0, 2, matrix_width);
 	
 	return struct_array; 
 	
@@ -552,6 +581,16 @@ void Photometry::makeAllOutputs(){ // generate all the output matrices needed
 	if(best_offset_y==0) best_offset_y=new float[num_cutouts]; 
 	for(int j=0; j<num_cutouts; j++) best_offset_y[j]=NAN;
 	
+	if(average_offset_x==0) average_offset_x=new float[num_cutouts];
+	for(int j=0; j<num_cutouts; j++) average_offset_x[j]=NAN;
+	
+	if(average_offset_y==0) average_offset_y=new float[num_cutouts];
+	for(int j=0; j<num_cutouts; j++) average_offset_y[j]=NAN;
+	
+	if(average_width==0) average_width=new float[num_cutouts];
+	for(int j=0; j<num_cutouts; j++) average_width[j]=NAN;
+	
+	
 }
 
 void Photometry::allocateOutputArray(float **&output, int num_fluxes){ // create new memory for flux, background etc...
@@ -699,7 +738,13 @@ void Photometry::deleteOutputs(){ // get rid of output arrays only
 	
 	if(best_offset_x){ delete[](best_offset_x); best_offset_x=0;}
 	if(best_offset_y){ delete[](best_offset_y); best_offset_y=0;}
+	
+	if(average_offset_x){ delete[](average_offset_x); average_offset_x=0;}
+	if(average_offset_y){ delete[](average_offset_y); average_offset_y=0;}
+	if(average_width){ delete[](average_width); average_width=0;}
 
+	
+	
 }
 
 void Photometry::deleteOutputArray(float **&output){ // go over and deallocate the memory for one of the outputs
@@ -936,6 +981,8 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 		mxy=sumArrays(image, background[j], X, m1x, Y, m1y, &gaussians[idx*N])/norm;
 		
 		width[j]=getWidthFromMoments(m2x, m2y, mxy); 
+				
+		bad_pixels[j]=countNaNs(image, &gaussians[idx*N]); 
 		
 		flag[j]=checkMoments(offset_x[j], offset_y[j], width[j]); 
 
@@ -1044,15 +1091,19 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 
 void Photometry::runForced(){
 	
-	int shift_idx=0;
-	if(use_gaussian) shift_idx=getShiftIndex(getAverageOffsetX(output_gaussian), getAverageOffsetY(output_gaussian));
-	else if(use_apertures) shift_idx=getShiftIndex(getAverageOffsetX(output_apertures), getAverageOffsetY(output_apertures));
-	else shift_idx=getShiftIndex(getAverageOffsetX(output_raw), getAverageOffsetY(output_raw));
+	// int shift_idx=0;
+	// if(use_gaussian) shift_idx=getShiftIndex(getAverageOffsetX(output_gaussian), getAverageOffsetY(output_gaussian));
+	// else if(use_apertures) shift_idx=getShiftIndex(getAverageOffsetX(output_apertures), getAverageOffsetY(output_apertures));
+	// else shift_idx=getShiftIndex(getAverageOffsetX(output_raw), getAverageOffsetY(output_raw));
+	
+	if(use_gaussian) calcFrameAverages(output_gaussian);
+	else if(use_apertures) calcFrameAverages(output_apertures, num_radii);
+	else calcFrameAverages(output_raw);
 	
 	if(num_threads<=1){
 		for(int j=0;j<num_cutouts;j++){ // number of cutouts
 			
-			calculateForced(j, shift_idx);
+			calculateForced(j);
 			
 		} // for j
 	}
@@ -1066,13 +1117,13 @@ void Photometry::runForced(){
 		for(int i=0;i<num_threads-1;i++){
 			
 			if(debug_bit>2) mexPrintf("Sending a thread for indices %d to %d\n", current_idx, current_idx+step);
-			t.push_back(std::thread(&Photometry::runForced_idx, this, current_idx, current_idx+step, shift_idx));
+			t.push_back(std::thread(&Photometry::runForced_idx, this, current_idx, current_idx+step));
 			current_idx+=step; 
 			
 		}
 		
 		if(debug_bit>2) mexPrintf("Running on main thread indices %d to %d\n", current_idx, num_cutouts);
-		runForced_idx(current_idx,num_cutouts, shift_idx); // run the remaining cutouts on the main thread! 
+		runForced_idx(current_idx,num_cutouts); // run the remaining cutouts on the main thread! 
 		
 		for(int i=0;i<num_threads-1;i++){
 			t[i].join();
@@ -1082,17 +1133,17 @@ void Photometry::runForced(){
 	
 }
 
-void Photometry::runForced_idx(int start_idx, int end_idx, int shift_idx){
+void Photometry::runForced_idx(int start_idx, int end_idx){
 	
 	for(int j=start_idx;j<end_idx;j++){ // partial list of cutouts
 			
-			calculateForced(j, shift_idx);
+			calculateForced(j);
 			
 	} // for j
 	
 }
 
-void Photometry::calculateForced(int j, int idx){
+void Photometry::calculateForced(int j){
 
 	float *image=&cutouts[j*N]; // a pointer to the raw data
 
@@ -1109,8 +1160,7 @@ void Photometry::calculateForced(int j, int idx){
 	float *bad_pixels=output[IDX_BAD];
 	float *flag=output[IDX_FLAG];
 	
-	// NOTE: idx is given from outside, with the correct position from the avergae offset of all cutouts!
-	//idx=getShiftIndex(best_offset_x[j],best_offset_y[j]); // the updated centroid
+	int idx=getShiftIndex(average_offset_x[j], average_offset_y[j]); // the average centroid
 	
 	float annulus_pixels=countNonNaNsIndices(image, annulus_indices, idx); // how many non-NaN do we have in this annulus?
 	background[j]=sumIndices(image, annulus_indices, idx)/annulus_pixels; 	
@@ -1193,6 +1243,57 @@ float Photometry::getWidthFromMoments(float m2x, float m2y, float mxy){ // calcu
 
 }
 
+void Photometry::calcFrameAverages(float **output, int num_radii){ // save the average offset_x, offset_y and width for each frame
+
+	int num_frames=dims[2]; // assume dim 3 is the frame counter! 
+	int num_stars=dims[3]; // which also means each star's light is continuous in memory
+	
+	for(int i=0;i<num_frames;i++){ // this is an inefficient way to traverse the memory but I don't think it is very important
+	
+		// these will be used to find the average offsets/width for this frame
+		float sum_x=0;
+		float sum_y=0;
+		float sum_w=0;
+		float sum_f=0; // total flux in each frame
+		
+		for(int j=0;j<num_stars;j++){
+			
+			if(output[IDX_FLAG][i+j*num_frames+(num_radii-1)*num_cutouts]==0){ // don't take any flagged frames
+
+				// notice that the stars are picked from each frame
+				float flux=output[IDX_FLUX][i+j*num_frames+(num_radii-1)*num_cutouts]; 
+				sum_f+=flux;
+				sum_x+=output[IDX_DX][i+j*num_frames+(num_radii-1)*num_cutouts]*flux; 
+				sum_y+=output[IDX_DY][i+j*num_frames+(num_radii-1)*num_cutouts]*flux; 
+				sum_w+=output[IDX_WD][i+j*num_frames+(num_radii-1)*num_cutouts]*flux;
+				
+			}
+		}// for j (stars)
+	
+		if(sum_f>0){ 
+			sum_x/=sum_f;
+			sum_y/=sum_f;
+			sum_w/=sum_f;
+		}
+		else{
+			sum_x=0;
+			sum_y=0;
+			sum_w=0;
+		}
+	
+		for(int j=0;j<num_stars;j++){
+		
+			average_offset_x[i+j*num_frames]=sum_x;
+			average_offset_y[i+j*num_frames]=sum_y;
+			average_width[i+j*num_frames]=sum_w;
+		
+		}// for j (stars)
+	
+	}// for i (frames)
+
+}
+
+// these are obsolete
 float Photometry::getAverageWidth(float **output){ // calculate the average width from all the good measurements in this output type
 
 	float sum=0;
@@ -1255,11 +1356,21 @@ float Photometry::getAverageOffsetY(float **output){ // get the "flux weighted" 
 
 // ARRAY ARITHMETIC
 
-int Photometry::countNaNs(const float *array){ // check if an array has all NaN values
+int Photometry::countNaNs(const float *array){ // count the number of NaNs in the array
 	
 	int num_nans=0;
 	
 	for(int i=0;i<N; i++) if(array[i]!=array[i]) { num_nans++; } // NOTE: the array[i]!=array[i] test is much MUCH faster than testing isnan(array[i]) or even _isnanf(array[i]). 
+		
+	return num_nans;
+	
+}
+
+float Photometry::countNaNs(const float *array, const float *array2){ // count the number of NaNs weighted by a mask in array2
+	
+	float num_nans=0;
+	
+	for(int i=0;i<N; i++) if(array[i]!=array[i]) { num_nans+=array2[i]; } // NOTE: the array[i]!=array[i] test is much MUCH faster than testing isnan(array[i]) or even _isnanf(array[i]). 
 		
 	return num_nans;
 	
