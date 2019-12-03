@@ -79,6 +79,8 @@ classdef CurveGenerator < handle
         use_geometric = 0;
         use_clipping = 0;
         
+        use_residual_geometric = 0; % use this to calculate only the residual between geometric and diffractive lightcurves
+        
         rho_range = [0 10]; 
         rho_step = 0.01;
         
@@ -1222,12 +1224,14 @@ classdef CurveGenerator < handle
                 
             else
                 
+                obj.rho_range = [0 2*R+max(10,r*2)];
+                
                 amp_vector = obj.makeAmplitudeVector(r);
             
                 N = size(amp_vector,1);
                 margin1 = 2*ceil(R./obj.rho_step); % include enough margin to convolve with a wide star
                 margin2 = 2*ceil((R+obj.b_range(2))./obj.rho_step); % include enough margin to convolve and to have impact parameter
-                [X,Y] = meshgrid(-margin1:margin2, -max(N, margin1):max(N, margin1)); 
+                [X,Y] = meshgrid(-max(N, margin1):max(N, margin1), -margin2:margin2); 
                 
                 idx = round(sqrt(X.^2+Y.^2));
                 idx2 = idx;
@@ -1340,7 +1344,22 @@ classdef CurveGenerator < handle
 
                 for ii = 1:length(obj.r)
                     % these sort-of arbitrary conditions allow for smooth transitions between geometric approx. S/N and diffractive S/N
-                    if obj.use_geometric && obj.R(ii)>obj.geometric_limit_R && obj.r(ii)>=obj.geometric_limit_r
+                    if obj.use_residual_geometric % trick mode to calculate the difference between geometric and diffractive
+                    
+                        [I, x_steps, y_steps] = obj.makeIntensityMap(obj.r(ii), obj.R(ii), obj.r2(ii), obj.d(ii), obj.th(ii));
+                        [~, x0_idx] = min(abs(obj.b(ii)-x_steps.*obj.rho_step)); % find the index of x closest to the impact parameter we want
+                        high_res_lc2 = I(:,x0_idx); 
+                        rho2 = y_steps.*obj.rho_step;
+                        
+                        obj.rho_range = [0, max(rho2)]; 
+                        obj.rho_axis = [];
+                        high_res_lc = obj.geometricLightcurve(obj.r(ii), obj.R(ii), obj.b(ii)); 
+                        high_res_lc = [flip(high_res_lc); high_res_lc(2:end)];
+                        rho = [-flip(obj.rho_axis); obj.rho_axis(2:end)];
+                        
+                        high_res_lc = high_res_lc2 - high_res_lc + 1;
+                        
+                    elseif obj.use_geometric && obj.R(ii)>obj.geometric_limit_R && obj.r(ii)>=obj.geometric_limit_r
                         
                         high_res_lc = obj.geometricLightcurve(obj.r(ii), obj.R(ii), obj.b(ii)); 
                         high_res_lc = [flip(high_res_lc); high_res_lc(2:end)];
@@ -1349,12 +1368,7 @@ classdef CurveGenerator < handle
                     else % use full diffractive calculation
                     
                         [I, x_steps, y_steps] = obj.makeIntensityMap(obj.r(ii), obj.R(ii), obj.r2(ii), obj.d(ii), obj.th(ii));
-
                         [~, x0_idx] = min(abs(obj.b(ii)-x_steps.*obj.rho_step)); % find the index of x closest to the impact parameter we want
-%                         [~, y0_idx] = min(abs(y_steps)); % find the index of y closest to zero
-
-%                         high_res_lc = [I(end:-1:y0_idx+1,x0_idx); I(y0_idx:end,x0_idx)]; % a cut through the 2D map and the reflection
-%                         rho = [-y_steps(end:-1:y0_idx+1); y_steps(y0_idx:end)].*obj.rho_step; % the same reflection in the y axis, translated to (FSU)
                         high_res_lc = I(:,x0_idx); 
                         rho = y_steps.*obj.rho_step;
 
