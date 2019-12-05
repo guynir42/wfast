@@ -20,7 +20,7 @@ function M_out = conv_f(kernel, image, varargin)
     
     conjugate = 0;
     crop = 'full';
-    mem_limit_gb = 30;
+    mem_limit_gb = util.sys.free_ram('GBs');
     use_fft = [];
     
     if ~isempty(varargin) && mod(length(varargin),2)==1
@@ -63,6 +63,8 @@ function M_out = conv_f(kernel, image, varargin)
     
     S = SK + SI - 1;
     
+    bytes = max(util.sys.getElementSize(image), util.sys.getElementSize(kernel)); % number of bytes per pixel
+    
     if ~use_fft % just skip using fft
         if cs(crop, 'full')
             M_out = zeros([S size(image,3)], 'like', image);
@@ -91,7 +93,7 @@ function M_out = conv_f(kernel, image, varargin)
             end
         end
         
-    elseif S(1)*S(2)*size(image,3)*16*4>1024^3*mem_limit_gb % out of memory, use conv_f on slices 
+    elseif S(1)*S(2)*size(image,3)*bytes*4>1024^3*mem_limit_gb % out of memory, use conv_f on slices 
         
         if size(image,3)>1 || size(image,4)>1
 
