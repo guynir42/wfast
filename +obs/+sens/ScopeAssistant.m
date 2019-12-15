@@ -31,7 +31,7 @@ classdef ScopeAssistant < handle
     
     properties % switches/controls
         
-        port_name = 'COM20'; % used only for USB (not used now)
+        port_name = 'COM25'; % used only for USB (not used now)
         bluetooth_name = 'HC-06'; 
         bluetooth_id = ''; 
         

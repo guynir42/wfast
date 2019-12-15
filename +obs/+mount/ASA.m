@@ -1116,7 +1116,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             try
                
                 if obj.use_accelerometer
-                    if obj.ard.status==0
+                    if isempty(obj.ard) || obj.ard.status==0
                         obj.connectArduino;
                     end
                 end
@@ -1182,7 +1182,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             obj.sync.outgoing.TELRA_DEG = obj.telRA_deg;
             obj.sync.outgoing.TELDEC_DEG = obj.telDEC_deg;
             
-            if obj.tracking==0 || (~isempty(obj.objRA_deg) && abs(obj.objRA_deg-obj.telRA_deg)>1) % if mount stops tracking or is 4 time-minutes away from target RA, stop the camera (e.g., when reaching limit)
+            if isempty(obj.tracking) || obj.tracking==0 || (~isempty(obj.objRA_deg) && abs(obj.objRA_deg-obj.telRA_deg)>1) % if mount stops tracking or is 4 time-minutes away from target RA, stop the camera (e.g., when reaching limit)
                 obj.sync.outgoing.stop_camera = 1;
             else
 %                 obj.sync.outgoing.stop_camera = 0;

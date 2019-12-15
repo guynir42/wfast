@@ -54,6 +54,9 @@ classdef SensorChecker < handle
         humid_all;
         humid_jul;
         
+        wise_data_raw;
+        wise_data_struct;
+        
         status = 1;
         sensors_ok = 1;
         report = 'OK';
@@ -79,6 +82,8 @@ classdef SensorChecker < handle
         min_humid = -Inf;
         
         show_day_frac = 0.2; % what fraction of a day to plot back on GUI
+        
+        use_wise_data = 1;
         
         debug_bit = 1;
         
@@ -305,7 +310,7 @@ classdef SensorChecker < handle
                     end
                 end
             end
-             
+            
         end
         
     end
@@ -334,7 +339,6 @@ classdef SensorChecker < handle
                 elseif isprop(sens, 'daylight')
                     new_val = sens.daylight;
                 end
-                
                 
                 if ~isempty(new_val)
                     
@@ -662,7 +666,28 @@ classdef SensorChecker < handle
             
         end
         
+        function getWiseData(obj) % call the Wise computer and ask for all the weather data
+            
+            % I got this string from Arie, and had to install cURL for windows but now it works. Note the use of double quotes
+            [rc,rv] = system('curl --connect-timeout 2 --silent -X PUT --header "Content-Type: application/x-www-form-urlencoded" --header "Accept: application/json" --data "Action=raw-weather-data&Parameters=" http://132.66.65.9:11111/api/v1/safetymonitor/0/action');
+            
+            if rc==0
+                
+                obj.wise_data_raw = rv;
+                
+                value = jsondecode(rv); 
+                
+                obj.wise_data_struct = jsondecode(value.Value); 
+                
+            end
+            
+        end
+                    
         function collect_all(obj)
+            
+            if obj.use_wise_data
+                obj.getWiseData; % first make sure all virtual sensors are updated
+            end
             
             str = ''; % this is filled logged in weather-log
             obj.collect_light;

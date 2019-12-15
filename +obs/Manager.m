@@ -632,6 +632,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     obj.shutdown;
                 end
             end
+            
+            if obj.use_shutdown && obj.checkDayTime % check if the system clock says it is day time
+                if obj.is_shutdown==0 % if already shut down, don't need to do it again
+                    obj.shutdown;
+                end
+            end
 
             if ~isempty(obj.gui) && obj.gui.check
                 obj.gui.update;
@@ -663,6 +669,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             end
             
             % add maybe checks for boltwood if we think it is critical?
+            
+        end
+        
+        function val = checkDayTime(obj) % return true if it is day time according to the system clock
+            
+            time = datetime('now', 'TimeZone', 'Asia/Jerusalem');
+            
+            if time.Hour>7 || time.Hour<16
+                val = 1;
+            else
+                val = 0;
+            end
             
         end
         

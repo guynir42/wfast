@@ -259,10 +259,12 @@ classdef ManagerGUI < handle
                 obj.buttons{ii}.update;
             end
             
-            if obj.owner.mount.telRA_deg<obj.owner.mount.LST_deg && strcmp(obj.owner.mount.hndl.SideOfPier, 'pierWest')
-                obj.panel_telescope.button_RA.BackgroundColor = 'red';
-            else
-                obj.panel_telescope.button_RA.BackgroundColor = util.plot.GraphicButton.defaultColor;
+            if ~isempty(obj.owner.mount) && ~isempty(obj.owner.mount.telRA_deg) && ~isempty(obj.owner.mount.hndl.SideOfPier)
+                if obj.owner.mount.telRA_deg<obj.owner.mount.LST_deg && strcmp(obj.owner.mount.hndl.SideOfPier, 'pierWest')
+                    obj.panel_telescope.button_RA.BackgroundColor = 'red';
+                else
+                    obj.panel_telescope.button_RA.BackgroundColor = util.plot.GraphicButton.defaultColor;
+                end
             end
             
             if obj.owner.mount.telALT<20
@@ -275,20 +277,20 @@ classdef ManagerGUI < handle
                 obj.panel_dome.button_shutter_west.String = 'Shut.West: error';
                 obj.panel_dome.button_shutter_east.String = 'Shut.East: error';
             else
-                if obj.owner.dome.shutter_west_deg==0
+                if obj.owner.dome.shutter1_deg==0
                     obj.panel_dome.button_shutter_west.String = sprintf('Shut.West: open');
-                elseif obj.owner.dome.shutter_west_deg==90
+                elseif obj.owner.dome.shutter1_deg==90
                     obj.panel_dome.button_shutter_west.String = sprintf('Shut.West: closed');
                 else
-                    obj.panel_dome.button_shutter_west.String = sprintf('Shut.West: %d deg', round(obj.owner.dome.shutter_west_deg));
+                    obj.panel_dome.button_shutter_west.String = sprintf('Shut.West: %d deg', round(obj.owner.dome.shutter1_deg));
                 end
                 
-                if obj.owner.dome.shutter_east_deg==0
+                if obj.owner.dome.shutter2_deg==0
                     obj.panel_dome.button_shutter_east.String = sprintf('Shut.East: open');
-                elseif obj.owner.dome.shutter_east_deg==90
+                elseif obj.owner.dome.shutter2_deg==90
                     obj.panel_dome.button_shutter_east.String = sprintf('Shut.East: closed');
                 else
-                    obj.panel_dome.button_shutter_east.String = sprintf('Shut.East: %d deg', round(obj.owner.dome.shutter_east_deg));
+                    obj.panel_dome.button_shutter_east.String = sprintf('Shut.East: %d deg', round(obj.owner.dome.shutter2_deg));
                 end
                 
             end

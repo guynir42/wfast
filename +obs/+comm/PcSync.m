@@ -49,7 +49,7 @@ classdef PcSync < handle
         raw_data_rx_temp; % for broken up incoming messages
         raw_data_tx_temp;
         
-        default_client_remote_ip = '192.168.1.102';
+        default_client_remote_ip = '192.168.1.101';
         default_server_remote_ip = '0.0.0.0';
         
         default_server_remote_port_rx = 4012;
