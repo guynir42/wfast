@@ -206,12 +206,16 @@ classdef ManagerGUI < handle
             pos = pos - N;
             
             obj.panel_weather = GraphicPanel(obj.owner, [0.2, pos/N_middle, 0.6, N/N_middle], 'weather');
-            obj.panel_weather.addButton('button_temp', 'average_temp', 'info', 'Amb. Temp= ', 'C', '', 1/3);
-            obj.panel_weather.addButton('button_clouds', 'average_clouds', 'info', 'dT= ', 'C', '', 1/3);
-            obj.panel_weather.addButton('button_light', 'average_light', 'info', 'Light= ', '', '', 1/3);
-            obj.panel_weather.addButton('button_wind', 'average_wind', 'info', 'wind= ', ' km/h', '', 1/3);
-            obj.panel_weather.addButton('button_wind_az', 'average_wind_az', 'info', 'wind az= ', ' deg', '', 1/3);
-            obj.panel_weather.addButton('button_hummid', 'average_humid', 'info', 'humidity= ', '%', '', 1/3);
+            obj.panel_weather.addButton('button_temperature', 'average_temperature', 'info', 'Amb. Temp= ', 'C', '', 1/4);
+            obj.panel_weather.addButton('button_clouds', 'average_clouds', 'info', 'dT= ', 'C', '', 1/4);
+            obj.panel_weather.addButton('button_light', 'average_light', 'info', 'Light= ', '', '', 1/4);
+            obj.panel_weather.addButton('button_pressure', 'average_pressure', 'info', 'Pres= ', '', '', 1/4); 
+            
+            obj.panel_weather.addButton('button_wind_speed', 'average_wind_speed', 'info', 'wind= ', ' km/h', '', 1/4);
+            obj.panel_weather.addButton('button_wind_dir', 'average_wind_dir', 'info', 'wind dir= ', ' deg', '', 1/4);
+            obj.panel_weather.addButton('button_humidity', 'average_humidity', 'info', 'humid= ', '%', '', 1/4);
+            obj.panel_weather.addButton('button_rain', 'any_rain', 'info', 'rain= ', '', '', 1/4);
+            
             obj.panel_weather.margin = [0.01 0.01];
             obj.panel_weather.number = N;
             
@@ -277,20 +281,20 @@ classdef ManagerGUI < handle
                 obj.panel_dome.button_shutter_west.String = 'Shut.West: error';
                 obj.panel_dome.button_shutter_east.String = 'Shut.East: error';
             else
-                if obj.owner.dome.shutter1_deg==0
+                if obj.owner.dome.shutter_west_deg==0
                     obj.panel_dome.button_shutter_west.String = sprintf('Shut.West: open');
-                elseif obj.owner.dome.shutter1_deg==90
+                elseif obj.owner.dome.shutter_west_deg==90
                     obj.panel_dome.button_shutter_west.String = sprintf('Shut.West: closed');
                 else
-                    obj.panel_dome.button_shutter_west.String = sprintf('Shut.West: %d deg', round(obj.owner.dome.shutter1_deg));
+                    obj.panel_dome.button_shutter_west.String = sprintf('Shut.West: %d deg', round(obj.owner.dome.shutter_west_deg));
                 end
                 
-                if obj.owner.dome.shutter2_deg==0
+                if obj.owner.dome.shutter_east_deg==0
                     obj.panel_dome.button_shutter_east.String = sprintf('Shut.East: open');
-                elseif obj.owner.dome.shutter2_deg==90
+                elseif obj.owner.dome.shutter_east_deg==90
                     obj.panel_dome.button_shutter_east.String = sprintf('Shut.East: closed');
                 else
-                    obj.panel_dome.button_shutter_east.String = sprintf('Shut.East: %d deg', round(obj.owner.dome.shutter2_deg));
+                    obj.panel_dome.button_shutter_east.String = sprintf('Shut.East: %d deg', round(obj.owner.dome.shutter_east_deg));
                 end
                 
             end

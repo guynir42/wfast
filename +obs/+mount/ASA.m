@@ -231,14 +231,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 end
 
             end
-
-            if isempty(obj.ard.telescope)
-                obj.ard.telescope = obj;
-            end
             
-            obj.ard.connect;
-                    
-            obj.ard.update;
+            if ~isempty(obj.ard)
+                
+                if isempty(obj.ard.telescope)
+                    obj.ard.telescope = obj;
+                end
+
+                obj.ard.connect;
+
+                obj.ard.update;
+
+            end
             
         end
         

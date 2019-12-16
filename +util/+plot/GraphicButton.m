@@ -345,7 +345,13 @@ classdef GraphicButton < handle
                     S(ii) = struct('type', '.', 'subs', vars{ii});
                 end
 
-                val = subsref(obj.owner, S);
+                if isempty(obj) || isempty(obj.owner)
+                    val = [];
+                elseif length(S)>1 && isempty(subsref(obj.owner, S(1)))
+                    val = [];
+                else
+                    val = subsref(obj.owner, S);
+                end
                 
             end
             

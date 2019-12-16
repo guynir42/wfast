@@ -29,6 +29,8 @@ classdef WindETH < handle
         % generic fields
         id = 'wind';
         status = 0; % false - readings are unreliable, true - ok
+        use_this = 1; % is true get the data from this sensor. If not, ignore it and move on
+        
         data@util.vec.CircularBuffer; % Stack object containing data history
         dataCol = {'JD','WindSpeed','WindAz'};   % Stack object columns
         dataUnits = {'day','km/h','deg'};          % Stack object column units

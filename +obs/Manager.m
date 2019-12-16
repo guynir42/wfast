@@ -392,39 +392,51 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function val = average_temp(obj) % average of all sensors that can measure this
+        function val = average_temperature(obj) % average of all sensors that can measure this
             
-            val = mean(obj.checker.temp_now, 'omitnan');
+            val = nanmean(obj.checker.temperature.now);
             
         end
         
         function val = average_clouds(obj) % average of all sensors that can measure this
             
-            val = mean(obj.checker.clouds_now, 'omitnan');
+            val = nanmean(obj.checker.clouds.now);
             
         end
         
         function val = average_light(obj) % average of all sensors that can measure this
             
-            val = mean(obj.checker.light_now, 'omitnan');
+            val = nanmean(obj.checker.light.now);
             
         end
         
-        function val = average_wind(obj) % average of all sensors that can measure this
+        function val = average_wind_speed(obj) % average of all sensors that can measure this
             
-            val = mean(obj.checker.wind_now, 'omitnan');
-            
-        end
-        
-        function val = average_wind_az(obj) % average of all sensors that can measure this
-            
-            val = mean(obj.checker.wind_az_now, 'omitnan');
+            val = nanmean(obj.checker.wind_speed.now);
             
         end
         
-        function val = average_humid(obj) % average of all sensors that can measure this
+        function val = average_wind_dir(obj) % average of all sensors that can measure this
             
-            val = mean(obj.checker.humid_now, 'omitnan');
+            val = nanmean(obj.checker.wind_dir.now);
+            
+        end
+        
+        function val = average_humidity(obj) % average of all sensors that can measure this
+            
+            val = nanmean(obj.checker.humidity.now);
+            
+        end
+        
+        function val = average_pressure(obj)
+            
+            val = nanmean(obj.checker.pressure.now);
+        
+        end
+        
+        function val = any_rain(obj)
+            
+            val = any(obj.checker.rain.now); 
             
         end
         
@@ -707,11 +719,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
             end
             
-            obj.sync.outgoing.TEMP_OUT = mean(obj.checker.temp_now, 'omitnan');
-            obj.sync.outgoing.WIND_DIR = mean(obj.checker.wind_az_now, 'omitnan');
-            obj.sync.outgoing.WIND_SPEED = mean(obj.checker.wind_now, 'omitnan');
-            obj.sync.outgoing.HUMID_OUT = mean(obj.checker.humid_now, 'omitnan');
-            obj.sync.outgoing.LIGHT = mean(obj.checker.light_now, 'omitnan');
+            obj.sync.outgoing.TEMP_OUT = obj.average_temperature;
+            obj.sync.outgoing.WIND_DIR = obj.average_wind_dir;
+            obj.sync.outgoing.WIND_SPEED = obj.average_wind_speed;
+            obj.sync.outgoing.HUMID_OUT = obj.average_humidity;
+            obj.sync.outgoing.LIGHT = obj.average_light; 
+            obj.sync.outgoing.PRESSURE = obj.average_pressure; 
             
             if obj.dome.is_closed
                 
