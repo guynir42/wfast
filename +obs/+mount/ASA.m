@@ -266,8 +266,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function loadServer(obj)
             
 %             system('C:\Program Files (x86)\Autoslew\AstroOptikServer.exe &'); % call the system command to load the server outside of matlab 
-            system('D:\matlab\wfast\+obs\+mount\launch_server.bat &'); % call the batch file to load the server then exit the cmd
-            
+%             system('D:\matlab\wfast\+obs\+mount\launch_server.bat &'); % call the batch file to load the server then exit the cmd
+            system(fullfile(getenv('WFAST'), '+obs\+mount\launch_server.bat &')); % call the batch file to load the server then exit the cmd
+
             tic;
             
             for ii = 1:100
