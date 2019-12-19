@@ -6,7 +6,7 @@ classdef Deflator < file.AstroData
         
         prog@util.sys.ProgressBar;
         
-        timer@timer;
+        timer;
         
     end
     

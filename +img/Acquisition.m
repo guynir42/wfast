@@ -83,16 +83,19 @@ classdef Acquisition < file.AstroData
         % these swithces determine how stars are picked when run begins
         detect_thresh = 10; % minimal S/N of the stack stars for selecting cutouts
         use_remove_bad_pixels = true;
-        use_remove_saturated = false; % remove all stars with any pixels about saturation value
+        use_remove_saturated = false; % remove all stars with any pixels above saturation value
         saturation_value = 50000; % consider any pixels above this to be saturated
         min_star_temp; % set a lower limit on temperature of stars for findStarsMAAT;
         
         use_quick_find_stars = true; % use new method that runs faster
         use_mextractor = false; % use mextractor to identify stars and find their WCS and catalog mag/temp
+        use_astrometry = false; % calculate the star positions matched to GAIA DR2 and save catalog
         use_arbitrary_pos = false; % don't look for stars (e.g., when testing with the dome closed)
         
         use_cutouts = true;
         use_adjust_cutouts = 1; % use adjustments in software (not by moving the mount)
+        use_lock_adjust = 0; % make all cutouts move together based on the average drift
+        
         use_simple_photometry = 1; % use only sums on the cutouts instead of Photometry object for full cutouts
         
         use_model_psf = 1;
@@ -329,7 +332,9 @@ classdef Acquisition < file.AstroData
 
         function setupDefaults(obj)
 
-            obj.num_batches = 500;
+            obj.total_runtime = 60;
+            obj.runtime_units = 'minutes';
+%             obj.num_batches = 500;
             obj.batch_size = 100;
             
             obj.num_stars = 1000;
@@ -1299,7 +1304,6 @@ classdef Acquisition < file.AstroData
             
         end
         
-        
     end
     
     methods % commands/calculations
@@ -1429,7 +1433,6 @@ classdef Acquisition < file.AstroData
                 if obj.use_save && obj.use_autodeflate
                     obj.deflator.setup_timer;
                 end
-                    
                 
                 obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
                 
@@ -1982,6 +1985,18 @@ classdef Acquisition < file.AstroData
             obj.expT = obj.fast_mode_expT;
             obj.frame_rate = obj.fast_mode_frame_rate;
             obj.batch_size = obj.fast_mode_batch_size;
+            
+        end
+        
+        function startLiveView(obj)
+            
+            if ~isempty(obj.cam.gui) && obj.cam.gui.check
+                figure(obj.cam.gui.fig.fig)
+            else
+                obj.cam.makeGUI;
+            end
+            
+            obj.cam.live;
             
         end
         

@@ -332,7 +332,7 @@ classdef MenuItem < dynamicprops
             elseif cs(obj.type, 'info')
                 obj.Callback = '';
                 obj.str_format = obj.Text; % the text field is used as the string format...
-            elseif cs(obj.type', 'custom')
+            elseif cs(obj.type, 'custom')
                 obj.Callback = '';
             else
                 error('Unknown menu item type "%s". Use "menu", "toggle", "push", "input", "input_text", "info" or "custom".', obj.type);
@@ -395,7 +395,8 @@ classdef MenuItem < dynamicprops
         
         function str = getFormattedVariable(obj)
             
-            val = obj.owner.(obj.variable);
+%             val = obj.owner.(obj.variable);
+            val = obj.getVariable;
             
             if ischar(val)
 %                 str = val;

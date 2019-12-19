@@ -117,19 +117,69 @@ classdef AcqGUI < handle
             % menu types: menu, toggle, push, input, input_text, info, custom
             
             obj.menu_options = MenuItem(obj, '&Options', 'menu');
-            obj.menu_options.addButton('menu_cutouts', '&Cutouts', 'menu');
+            
             obj.menu_options.addButton('menu_parameters', '&Parameters', 'menu');
-            obj.menu_options.addButton('menu_header', '&Header', 'menu');
-            
-            obj.menu_options.menu_cutouts.addButton('button_num_stars', 'Num &Stars', 'input', 'num_stars', 'Maximum number of cutouts around stars');
-            obj.menu_options.menu_cutouts.addButton('button_cut_size', '&Cutout size', 'input', 'cut_size', 'Size of star cutouts (pixels)');
-            % add edges and background cutouts 
-            % add latest_error/warning to MenuItem
-            
             obj.menu_options.menu_parameters.addButton('button_expT', 'exp&T= %6.3f s', 'input', 'expT', 'Exposure time for each frame (seconds)');
             obj.menu_options.menu_parameters.addButton('button_frame_rate', '&Frame_rate= %6.3f Hz', 'input', 'frame_rate', 'frame rate (cadence) given in Hz');
             
+            obj.menu_options.addButton('menu_header', '&Header', 'menu');
             obj.menu_options.menu_header.addButton('button_object', '&Object: %s', 'input_text', 'run_name', 'object or field name (used for naming the data folder');
+            obj.menu_options.menu_header.addButton('button_ra', '&RA: %s', 'input_text', 'pars.RA', 'object right ascention (hours)');
+            obj.menu_options.menu_header.addButton('button_dec', '&Dec: %s', 'input_text', 'pars.Dec', 'object declination (degrees)');
+            
+            
+            obj.menu_options.addButton('menu_find_stars', '&Find stars', 'menu');
+            obj.menu_options.menu_find_stars.addButton('button_astrometry', '&Astrometry', 'toggle', 'use_astrometry', 'use astrometry (with GAIA DR2) to get star positions/magnitudes');
+            obj.menu_options.menu_find_stars.addButton('button_mextractor', '&Mextractor', 'toggle', 'use_mextractor', 'use mextractor to find the star positions');
+            obj.menu_options.menu_find_stars.addButton('button_arbitrary', '&Arbitrary pos', 'toggle', 'use_arbitrary_pos', 'set random cutout positions (debugging only!)');
+            obj.menu_options.menu_find_stars.addButton('button_threshold', '&Threshold', 'input', 'detect_thresh', 'threshold for detection in stack image (noise rms)');
+            obj.menu_options.menu_find_stars.addButton('button_bad_pixels', '&Bad pixels', 'toggle', 'use_remove_bad_pixels', 'remove bad pixels before finding stars');
+            obj.menu_options.menu_find_stars.addButton('button_saturated', '&Remove saturated', 'toggle', 'use_remove_saturated', 'remove any stars with any saturated pixels');
+            obj.menu_options.menu_find_stars.addButton('button_sat_value', '&Saturation value', 'input', 'saturation_value', 'what pixel value is considered saturated');
+            obj.menu_options.menu_find_stars.addButton('button_min_temp', '&Minimal temperature', 'input', 'min_star_temp', 'take only stars with temperature above this value (Kelvin). Works only with astrometry');
+            
+            obj.menu_options.addButton('menu_cutouts', '&Cutouts', 'menu');
+            obj.menu_options.menu_cutouts.addButton('button_num_stars', '&Num stars', 'input', 'num_stars', 'Maximum number of cutouts around stars');
+            obj.menu_options.menu_cutouts.addButton('button_cut_size', '&Cutout size', 'input', 'cut_size', 'Size of star cutouts (pixels)');
+            obj.menu_options.menu_cutouts.addButton('button_egdes', '&Edge distance', 'input', 'avoid_edges', 'Distance from edges to avoid finding stars (pixels)');
+            obj.menu_options.menu_cutouts.addButton('button_num_bgs', 'Num &Backgrounds', 'input', 'num_backgrounds', 'Number of background cutouts');
+            obj.menu_options.menu_cutouts.addButton('button_size_bgs', '&Background &size', 'input', 'cut_size_bg', 'Size of background cutouts (pixels)');
+            obj.menu_options.menu_cutouts.addButton('button_adjust', '&Adjust cutouts', 'toggle', 'use_adjust_cutouts', 'Toggle cutout adjustments: reposition cutouts based on centroids');
+            obj.menu_options.menu_cutouts.addButton('button_lock_adjust', '&Lock adjust', 'toggle', 'use_lock_adjust', 'Toggle cutout adjust lock: all cutouts would move together');
+            
+            obj.menu_options.addButton('menu_photometry', '&Photometry', 'menu');
+            obj.menu_options.menu_photometry.addButton('button_use_simple', '&Simple photometry', 'toggle', 'use_simple_photometry', 'just sum the cutouts, not using Photometry/Lightcurve objects');
+            obj.menu_options.menu_photometry.addButton('button_model_psf', '&PSF model', 'toggle', 'use_model_psf', 'stack the cutouts and fit it to a PSF model');
+
+            
+            obj.menu_options.addButton('menu_sync', '&Synchronization', 'menu');
+            obj.menu_options.menu_sync.addButton('button_use_sync', '&Use sync', 'toggle', 'use_sync', 'use the sync between the two computers');
+            obj.menu_options.menu_sync.addButton('button_ignore_manager', '&Ignore manager', 'toggle', 'use_ignore_manager', 'when true, Acquisition will ignore all commands from Manager');
+            obj.menu_options.menu_sync.addButton('button_stop', 'Sync &stop', 'toggle', 'use_sync_stop', 'when true, will stop camera when given command from Manager, when dome is close, when telescope is not tracking');
+            obj.menu_options.menu_sync.addButton('button_guiding', '&Guiding', 'toggle', 'use_autoguide', 'use this to pass position data back to mount');
+            
+            obj.menu_options.addButton('menu_deflate', '&Deflate', 'menu');
+            obj.menu_options.menu_deflate.addButton('button_autodeflate', '&Autodeflate', 'toggle', 'use_autodeflate', 'turn on the deflate automatically in the morning');
+
+
+            
+            
+            % add latest_error/warning to MenuItem
+            
+            obj.menu_objects = MenuItem(obj, 'O&bjects', 'menu');
+            obj.menu_objects.addButton('button_camera', '&Camera', 'push', 'cam', 'Start the camera GUI'); 
+            obj.menu_objects.addButton('button_header', '&Header', 'push', 'pars', 'Start the header object GUI'); 
+            obj.menu_objects.addButton('button_calibration', 'C&alibration', 'push', 'cal', 'Start the Calibration object GUI'); 
+            obj.menu_objects.addButton('button_clipper', 'C&lipper', 'push', 'clip', 'Start the Clipper GUI'); 
+            obj.menu_objects.addButton('button_photometry', '&Photometry', 'push', 'phot', 'Start the Photometry GUI'); 
+            obj.menu_objects.addButton('button_lightcurves', '&Lightcurves', 'push', 'lightcurves', 'Start the Lightcurves GUI'); 
+            obj.menu_objects.addButton('button_buffers', '&Buffers', 'push', 'buf', 'Start the BufferWheel GUI'); 
+            obj.menu_objects.addButton('button_focuser', '&Focuser', 'custom', '', 'Start the Focuser GUI'); 
+            obj.menu_objects.addButton('button_deflator', '&Deflator', 'push', 'deflator', 'Start the Deflator GUI'); 
+
+            obj.menu_objects.button_focuser.Callback = @obj.callback_focuser;
+            
+            %%%%%%%%%%%%%%% BUTTONS %%%%%%%%%%%%%%%%%
             
             N_left = 15;
             N_right = 15;
@@ -152,7 +202,7 @@ classdef AcqGUI < handle
             obj.panel_controls.addButton('button_single', 'single', 'push', 'Take single exposure', '', '', [], '', '', 'Take a single image and show it on screen. Does not save the image to file');
             obj.panel_controls.addButton('button_live', 'startLiveView', 'push', 'Start live view', '', '', [], '', '', 'Open the camera GUI and start the live-view video mode. Does not save any images to file');
             obj.panel_controls.addButton('button_auto_focus', 'runFocus', 'push', 'Auto-focus', '', '', 0.7, '', '', 'Start a focus-run. Does not save any images to file');
-            obj.panel_controls.addButton('button_manual_focus', '', 'custom', 'manual', '', '', 0.3, '', '', 'open the focuse GUI for manual focusing');
+            obj.panel_controls.addButton('button_manual_focus', '', 'custom', 'manual', '', '', 0.3, '', '', 'open the focus GUI for manual focusing');
             obj.panel_controls.addButton('button_preview', '', 'custom', 'Preview run', '', '', [], '', '', 'Start a preview run, checking full acquisition pipeline. Does not save any images to file');
             
             obj.panel_controls.margin = [0.02 0.01];
