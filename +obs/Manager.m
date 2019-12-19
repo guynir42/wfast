@@ -688,7 +688,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             time = datetime('now', 'TimeZone', 'Asia/Jerusalem');
             
-            if time.Hour>7 || time.Hour<16
+            if time.Hour>7 && time.Hour<16
                 val = 1;
             else
                 val = 0;

@@ -77,27 +77,11 @@ classdef SensorChecker < handle
     
     properties % switches/controls
         
-%         max_light = 250; % units??
-%         min_light = -Inf;
-        
-%         max_clouds = -15; % negative --> cloudy (clear days have -30 or -20, very cloudy is -10)
-%         min_clouds = -Inf; % degree difference to sky
-        
-%         max_temp = 30; % night time temperature
-%         min_temp = 0; % in C obviously
-        
-%         max_wind = 50; % km/h
-%         min_wind = -Inf;
-        
-%         max_humid = 85; % percent
-%         min_humid = -Inf;
-        
-%         max_pressure = Inf; % millibar
-%         min_pressure = -Inf; 
+        use_wise_data = 1;
         
         show_day_frac = 0.2; % what fraction of a day to plot back on GUI
         
-        use_wise_data = 1;
+        use_only_plot_mean = 0; % only display the mean of each weather data type
         
         debug_bit = 1;
         
@@ -151,6 +135,8 @@ classdef SensorChecker < handle
                 error('Must supply a top-level object as owner of StatusChecker!');
             end
             
+            obj.reset;
+            
             list = properties(obj.owner);
             
             obj.sensors = {};
@@ -168,6 +154,77 @@ classdef SensorChecker < handle
                 end
                 
             end
+            
+            if obj.use_wise_data
+                obj.connectVirtualSensors;
+            end
+            
+        end
+        
+        function connectVirtualSensors(obj)
+            
+            obj.getWiseData;
+            
+            virtual_devices = {};
+            
+            % connect to Wise Boltwood 1 and 2
+            for ii = 1:2
+            
+                device = obs.sens.VirtualSensor;
+                device.data_path = {'Boltwood', ii, 'SensorData'};
+                device.id = sprintf('BWW%d', ii); 
+                virtual_devices{end+1} = device; 
+                
+            end
+            
+            % connect to Wise VantagePro
+            device = obs.sens.VirtualSensor;
+            device.data_path = {'VantagePro2', 'SensorData'};
+            device.id = 'VPro'; 
+            virtual_devices{end+1} = device; 
+            
+            % connect to Korean OWL/AWS
+            device = obs.sens.VirtualSensor;
+            device.data_path = {'OWL', 'AWS'};
+            device.id = 'AWS'; 
+            virtual_devices{end+1} = device; 
+
+            % connect to Korean OWL/WDS X3
+            for ii = 1:3
+                
+                device = obs.sens.VirtualSensor;
+                device.data_path = {'OWL', 'WDS', ii};
+                device.id = sprintf('WDS%d', ii); 
+                virtual_devices{end+1} = device; 
+
+            end
+                        
+            % connect to Korean OWL/THS X5
+            for ii = 1:3
+                
+                device = obs.sens.VirtualSensor;
+                device.data_path = {'OWL', 'THS', ii};
+                device.id = sprintf('THS%d', ii); 
+                virtual_devices{end+1} = device; 
+
+            end     
+            
+            % connect to Korean OWL/CLS X2 (we are going to ignore CLS 3 as it is malfunctioning 
+            for ii = 1:2
+                
+                device = obs.sens.VirtualSensor;
+                device.data_path = {'OWL', 'CLS', ii};
+                device.id = sprintf('CLS%d', ii); 
+                virtual_devices{end+1} = device; 
+
+            end
+            
+            for ii = 1:length(virtual_devices)
+                virtual_devices{ii}.owner = obj;
+                virtual_devices{ii}.connect;
+            end
+            
+            obj.sensors = [obj.sensors virtual_devices]; 
             
         end
         
@@ -202,6 +259,7 @@ classdef SensorChecker < handle
             obj.light.names = {'light', 'light_value', 'daylight'};
             obj.light.data = [];
             obj.light.sensors = {}; 
+            obj.light.index = [];
             obj.light.now = [];
             obj.light.string = '';
             obj.light.jd = [];
@@ -215,25 +273,27 @@ classdef SensorChecker < handle
         function reset_clouds(obj)
             
             obj.clouds = struct();
-            obj.clouds.names = {'clouds', 'temp_sky', 'sky_temp', 'skyAmbientTemperature'};
+            obj.clouds.names = {'clouds', 'temp_sky', 'sky_temp', 'skyAmbientTemp', 'skyAmbientTemperature'};
             obj.clouds.data = [];
             obj.clouds.sensors = {};
+            obj.clouds.index = [];
             obj.clouds.now = [];
             obj.clouds.string = '';
             obj.clouds.jd = [];
             obj.clouds.units = 'C';
             obj.clouds.err_str = 'Sky is cloudy!'; 
             
-            obj.clouds.max = -15; % negative --> cloudy (clear days have -30 or -20, very cloudy is -10)
+            obj.clouds.max = -10; % less negative --> more cloudy (clear days have -30 or -20, very cloudy is -10)
             
         end
         
         function reset_temperature(obj)
 
             obj.temperature = struct();
-            obj.temperature.names = {'temperature', 'ambientTemperature'}; 
+            obj.temperature.names = {'temperature', 'ambientTemp', 'ambientTemperature', 'outsideTemp', 'outsideTemperature'}; 
             obj.temperature.data = [];
             obj.temperature.sensors = {};
+            obj.temperature.index = [];
             obj.temperature.now = [];
             obj.temperature.string = '';
             obj.temperature.jd = [];
@@ -252,11 +312,12 @@ classdef SensorChecker < handle
             obj.wind_speed.names = {'wind', 'wind_speed', 'windSpeed'};
             obj.wind_speed.data = [];
             obj.wind_speed.sensors = {};
+            obj.wind_speed.index = [];
             obj.wind_speed.now = [];
             obj.wind_speed.string = '';
             obj.wind_speed.jd = [];
             obj.wind_speed.units = 'km/h';
-            obj.wind_speed.err_str = 'Wind to strong!';
+            obj.wind_speed.err_str = 'Wind too strong!';
         
             obj.wind_speed.max = 50; % km/h
             
@@ -268,6 +329,7 @@ classdef SensorChecker < handle
             obj.wind_dir.names = {'wind_dir', 'wind_az', 'windDir'};
             obj.wind_dir.data = [];
             obj.wind_dir.sensors = {};
+            obj.wind_dir.index  = [];
             obj.wind_dir.now = [];
             obj.wind_dir.string = '';
             obj.wind_dir.jd = [];
@@ -278,9 +340,10 @@ classdef SensorChecker < handle
         function reset_humidity(obj)
             
             obj.humidity = struct();
-            obj.humidity.names = {'humid', 'humidity'}; 
+            obj.humidity.names = {'humid', 'humidity', 'outsideHumidity'}; 
             obj.humidity.data = [];
             obj.humidity.sensors = {};
+            obj.humidity.index = [];
             obj.humidity.now = [];
             obj.humidity.string = '';
             obj.humidity.jd = [];
@@ -294,9 +357,10 @@ classdef SensorChecker < handle
         function reset_pressure(obj)
             
             obj.pressure = struct();
-            obj.pressure.names = {'pressure', 'airPressure'}; 
+            obj.pressure.names = {'pressure', 'airPressure', 'barometer'}; 
             obj.pressure.data = [];
             obj.pressure.sensors = {};
+            obj.pressure.index = [];
             obj.pressure.now = [];
             obj.pressure.string = '';
             obj.pressure.jd = [];
@@ -308,9 +372,10 @@ classdef SensorChecker < handle
         function reset_rain(obj)
             
             obj.rain = struct();
-            obj.rain.names = {'rain'}; 
+            obj.rain.names = {'rain', 'rainRate'}; 
             obj.rain.data = [];
             obj.rain.sensors = {};
+            obj.rain.index = [];
             obj.rain.now = [];
             obj.rain.string = '';
             obj.rain.jd = [];
@@ -358,10 +423,12 @@ classdef SensorChecker < handle
         
         function val = getInstrJD(~, device)
             
-            if isprop(device, 'jd') || ismethod(device, 'status')
+            if isprop(device, 'jd') || ismethod(device, 'jd')
                 val = device.jd;
             elseif isprop(device, 'time')
                 val = juliandate(device.time);
+            elseif isprop(device, 'updatedAtUT')
+                val = julianedate(util.text.str2time(device.updatedAtUT)); 
             end
                 
         end
@@ -400,7 +467,7 @@ classdef SensorChecker < handle
     end
     
     methods % these are all called on t2
-        
+           
         function collect(obj, type)
             
             if isprop(obj, type) || ~isa(obj.(type), 'struct')
@@ -408,6 +475,7 @@ classdef SensorChecker < handle
                 values = [];
                 ids = {};
                 str = '';
+                idx = [];
 %                 time_now = datetime('now', 'TimeZone', 'UTC'); 
 
                 jd_now = juliandate(datetime('now', 'TimeZone', 'UTC'));
@@ -422,6 +490,7 @@ classdef SensorChecker < handle
                     new_val = []; % put the value we found into this
                     new_id = ''; % id of the sensor
                     new_str = '';
+                    new_idx = [];
                     
                     for jj = 1:length(obj.(type).names)
                         
@@ -437,9 +506,10 @@ classdef SensorChecker < handle
                             new_val = sensor.(obj.capital(name));
                         end
                         
-                        if ~isempty(new_val) % we found a sensor with the correct
+                        if ~isempty(new_val)
                             
                             new_id = obj.getInstrID(sensor); 
+                            new_idx = ii;
 %                             new_time = obj.getInstrTime(sensor); 
                             new_jd = obj.getInstrJD(sensor);
                             
@@ -447,17 +517,23 @@ classdef SensorChecker < handle
                                 new_val = NaN;
                             end
                             
+                            if ischar(new_val)
+                                new_val = str2double(new_val);
+                            end
+                            
                             new_str = sprintf('%s= %4.2f', new_id, new_val); 
+                            
                             
                             break; % go to the next sensor! 
                             
                         end
-                                                
+                        
                     end % for jj (names)
             
                     if ~isempty(new_val) 
                         values(end+1) = new_val;
                         ids{end+1} = new_id;
+                        idx(end+1) = new_idx; 
                         if isempty(str)
                             str = new_str;
                         else
@@ -474,6 +550,7 @@ classdef SensorChecker < handle
                 if ~isempty(values)
                     obj.(type).now = values;
                     obj.(type).sensors = ids; 
+                    obj.(type).index = idx; 
                     obj.(type).jd(end+1) = jd_now;
                     obj.(type).data(end+1,:) = values;
                 end
@@ -483,353 +560,25 @@ classdef SensorChecker < handle
             end
             
         end
-        
-        function collect_light(obj) % to be depricated
+              
+        function collect_all(obj)
             
-            val = [];
-            str = '';
-            obj.light_ids = {};
+            if obj.use_wise_data
+                obj.getWiseData; % first make sure all virtual sensors are updated
+            end
             
-            for ii = 1:length(obj.sensors)
+            str = ''; % this is filled logged in weather-log
+            
+            for ii = 1:length(obj.data_types)
+                name = obj.data_types{ii};
                 
-                sens = obj.sensors{ii};
-                new_val = [];
+                obj.collect(name);
                 
-                if isprop(sens, 'light_value_average')
-                    new_val = sens.light_value_average;
-                elseif isprop(sens, 'light_value')
-                    new_val = sens.light_value;
-                elseif isprop(sens, 'light')
-                    new_val = sens.light;
-                elseif isprop(sens, 'Light')
-                    new_val = sens.Light;
-                elseif isprop(sens, 'daylight')
-                    new_val = sens.daylight;
-                end
-                
-                if ~isempty(new_val)
-                    
-                    if sens.status==0
-                        new_val = NaN;
-                    end
-                
-                    val = [val new_val];
-                    
-                    new_str = sprintf('%s=%4.2f ', obj.getInstrID(sens), new_val);
-                    
-                    str = [str new_str];
-                    obj.light_ids{end+1} = obj.getInstrID(sens);
-                end
+                str = [str upper(name) ': ' obj.(name).string]; 
                 
             end
             
-            obj.light_now = val; 
-            j = juliandate(datetime('now', 'timezone', 'UTC'));
-            obj.light_str = str;
-            
-            if size(val,2)==size(obj.light_all,2)
-                obj.light_all = [obj.light_all; val];
-                obj.light_jul = [obj.light_jul; j]; 
-            elseif isempty(val)
-                % pass
-            else
-                obj.reset_light;
-                obj.light_all = val;
-                obj.light_jul = j;
-            end
-            
-        end
-        
-        function collect_clouds(obj) % to be depricated
-            
-            val = [];
-            str = '';
-            obj.clouds_ids = {};
-            
-            for ii = 1:length(obj.sensors)
-                
-                sens = obj.sensors{ii};
-                new_val = [];
-                if isprop(sens, 'temp_sky_average')
-                    new_val = sens.temp_sky_average;
-                elseif isprop(sens, 'temp_sky')
-                    new_val = sens.temp_sky;
-                elseif isprop(sens, 'clouds')
-                    new_val = sens.clouds;
-                elseif isprop(sens, 'Clouds')
-                    new_val = sens.Clouds;
-                
-                end
-                
-                
-                if ~isempty(new_val)
-                    
-                    if sens.status==0
-                        new_val = NaN;
-                    end
-                
-                    val = [val new_val];
-                    
-                    new_str = sprintf('%s=%4.2f ', obj.getInstrID(sens), new_val);
-                    
-                    str = [str new_str];
-                    
-                end
-                
-            end
-            
-            obj.clouds_now = val; 
-            j = juliandate(datetime('now', 'timezone', 'UTC'));
-            obj.clouds_str = str;
-            
-            if size(val,2)==size(obj.clouds_all,2)
-                obj.clouds_all = [obj.clouds_all; val];
-                obj.clouds_jul = [obj.clouds_jul; j]; 
-            elseif isempty(val)
-                % pass
-            else
-                obj.reset_clouds;
-                obj.clouds_all = val;
-                obj.clouds_jul = j;
-                obj.clouds_ids{end+1} = obj.getInstrID(sens);
-            end
-            
-        end
-        
-        function collect_temp(obj) % to be depricated
-            
-            val = [];
-            str = '';
-            obj.temp_ids = {};
-            
-            for ii = 1:length(obj.sensors)
-                
-                sens = obj.sensors{ii};
-                new_val = [];
-                
-                if isprop(sens, 'temperature_average')
-                    new_val = sens.temperature_average;
-                elseif isprop(sens, 'temperature')
-                    new_val = sens.temperature;
-                elseif isprop(sens, 'Temperature')
-                    new_val = sens.Temperature;
-                    
-                elseif isprop(sens, 'temp')
-                    new_val = sens.temp;
-                elseif isprop(sens, 'Temp')
-                    new_val = sens.Temp;
-                end
-                
-                
-                
-                if ~isempty(new_val)
-                    
-                    if sens.status==0
-                        new_val = NaN;
-                    end
-                    
-                    val = [val new_val];
-                    
-                    new_str = sprintf('%s=%4.2f ', obj.getInstrID(sens), new_val);
-                    
-                    str = [str new_str];
-                    
-                    obj.temp_ids{end+1} = obj.getInstrID(sens);
-                    
-                end
-                
-            end
-            
-            obj.temp_now = val; 
-            j = juliandate(datetime('now', 'timezone', 'UTC'));
-            obj.temp_str = str;
-            
-            if size(val,2)==size(obj.temp_all,2)
-                obj.temp_all = [obj.temp_all; val];
-                obj.temp_jul = [obj.temp_jul; j]; 
-            elseif isempty(val)
-                % pass
-            else
-                obj.reset_temp;
-                obj.temp_all = val;
-                obj.temp_jul = j;
-            end
-            
-        end
-        
-        function collect_wind(obj) % to be depricated
-            
-            val = [];
-            str = '';
-            obj.wind_ids = {};
-            
-            for ii = 1:length(obj.sensors)
-                
-                sens = obj.sensors{ii};
-                new_val = [];
-                if isprop(sens, 'wind_speed_average')
-                    new_val = sens.wind_speed_average;
-                elseif isprop(sens, 'wind_speed')
-                    new_val = sens.wind_speed;
-                elseif isprop(sens, 'WindSpeed')
-                    new_val = sens.WindSpeed;
-                elseif isprop(sens, 'wind')
-                    new_val = sens.wind;
-                elseif isprop(sens, 'Wind')
-                    new_val = sens.Wind;
-                end
-                
-                if ~isempty(new_val)
-                    
-                    if sens.status==0
-                        new_val = NaN;
-                    end
-                
-                    val = [val new_val];
-                    
-                    new_str = sprintf('%s=%4.2f ', obj.getInstrID(sens), new_val);
-                    
-                    str = [str new_str];
-                    
-                    obj.wind_ids{end+1} = obj.getInstrID(sens);
-                    
-                end
-                
-            end
-            
-            obj.wind_now = val; 
-            j = juliandate(datetime('now', 'timezone', 'UTC'));
-            obj.wind_str = str;
-            
-            if size(val,2)==size(obj.wind_all,2)
-                obj.wind_all = [obj.wind_all; val];
-                obj.wind_jul = [obj.wind_jul; j]; 
-            elseif isempty(val)
-                % pass
-            else
-                obj.reset_wind;
-                obj.wind_all = val;
-                obj.wind_jul = j;
-            end
-            
-        end
-        
-        function collect_wind_az(obj) % to be depricated
-            
-            val = [];
-            str = '';
-            obj.wind_az_ids = {};
-            
-            for ii = 1:length(obj.sensors)
-                
-                sens = obj.sensors{ii};
-                new_val = [];
-                
-                if isprop(sens, 'wind_az_average')
-                    new_val = sens.wind_az_average;
-                elseif isprop(sens, 'wind_az')
-                    new_val = sens.wind_az;
-                elseif isprop(sens, 'WindAz')
-                    new_val = sens.WindAz;
-                elseif isprop(sens, 'wind_direction')
-                    new_val = sens.wind_direction;
-                elseif isprop(sens, 'WindDirection')
-                    new_val = sens.WindDirection;
-                end
-                
-                
-                
-                if ~isempty(new_val)
-                    
-                    if sens.status==0
-                        new_val = NaN;
-                    end
-                    
-                    val = [val new_val];
-                    
-                    new_str = sprintf('%s=%4.2f ', obj.getInstrID(sens), new_val);
-                    
-                    str = [str new_str];
-                    
-                    obj.wind_az_ids{end+1} = obj.getInstrID(sens);
-                
-                end
-                
-            end
-            
-            obj.wind_az_now = val; 
-            j = juliandate(datetime('now', 'timezone', 'UTC'));
-            obj.wind_az_str = str;
-            
-            if size(val,2)==size(obj.wind_az_all,2)
-                obj.wind_az_all = [obj.wind_az_all; val];
-                obj.wind_az_jul = [obj.wind_jul; j]; 
-            elseif isempty(val)
-                % pass
-            else
-                obj.reset_wind_az;
-                obj.wind_az_all = val;
-                obj.wind_az_jul = j;
-            end
-            
-        end
-        
-        function collect_humid(obj) % to be depricated
-            
-            val = [];
-            str = '';
-            obj.humid_ids = {};
-            
-            for ii = 1:length(obj.sensors)
-                
-                sens = obj.sensors{ii};
-                new_val = [];
-                
-                if isprop(sens, 'humidity_average')
-                    new_val = sens.humidity_average;
-                elseif isprop(sens, 'humidity')
-                    new_val = sens.humidity;
-                elseif isprop(sens, 'Humidity')
-                    new_val = sens.Humidity;
-                elseif isprop(sens, 'humid')
-                    new_val = sens.humid;
-                elseif isprop(sens, 'Humid')
-                    new_val = sens.Humid;
-                
-                end
-                
-                if ~isempty(new_val)
-                    
-                    if sens.status==0
-                        new_val = NaN;
-                    end
-                
-                    val = [val new_val];
-                    
-                    new_str = sprintf('%s=%4.2f ', obj.getInstrID(sens), new_val);
-                    
-                    str = [str new_str];
-                    
-                    obj.humid_ids{end+1} = obj.getInstrID(sens);
-                    
-                end
-                
-            end
-            
-            obj.humid_now = val; 
-            j = juliandate(datetime('now', 'timezone', 'UTC'));
-            obj.humid_str = str;
-            
-            if size(val,2)==size(obj.humid_all,2)
-                obj.humid_all = [obj.humid_all; val];
-                obj.humid_jul = [obj.humid_jul; j]; 
-            elseif isempty(val)
-                % pass
-            else
-                obj.reset_humid;
-                obj.humid_all = val;
-                obj.humid_jul = j;
-            end
+            obj.log.input(str);
             
         end
         
@@ -849,65 +598,24 @@ classdef SensorChecker < handle
             end
             
         end
-                    
-        function collect_all(obj)
-            
-            if obj.use_wise_data
-                obj.getWiseData; % first make sure all virtual sensors are updated
-            end
-            
-            str = ''; % this is filled logged in weather-log
-            
-            for ii = 1:length(obj.data_types)
-                name = obj.data_types{ii};
-                
-                obj.collect(name);
-                
-                str = [str upper(name) ': ' obj.(name).string]; 
-                
-            end
-            
-%             obj.collect('light');
-%             str = [str 'LIGHT: ' obj.light.string];
-%             
-%             obj.collect('clouds');
-%             str = [str 'CLOUDS: ' obj.clouds.string];
-%             
-%             obj.collect('temperature');
-%             str = [str 'TEMP: ' obj.temperature.string];
-%             
-%             obj.collect('wind_speed');
-%             str = [str 'WIND: ' obj.wind_speed.string];
-%             
-%             obj.collect('wind dir');
-%             str = [str 'WIND_AZ: ' obj.wind_dir.string];
-%             
-%             obj.collect('humidity');
-%             str = [str 'HUMID: ' obj.humidity.string];
-            
-            obj.log.input(str);
-            
-        end
-        
+           
         function val = checkValueOK(obj, type) % check one data type if it is within bounds
             
             if isprop(obj, type) || ~isa(obj.(type), 'struct')
                 
-                val = 1;
-                
                 st = obj.(type);
                 value_now = nanmean(st.now); 
                 
-                if isnan(value_now)
+                if isempty(st.now)
+                    val = 1;
+                elseif isnan(value_now)
                     val = 0;
-                end
-                
-                if isfield(st, 'max') && value_now>st.max
+                elseif isfield(st, 'max') && value_now>st.max
                     val = 0;
-                end
-                
-                if isfield(st, 'min') && value_now<st.min
+                elseif isfield(st, 'min') && value_now<st.min
                     val = 0;
+                else 
+                    val = 1;
                 end
                 
             else
@@ -936,56 +644,6 @@ classdef SensorChecker < handle
             
         end
         
-        function val = decision_light(obj) % to be depricated
-            
-            if any(obj.light_now>obj.max_light) || any(obj.light_now<obj.min_light)
-                val = 0;
-            else
-                val = 1;
-            end
-            
-        end
-        
-        function val = decision_clouds(obj) % to be depricated
-            
-            if any(obj.clouds_now>obj.max_clouds) || any(obj.clouds_now<obj.min_clouds)
-                val = 0;
-            else
-                val = 1;
-            end
-            
-        end
-        
-        function val = decision_temp(obj) % to be depricated
-            
-            if any(obj.temp_now>obj.max_temp) || any(obj.temp_now<obj.min_temp)
-                val = 0;
-            else
-                val = 1;
-            end
-            
-        end
-        
-        function val = decision_wind(obj) % to be depricated
-            
-            if any(obj.wind_now>obj.max_wind) || any(obj.wind_now<obj.min_wind)
-                val = 0;
-            else
-                val = 1;
-            end
-            
-        end
-        
-        function val = decision_humid(obj) % to be depricated
-            
-            if any(obj.humid_now>obj.max_humid) || any(obj.humid_now<obj.min_humid)
-                val = 0;
-            else
-                val = 1;
-            end
-            
-        end
-        
         function decision_all(obj) % summary of all sensor info, make a decision if it is ok to continue
             
             % should I add a rain-checker also??
@@ -998,6 +656,8 @@ classdef SensorChecker < handle
             for ii = 1:length(obj.data_types)
                 
                 name = obj.data_types{ii}; 
+                
+                if util.text.cs(name, 'wind_dir', 'pressure'), continue; end
                 
                 if ~obj.checkValueOK(name) || ~obj.checkBoolOK(name)
                     obj.sensors_ok = 0;
@@ -1058,9 +718,13 @@ classdef SensorChecker < handle
             
             input.ax.NextPlot = 'replace'; 
             
-            h_list = [];
             ax_max = 50;
-            markers = {'o', '+', '*', 's', 'v', '^','x', 'd', 'p'}; 
+            ax_min = 0;
+            
+            markers = {'o', '+', '*', 's', 'v', 'x', 'd', 'p', '^', '>', '<', 'h'}; 
+            Nmark = length(markers); 
+            lines = {'-', '--', ':', '.-'}; 
+            colors = {'yellow', 'cyan', 'red', 'magenta', 'black', 'blue', 'green', 'black'}; 
             
             for ii = 1:length(obj.data_types)
                 
@@ -1072,69 +736,57 @@ classdef SensorChecker < handle
                 
                 [v,t] = obj.getWeatherTimeData(obj.(name).data, obj.(name).jd, input.day_frac);
                 
+                idx = obj.(name).index;
+                unit = obj.(name).units;
+                
                 if cs(name, 'light') % scale to the axes
-                    v = v/20;
+                    v = v/16;
+                    unit = [unit '/16'];
                 end
                 
-                if cs(name, 'clouds') % flip the values
-                    v = -v; 
+                if cs(name, 'clouds') % get the values on the same scale
+                    v = v + 60; 
+                    unit = ['+60 ' unit];
                 end
                 
-                input.ax.ColorOrderIndex = 1;
-                
-                h = plot(input.ax, t, v, '-', 'Marker', markers{ii});
-                
-                for jj = 1:length(h) 
-                    h(jj).DisplayName = sprintf('%s [%s]: %s', strrep(name, '_', ' '), obj.(name).units, obj.(name).sensors{jj}); 
+                if cs(name, 'pressure') % scale the pressure by 20
+                    v = v - 975;
+                    unit = ['-975 ' unit];
                 end
                 
-                input.ax.NextPlot = 'add';
+                if obj.use_only_plot_mean
+                    h = plot(input.ax, t, nanmean(v,2), '-', 'LineWidth', 2, 'DisplayName', sprintf('mean %s [%s]', strrep(name, '_', ' '), unit), 'Color', colors{ii}); 
+                    input.ax.NextPlot = 'add';
+                else
+
+                    h = plot(input.ax, t, v, '-');
+
+                    for jj = 1:length(h) 
+                        h(jj).DisplayName = sprintf('%s [%s]: %s', strrep(name, '_', ' '), unit, obj.(name).sensors{jj}); 
+                        h(jj).Marker = markers{mod(idx(jj)-1, Nmark)+1};
+                        h(jj).MarkerSize = 8;
+                        h(jj).LineWidth = 0.5;
+                        h(jj).LineStyle = lines{floor((idx(jj)-1)/Nmark)+1};
+                        h(jj).Color = colors{ii}; 
+                    end
+
+                    input.ax.NextPlot = 'add';
+
+                    plot(input.ax, t, nanmean(v,2), '-', 'LineWidth', 2, 'HandleVisibility', 'off', 'Color', h(1).Color); 
                 
-                h_list = [h_list; h];
+                end
                 
-                if max(v)>ax_max, ax_max = max(v); end
+                if max(v(:))>ax_max, ax_max = max(v(:))*1.1; end
+                if min(v(:))<ax_min, ax_min = min(v(:))*1.1; end
                 
             end
             
-%             
-%             % get temperatures
-%             [v,t] = obj.getWeatherTimeData(obj.temp_all, obj.temp_jul, input.day_frac);
-%             h = plot(input.ax, t, v, '-');
-%             for ii = 1:length(h), h(ii).DisplayName = ['temperature (C) ' obj.temp_ids{ii}]; end 
-%             h_list = [h_list; h];
-%             if max(v)>ax_max, ax_max = max(v); end
-%             hold(input.ax, 'on');
-%             
-%             % get wind data
-%             [v,t] = obj.getWeatherTimeData(obj.wind_all, obj.wind_jul, input.day_frac);
-%             h = plot(input.ax, t, v, '-o');
-%             for ii = 1:length(h), h(ii).DisplayName = ['wind (km/h) ' obj.wind_ids{ii}]; end
-%             h_list = [h_list; h];
-%             if max(v)>ax_max, ax_max = max(v); end
-%             hold(input.ax, 'on');
-%             
-%             % get humidity data
-%             [v,t] = obj.getWeatherTimeData(obj.humid_all, obj.humid_jul, input.day_frac);
-%             h = plot(input.ax, t, v, '-+');
-%             for ii = 1:length(h), h(ii).DisplayName = ['Humidity (%) ' obj.humid_ids{ii}]; end
-%             h_list = [h_list; h];
-%             if max(v)>ax_max, ax_max = max(v); end
-%             hold(input.ax, 'on');
-%             
-%             % get light data
-%             [v,t] = obj.getWeatherTimeData(obj.light_all, obj.light_jul, input.day_frac);
-%             v = v/20;
-%             h = plot(input.ax, t, v, '-*');
-%             for ii = 1:length(h), h(ii).DisplayName = ['daylight /20 ' obj.light_ids{ii}]; end
-%             h_list = [h_list; h];
-%             if max(v)>ax_max, ax_max = max(v); end
-%             hold(input.ax, 'on');
-            
             input.ax.NextPlot = 'replace'; 
             
-            input.ax.YLim = [-10, ax_max];
+            input.ax.YLim = [ax_min, ax_max];
             
-            legend(input.ax, h_list, 'Location', 'SouthWest');
+            hl = legend(input.ax, 'Location', 'SouthEastOutside');
+            hl.FontSize = 12;
             
         end
         

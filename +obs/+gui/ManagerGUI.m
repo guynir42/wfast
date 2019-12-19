@@ -40,6 +40,7 @@ classdef ManagerGUI < handle
         
         panel_image;
         button_reset_axes;
+        button_mean_only;
         axes_image;
     
     end
@@ -232,6 +233,8 @@ classdef ManagerGUI < handle
             
             obj.button_reset_axes = GraphicButton(obj.panel_image, [0.9 0.95 0.1 0.05], obj.owner, '', 'custom','reset');
             obj.button_reset_axes.Callback = @obj.makeAxes;
+            
+            obj.button_mean_only = GraphicButton(obj.panel_image, [0.0 0.95 0.1 0.05], obj.owner, 'checker.use_only_plot_mean', 'toggle', 'all', 'mean'); 
             
             %%%%%%%%%%% panel stop %%%%%%%%%%%%%%%%%%%
             
