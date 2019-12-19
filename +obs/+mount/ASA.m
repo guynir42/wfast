@@ -183,6 +183,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 obj.loadServer;
                 
+                pause(5);
+                
                 obj.hndl = actxserver('AstrooptikServer.Telescope');
             
                 if ~obj.checkServer
@@ -203,7 +205,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     try 
                         
                         if obj.use_accelerometer
-                            obj.connectArduino;
+%                             obj.connectArduino;
                         end
                 
                     catch ME
