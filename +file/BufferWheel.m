@@ -512,7 +512,6 @@ classdef BufferWheel < file.AstroData
                 d = obj.flat_dir_name;
             end
             
-            
             if obj.use_year_folder
                 val = fullfile(obj.base_dir, obj.date_dir(1:4), obj.date_dir, d);
             else
@@ -933,7 +932,7 @@ classdef BufferWheel < file.AstroData
             tStart = tic;
             
             % make dir if it doesn't exist yet...
-            this_dir = obj.directory;            
+            this_dir = obj.directory;
             if ~isempty(this_dir) && ~exist(this_dir, 'dir') % create directory if doesn't exist
                 if obj.debug_bit, disp(['creating directory ' this_dir]); end                
                 mkdir(this_dir);
