@@ -42,8 +42,8 @@ classdef SkyMap < handle
         mag_step = 0.5; % bin steps for magnitudes
         size_step = 1; % micro arcsec 
         size_min = 1; % micro arcsec
-        size_max = 100; % micro arcsec
-        angle_step = 1; % degrees
+        size_max = 1000; % micro arcsec
+        angle_step = 0.5; % degrees
         
         use_partial_load = 0; % load only the required columns from each HDF5 file
         use_mex_binning = 0; % use mex function to make the histogram counts instead of 2 loops and histcounts2
@@ -126,7 +126,7 @@ classdef SkyMap < handle
             obj.reset;
             
             obj.RA_axis = 0:obj.angle_step:360;
-            obj.DE_axis = 0:obj.angle_step:180;
+            obj.DE_axis = -90:obj.angle_step:90;
             obj.mag_axis = 10:obj.mag_step:ceil(obj.limit_mag); 
             obj.size_axis = obj.size_min:obj.size_step:obj.size_max;
             
