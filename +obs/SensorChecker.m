@@ -523,7 +523,6 @@ classdef SensorChecker < handle
                             
                             new_str = sprintf('%s= %4.2f', new_id, new_val); 
                             
-                            
                             break; % go to the next sensor! 
                             
                         end
@@ -553,6 +552,7 @@ classdef SensorChecker < handle
                     obj.(type).index = idx; 
                     obj.(type).jd(end+1) = jd_now;
                     obj.(type).data(end+1,:) = values;
+                    obj.(type).string = str;
                 end
                 
             else
@@ -570,11 +570,12 @@ classdef SensorChecker < handle
             str = ''; % this is filled logged in weather-log
             
             for ii = 1:length(obj.data_types)
+                
                 name = obj.data_types{ii};
                 
                 obj.collect(name);
                 
-                str = [str upper(name) ': ' obj.(name).string]; 
+                str = [str upper(name) ': ' obj.(name).string ' | ']; 
                 
             end
             
@@ -662,40 +663,27 @@ classdef SensorChecker < handle
                 if ~obj.checkValueOK(name) || ~obj.checkBoolOK(name)
                     obj.sensors_ok = 0;
                     obj.report = obj.(name).err_str; 
+                    return; 
                 end
                 
             end
             
-%             if obj.decision_light==0
-%                 obj.sensors_ok = 0;
-%                 obj.report = ['Light too bright! ' obj.light_str];
-% %                 obj.owner.dome.closeBothFull; % can we put this somewhere better??
-%                 return;
-%             end
-%             
-%             if obj.decision_clouds==0
-%                 obj.sensors_ok = 0;
-%                 obj.report = ['Sky is cloudy! ' obj.clouds_str];
-%                 return;
-%             end
-%             
-%             if obj.decision_temp==0
-%                 obj.sensors_ok = 0;
-%                 obj.report = ['Temperature out of range! ' obj.temp_str];
-%                 return;
-%             end
-%             
-%             if obj.decision_wind==0
-%                 obj.sensors_ok = 0;
-%                 obj.report = ['Wind too strong! ' obj.wind_str];
-%                 return;
-%             end
-%             
-%             if obj.decision_humid==0
-%                 obj.sensors_ok = 0;
-%                 obj.report = ['Humidity too high! ' obj.humid_str];
-%                 return;
-%             end
+            % check the wise general safety flag
+            if obj.use_wise_data
+                [rc,rv] = system('curl --connect-timeout 2 --silent -X PUT --header "Content-Type: application/x-www-form-urlencoded" --header "Accept: application/json" --data "Action=wise-issafe&Parameters=" http://132.66.65.9:11111/api/v1/safetymonitor/0/action');
+                if(rc==0) % check the call succeeded
+                    value = jsondecode(rv);
+                    if strcmp(value.Value, 'False')
+                        obj.sensors_ok = 0;
+                        obj.report = 'Wise-unsafe! '; 
+                        [rc,rv] = system('curl --connect-timeout 2 --silent -X PUT --header "Content-Type: application/x-www-form-urlencoded" --header "Accept: application/json" --data "Action=wise-unsafereasons&Parameters=" http://132.66.65.9:11111/api/v1/safetymonitor/0/action');
+                        if(rc==0)
+                            value = jsondecode(rv);
+                            obj.report = [obj.report value.Value]; 
+                        end
+                    end
+                end
+            end
             
         end
         

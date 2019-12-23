@@ -226,7 +226,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             if isempty(obj.ard) 
 
                 try
-                    obj.ard = obs.sens.ScopeAssistant;
+                    
+                    if isempty(obj.ard)
+                        obj.ard = obs.sens.ScopeAssistant;
+                    end
+                    
                 catch ME
                     obj.use_accelerometer = 0;
                     warning(ME.getReport);
@@ -236,14 +240,20 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             if ~isempty(obj.ard)
                 
-                if isempty(obj.ard.telescope)
-                    obj.ard.telescope = obj;
+                try
+                    
+                    if isempty(obj.ard.telescope)
+                        obj.ard.telescope = obj;
+                    end
+                    obj.ard.connect;
+
+                    obj.ard.update;
+                    
+                catch ME
+                    obj.use_accelerometer = 0;
+                    warning(ME.getReport);
                 end
-
-                obj.ard.connect;
-
-                obj.ard.update;
-
+                
             end
             
         end
@@ -784,7 +794,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     return;
                 end
 
-
                 val = 1;
             
             catch ME
@@ -819,8 +828,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 if obj.check_need_flip
                     
-                    if obj.telDE_deg<70
-                        obj.slewWithoutPrechecks(obj.hndl.RightAscension, 70); % do a preslew to dec +70 so we can make the flip! 
+                    if obj.telDE_deg<30 || obj.telDE_deg>60
+                        obj.slewWithoutPrechecks(obj.hndl.RightAscension, 45); % do a preslew to dec +70 so we can make the flip! 
                     end
                     
                     
@@ -932,6 +941,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         end
         
         function callback_timer(obj, ~, ~) % update sensors and GUI
+            
+            if isempty(obj) || isempty(obj.hndl)
+                return;
+            end
             
             try 
             

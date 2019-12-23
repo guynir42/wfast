@@ -84,12 +84,14 @@ classdef VirtualSensor < dynamicprops
         
         function update(obj)
             
+            import util.text.cs;
+            
             obj.status = 0;
             
             obj.data_struct = subsref(obj.owner.wise_data_struct, obj.subsref_struct);
             
             if ~isempty(obj.data_struct)
-                
+                                
                 for ii = 1:length(obj.data_names)
                             
                     field_name = '';
@@ -104,10 +106,17 @@ classdef VirtualSensor < dynamicprops
 
                         obj.(field_name) = obj.data_struct.(field_name); 
 
+                        % quality checks
+                        if cs(field_name, 'clouds', 'sky ambient temperature')
+                            if obj.(field_name)<-100
+                                obj.(field_name) = NaN;
+                            end
+                        end
+                        
                     end
                     
                 end
-                
+
                 obj.status = 1;
                 
             end
