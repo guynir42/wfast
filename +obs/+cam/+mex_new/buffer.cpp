@@ -255,7 +255,7 @@ int get_enum(AT_H hndl, const AT_WC *par_name, AT_WC *str){
 
 }
 
-bool cs(const char *keyword, const char *compare_str, int num_letters){ // compare two strings ignoring case and so one (for varargin parsing)
+bool cs(const char *keyword, const char *compare_str, int num_letters){ // compare two strings ignoring case and so on (for varargin parsing)
 	
 	char str1[STRLN]={0};
 	char str2[STRLN]={0};
@@ -307,13 +307,13 @@ bool cs(const char *keyword, const char *compare_str, int num_letters){ // compa
 	
 }
 
-bool cs(const char *keyword, const char *str1, const char *str2, int num_letters){ // compare two strings ignoring case and so one (for varargin parsing)
+bool cs(const char *keyword, const char *str1, const char *str2, int num_letters){ // compare two strings ignoring case and so on (for varargin parsing)
 
 	return cs(keyword, str1, num_letters) || cs(keyword, str2, num_letters);
 
 }
 
-bool cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters){ // compare two strings ignoring case and so one (for varargin parsing)
+bool cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters){ // compare two strings ignoring case and so on (for varargin parsing)
 
 	return cs(keyword, str1, num_letters) || cs(keyword, str2, num_letters) || cs(keyword, str3, num_letters);
 

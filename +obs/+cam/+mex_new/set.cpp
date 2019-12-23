@@ -76,6 +76,12 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		rc=AT_SetFloat(hndl, L"FrameRate", value); 
 		
 	}
+	else if(cs(key, "binning")){
+	
+		if(isnan(value)) throw_error("Input 3 must be a non-empty character vector!\n Use '1x1' or '2x2' or '3x3' or '4x4' or '8x8'."); 
+		rc=AT_SetEnumString(hndl, L"AOIBinning", wide_str);
+	
+	}
 	else if(cs(key, "height", "AOI height", 4)){
 		
 		AT_64 int_value=0;
@@ -204,7 +210,7 @@ void throw_error(const char *description, const char *par_name, int error_code){
 
 }
 
-bool cs(const char *keyword, const char *compare_str, int num_letters){ // compare two strings ignoring case and so one (for varargin parsing)
+bool cs(const char *keyword, const char *compare_str, int num_letters){ // compare two strings ignoring case and so on (for varargin parsing)
 	
 	char str1[STRLN]={0};
 	char str2[STRLN]={0};
@@ -256,13 +262,13 @@ bool cs(const char *keyword, const char *compare_str, int num_letters){ // compa
 	
 }
 
-bool cs(const char *keyword, const char *str1, const char *str2, int num_letters){ // compare two strings ignoring case and so one (for varargin parsing)
+bool cs(const char *keyword, const char *str1, const char *str2, int num_letters){ // compare two strings ignoring case and so on (for varargin parsing)
 
 	return cs(keyword, str1, num_letters) || cs(keyword, str2, num_letters);
 
 }
 
-bool cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters){ // compare two strings ignoring case and so one (for varargin parsing)
+bool cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters){ // compare two strings ignoring case and so on (for varargin parsing)
 
 	return cs(keyword, str1, num_letters) || cs(keyword, str2, num_letters) || cs(keyword, str3, num_letters);
 

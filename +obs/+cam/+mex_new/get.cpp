@@ -152,6 +152,18 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		plhs[0]=output_string(wide_str); 
 		
 	}
+	else if(cs(key, "vertical binning")){
+	
+		rc=AT_GetInt(hndl, L"AOIVBin", &int_value);
+		plhs[0]=output_scalar(int_value); 
+	
+	}
+	else if(cs(key, "horizontal binning")){
+	
+		rc=AT_GetInt(hndl, L"AOIHBin", &int_value);
+		plhs[0]=output_scalar(int_value); 
+	
+	}
 	else if(cs(key, "bytes per pixel")){
 		
 		rc=AT_GetFloat(hndl, L"BytesPerPixel", &value);
@@ -292,6 +304,12 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		plhs[0]=output_scalar(bool_value);
 		
 	}
+	else if(cs(key, "layout")){
+	
+		rc=get_enum(hndl, L"AOILayout", wide_str);
+		plhs[0]=output_string(wide_str); 
+	
+	}
 	else if(cs(key, "name")){
 	
 		rc=get_string(hndl, L"CameraName", wide_str); 
@@ -318,6 +336,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	if(rc) throw_error("Get failed", key, rc); 
 	
 }
+
 void throw_error(const char *description, const char *par_name, int error_code){
 
 	char report[STRLN]={0};
@@ -409,7 +428,7 @@ mxArray *output_string(const AT_WC *str){
 
 }
 
-bool cs(const char *keyword, const char *compare_str, int num_letters){ // compare two strings ignoring case and so one (for varargin parsing)
+bool cs(const char *keyword, const char *compare_str, int num_letters){ // compare two strings ignoring case and so on (for varargin parsing)
 	
 	char str1[STRLN]={0};
 	char str2[STRLN]={0};
@@ -461,13 +480,13 @@ bool cs(const char *keyword, const char *compare_str, int num_letters){ // compa
 	
 }
 
-bool cs(const char *keyword, const char *str1, const char *str2, int num_letters){ // compare two strings ignoring case and so one (for varargin parsing)
+bool cs(const char *keyword, const char *str1, const char *str2, int num_letters){ // compare two strings ignoring case and so on (for varargin parsing)
 
 	return cs(keyword, str1, num_letters) || cs(keyword, str2, num_letters);
 
 }
 
-bool cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters){ // compare two strings ignoring case and so one (for varargin parsing)
+bool cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters){ // compare two strings ignoring case and so on (for varargin parsing)
 
 	return cs(keyword, str1, num_letters) || cs(keyword, str2, num_letters) || cs(keyword, str3, num_letters);
 

@@ -51,10 +51,16 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		rc=AT_Command(hndl, L"SoftwareTrigger"); 
 		
 	}
+	else if(cs(key, "reset")){
+
+		rc=AT_Command(hndl, L"ResetToDefaultValues"); 
+
+	}
 	if(rc) throw_error("Command failed", key, rc); 
 	
 	
 }
+
 void throw_error(const char *description, const char *par_name, int error_code){
 
 	char report[STRLN]={0};

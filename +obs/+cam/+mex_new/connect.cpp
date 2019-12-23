@@ -11,6 +11,8 @@
 void mexFunction( int nlhs, mxArray *plhs[],
                   int nrhs, const mxArray *prhs[] ){
 
+	printf("Trying to connect to Andor camera!\n"); 
+				  
 	int rc=0; // return code! 
 	
 	long int *output = (long int *) mxCalloc(1, sizeof(long int));
