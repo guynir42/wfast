@@ -260,6 +260,7 @@ classdef PcSync < handle
         function update(obj)
             
             if obj.is_connected
+                
                 obj.hndl_rx.BytesAvailableFcn = @obj.read_data_rx;
                 obj.hndl_tx.BytesAvailableFcn = @obj.read_data_tx;
                 obj.outgoing.time = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));

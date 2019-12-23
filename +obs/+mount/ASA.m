@@ -346,10 +346,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function val = get.objName(obj)
             
-            if isempty(obj.sync) || isempty(obj.sync.outgoing) || ~isfield(obj.sync.outgoing, 'obj_name')
+            if isempty(obj.sync) || isempty(obj.sync.outgoing) || ~isfield(obj.sync.outgoing, 'OBJECT')
                 val = '';
             else
-                val = obj.sync.outgoing.obj_name;
+                val = obj.sync.outgoing.OBJECT;
             end
             
         end
@@ -569,7 +569,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function set.objName(obj, val)
             
             if ~isempty(obj.sync)
-                obj.sync.outgoing.obj_name = val;
+                obj.sync.outgoing.OBJECT = val;
             end
             
         end

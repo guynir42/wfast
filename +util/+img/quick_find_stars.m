@@ -57,8 +57,10 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
         
     end
     
-    I = regionfill(I, isnan(I));
-    I_reduced = (I-input.mean)./input.std;
+    I_reduced = I;
+    
+    I_reduced = (I-input.mean)./input.std;    
+    I_reduced = regionfill(I_reduced, isnan(I_reduced));
     
     if input.edges
         I_reduced = util.img.pad2size(util.img.crop2size(I_reduced, size(I)-input.edges.*2), size(I), NaN);
@@ -106,20 +108,22 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
             F = cellfun(@sum, T.PixelValues);
 
             P = T.WeightedCentroid;
-
+            
             MX = zeros(N,1);
+            MX_f = zeros(N,1);
             MX_half = zeros(N,1);
             MX_twice = zeros(N,1);
 
             for jj = 1:N
-                MX(jj) = max(If(T.PixelIdxList{jj}));
-                MX_half(jj) = max(If_half(T.PixelIdxList{jj}));
-                MX_twice(jj) = max(If_twice(T.PixelIdxList{jj}));
+                MX(jj) = nanmax(T.PixelValues{jj});
+                MX_f(jj) = nanmax(If(T.PixelIdxList{jj}));
+                MX_half(jj) = nanmax(If_half(T.PixelIdxList{jj}));
+                MX_twice(jj) = nanmax(If_twice(T.PixelIdxList{jj}));
             end
 
             f = zeros(size(P,1),1);    
-            f(MX<MX_half*input.fraction) = 2; % point source 
-            f(MX<MX_twice*input.fraction) = 3; % extended object
+            f(MX_f<MX_half*input.fraction) = 2; % point source 
+            f(MX_f<MX_twice*input.fraction) = 3; % extended object
             f(MX>input.saturation) = 1; % saturated star 
 
             pos = vertcat(pos, P);
@@ -136,6 +140,8 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
         end
         
     end
+    
+    I_reduced = I_reduced.*input.std + input.mean; % rescale this back to the original values
     
     T2 = table(flux, flag);
     

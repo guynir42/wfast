@@ -74,6 +74,8 @@ classdef Acquisition < file.AstroData
         
         start_index; % if non empty, use this number as initial index for run (e.g., to continue from where we stopped)
         
+        run_name_append = '';
+        
         total_runtime;
         runtime_units = 'minutes';
         
@@ -352,8 +354,6 @@ classdef Acquisition < file.AstroData
         
         function reset(obj)
             
-%             disp('resetting');
-            
             if obj.brake_bit==0
                 warning('Must stop acquisition before resetting!');
                 return;
@@ -364,7 +364,9 @@ classdef Acquisition < file.AstroData
             for ii = 1:length(list)
                 
                 if isobject(obj.(list{ii})) && ~isempty(obj.(list{ii})) && ismethod(obj.(list{ii}), 'reset') 
-                    obj.(list{ii}).reset;
+                    if ~util.text.cs(list{ii}, 'sync')
+                        obj.(list{ii}).reset;
+                    end
                 end
                 
             end
@@ -1277,7 +1279,8 @@ classdef Acquisition < file.AstroData
             
             try 
                 
-                drawnow;
+                obj.sync.update;
+                
                 s = obj.sync.incoming;
                 
                 list = head.Parameters.makeSyncList; 
@@ -1360,10 +1363,6 @@ classdef Acquisition < file.AstroData
         
         function update(obj, input)
             
-            if obj.use_sync && obj.use_ignore_manager==0
-                obj.getSyncData;
-            end
-            
             if nargin>=2 && ~isempty(input) && isa(input, 'util.text.InputVars')
                 
                 if ~isempty(input.RA)
@@ -1378,6 +1377,10 @@ classdef Acquisition < file.AstroData
                     obj.pars.target_name = input.run_name;
                 end
                 
+            end
+            
+            if obj.use_sync && obj.use_ignore_manager==0
+                obj.getSyncData;
             end
             
             obj.pars.update;
@@ -1448,8 +1451,23 @@ classdef Acquisition < file.AstroData
                 
                 if obj.use_save
                     try
+                        
+                        basename = obj.buf.makeFullpath; % the name from the object_name, ignoring the override
+                        
+                        for ii = 1:100
+                            
+                            dirname = sprintf('%s%s_run%d', basename, obj.run_name_append, ii);
+                            if ~exist(dirname, 'dir')
+                                mkdir(dirname);
+                                obj.buf.directory_override = dirname;
+                                break;
+                            end
+                            
+                        end
+                        
                         filename = obj.buf.getReadmeFilename;
                         util.oop.save(obj, filename, 'name', 'acquisition'); 
+                        
                     catch ME
                         warning(ME.getReport);
                     end
@@ -1517,6 +1535,8 @@ classdef Acquisition < file.AstroData
             obj.brake_bit = 1;
             
             obj.unstash_parameters;
+            
+            obj.buf.directory_override = '';
             
             obj.is_running = 0;
             
