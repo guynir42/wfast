@@ -200,20 +200,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 obj.update;
                 
-                if obj.status % need better checks here
-                    
-                    try 
-                        
-                        if obj.use_accelerometer
-%                             obj.connectArduino;
-                        end
-                
-                    catch ME
-                        warning(ME.getReport);
-                    end
-                    
-                end
-                
             catch ME
                 obj.log.error(ME.getReport);
                 rethrow(ME);
@@ -223,6 +209,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function connectArduino(obj)
 
+            obj.log.input('Connecting Arduino.');
+            
             if isempty(obj.ard) 
 
                 try
@@ -757,7 +745,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     
                     pause(0.1);
                     
-                    if obj.ard.status==0
+                    if isempty(obj.ard) || obj.ard.status==0 || obj.checkArduinoTime==0
                         obj.connectArduino;
                     end
                     
@@ -1133,10 +1121,20 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 return;
             end
             
-            try
+            obj.setup_timer;
+            
+            try % logger hearteat
+                if ~obj.log.check_heartbeat
+                    obj.log.heartbeat(300, obj); 
+                end
+            catch ME
+                warning(ME.getReport);
+            end
+            
+            try % arduino
                
                 if obj.use_accelerometer
-                    if isempty(obj.ard) || obj.ard.status==0
+                    if isempty(obj.ard) || obj.ard.status==0 || obj.checkArduinoTime==0
                         obj.connectArduino;
                     end
                 end
@@ -1207,6 +1205,30 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             else
 %                 obj.sync.outgoing.stop_camera = 0;
             end
+            
+        end
+        
+        function val = checkArduinoTime(obj)
+            
+            val = 1;
+            
+            if ~isempty(obj.log.time)
+            
+                dt = seconds(obj.log.time- obj.ard.time);
+            
+                if dt>600 % arduino has not updated in a few minutes
+                    val = 0;
+                    return;
+                end
+                
+            end
+            
+        end
+        
+        function val = printout(obj)
+        
+            val = sprintf('Status= %d, LST= %s, RA= %s, Dec= %s, HA= %s, ALT= %4.2f, %s', ...
+                obj.status, obj.LST, obj.telRA, obj.telDE, obj.telHA, obj.telALT, obj.pier_side); 
             
         end
         
