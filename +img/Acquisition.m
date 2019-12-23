@@ -1407,7 +1407,7 @@ classdef Acquisition < file.AstroData
                 end
                 
                 if input.log_level
-                    obj.log.input('Starting a new run with Acquisition.'); % maybe add some more info here...?
+                    obj.log.input(sprintf('Starting a new run "%s" (saving is %d). ', obj.run_name, obj.use_save)); 
                 end
                 
                 if ~obj.cal.checkDark

@@ -143,7 +143,7 @@ classdef AcqGUI < handle
             obj.menu_options.menu_cutouts.addButton('button_cut_size', '&Cutout size', 'input', 'cut_size', 'Size of star cutouts (pixels)');
             obj.menu_options.menu_cutouts.addButton('button_egdes', '&Edge distance', 'input', 'avoid_edges', 'Distance from edges to avoid finding stars (pixels)');
             obj.menu_options.menu_cutouts.addButton('button_num_bgs', 'Num &Backgrounds', 'input', 'num_backgrounds', 'Number of background cutouts');
-            obj.menu_options.menu_cutouts.addButton('button_size_bgs', '&Background &size', 'input', 'cut_size_bg', 'Size of background cutouts (pixels)');
+            obj.menu_options.menu_cutouts.addButton('button_size_bgs', '&Background size', 'input', 'cut_size_bg', 'Size of background cutouts (pixels)');
             obj.menu_options.menu_cutouts.addButton('button_adjust', '&Adjust cutouts', 'toggle', 'use_adjust_cutouts', 'Toggle cutout adjustments: reposition cutouts based on centroids');
             obj.menu_options.menu_cutouts.addButton('button_lock_adjust', '&Lock adjust', 'toggle', 'use_lock_adjust', 'Toggle cutout adjust lock: all cutouts would move together');
             
