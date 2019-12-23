@@ -31,8 +31,9 @@ classdef ScopeAssistant < handle
     
     properties % switches/controls
         
-        port_name = 'COM20'; % used only for USB (not used now)
-        bluetooth_name = 'HC-06'; 
+        port_name = 'COM25'; % used only for USB (not used now)
+%         bluetooth_name = 'HC-06'; 
+        bluetooth_name = 'btspp://0021130386D9';
         bluetooth_id = ''; 
         
         use_check_alt = 1;
@@ -77,7 +78,7 @@ classdef ScopeAssistant < handle
             else
                 if obj.debug_bit, fprintf('ScopeAssistant constructor v%4.2f\n', obj.version); end
                 
-                obj.connect(varargin{:});
+%                obj.connect(varargin{:});
                 obj.data = util.vec.CircularBuffer(100);
                 obj.reset;
                 
@@ -186,7 +187,7 @@ classdef ScopeAssistant < handle
         
         function disconnect(obj)
             
-            if ~isempty(obj.hndl)
+            if ~isempty(obj) && ~isempty(obj.hndl) && isvalid(obj.hndl)
                 fclose(obj.hndl);
                 delete(obj.hndl);
                 obj.hndl = [];

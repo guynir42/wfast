@@ -321,7 +321,7 @@ classdef AutoFocus < handle
             end
             
             if obj.use_min_position
-                plot(obj.ax, obj.pos, mean(obj.widths,1,'omitnan'), 'LineWidth', 3, 'Color', 'k');
+                plot(obj.ax, obj.pos, real(nanmean(obj.widths)), 'LineWidth', 3, 'Color', 'k');
             end
             
             hold(obj.ax, 'off');

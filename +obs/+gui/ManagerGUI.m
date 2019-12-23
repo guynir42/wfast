@@ -40,6 +40,7 @@ classdef ManagerGUI < handle
         
         panel_image;
         button_reset_axes;
+        button_mean_only;
         axes_image;
     
     end
@@ -206,12 +207,16 @@ classdef ManagerGUI < handle
             pos = pos - N;
             
             obj.panel_weather = GraphicPanel(obj.owner, [0.2, pos/N_middle, 0.6, N/N_middle], 'weather');
-            obj.panel_weather.addButton('button_temp', 'average_temp', 'info', 'Amb. Temp= ', 'C', '', 1/3);
-            obj.panel_weather.addButton('button_clouds', 'average_clouds', 'info', 'dT= ', 'C', '', 1/3);
-            obj.panel_weather.addButton('button_light', 'average_light', 'info', 'Light= ', '', '', 1/3);
-            obj.panel_weather.addButton('button_wind', 'average_wind', 'info', 'wind= ', ' km/h', '', 1/3);
-            obj.panel_weather.addButton('button_wind_az', 'average_wind_az', 'info', 'wind az= ', ' deg', '', 1/3);
-            obj.panel_weather.addButton('button_hummid', 'average_humid', 'info', 'humidity= ', '%', '', 1/3);
+            obj.panel_weather.addButton('button_temperature', 'average_temperature', 'info', 'Amb. Temp= ', 'C', '', 1/4);
+            obj.panel_weather.addButton('button_clouds', 'average_clouds', 'info', 'dT= ', 'C', '', 1/4);
+            obj.panel_weather.addButton('button_light', 'average_light', 'info', 'Light= ', '', '', 1/4);
+            obj.panel_weather.addButton('button_pressure', 'average_pressure', 'info', 'Pres= ', '', '', 1/4); 
+            
+            obj.panel_weather.addButton('button_wind_speed', 'average_wind_speed', 'info', 'wind= ', ' km/h', '', 1/4);
+            obj.panel_weather.addButton('button_wind_dir', 'average_wind_dir', 'info', 'wind dir= ', ' deg', '', 1/4);
+            obj.panel_weather.addButton('button_humidity', 'average_humidity', 'info', 'humid= ', '%', '', 1/4);
+            obj.panel_weather.addButton('button_rain', 'any_rain', 'info', 'rain= ', '', '', 1/4);
+            
             obj.panel_weather.margin = [0.01 0.01];
             obj.panel_weather.number = N;
             
@@ -228,6 +233,8 @@ classdef ManagerGUI < handle
             
             obj.button_reset_axes = GraphicButton(obj.panel_image, [0.9 0.95 0.1 0.05], obj.owner, '', 'custom','reset');
             obj.button_reset_axes.Callback = @obj.makeAxes;
+            
+            obj.button_mean_only = GraphicButton(obj.panel_image, [0.0 0.95 0.1 0.05], obj.owner, 'checker.use_only_plot_mean', 'toggle', 'all', 'mean'); 
             
             %%%%%%%%%%% panel stop %%%%%%%%%%%%%%%%%%%
             
@@ -259,10 +266,12 @@ classdef ManagerGUI < handle
                 obj.buttons{ii}.update;
             end
             
-            if obj.owner.mount.telRA_deg<obj.owner.mount.LST_deg && strcmp(obj.owner.mount.hndl.SideOfPier, 'pierWest')
-                obj.panel_telescope.button_RA.BackgroundColor = 'red';
-            else
-                obj.panel_telescope.button_RA.BackgroundColor = util.plot.GraphicButton.defaultColor;
+            if ~isempty(obj.owner.mount) && ~isempty(obj.owner.mount.telRA_deg) && ~isempty(obj.owner.mount.hndl.SideOfPier)
+                if obj.owner.mount.telRA_deg<obj.owner.mount.LST_deg && strcmp(obj.owner.mount.hndl.SideOfPier, 'pierWest')
+                    obj.panel_telescope.button_RA.BackgroundColor = 'red';
+                else
+                    obj.panel_telescope.button_RA.BackgroundColor = util.plot.GraphicButton.defaultColor;
+                end
             end
             
             if obj.owner.mount.telALT<20

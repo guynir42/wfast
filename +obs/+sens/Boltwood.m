@@ -27,6 +27,7 @@ classdef Boltwood < handle
     
         % generic fields
         status = 0; % false - readings are unreliable, true - ok
+        use_this = 1; % is true get the data from this sensor. If not, ignore it and move on
         id = 'BWW'; 
         data@util.vec.CircularBuffer; % Stack object containing data history
         data_col = {'JD', 'DayLightV', 'AmbientT', 'RelSkyT', 'SensorT', 'DewPointT', 'WindSpeed', 'Humidity', 'Rain'}; % Stack object columns
@@ -41,7 +42,7 @@ classdef Boltwood < handle
         temp_dew_point = NaN; % Dew point temperature
         wind_speed = NaN; % Wind speed
         humidity = NaN; % Humiditiy
-        rain = NaN; % Rain (is this in mm or logical 0/1??)
+        rain = NaN; % Rain (logical 0/1)
         
         % Text conditions from Boltwood
         light_condition   = '';                        % Day condition
