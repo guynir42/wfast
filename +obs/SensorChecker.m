@@ -266,7 +266,7 @@ classdef SensorChecker < handle
             obj.light.err_str = 'Light is too bright!'; 
             obj.light.units = '';
             
-            obj.light.max = 250; % units??
+            obj.light.max = 400; % units??
             
         end
         

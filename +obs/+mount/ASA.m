@@ -220,7 +220,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     end
                     
                 catch ME
-                    obj.use_accelerometer = 0;
+%                     obj.use_accelerometer = 0;
                     warning(ME.getReport);
                 end
 
@@ -238,7 +238,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     obj.ard.update;
                     
                 catch ME
-                    obj.use_accelerometer = 0;
+%                     obj.use_accelerometer = 0;
                     warning(ME.getReport);
                 end
                 
