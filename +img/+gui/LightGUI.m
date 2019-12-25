@@ -33,7 +33,8 @@ classdef LightGUI < handle
         
         panel_image;
         button_reset_axes;
-        button_cut_number;
+        button_log_scale
+        button_cut_number; % what did we want this for?
         axes_image;
     
     end
@@ -137,7 +138,7 @@ classdef LightGUI < handle
             obj.button_reset_axes = GraphicButton(obj.panel_image, [0.9 0.95 0.1 0.05], obj.owner, '', 'custom', 'reset');
             obj.button_reset_axes.Callback = @obj.makeAxes;
             
-            obj.button_cut_number = GraphicButton(obj.panel_image, [0.0 0.95 0.1 0.05], obj.owner, '', 'custom', '');
+            obj.button_log_scale = GraphicButton(obj.panel_image, [0.0 0.95 0.1 0.05], obj.owner, 'use_show_log', 'toggle', 'linear', 'log', 'small');
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
                         

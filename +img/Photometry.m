@@ -54,14 +54,15 @@ classdef Photometry < handle
         
         use_mex = 1; % use the (now old) mex function for faster processing 
         use_new_method = 1; % use the new mex function that is much faster and more accurate
-        num_threads = 1; % for multithreaded mex photometry
+        num_threads = 2; % for multithreaded mex photometry
         use_backgrounds = 1; % remove background from individual cutout
         use_self_psf = 0; % use image as a proxy for its own PSF
         
         iterations = 2; % repeat the photometry and relocate the aperutre to the centroid
-        use_basic = 0;
-        use_aperture = 1;
+        use_basic = 1;
+        use_centering = 1;
         use_gaussian = 1;
+        use_aperture = 1;
         use_forced = 1;
         
         corner_size = 0.15; % fraction of the cut_size or pixel value (must be smaller than cut_size!)
@@ -237,6 +238,7 @@ classdef Photometry < handle
             obj.centroids_y = [];
             obj.widths = [];
             obj.bad_pixels = [];
+            obj.flags = [];
             
             obj.fluxes_basic = [];
             obj.errors_basic = [];
@@ -249,6 +251,7 @@ classdef Photometry < handle
             obj.centroids_y_basic = [];
             obj.widths_basic = [];
             obj.bad_pixels_basic = [];
+            obj.flags_basic = [];
             
             obj.fluxes_ap = [];
             obj.errors_ap = [];
@@ -261,6 +264,7 @@ classdef Photometry < handle
             obj.centroids_y_ap = [];
             obj.widths_ap = [];
             obj.bad_pixels_ap = [];
+            obj.flags_ap = [];
             
             obj.fluxes_gauss = [];
             obj.errors_gauss = [];
@@ -273,6 +277,7 @@ classdef Photometry < handle
             obj.centroids_y_gauss = [];
             obj.widths_gauss = [];
             obj.bad_pixels_gauss = [];
+            obj.flags_gauss = [];
             
             obj.fluxes_fit = [];
             obj.errors_fit = [];
@@ -285,6 +290,7 @@ classdef Photometry < handle
             obj.centroids_y_fit = [];
             obj.widths_fit = [];
             obj.bad_pixels_fit = [];
+            obj.flags_fit = [];
             
         end
         
@@ -335,8 +341,11 @@ classdef Photometry < handle
                 
                 s = util.img.photometry2(single(obj.cutouts), 'iterations', obj.iterations, ...
                     'radii', obj.aperture, 'annulus', [obj.annulus, obj.annulus_outer], 'sigma', obj.gauss_sigma, ...
-                    'use_apertures', obj.use_aperture, 'use_gaussian', obj.use_gaussian, 'use_forced', obj.use_forced, ...
+                    'use_gaussian', obj.use_gaussian, 'use_centering', obj.use_centering, ...
+                    'use_apertures', obj.use_aperture, 'use_forced', obj.use_forced, ...
                     'threads', obj.num_threads, 'debug_bit', obj.debug_bit); 
+                
+                obj.pars_struct = s.parameters;
                 
                 obj.fluxes_basic = s.raw_photometry.flux;
                 obj.areas_basic = s.raw_photometry.area;
@@ -473,11 +482,13 @@ classdef Photometry < handle
                     obj.calcFit;
                 end
                 
+                obj.updatePars;
+                obj.flags = zeros(size(obj.fluxes)); 
+                
             end
             
             obj.updateAverages;
             
-            obj.updatePars;
             
             if ~isempty(obj.gui) && obj.gui.check
                 obj.gui.update;
@@ -1012,7 +1023,8 @@ classdef Photometry < handle
         function updateAverages(obj)
             
             F = obj.fluxes;
-            idx = F>util.stat.max2(F).*obj.percentile & ~isnan(F); % choose only good flux values
+            
+            idx = F>util.stat.max2(F).*obj.percentile & ~isnan(F) & obj.flags; % choose only good flux values
             
             % 1D vectors containing the good values only...
             F = obj.fluxes(idx);

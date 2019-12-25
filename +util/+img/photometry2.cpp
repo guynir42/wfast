@@ -29,11 +29,6 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	
 	photometry.run();
 
-	// float x=-2.2;
-	// float y=0.1;
-	// int idx=photometry.getShiftIndex(x,y); 
-	// printf("x= %f | y= %f | idx= %d | dx= %f | dy=%f\n", x, y, idx, photometry.dx[idx], photometry.dy[idx]); 
-	
 	char *field_names[6];
 	for(int i=0;i<6;i++) field_names[i]=(char*) mxMalloc(STRLN);
 	
@@ -45,7 +40,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	snprintf(field_names[5], STRLN, "parameters"); 
 	
 	plhs[0]=mxCreateStructMatrix(1,1,6, (const char**) field_names); 
-	
+		
 	mxSetFieldByNumber(plhs[0], 0, 0, photometry.outputStruct(photometry.output_raw)); 
 	if(photometry.use_forced) mxSetFieldByNumber(plhs[0], 0, 1, photometry.outputStruct(photometry.output_forced)); 
 	if(photometry.use_apertures) mxSetFieldByNumber(plhs[0], 0, 2, photometry.outputStruct(photometry.output_apertures, photometry.num_radii)); 
@@ -1086,6 +1081,10 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 			
 			error[j+num_cutouts*k]=getError(flux[j+num_cutouts*k]-area[j+num_cutouts*k]*background[j], area[j+num_cutouts*k]*variance[j], annulus_pixels*variance[j]);
 			width[j+num_cutouts*k]=getWidthFromMoments(m2x, m2y, mxy); 
+
+			if(k==0) bad_pixels[j]=aperture_indices[idx].size()-countNonNaNsIndices(image, aperture_indices, idx);
+			else bad_pixels[j+num_cutouts*k]+=aperture_indices[idx+num_shifts*k].size()
+			                                   -countNonNaNsIndices(image, aperture_indices, idx+num_shifts*k);
 			
 			flag[j+num_cutouts*k]=checkMoments(offset_x[j], offset_y[j], width[j]); 
 
@@ -1197,6 +1196,8 @@ void Photometry::calculateForced(int j){
 	error[j]=getError(flux[j]-background[j], variance[j]*area[j], variance[j]*annulus_pixels); 
 	
 	width[j]=getWidthFromMoments(m2x, m2y, mxy); 
+	
+	bad_pixels[j]=forced_indices[idx].size()-countNonNaNsIndices(image, forced_indices, idx);
 	
 	flag[j]=checkMoments(offset_x[j], offset_y[j], width[j]); 
 

@@ -33,7 +33,7 @@ classdef Lightcurves < handle
         show_num_stars = 10; % up to this number of stars are shown.
         use_smooth = 1;
         smooth_interval = 10;
-        
+        use_show_log = 0; 
         use_double_up = 1; % choose if you want to expand the data storage by factor of 2 each time when space runs out... 
         
         debug_bit = 1;
@@ -369,6 +369,7 @@ classdef Lightcurves < handle
                 input.input_var('offsets_y', []);
                 input.input_var('widths', []);
                 input.input_var('bad_pixels', []);
+                input.input_var('flags', []); 
                 input.input_var('pars_struct', [], 'phot_pars');
                 input.scan_vars(varargin{:});
             end
@@ -401,7 +402,7 @@ classdef Lightcurves < handle
                 type = '';
             end
             
-            list = {'fluxes', 'errors', 'areas', 'backgrounds', 'variances', 'offsets_x', 'offsets_y', 'centroids_x', 'centroids_y', 'widths', 'bad_pixels'};
+            list = {'fluxes', 'errors', 'areas', 'backgrounds', 'variances', 'offsets_x', 'offsets_y', 'centroids_x', 'centroids_y', 'widths', 'bad_pixels', 'flags'};
             
             if ~isempty(type)
                 list2 = strcat(list, ['_' type]);
@@ -526,7 +527,7 @@ classdef Lightcurves < handle
                 ylabel(input.ax, 'flux (counts)');
             
             elseif cs(obj.show_what, 'areas')
-                obj.addPlots(input.ax, obj.weights);
+                obj.addPlots(input.ax, obj.areas);
                 ylabel(input.ax, 'areas (pixels in aperture)');
             elseif cs(obj.show_what, 'offsets')
                 obj.addPlots(input.ax, obj.offsets_x, '-');
@@ -542,6 +543,12 @@ classdef Lightcurves < handle
             elseif cs(obj.show_what, 'backgrounds')
                 obj.addPlots(input.ax, obj.backgrounds);
                 ylabel(input.ax, 'background (counts/pixel)');
+            elseif cs(obj.show_what, 'variances')
+                obj.addPlots(input.ax, obj.variances);
+                ylabel(input.ax, 'variance (counts^2/pixel)'); 
+            elseif cs(obj.show_what, 'bad_pixels')
+                obj.addPlots(input.ax, obj.bad_pixels);
+                ylabel(input.ax, 'number of bad pixels in aperture'); 
             else
                 error('Unknown data to show "%s", use "fluxes" or "offset" etc...', obj.show_what);
             end
@@ -549,6 +556,12 @@ classdef Lightcurves < handle
             hold(input.ax, 'off');
             
             xlabel(input.ax, 'timestamps (seconds)');
+            
+            if obj.use_show_log
+                input.ax.YScale = 'log';
+            else
+                input.ax.YScale = 'linear';
+            end
             
         end
         
