@@ -141,15 +141,19 @@ classdef ManagerGUI < handle
             pos = pos - N;
             obj.panel_object = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'object');            
             obj.panel_object.number = N;
-            obj.panel_object.addButton('button_name', 'mount.objName', 'input_text', ' ', '', 'edit', 0.8); 
-            obj.panel_object.addButton('button_resolve', 'mount.inputTarget', 'push', 'resolve', '', 'edit', 0.2); 
-            obj.panel_object.addButton('button_ra', 'mount.objRA', 'input text', 'RA= ', '', 'edit', 0.5);
-            obj.panel_object.addButton('button_dec', 'mount.objDEC', 'input text', 'DE= ', '', 'edit', 0.5);
-            obj.panel_object.addButton('button_previous', '', 'custom', ' '); 
-            obj.panel_object.addButton('button_alt', 'mount.objALT', 'info', 'ALT= ', '', 'edit', 0.5);
-            obj.panel_object.addButton('button_side', 'mount.obj_pier_side', 'info', ' ', '', 'edit', 0.5);
+            obj.panel_object.addButton('button_name', 'mount.objName', 'input_text', ' ', '', 'edit', 0.8, '', '', 'Input the name of the object/field'); 
+            obj.panel_object.addButton('button_resolve', 'mount.inputTarget', 'push', 'resolve', '', 'edit', 0.2, '', '', 'Resolve name with SIMBAD'); 
+            obj.panel_object.addButton('button_ra', 'mount.objRA', 'input text', 'RA= ', '', 'edit', 0.5, '', '', 'Target right ascention');
+            obj.panel_object.addButton('button_dec', 'mount.objDEC', 'input text', 'DE= ', '', 'edit', 0.5, '', '', 'Target declination');
+            obj.panel_object.addButton('button_prev_objects', '', 'custom', '', '', '', [], '', '', 'List the last objects that were used to for slew');
+            obj.panel_object.addButton('button_alt', 'mount.objALT', 'info', 'ALT= ', '', 'edit', 0.5, '', '', 'Target altitute above horizong (degrees)');
+            obj.panel_object.addButton('button_pierside', 'mount.obj_pier_side', 'info', ' ', '', 'edit', 0.5, '', '', 'Side of the telescope when pointing to object');
             obj.panel_object.margin = [0.02 0.01];
             obj.panel_object.make;
+            
+            obj.panel_object.button_prev_objects.control.Style = 'popupmenu';
+            obj.panel_object.button_prev_objects.Callback = @obj.callback_prev_objects;
+            
             
             %%%%%%%%%%% panel dome %%%%%%%%%%%%%%%
             
@@ -249,7 +253,6 @@ classdef ManagerGUI < handle
             obj.menu_options.menu_dome.addButton('button_west_num', '&West num= %d', 'input', 'dome.number_west', 'How many steps to move the West shutter');
             
             obj.menu_options.addButton('menu_mount', '&Mount', 'menu');
-            obj.menu_options.menu_mount.addButton('button_sync', '&Sync', 'push', 'mount.syncToTarget', 'Sync telescope to current position');
             obj.menu_options.menu_mount.addButton('button_limit_alt', '&Alt limit= %d', 'input', 'mount.limit_alt', 'Altitude limit (degrees)');
             obj.menu_options.menu_mount.addButton('button_limit_flip', '&Flip limit= %d', 'input', 'mount.limit_flip', 'Meridian flip limit (degrees)');
             obj.menu_options.menu_mount.addButton('button_park', '&Park', 'push', 'mount.park', 'Park telescope');
@@ -259,7 +262,8 @@ classdef ManagerGUI < handle
             obj.menu_options.menu_arduino.addButton('button_use_acc', '&Use Acelerometer', 'toggle', 'mount.use_accelerometer', 'Let the Arduino accelerometer stop telescope when it dips too low');
                         
             obj.menu_options.addButton('menu_object', '&Object', 'menu');
-            
+            obj.menu_options.menu_object.addButton('button_sync', '&Sync', 'push', 'mount.syncToTarget', 'Sync telescope to current position');
+            obj.menu_options.menu_object.addButton('button_reset_prev', '&Reset history', 'push', 'mount.resetPrevObjects', 'Clear the list of previous targets'); 
             
             obj.menu_options.addButton('menu_timers', '&Timers', 'menu');
             obj.menu_options.menu_timers.addButton('button_run_t1', 'run t&1', 'push', 'callback_t1', 'Run the first timer, that updates all devices');
@@ -350,6 +354,20 @@ classdef ManagerGUI < handle
                 obj.panel_telescope.button_ALT.control.ForegroundColor = 'black';
             end
             
+            % update object buttons
+            if isempty(obj.owner.mount.prev_objects)
+                obj.panel_object.button_prev_objects.control.String = {' '};
+            else
+                obj.panel_object.button_prev_objects.control.String = obj.owner.mount.prev_objects;
+            end
+            
+            if strcmp(obj.owner.mount.pier_side, obj.owner.mount.obj_pier_side)
+                obj.panel_object.button_pierside.BackgroundColor = util.plot.GraphicButton.defaultColor;
+            elseif ~strcmp(obj.owner.mount.obj_pier_side, 'pierUnknown')
+                obj.panel_object.button_pierside.BackgroundColor = 'red';
+                obj.panel_object.button_pierside.Tooltip = [obj.panel_object.button_pierside.Tooltip ' (need to flip!)']; 
+            end
+            
             if obj.owner.dome.status==0
                 obj.panel_dome.button_shutter_west.String = 'Shut.West: error';
                 obj.panel_dome.button_shutter_east.String = 'Shut.East: error';
@@ -392,7 +410,23 @@ classdef ManagerGUI < handle
 %                 end
 %             end
             
+            obj.updateStopButton;
+
             obj.owner.checker.plotWeather('ax', obj.axes_image);
+                        
+        end
+        
+        function updateStopButton(obj)
+            
+            if obj.owner.mount.hndl.Slewing
+                obj.panel_stop.button_stop.BackgroundColor = 'red';
+            elseif obj.owner.dome.brake_bit==0
+                obj.panel_stop.button_stop.BackgroundColor = 'red';
+            else
+                obj.panel_stop.button_stop.BackgroundColor = util.plot.GraphicButton.defaultColor;
+            end 
+            
+            drawnow;
             
         end
                         
@@ -406,11 +440,18 @@ classdef ManagerGUI < handle
                 
     methods % callbacks
         
-        function callback_run_t1(obj, ~, ~)
+        function callback_prev_objects(obj, hndl, ~)
             
-            if obj.debug_bit, disp('callback: run_t1'); end
+            if obj.debug_bit>1, disp('Callback: prev_objects'); end
+
+            idx = hndl.Value;
             
-            obj.owner.callback_t1;
+            if ~isempty(idx) && ~isempty(hndl.String)
+                str = hndl.String{idx};
+                if ~isempty(strip(str))
+                    obj.owner.mount.parseTargetString(str);
+                end
+            end
             
             obj.update;
             
@@ -434,16 +475,6 @@ classdef ManagerGUI < handle
             
         end
         
-        function callback_run_t2(obj, ~, ~)
-            
-            if obj.debug_bit, disp('callback: run_t2'); end
-            
-            obj.owner.callback_t2;
-            
-            obj.update;
-            
-        end
-        
         function callback_interval_t2(obj, ~, ~)
             
             if obj.debug_bit, disp('callback: interval_t2'); end
@@ -458,16 +489,6 @@ classdef ManagerGUI < handle
                     obj.owner.setup_t2;
                 end
             end
-            
-            obj.update;
-            
-        end
-        
-        function callback_run_t3(obj, ~, ~)
-            
-            if obj.debug_bit, disp('callback: run_t3'); end
-            
-            obj.owner.callback_t3;
             
             obj.update;
             
@@ -492,7 +513,7 @@ classdef ManagerGUI < handle
             
         end
         
-        function callback_close(obj, ~, ~)
+        function callback_close(obj, ~, ~) % this is unused! 
            
             if obj.debug_bit, disp('callback: close'); end
             

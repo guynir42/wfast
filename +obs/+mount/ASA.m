@@ -38,6 +38,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         hndl; % ASCOM object
         
+        owner@obs.Manager;
+        
         object@head.Ephemeris; % all position and time calculations done using Ephemeris class
         
         ard@obs.sens.ScopeAssistant; % connect to accelerometer and ultrasonic sensor
@@ -967,6 +969,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     obj.gui.update;
                 end
                 
+                if ~isempty(obj.owner) && ~isempty(obj.owner.gui) && obj.owner.gui.check
+                    obj.owner.gui.updateStopButton;
+                end
+                
             catch ME
                 obj.log.error(ME.getReport);
                 rethrow(ME);
@@ -1075,7 +1081,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function syncToTarget(obj)
             
-            obj.hndl.SyncToTarget;
+%             obj.hndl.SyncToTarget;
+            obj.hndl.SyncToCoordinates;
             
         end
         
