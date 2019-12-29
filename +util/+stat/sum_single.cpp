@@ -65,7 +65,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	}
 	else if(mxIsClass(prhs[0], "uint16")){
 		
-		short int *matrix=(short int*) mxGetData(prhs[0]);
+		short unsigned int *matrix=(short unsigned int*) mxGetData(prhs[0]);
 		
 		for(int j=0;j<dims[2];j++){// go over all frames
 		

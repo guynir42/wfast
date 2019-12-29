@@ -1379,7 +1379,7 @@ classdef Acquisition < file.AstroData
                 
             end
             
-            if obj.use_sync && obj.use_ignore_manager==0
+            if ~isempty(obj.sync) && obj.use_sync && obj.use_ignore_manager==0
                 obj.getSyncData;
             end
             
@@ -1399,6 +1399,9 @@ classdef Acquisition < file.AstroData
                 end
 
                 input = obj.makeInputVars(varargin{:});
+                
+                obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
+                
                 obj.stash_parameters(input);
                 
 %                 if ~isempty(obj.total_runtime)
@@ -1436,8 +1439,6 @@ classdef Acquisition < file.AstroData
                 if obj.use_save && obj.use_autodeflate
                     obj.deflator.setup_timer;
                 end
-                
-                obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
                 
                 if isempty(obj.positions)
                     if obj.debug_bit, disp('Positions field empty. Calling single then findStars'); end
