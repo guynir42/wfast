@@ -1712,7 +1712,9 @@ classdef Acquisition < file.AstroData
                 obj.flux_buf.input(obj.phot_stack.fluxes);
 
                 if obj.use_adjust_cutouts
-                    obj.clip.positions = double(obj.clip.positions + obj.average_offsets);
+                    offsets = obj.average_offsets;
+                    offsets(isnan(offsets)) = 0;
+                    obj.clip.positions = double(obj.clip.positions + offsets);
                 else
                     
                 end

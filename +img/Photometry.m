@@ -83,7 +83,7 @@ classdef Photometry < handle
         use_pixel_calibration = 0;
         pixel_cal_iterations = 3;
         
-        percentile = 0.5; % what fraction of the best flux are we taking for averages
+        percentile = 0.2; % what fraction of the best flux are we taking for averages
         
         show_num_stars = 10;
         show_num_frames = 3;
@@ -1024,8 +1024,9 @@ classdef Photometry < handle
             
             F = obj.fluxes;
             
-            idx = F>util.stat.max2(F).*obj.percentile & ~isnan(F) & obj.flags; % choose only good flux values
-            
+%             idx = F>util.stat.max2(F).*obj.percentile & ~isnan(F) & ~obj.flags; % choose only good flux values
+            idx = F>nanmedian(F) & ~isnan(F) & ~obj.flags; % choose only good flux values
+
             % 1D vectors containing the good values only...
             F = obj.fluxes(idx);
             B = obj.backgrounds(idx);
