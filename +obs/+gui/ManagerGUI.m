@@ -163,11 +163,11 @@ classdef ManagerGUI < handle
             obj.panel_dome.number = N;            
             obj.panel_dome.addButton('button_close_dome', 'closeDome', 'push', 'Close Dome');
             obj.panel_dome.addButton('button_shutter_east', '', 'custom', 'East shutter: ', '', 'edit', 0.5);
-            obj.panel_dome.addButton('button_shutter_west', '', 'custom', 'West shutter: ', '', 'small', 0.5);
+            obj.panel_dome.addButton('button_shutter_west', '', 'custom', 'West shutter: ', '', 'edit', 0.5);
             obj.panel_dome.addButton('button_close_east', 'dome.closeEast', 'push', 'Close East', '', 'edit', 0.5);
-            obj.panel_dome.addButton('button_close_west', 'dome.closeWest', 'push', 'Close West', '', 'small', 0.5);
+            obj.panel_dome.addButton('button_close_west', 'dome.closeWest', 'push', 'Close West', '', 'edit', 0.5);
             obj.panel_dome.addButton('button_open_east', 'dome.openEast', 'push', 'Open East', '', 'edit', 0.5);
-            obj.panel_dome.addButton('button_open_west', 'dome.openWest', 'push', 'Open West', '', 'small', 0.5);
+            obj.panel_dome.addButton('button_open_west', 'dome.openWest', 'push', 'Open West', '', 'edit', 0.5);
             obj.panel_dome.margin = [0.02 0.01];
             obj.panel_dome.make;
             
@@ -389,27 +389,7 @@ classdef ManagerGUI < handle
                 end
                 
             end
-            
-%             obj.panel_controls.button_interval_t1.String = ['P= ' num2str(obj.owner.period1) 's'];
-%             obj.panel_controls.button_interval_t2.String = ['P= ' num2str(obj.owner.period2) 's'];
-%             obj.panel_controls.button_interval_t3.String = ['P= ' num2str(obj.owner.period3) 's'];
-%             
-%             timer_vec = obj.owner.areTimersRunning;
-%             
-%             for ii = 1:3
-%                 button = obj.panel_controls.(['button_run_t' num2str(ii)]);
-%                 button2 = obj.panel_controls.(['button_interval_t' num2str(ii)]);
-%                 if timer_vec(ii)
-%                     button.String = ['run t' num2str(ii)];
-%                     button.BackgroundColor = util.plot.GraphicButton.defaultColor;
-%                     button2.BackgroundColor = util.plot.GraphicButton.defaultColor;
-%                 else
-%                     button.String = ['t' num2str(ii) ' stopped'];
-%                     button.BackgroundColor = 'red';
-%                     button2.BackgroundColor = 'red';
-%                 end
-%             end
-            
+                        
             obj.updateStopButton;
 
             obj.owner.checker.plotWeather('ax', obj.axes_image);
@@ -432,7 +412,7 @@ classdef ManagerGUI < handle
                         
         function c = check(obj)
            
-            c = ~isempty(obj) && ~isempty(obj.panel_stop) && isvalid(obj.panel_stop);
+            c = ~isempty(obj) && ~isempty(obj.panel_stop) && isvalid(obj.panel_stop.panel);
             
         end
         
