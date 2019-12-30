@@ -461,6 +461,16 @@ classdef SkyMap < handle
     
     methods % plotting tools / GUI
         
+        function makeGUI(obj)
+            
+            if isempty(obj.gui)
+                obj.gui = util.ast.gui.SkyGUI(obj);
+            end
+            
+            obj.gui.make;
+            
+        end
+        
         function h_out = show(obj, varargin)
             
             import util.text.cs;

@@ -1,8 +1,8 @@
-classdef objGUI < handle
+classdef SkyGUI < handle
     
     properties 
         
-        owner@package.OBJ; % link back to containg object
+        owner@util.ast.SkyMap; % link back to containg object
 
         fig@util.plot.FigHandler;
              
@@ -27,8 +27,8 @@ classdef objGUI < handle
         
         panel_controls;
         
-        panel_contrast;
-    
+        panel_contrast; % do we really need this??
+        
         panel_close;
         button_close;
         
@@ -46,21 +46,17 @@ classdef objGUI < handle
             
     methods % constructor
        
-        function obj = objGUI(owner)
+        function obj = SkyGUI(owner)
             
             % later add other options like copy constructor
-            if isa(owner, 'package.OBJ')
+            if isa(owner, 'util.ast.SkyMap')
                 
-                if obj.debug_bit, fprintf('objGUI constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit, fprintf('SkyGUI constructor v%4.2f\n', obj.version); end
                 
                 obj.owner = owner;
                 
-            elseif isa(owner, '...')
-                
-                
-                
             else
-                error('Input an ... to constructor of ...!');
+                error('Input a util.ast.SkyMap to constructor of SkyGUI!');
             end
             
         end
@@ -79,11 +75,11 @@ classdef objGUI < handle
             obj.buttons = {};
             obj.menus = {};
             
-            obj.fig = util.plot.FigHandler('...');
+            obj.fig = util.plot.FigHandler('Sky Map');
             obj.fig.clear;
             obj.fig.bottom = 5;
             obj.fig.height = 16;
-            obj.fig.width = 25;
+            obj.fig.width = 32;
             movegui(obj.fig.fig, 'center');
             
             
@@ -95,56 +91,51 @@ classdef objGUI < handle
             
             
             
-            N_left = 10; % number of buttons on left side
-            
-            %%%%%%%%%%%%%%%%%%% LEFT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%%
-            
-            pos = N_left;
+            N = 10; % number of buttons on left side
             
             %%%%%%%%%%% panel controls %%%%%%%%%%%%%%%
             
             % Add buttons using obj.addButton(button_name, var_name='', type='', str1='', str2='', font_size='', split=1, color_on=[], color_off=[], tooltip)
             
-            num_buttons = 5;
-            pos = pos-num_buttons;
-            obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left 0.2 num_buttons/N_left], 'controls', 1); % last input is for vertical (default)
+            num_buttons = 6;
+            obj.panel_controls = GraphicPanel(obj.owner, [0 (N-num_buttons)/N 0.2 num_buttons/N], 'controls', 1); % last input is for vertical (default)
+            obj.panel_controls.addButton('button_min_mag', 'show_brightest_magnitude', 'input', 'M_min= ', '', '', 0.5, '', '', 'Minimal magnitude (brightest) to show'); 
+            obj.panel_controls.addButton('button_max_mag', 'show_faintest_magnitude', 'input', 'M_max= ', '', '', 0.5, '', '', 'Maximal magnitude (faintest) to show'); 
+            obj.panel_controls.addButton('button_min_mag', 'show_biggest_size', 'input', 'size= ', ' uas', '', 1, '', '', 'Biggest size of stars to show (micro arcsec)'); 
+            obj.panel_controls.addButton('button_south', 'show_south_limit', 'input', 'south limit= ', ' deg', '', 1, '', '', 'How far south in declination to draw the map'); 
+            obj.panel_controls.addButton('button_log', 'show_log', 'toggle', 'linear scale', 'log scale', '', 0.5, '', '', 'Show the map in linear/log scale');
+            obj.panel_controls.addButton('button_placeholder', '', 'custom', '', '', '', 0.5, '', '', '');
+            obj.panel_controls.addButton('button_ecliptic', 'show_ecliptic', 'toggle', 'ecliptic', 'ecliptic', '', 0.5, 'blue', '', 'Show the ecliptic coordinates grid overlay');
+            obj.panel_controls.addButton('button_ecliptic', 'show_galactic', 'toggle', 'galactic', 'galactic', '', 0.5, 'blue', '', 'Show the galactic coordinates grid overlay');            
+            obj.panel_controls.addButton('button_ra_units', 'show_ra_units', 'input_text', 'units= ', '', '', 0.5, '', '', 'Choose "degrees" or "hours" for the RA coordinate axis');
+            obj.panel_controls.addButton('button_hour_grid', 'show_hour_grid', 'toggle', 'hour grid', 'hour grid', '', 0.5, 'blue', '', 'Show the time zone overlay');
             obj.panel_controls.number = num_buttons;
-            
+%             obj.panel_controls.margin = [0.03 0.02];
             obj.panel_controls.make;
             
             %%%%%%%%%%% panel contrast %%%%%%%%%%%%%%%
-            
-            obj.panel_contrast = util.plot.ContrastLimits(obj.axes_image, obj.fig.fig, [0 pos/N_left 0.2 5/N_left], 1); % last input is for vertical (default)
+                        
+            obj.panel_contrast = util.plot.ContrastLimits(obj.axes_image, obj.fig.fig, [0 1/N 0.2 3/N], 1); % last input is for vertical (default)
             obj.panel_contrast.font_size = obj.font_size;
             obj.panel_contrast.big_font_size = obj.big_font_size;
             obj.panel_contrast.small_font_size = obj.small_font_size;
             obj.panel_contrast.edit_font_size = obj.edit_font_size;
             
-            %%%%%%%%%%%%%%%%%%% RIGHT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
             
-            N_right = 10; pos = N_right;
+            obj.panel_close = uipanel('Position', [0 0 0.2 1/N]);
+            obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE');
+            obj.button_close.Callback = @obj.callback_close;
                         
-            %%%%%%%%%%%%%%%%%%%%%% MIDDLE %%%%%%%%%%%%%%%%%%%%%%%%%%%
-            
-            N_middle = 10; pos = N_middle;
-            
             %%%%%%%%%%% panel image %%%%%%%%%%%%%%%%%%
             
-            N = 9; pos = pos - N;
-            obj.panel_image = uipanel('Title', '', 'Position', [0.2 pos/N_middle 0.6 N/N_middle]);
+            obj.panel_image = uipanel('Title', '', 'Position', [0.2 0 0.8 1]);
                         
             obj.makeAxes;
             
-            obj.button_reset_axes = GraphicButton(obj.panel_image, [0.85 0.95 0.15 0.05], obj.owner, '', 'custom', 'new axes', '');
+            obj.button_reset_axes = GraphicButton(obj.panel_image, [0.85 0.0 0.15 0.05], obj.owner, '', 'custom', 'new axes', '');
             obj.button_reset_axes.Callback = @obj.makeAxes;
             obj.button_reset_axes.Tooltip = 'Create a new image axis, zoomed out and with default contrast limits'; 
-            
-            %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
-            
-            N = 1; pos = pos - N;            
-            obj.panel_close = uipanel('Position', [0 pos 0.2 N/N_middle]);
-            obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE');
-            obj.button_close.Callback = @obj.callback_close;
             
             obj.update;
             
@@ -177,6 +168,8 @@ classdef objGUI < handle
             for ii = 1:length(obj.menus)
                 obj.menus{ii}.update;
             end
+            
+            obj.owner.show('ax', obj.axes_image, 'font size', 20); 
             
             obj.panel_contrast.update;
             
