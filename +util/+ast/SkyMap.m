@@ -58,7 +58,7 @@ classdef SkyMap < handle
         show_log = true;
         show_ecliptic = false;
         show_galactic = false;
-        show_ra_units = 'deg';
+        show_ra_units = 'hours';
         show_grid = false;
         
         debug_bit = 1;
@@ -203,6 +203,20 @@ classdef SkyMap < handle
                 obj.show_south_limit = min(obj.DE_axis);
             else
                 obj.show_south_limit = -abs(val); % make sure to only take negative south values! 
+            end
+            
+        end
+        
+        function set.show_ra_units(obj, val)
+            
+            import util.text.cs;
+            
+            if cs(val, 'degrees')
+                obj.show_ra_units = 'degrees';
+            elseif cs(val, 'hours')
+                obj.show_ra_units = 'hours';
+            else
+                error('Unknown RA units "%s". Use "degrees" or "hours"...', val);
             end
             
         end
@@ -375,12 +389,12 @@ classdef SkyMap < handle
             
             e = head.Ephemeris;
             
-            obj.ecliptic_long = zeros(length(obj.RA_axis)-1, length(obj.DE_axis)-1);
-            obj.ecliptic_lat = zeros(length(obj.RA_axis)-1, length(obj.DE_axis)-1);
+            obj.ecliptic_long = zeros(length(obj.DE_axis)-1, length(obj.RA_axis)-1);
+            obj.ecliptic_lat = zeros(length(obj.DE_axis)-1, length(obj.RA_axis)-1);
             
-            obj.galactic_long = zeros(length(obj.RA_axis)-1, length(obj.DE_axis)-1);
-            obj.galactic_lat = zeros(length(obj.RA_axis)-1, length(obj.DE_axis)-1);
-            
+            obj.galactic_long = zeros(length(obj.DE_axis)-1, length(obj.RA_axis)-1);
+            obj.galactic_lat = zeros(length(obj.DE_axis)-1, length(obj.RA_axis)-1);
+
             obj.prog.start(length(obj.RA_axis)-1);
             
             for ii = 1:length(obj.RA_axis)-1
@@ -593,13 +607,13 @@ classdef SkyMap < handle
             
             if input.ecliptic
                 % need to handle south limit!
-                [C1,h1] = contour(input.ax, x, y, obj.ecliptic_lat(idx_de:end), [-50 -20 -10 0 10 20 50], 'Color', 'red'); 
+                [C1,h1] = contour(input.ax, x, y, obj.ecliptic_lat(idx_de:end,:), [-50 -20 -10 0 10 20 50], 'Color', 'red'); 
                 clabel(C1,h1, 'FontSize', 16, 'Color', 'red');
             end
             
             if input.galactic
                 % need to handle south limit!
-                [C2,h2] = contour(input.ax, x, y, obj.galactic_lat(idx_de:end), [-50 -20 0 20 50], 'Color', 'green'); 
+                [C2,h2] = contour(input.ax, x, y, obj.galactic_lat(idx_de:end,:), [-50 -20 0 20 50], 'Color', 'green'); 
                 clabel(C2,h2, 'FontSize', 16, 'Color', 'green');
             end
             
