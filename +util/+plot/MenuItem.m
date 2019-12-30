@@ -240,7 +240,9 @@ classdef MenuItem < dynamicprops
         function set.Tooltip(obj, val)
             
             if isprop(obj.hndl, 'Tooltip')
-                obj.hndl.Tooltip = val;
+                try
+                    obj.hndl.Tooltip = val;
+                end
             end
             
         end
