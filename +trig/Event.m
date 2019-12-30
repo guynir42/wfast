@@ -441,7 +441,7 @@ classdef Event < handle
             
         end
         
-        function new_obj = reduce_memory(obj)
+        function new_obj = reduce_memory_copy(obj)
             
             if util.text.cs(obj.which_batch, 'first')
                 other_batch = 'second';
@@ -479,7 +479,15 @@ classdef Event < handle
         end
         
         function reload_memory(obj) % loads cutouts/positions/stack from file
-            error('not yet implemented!');
+            
+            obj.cutouts_first = h5read(obj.filename_first, '/cutouts'); 
+            obj.positions_first = h5read(obj.filename_first, '/positions'); 
+            obj.stack_first = h5read(obj.filename_first, '/stack'); 
+
+            obj.cutouts_second = h5read(obj.filename_second, '/cutouts'); 
+            obj.positions_second = h5read(obj.filename_second, '/positions'); 
+            obj.stack_second = h5read(obj.filename_second, '/stack'); 
+            
         end
         
     end
@@ -530,7 +538,6 @@ classdef Event < handle
                 h2.DisplayName = 'trigger region';
             end
             
-%             f = obj.flux_raw_all(:,obj.star_index);
             f = obj.flux_detrended;
             s = obj.std_flux;
             
@@ -554,6 +561,11 @@ classdef Event < handle
             
             h7 = plot(input.ax, obj.timestamps, obj.offsets_y_at_star, 'o', 'MarkerSize', 1);
             h7.DisplayName = 'offset y';
+            
+            h8 = plot(input.ax, obj.timestamps, obj.widths_at_star, 'p', 'MarkerSize', 1);
+            h8.DisplayName = 'PSF width';
+            
+            
             
 %             h8 = bar(input.ax, obj.timestamps, obj.bad_pixels_at_star-mean(obj.bad_pixels_at_star)-5, 'BaseValue', -5, 'FaceAlpha', 0.5);
 %             h8.DisplayName = 'relative bad pixels';
@@ -652,11 +664,11 @@ classdef Event < handle
                     
                     if ~isempty(obj.gauss_sigma)
                         rad = obj.gauss_sigma;
-                        str = sprintf('sigma= %4.2f', rad); 
+                        str = sprintf('sigma= %4.2f', rad(end)); 
                         col = 'magenta';
                     elseif ~isempty(obj.aperture)
                         rad = obj.aperture;
-                        str = sprintf('ap= %4.2f', rad); 
+                        str = sprintf('ap= %4.2f', rad(end)); 
                         col = 'green';
                     end
 
@@ -697,7 +709,7 @@ classdef Event < handle
                     end
                     
                     if ~isempty(rad)
-                        viscircles(ax{ii}, cen(ii,:), rad, 'EdgeColor', col);
+                        viscircles(ax{ii}, cen(ii,:), rad(end), 'EdgeColor', col);
                         if idx_start+ii-1==idx
                             util.plot.inner_title(str, 'Position', 'bottom', 'Color', col, 'FontSize', input.font_size, 'ax', ax{ii});
                         end

@@ -144,11 +144,14 @@ classdef FinderGUI < handle
             num_buttons = 1;
             pos = pos-num_buttons;
             obj.panel_memory = GraphicPanel(obj.owner, [0 pos/N_left 0.2 num_buttons/N_left], 'memory control', 1); % last input is for vertical (default)
-            obj.panel_memory.addButton('button_clear', 'clearOneEventMemory', 'push', 'clear mem ', '', '', 0.5, [], [], 'Remove images and raw fluxes for current event');
-            obj.panel_memory.addButton('button_load', 'loadOneEventMemory', 'push', 'load mem ', '', '', 0.5, [], [], 'Load from file images and raw fluxes for current event');
+            obj.panel_memory.addButton('button_clear', 'clearOneEventMemory', 'custom', 'clear mem ', '', '', 0.5, [], [], 'Remove images and raw fluxes for current event');
+            obj.panel_memory.addButton('button_load', 'loadOneEventMemory', 'custom', 'load mem ', '', '', 0.5, [], [], 'Load from file images and raw fluxes for current event');
             obj.panel_memory.number = num_buttons;
             
             obj.panel_memory.make;
+
+            obj.panel_memory.button_clear.Callback = @obj.callback_clear_memory;
+            obj.panel_memory.button_load.Callback = @obj.callback_reload_memory;
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
             
@@ -231,6 +234,30 @@ classdef FinderGUI < handle
     end
                 
     methods % callbacks
+        
+        function callback_clear_memory(obj, ~, ~)
+            
+            if obj.debug_bit, disp('callback: clear memory'); end
+            
+            obj.owner.clearOneEventMemory;
+            
+            obj.update;
+            
+            obj.owner.show;
+            
+        end
+        
+        function callback_reload_memory(obj, ~, ~)
+            
+            if obj.debug_bit, disp('callback: reload memory'); end
+            
+            obj.owner.loadOneEventMemory;
+            
+            obj.update;
+            
+            obj.owner.show;
+            
+        end
         
         function callback_close(obj, ~, ~)
            

@@ -1185,7 +1185,7 @@ void Photometry::calculateForced(int j){
 
 	float norm=flux[j]-area[j]*background[j];
 	float m1x=sumIndices(image, background[j], X, aperture_indices, idx)/norm;
-	float m1y=sumIndices(image, background[j], X, aperture_indices, idx)/norm;
+	float m1y=sumIndices(image, background[j], Y, aperture_indices, idx)/norm;
 	offset_x[j]=m1x;
 	offset_y[j]=m1y;
 	
@@ -1224,10 +1224,10 @@ int Photometry::getShiftIndex(float x, float y){ // find the index closest to th
 
 float Photometry::getError(float reduced_flux, float aperture_variance, float background_variance){ // calculate the best estimate for the noise, including background noise, source noise, and scintillation
 	
-	return sqrt(pow(reduced_flux,2)*scintillation_fraction + 
-	            reduced_flux*gain + 
-				aperture_variance + 
-				background_variance); 
+	float V=pow(reduced_flux,2)*scintillation_fraction + reduced_flux*gain + aperture_variance + background_variance;
+	
+	if(V<=0) return NAN;
+	else return sqrt(V); 
 	
 }
 
@@ -1236,7 +1236,7 @@ bool Photometry::checkMoments(float offset_x, float offset_y, float width){ // r
 	if(offset_x>dims[1]/2) return 1;
 	if(offset_y>dims[0]/2) return 1;
 	if(width>dims[0]/2 || width>dims[1]/2) return 1;
-	if(width<0) return 1;
+	if(width<=0) return 1;
 	if(offset_x!=offset_x || offset_y!=offset_y || width!=width) return 1; // if one of them are NaN
 	
 	return 0; // if all checks are not triggered, return with the ok flag
@@ -1252,10 +1252,13 @@ float Photometry::getWidthFromMoments(float m2x, float m2y, float mxy){ // calcu
 	float tr=m2x+m2y;
 	float det=m2x*m2y - mxy*mxy;
 	
+	if( (tr*tr-4*det) < 0) return 0;
+	
 	float r1=(tr-sqrt(tr*tr-4*det))/2;
 	float r2=(tr+sqrt(tr*tr-4*det))/2;
-	
-	return (sqrt(r1)+sqrt(r2))/2;
+
+	if(m2x<0 || m2y<0 || r1<0 || r2<0) return 0;	
+	else return (sqrt(r1)+sqrt(r2))/2;
 
 }
 
@@ -1278,12 +1281,19 @@ void Photometry::calcFrameAverages(float **output, int num_radii){ // save the a
 
 				// notice that the stars are picked from each frame
 				float flux=output[IDX_FLUX][i+j*num_frames+(num_radii-1)*num_cutouts]; 
-				sum_f+=flux;
-				sum_x+=output[IDX_DX][i+j*num_frames+(num_radii-1)*num_cutouts]*flux; 
-				sum_y+=output[IDX_DY][i+j*num_frames+(num_radii-1)*num_cutouts]*flux; 
-				sum_w+=output[IDX_WD][i+j*num_frames+(num_radii-1)*num_cutouts]*flux;
+				float dx=output[IDX_DX][i+j*num_frames+(num_radii-1)*num_cutouts];
+				float dy=output[IDX_DY][i+j*num_frames+(num_radii-1)*num_cutouts];
+				float wd=output[IDX_WD][i+j*num_frames+(num_radii-1)*num_cutouts];
+				
+				if(flux==flux && dx==dx && dy==dy && wd==wd){ // do not add NaNs! 
+					sum_f+=flux;
+					sum_x+=dx*flux; 
+					sum_y+=dy*flux; 
+					sum_w+=wd*flux;
+				}
 				
 			}
+			
 		}// for j (stars)
 	
 		if(sum_f>0){ 

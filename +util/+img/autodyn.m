@@ -34,8 +34,7 @@ function [dynamic_range_vector, image_reduced] = autodyn(image, filler)
     M = median2(image_reduced);
     S = std2(image_reduced);
     
-    
-    dynamic_range_vector(1) = util.stat.min2(squeeze(double(M-S)));
-    dynamic_range_vector(2) = util.stat.max2(squeeze(double(M+10*S)));
+    dynamic_range_vector(1) = util.stat.min2(squeeze(double(M)-S));
+    dynamic_range_vector(2) = util.stat.max2(squeeze(double(M)+10*S));
     
 end

@@ -114,6 +114,7 @@ classdef Lightcurves < handle
             obj.centroids_y_full = [];
             obj.widths_full = [];
             obj.bad_pixels_full = [];
+            obj.flags_full = [];
             
             obj.frame_index = 1;
             
@@ -131,7 +132,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index-1,:);
+            val = val(1:obj.frame_index-1,:,:);
             
             if all(isnan(val))
                 val = [];
@@ -166,7 +167,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index-1,:);
+            val = val(1:obj.frame_index-1,:,:);
             
             if all(isnan(val))
                 val = [];
@@ -198,7 +199,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index-1,:);
+            val = val(1:obj.frame_index-1,:,:);
             
             if all(isnan(val))
                 val = [];
@@ -214,7 +215,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index-1,:);
+            val = val(1:obj.frame_index-1,:,:);
             
             if all(isnan(val))
                 val = [];
@@ -230,7 +231,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index-1,:);
+            val = val(1:obj.frame_index-1,:,:);
             
             if all(isnan(val))
                 val = [];
@@ -246,7 +247,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index-1,:);
+            val = val(1:obj.frame_index-1,:,:);
             
             if all(isnan(val))
                 val = [];
@@ -262,7 +263,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index-1,:);
+            val = val(1:obj.frame_index-1,:,:);
             
             if all(isnan(val))
                 val = [];
@@ -278,7 +279,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index-1,:);
+            val = val(1:obj.frame_index-1,:,:);
             
             if all(isnan(val))
                 val = [];
@@ -294,7 +295,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index-1,:);
+            val = val(1:obj.frame_index-1,:,:);
             
             if all(isnan(val))
                 val = [];
@@ -310,7 +311,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index-1,:);
+            val = val(1:obj.frame_index-1,:,:);
             
             if all(isnan(val))
                 val = [];
@@ -326,7 +327,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index-1,:);
+            val = val(1:obj.frame_index-1,:,:);
             
             if all(isnan(val))
                 val = [];
@@ -342,7 +343,7 @@ classdef Lightcurves < handle
                 return;
             end
             
-            val = val(1:obj.frame_index-1,:);
+            val = val(1:obj.frame_index-1,:,:);
             
             if all(isnan(val))
                 val = [];
@@ -394,19 +395,19 @@ classdef Lightcurves < handle
             
             N = size(input.fluxes,1);
             
-            obj.fluxes_full = insert_matrix(obj.fluxes_full, input.fluxes, [obj.frame_index,1], NaN, obj.use_double_up);
-            obj.errors_full = insert_matrix(obj.errors_full, input.errors, [obj.frame_index,1], NaN, obj.use_double_up);
-            obj.timestamps_full = insert_matrix(obj.timestamps_full, input.timestamps, [obj.frame_index,1], NaN, obj.use_double_up);
-            obj.areas_full = insert_matrix(obj.areas_full, input.areas, [obj.frame_index,1], NaN, obj.use_double_up);
-            obj.backgrounds_full = insert_matrix(obj.backgrounds_full, input.backgrounds, [obj.frame_index,1], NaN, obj.use_double_up);
-            obj.variances_full = insert_matrix(obj.variances_full, input.variances, [obj.frame_index,1], NaN, obj.use_double_up);
-            obj.centroids_x_full = insert_matrix(obj.centroids_x_full, input.centroids_x, [obj.frame_index,1], NaN, obj.use_double_up);
-            obj.centroids_y_full = insert_matrix(obj.centroids_y_full, input.centroids_y, [obj.frame_index,1], NaN, obj.use_double_up);
-            obj.offsets_x_full = insert_matrix(obj.offsets_x_full, input.offsets_x, [obj.frame_index,1], NaN, obj.use_double_up);
-            obj.offsets_y_full = insert_matrix(obj.offsets_y, input.offsets_y, [obj.frame_index,1], NaN, obj.use_double_up);
-            obj.widths_full = insert_matrix(obj.widths_full, input.widths, [obj.frame_index,1], NaN, obj.use_double_up);
-            obj.bad_pixels_full = insert_matrix(obj.bad_pixels_full, input.bad_pixels, [obj.frame_index,1], NaN, obj.use_double_up);
-            obj.flags_full = insert_matrix(obj.flags_full, input.flags, [obj.frame_index,1], NaN, obj.use_double_up);
+            obj.fluxes_full = insert_matrix(obj.fluxes_full, input.fluxes, [obj.frame_index,1,1], NaN, obj.use_double_up);
+            obj.errors_full = insert_matrix(obj.errors_full, input.errors, [obj.frame_index,1,1], NaN, obj.use_double_up);
+            obj.timestamps_full = insert_matrix(obj.timestamps_full, input.timestamps, [obj.frame_index,1,1], NaN, obj.use_double_up);
+            obj.areas_full = insert_matrix(obj.areas_full, input.areas, [obj.frame_index,1,1], NaN, obj.use_double_up);
+            obj.backgrounds_full = insert_matrix(obj.backgrounds_full, input.backgrounds, [obj.frame_index,1,1], NaN, obj.use_double_up);
+            obj.variances_full = insert_matrix(obj.variances_full, input.variances, [obj.frame_index,1,1], NaN, obj.use_double_up);
+            obj.centroids_x_full = insert_matrix(obj.centroids_x_full, input.centroids_x, [obj.frame_index,1,1], NaN, obj.use_double_up);
+            obj.centroids_y_full = insert_matrix(obj.centroids_y_full, input.centroids_y, [obj.frame_index,1,1], NaN, obj.use_double_up);
+            obj.offsets_x_full = insert_matrix(obj.offsets_x_full, input.offsets_x, [obj.frame_index,1,1], NaN, obj.use_double_up);
+            obj.offsets_y_full = insert_matrix(obj.offsets_y, input.offsets_y, [obj.frame_index,1,1], NaN, obj.use_double_up);
+            obj.widths_full = insert_matrix(obj.widths_full, input.widths, [obj.frame_index,1,1], NaN, obj.use_double_up);
+            obj.bad_pixels_full = insert_matrix(obj.bad_pixels_full, input.bad_pixels, [obj.frame_index,1,1], NaN, obj.use_double_up);
+            obj.flags_full = insert_matrix(obj.flags_full, input.flags, [obj.frame_index,1,1], NaN, obj.use_double_up);
             obj.frame_index = obj.frame_index + N;
             
             if ~isempty(input.pars_struct)
@@ -433,6 +434,25 @@ classdef Lightcurves < handle
             
             for ii = 1:length(list)
                 input.input_var(list{ii}, photometry.(list2{ii}));
+            end
+            
+            input.input_var('timestamps', photometry.timestamps);
+            input.input_var('pars_struct', photometry.pars_struct);
+            
+            obj.input(input);
+            
+        end
+        
+        function getAperturesAndForced(obj, photometry)
+            
+            input = util.text.InputVars;           
+            
+            list = {'fluxes', 'errors', 'areas', 'backgrounds', 'variances', 'offsets_x', 'offsets_y', 'centroids_x', 'centroids_y', 'widths', 'bad_pixels', 'flags'};
+            list2 = strcat(list, '_ap');
+            list3 = strcat(list, '_forced');
+            
+            for ii = 1:length(list)
+                input.input_var(list{ii}, cat(3, photometry.(list2{ii}), photometry.(list3{ii})));
             end
             
             input.input_var('timestamps', photometry.timestamps);

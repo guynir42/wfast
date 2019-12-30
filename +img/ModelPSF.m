@@ -136,14 +136,11 @@ classdef ModelPSF < handle
             dy = obj.offsets_y;
             
             % average offsets (I would prefer the flux-weighted average)
-            Adx = nanmean(dx);
-            Ady = nanmean(dy); 
+            Adx = repmat(nanmean(dx,2), [1,size(dx,2)]);
+            Ady = repmat(nanmean(dy,2), [1,size(dy,2)]); 
             
-            dx(isnan(dx)) = Adx;
-            dy(isnan(dy)) = Ady;
-            
-            dx(abs(dx)>S(2)/2) = Adx;
-            dy(abs(dy)>S(1)/2) = Ady;
+            dx = (abs(dx)<=S(2)/2).*dx + (isnan(dx) | abs(dx)>S(2)/2).*Adx;
+            dy = (abs(dy)<=S(1)/2).*dy + (isnan(dy) | abs(dy)>S(1)/2).*Ady;
             
             if isempty(dx) || isempty(dy)
                 obj.cutouts_shifted = obj.cutouts;
@@ -176,7 +173,7 @@ classdef ModelPSF < handle
             
             import util.stat.sum2;
             
-            obj.stack = sum(sum(obj.cutouts_shifted,3, 'omitnan'),4, 'omitnan');
+            obj.stack = nansum(nansum(obj.cutouts_shifted,3),4);
             
             if obj.use_gaussian
                 obj.stack = obj.stack.*util.img.gaussian2(obj.gauss_sigma, 'size', [size(obj.cutouts,1),size(obj.cutouts,2)]); 

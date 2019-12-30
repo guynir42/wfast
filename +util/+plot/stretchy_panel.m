@@ -37,6 +37,8 @@ function callback(hndl, ~, ratio)
     bottom = (pos(4) - height)/2;
     
     h = findobj('Parent', hndl, 'type', 'uipanel');
-    h.Position = [left bottom width height];
+    if ~isempty(h)
+        h.Position = [left bottom width height];
+    end
     
 end
