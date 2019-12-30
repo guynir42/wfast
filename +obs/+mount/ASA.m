@@ -38,6 +38,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         hndl; % ASCOM object
         
+        owner@obs.Manager;
+        
         object@head.Ephemeris; % all position and time calculations done using Ephemeris class
         
         ard@obs.sens.ScopeAssistant; % connect to accelerometer and ultrasonic sensor
@@ -183,6 +185,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 obj.loadServer;
                 
+                pause(5);
+                
                 obj.hndl = actxserver('AstrooptikServer.Telescope');
             
                 if ~obj.checkServer
@@ -198,20 +202,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 obj.update;
                 
-                if obj.status % need better checks here
-                    
-                    try 
-                        
-                        if obj.use_accelerometer
-                            obj.connectArduino;
-                        end
-                
-                    catch ME
-                        warning(ME.getReport);
-                    end
-                    
-                end
-                
             catch ME
                 obj.log.error(ME.getReport);
                 rethrow(ME);
@@ -221,24 +211,39 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function connectArduino(obj)
 
+            obj.log.input('Connecting Arduino.');
+            
             if isempty(obj.ard) 
 
                 try
+                    
                     obj.ard = obs.sens.ScopeAssistant;
+                    
                 catch ME
-                    obj.use_accelerometer = 0;
+%                     obj.use_accelerometer = 0;
                     warning(ME.getReport);
                 end
 
             end
-
-            if isempty(obj.ard.telescope)
-                obj.ard.telescope = obj;
-            end
             
-            obj.ard.connect;
+            if ~isempty(obj.ard)
+                
+                try
                     
-            obj.ard.update;
+                    if isempty(obj.ard.telescope)
+                        obj.ard.telescope = obj;
+                    end
+                    
+                    obj.ard.connect;
+
+                    obj.ard.update;
+                    
+                catch ME
+%                     obj.use_accelerometer = 0;
+                    warning(ME.getReport);
+                end
+                
+            end
             
         end
         
@@ -266,8 +271,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function loadServer(obj)
             
 %             system('C:\Program Files (x86)\Autoslew\AstroOptikServer.exe &'); % call the system command to load the server outside of matlab 
-            system('D:\matlab\wfast\+obs\+mount\launch_server.bat &'); % call the batch file to load the server then exit the cmd
-            
+%             system('D:\matlab\wfast\+obs\+mount\launch_server.bat &'); % call the batch file to load the server then exit the cmd
+            system(fullfile(getenv('WFAST'), '+obs\+mount\launch_server.bat &')); % call the batch file to load the server then exit the cmd
+
             tic;
             
             for ii = 1:100
@@ -341,10 +347,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function val = get.objName(obj)
             
-            if isempty(obj.sync) || isempty(obj.sync.outgoing) || ~isfield(obj.sync.outgoing, 'obj_name')
+            if isempty(obj.sync) || isempty(obj.sync.outgoing) || ~isfield(obj.sync.outgoing, 'OBJECT')
                 val = '';
             else
-                val = obj.sync.outgoing.obj_name;
+                val = obj.sync.outgoing.OBJECT;
             end
             
         end
@@ -564,7 +570,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function set.objName(obj, val)
             
             if ~isempty(obj.sync)
-                obj.sync.outgoing.obj_name = val;
+                obj.sync.outgoing.OBJECT = val;
             end
             
         end
@@ -740,7 +746,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     
                     pause(0.1);
                     
-                    if obj.ard.status==0
+                    if isempty(obj.ard) || obj.ard.status==0 || obj.checkArduinoTime==0
                         obj.connectArduino;
                     end
                     
@@ -777,7 +783,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     return;
                 end
 
-
                 val = 1;
             
             catch ME
@@ -812,8 +817,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 if obj.check_need_flip
                     
-                    if obj.telDE_deg<70
-                        obj.slewWithoutPrechecks(obj.hndl.RightAscension, 70); % do a preslew to dec +70 so we can make the flip! 
+                    if obj.telDE_deg<30 || obj.telDE_deg>60
+                        obj.slewWithoutPrechecks(obj.hndl.RightAscension, 45); % do a preslew to dec +70 so we can make the flip! 
                     end
                     
                     
@@ -926,6 +931,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function callback_timer(obj, ~, ~) % update sensors and GUI
             
+            if isempty(obj) || isempty(obj.hndl)
+                return;
+            end
+            
             try 
             
                 if obj.use_guiding && obj.tracking % && obj.sync.status
@@ -936,13 +945,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     end
                     
                     if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'RA_rate_delta') && ~isempty(obj.sync.incoming.RA_rate_delta)
-                        obj.rate_RA = obj.rate_RA + direction*obj.sync.incoming.RA_rate_delta;
+                        dRA = obj.sync.incoming.RA_rate_delta;
+                        if isempty(dRA) || isnan(dRA), dRA = 0; end
+                        obj.rate_RA = obj.rate_RA + direction*dRA;
                         obj.sync.incoming.RA_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
                         obj.sync.outgoing.RA_rate = obj.rate_RA;
                     end
                     
                     if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'DE_rate_delta') && ~isempty(obj.sync.incoming.DE_rate_delta)
-                        obj.rate_DE = obj.rate_DE + direction*obj.sync.incoming.DE_rate_delta;
+                        dDE = obj.sync.incoming.DE_rate_delta;
+                        if isempty(dDE) || isnan(dDE), dDE = 0; end
+                        obj.rate_DE = obj.rate_DE + direction*dDE;
                         obj.sync.incoming.DE_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
                         obj.sync.outgoing.DE_rate = obj.rate_DE;
                     end
@@ -957,6 +970,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 if ~isempty(obj.gui) && obj.gui.check
                     obj.gui.update;
+                end
+                
+                if ~isempty(obj.owner) && ~isempty(obj.owner.gui) && obj.owner.gui.check
+                    obj.owner.gui.updateStopButton;
                 end
                 
             catch ME
@@ -1067,7 +1084,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function syncToTarget(obj)
             
-            obj.hndl.SyncToTarget;
+%             obj.hndl.SyncToTarget;
+            obj.hndl.SyncToCoordinates;
             
         end
         
@@ -1113,10 +1131,20 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 return;
             end
             
-            try
+            obj.setup_timer;
+            
+            try % logger hearteat
+                if ~obj.log.check_heartbeat
+                    obj.log.heartbeat(300, obj); 
+                end
+            catch ME
+                warning(ME.getReport);
+            end
+            
+            try % arduino
                
                 if obj.use_accelerometer
-                    if obj.ard.status==0
+                    if isempty(obj.ard) || obj.ard.status==0 || obj.checkArduinoTime==0
                         obj.connectArduino;
                     end
                 end
@@ -1182,11 +1210,35 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             obj.sync.outgoing.TELRA_DEG = obj.telRA_deg;
             obj.sync.outgoing.TELDEC_DEG = obj.telDEC_deg;
             
-            if obj.tracking==0 || (~isempty(obj.objRA_deg) && abs(obj.objRA_deg-obj.telRA_deg)>1) % if mount stops tracking or is 4 time-minutes away from target RA, stop the camera (e.g., when reaching limit)
+            if isempty(obj.tracking) || obj.tracking==0 || (~isempty(obj.objRA_deg) && abs(obj.objRA_deg-obj.telRA_deg)>1) % if mount stops tracking or is 4 time-minutes away from target RA, stop the camera (e.g., when reaching limit)
                 obj.sync.outgoing.stop_camera = 1;
             else
 %                 obj.sync.outgoing.stop_camera = 0;
             end
+            
+        end
+        
+        function val = checkArduinoTime(obj)
+            
+            val = 1;
+            
+            if ~isempty(obj.log.time)
+            
+                dt = seconds(obj.log.time- obj.ard.time);
+            
+                if dt>600 % arduino has not updated in a few minutes
+                    val = 0;
+                    return;
+                end
+                
+            end
+            
+        end
+        
+        function val = printout(obj)
+        
+            val = sprintf('Status= %d, LST= %s, RA= %s, Dec= %s, HA= %s, ALT= %4.2f, %s', ...
+                obj.status, obj.LST, obj.telRA, obj.telDE, obj.telHA, obj.telALT, obj.pier_side); 
             
         end
         

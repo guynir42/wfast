@@ -49,7 +49,7 @@ classdef PcSync < handle
         raw_data_rx_temp; % for broken up incoming messages
         raw_data_tx_temp;
         
-        default_client_remote_ip = '192.168.1.102';
+        default_client_remote_ip = '192.168.1.101';
         default_server_remote_ip = '0.0.0.0';
         
         default_server_remote_port_rx = 4012;
@@ -260,6 +260,7 @@ classdef PcSync < handle
         function update(obj)
             
             if obj.is_connected
+                
                 obj.hndl_rx.BytesAvailableFcn = @obj.read_data_rx;
                 obj.hndl_tx.BytesAvailableFcn = @obj.read_data_tx;
                 obj.outgoing.time = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));

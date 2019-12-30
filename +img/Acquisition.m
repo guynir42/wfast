@@ -74,6 +74,8 @@ classdef Acquisition < file.AstroData
         
         start_index; % if non empty, use this number as initial index for run (e.g., to continue from where we stopped)
         
+        run_name_append = '';
+        
         total_runtime;
         runtime_units = 'minutes';
         
@@ -83,16 +85,19 @@ classdef Acquisition < file.AstroData
         % these swithces determine how stars are picked when run begins
         detect_thresh = 10; % minimal S/N of the stack stars for selecting cutouts
         use_remove_bad_pixels = true;
-        use_remove_saturated = false; % remove all stars with any pixels about saturation value
+        use_remove_saturated = false; % remove all stars with any pixels above saturation value
         saturation_value = 50000; % consider any pixels above this to be saturated
         min_star_temp; % set a lower limit on temperature of stars for findStarsMAAT;
         
         use_quick_find_stars = true; % use new method that runs faster
         use_mextractor = false; % use mextractor to identify stars and find their WCS and catalog mag/temp
+        use_astrometry = false; % calculate the star positions matched to GAIA DR2 and save catalog
         use_arbitrary_pos = false; % don't look for stars (e.g., when testing with the dome closed)
         
         use_cutouts = true;
         use_adjust_cutouts = 1; % use adjustments in software (not by moving the mount)
+        use_lock_adjust = 0; % make all cutouts move together based on the average drift
+        
         use_simple_photometry = 1; % use only sums on the cutouts instead of Photometry object for full cutouts
         
         use_model_psf = 1;
@@ -329,7 +334,9 @@ classdef Acquisition < file.AstroData
 
         function setupDefaults(obj)
 
-            obj.num_batches = 500;
+            obj.total_runtime = 60;
+            obj.runtime_units = 'minutes';
+%             obj.num_batches = 500;
             obj.batch_size = 100;
             
             obj.num_stars = 1000;
@@ -347,8 +354,6 @@ classdef Acquisition < file.AstroData
         
         function reset(obj)
             
-%             disp('resetting');
-            
             if obj.brake_bit==0
                 warning('Must stop acquisition before resetting!');
                 return;
@@ -359,7 +364,9 @@ classdef Acquisition < file.AstroData
             for ii = 1:length(list)
                 
                 if isobject(obj.(list{ii})) && ~isempty(obj.(list{ii})) && ismethod(obj.(list{ii}), 'reset') 
-                    obj.(list{ii}).reset;
+                    if ~util.text.cs(list{ii}, 'sync')
+                        obj.(list{ii}).reset;
+                    end
                 end
                 
             end
@@ -1272,7 +1279,8 @@ classdef Acquisition < file.AstroData
             
             try 
                 
-                drawnow;
+                obj.sync.update;
+                
                 s = obj.sync.incoming;
                 
                 list = head.Parameters.makeSyncList; 
@@ -1298,7 +1306,6 @@ classdef Acquisition < file.AstroData
             end
             
         end
-        
         
     end
     
@@ -1356,10 +1363,6 @@ classdef Acquisition < file.AstroData
         
         function update(obj, input)
             
-            if obj.use_sync && obj.use_ignore_manager==0
-                obj.getSyncData;
-            end
-            
             if nargin>=2 && ~isempty(input) && isa(input, 'util.text.InputVars')
                 
                 if ~isempty(input.RA)
@@ -1374,6 +1377,10 @@ classdef Acquisition < file.AstroData
                     obj.pars.target_name = input.run_name;
                 end
                 
+            end
+            
+            if ~isempty(obj.sync) && obj.use_sync && obj.use_ignore_manager==0
+                obj.getSyncData;
             end
             
             obj.pars.update;
@@ -1392,6 +1399,9 @@ classdef Acquisition < file.AstroData
                 end
 
                 input = obj.makeInputVars(varargin{:});
+                
+                obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
+                
                 obj.stash_parameters(input);
                 
 %                 if ~isempty(obj.total_runtime)
@@ -1403,7 +1413,7 @@ classdef Acquisition < file.AstroData
                 end
                 
                 if input.log_level
-                    obj.log.input('Starting a new run with Acquisition.'); % maybe add some more info here...?
+                    obj.log.input(sprintf('Starting a new run "%s" (saving is %d). ', obj.run_name, obj.use_save)); 
                 end
                 
                 if ~obj.cal.checkDark
@@ -1429,9 +1439,6 @@ classdef Acquisition < file.AstroData
                 if obj.use_save && obj.use_autodeflate
                     obj.deflator.setup_timer;
                 end
-                    
-                
-                obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
                 
                 if isempty(obj.positions)
                     if obj.debug_bit, disp('Positions field empty. Calling single then findStars'); end
@@ -1445,8 +1452,23 @@ classdef Acquisition < file.AstroData
                 
                 if obj.use_save
                     try
+                        
+                        basename = obj.buf.makeFullpath; % the name from the object_name, ignoring the override
+                        
+                        for ii = 1:100
+                            
+                            dirname = sprintf('%s%s_run%d', basename, obj.run_name_append, ii);
+                            if ~exist(dirname, 'dir')
+                                mkdir(dirname);
+                                obj.buf.directory_override = dirname;
+                                break;
+                            end
+                            
+                        end
+                        
                         filename = obj.buf.getReadmeFilename;
                         util.oop.save(obj, filename, 'name', 'acquisition'); 
+                        
                     catch ME
                         warning(ME.getReport);
                     end
@@ -1514,6 +1536,8 @@ classdef Acquisition < file.AstroData
             obj.brake_bit = 1;
             
             obj.unstash_parameters;
+            
+            obj.buf.directory_override = '';
             
             obj.is_running = 0;
             
@@ -1688,7 +1712,9 @@ classdef Acquisition < file.AstroData
                 obj.flux_buf.input(obj.phot_stack.fluxes);
 
                 if obj.use_adjust_cutouts
-                    obj.clip.positions = double(obj.clip.positions + obj.average_offsets);
+                    offsets = obj.average_offsets;
+                    offsets(isnan(offsets)) = 0;
+                    obj.clip.positions = double(obj.clip.positions + offsets);
                 else
                     
                 end
@@ -1982,6 +2008,18 @@ classdef Acquisition < file.AstroData
             obj.expT = obj.fast_mode_expT;
             obj.frame_rate = obj.fast_mode_frame_rate;
             obj.batch_size = obj.fast_mode_batch_size;
+            
+        end
+        
+        function startLiveView(obj)
+            
+            if ~isempty(obj.cam.gui) && obj.cam.gui.check
+                figure(obj.cam.gui.fig.fig)
+            else
+                obj.cam.makeGUI;
+            end
+            
+            obj.cam.live;
             
         end
         

@@ -334,6 +334,12 @@ classdef Logger < handle
             
         end
         
+        function val = check_heartbeat(obj)
+            
+            val = ~isempty(obj.timer) && isa(obj.timer, 'timer') && isvalid(obj.timer) && strcmp(obj.timer.Running, 'on');
+            
+        end
+        
         function heartbeat(obj, time_sec, owner)
             
             if nargin<2 || isempty(time_sec)
@@ -344,7 +350,7 @@ classdef Logger < handle
                 obj.owner = owner;
             end
             
-            if ~isempty(obj.timer) && isa(obj.timer, 'timer') && isvalid(obj.timer)
+            if obj.check_heartbeat
                 stop(obj.timer);
                 delete(obj.timer);
                 obj.timer = [];
@@ -368,18 +374,35 @@ classdef Logger < handle
         end
         
         function timer_callback(obj, ~, ~)
+                
+            if ~isempty(obj.owner)
+                
+                if ismethod(obj.owner, 'update')
+                    obj.owner.update;
+                elseif ismethod(obj.owner, 'Update')
+                    obj.owner.Update;
+                end
             
-            if ~isempty(obj.owner) && ...
-                ( ismethod(obj.owner, 'update') || ismethod(obj.owner, 'Update') ) && ...
-                ( isprop(obj.owner, 'status') || isprop(obj.owner, 'Status') )
+                str = '';
                 
-                obj.owner.update;
-                obj.input(['Heartbeat: status= ' num2str(obj.owner.status)]);
+                if isprop(obj.owner, 'printout') || ismethod(obj.owner, 'printout')
+                    str = obj.owner.printout;
+                elseif isprop(obj.owner, 'Printout') || ismethod(obj.owner, 'Printout')
+                    str = obj.owner.Printout;
+                elseif isprop(obj.owner, 'status')  
+                    str = obj.owner.status;
+                elseif isprop(obj.owner, 'Status')
+                    str = obj.owner.Status;
+                end
                 
+                if isnumeric(str)
+                    str = num2str(str);
+                end
+                
+                obj.input(['Heartbeat: ' str]);
+            
             else
-                
                 obj.input('Heartbeat...');
-                
             end
             
         end

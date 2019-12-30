@@ -29,11 +29,6 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	
 	photometry.run();
 
-	// float x=-2.2;
-	// float y=0.1;
-	// int idx=photometry.getShiftIndex(x,y); 
-	// printf("x= %f | y= %f | idx= %d | dx= %f | dy=%f\n", x, y, idx, photometry.dx[idx], photometry.dy[idx]); 
-	
 	char *field_names[6];
 	for(int i=0;i<6;i++) field_names[i]=(char*) mxMalloc(STRLN);
 	
@@ -45,7 +40,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	snprintf(field_names[5], STRLN, "parameters"); 
 	
 	plhs[0]=mxCreateStructMatrix(1,1,6, (const char**) field_names); 
-	
+		
 	mxSetFieldByNumber(plhs[0], 0, 0, photometry.outputStruct(photometry.output_raw)); 
 	if(photometry.use_forced) mxSetFieldByNumber(plhs[0], 0, 1, photometry.outputStruct(photometry.output_forced)); 
 	if(photometry.use_apertures) mxSetFieldByNumber(plhs[0], 0, 2, photometry.outputStruct(photometry.output_apertures, photometry.num_radii)); 
@@ -341,7 +336,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 		mxArray *val=0;
 		if(i+1<nrhs) val=(mxArray*) prhs[i+1]; // if the varargin is odd numbered, leave val=0 as default
 		
-		if(cs(key, "aperture", "radius", "radii")){
+		if(cs(key, "apertures", "radius", "radii")){
 
 			if(val==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
 			if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
@@ -874,7 +869,6 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 	
 	if(bad_pixels[j]==N){ // image is all NaN!
 		
-		// mexPrintf("skipping image, all nans\n");
 		flux[j]=NAN;
 		area[j]=NAN;
 		error[j]=NAN;
@@ -894,9 +888,9 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 		
 		for(int k=0;k<num_radii;k++){ 
 			for(int i=0;i<NUM_DATA_TYPES;i++) output_apertures[i][k*num_cutouts + j]=NAN;
-			output_gaussian[k*num_cutouts+IDX_FLAG][j]=1;
+			output_apertures[IDX_FLAG][k*num_cutouts+j]=1;
 		}
-		
+	
 		return; // don't bother to do anything more with this image
 		
 	}
@@ -908,14 +902,14 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 	int idx=getShiftIndex(0,0); // for the first order, raw photometry estimate of the background, use centered annulus
 	int annulus_pixels=countNonNaNsIndices(image, annulus_indices, idx); // how many non-NaN do we have in this annulus?
 	
-	//background[j]=sumIndices(image, annulus_indices, idx)/annulus_pixels; // claculate the sum of values in the annulus, divided by number of pixels
+	// what happens if annulus_pixels is zero?
 	background[j]=medianIndices(image, annulus_indices, idx); 
 	variance[j]=sumIndices(image, background[j], image, background[j], annulus_indices, idx)/annulus_pixels; // subtract the average b/g then take the square, and sum all the values (then divide by number of pixels)
 	
 	error[j]=getError(flux[j]-area[j]*background[j], area[j]*variance[j], annulus_pixels*variance[j]); 
 	
 	// first moments:
-	float norm=flux[j]-area[j]*background[j];
+	float norm=flux[j]-area[j]*background[j]; // what if norm is zero or very close to zero?
 	float m1x=sumArrays(image, background[j], X)/norm;
 	float m1y=sumArrays(image, background[j], Y)/norm;
 	
@@ -952,6 +946,8 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 		best_offset_x[j]=m1x;
 		best_offset_y[j]=m1y;
 		
+		// check if offsets make sense!
+		
 	} // finished centering aperture
 	
 	if(use_gaussian){// do gaussian photometry! 
@@ -969,7 +965,7 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 		flag=output[IDX_FLAG];
 		
 		for(int k=0; k<num_iterations; k++){
-			
+		
 			idx=getShiftIndex(best_offset_x[j],best_offset_y[j]); // the updated centroid
 			annulus_pixels=countNonNaNsIndices(image, annulus_indices, idx); // how many non-NaN do we have in this annulus?
 			area[j]=sumArrays(&gaussians[idx*N]); 
@@ -1016,9 +1012,9 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 		bad_pixels=output[IDX_BAD];
 		flag=output[IDX_FLAG];
 		
-		// get the background reading for all concentric apertures
 		idx=getShiftIndex(best_offset_x[j],best_offset_y[j]); // the updated centroid
 		
+		// get the background reading for all concentric apertures
 		annulus_pixels=countNonNaNsIndices(image, annulus_indices, idx); // how many non-NaN do we have in this annulus?
 		background[j]=sumIndices(image, annulus_indices, idx)/annulus_pixels; 	
 		variance[j]=sumIndices(image, background[j], image, background[j], annulus_indices, idx)/annulus_pixels; // subtract the average b/g then take the square, and sum all the values (then divide by number of pixels)
@@ -1031,6 +1027,7 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 		
 		for(int k=0;k<num_radii;k++){
 		
+			// the background/variance is the same for each aperture size, but 
 			// it is easier to just copy these out for each aperture than to clip the data or leave zeros... 
 			background[j+num_cutouts*k]=background[j];
 			variance[j+num_cutouts*k]=variance[j];
@@ -1084,6 +1081,10 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 			
 			error[j+num_cutouts*k]=getError(flux[j+num_cutouts*k]-area[j+num_cutouts*k]*background[j], area[j+num_cutouts*k]*variance[j], annulus_pixels*variance[j]);
 			width[j+num_cutouts*k]=getWidthFromMoments(m2x, m2y, mxy); 
+
+			if(k==0) bad_pixels[j]=aperture_indices[idx].size()-countNonNaNsIndices(image, aperture_indices, idx);
+			else bad_pixels[j+num_cutouts*k]+=aperture_indices[idx+num_shifts*k].size()
+			                                   -countNonNaNsIndices(image, aperture_indices, idx+num_shifts*k);
 			
 			flag[j+num_cutouts*k]=checkMoments(offset_x[j], offset_y[j], width[j]); 
 
@@ -1196,6 +1197,8 @@ void Photometry::calculateForced(int j){
 	
 	width[j]=getWidthFromMoments(m2x, m2y, mxy); 
 	
+	bad_pixels[j]=forced_indices[idx].size()-countNonNaNsIndices(image, forced_indices, idx);
+	
 	flag[j]=checkMoments(offset_x[j], offset_y[j], width[j]); 
 
 }
@@ -1234,7 +1237,7 @@ bool Photometry::checkMoments(float offset_x, float offset_y, float width){ // r
 	if(offset_y>dims[0]/2) return 1;
 	if(width>dims[0]/2 || width>dims[1]/2) return 1;
 	if(width<0) return 1;
-	if(offset_x!=offset_x || offset_y!=offset_y || width!=width) return 1;
+	if(offset_x!=offset_x || offset_y!=offset_y || width!=width) return 1; // if one of them are NaN
 	
 	return 0; // if all checks are not triggered, return with the ok flag
 	

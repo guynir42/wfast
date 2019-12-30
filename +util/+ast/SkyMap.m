@@ -394,7 +394,7 @@ classdef SkyMap < handle
             
             obj.galactic_long = zeros(length(obj.DE_axis)-1, length(obj.RA_axis)-1);
             obj.galactic_lat = zeros(length(obj.DE_axis)-1, length(obj.RA_axis)-1);
-            
+
             obj.prog.start(length(obj.RA_axis)-1);
             
             for ii = 1:length(obj.RA_axis)-1

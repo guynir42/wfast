@@ -1,4 +1,12 @@
 function R_FSU = stellar_size(bol_mag, temp_eff, distance_au, wavelength_nm)
+% Usage: R_FSU = stellar_size(bol_mag, temp_eff, distance_au=40, wavelength_nm=550)
+% Get the estimated size (in Fresnel Scale Units: FSU) for all the stars
+% given their bolometric magnitude and effective temperature. 
+%
+% Basically it skips over the actual distance and luminosity of the star. 
+%
+
+    if nargin==0, help('occult.stellar_size'); return; end
     
     if nargin<3 || isempty(distance_au)
         distance_au = 40; % AU

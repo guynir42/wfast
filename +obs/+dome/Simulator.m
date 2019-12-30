@@ -13,6 +13,9 @@ classdef Simulator < handle
         status = 1;
         id = 'dome(sim)';
         
+        shutter1_deg = 90;
+        shutter2_deg = 90;
+        
         is_closed = 1;
         
         

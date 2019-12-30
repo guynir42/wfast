@@ -334,7 +334,7 @@ classdef MenuItem < dynamicprops
             elseif cs(obj.type, 'info')
                 obj.Callback = '';
                 obj.str_format = obj.Text; % the text field is used as the string format...
-            elseif cs(obj.type', 'custom')
+            elseif cs(obj.type, 'custom')
                 obj.Callback = '';
             else
                 error('Unknown menu item type "%s". Use "menu", "toggle", "push", "input", "input_text", "info" or "custom".', obj.type);
@@ -384,7 +384,7 @@ classdef MenuItem < dynamicprops
             if cs(obj.type, 'menu', 'push', 'custom')
                 % pass
             elseif cs(obj.type, 'toggle')
-                obj.Value = obj.owner.(obj.variable);
+                obj.Value = obj.getVariable;
             elseif cs(obj.type, 'input', 'input_text', 'info')
                 obj.Text = obj.getFormattedVariable; 
 %             elseif cs(obj.type, 'input_text')
@@ -397,7 +397,8 @@ classdef MenuItem < dynamicprops
         
         function str = getFormattedVariable(obj)
             
-            val = obj.owner.(obj.variable);
+%             val = obj.owner.(obj.variable);
+            val = obj.getVariable;
             
             if ischar(val)
 %                 str = val;
@@ -445,11 +446,20 @@ classdef MenuItem < dynamicprops
             if obj.debug_bit, fprintf('Callback from menu: push %s\n', obj.Text); end
             
             % add option for sub-object commands (e.g., variable=some_object.func)
+            c = strsplit(obj.variable, '.'); 
             
-            if isprop(obj.owner, obj.variable) && isobject(obj.owner.(obj.variable))
-                obj.owner.(obj.variable).makeGUI;
-            elseif ismethod(obj.owner, obj.variable)
-                obj.owner.(obj.variable);
+            if length(c)==1
+                if ismethod(obj.owner, c{1})
+                    obj.owner.(c{1});
+                elseif isprop(obj.owner, c{1}) && ismethod(obj.owner.(c{1}), 'makeGUI')
+                    obj.owner.(c{1}).makeGUI;
+                end
+            elseif length(c)==2
+                if ismethod(obj.owner.(c{1}), c{2})
+                    obj.owner.(c{1}).(c{2});
+                elseif isprop(obj.owner.(c{1}), c{2}) && ismethod(obj.owner.(c{1}).(c{2}), 'makeGUI')
+                    obj.owner.(c{1}).(c{2}).makeGUI;
+                end
             end
             
             obj.gui.update;
