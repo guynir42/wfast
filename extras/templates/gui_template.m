@@ -90,7 +90,7 @@ classdef objGUI < handle
             %%%%%%%%%%%%%%%%%%%%%%% MENUS %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
             % MenuItem(parent, text, type, variable, tooltip, separator)
-            % obj.addButton(text, type, variable, tooltip, separator)
+            % obj.addButton(name, text, type, variable, tooltip, separator)
             % menu types: menu, toggle, push, input, input_text, info, custom
             
             

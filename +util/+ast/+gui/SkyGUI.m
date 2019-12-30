@@ -25,6 +25,8 @@ classdef SkyGUI < handle
     
     properties % gui stuff
         
+        menu_options;
+        
         panel_controls;
         
         panel_contrast; % do we really need this??
@@ -34,6 +36,7 @@ classdef SkyGUI < handle
         
         panel_image;
         button_reset_axes;
+        button_get_time;
         axes_image;
     
     end
@@ -86,10 +89,13 @@ classdef SkyGUI < handle
             %%%%%%%%%%%%%%%%%%%%%%% MENUS %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
             % MenuItem(parent, text, type, variable, tooltip, separator)
-            % obj.addButton(text, type, variable, tooltip, separator)
+            % obj.addButton(name, text, type, variable, tooltip, separator)
             % menu types: menu, toggle, push, input, input_text, info, custom
             
+            obj.menu_options = MenuItem(obj, '&Options', 'menu'); 
+            obj.menu_options.addButton('button_reset', '&Reset', 'custom', '', 'Reset all cuts on data to default values (maximal range)');
             
+            obj.menu_options.button_reset.Callback = @obj.callback_reset;
             
             N = 10; % number of buttons on left side
             
@@ -107,14 +113,18 @@ classdef SkyGUI < handle
             obj.panel_controls.addButton('button_placeholder', '', 'custom', '', '', '', 0.5, '', '', '');
             obj.panel_controls.addButton('button_ecliptic', 'show_ecliptic', 'toggle', 'ecliptic', 'ecliptic', '', 0.5, 'blue', '', 'Show the ecliptic coordinates grid overlay');
             obj.panel_controls.addButton('button_ecliptic', 'show_galactic', 'toggle', 'galactic', 'galactic', '', 0.5, 'blue', '', 'Show the galactic coordinates grid overlay');            
-            obj.panel_controls.addButton('button_ra_units', 'show_ra_units', 'input_text', 'units= ', '', '', 0.5, '', '', 'Choose "degrees" or "hours" for the RA coordinate axis');
-            obj.panel_controls.addButton('button_hour_grid', 'show_hour_grid', 'toggle', 'hour grid', 'hour grid', '', 0.5, 'blue', '', 'Show the time zone overlay');
+            obj.panel_controls.addButton('button_ra_units', 'show_ra_units', 'custom', '', '', '', 0.5, '', '', 'Choose "degrees" or "hours" for the RA coordinate axis');
+            obj.panel_controls.addButton('button_grid', 'show_grid', 'toggle', 'grid', 'grid', '', 0.5, 'blue', '', 'Show the time zone overlay');
             obj.panel_controls.number = num_buttons;
 %             obj.panel_controls.margin = [0.03 0.02];
             obj.panel_controls.make;
             
+            obj.panel_controls.button_ra_units.control.Style = 'popupmenu';
+            obj.panel_controls.button_ra_units.control.String = {'degrees', 'hours'};
+            obj.panel_controls.button_ra_units.Callback = @obj.callback_units_picker;
+            
             %%%%%%%%%%% panel contrast %%%%%%%%%%%%%%%
-                        
+            
             obj.panel_contrast = util.plot.ContrastLimits(obj.axes_image, obj.fig.fig, [0 1/N 0.2 3/N], 1); % last input is for vertical (default)
             obj.panel_contrast.font_size = obj.font_size;
             obj.panel_contrast.big_font_size = obj.big_font_size;
@@ -136,7 +146,7 @@ classdef SkyGUI < handle
             obj.button_reset_axes = GraphicButton(obj.panel_image, [0.85 0.0 0.15 0.05], obj.owner, '', 'custom', 'new axes', '');
             obj.button_reset_axes.Callback = @obj.makeAxes;
             obj.button_reset_axes.Tooltip = 'Create a new image axis, zoomed out and with default contrast limits'; 
-            
+            obj.button_get_time = GraphicButton(obj.panel_image, [0 0 0.15 0.05], obj.owner, '', 'custom'); 
             obj.update;
             
         end
@@ -169,9 +179,19 @@ classdef SkyGUI < handle
                 obj.menus{ii}.update;
             end
             
-            obj.owner.show('ax', obj.axes_image, 'font size', 20); 
+            obj.panel_controls.button_ra_units.control.Value = find(strcmpi(obj.panel_controls.button_ra_units.control.String, obj.owner.show_ra_units));
+
+            obj.button_get_time.String = 'working...';
+            drawnow;
             
+            t = tic;
+            obj.owner.show('ax', obj.axes_image, 'font size', 20); 
+            obj.button_get_time.String = sprintf('%4.2f sec', toc(t)); 
+            
+            obj.panel_contrast.min_val = 0;
+            obj.panel_contrast.clim = [];
             obj.panel_contrast.update;
+            
             
         end
                         
@@ -184,6 +204,29 @@ classdef SkyGUI < handle
     end
                 
     methods % callbacks
+        
+        function callback_reset(obj, hndl, ~)
+            
+            if obj.debug_bit, disp('callback: reset'); end
+            
+            obj.owner.show_brightest_magnitude = [];
+            obj.owner.show_faintest_magnitude = [];
+            obj.owner.show_biggest_size = [];
+            obj.owner.show_south_limit = [];
+            
+            obj.update;
+            
+        end
+        
+        function callback_units_picker(obj, hndl, ~)
+            
+            if obj.debug_bit, disp('callback: units picker'); end
+            
+            obj.owner.show_ra_units = hndl.String{hndl.Value};
+            
+            obj.update;
+            
+        end
         
         function callback_close(obj, ~, ~)
            

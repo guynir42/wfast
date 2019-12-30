@@ -55,6 +55,7 @@ classdef Lightcurves < handle
         offsets_y;
         widths;
         bad_pixels;
+        flags;
         
     end
     
@@ -72,11 +73,12 @@ classdef Lightcurves < handle
         offsets_y_full;
         widths_full;
         bad_pixels_full;
+        flags_full;
         
         show_what_list = {'fluxes', 'areas', 'backgrounds', 'variances', 'centroids', 'offsets', 'widths', 'bad_pixels'};
         show_cal_list = {'raw', 'cal', 'both'};
         
-        version = 1.04;
+        version = 1.05;
         
     end
     
@@ -332,6 +334,22 @@ classdef Lightcurves < handle
             
         end
         
+        function val = get.flags(obj)
+            
+            val = obj.flags_full;
+            
+            if isempty(val)
+                return;
+            end
+            
+            val = val(1:obj.frame_index-1,:);
+            
+            if all(isnan(val))
+                val = [];
+            end
+            
+        end
+        
     end
     
     methods % setters
@@ -388,6 +406,7 @@ classdef Lightcurves < handle
             obj.offsets_y_full = insert_matrix(obj.offsets_y, input.offsets_y, [obj.frame_index,1], NaN, obj.use_double_up);
             obj.widths_full = insert_matrix(obj.widths_full, input.widths, [obj.frame_index,1], NaN, obj.use_double_up);
             obj.bad_pixels_full = insert_matrix(obj.bad_pixels_full, input.bad_pixels, [obj.frame_index,1], NaN, obj.use_double_up);
+            obj.flags_full = insert_matrix(obj.flags_full, input.flags, [obj.frame_index,1], NaN, obj.use_double_up);
             obj.frame_index = obj.frame_index + N;
             
             if ~isempty(input.pars_struct)
@@ -420,6 +439,33 @@ classdef Lightcurves < handle
             input.input_var('pars_struct', photometry.pars_struct);
             
             obj.input(input);
+            
+        end
+        
+        function rho = getCorrelationCoeff(obj, type) % calculate Pearson's coefficient with respect to flux and any other quantity
+            
+            f1 = obj.fluxes;
+            f1(obj.flags>0) = NaN;
+            f2 = obj.(type); 
+            f2(obj.flags>0) = NaN;
+            
+            M1 = nanmean(f1);
+            M2 = nanmean(f2);
+            s1 = nanstd(f1);
+            s2 = nanstd(f2); 
+            C = nanmean((f1-M1).*(f2-M2)); 
+            
+            rho = C./s1./s2;
+            
+        end
+        
+        function flux_corr = calibrateFlux(obj, type)
+            
+            rho = obj.getCorrelationCoeff(type); 
+            
+            Av = nanmean(obj.(type) .* ~obj.flags, 2); % maybe replace this with the flux weighted sum?
+            
+            flux_corr = obj.fluxes.*rho./(Av./nanmean(Av));
             
         end
         

@@ -59,7 +59,7 @@ classdef SkyMap < handle
         show_ecliptic = false;
         show_galactic = false;
         show_ra_units = 'deg';
-        show_hour_grid = false;
+        show_grid = false;
         
         debug_bit = 1;
         
@@ -74,15 +74,20 @@ classdef SkyMap < handle
     properties(Hidden=true)
        
         % for lazy loading the summed map
+        
+        partial_sum_mag;
+        partial_brightest_magnitude;
+        partial_faintest_magnitude;
+        
+        partial_sum_size;
+        partial_biggest_size;
+        
         latest_map; 
-        latest_ra;
-        latest_de;
         latest_brightest_magnitude;
         latest_faintest_magnitude;
         latest_biggest_size;
-        latest_south_limit;
         
-        version = 1.01;
+        version = 1.02;
         
     end
     
@@ -140,13 +145,17 @@ classdef SkyMap < handle
         
         function clear_latest(obj)
             
+            obj.partial_sum_mag = [];
+            obj.partial_brightest_magnitude = [];
+            obj.partial_faintest_magnitude = [];
+            
+            obj.partial_sum_size = [];
+            obj.partial_biggest_size = [];
+            
             obj.latest_map = [];
-            obj.latest_ra = [];
-            obj.latest_de = [];
             obj.latest_brightest_magnitude = [];
             obj.latest_faintest_magnitude = [];
             obj.latest_biggest_size = [];
-            obj.latest_south_limit = [];
             
         end
         
@@ -160,8 +169,8 @@ classdef SkyMap < handle
         
         function set.show_brightest_magnitude(obj, val)
             
-            if isempty(val) || val>max(obj.mag_axis)
-                obj.show_brightest_magnitude = max(obj.mag_axis);
+            if isempty(val) || val<min(obj.mag_axis)
+                obj.show_brightest_magnitude = min(obj.mag_axis);
             else
                 obj.show_brightest_magnitude = val;
             end
@@ -170,8 +179,8 @@ classdef SkyMap < handle
         
         function set.show_faintest_magnitude(obj, val)
             
-            if isempty(val) || val>min(obj.mag_axis)
-                obj.show_faintest_magnitude = min(obj.mag_axis);
+            if isempty(val) || val>max(obj.mag_axis)
+                obj.show_faintest_magnitude = max(obj.mag_axis);
             else
                 obj.show_faintest_magnitude = val;
             end
@@ -191,9 +200,9 @@ classdef SkyMap < handle
         function set.show_south_limit(obj, val)
             
             if isempty(val) || val>max(obj.DE_axis)
-                obj.show_south_limit = max(obj.DE_axis);
+                obj.show_south_limit = min(obj.DE_axis);
             else
-                obj.show_south_limit = val;
+                obj.show_south_limit = -abs(val); % make sure to only take negative south values! 
             end
             
         end
@@ -222,7 +231,7 @@ classdef SkyMap < handle
             obj.mag_axis = 10:obj.mag_step:ceil(obj.limit_mag); 
             obj.size_axis = obj.size_min:obj.size_step:obj.size_max;
             
-            obj.data = zeros(length(obj.RA_axis)-1, length(obj.DE_axis)-1, length(obj.mag_axis)-1, length(obj.size_axis)-1, 'uint32');
+            obj.data = zeros(length(obj.DE_axis)-1, length(obj.RA_axis)-1, length(obj.mag_axis)-1, length(obj.size_axis)-1, 'uint32');
             
             filenames = obj.dir.match('GAIADR2_htm_*.hdf5');
             
@@ -270,7 +279,7 @@ classdef SkyMap < handle
                                 
                                 counts = histcounts2(local_cat(:,filt1), local_cat(:,end), obj.mag_axis, obj.size_axis); 
                             
-                                obj.data(r,d,:,:) = obj.data(r,d,:,:) + uint32(permute(counts, [3,4,1,2]));
+                                obj.data(d,r,:,:) = obj.data(r,d,:,:) + uint32(permute(counts, [3,4,1,2]));
                             
                             end
                             
@@ -381,11 +390,11 @@ classdef SkyMap < handle
                     e.RA = obj.RA_axis(ii)/15;
                     e.Dec = obj.DE_axis(jj); 
                     
-                    obj.ecliptic_long(ii,jj) = e.ECL_LAMBDA;
-                    obj.ecliptic_lat(ii,jj) = e.ECL_BETA;
+                    obj.ecliptic_long(jj,ii) = e.ECL_LAMBDA;
+                    obj.ecliptic_lat(jj,ii) = e.ECL_BETA;
                     
-                    obj.galactic_long(ii,jj) = e.GAL_Long;
-                    obj.galactic_lat(ii,jj) = e.GAL_Lat;
+                    obj.galactic_long(jj,ii) = e.GAL_Long;
+                    obj.galactic_lat(jj,ii) = e.GAL_Lat;
                     
                 end
                 
@@ -393,66 +402,87 @@ classdef SkyMap < handle
                 
             end
             
-            obj.ecliptic_long = obj.ecliptic_long';
-            obj.ecliptic_lat = obj.ecliptic_lat';
-            obj.galactic_long = obj.galactic_long';
-            obj.galactic_lat = obj.galactic_lat';
-            
             obj.prog.finish;
             
         end
                 
-        function [val, ra, de] = getMap(obj, varargin)
+        function val = getMap(obj, varargin)
             
             input = util.text.InputVars;
-            input.input_var('max_mag', obj.show_brightest_magnitude, 'brightest_magnitude'); 
-            input.input_var('min_mag', obj.show_faintest_magnitude, 'faintest_magnitude'); 
+            input.input_var('min_mag', obj.show_brightest_magnitude, 'brightest_magnitude'); 
+            input.input_var('max_mag', obj.show_faintest_magnitude, 'faintest_magnitude'); 
             input.input_var('biggest_size', obj.show_biggest_size, 'biggest_star', 'largest_size', 'largest_star'); 
-            input.input_var('south_limit', obj.show_south_limit, 'de_limit', 'dec_limit'); 
             input.scan_vars(varargin{:}); 
             
             [~, idx_m1] = min(abs(obj.mag_axis-input.min_mag)); 
             [~, idx_m2] = min(abs(obj.mag_axis-input.max_mag)); 
             [~, idx_s]  = min(abs(obj.size_axis-input.biggest_size)); 
-            [~, idx_de] = min(abs(obj.DE_axis-input.south_limit)); 
             
             if ~isempty(obj.latest_map) && isequal(input.min_mag, obj.latest_brightest_magnitude)... 
-                    && isequal(input.max_mag, obj.latest_faintest_magnitude) && isequal(input.biggest_size, obj.latest_biggest_size) ...
-                    && isequal(input.south_limit, obj.latest_south_limit)
+                    && isequal(input.max_mag, obj.latest_faintest_magnitude) && isequal(input.biggest_size, obj.latest_biggest_size)
                 
-                M = obj.latest_map;
-                x = obj.latest_ra;
-                y = obj.latest_de;
+%                 disp('lazy loading latest map');
                 
-            else % no match with given parameters, must recreate the latest_map
+                M = obj.latest_map; % just lazy load the latest map
                 
-                M = nansum(nansum(obj.data(:,:,idx_m1:idx_m2-1, 1:idx_s-1),3),4);
+            elseif isequal(input.min_mag, obj.partial_brightest_magnitude) ... % we can recycle the partial sums if we have them 
+                    && isequal(input.max_mag, obj.partial_faintest_magnitude)
                 
-                M = M(:,1:idx_de-1); 
+%                 disp('making use of the partial_sum_mag'); 
+
+                if isempty(obj.partial_sum_mag)
+%                     disp('making a new partial_sum_mag'); 
+                    obj.partial_sum_mag = nansum(obj.data(:,:,idx_m1:idx_m2-1,:),3);
+                    obj.partial_brightest_magnitude = input.min_mag;
+                    obj.partial_faintest_magnitude = input.max_mag;
+                end
                 
-                M = M';
-                x = obj.RA_axis(1:end-1);
-                y = obj.DE_axis(1:idx_de-1);
+                M = nansum(obj.partial_sum_mag(:,:,:,1:idx_s-1),4);
+                
                 obj.latest_map = M;
-                obj.latest_ra = x;
-                obj.latest_de = y; 
+                obj.latest_brightest_magnitude = input.min_mag;
+                obj.latest_faintest_magnitude = input.max_mag;
+                obj.latest_biggest_size = input.biggest_size; % update only the new size limit
+                
+            elseif isequal(input.biggest_size, obj.partial_biggest_size) % we can recycle the partial sums if we have them
+                
+%                 disp('making use of the partial_sum_size'); 
+                
+                if isempty(obj.partial_sum_size)
+%                     disp('making a new partial_sum_size'); 
+                    obj.partial_sum_size = nansum(obj.data(:,:,:,1:idx_s-1),4); 
+                    obj.partial_biggest_size = input.biggest_size;
+                end
+                
+                M = nansum(obj.partial_sum_mag(:,:,idx_m1:idx_m2-1),3);
+                
+                obj.latest_map = M;
                 obj.latest_brightest_magnitude = input.min_mag;
                 obj.latest_faintest_magnitude = input.max_mag;
                 obj.latest_biggest_size = input.biggest_size;
-                obj.latest_south_limit = input.south_limit;
+                
+            else % no match with given parameters, must recreate the latest_map
+                
+%                 disp('recreate both partial sums and latest_map'); 
+                
+                obj.partial_sum_mag = nansum(obj.data(:,:,idx_m1:idx_m2-1,:),3);
+                obj.partial_brightest_magnitude = input.min_mag;
+                obj.partial_faintest_magnitude = input.max_mag;
+                
+                obj.partial_sum_size = nansum(obj.data(:,:,:,1:idx_s-1),4);
+                obj.partial_biggest_size = input.biggest_size;
+
+                M = nansum(obj.partial_sum_mag(:,:,:,1:idx_s-1),4);
+                
+                obj.latest_map = M;
+                obj.latest_brightest_magnitude = input.min_mag;
+                obj.latest_faintest_magnitude = input.max_mag;
+                obj.latest_biggest_size = input.biggest_size;
                 
             end
             
             if nargout>0
                 val = M;
-            end
-            
-            if nargout>1
-                ra = x;
-            end
-            
-            if nargout>2
-                de = y;
             end
             
         end
@@ -477,15 +507,15 @@ classdef SkyMap < handle
             
             input = util.text.InputVars;
             input.input_var('ax', [], 'axes', 'axis');
-            input.input_var('max_mag', obj.show_brightest_magnitude, 'brightest_magnitude'); 
-            input.input_var('min_mag', obj.show_faintest_magnitude, 'faintest_magnitude'); 
+            input.input_var('min_mag', obj.show_brightest_magnitude, 'brightest_magnitude'); 
+            input.input_var('max_mag', obj.show_faintest_magnitude, 'faintest_magnitude'); 
             input.input_var('biggest_size', obj.show_biggest_size, 'biggest_star', 'largest_size', 'largest_star'); 
             input.input_var('south_limit', obj.show_south_limit, 'de_limit', 'dec_limit'); 
             input.input_var('log', obj.show_log, 'use_log'); 
             input.input_var('ecliptic', obj.show_ecliptic, 'use_ecliptic'); 
             input.input_var('galactic', obj.show_galactic, 'use_galactic'); 
             input.input_var('units', obj.show_ra_units, 'ra_units');
-            input.input_var('hours', obj.show_hour_grid, 'hour_grid');
+            input.input_var('grid', obj.show_grid, 'use_grid'); 
             input.input_var('font_size', 26); 
             input.scan_vars(varargin{:}); 
             
@@ -497,32 +527,47 @@ classdef SkyMap < handle
                 input.ax = gca;
             end
             
-            [M,x,y] = obj.getMap;
+            input.south_limit = -abs(input.south_limit); % make sure this only clips the negative DE values
+            
+            M = obj.getMap('min_mag', input.min_mag, 'max_mag', input.max_mag, 'biggest_size', input.biggest_size);
+            
+            x = obj.RA_axis(1:end-1);
+            y = obj.DE_axis(1:end-1);
             
             summary_str = sprintf('Number of stars, %4.1f<M<%4.1f, up to size %d \\muas', input.min_mag, input.max_mag, input.biggest_size);  
             
             M(M==0) = 0.0001;
             
-                                    
+            [~, idx_de] = min(abs(obj.DE_axis-input.south_limit)); 
+            
+            M = M(idx_de:end,:); 
+            
+            h = imagesc(input.ax, M); 
+            
+            y = y(idx_de:end); 
+            
             if cs(input.units, 'degrees')
                 x_str = 'Right ascention [degrees]';
             elseif cs(input.units, 'hours')
                 x = x/15;
                 x_str = 'Right ascention [hours]'; 
+                input.ax.XTick = 3:3:21;
+                input.ax.XAxis.TickLabelFormat = '%02d:00';
             else
                 error('Unknown RA units option "%s". Try "degrees" or "hours"...', input.units); 
             end
             
-%             util.plot.show(M, 'xval', x, 'yval', y, 'ax', input.ax); 
-            
-            h = imagesc(input.ax, M); 
             h.XData = x;
             h.YData = y;
-
+            
             if input.log
+                
                 input.ax.ColorScale = 'log';
-                input.ax.CLim(1) = 1;
+                
+                input.ax.CLim = [1 util.stat.max2(M)+1];
+                
                 summary_str = [summary_str, ', log_{10} scale '];
+                
             end
             
             title(input.ax, summary_str);
@@ -535,24 +580,26 @@ classdef SkyMap < handle
             input.ax.YDir = 'normal';
             input.ax.FontSize = input.font_size;
             
-            input.ax.NextPlot = 'add';
-            
-            if input.hours
-                % add plot for "time zones" in RA
+            if input.grid
+                grid(input.ax);
+                input.ax.GridColor = 'm';
+                input.ax.GridAlpha = 0.5;
             end
+            
+            input.ax.NextPlot = 'add';
             
             y = repmat(y', [1 length(obj.RA_axis)-1]);            
             x = repmat(x, [size(y,1) 1]);
             
             if input.ecliptic
                 % need to handle south limit!
-                [C1,h1] = contour(input.ax, x, y, obj.ecliptic_lat, [-50 -20 -10 0 10 20 50], 'Color', 'red'); 
+                [C1,h1] = contour(input.ax, x, y, obj.ecliptic_lat(idx_de:end), [-50 -20 -10 0 10 20 50], 'Color', 'red'); 
                 clabel(C1,h1, 'FontSize', 16, 'Color', 'red');
             end
             
             if input.galactic
                 % need to handle south limit!
-                [C2,h2] = contour(input.ax, x, y, obj.galactic_lat, [-50 -20 0 20 50], 'Color', 'green'); 
+                [C2,h2] = contour(input.ax, x, y, obj.galactic_lat(idx_de:end), [-50 -20 0 20 50], 'Color', 'green'); 
                 clabel(C2,h2, 'FontSize', 16, 'Color', 'green');
             end
             
