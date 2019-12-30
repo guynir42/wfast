@@ -1422,8 +1422,9 @@ classdef Analysis < file.AstroData
 
             if obj.phot.use_gaussian
                 g = obj.phot.gauss_sigma;
-            elseif obj.phot.use_aperture
-
+            end
+                
+            if obj.phot.use_aperture
                 r = obj.phot.aperture;
             end
 

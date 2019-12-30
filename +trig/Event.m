@@ -562,7 +562,7 @@ classdef Event < handle
             h7 = plot(input.ax, obj.timestamps, obj.offsets_y_at_star, 'o', 'MarkerSize', 1);
             h7.DisplayName = 'offset y';
             
-            h8 = plot(input.ax, obj.timestamps, obj.widths_at_star, 'p', 'MarkerSize', 1);
+            h8 = plot(input.ax, obj.timestamps, obj.widths_at_star, 'p', 'MarkerSize', 0.5);
             h8.DisplayName = 'PSF width';
             
             
@@ -662,11 +662,12 @@ classdef Event < handle
                     cen = floor([size(cutouts,2), size(cutouts,1)]/2)+1;
                     cen = cen + [obj.offsets_x_at_star(idx_start:idx_end) obj.offsets_y_at_star(idx_start:idx_end)];
                     
-                    if ~isempty(obj.gauss_sigma)
-                        rad = obj.gauss_sigma;
-                        str = sprintf('sigma= %4.2f', rad(end)); 
-                        col = 'magenta';
-                    elseif ~isempty(obj.aperture)
+%                     if ~isempty(obj.gauss_sigma)
+%                         rad = obj.gauss_sigma;
+%                         str = sprintf('sigma= %4.2f', rad(end)); 
+%                         col = 'magenta';
+%                     elseif ~isempty(obj.aperture)
+                    if ~isempty(obj.aperture)
                         rad = obj.aperture;
                         str = sprintf('ap= %4.2f', rad(end)); 
                         col = 'green';
