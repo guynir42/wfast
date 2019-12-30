@@ -47,6 +47,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     properties % switches/controls
         
         use_shutdown = 1; % when this is enabled, observatory shuts down on bad weather/device failure
+        use_startup = 0; % when this is enabled, observatory opens up and starts working by itself! 
         
         % use these to override these devices/sensors
         use_dome = 1; % override AstroHaven dome
@@ -160,7 +161,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.log.input('Connecting to dome.');
             
             try 
+                
                 obj.dome = obs.dome.AstroHaven;
+                obj.dome.owner = obj;
+                
             catch ME
                 
                 obj.log.error(ME.getReport);
@@ -186,7 +190,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.log.input('Connecting to mount.');
             
             try 
+                
                 obj.mount = obs.mount.ASA;
+                obj.mount.owner = obj;
+                
             catch ME
                 
                 obj.log.error(ME.getReport);

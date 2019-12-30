@@ -126,13 +126,24 @@ classdef ModelPSF < handle
             obj.offsets_x = input.offsets_x;
             obj.offsets_y = input.offsets_y;
             
+            S = util.vec.imsize(obj.cutouts);
+            
             if ~isempty(input.radius)
                 obj.radius = input.radius;
             end
+            
             dx = obj.offsets_x;
-%             dx(isnan(dx)) = 0;
             dy = obj.offsets_y;
-%             dy(isnan(dy)) = 0;
+            
+            % average offsets (I would prefer the flux-weighted average)
+            Adx = nanmean(dx);
+            Ady = nanmean(dy); 
+            
+            dx(isnan(dx)) = Adx;
+            dy(isnan(dy)) = Ady;
+            
+            dx(abs(dx)>S(2)/2) = Adx;
+            dy(abs(dy)>S(1)/2) = Ady;
             
             if isempty(dx) || isempty(dy)
                 obj.cutouts_shifted = obj.cutouts;

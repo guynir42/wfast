@@ -57,10 +57,11 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
         
     end
     
+    I = regionfill(I, isnan(I));    
     I_reduced = I;
     
-    I_reduced = (I-input.mean)./input.std;    
-    I_reduced = regionfill(I_reduced, isnan(I_reduced));
+    I_reduced = (I_reduced-input.mean)./input.std;    
+%     I_reduced = regionfill(I_reduced, isnan(I_reduced));
     
     if input.edges
         I_reduced = util.img.pad2size(util.img.crop2size(I_reduced, size(I)-input.edges.*2), size(I), NaN);

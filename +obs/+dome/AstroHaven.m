@@ -21,6 +21,8 @@ classdef AstroHaven < handle
         
         hndl; % serial port object
         
+        owner@obs.Manager;
+        
         acc_W@obs.sens.Accelerometer; % accelerometer for west shutter
         acc_E@obs.sens.Accelerometer; % accelerometer for east shutter
         
@@ -622,6 +624,10 @@ classdef AstroHaven < handle
 
                             if ~isempty(obj.gui)
                                 obj.gui.update;
+                            end
+                            
+                            if ~isempty(obj.owner) && ~isempty(obj.owner.gui) && obj.owner.gui.check
+                                obj.owner.gui.updateStopButton;
                             end
                             
                             reply = obj.send(command_vector(jj)); 

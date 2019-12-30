@@ -499,12 +499,25 @@ classdef GraphicButton < handle
                 try
 
                     if isempty(obj.str2)
-                        if ismethod(obj.owner, obj.variable)
-                            obj.owner.(obj.variable);
-                        elseif isprop(obj.owner, obj.variable) && ismethod(obj.owner.(obj.variable), 'makeGUI')
-                            obj.owner.(obj.variable).makeGUI;
+                        
+                        c = strsplit(obj.variable, '.'); 
+                        
+                        if length(c)==1
+                            if ismethod(obj.owner, c{1})
+                                obj.owner.(c{1});
+                            elseif isprop(obj.owner, c{1}) && ismethod(obj.owner.(c{1}), 'makeGUI')
+                                obj.owner.(c{1}).makeGUI;
+                            end
+                        elseif length(c)==2
+                            if ismethod(obj.owner.(c{1}), c{2})
+                                obj.owner.(c{1}).(c{2});
+                            elseif isprop(obj.owner.(c{1}), c{2}) && ismethod(obj.owner.(c{1}).(c{2}), 'makeGUI')
+                                obj.owner.(c{1}).(c{2}).makeGUI;
+                            end
                         end
-                    else % if we are given str2 (input to function)
+                        
+                        
+                    else % if we are given str2 (input to function) does this even work??
                         obj.owner.(obj.variable).(obj.str2);
                     end
 

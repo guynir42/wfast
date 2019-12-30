@@ -53,7 +53,7 @@ Optional arguments:
                                 to the more narrow gaussian photometry. 
        *use_gaussian: If falue, skip gaussians altogether (default true).
        *use_apertures: If false, skip aperture photometery (default true).
-       *use_forced: If false, skip doing forced photometry. 
+       *use_forced: If false, skip doing forced photometry (default true). 
        *debug_bit: Level of verbosity of the code (default: 0). 
 
 For more information about how to use this function, see photometry2.m

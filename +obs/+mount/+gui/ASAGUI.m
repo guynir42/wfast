@@ -120,7 +120,7 @@ classdef ASAGUI < handle
             num_buttons = 3;
             pos = pos-2; % horizontal panel
             obj.panel_motion = GraphicPanel(obj.owner, [0 pos/N 0.4 2/N], 'motion', 1); % last input is for vertical
-            obj.panel_motion.addButton('button_morors', '', 'custom', 'Motor', '', '', 0.5, '', '', 'Need to implement motor on/off and feedback from mount!');
+            obj.panel_motion.addButton('button_motors', '', 'custom', 'Motor', '', '', 0.5, '', '', 'Need to implement motor on/off and feedback from mount!');
             obj.panel_motion.addButton('button_tracking', 'tracking', 'toggle', '', '', '', 0.5, obj.color_on, 'red', 'telescope tracking');
             obj.panel_motion.addButton('button_guiding', 'use_guiding', 'toggle', 'guiding off', 'guiding on', '', 0.5, obj.color_on, 'red', 'Apply rate corrections based on inputs from camera');
             obj.panel_motion.addButton('button_reset_rates', 'resetRate', 'push', 'reset rates', '', '', 0.5, '', '', 'Reset guiding rates');

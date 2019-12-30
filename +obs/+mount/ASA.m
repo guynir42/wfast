@@ -38,6 +38,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         hndl; % ASCOM object
         
+        owner@obs.Manager;
+        
         object@head.Ephemeris; % all position and time calculations done using Ephemeris class
         
         ard@obs.sens.ScopeAssistant; % connect to accelerometer and ultrasonic sensor
@@ -215,12 +217,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 
                 try
                     
-                    if isempty(obj.ard)
-                        obj.ard = obs.sens.ScopeAssistant;
-                    end
+                    obj.ard = obs.sens.ScopeAssistant;
                     
                 catch ME
-                    obj.use_accelerometer = 0;
+%                     obj.use_accelerometer = 0;
                     warning(ME.getReport);
                 end
 
@@ -233,12 +233,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     if isempty(obj.ard.telescope)
                         obj.ard.telescope = obj;
                     end
+                    
                     obj.ard.connect;
 
                     obj.ard.update;
                     
                 catch ME
-                    obj.use_accelerometer = 0;
+%                     obj.use_accelerometer = 0;
                     warning(ME.getReport);
                 end
                 
@@ -944,13 +945,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     end
                     
                     if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'RA_rate_delta') && ~isempty(obj.sync.incoming.RA_rate_delta)
-                        obj.rate_RA = obj.rate_RA + direction*obj.sync.incoming.RA_rate_delta;
+                        dRA = obj.sync.incoming.RA_rate_delta;
+                        if isempty(dRA) || isnan(dRA), dRA = 0; end
+                        obj.rate_RA = obj.rate_RA + direction*dRA;
                         obj.sync.incoming.RA_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
                         obj.sync.outgoing.RA_rate = obj.rate_RA;
                     end
                     
                     if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'DE_rate_delta') && ~isempty(obj.sync.incoming.DE_rate_delta)
-                        obj.rate_DE = obj.rate_DE + direction*obj.sync.incoming.DE_rate_delta;
+                        dDE = obj.sync.incoming.DE_rate_delta;
+                        if isempty(dDE) || isnan(dDE), dDE = 0; end
+                        obj.rate_DE = obj.rate_DE + direction*dDE;
                         obj.sync.incoming.DE_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
                         obj.sync.outgoing.DE_rate = obj.rate_DE;
                     end
@@ -965,6 +970,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 if ~isempty(obj.gui) && obj.gui.check
                     obj.gui.update;
+                end
+                
+                if ~isempty(obj.owner) && ~isempty(obj.owner.gui) && obj.owner.gui.check
+                    obj.owner.gui.updateStopButton;
                 end
                 
             catch ME
@@ -1075,7 +1084,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function syncToTarget(obj)
             
-            obj.hndl.SyncToTarget;
+%             obj.hndl.SyncToTarget;
+            obj.hndl.SyncToCoordinates;
             
         end
         

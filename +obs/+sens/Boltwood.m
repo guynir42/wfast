@@ -35,7 +35,7 @@ classdef Boltwood < handle
 
         % specific fields
         jd = NaN; % latest date when data was successfully updated
-        light_value = NaN; % Day light value
+        light = NaN; % Day light value
         temperature = NaN; % Ambient temperature
         temp_sky = NaN; % Sky minus ambient temperature; an indicator for the clouds condition
         temp_sensor = NaN; % Sensor temperature
@@ -56,7 +56,7 @@ classdef Boltwood < handle
     
     properties(Dependent=true)
         
-        light_value_average;
+        light_average;
         temperature_average;
         temp_sky_average;
         temp_sensor_average;
@@ -116,7 +116,7 @@ classdef Boltwood < handle
     
     methods % getters
         
-        function val = get.light_value_average(obj)
+        function val = get.light_average(obj)
             
             if isempty(obj.data)
                 val = [];
@@ -221,7 +221,7 @@ classdef Boltwood < handle
             
             obj.status = 0;
             obj.jd = NaN;
-            obj.light_value = NaN;
+            obj.light = NaN;
             obj.temperature = NaN;
             obj.temp_sky = NaN;
             obj.temp_sensor = NaN;
@@ -281,7 +281,7 @@ classdef Boltwood < handle
             % get current time [JD]
             obj.jd = juliandate(datetime('now', 'timezone', 'UTC'));
             
-            obj.light_value = obj.hndl.DayLightV; % Day light value
+            obj.light = obj.hndl.DayLightV; % Day light value
             
             obj.temperature = obj.hndl.AmbientT; % Ambient temperature
             
@@ -300,7 +300,7 @@ classdef Boltwood < handle
             obj.wind_condition = obj.hndl.WindCondition; % Wind condition
             obj.rain_condition = obj.hndl.RainCondition; % Rain condition
             
-            obj.data.input([obj.jd, obj.light_value, obj.temperature, obj.temp_sky, obj.temp_sensor, obj.temp_dew_point, ...
+            obj.data.input([obj.jd, obj.light, obj.temperature, obj.temp_sky, obj.temp_sensor, obj.temp_dew_point, ...
                          obj.wind_speed, obj.humidity, obj.rain]);
             
         end

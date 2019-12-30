@@ -33,7 +33,7 @@ classdef Lightcurves < handle
         show_num_stars = 10; % up to this number of stars are shown.
         use_smooth = 1;
         smooth_interval = 10;
-        
+        use_show_log = 0; 
         use_double_up = 1; % choose if you want to expand the data storage by factor of 2 each time when space runs out... 
         
         debug_bit = 1;
@@ -55,6 +55,7 @@ classdef Lightcurves < handle
         offsets_y;
         widths;
         bad_pixels;
+        flags;
         
     end
     
@@ -72,11 +73,12 @@ classdef Lightcurves < handle
         offsets_y_full;
         widths_full;
         bad_pixels_full;
+        flags_full;
         
         show_what_list = {'fluxes', 'areas', 'backgrounds', 'variances', 'centroids', 'offsets', 'widths', 'bad_pixels'};
         show_cal_list = {'raw', 'cal', 'both'};
         
-        version = 1.04;
+        version = 1.05;
         
     end
     
@@ -332,6 +334,22 @@ classdef Lightcurves < handle
             
         end
         
+        function val = get.flags(obj)
+            
+            val = obj.flags_full;
+            
+            if isempty(val)
+                return;
+            end
+            
+            val = val(1:obj.frame_index-1,:);
+            
+            if all(isnan(val))
+                val = [];
+            end
+            
+        end
+        
     end
     
     methods % setters
@@ -369,6 +387,7 @@ classdef Lightcurves < handle
                 input.input_var('offsets_y', []);
                 input.input_var('widths', []);
                 input.input_var('bad_pixels', []);
+                input.input_var('flags', []); 
                 input.input_var('pars_struct', [], 'phot_pars');
                 input.scan_vars(varargin{:});
             end
@@ -387,6 +406,7 @@ classdef Lightcurves < handle
             obj.offsets_y_full = insert_matrix(obj.offsets_y, input.offsets_y, [obj.frame_index,1], NaN, obj.use_double_up);
             obj.widths_full = insert_matrix(obj.widths_full, input.widths, [obj.frame_index,1], NaN, obj.use_double_up);
             obj.bad_pixels_full = insert_matrix(obj.bad_pixels_full, input.bad_pixels, [obj.frame_index,1], NaN, obj.use_double_up);
+            obj.flags_full = insert_matrix(obj.flags_full, input.flags, [obj.frame_index,1], NaN, obj.use_double_up);
             obj.frame_index = obj.frame_index + N;
             
             if ~isempty(input.pars_struct)
@@ -401,7 +421,7 @@ classdef Lightcurves < handle
                 type = '';
             end
             
-            list = {'fluxes', 'errors', 'areas', 'backgrounds', 'variances', 'offsets_x', 'offsets_y', 'centroids_x', 'centroids_y', 'widths', 'bad_pixels'};
+            list = {'fluxes', 'errors', 'areas', 'backgrounds', 'variances', 'offsets_x', 'offsets_y', 'centroids_x', 'centroids_y', 'widths', 'bad_pixels', 'flags'};
             
             if ~isempty(type)
                 list2 = strcat(list, ['_' type]);
@@ -419,6 +439,33 @@ classdef Lightcurves < handle
             input.input_var('pars_struct', photometry.pars_struct);
             
             obj.input(input);
+            
+        end
+        
+        function rho = getCorrelationCoeff(obj, type) % calculate Pearson's coefficient with respect to flux and any other quantity
+            
+            f1 = obj.fluxes;
+            f1(obj.flags>0) = NaN;
+            f2 = obj.(type); 
+            f2(obj.flags>0) = NaN;
+            
+            M1 = nanmean(f1);
+            M2 = nanmean(f2);
+            s1 = nanstd(f1);
+            s2 = nanstd(f2); 
+            C = nanmean((f1-M1).*(f2-M2)); 
+            
+            rho = C./s1./s2;
+            
+        end
+        
+        function flux_corr = calibrateFlux(obj, type)
+            
+            rho = obj.getCorrelationCoeff(type); 
+            
+            Av = nanmean(obj.(type) .* ~obj.flags, 2); % maybe replace this with the flux weighted sum?
+            
+            flux_corr = obj.fluxes.*rho./(Av./nanmean(Av));
             
         end
         
@@ -526,7 +573,7 @@ classdef Lightcurves < handle
                 ylabel(input.ax, 'flux (counts)');
             
             elseif cs(obj.show_what, 'areas')
-                obj.addPlots(input.ax, obj.weights);
+                obj.addPlots(input.ax, obj.areas);
                 ylabel(input.ax, 'areas (pixels in aperture)');
             elseif cs(obj.show_what, 'offsets')
                 obj.addPlots(input.ax, obj.offsets_x, '-');
@@ -542,6 +589,12 @@ classdef Lightcurves < handle
             elseif cs(obj.show_what, 'backgrounds')
                 obj.addPlots(input.ax, obj.backgrounds);
                 ylabel(input.ax, 'background (counts/pixel)');
+            elseif cs(obj.show_what, 'variances')
+                obj.addPlots(input.ax, obj.variances);
+                ylabel(input.ax, 'variance (counts^2/pixel)'); 
+            elseif cs(obj.show_what, 'bad_pixels')
+                obj.addPlots(input.ax, obj.bad_pixels);
+                ylabel(input.ax, 'number of bad pixels in aperture'); 
             else
                 error('Unknown data to show "%s", use "fluxes" or "offset" etc...', obj.show_what);
             end
@@ -549,6 +602,12 @@ classdef Lightcurves < handle
             hold(input.ax, 'off');
             
             xlabel(input.ax, 'timestamps (seconds)');
+            
+            if obj.use_show_log
+                input.ax.YScale = 'log';
+            else
+                input.ax.YScale = 'linear';
+            end
             
         end
         

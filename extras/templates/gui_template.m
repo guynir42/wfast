@@ -74,6 +74,7 @@ classdef objGUI < handle
             import util.plot.GraphicButton;
             import util.plot.GraphicPanel;
             import util.plot.ContrastLimits;
+            import util.plot.MenuItem;
             
             obj.buttons = {};
             obj.menus = {};
@@ -89,7 +90,7 @@ classdef objGUI < handle
             %%%%%%%%%%%%%%%%%%%%%%% MENUS %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
             % MenuItem(parent, text, type, variable, tooltip, separator)
-            % obj.addButton(text, type, variable, tooltip, separator)
+            % obj.addButton(name, text, type, variable, tooltip, separator)
             % menu types: menu, toggle, push, input, input_text, info, custom
             
             

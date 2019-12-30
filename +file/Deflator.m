@@ -211,8 +211,6 @@ classdef Deflator < file.AstroData
             
             try
                 
-                obj.clearBuffers;
-                
                 d = obj.src_dir.dir;
                 d{end+1} = ''; % add the base dir itself to the list... 
                 
@@ -255,6 +253,8 @@ classdef Deflator < file.AstroData
                         return;
                     end
 
+                    obj.clearBuffers;
+                
                     obj.resetFilenames;
                     
                     if obj.use_copy_text_files

@@ -187,10 +187,16 @@ classdef ScopeAssistant < handle
         
         function disconnect(obj)
             
-            if ~isempty(obj) && ~isempty(obj.hndl) && isvalid(obj.hndl)
-                fclose(obj.hndl);
+            if ~isempty(obj) && ~isempty(obj.hndl)  
+                
+                if isvalid(obj.hndl)
+                    fclose(obj.hndl);
+                end
+                
                 delete(obj.hndl);
+                
                 obj.hndl = [];
+                
             end
             
         end
