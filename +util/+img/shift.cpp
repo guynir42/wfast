@@ -117,7 +117,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 				memcpy(&image_shifted[start_index], &image[start_index], N*sizeof(float));
 			}
 			else if(offsets_x[n][m]<=-(int)dims[1] || offsets_x[n][m]>=dims[1] || offsets_y[n][m]<=-(int)dims[0] || offsets_y[n][m]>=dims[0]){
-				// mexPrintf("Placing filler in whole image\n");
+				mexPrintf("Placing filler in whole image\n");
 				for(int i=0;i<N;i++) image_shifted[start_index+i]=filler; // just skip the whole image
 			}
 			else{

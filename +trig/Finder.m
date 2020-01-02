@@ -51,6 +51,7 @@ classdef Finder < handle
         offsets_y;
         widths;
         bad_pixels;
+        flags;
         
         prev_timestamps;
         prev_cutouts;
@@ -68,6 +69,7 @@ classdef Finder < handle
         prev_offsets_y;
         prev_widths;
         prev_bad_pixels;
+        prev_flags;
         
         dt; 
         coverage_total;
@@ -83,6 +85,8 @@ classdef Finder < handle
     end
     
     properties % switches/controls
+        
+        lightcurve_type_index = 'end'; % for multiple photometry products choose the one that most suits you for event detection
         
         min_star_snr = 5; % stars with lower S/N are not even tested for events
         threshold = 7.5; % threshold (in units of S/N) for peak of event 
@@ -178,6 +182,8 @@ classdef Finder < handle
             obj.prev_offsets_y = [];
             obj.prev_widths = [];
             obj.prev_bad_pixels = [];
+            obj.prev_flags = [];
+            
             obj.prev_timestamps = [];
             obj.prev_cutouts = [];
             obj.prev_positions = [];
@@ -224,6 +230,8 @@ classdef Finder < handle
             obj.offsets_y = [];
             obj.widths = [];
             obj.bad_pixels = [];
+            obj.flags = [];
+            
             obj.timestamps = [];
             obj.cutouts = [];
             obj.positions = [];
@@ -317,20 +325,11 @@ classdef Finder < handle
                 val = '';
             else
                 
-                val = '';
-                
-                val = [val 'b/g sub: ' num2str(obj.phot_pars.used_bg_sub)];
-                
-                if strcmpi(obj.phot_pars.signal_method, 'aperture')
-                    val = [val sprintf(' | aperture %4.2f pix radius', obj.phot_pars.radius)];
-                end
-                
-                if strcmpi(obj.phot_pars.signal_method, 'aperture')
-                    val = [val sprintf(' | annulus %4.2f-%4.2f pixels', obj.phot_pars.annulus, obj.phot_pars.annulus_outer)];
-                end
-                
-                val = [val ' | iter= ' num2str(obj.phot_pars.iterations)];
-                
+                val = sprintf('aperture: %s pix | annulus: %s pix | iterations: %d', ...
+                    util.text.print_vec(obj.phot_pars.aperture_radii),...
+                    util.text.print_vec(obj.phot_pars.annulus_radii),...
+                    obj.phot_pars.iterations);
+                                
             end
             
         end
@@ -371,7 +370,9 @@ classdef Finder < handle
         end
         
         function input(obj, varargin)
-                
+            
+            import util.text.cs;
+            
             input = util.text.InputVars;
             input.use_ordered_numeric = 1;
             input.input_var('fluxes', []);
@@ -383,6 +384,7 @@ classdef Finder < handle
             input.input_var('offsets_y', [], 'offset_y', 'dy');
             input.input_var('widths', []);
             input.input_var('bad_pixels', []);
+            input.input_var('flags', []); 
             input.input_var('aperture', [], 'radius');
             input.input_var('gauss_sigma', [], 'sigma', 'gaussian_sigma');
             input.input_var('timestamps', []); 
@@ -453,15 +455,23 @@ classdef Finder < handle
             
             obj.clear;
             
-            obj.fluxes = input.fluxes;
-            obj.errors = input.errors;
-            obj.areas = input.areas;
-            obj.backgrounds = input.backgrounds;
-            obj.variances = input.variances;
-            obj.offsets_x = input.offsets_x;
-            obj.offsets_y = input.offsets_y;
-            obj.widths = input.widths;
-            obj.bad_pixels = input.bad_pixels;
+            list = {'fluxes', 'errors', 'areas', 'backgrounds', 'variances', 'offsets_x', 'offsets_y', 'widths', 'bad_pixels', 'flags'};
+            
+            for ii = 1:length(list)
+                
+                data = input.(list{ii}); 
+                if isempty(obj.lightcurve_type_index) || cs(obj.lightcurve_type_index, ':', 'all')
+                    obj.(list{ii}) = data;
+                elseif isnumeric(obj.lightcurve_type_index)
+                    obj.(list{ii}) = data(:,:,obj.lightcurve_type_index);
+                elseif cs(obj.lightcurve_type_index, 'end')
+                    obj.(list{ii}) = data(:,:,end); 
+                else
+                    error('Unknown lightcurve_type_index "%s". Use numeric value or "end". ', obj.lightcurve_type_index); 
+                end
+                
+            end
+            
             obj.timestamps = input.timestamps;
             obj.cutouts = input.cutouts;
             obj.positions = input.positions;
@@ -557,6 +567,7 @@ classdef Finder < handle
             obj.prev_offsets_y = obj.offsets_y;
             obj.prev_widths = obj.widths;
             obj.prev_bad_pixels = obj.bad_pixels;
+            obj.prev_flags = obj.flags;
             obj.prev_timestamps = obj.timestamps;
             obj.prev_cutouts = obj.cutouts;
             obj.prev_positions = obj.positions;
@@ -984,13 +995,22 @@ classdef Finder < handle
         
         function saveEvents(obj, filename)
             
+            
             for ii = 1:length(obj.all_events)
                 if obj.all_events(ii).keep
-                    events(ii) = obj.all_events(ii).reduce_memory;
-                else
-                    events(ii) = obj.all_events(ii);
+                    obj.all_events(ii).clearImages;
                 end
             end
+            
+            events = obj.all_events;
+            
+%             for ii = 1:length(obj.all_events)
+%                 if obj.all_events(ii).keep
+%                     events(ii) = obj.all_events(ii).reduce_memory_copy;
+%                 else
+%                     events(ii) = obj.all_events(ii);
+%                 end
+%             end
             
             save(filename, 'events');
             
@@ -1037,6 +1057,20 @@ classdef Finder < handle
             end
             
             obj.all_events(idx).reload_memory;
+            
+        end
+        
+        function clearOneEventMemory(obj, idx)
+            
+            if nargin<2 || isempty(idx)
+                idx = obj.display_event_idx;
+            end
+            
+            if isempty(idx)
+                return;
+            end
+            
+            obj.all_events(idx).clearImages;
             
         end
         

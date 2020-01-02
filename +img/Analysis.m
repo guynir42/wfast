@@ -177,9 +177,9 @@ classdef Analysis < file.AstroData
                 obj.clip_bg.use_adjust = 0; % this should be disabled and depricated!
                 obj.back = img.Background;
                 obj.phot = img.Photometry;
-                obj.phot.use_basic = 0;
-                obj.phot.use_aperture = 1;
-                obj.phot.use_gaussian = 0;
+%                 obj.phot.use_basic = 0;
+%                 obj.phot.use_aperture = 1;
+%                 obj.phot.use_gaussian = 1;
                 
                 obj.phot_stack = img.Photometry;
                 obj.flux_buf = util.vec.CircularBuffer;
@@ -1269,6 +1269,7 @@ classdef Analysis < file.AstroData
                 'positions', obj.positions, 'variance', single(2.5)); % need to add the sky background too
 
             obj.lightcurves.getData(obj.phot);
+%             obj.lightcurves.getAperturesAndForced(obj.phot);
             if obj.lightcurves.gui.check, obj.lightcurves.gui.update; end
 
             if obj.debug_bit>1, fprintf('Time for photometry: %f seconds\n', toc(t)); end
@@ -1413,6 +1414,7 @@ classdef Analysis < file.AstroData
             y = obj.phot.offsets_y;
             w = obj.phot.widths;
             p = obj.phot.bad_pixels;
+            F = obj.phot.flags;
             phot_pars = obj.phot.pars_struct; % maybe also give this to model_psf??
 
             r = [];
@@ -1420,13 +1422,14 @@ classdef Analysis < file.AstroData
 
             if obj.phot.use_gaussian
                 g = obj.phot.gauss_sigma;
-            elseif obj.phot.use_aperture
-
+            end
+                
+            if obj.phot.use_aperture
                 r = obj.phot.aperture;
             end
 
-            obj.finder.input(f, e, a, b, v, x, y, w, p, r, g, ...
-                obj.timestamps, obj.cutouts_proc, obj.positions, obj.stack_proc, ...
+            obj.finder.input(f, e, a, b, v, x, y, w, p, F, r, g, ...
+                obj.timestamps, obj.cutouts, obj.positions, obj.stack, ...
                 obj.batch_counter+1, 'filename', obj.thisFilename, ...
                 't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp,...
                 'used_background', obj.phot.use_backgrounds, 'pars', phot_pars);

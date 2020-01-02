@@ -457,6 +457,18 @@ classdef Photometry < handle
                         obj.centroids_y_forced = obj.offsets_y_forced + obj.positions(:,2)';
                     end 
                     
+                    % update the newest values including all apertures and the forced results 
+                    obj.fluxes = cat(3, obj.fluxes_ap, obj.fluxes_forced);
+                    obj.areas = cat(3, obj.areas_ap, obj.areas_forced);
+                    obj.errors = cat(3, obj.errors_ap, obj.errors_forced);
+                    obj.backgrounds = cat(3, obj.backgrounds_ap, obj.backgrounds_forced);
+                    obj.variances = cat(3, obj.variances_ap, obj.variances_forced);
+                    obj.offsets_x = cat(3, obj.offsets_x_ap, obj.offsets_x_forced);
+                    obj.offsets_y = cat(3, obj.offsets_y_ap, obj.offsets_y_forced);
+                    obj.widths = cat(3, obj.widths_ap, obj.widths_forced);
+                    obj.bad_pixels = cat(3, obj.bad_pixels_ap, obj.bad_pixels_forced); 
+                    obj.flags = cat(3, obj.flags_ap, obj.flags_forced);
+                    
                 end
                 
                 if ~isempty(obj.positions)
