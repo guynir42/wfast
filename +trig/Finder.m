@@ -14,6 +14,7 @@ classdef Finder < handle
         cat@head.Catalog;
         
         cal@trig.Calibrator;
+        psd@trig.PSDCorrector;
         
         all_events@trig.Event;
         new_events@trig.Event;
@@ -31,6 +32,9 @@ classdef Finder < handle
     end
     
     properties % inputs/outputs
+        
+        fluxes_deredened;
+        stds_deredened; 
         
         black_list_stars;
         black_list_batches;
@@ -502,8 +506,21 @@ classdef Finder < handle
                 obj.cal.input(vertcat(obj.prev_fluxes, obj.fluxes), vertcat(obj.prev_errors, obj.errors), vertcat(obj.prev_timestamps, obj.timestamps)); 
                 if obj.debug_bit>2, fprintf('Calibration time: %f seconds.\n', toc(t)); end
                 
+                if obj.use_psd_correction
+                   
+                    t = tic;
+                    
+                    [obj.fluxes_deredened, obj.stds_deredened] = obj.psd.input(obj.cal.fluxes_detrended);
+                    
+                    if obj.debug_bit>2, fprintf('PSD correction time: %f seconds.\n', toc(t)); end
+
+                else
+                    obj.fluxes_deredened = obj.cal.fluxes_detrended;
+                    obj.stds_deredened = obj.cal.stds_detrended;
+                end
+                
                 t = tic;
-                obj.bank.input(obj.cal.fluxes_detrended, obj.cal.stds_detrended, obj.cal.timestamps); % use the filter bank on the fluxes
+                obj.bank.input(obj.fluxes_deredened, obj.stds_deredened, obj.cal.timestamps); % use the filter bank on the fluxes
 
                 if nnz(~isnan(obj.bank.fluxes_filtered))==0
                     error('Filtered fluxes in ShuffleBank are all NaN!');
