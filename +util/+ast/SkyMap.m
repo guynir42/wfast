@@ -1,4 +1,27 @@
 classdef SkyMap < handle
+% Plot the position in RA/DE of all stars in some magnitude and size range. 
+% Usage: obj.makeMap will generate the map based on GAIA data in htm format. 
+%        This takes more than 24 hours on a fast computer. 
+%        Prefer to load this object from DATA/WFAST/saved/sky_map.mat
+%
+% Best thing is to make a GUI and play with it. Some of the options (also 
+% available when calling the show(...) function are: 
+% -axes or axis: plot into this axes object. (default is GUI axes)
+% -min_mag and max_mag: the brightest and faintest stars to show, respectively. Default is 10-17
+% -biggest_size: star size in micro arcseconds. Default is 1000. 
+% -south_limit: most negative DE (in degrees). 
+% -log: show the map in log scale (default true). 
+% -ecliptic: show an overlay with ecliptic latitude. 
+% -galactic: show an overlay with galactic latitude. 
+% -units: choose to show RA in degrees or hours. 
+% -grid: show an RA/DE grid on top of map. 
+% -font_size: for axes, etc. 
+%
+%
+% To find good observing fields, choose the maximum size permitted by your 
+% Fresnel scale, the magnitude you can reach, and the south limit for your
+% southern most observations. Then look for something in the right RA and 
+% close enough to the ecliptic. 
 
     properties(Transient=true)
         

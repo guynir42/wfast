@@ -1,6 +1,6 @@
 function file_handle = save(obj, filename, varargin)
+% Usage: file_handle = save(obj, filename, varargin). 
 % Saves an object into a txt, HDF5 or mat file. 
-% usage: save(obj, filename, varargin). 
 %
 % Will automatically convert all short properties into "attributes" and all
 % long (data) properties into datasets. 

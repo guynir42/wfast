@@ -1,5 +1,28 @@
 function [Im_new_shifted, shift, confidence] = quick_align(Im_ref, Im_new, varargin)
-    
+% Usage: [Im_new_shifted, shift, confidence] = quick_align(Im_ref, Im_new, varargin)
+% Reposition the new image to be aligned with the old image, using star positions. 
+%
+% Takes the max of rows and columns for each image, representing the positions
+% of the brightest stars, then cross correlates them in X and Y to find the 
+% best alignement between the images. 
+%
+% INPUTS: Im_ref and Im_new are the two images to be aligned. New is moved to ref. 
+%
+% OPTIONAL ARGUMENTS:
+%   -static: if true, do not shift the new image, return it as-is, and just 
+%            report the required shift between the two images as 2nd output.
+%   -flip: return shift as X then Y (default true). 
+%
+% OUTPUTS: 
+%   -Im_new_shifted: the new image, shifted to match the reference. 
+%                    Uses util.img.imshift to do the moving and padding. 
+%   -shift: what is the shift, in pixels, between the images (when flip option
+%           is given, which is the default, returns X then Y elements). 
+%   -confidence: how good the match between the images is. To be added later,
+%                in this version confidence is always zero! 
+%
+%
+
     import util.img.pad2size;
     
     if nargin==0, help('util.img.quick_align'); return; end

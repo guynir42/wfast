@@ -20,9 +20,9 @@ function sizes = stellar_size(bol_mag, temp_eff, varargin)
     if nargin==0, help('util.ast.stellar_size'); return; end
     
     input = util.text.InputVars;
-    input.input_var('units', 'rad'); 
-    input.input_var('wavelength', 550); % in nm
-    input.input_var('distance', 10); % in pc
+    input.input_var('units', 'rad'); % can choose rad, degrees, arcsec, mas, uas (micro arcsec) or fsu (Fresnel scale units)
+    input.input_var('wavelength', 550); % in nm (only used for calculating size in FSU)
+    input.input_var('distance', 10); % in pc (only used for calculating size in FSU)
     input.scan_vars(varargin{:});
     
     % sun is used as reference:

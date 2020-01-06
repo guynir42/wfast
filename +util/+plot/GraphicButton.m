@@ -1,9 +1,10 @@
 classdef GraphicButton < handle
-% usage: GraphicButton(parent, position, owner, var_name, type, str1, str2, font_size, self_name, buttons_name, color_on, color_off, tooltip)
+% Usage: GraphicButton(parent, position, owner, var_name, type, str1, str2, font_size, self_name, buttons_name, color_on, color_off, tooltip)
 % Wrapper for uicontrol. 
 % Has some defaults for controlling an object "owner" that is responsible
 % for this GUI object. Also adds itself to the GUI's button array, for easy
-% updating. Defaults are: toggle, push, info, custom (to define your own). 
+% updating. 
+% Options for "type": toggle, push, info, input, input_text, custom. 
 %
 
     properties

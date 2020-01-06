@@ -1,5 +1,16 @@
 classdef BolometricCorrections < handle
-    
+% Creates an interpolation object between color, temperature and bolometric correction. 
+% Uses Eran's AstroUtil.spec.blackbody_mag_c and AstroUtil.spec.blackbody_bolmag
+% 
+% Usage: obj.makeSourceMatrix(filter1='BP', filter2='RP', filter_system='GAIA', mag_system='AB')
+% This will generate the interpolation object. It takes some time (like 20 seconds). 
+% After that you can quickly ask for bolometric corrections and temperature based on color. 
+% The default is to use GAIA's BP-RP color. 
+%
+% To get the results use: obj.getTemp(color), make sure to use the right filters. Color can be a vector. 
+% Can use the temperature to get bolometric correction (to be added to filter1) using obj.getBolCorr(temp). 
+% Skip the temperature and get the bolometric correction from color using obj.getBolCorrFromColor(color). 
+
     properties
         
         filter1;
@@ -116,36 +127,6 @@ classdef BolometricCorrections < handle
             end
             
             val = interp1(obj.color_vec, obj.bol_corr_vec, color);
-            
-        end
-        
-        
-        function val = getBolCorrOld(obj, temp, filter, filter_system, mag_system) % to be depricated! 
-            
-            import AstroUtil.spec.blackbody_mag_c
-            import AstroUtil.spec.blackbody_bolmag;
-            
-            if nargin<4 || isempty(filter_system)
-                filter_system = 'GAIA';
-            end
-            
-            if nargin<5 || isempty(mag_system)
-                mag_system = 'AB';
-            end
-            
-            if isempty(filter)
-                error('Must supply a non empty filter!');
-            end
-            
-            if isnumeric(filter)
-                filter_system = filter;
-                filter = [];
-            end
-            
-            mag1 = blackbody_mag_c(temp, filter_system, filter, mag_system); % assume radius and distance at the default 1cm/10pc
-            bolmag = blackbody_bolmag(temp); % assume radius and distance at the default 1cm/10pc
-            
-            val = bolmag-mag1;
             
         end
         
