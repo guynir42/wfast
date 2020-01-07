@@ -54,7 +54,7 @@ classdef Photometry < handle
         
         use_mex = 1; % use the (now old) mex function for faster processing 
         use_new_method = 1; % use the new mex function that is much faster and more accurate
-        num_threads = 2; % for multithreaded mex photometry
+        num_threads = 4; % for multithreaded mex photometry
         use_backgrounds = 1; % remove background from individual cutout
         use_self_psf = 0; % use image as a proxy for its own PSF
         
@@ -66,9 +66,9 @@ classdef Photometry < handle
         use_forced = 1;
         
         corner_size = 0.15; % fraction of the cut_size or pixel value (must be smaller than cut_size!)
-        aperture = 5;
-        annulus = 8;
-        annulus_outer = 11; % empty means take the rest of the cutout
+        aperture = [5 7 9];
+        annulus = 10;
+        annulus_outer = 13; % empty means take the rest of the cutout
         gauss_sigma = 2;
         gauss_thresh = 1e-6;
         
