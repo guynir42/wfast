@@ -6,6 +6,8 @@ classdef Deflator < file.AstroData
         
         prog@util.sys.ProgressBar;
         
+        futures = {}; % for using parfeval
+        
         timer;
         
     end
@@ -36,6 +38,8 @@ classdef Deflator < file.AstroData
         auto_deflate_destination = getenv('DATA_EXTRAS');
         
         use_auto_delete = 0;
+        
+        use_parallel_auto_deflate = 1;
         
         use_auto_backup = 0;
         
@@ -142,6 +146,13 @@ classdef Deflator < file.AstroData
     
     methods % reset
         
+        function clear(obj)
+           
+            clear@file.AstroData(obj);
+            obj.clearBuffers;
+            
+        end
+        
         function clearBuffers(obj)
         
             obj.buffers.clear;         
@@ -153,6 +164,12 @@ classdef Deflator < file.AstroData
             obj.reader.dir = util.sys.WorkingDirectory(obj.src_subdir);
             obj.reader.reset;
             obj.reader.num_files_per_batch = 1;
+            
+        end
+        
+        function reset_futures(obj)
+            
+            obj.futures = {};
             
         end
         
@@ -221,6 +238,10 @@ classdef Deflator < file.AstroData
                     N = N + length(obj.src_subdir.match('*.h5'));
                 end
                 
+                if isempty(obj.prog)
+                    obj.prog = util.sys.ProgressBar;
+                end
+                
                 obj.prog.start(N);
                 
                 for jj = 1:length(d)
@@ -253,8 +274,6 @@ classdef Deflator < file.AstroData
                         return;
                     end
 
-                    obj.clearBuffers;
-                
                     obj.resetFilenames;
                     
                     if obj.use_copy_text_files
@@ -284,6 +303,8 @@ classdef Deflator < file.AstroData
                             break;
                         end
                         
+                        obj.clear;
+                
                         [output_exists, output_filename] = obj.checkFileExists(obj.reader.this_filename, obj.out_subdir.pwd);
                         
                         if ~obj.use_auto_backup
@@ -359,6 +380,12 @@ classdef Deflator < file.AstroData
             
         end
         
+        function run_async(obj)
+            
+            obj.futures{end+1} = parfeval(@obj.run, 0); 
+            
+        end
+        
         function setup_timer(obj, hour) % sets up the deflator to automatically deflate latest files in DATA_TEMP at the given hour today (UTC!)
             
             if nargin<2 || isempty(hour)
@@ -413,7 +440,11 @@ classdef Deflator < file.AstroData
                 
                 fprintf('\nSRC DIR: %s\n\nDEST DIR: %s\n\n', obj.src_dir.pwd, obj.out_dir.pwd);
                 
-                obj.run; 
+                if obj.use_parallel_auto_deflate
+                    obj.run_async;
+                else
+                    obj.run; 
+                end
                 
             end
             

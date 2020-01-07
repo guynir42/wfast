@@ -334,8 +334,8 @@ classdef Acquisition < file.AstroData
 
         function setupDefaults(obj)
 
-            obj.total_runtime = 60;
-            obj.runtime_units = 'minutes';
+            obj.total_runtime = 4;
+            obj.runtime_units = 'hours';
 %             obj.num_batches = 500;
             obj.batch_size = 100;
             

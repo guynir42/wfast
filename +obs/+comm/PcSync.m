@@ -171,7 +171,9 @@ classdef PcSync < handle
                     obj.hndl_rx = obj.connectSocket('rx');
                 end
                 
-%                 obj.update;
+                pause(0.1);
+                
+                obj.update;
                 
             catch ME
                 obj.log.error(ME.getReport);
