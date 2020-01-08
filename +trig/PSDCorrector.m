@@ -17,6 +17,9 @@ classdef PSDCorrector < handle
         fluxes_deredened;
         std_deredened;
         
+        fluxes_blued;
+        stds_blued;
+        
         
     end
     
@@ -88,13 +91,15 @@ classdef PSDCorrector < handle
     
     methods % calculations
         
-        function [F,S] = input(obj, fluxes)
+        function input(obj, fluxes)
             
             if ndims(fluxes)>3
                 error('Must add some more : marks to allow fluxes with over 3 dimensions!'); 
             end
             
             obj.clear;
+            
+            fluxes = fillmissing(fluxes, 'spline'); 
             
             obj.fluxes_input = fluxes;
             
@@ -106,14 +111,6 @@ classdef PSDCorrector < handle
             
             obj.calculate;
             
-            if nargout>0
-                F = obj.fluxes_deredened;
-            end
-            
-            if nargout>1
-                S = obj.std_deredened;
-            end
-            
         end
         
         function calculate(obj)
@@ -123,7 +120,12 @@ classdef PSDCorrector < handle
             obj.fluxes_deredened = ifft(fft(obj.fluxes_input./sqrt(obj.psd))); 
             
             obj.std_deredened = std(obj.fluxes_deredened); 
-             
+            
+            % these are divided twice by the sqrt(PSD) to account for the filter being deredened as well.
+            obj.fluxes_blued = ifft(fft(obj.fluxes_input./(obj.psd))); 
+            
+            obj.std_blued = std(obj.fluxes_deredened); 
+            
         end
         
     end

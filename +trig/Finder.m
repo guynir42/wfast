@@ -510,18 +510,21 @@ classdef Finder < handle
                    
                     t = tic;
                     
-                    [obj.fluxes_deredened, obj.stds_deredened] = obj.psd.input(obj.cal.fluxes_detrended);
+                    obj.psd.input(obj.cal.fluxes_detrended);
+                    
+                    F = obj.psd.fluxes_blued;
+                    S = obj.psd.stds_blued;
                     
                     if obj.debug_bit>2, fprintf('PSD correction time: %f seconds.\n', toc(t)); end
 
                 else
-                    obj.fluxes_deredened = obj.cal.fluxes_detrended;
-                    obj.stds_deredened = obj.cal.stds_detrended;
+                    F = obj.cal.fluxes_detrended;
+                    S = obj.cal.stds_detrended;
                 end
                 
                 t = tic;
-                obj.bank.input(obj.fluxes_deredened, obj.stds_deredened, obj.cal.timestamps); % use the filter bank on the fluxes
-
+                obj.bank.input(F, S, obj.cal.timestamps); % use the filter bank on the fluxes
+                
                 if nnz(~isnan(obj.bank.fluxes_filtered))==0
                     error('Filtered fluxes in ShuffleBank are all NaN!');
                 end
