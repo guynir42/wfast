@@ -1509,7 +1509,7 @@ classdef Acquisition < file.AstroData
             end
             
             obj.src.finishup;
-            
+                        
             if obj.use_save
                 try
                     filename = obj.buf.getReadmeFilename('Z');
