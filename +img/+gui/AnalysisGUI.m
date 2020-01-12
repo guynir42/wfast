@@ -125,6 +125,7 @@ classdef AnalysisGUI < handle
             obj.panel_controls.addButton('button_photometry', 'use_photometry', 'toggle', 'no photometry', 'with photometry', 'small', 0.5, obj.color_on, '', 'Run photometry on cutotus'); 
             obj.panel_controls.addButton('button_psf_model', 'use_psf_model', 'toggle', 'no PSF modeling', 'with PSF modeling', 'small', 0.5, obj.color_on, '', 'Calculate the model PSF from all cutouts.'); 
             obj.panel_controls.addButton('button_events', 'use_event_finding', 'toggle', 'no event search', 'use event search', 'small', 0.5, obj.color_on, '', 'Run event search using match filtering of lightcurves'); 
+            obj.panel_controls.addButton('button_psd', 'finder.use_psd_correction', 'toggle', 'no PSD correct', 'use PSD correct', 'small', 0.5, obj.color_on, '', 'Use PSD correction on fluxes before feeding them to event finder');
             obj.panel_controls.addButton('button_auto_load_cal', 'use_auto_load_cal', 'toggle', 'no load cal', 'auto load cal', 'small', 0.5, obj.color_on, '', 'Always test for most relevant calibration file when starting a new run'); 
             obj.panel_controls.addButton('button_check_flux', 'use_check_flux', 'toggle', 'no check flux', 'use check flux', 'small', 0.5, obj.color_on, '', 'Check if flux is lost a few times in a row, quit the run. '); 
             obj.panel_controls.margin = [0.03 0.01];

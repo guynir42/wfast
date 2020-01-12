@@ -556,13 +556,13 @@ classdef Event < handle
             h5 = plot(input.ax, obj.timestamps, obj.backgrounds_at_star, '--'); 
             h5.DisplayName = 'background';
             
-            h6 = plot(input.ax, obj.timestamps, obj.offsets_x_at_star, 'o', 'MarkerSize', 1);
+            h6 = plot(input.ax, obj.timestamps, obj.offsets_x_at_star, 'x', 'MarkerSize', 4);
             h6.DisplayName = 'offset x';
             
-            h7 = plot(input.ax, obj.timestamps, obj.offsets_y_at_star, 'o', 'MarkerSize', 1);
+            h7 = plot(input.ax, obj.timestamps, obj.offsets_y_at_star, '+', 'MarkerSize', 4);
             h7.DisplayName = 'offset y';
             
-            h8 = plot(input.ax, obj.timestamps, obj.widths_at_star, 'p', 'MarkerSize', 0.5);
+            h8 = plot(input.ax, obj.timestamps, obj.widths_at_star, 'p', 'MarkerSize', 3);
             h8.DisplayName = 'PSF width';
             
             
