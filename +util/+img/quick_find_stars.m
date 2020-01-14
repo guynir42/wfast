@@ -11,6 +11,9 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
 % -sigma: Threshold for finding stars (after mean subtract and divide by std). Default 3.5.
 % -saturation: Value of brightest pixel must be lower than this or else flag 1 is set. 
 % -edges: Replace edges with NaN before finding stars. If empty will be dilate*2. 
+% -fraction: of MX_twice or MX_half that must surpass MX to be counted as point-source or extended-source
+% -unflagged: if true only leave rows which have flag==0 (Default is false: take all stars!)
+%
 %
 % OUTPUTS: 
 % -table_props: output from regionprops in a table, along with positions 
@@ -18,9 +21,10 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
 % I_reduced: the image with found stars replaced with NaNs. 
 % 
 % NOTE: flag values are given as:
-% 1- saturated star
-% 2- better fit to point source. 
-% 3- better fit to extended source. 
+% 0- No flag, star is ok. 
+% 1- Saturated star
+% 2- Better fit to point source. 
+% 3- Better fit to extended source. 
 % ...
 %
 
@@ -32,7 +36,7 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     input.input_var('psf_sigma', 2);
     input.input_var('mean', []);
     input.input_var('std', []);
-    input.input_var('sigma', 5);
+    input.input_var('sigma', 5, 'threshold');
     input.input_var('saturation', 5e6); % saturation by default for 100 images in a stack
     input.input_var('edges', []);
     input.input_var('fraction', 0.8); % fraction of MX_twice or MX_half that must surpass MX to be counted as point-source or extended-source

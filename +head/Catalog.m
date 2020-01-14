@@ -28,6 +28,8 @@ classdef Catalog < handle
         width; % equivalent to 1st moment (=FWHM/2.355)
         seeing; % arcsec
         
+        detection_limit; % faintest magnitude we can detect, based on the given stars
+        
         success; % fill this if astrometry is successfull or failed (empty means we didn't run it yet)
         
     end
@@ -39,7 +41,7 @@ classdef Catalog < handle
         
         avoid_edges = 50; % how many pixels away from edge of image (need image to know the size!)
         
-        use_matched_only = 1; % only keep stars that are matched to a proper GAIA star
+        use_matched_only = 0; % only keep stars that are matched to a proper GAIA star
         use_psf_width = 1; % only keep stars that have the best response to the correct PSF width
         
         min_star_temp;
@@ -112,6 +114,18 @@ classdef Catalog < handle
     
     methods % getters
         
+        function val = get.wcs_object(obj)
+            
+            % lazy load the example WCS object. One day I will know how to generate one for myself... 
+            if isempty(obj.wcs_object)
+                load(fullfile(getenv('DATA'), 'WFAST/saved/WCS_example')); 
+                obj.wcs_object = w;
+            end
+            
+            val = obj.wcs_object;
+            
+        end
+        
         function val = plate_scale(obj)
             
             if isempty(obj.pars)
@@ -150,7 +164,7 @@ classdef Catalog < handle
     
     methods % calculations
         
-        function input(obj, Im)
+        function input(obj, Im) % to be depricated! 
             
             obj.success = 0; % change to 1 after all functions return normally 
             
@@ -171,6 +185,34 @@ classdef Catalog < handle
             end
             
             obj.success = 1;
+            
+        end
+        
+        function inputPositions(obj, P)
+            
+            if istable(P) && ismember('pos', P.Properties.VariableNames)
+                P = P.pos; % if given a table from quick_find_stars, just take out the positions only
+            end
+            
+            S = SIM;
+            S.Cat = [P NaN(size(P,1), 3)]; 
+%             S.Col.X=1; S.Col.Y=2; S.Col.Mag=3; S.Col.RA=4; S.Col.Dec=5;
+%             S.ColCell = {'X', 'Y', 'Mag', 'RA', 'Dec'};
+            S.Col.X=1; S.Col.Y=2; S.Col.Mag=3; S.Col.Im_RA=4; S.Col.Im_Dec=5;
+            S.ColCell = {'X', 'Y', 'Mag', 'Im_RA', 'Im_Dec'};
+            
+            [R,S2] = astrometry(S, 'RA', obj.pars.RA, 'Dec', obj.pars.Dec, 'Scale', obj.pars.SCALE, ...
+                'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', [3000 3000], 'ApplyPM', false, ...
+                'MinRot', -20, 'MaxRot', 20, 'CatColMag', 'Mag', 'ImSize', [obj.pars.NAXIS1, obj.pars.NAXIS2]);
+            
+            % what should we do with R? check a correct match maybe? 
+            obj.mextractor_sim = update_coordinates(S2, 'ColNameRA', 'Im_RA', 'ColNameDec', 'Im_Dec'); 
+            
+            obj.catalog_matched = catsHTM.sources_match('GAIADR2',obj.mextractor_sim, 'ColRA', {'Im_RA'}, 'ColDec', {'Im_Dec'});
+            
+            obj.wcs_object = ClassWCS.populate(S);
+            
+            obj.makeCatalog;
             
         end
         
@@ -281,8 +323,6 @@ classdef Catalog < handle
             
 %             T = T(~isnan(T{:,1}),:);
 
-            [~, idx] = unique(T{:,1:2}, 'rows');
-            T = T(idx,:);
 
 %             T.Properties.VariableNames; % change variable names??
 
@@ -290,23 +330,32 @@ classdef Catalog < handle
             T.Dec = T.Dec.*180/pi;
             T.Dist = T.Dist.*180/pi*3600;
             
-            T.ALPHAWIN_J2000 = T.ALPHAWIN_J2000.*180/pi;
-            T.DELTAWIN_J2000 = T.DELTAWIN_J2000.*180/pi;
+            T.Im_RA = T.Im_RA.*180/pi;
+            T.Im_Dec = T.Im_Dec.*180/pi;
             
-            T.Properties.VariableUnits = {'deg', 'deg', 'year', '"', '"', '"', '"', '"', '"', '"', '"', '', '', '', ...
-                'mag', 'mag', 'mag', 'mag', 'mag', 'mag', 'km/s', 'km/s', '', 'K', 'K', 'K', '', '', '"', '',  ...
-                'pix', 'pix', 'pix', 'pix', 'pix', 'pix', 'pix', 'deg', '', ...
-                'deg', 'deg', 'counts', 'counts', '', '', '', '','', 'counts', 'counts', 'mag', 'mag', '', '', '', ...
-                'counts', 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', ...
-                'counts', 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', ...
-                '', '', 'arcsec'}; % input units for all variables
+%             T.Properties.VariableUnits = {'deg', 'deg', 'year', '"', '"', '"', '"', '"', '"', '"', '"', '', '', '', ...
+%                 'mag', 'mag', 'mag', 'mag', 'mag', 'mag', 'km/s', 'km/s', '', 'K', 'K', 'K', '', '', '"', '',  ...
+%                 'pix', 'pix', 'pix', 'pix', 'pix', 'pix', 'pix', 'deg', '', ...
+%                 'deg', 'deg', 'counts', 'counts', '', '', '', '','', 'counts', 'counts', 'mag', 'mag', '', '', '', ...
+%                 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', ...
+%                 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', ...
+%                 '', '', 'arcsec'}; % input units for all variables
             
             if obj.use_matched_only
                 obj.data = T(~isnan(T.Mag_BP),:); 
+                [~, idx] = unique(T{:,1:2}, 'rows');
+                T = T(idx,:); % sort the table... 
             else                
                 obj.data = T;
             end
-
+            
+            obj.positions = [obj.data.X, obj.data.Y];
+            obj.magnitudes = obj.data.Mag_BP;
+            obj.coordinates = [obj.data.RA obj.data.Dec];
+            obj.temperatures = obj.data.Teff;
+            
+            obj.detection_limit = nanmax(obj.magnitudes); 
+            
         end
         
         function idx = findOutburst(obj)
@@ -387,7 +436,7 @@ classdef Catalog < handle
             
         end
         
-        function findStars(obj, pos_xy, min_radius)
+        function findStars(obj, pos_xy, min_radius) % to be depricated! 
             
             if obj.debug_bit, disp('Finding stars and matching them to catalog...'); end
             
