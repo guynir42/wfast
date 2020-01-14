@@ -1,5 +1,5 @@
 classdef GraphicPanel < dynamicprops
-% usage: GraphicPanel(owner, position, title='', is_vertical=1, self_name='gui')
+% Usage: GraphicPanel(owner, position, title='', is_vertical=1, self_name='gui')
 % Container for GraphicButton objects. 
 % Add buttons using obj.addButton(button_name, var_name='', type='', str1='', str2='', font_size='', split=1, color_on=[], color_off=[], tooltip)
 % when you are done, use "make".

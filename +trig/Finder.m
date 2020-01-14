@@ -14,6 +14,7 @@ classdef Finder < handle
         cat@head.Catalog;
         
         cal@trig.Calibrator;
+        psd@trig.PSDCorrector;
         
         all_events@trig.Event;
         new_events@trig.Event;
@@ -31,6 +32,9 @@ classdef Finder < handle
     end
     
     properties % inputs/outputs
+        
+        fluxes_corrected;
+        stds_corrected
         
         black_list_stars;
         black_list_batches;
@@ -87,6 +91,8 @@ classdef Finder < handle
     properties % switches/controls
         
         lightcurve_type_index = 'end'; % for multiple photometry products choose the one that most suits you for event detection
+        
+        use_psd_correction = 1;
         
         min_star_snr = 5; % stars with lower S/N are not even tested for events
         threshold = 7.5; % threshold (in units of S/N) for peak of event 
@@ -152,6 +158,8 @@ classdef Finder < handle
                 obj.var_buf = util.vec.CircularBuffer;
                 
                 obj.prog = util.sys.ProgressBar;
+                
+                obj.psd = trig.PSDCorrector;
                 
             end
             
@@ -502,9 +510,26 @@ classdef Finder < handle
                 obj.cal.input(vertcat(obj.prev_fluxes, obj.fluxes), vertcat(obj.prev_errors, obj.errors), vertcat(obj.prev_timestamps, obj.timestamps)); 
                 if obj.debug_bit>2, fprintf('Calibration time: %f seconds.\n', toc(t)); end
                 
-                t = tic;
-                obj.bank.input(obj.cal.fluxes_detrended, obj.cal.stds_detrended, obj.cal.timestamps); % use the filter bank on the fluxes
+                if obj.use_psd_correction
+                   
+                    t = tic;
+                    
+                    obj.psd.num_frames_to_add = size(obj.fluxes,1); % only add the first 100 measurements
+                    obj.psd.input(obj.cal.fluxes_detrended);
+                    
+                    obj.fluxes_corrected = obj.psd.fluxes_deredened;
+                    obj.stds_corrected = obj.psd.stds_deredened;
 
+                    if obj.debug_bit>2, fprintf('PSD correction time: %f seconds.\n', toc(t)); end
+
+                else
+                    obj.fluxes_corrected = obj.cal.fluxes_detrended;
+                    obj.stds_corrected = obj.cal.stds_detrended;
+                end
+                
+                t = tic;
+                obj.bank.input(obj.fluxes_corrected, obj.stds_corrected, obj.cal.timestamps); % use the filter bank on the fluxes
+                
                 if nnz(~isnan(obj.bank.fluxes_filtered))==0
                     error('Filtered fluxes in ShuffleBank are all NaN!');
                 end
@@ -619,7 +644,6 @@ classdef Finder < handle
                 ff_sim = util.img.shift(ff_sim, 0, shift_frames, 0);
                 ff = ff(:,:,star_index_sim) + ff_sim;
                 
-                
                 if obj.debug_bit>3, fprintf('Adding simulated template time: %f seconds.\n', toc(t_sim)); end
 
             else
@@ -700,8 +724,9 @@ classdef Finder < handle
                         ev.previous_std = sqrt(obj.var_buf.mean(1,ev.kern_index, ev.star_index));
                     end
 
-                    ev.flux_detrended = obj.cal.fluxes_detrended(:,ev.star_index); 
-                    ev.std_flux = std(ev.flux_detrended, [], 'omitnan');
+                    ev.flux_detrended = obj.fluxes_corrected(:,ev.star_index); 
+                    ev.std_flux = obj.stds_corrected(ev.star_index); 
+%                     ev.std_flux = std(ev.flux_detrended, [], 'omitnan');
                     ev.flux_raw_all = obj.cal.fluxes;
                     % somewhere around here we MUST make use of the flux errors
 

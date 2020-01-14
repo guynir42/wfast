@@ -4,7 +4,7 @@ function [m1x, m1y, m2x, m2y, mxy] = moments(I, varargin)
 % If sum of input image I is zero: 1st moments set to 0, 2nd moments to NaN.
 % Negative 2nd moments also set to NaN.
 %
-% OPTIONAL ARGUMENTS:
+% OPTIONAL ARGUMENTS: may be added later...
 %
 %
 % OUTPUTS:

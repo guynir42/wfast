@@ -1,9 +1,11 @@
 classdef ContrastLimits < handle
-% usage: ContrastLimits(ax, parent, position, vertical_mode=1)
-% manipulates the CLim of some axes object. Also has autodyn. 
-% replaces a uipanel inside a GUI object or figure. 
+% Usage: ContrastLimits(ax, parent, position, vertical_mode=1)
+% Manipulates the CLim of some axes object. Also has autodyn. 
+% Replaces a uipanel inside a GUI object or figure. 
 %
-% EXAMPLE: f1=figure; c=util.plot.ContrastLimits([], f1); 
+% EXAMPLE: f1=figure; ax=axes('Parent', f1); imagesc(ax, normrnd(0,10,[100,100])); 
+%          c=util.plot.ContrastLimits(ax, f1, [0 0 1 0.1], 0); 
+%          
 
     properties % objects
         

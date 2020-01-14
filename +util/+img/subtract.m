@@ -1,5 +1,18 @@
 function [D, PD, FD, shift, ratio] = subtract(varargin)
 % Usage: [D, PD, FD, shift, ratio] = subtract(M1,P1,M2,P2,F1=1,F2=1,sig1=1,sig2=1,align=0,match_flux=0)
+% Applies ZOGY proper image subtraction. 
+% INPUTS: the first 4 inputs are mandatory, the rest have reasonable defaults. 
+%         The inputs are all named, so if you don't want to give them in order,
+%         simply input them as keyword-value pairs. 
+%   -M1 and M2 are the images to be subtracted, i.e., D=M2-M1
+%   -P1 and P2 are the respective PSFs (point spread functions). 
+%   -F1 and F2 are the relative flux or transparency of each image. 
+%   -sig1 and sig2 are the image noise rms (can be scalar or map the size of M). 
+%
+% These are still experimental at this point:
+%   -align: use subpixel shifts to get the smallest residuals after subtractions.
+%   -match_flux: use rescaling of M2 to M1 to get the smallest residuals.
+
     import util.img.pad2size;
     import util.fft.fftshift2;
 
@@ -15,8 +28,8 @@ function [D, PD, FD, shift, ratio] = subtract(varargin)
     input.input_var('sig1', 1, 'noise1', 'sigma1', 'ref_noise', 'ref_sigma');
     input.input_var('F2', 1, 'flux2', 'new_flux');
     input.input_var('sig2', 1, 'noise2', 'sigma2', 'new_noise', 'new_sigma');
-    input.input_var('align', 0, 'subpixel');
-    input.input_var('match_flux', 0);
+    input.input_var('align', false, 'subpixel');
+    input.input_var('match_flux', false);
     input.scan_vars(varargin{:});
     
     if isempty(input.M1) || isempty(input.P1) || isempty(input.M2) || isempty(input.P2)
@@ -90,7 +103,7 @@ function sum_res = alignHelper(b, M1, P1, F1, sig1, M2, P2, F2, sig2)
     
 %     util.plot.show(D);
 %     drawnow;
-    disp(['shift= ' num2str(b)]);
+%     disp(['shift= ' num2str(b)]);
     
     sum_res = util.stat.sum2(abs(D));
     

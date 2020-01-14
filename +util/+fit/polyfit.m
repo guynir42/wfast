@@ -1,5 +1,18 @@
 function results = polyfit(x,y,varargin)
 % Usage: results = polyfit(x,y,varagin)
+% Fits the data in x and y to a polynomial, using linear least squares and 
+% removing outliers iteratively. 
+% 
+% Inputs: x and y, e.g., x is the time and y the flux. 
+% OPTIONAL ARGUMENTS: 
+%   -order: the highest power of the polynomial (default 2, e.g., ax^2+bx+c)
+%   -sigma: how many times the noise rms is considered outlier (default 3). 
+%   -iterations: how many times to refit after removing outliers (default 3). 
+%   -variances: if you have the error^2 per sample, it can be given to the fitter
+%   -double: use double (64 bit) precision instead of single (32 bit). Default is false. 
+%   -plotting: make the fitter plot the results of each iteration for debugging. 
+%   -axes: what axes object to plot to. 
+%   -pause: length of pause after each plot. Default 0.3 seconds. 
 
     if nargin==0, help('util.fit.polyfit'); return; end
 
@@ -8,7 +21,7 @@ function results = polyfit(x,y,varargin)
     input.input_var('sigma', 3); % above this threshold is considered outliers
     input.input_var('iterations', 3); % how many iterations of removing outliers
     input.input_var('variances', []); % assume no covariance, only different variance per sample
-    input.input_var('double', 0); % use double precision
+    input.input_var('double', false); % use double precision
     input.input_var('plotting', 0);
     input.input_var('axes', [], 'axis');
     input.input_var('pause', 0.3);

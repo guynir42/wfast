@@ -1,8 +1,13 @@
 classdef FigHandler < handle
-% wrapper for matlab's figure object. 
+% Wrapper for matlab's figure object. 
 % Prevents new windows from popping up, but creates a new one if needed. 
 %
-% TEST PROTOCOL: f1=FigHandler('test'); delete(f1.fig); 
+% Use width and height (in cm) to set the size. 
+% Use clear to remove all axes and other graphics. 
+% Use the "fig" property to access the underlying figure. 
+%
+% EXAMPLE: f1=util.plot.FigHandler('test'); 
+
 
     properties
        

@@ -43,7 +43,7 @@ classdef AutoFocus < handle
         expT = 0.03;
         frame_rate = NaN;
         batch_size = 10;
-        use_loop_back = 1;
+        use_loop_back = 0;
         num_stars_per_quadrant = 5;
         
         use_model_psf = 1;

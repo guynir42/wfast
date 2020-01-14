@@ -1,5 +1,5 @@
 function setprop(obj_vec, prop, val)
-% usage: setprop(obj_vec, prop, val). Sets the property "prop" for each 
+% Usage: setprop(obj_vec, prop, val). Sets the property "prop" for each 
 % element in "obj_vec" to val. 
 % At this point doesn't handle 3D matrices... 
 

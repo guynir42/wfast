@@ -1,8 +1,30 @@
 function [values, radii] = radialStats(M, func, varargin)
-% usage: [values, radii] = radialStats(M, func, varargin)
-% run annulusPixels on all radii in M, do a function on the pixels or give
+% Usage: [values, radii] = radialStats(M, func, varargin)
+% Run annulusPixels on all radii in M, do a function on the pixels or give
 % them back as a cell array. 
-% if func= "cell" will give the results. can choose any function without parameters... (std, var, mean, max, min...)
+% If func= "cell" will give the pixel values. 
+% Can choose any function with one input (std, var, mean, max, min...).
+% 
+% OPTIONAL ARGUMENTS:
+%   -r_delta: how many pixels is the width of each annulus (default 2).  
+%   -r_min: minimal radius in pixels to start calculations (default 3). 
+%   -r_max: maximum radius in pixels for the biggest annulus (the default 
+%           is half the image size, so basically the largest annulus you 
+%           can fit in the image). 
+%   -edges: check if to include the pixels along the edges of each quadrant. 
+%           If zero, no edge pixels are taken. 
+%           If one, only leading edge is taken (default). 
+%           If two, both edges are taken. 
+%   -quadrants: which quadrants of the data should be used (useful if there
+%               is a known source in some quadrants that should be ignored. 
+%               Input quadrants as a 4 element vector with zeros and ones. 
+%               See annulusPixels for how this is sectioned. 
+%
+% OUTPUTS: 
+%   -values: the result of the function on each annulus (e.g., mean) or the
+%            values in a cell array (if func="cell"). 
+%            The length of this output is equal to the number of annuli. 
+%   -radii: the inner radius of each annulus (this is mostly used for plotting). 
 
     import util.text.cs;
     import util.img.annulusPixels;

@@ -1,8 +1,16 @@
 function val = fwhm(I, varargin)
 % Usage: val = fwhm(I, varargin)
-% Calculate the Full Width at Half-Maximum (FWHM) for an image. 
+% Calculate the Full Width at Half-Maximum (FWHM) for an image.
+% Uses the radialStats function to calculate the mean of each annulus, 
+% then finds the point where the value reaches half. 
+% Assumes image is a centered, radial distribution!
 % 
 % OPTIONAL ARGUMENTS:
+%   -number_interp: minimal number of points along slope. If the number of
+%                   pixels in the image is larger than this, we don't need
+%                   to interpolate. Otherwise it will interpolate to this 
+%                   number of points. Default is 100. 
+%
 
     if nargin==0, help('util.img.fwhm'); return; end
     

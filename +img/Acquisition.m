@@ -98,11 +98,11 @@ classdef Acquisition < file.AstroData
         use_adjust_cutouts = 1; % use adjustments in software (not by moving the mount)
         use_lock_adjust = 0; % make all cutouts move together based on the average drift
         
-        use_simple_photometry = 1; % use only sums on the cutouts instead of Photometry object for full cutouts
+        use_simple_photometry = 0; % use only sums on the cutouts instead of Photometry object for full cutouts
         
         use_model_psf = 1;
         
-        use_check_flux = 1;
+        use_check_positions = 1;
         lost_stars_fraction = 0.3;
         lost_flux_threshold = 0.3;
         max_failed_batches = 3; % if star flux is lost for more than this number of batches, quit the run
@@ -283,13 +283,9 @@ classdef Acquisition < file.AstroData
                 obj.clip_bg.use_adjust = 0;
                 
                 obj.phot_stack = img.Photometry;
-                obj.phot_stack.use_aperture = 1;
-                obj.phot_stack.use_gaussian = 0;
                 obj.flux_buf = util.vec.CircularBuffer;
                 
                 obj.phot = img.Photometry;
-                obj.phot.use_aperture = 0;
-                obj.phot.use_gaussian = 0;
                 obj.lightcurves = img.Lightcurves;
                 
                 obj.model_psf = img.ModelPSF;
@@ -334,8 +330,8 @@ classdef Acquisition < file.AstroData
 
         function setupDefaults(obj)
 
-            obj.total_runtime = 60;
-            obj.runtime_units = 'minutes';
+            obj.total_runtime = 4;
+            obj.runtime_units = 'hours';
 %             obj.num_batches = 500;
             obj.batch_size = 100;
             
@@ -1513,7 +1509,7 @@ classdef Acquisition < file.AstroData
             end
             
             obj.src.finishup;
-            
+                        
             if obj.use_save
                 try
                     filename = obj.buf.getReadmeFilename('Z');
@@ -1706,8 +1702,10 @@ classdef Acquisition < file.AstroData
                 obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.clip.positions); % run photometry on the stack to verify flux and adjust positions
                 if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
 
-                obj.checkRealign;
-
+                if obj.use_check_positions
+                    obj.checkRealign;
+                end
+                
                 % store the latest fluxes from the stack cutouts
                 obj.flux_buf.input(obj.phot_stack.fluxes);
 
@@ -1933,6 +1931,7 @@ classdef Acquisition < file.AstroData
                 if ~isempty(obj.phot.gui) && obj.phot.gui.check, obj.phot.gui.update; end
 
                 obj.fluxes = obj.phot.fluxes;
+                obj.lightcurves.getData(obj.phot);
                 
 %                 obj.lightcurves.input(obj.phot.fluxes, obj.phot.erros, obj.timestamps, obj.phot.areas, ...
 %                     obj.phot.backgrounds, obj.phot.variances, ...
