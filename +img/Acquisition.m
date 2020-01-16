@@ -1472,6 +1472,10 @@ classdef Acquisition < file.AstroData
                         filename = obj.buf.getReadmeFilename;
                         util.oop.save(obj, filename, 'name', 'acquisition'); 
                         
+                        filename = fullfile(obj.buf.directory, 'catalog.mat');
+                        if obj.debug_bit, fprintf('Saving catalog file to %s\n', filename); end
+                        obj.cat.saveMAT(filename);
+                        
                     catch ME
                         warning(ME.getReport);
                     end
@@ -1765,6 +1769,7 @@ classdef Acquisition < file.AstroData
             
             if obj.use_arbitrary_pos
                 obj.clip.arbitraryPositions; % maybe add some input parameters?
+                obj.positions = obj.clip.positions;
             elseif obj.use_mextractor
                 obj.findStarsMAAT;
             elseif obj.use_quick_find_stars
@@ -1809,8 +1814,7 @@ classdef Acquisition < file.AstroData
                 obj.positions = obj.cat.positions; % usually we will already have positions so this should do nothing (unless this analysis is on full frame rate images)
                 
                 if obj.use_save
-                    filename = fullfile(obj.buf.directory, 'catalog.mat');
-                    obj.cat.saveMAT(filename);
+                    
                 end
             
             end

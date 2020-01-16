@@ -195,6 +195,10 @@ classdef Catalog < handle
             
             obj.success = 0; % change to 1 after all functions return normally 
             
+            if isempty(P)
+                return; % with success==0
+            end
+            
             if istable(P) && ismember('pos', P.Properties.VariableNames)
                 P = P.pos; % if given a table from quick_find_stars, just take out the positions only
             end
@@ -207,10 +211,15 @@ classdef Catalog < handle
             S.ColCell = {'X', 'Y', 'Mag', 'Im_RA', 'Im_Dec'};
             
             addpath(fullfile(getenv('DATA'), 'GAIA/DR2')); 
-            
+
+            try 
             [R,S2] = astrometry(S, 'RA', obj.pars.RA, 'Dec', obj.pars.Dec, 'Scale', obj.pars.SCALE, ...
                 'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', [3000 3000], 'ApplyPM', false, ...
                 'MinRot', -20, 'MaxRot', 20, 'CatColMag', 'Mag', 'ImSize', [obj.pars.NAXIS1, obj.pars.NAXIS2]);
+            catch ME
+                warning(ME.getReport);
+                return; % with success==0
+            end
             
             % what should we do with R? check a correct match maybe? 
             obj.mextractor_sim = update_coordinates(S2, 'ColNameRA', 'Im_RA', 'ColNameDec', 'Im_Dec'); 

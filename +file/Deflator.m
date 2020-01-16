@@ -44,7 +44,8 @@ classdef Deflator < file.AstroData
         use_auto_backup = 0;
         
         use_copy_text_files = 1;
-
+        use_copy_catalogs = 1;
+        
         debug_bit = 1;
         
     end
@@ -293,6 +294,13 @@ classdef Deflator < file.AstroData
                         end
                     end
 
+                    if obj.use_copy_catalogs
+                        f = obj.src_subdir.match('catalog.mat');
+                        [~, name, ext] = fileparts(f{1});
+                        disp(['copying file ' name ext ' from ' obj.src_subdir.pwd ' to ' obj.out_subdir.pwd])
+                        copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir.pwd, name, ext));
+                    end
+                    
                     for ii = 1:100000
 
                         if obj.brake_bit
