@@ -91,7 +91,7 @@ classdef Acquisition < file.AstroData
         
         use_quick_find_stars = true; % use new method that runs faster
         use_mextractor = false; % use mextractor to identify stars and find their WCS and catalog mag/temp
-        use_astrometry = false; % calculate the star positions matched to GAIA DR2 and save catalog
+        use_astrometry = true; % calculate the star positions matched to GAIA DR2 and save catalog
         use_arbitrary_pos = false; % don't look for stars (e.g., when testing with the dome closed)
         
         use_cutouts = true;
@@ -1440,6 +1440,10 @@ classdef Acquisition < file.AstroData
                     if obj.debug_bit, disp('Positions field empty. Calling single then findStars'); end
                     obj.single;
                     obj.findStars;
+                    if obj.use_astrometry
+                        obj.runAstrometry
+                    end
+                    
                 end
                 
 %                 obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
@@ -1767,6 +1771,8 @@ classdef Acquisition < file.AstroData
                     error('Could not find any stars using quick_find_stars!');
                 end
                 
+                obj.pars.THRESHOLD = obj.detect_thresh; 
+                
                 obj.clip.positions = T.pos;
                 obj.positions = T.pos;
                 obj.num_stars_found = size(obj.clip.positions,1);
@@ -1777,6 +1783,34 @@ classdef Acquisition < file.AstroData
             
             obj.ref_stack = obj.stack_proc;
             obj.ref_positions = obj.clip.positions;
+            
+        end
+        
+        function runAstrometry(obj)
+            
+            obj.cat.detection_threshold = obj.detect_thresh;
+            obj.cat.detection_stack_number = obj.num_sum;
+            obj.cat.detection_exposure_time = obj.expT;
+            
+            obj.cat.inputPositions(obj.positions); 
+            obj.positions = obj.cat.positions; % if used some filter on the stars we found
+            obj.ref_positions = obj.cat.positions;
+            obj.clip.positions = obj.cat.positions;
+            
+            if ~isempty(obj.cat.data) && obj.cat.success % successfully filled the catalog
+
+                obj.cat.num_stars = obj.num_stars;
+
+                obj.positions = obj.cat.positions; % usually we will already have positions so this should do nothing (unless this analysis is on full frame rate images)
+                
+                if obj.use_save
+                    filename = fullfile(obj.buf.directory, 'catalog.mat');
+                    obj.cat.saveMAT(filename);
+                end
+            
+            end
+
+           obj.pars.MAG_LIMIT = obj.cat.detection_limit; 
             
         end
         

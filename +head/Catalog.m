@@ -29,6 +29,9 @@ classdef Catalog < handle
         seeing; % arcsec
         
         detection_limit; % faintest magnitude we can detect, based on the given stars
+        detection_threshold; % what was the detection S/N
+        detection_stack_number; % how many image were stacked for the detection image
+        detection_exposure_time; % the length of individual exposures in the detection stack
         
         success; % fill this if astrometry is successfull or failed (empty means we didn't run it yet)
         
@@ -190,6 +193,8 @@ classdef Catalog < handle
         
         function inputPositions(obj, P)
             
+            obj.success = 0; % change to 1 after all functions return normally 
+            
             if istable(P) && ismember('pos', P.Properties.VariableNames)
                 P = P.pos; % if given a table from quick_find_stars, just take out the positions only
             end
@@ -215,6 +220,9 @@ classdef Catalog < handle
             obj.wcs_object = ClassWCS.populate(S);
             
             obj.makeCatalog;
+            
+            % add tests for matching fraction and magnitude range, etc
+            obj.success = 1;
             
         end
         

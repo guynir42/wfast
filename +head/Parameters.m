@@ -56,6 +56,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
 %         frame_rate_measured;
         ACT_FRAMERATE; 
         
+        THRESHOLD; % detection threshold for findStars
+        MAG_LIMIT; % faintest star found by findStars, in GAIA_BP
+        
         FILTER = 'F505W'; 
         
 %         batch_size;
