@@ -578,6 +578,8 @@ classdef Acquisition < file.AstroData
             
             val = sprintf('%s\n PSF angle= %4.2f deg', val, obj.model_psf.angle);
             
+            val = sprintf('%s\n MAG_LIMIT= %4.2f', val, obj.pars.MAG_LIMIT); 
+            
             if length(obj.average_offsets)==2
                 val = sprintf('%s\n dx/dy= %4.2f / %4.2f pix', val, obj.average_offsets(2), obj.average_offsets(1));
             end
@@ -1437,6 +1439,7 @@ classdef Acquisition < file.AstroData
                 end
                 
                 if isempty(obj.positions)
+                    
                     if obj.debug_bit, disp('Positions field empty. Calling single then findStars'); end
                     obj.single;
                     obj.findStars;
@@ -1787,6 +1790,8 @@ classdef Acquisition < file.AstroData
         end
         
         function runAstrometry(obj)
+            
+            disp('runAstrometry'); 
             
             obj.cat.detection_threshold = obj.detect_thresh;
             obj.cat.detection_stack_number = obj.num_sum;
