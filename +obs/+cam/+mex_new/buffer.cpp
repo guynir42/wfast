@@ -68,8 +68,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		
 	if(cs(key, "allocate")){
 		
-		if(isnan(par)) buffer.allocate(hndl);
-		else buffer.allocate(hndl,(int) par); 
+		if(isnan(par)) buffer.allocate(hndl); // use the default number of images
+		else buffer.allocate(hndl,(int) par); // use the input number of images
 		
 	}
 	else if(cs(key, "release")){
@@ -137,7 +137,7 @@ void BufferQueue::release(){
 	if(rc) throw_error("Problem when stopping camera!", "release", rc); 
 	
 	rc=AT_FinaliseUtilityLibrary();
-	if(rc) throw_error("Cannot initialize utilities library!", "allocate", rc); 
+	if(rc) throw_error("Cannot release utilities library!", "allocate", rc); 
 	
 	rc=AT_Flush(hndl); 
 	if(rc) throw_error("Problem when flushing buffers!", "release", rc); 
@@ -213,7 +213,7 @@ mxArray *BufferQueue::getImageMatrix(){
 	
 	memcpy(ptr, latest_image, im_size_bytes); 
 	
-	return matrix; 
+	// return matrix; 
 	// below is the correct code but for some reason it doesn't work
 	
 	rc=AT_ConvertBuffer(latest_image, (AT_U8*) ptr, width, height, stride, L"Mono16", L"Mono16"); 

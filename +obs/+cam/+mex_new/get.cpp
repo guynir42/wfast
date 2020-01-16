@@ -298,6 +298,10 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		}
 		
 	}
+	else if(cs(key, "clock frequency", "frequency")){
+		rc=AT_GetInt(hndl, L"TimestampClockFrequency", &int_value);
+		plhs[0]=output_scalar(int_value);
+	}
 	else if(cs(key, "metadata")){
 		
 		rc=AT_GetBool(hndl, L"MetadataEnable", &bool_value); 

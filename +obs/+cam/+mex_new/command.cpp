@@ -46,7 +46,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		rc=AT_Command(hndl, L"AcquisitionStop"); 
 	
 	}
-	else if(cs(key, "capture")){
+	else if(cs(key, "capture", "trigger")){
 		
 		rc=AT_Command(hndl, L"SoftwareTrigger"); 
 		
@@ -56,6 +56,13 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		rc=AT_Command(hndl, L"ResetToDefaultValues"); 
 
 	}
+	else if(cs(key, "timestamp reset", "time reset", "clock reset")){
+	
+		rc=AT_Command(hndl, L"TimestampClockReset"); 
+	
+	}
+	else throw_error("Unknown parameter", key); 
+	
 	if(rc) throw_error("Command failed", key, rc); 
 	
 	

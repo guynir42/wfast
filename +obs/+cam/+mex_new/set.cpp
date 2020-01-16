@@ -188,6 +188,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 
 		if(isnan(value)) value=1; // the default is to use this feature!
 		rc=AT_SetBool(hndl, L"MetadataEnable", (bool) value); 
+		rc=AT_SetBool(hndl, L"MetadataTimestamp", (bool) value); 
 				
 	}
 	else throw_error("Unknown parameter", key); 

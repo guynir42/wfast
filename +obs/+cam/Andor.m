@@ -7,7 +7,7 @@ classdef Andor < file.AstroData
 % Each batch consists of filling properties "images" and "timestamps" and 
 % a few timing parameters ("t_start", "t_end", "t_end_stamp"). See the 
 % description of file.AstroData for more details. 
-%hutter
+%
 % The camera can run in synchronous/async modes. 
 % Synchronuous mode just holds up the main thread until all images are captured. 
 % Async mode lets the camera run on a separate thread using C++/mex. 
@@ -62,7 +62,7 @@ classdef Andor < file.AstroData
 %
 % NOTE: There are 3 levels of input parameters for running the camera:
 %       1) Hardware parameters, as the camera was setup when it last took 
-%          images. These is only relevant when a run has started, after many
+%          images. These are only relevant when a run has started, after many
 %          changes to parameters are given from object/user parameters.
 %       2) Object defined parameters, as given by setting object properties 
 %          or by changing them via GUI. These override (1) at the beginning
@@ -91,7 +91,7 @@ classdef Andor < file.AstroData
 % NOTE: use the syntax 
 %       >> on_cleanup = onCleanup(@a.finishup);
 %       right after the call to "startup" to make sure finishup is called 
-%       even if there was an error or user ctrl+C break during the loop. 
+%       even if there was an error or user hit ctrl+C during the loop. 
 %
     
     properties(Transient=true)
@@ -293,29 +293,37 @@ classdef Andor < file.AstroData
             
             try 
                     
-                rc = obs.cam.sdk.AT_InitialiseLibrary; obs.cam.sdk.AT_CheckError(rc);
+%                 rc = obs.cam.sdk.AT_InitialiseLibrary; obs.cam.sdk.AT_CheckError(rc);
                     
-                [rc, obj.hndl] = obs.cam.sdk.AT_Open(0); obs.cam.sdk.AT_CheckError(rc);
-%                 obj.hndl = obs.cam.mex_new.connect; % the new mex code is better than the matlab SDK because...?
+%                 [rc, obj.hndl] = obs.cam.sdk.AT_Open(0); obs.cam.sdk.AT_CheckError(rc);
+                obj.hndl = obs.cam.mex_new.connect; % the new mex code is better than the matlab SDK because...?
                 
-                [rc] = obs.cam.sdk.AT_SetBool(obj.hndl, 'SensorCooling', 1); obs.cam.sdk.AT_CheckWarning(rc);        
+%                 [rc] = obs.cam.sdk.AT_SetBool(obj.hndl, 'SensorCooling', 1); obs.cam.sdk.AT_CheckWarning(rc);        
+                obs.cam.mex_new.set(obj.hndl, 'cooling', 1); 
               
-                rc = obs.cam.sdk.AT_SetBool(obj.hndl, 'SpuriousNoiseFilter', 0); obs.cam.sdk.AT_CheckWarning(rc);
-                rc = obs.cam.sdk.AT_SetBool(obj.hndl, 'StaticBlemishCorrection', 0); obs.cam.sdk.AT_CheckWarning(rc);
+%                 rc = obs.cam.sdk.AT_SetBool(obj.hndl, 'SpuriousNoiseFilter', 0); obs.cam.sdk.AT_CheckWarning(rc);
+%                 rc = obs.cam.sdk.AT_SetBool(obj.hndl, 'StaticBlemishCorrection', 0); obs.cam.sdk.AT_CheckWarning(rc);
+                obs.cam.mex_new.set(obj.hndl, 'blemish', 0); 
+                obs.cam.mex_new.set(obj.hndl, 'noise', 0); 
                 
 %                 [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'ElectronicShutteringMode','Rolling'); obs.cam.sdk.AT_CheckWarning(rc);
                 
-                [rc, val] = obs.cam.sdk.AT_IsEnumIndexImplemented(obj.hndl, 'SimplePreAmpGainControl',2); obs.cam.sdk.AT_CheckWarning(rc);
-                if(val)
-                    [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'SimplePreAmpGainControl','16-bit (low noise & high well capacity)'); obs.cam.sdk.AT_CheckWarning(rc);
-                end
-                [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'PixelEncoding','Mono16'); obs.cam.sdk.AT_CheckWarning(rc);
-                                
+%                 [rc, val] = obs.cam.sdk.AT_IsEnumIndexImplemented(obj.hndl, 'SimplePreAmpGainControl',2); obs.cam.sdk.AT_CheckWarning(rc);
+%                 if(val)
+%                     [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'SimplePreAmpGainControl','16-bit (low noise & high well capacity)'); obs.cam.sdk.AT_CheckWarning(rc);
+%                 end
+%                 [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'PixelEncoding','Mono16'); obs.cam.sdk.AT_CheckWarning(rc);
+  
+                obs.cam.mex_new.set(obj.hndl, 'encoding', 'Mono16'); 
+
                 % Enable Metadata
-                [rc] = obs.cam.sdk.AT_SetBool(obj.hndl,'MetadataEnable',1); obs.cam.sdk.AT_CheckWarning(rc);
-                [rc] = obs.cam.sdk.AT_SetBool(obj.hndl,'MetadataTimestamp',1); obs.cam.sdk.AT_CheckWarning(rc);
+%                 [rc] = obs.cam.sdk.AT_SetBool(obj.hndl,'MetadataEnable',1); obs.cam.sdk.AT_CheckWarning(rc);
+%                 [rc] = obs.cam.sdk.AT_SetBool(obj.hndl,'MetadataTimestamp',1); obs.cam.sdk.AT_CheckWarning(rc);
+%                 
+%                 [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'CycleMode','Continuous'); obs.cam.sdk.AT_CheckWarning(rc); % I think we don't need to limit the number of frames (there are explicit stops in the code).
+                obs.cam.mex_new.set(obj.hndl, 'metadata', 1); 
                 
-                [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'CycleMode','Continuous'); obs.cam.sdk.AT_CheckWarning(rc); % I think we don't need to limit the number of frames (there are explicit stops in the code).
+                obs.cam.mex_new.set(obj.hndl, 'cycle mode', 'Continuous'); % I think we don't need to limit the number of frames (there are explicit stops in the code).
                 
             catch ME
                 obj.log.error(ME.getReport);
@@ -757,12 +765,20 @@ classdef Andor < file.AstroData
             
             if obj.debug_bit>3, disp('updating camera'); end
             
-            rc = obs.cam.sdk.AT_GetFloat(obj.hndl, 'ExposureTime'); % contact hardware to see if it is connected
-            
-            if rc % non-zero value indicates an error
-                obj.status = 0; 
-            else
+%             rc = obs.cam.sdk.AT_GetFloat(obj.hndl, 'ExposureTime'); % contact hardware to see if it is connected
+%             
+%             if rc % non-zero value indicates an error
+%                 obj.status = 0; 
+%             else
+%                 obj.status = 1;
+%             end
+
+            try 
+                obs.cam.mex_new.get(obj.hndl, 'ExposureTime'); 
                 obj.status = 1;
+            catch ME
+                warning(ME.getReport); 
+                obj.status = 0;
             end
             
             % maybe add some more tests to see if camera is alive??
@@ -843,9 +859,11 @@ classdef Andor < file.AstroData
                 obj.setShutterModeHW('rolling'); % maybe add this as an optional argument?
                 
                 if isempty(obj.frame_rate) || isnan(obj.frame_rate) % in this mode the camera takes an image as soon as it gets a command to "software trigger"
-                    [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'TriggerMode','Software'); obs.cam.sdk.AT_CheckWarning(rc);
+%                     [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'TriggerMode','Software'); obs.cam.sdk.AT_CheckWarning(rc);
+                    obs.cam.mex_new.set(obj.hndl, 'trigger mode', 'Software'); 
                 else % in this mode there is a fixed frame rate, so the frame rate may be lower than the maximum 
-                    [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'TriggerMode','Internal'); obs.cam.sdk.AT_CheckWarning(rc);
+%                     [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'TriggerMode','Internal'); obs.cam.sdk.AT_CheckWarning(rc);
+                    obs.cam.mex_new.set(obj.hndl, 'trigger mode', 'Internal'); 
                 end
 
                 obj.check_inputs; % check the hardware/input configuration is compatible
@@ -870,6 +888,9 @@ classdef Andor < file.AstroData
                 end
 
                 if obj.use_progress
+                    if isempty(obj.prog)
+                        obj.prog = util.sys.ProgressBar;
+                    end
                     obj.prog.start(input.num_batches);
                 end
 
@@ -891,30 +912,41 @@ classdef Andor < file.AstroData
                 else % synchronous startup option
 
                     if strcmp(obj.getCycleModeHW, 'Fixed') % this shouldn't happen (we don't use this mode anymore)
-                        [rc] = obs.cam.sdk.AT_SetInt(obj.hndl,'FrameCount',obj.batch_size); obs.cam.sdk.AT_CheckWarning(rc);
+%                         [rc] = obs.cam.sdk.AT_SetInt(obj.hndl,'FrameCount',obj.batch_size); obs.cam.sdk.AT_CheckWarning(rc);
+                        obs.cam.mex_new.set(obj.hndl, 'FrameCount', obj.batch_size); 
                     end
 
                     % save these parameters from hardware to save calls whenever we need to parse the raw data
-                    [rc, obj.imageSizeBytes] = obs.cam.sdk.AT_GetInt(obj.hndl, 'ImageSizeBytes'); obs.cam.sdk.AT_CheckWarning(rc); % size of raw data buffer for single image
+%                     [rc, obj.imageSizeBytes] = obs.cam.sdk.AT_GetInt(obj.hndl, 'ImageSizeBytes'); obs.cam.sdk.AT_CheckWarning(rc); % size of raw data buffer for single image
+                    obj.imageSizeBytes = obs.cam.mex_new.get(obj.hndl, 'size');
 
                     % note width and height are flipped due to C -> matlab conventions
-                    [rc, obj.AOIwidth_c] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOIWidth'); obs.cam.sdk.AT_CheckWarning(rc);
-                    [rc, obj.AOIheight_c] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOIHeight'); obs.cam.sdk.AT_CheckWarning(rc);
+%                     [rc, obj.AOIwidth_c] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOIWidth'); obs.cam.sdk.AT_CheckWarning(rc);
+%                     [rc, obj.AOIheight_c] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOIHeight'); obs.cam.sdk.AT_CheckWarning(rc);
+%                     
+%                     [rc, obj.AOIstride] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOIStride'); obs.cam.sdk.AT_CheckWarning(rc);
+% 
+%                     [rc, obj.clockFreq] = obs.cam.sdk.AT_GetInt(obj.hndl, 'TimestampClockFrequency'); obs.cam.sdk.AT_CheckWarning(rc);
 
-                    [rc, obj.AOIstride] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOIStride'); obs.cam.sdk.AT_CheckWarning(rc);
+                    obj.AOIwidth_c = obs.cam.mex_new.get(obj.hndl, 'width'); 
+                    obj.AOIheight_c = obs.cam.mex_new.get(obj.hndl, 'height');
+                    obj.AOIstride = obs.cam.mex_new.get(obj.hndl, 'stride'); 
+                    obj.clockFreq = obs.cam.mex_new.get(obj.hndl, 'frequency'); 
 
-                    [rc, obj.clockFreq] = obs.cam.sdk.AT_GetInt(obj.hndl, 'TimestampClockFrequency'); obs.cam.sdk.AT_CheckWarning(rc);
+%                     [rc] = obs.cam.sdk.AT_Flush(obj.hndl); obs.cam.sdk.AT_CheckWarning(rc); % clear any leftover hardware buffers from last run
+% 
+%                     for X = 1:10 % setup new hardware buffers
+%                         [rc] = obs.cam.sdk.AT_QueueBuffer(obj.hndl, obj.imageSizeBytes); obs.cam.sdk.AT_CheckWarning(rc);
+%                     end
 
-                    [rc] = obs.cam.sdk.AT_Flush(obj.hndl); obs.cam.sdk.AT_CheckWarning(rc); % clear any leftover hardware buffers from last run
+                    obs.cam.mex_new.buffer(obj.hndl, 'allocate'); 
 
-                    for X = 1:10 % setup new hardware buffers
-                        [rc] = obs.cam.sdk.AT_QueueBuffer(obj.hndl, obj.imageSizeBytes); obs.cam.sdk.AT_CheckWarning(rc);
-                    end
-
-                    [rc] = obs.cam.sdk.AT_Command(obj.hndl, 'TimestampClockReset'); obs.cam.sdk.AT_CheckWarning(rc); % reset the time stamp clock to now
-
-                    [rc] = obs.cam.sdk.AT_Command(obj.hndl, 'AcquisitionStart'); obs.cam.sdk.AT_CheckWarning(rc); % start rolling the camera
-
+%                     [rc] = obs.cam.sdk.AT_Command(obj.hndl, 'TimestampClockReset'); obs.cam.sdk.AT_CheckWarning(rc); % reset the time stamp clock to now
+                    obs.cam.mex_new.command(obj.hndl, 'clock reset'); 
+                    
+%                     [rc] = obs.cam.sdk.AT_Command(obj.hndl, 'AcquisitionStart'); obs.cam.sdk.AT_CheckWarning(rc); % start rolling the camera
+                    obs.cam.mex_new.command(obj.hndl, 'start'); 
+                    
                 end
 
                 obj.brake_bit = 0; % this allows all the loops to continue. It becomes 1 if the GUI stop button is pressed.
@@ -940,9 +972,11 @@ classdef Andor < file.AstroData
 
                 else
 
-                    [rc] = obs.cam.sdk.AT_Command(obj.hndl,'AcquisitionStop'); obs.cam.sdk.AT_CheckWarning(rc);
-
-                    [rc] = obs.cam.sdk.AT_Flush(obj.hndl); obs.cam.sdk.AT_CheckWarning(rc);
+%                     [rc] = obs.cam.sdk.AT_Command(obj.hndl,'AcquisitionStop'); obs.cam.sdk.AT_CheckWarning(rc);
+                    obs.cam.mex_new.command(obj.hndl, 'stop'); 
+                    
+%                     [rc] = obs.cam.sdk.AT_Flush(obj.hndl); obs.cam.sdk.AT_CheckWarning(rc);
+                    obs.cam.mex_new.buffer(obj.hndl, 'release'); 
 
                 end
 
@@ -1134,7 +1168,8 @@ classdef Andor < file.AstroData
                 
             end
             
-            [rc, cooling] = obs.cam.sdk.AT_GetBool(obj.hndl, 'SensorCooling'); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, cooling] = obs.cam.sdk.AT_GetBool(obj.hndl, 'SensorCooling'); obs.cam.sdk.AT_CheckWarning(rc);
+            cooling = obs.cam.mex_new.get(obj.hndl, 'cooling'); 
             if ~cooling, error('Camera sensor cooling is off!'); end
             
             % add other checks for consistency in parameters... 
@@ -1213,10 +1248,12 @@ classdef Andor < file.AstroData
             
             timeout = max([1, obj.expT.*2]); % if exposure time is short, set timeout to 1 second, otherwise set it to 2*expT
             
-            [rc] = obs.cam.sdk.AT_QueueBuffer(obj.hndl,obj.imageSizeBytes); obs.cam.sdk.AT_CheckWarning(rc);
-
+%             [rc] = obs.cam.sdk.AT_QueueBuffer(obj.hndl,obj.imageSizeBytes); obs.cam.sdk.AT_CheckWarning(rc);
+            obs.cam.mex_new.buffer(obj.hndl, 'queue'); 
+            
 %             if strcmp(obj.getTriggerModeHW, 'Software') % I think we can just give a SoftwareTrigger which is ignored in any other mode
-                [rc] = obs.cam.sdk.AT_Command(obj.hndl,'SoftwareTrigger'); obs.cam.sdk.AT_CheckWarning(rc);
+%                 [rc] = obs.cam.sdk.AT_Command(obj.hndl,'SoftwareTrigger'); obs.cam.sdk.AT_CheckWarning(rc);
+                obs.cam.mex_new.command(obj.hndl, 'trigger'); 
 %             end
 
             obj.t_start = util.text.time2str(datetime('now', 'TimeZone', 'UTC')); % get time from system clock
@@ -1225,30 +1262,35 @@ classdef Andor < file.AstroData
                 
                 buf = [];
                 
-                [rc, buf] = obs.cam.sdk.AT_WaitBuffer(obj.hndl, timeout*1000); % timeout in milliseconds! 
+%                 [rc, buf] = obs.cam.sdk.AT_WaitBuffer(obj.hndl, timeout*1000); % timeout in milliseconds! 
+                buf = obs.cam.mex_new.buffer(obj.hndl, 'wait', timeout*1000); 
                 
-                if rc==0 % if we did not timeout or other error
-                    
+%                 if rc==0 % if we did not timeout or other error
+                try
                     if ii<obj.batch_size
 %                         if strcmp(obj.getTriggerModeHW, 'Software') % I think we can just give a SoftwareTrigger which is ignored in any other mode
-                            [rc] = obs.cam.sdk.AT_Command(obj.hndl,'SoftwareTrigger'); obs.cam.sdk.AT_CheckWarning(rc);
-                            [rc] = obs.cam.sdk.AT_QueueBuffer(obj.hndl, obj.imageSizeBytes); obs.cam.sdk.AT_CheckWarning(rc); 
+%                             [rc] = obs.cam.sdk.AT_Command(obj.hndl,'SoftwareTrigger'); obs.cam.sdk.AT_CheckWarning(rc);
+                           obs.cam.mex_new.command(obj.hndl, 'trigger'); 
+
+%                             [rc] = obs.cam.sdk.AT_QueueBuffer(obj.hndl, obj.imageSizeBytes); obs.cam.sdk.AT_CheckWarning(rc); 
+                           obs.cam.mex_new.buffer(obj.hndl, 'queue'); 
+ 
 %                         end
                     end
                     
-                    [rc,buf2] = obs.cam.sdk.AT_ConvertMono16ToMatrix(buf, obj.AOIheight_c, obj.AOIwidth_c, obj.AOIstride); obs.cam.sdk.AT_CheckWarning(rc); % convert the raw buffer to a matrix we can use
-                    
-                    temp_images(:,:,ii) = buf2; % collect all images in the batch
+%                     [rc,buf2] = obs.cam.sdk.AT_ConvertMono16ToMatrix(buf, obj.AOIheight_c, obj.AOIwidth_c, obj.AOIstride); obs.cam.sdk.AT_CheckWarning(rc); % convert the raw buffer to a matrix we can use
+                                        
+                    temp_images(:,:,ii) = buf; % collect all images in the batch
                     
                     % Get timestamp and convert it into seconds
 %                     [rc,ticks] = obs.cam.sdk.AT_GetTimeStamp(buf, obj.imageSizeBytes); obs.cam.sdk.AT_CheckWarning(rc);
 %                     obj.timestamps(ii) = double(ticks)./double(obj.clockFreq);
                     
-                else % if the acquisition got stuck... 
-                    if rc==13
-                        disp('ERROR 13: timeout...');
-                    end
-                    
+                catch ME % if the acquisition got stuck... 
+%                     if rc==13
+%                         disp('ERROR 13: timeout...');
+%                     end
+                    warning(ME.getReport); 
                     obj.num_restarts = obj.num_restarts + 1;
                     disp(['Restarting acquisition... num_restart= ' num2str(obj.num_restarts)]);
                     obj.restart_sync; % stop the camera and restart the acquisition
