@@ -3,8 +3,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     properties % objects
         
         time@datetime;
-        moon; 
-        sun;
+        moon; % structure with some details on the moon position etc
+        sun; % structure with some details on the sun position etc
         
     end
     

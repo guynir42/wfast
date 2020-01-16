@@ -201,6 +201,8 @@ classdef Catalog < handle
             S.Col.X=1; S.Col.Y=2; S.Col.Mag=3; S.Col.Im_RA=4; S.Col.Im_Dec=5;
             S.ColCell = {'X', 'Y', 'Mag', 'Im_RA', 'Im_Dec'};
             
+            addpath(fullfile(getenv('DATA'), 'GAIA/DR2')); 
+            
             [R,S2] = astrometry(S, 'RA', obj.pars.RA, 'Dec', obj.pars.Dec, 'Scale', obj.pars.SCALE, ...
                 'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', [3000 3000], 'ApplyPM', false, ...
                 'MinRot', -20, 'MaxRot', 20, 'CatColMag', 'Mag', 'ImSize', [obj.pars.NAXIS1, obj.pars.NAXIS2]);
