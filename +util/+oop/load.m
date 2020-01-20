@@ -204,7 +204,9 @@ function obj = loadHDF5(filename, input)
 
                 else % load a regular attribute...
                     mp = findprop(obj, att_names{ii});
-                    if ~isobject(obj.(att_names{ii})) % skip over loading objects
+                    if isa(obj.(att_names{ii}), 'datetime') && ischar(value)
+                        obj.(att_names{ii}) = util.text.str2time(value); 
+                    elseif ~isobject(obj.(att_names{ii})) % skip over loading objects
                         try
                             if isempty(value)
                                 obj.(att_names{ii}) = feval([class(obj.(att_names{ii})) '.empty']);

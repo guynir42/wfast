@@ -39,7 +39,7 @@ classdef ScopeAssistant < handle
         use_check_alt = 1;
         alt_limit = 10;
         
-        default_period = 0.1;
+        default_period = 0; % replaced 0.1, trying to work without internal timer
         timeout = 5;
         
         status = 0;
@@ -92,7 +92,8 @@ classdef ScopeAssistant < handle
 
             obj.disconnect;
 
-            disp('connecting arduino bluetooth');
+            t = datetime('now', 'TimeZone', 'UTC');
+            fprintf('%s: connecting arduino bluetooth\n', t);
 
             obj.connectBluetooth(varargin{:});
             
@@ -154,7 +155,13 @@ classdef ScopeAssistant < handle
             
             obj.hndl.RemoteID = obj.bluetooth_id; 
             
-            fopen(obj.hndl);
+            try
+                fopen(obj.hndl);
+            catch
+                t = datetime('now', 'TimeZone', 'UTC');
+                fprintf('%s: Cannot open bluetooth to ScopeAssistant!\n', t); 
+                delete(obj.hndl); 
+            end
             
             pause(0.1);
             
@@ -229,7 +236,7 @@ classdef ScopeAssistant < handle
         
         function val = get.acc_vec(obj)
             
-            if isempty(obj.gain) || isempty(obj.bias)
+            if isempty(obj.gain) || isempty(obj.bias) || isempty(obj.acc_vec_raw)
                 val = obj.acc_vec_raw;
             else
                 val = (obj.acc_vec_raw - obj.bias)./obj.gain;
@@ -279,19 +286,21 @@ classdef ScopeAssistant < handle
     
     methods % commands
         
-        function update(obj)
-            
-            obj.status = 0;
+        function ok = update(obj)
             
             if ~obj.is_connected
-                error('Device is closed, use fopen or connect function');
+                obj.status = 0;
+                ok = 0; 
+                return;
             end
             
             obj.hndl.BytesAvailableFcn = @obj.read_data;
             
-            obj.use_check_alt = 1;
+            ok = obj.send('measure'); 
             
-            fprintf(obj.hndl, 'measure;');
+            if ok
+                obj.use_check_alt = 1;
+            end
             
         end
         
@@ -311,10 +320,44 @@ classdef ScopeAssistant < handle
             
         end
         
+        function ok = send(obj, str)
+            
+            if nargin<2 || isempty(str)
+                return;
+            end
+            
+            if ~strcmp(obj.hndl.Status, 'open')
+                warning('Device is closed, use fopen or connect function');
+                ok = 0;
+                return;
+            end
+            
+            try 
+                fprintf(obj.hndl, str);
+                ok = 1;
+            catch ME
+                disp('Problem writing to Arduino'); 
+                
+                try % try again
+                    fprintf(obj.hndl, str);
+                    ok = 1;
+                catch ME
+                    disp('Failed second attempt to write'); 
+                    ok = 0;
+                end
+                
+            end
+            
+            
+        end
+        
         function read_data(obj, ~, ~)
             
             obj.reply = strip(fgetl(obj.hndl)); % text reply
 
+%             t = datetime('now', 'TimeZone', 'UTC'); 
+%             fprintf('%s Arduino reply: %s\n', t, obj.reply); 
+            
 %             reply = str2double(regexp(obj.reply,'-?\d*','Match'));
             numeric_reply = str2double(split(obj.reply, ','))';
             

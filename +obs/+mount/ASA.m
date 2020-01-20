@@ -525,14 +525,22 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function val = get.rate_RA(obj)
             
-            val = obj.hndl.RightAscensionRate;
+            try 
+                val = obj.hndl.RightAscensionRate;
+            catch
+                val = [];
+            end
             
         end
         
         function val = get.rate_DE(obj)
             
-            val = obj.hndl.DeclinationRate;
-            
+            try
+                val = obj.hndl.DeclinationRate;
+            catch
+                val = [];
+            end
+                
         end
         
         function val = get.pier_side(obj)
@@ -732,7 +740,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             val = 0;
             
-            obj.object.update;
+            obj.object.update; % the Ephemeris object can calculate the ALT and whatever other parameters
             
             if obj.object.Alt_deg<obj.limit_alt
                 disp(['Target alt (' num2str(obj.object.Alt_deg) ') is below alt limit (' num2str(obj.limit_alt) ')']);
@@ -740,13 +748,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             end
             
             if obj.use_accelerometer
+                
                 if obj.ard.status==0
                     
-                    obj.ard.update;
+                    ok = obj.ard.update;
                     
                     pause(0.1);
                     
-                    if isempty(obj.ard) || obj.ard.status==0 || obj.checkArduinoTime==0
+                    if isempty(obj.ard) || obj.ard.status==0 || obj.checkArduinoTime==0 || ok==0
                         obj.connectArduino;
                     end
                     
@@ -783,6 +792,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     return;
                 end
 
+                % I think it is better to rely on the timer for these checks
+%                 ok = obj.ard.update;
+%                 
+%                 if obj.ard.ALT<obj.limit_alt || ok==0
+%                     return;
+%                 end
+                
                 val = 1;
             
             catch ME
@@ -923,7 +939,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             delete(timerfind('name', 'mount-timer'));
             
             obj.timer = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'mount-timer', ...
-                'Period', 2, 'StartDelay', 1, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer);
+                'Period', 1, 'StartDelay', 1, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer);
             
             start(obj.timer);
             
@@ -937,7 +953,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             try 
             
-                if obj.use_guiding && obj.tracking % && obj.sync.status
+                if obj.use_guiding && ~isempty(obj.tracking) && obj.tracking % && obj.sync.status
                     
                     direction = 1;
                     if strcmp(obj.pier_side, 'pierEast')
@@ -966,6 +982,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 if ~isempty(obj.rate_RA) && ~isempty(obj.rate_DE) 
                     obj.guiding_history.input([obj.rate_RA, obj.rate_DE]);
+                end
+                
+                if obj.use_accelerometer
+                    
+                    if ~isempty(obj.ard)
+                        ok = obj.ard.update;
+                    end
+                    
+                    if isempty(obj.ard) || ok==0
+                        obj.connectArduino;
+                    end
+                    
                 end
                 
                 if ~isempty(obj.gui) && obj.gui.check
@@ -1131,7 +1159,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 return;
             end
             
-            obj.setup_timer;
+            obj.setup_timer; % the timer also updates GUI and arduino
             
             try % logger hearteat
                 if ~obj.log.check_heartbeat
@@ -1141,17 +1169,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 warning(ME.getReport);
             end
             
-            try % arduino
-               
-                if obj.use_accelerometer
-                    if isempty(obj.ard) || obj.ard.status==0 || obj.checkArduinoTime==0
-                        obj.connectArduino;
-                    end
-                end
-                
-            catch ME
-                warning(ME.getReport);
-            end
+%             try % arduino
+%                
+%                 if obj.use_accelerometer
+%                     
+%                     obj.ard.update;
+%                     
+%                     if isempty(obj.ard) || obj.ard.status==0 || obj.checkArduinoTime==0
+%                         obj.connectArduino;
+%                     end
+%                     
+%                 end
+%                 
+%             catch ME
+%                 warning(ME.getReport);
+%             end
             
             % add additional tests?
             
@@ -1211,7 +1243,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             obj.sync.outgoing.TELDEC_DEG = obj.telDEC_deg;
             
             if isempty(obj.tracking) || obj.tracking==0 || (~isempty(obj.objRA_deg) && abs(obj.objRA_deg-obj.telRA_deg)>1) % if mount stops tracking or is 4 time-minutes away from target RA, stop the camera (e.g., when reaching limit)
-                obj.sync.outgoing.stop_camera = 1;
+                
+                if ~isempty(obj.sync) && isfield(obj.sync.outgoing, 'stop_camera') && obj.sync.outgoing.stop_camera==0
+                    obj.sync.outgoing.stop_camera = 1;
+                    obj.log.input('Telescope not tracking, stopping camera');
+                    disp(obj.log.report); 
+                end
+                
             else
 %                 obj.sync.outgoing.stop_camera = 0;
             end

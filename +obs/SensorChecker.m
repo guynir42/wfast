@@ -450,7 +450,7 @@ classdef SensorChecker < handle
     methods % this is called on t1, only update sensors without checking results
         
         function update(obj)
-            
+            return
             for ii = 1:length(obj.sensors)
                 if ismethod(obj.sensors{ii}, 'update')
                     try
@@ -723,6 +723,10 @@ classdef SensorChecker < handle
                 end
                 
                 [v,t] = obj.getWeatherTimeData(obj.(name).data, obj.(name).jd, input.day_frac);
+                
+                if isempty(t)
+                    return;
+                end
                 
                 idx = obj.(name).index;
                 unit = obj.(name).units;

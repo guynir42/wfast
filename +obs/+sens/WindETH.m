@@ -102,7 +102,7 @@ classdef WindETH < handle
         
         function disconnect(obj)
             
-            if ~isempty(obj.hndl)
+            if ~isempty(obj.hndl) && isvalid(obj.hndl)
                 fclose(obj.hndl);
                 delete(obj.hndl);
                 obj.hndl = [];

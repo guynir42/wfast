@@ -1067,6 +1067,10 @@ classdef Analysis < file.AstroData
                 obj.stack_proc = obj.cal.input(obj.stack, 'sum', obj.num_sum);
             end
             
+            if isempty(obj.positions) % if we didn't get star positions from file
+                obj.findStars;
+            end
+
             if isempty(obj.use_astrometry) || obj.use_astrometry
                 try
                     obj.analysisAstrometry;
@@ -1079,10 +1083,6 @@ classdef Analysis < file.AstroData
                 obj.magnitudes = obj.cat.magnitudes;
                 obj.temperatures = obj.cat.temperatures;
                 obj.coordinates = obj.cat.coordinates;
-            end
-
-            if isempty(obj.positions) % if astrometry failed or was not used, we need to get positions somehow
-                obj.findStars;
             end
 
             % cutouts of the stack
@@ -1168,20 +1168,21 @@ classdef Analysis < file.AstroData
 
                 if ast 
 
-                    obj.cat.input(obj.stack_proc);
+                    obj.getDetectionParameters;
+                    
+%                     obj.cat.input(obj.stack_proc);
+                    obj.cat.use_matched_only = 0; % cannot throw away stars with no match, we have cutouts already!! 
+                    obj.cat.inputPositions(obj.positions); 
 
-                    if ~isempty(obj.cat.data) % successfully filled the catalog
+                    if ~isempty(obj.cat.data) && obj.cat.success % successfully filled the catalog
 
                         obj.cat.num_stars = obj.num_stars;
-                        obj.cat.findStars(obj.positions); 
+%                         obj.cat.findStars(obj.positions); 
 
                         obj.positions = obj.cat.positions; % usually we will already have positions so this should do nothing (unless this analysis is on full frame rate images)
 
-                    end
+                        filename = fullfile(obj.reader.dir.pwd, 'catalog.mat');
 
-                    filename = fullfile(obj.reader.dir.pwd, 'catalog.mat');
-
-                    if ~isempty(obj.cat.data)
                         if isempty(obj.use_astrometry)
                             if ~exist(filename, 'file') % in auto-mode, only save if there was no catalog file
                                 obj.cat.saveMAT(filename);
@@ -1189,19 +1190,65 @@ classdef Analysis < file.AstroData
                         elseif obj.use_astrometry % in force-astrometry mode must update the catalog file
                             obj.cat.saveMAT(filename);
                         end
+                        
+                        obj.pars.MAG_LIMIT = obj.cat.detection_limit; 
+
+                        obj.magnitudes = obj.cat.magnitudes;
+                        obj.coordinates = obj.cat.coordinates;
+                        obj.temperatures = obj.cat.temperatures;
+                        
                     end
 
                 end
+                
 
             end
+                        
+            if obj.debug_bit>1, fprintf('Time for astrometry: %f seconds\n', toc(t)); end
             
-            if ~isempty(obj.cat.data)
-                obj.magnitudes = obj.cat.magnitudes;
-                obj.coordinates = obj.cat.coordinates;
-                obj.temperatures = obj.cat.temperatures; 
+        end
+        
+        function getDetectionParameters(obj)
+            
+            import util.text.cs;
+            
+            filename = fullfile(obj.reader.dir.pwd, 'A_README.txt'); 
+            
+            if ~exist(filename, 'file')
+                return;
             end
             
-            if obj.debug_bit>1, fprintf('Time for astrometry: %f seconds\n', toc(t)); end
+            f = fopen(filename, 'r'); 
+            
+            on_cleanup = onCleanup( @()fclose(f)); 
+            
+            for ii = 1:1e6
+                
+                line = fgetl(f);
+                
+                if line==-1, break; end
+                
+                line = strip(line);
+                
+                if ~isempty(line)
+                    
+                    c = strsplit(line, ':'); 
+                    
+                    if length(c)>1 && ~isempty(c{2}) && ~cs(c{2}, '[]') 
+                        
+                        if cs(c{1}, 'detect_thresh')
+                            obj.cat.detection_threshold = str2double(c{2}); % consider a test if this field is already filled??
+                        elseif cs(c{1}, 'NAXIS3')
+                            obj.cat.detection_stack_number = str2double(c{2}); % consider a test if this field is already filled?? 
+                        elseif cs(c{1}, 'EXPTIME')
+                            obj.cat.detection_exposure_time = str2double(c{2}); % consider a test if this field is already filled?? 
+                        end
+                    
+                    end
+                    
+                end
+                
+            end
             
         end
         
@@ -1307,8 +1354,8 @@ classdef Analysis < file.AstroData
 %                     S = double(obj.mean_buf.median)';
 %                     N = double(sqrt(obj.var_buf.median))';
 
-                    S = mean(obj.phot.fluxes, 1, 'omitnan')'; % signal
-                    N = std(obj.phot.fluxes, [], 1, 'omitnan')'; % noise
+                    S = mean(obj.phot.fluxes(:,:,end), 1, 'omitnan')'; % signal
+                    N = std(obj.phot.fluxes(:,:,end), [], 1, 'omitnan')'; % noise
                     M = obj.cat.magnitudes; % mag
                     
 %                     pars.zero_point = median(obj.mean_buf.median.*10.^(0.4.*obj.cat.magnitudes') ,2,'omitnan');

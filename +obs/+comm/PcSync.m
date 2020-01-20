@@ -190,7 +190,11 @@ classdef PcSync < handle
             flushinput(hndl);
             flushoutput(hndl);
 
-            fopen(hndl);
+            try
+                fopen(hndl);
+            catch
+                delete(hndl); 
+            end
             
 %             hndl.BytesAvailableFcnCount = 32;
             hndl.BytesAvailableFcnMode = 'terminator';

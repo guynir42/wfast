@@ -640,6 +640,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 
             obj.log.input(obj.report); % summary of observatory status
 
+            if ~isempty(obj.sync) && isfield(obj.sync.outgoing, 'stop_camera')
+                obj.sync.outgoing.stop_camera = 0; % if everything is cool, let the camera keep going
+                obj.sync.update;
+            end
+            
             if obj.use_shutdown && obj.devices_ok==0 % critical device failure, must shut down
                 if obj.is_shutdown==0 % if already shut down, don't need to do it again
                     obj.shutdown;
@@ -657,7 +662,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     obj.shutdown;
                 end
             end
-
+            
             if ~isempty(obj.gui) && obj.gui.check
                 obj.gui.update;
             end
@@ -712,6 +717,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
 
             catch 
+                t = datetime('now', 'TimeZone', 'UTC'); 
+                fprintf('%s: Failed to connect to camera computer\n', t); 
                 % do nothing, as we can be waiting for ever for server to connect
             end
             
@@ -735,7 +742,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             if obj.dome.is_closed
                 
-                if obj.sync.outgoing.stop_camera==0
+                if ~isfield(obj.sync.outgoing, 'stop_camera') || obj.sync.outgoing.stop_camera==0
                     obj.log.input('Dome closed, sending camera stop command');
                     disp(obj.log.report);
                 end

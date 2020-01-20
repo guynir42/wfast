@@ -91,7 +91,7 @@ classdef Acquisition < file.AstroData
         
         use_quick_find_stars = true; % use new method that runs faster
         use_mextractor = false; % use mextractor to identify stars and find their WCS and catalog mag/temp
-        use_astrometry = false; % calculate the star positions matched to GAIA DR2 and save catalog
+        use_astrometry = true; % calculate the star positions matched to GAIA DR2 and save catalog
         use_arbitrary_pos = false; % don't look for stars (e.g., when testing with the dome closed)
         
         use_cutouts = true;
@@ -577,6 +577,8 @@ classdef Acquisition < file.AstroData
             val = sprintf('%s\n PSF widths= %4.2f / %4.2f pix', val, obj.minor_axis, obj.major_axis);
             
             val = sprintf('%s\n PSF angle= %4.2f deg', val, obj.model_psf.angle);
+            
+            val = sprintf('%s\n MAG_LIMIT= %4.2f', val, obj.pars.MAG_LIMIT); 
             
             if length(obj.average_offsets)==2
                 val = sprintf('%s\n dx/dy= %4.2f / %4.2f pix', val, obj.average_offsets(2), obj.average_offsets(1));
@@ -1437,9 +1439,14 @@ classdef Acquisition < file.AstroData
                 end
                 
                 if isempty(obj.positions)
+                    
                     if obj.debug_bit, disp('Positions field empty. Calling single then findStars'); end
                     obj.single;
                     obj.findStars;
+                    if obj.use_astrometry
+                        obj.runAstrometry
+                    end
+                    
                 end
                 
 %                 obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
@@ -1464,6 +1471,10 @@ classdef Acquisition < file.AstroData
                         
                         filename = obj.buf.getReadmeFilename;
                         util.oop.save(obj, filename, 'name', 'acquisition'); 
+                        
+                        filename = fullfile(obj.buf.directory, 'catalog.mat');
+                        if obj.debug_bit, fprintf('Saving catalog file to %s\n', filename); end
+                        obj.cat.saveMAT(filename);
                         
                     catch ME
                         warning(ME.getReport);
@@ -1758,6 +1769,7 @@ classdef Acquisition < file.AstroData
             
             if obj.use_arbitrary_pos
                 obj.clip.arbitraryPositions; % maybe add some input parameters?
+                obj.positions = obj.clip.positions;
             elseif obj.use_mextractor
                 obj.findStarsMAAT;
             elseif obj.use_quick_find_stars
@@ -1766,6 +1778,8 @@ classdef Acquisition < file.AstroData
                 if isempty(T)
                     error('Could not find any stars using quick_find_stars!');
                 end
+                
+                obj.pars.THRESHOLD = obj.detect_thresh; 
                 
                 obj.clip.positions = T.pos;
                 obj.positions = T.pos;
@@ -1777,6 +1791,35 @@ classdef Acquisition < file.AstroData
             
             obj.ref_stack = obj.stack_proc;
             obj.ref_positions = obj.clip.positions;
+            
+        end
+        
+        function runAstrometry(obj)
+            
+            disp('runAstrometry'); 
+            
+            obj.cat.detection_threshold = obj.detect_thresh;
+            obj.cat.detection_stack_number = obj.num_sum;
+            obj.cat.detection_exposure_time = obj.expT;
+            
+            obj.cat.inputPositions(obj.positions); 
+            obj.positions = obj.cat.positions; % if used some filter on the stars we found
+            obj.ref_positions = obj.cat.positions;
+            obj.clip.positions = obj.cat.positions;
+            
+            if ~isempty(obj.cat.data) && obj.cat.success % successfully filled the catalog
+
+                obj.cat.num_stars = obj.num_stars;
+
+                obj.positions = obj.cat.positions; % usually we will already have positions so this should do nothing (unless this analysis is on full frame rate images)
+                
+                if obj.use_save
+                    
+                end
+            
+            end
+
+           obj.pars.MAG_LIMIT = obj.cat.detection_limit; 
             
         end
         

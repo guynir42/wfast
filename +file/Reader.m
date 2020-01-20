@@ -969,6 +969,9 @@ classdef Reader < file.AstroData
             
             try
                 loaded_pars = util.oop.load(filename, 'location', location, 'class', class(obj.pars));
+
+                loaded_pars.ephem.time = util.text.str2time(loaded_pars.STARTTIME); % fix the bug in read/write of datetime objects we used to have (only rely on times stored as strings)
+                loaded_pars.ephem.updateSecondaryCoords;
             catch ME
                 % if we can't read this it is OK, there is still the README file. Can't give warnings on every file now...
                 disp('Could not read parameter object...');
@@ -995,6 +998,9 @@ classdef Reader < file.AstroData
                 end
                 
             end
+            
+            loaded_pars.ephem.time = util.text.str2time(loaded_pars.STARTTIME); % fix the bug in read/write of datetime objects we used to have (only rely on times stored as strings)
+            loaded_pars.ephem.updateSecondaryCoords;
             
         end
         
