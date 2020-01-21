@@ -911,7 +911,7 @@ classdef Reader < file.AstroData
                         
                         num_frames = min(num_frames, num_images_on_file); % make sure we don't ask for more frames than we have on file
                         
-                        loaded_fluxes = h5read(filename, sa('/', data_name), [frame_start 1], [num_frames Inf]); % must check the dimensions on file fit what I think I am saving...
+                        loaded_fluxes = h5read(filename, sa('/', data_name), [frame_start 1 1], [num_frames Inf Inf]); % must check the dimensions on file fit what I think I am saving...
                         obj.fluxes = cat(1, obj.fluxes, loaded_fluxes); % append to the existing images
                         
                     elseif any(strcmp(data_name, obj.dataset_names.pars)) 

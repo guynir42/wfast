@@ -281,7 +281,7 @@ classdef Lightcurves < handle
         function clearFluxes(obj) % clear the process fluxes (sub, rem, cal)
 
             obj.fluxes_sub_ = [];
-            obj.fluxes_rem = [];
+            obj.fluxes_rem_ = [];
             obj.fluxes_cal_ = [];
             
             

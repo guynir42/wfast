@@ -45,6 +45,7 @@ classdef Deflator < file.AstroData
         
         use_copy_text_files = 1;
         use_copy_catalogs = 1;
+        use_copy_calibration = 1;
         
         debug_bit = 1;
         
@@ -296,12 +297,23 @@ classdef Deflator < file.AstroData
 
                     if obj.use_copy_catalogs
                         f = obj.src_subdir.match('catalog.mat');
-                        [~, name, ext] = fileparts(f{1});
-                        disp(['copying file ' name ext ' from ' obj.src_subdir.pwd ' to ' obj.out_subdir.pwd])
-                        copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir.pwd, name, ext));
+                        if ~isempty(f)
+                            [~, name, ext] = fileparts(f{1});
+                            disp(['copying file ' name ext ' from ' obj.src_subdir.pwd ' to ' obj.out_subdir.pwd])
+                            copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir.pwd, name, ext));
+                        end
                     end
                     
-                    for ii = 1:100000
+                    if obj.use_copy_calibration
+                        f = obj.src_subdir.match('calibration*.mat');
+                        if ~isempty(f)
+                            [~, name, ext] = fileparts(f{1});
+                            disp(['copying file ' name ext ' from ' obj.src_subdir.pwd ' to ' obj.out_subdir.pwd])
+                            copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir.pwd, name, ext));
+                        end
+                    end
+                    
+                    for ii = 1:100000 % go over image files
 
                         if obj.brake_bit
                             return;
