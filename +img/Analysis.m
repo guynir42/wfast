@@ -1316,7 +1316,7 @@ classdef Analysis < file.AstroData
                 'positions', obj.positions, 'variance', single(2.5)); % need to add the sky background too
 
             obj.lightcurves.getData(obj.phot);
-%             obj.lightcurves.getAperturesAndForced(obj.phot);
+
             if obj.lightcurves.gui.check, obj.lightcurves.gui.update; end
 
             if obj.debug_bit>1, fprintf('Time for photometry: %f seconds\n', toc(t)); end

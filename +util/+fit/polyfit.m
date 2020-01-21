@@ -63,74 +63,69 @@ function results = polyfit(x,y,varargin)
     for ii = 1:size(y,2)
         
         if size(x,2)==1
-            xtemp = x;
+            xdata = x;
         else
-            xtemp = x(:,ii);
+            xdata = x(:,ii);
         end
 
-        ytemp = y(:,ii);
+        ydata = y(:,ii);
         
         if isempty(input.variances)
-            vtemp = var(ytemp,[],1,'omitnan').*ones(size(ytemp,1),1); 
+            vdata = nanvar(ydata).*ones(size(ydata,1),1);             
         elseif isscalar(input.variances)
-            vtemp = input.variances.*ones(size(ytemp,1),1); 
+            vdata = input.variances.*ones(size(ydata,1),1); 
         elseif size(input.variances,2)==1
-            vtemp = input.variances;
+            vdata = input.variances;
         elseif size(input.variances,1)==1 && size(input.variances,2)==size(y,2)
-            vtemp = ones(size(ytemp,1),1).*input.variances(1,ii);
+            vdata = ones(size(ytemp,1),1).*input.variances(1,ii);
         else
-            vtemp = input.variances(:,ii);
+            vdata = input.variances(:,ii);
         end
 
-        nan_idx = isnan(xtemp) | isnan(ytemp) | isnan(vtemp);
-
-        xtemp(nan_idx) = [];
-        ytemp(nan_idx) = [];
-        vtemp(nan_idx) = [];
+        xdata = fillmissing(xdata, 'linear'); % there shouldn't be any NaNs in the xdata!
+        
+        bad_idx = isnan(ydata) | isnan(vdata);
+                
+        X = ones(length(xdata),1); 
+        
+        for k = 1:input.order
+            X = [X xdata.^k];
+        end
         
         for jj = 1:input.iterations
-            
-            % reasses the variance 
-            
-            X = ones(length(xtemp),1); 
-            for k = 1:input.order
-                X = [X xtemp.^k];
-            end
+
+            ytemp = ydata(~bad_idx);
+            vtemp = vdata(~bad_idx);
+            Xtemp = X(~bad_idx,:); 
             
             C = 1./vtemp;
-            XCX = X'*(C.*X); 
+            XCX = Xtemp'*(C.*Xtemp); 
             
-            results(ii).coeffs = XCX\(X'*(C.*ytemp));
+            results(ii).coeffs = XCX\(Xtemp'*(C.*ytemp));
             results(ii).model = print_model(input.order);
-%             results(ii).coeffs = inv(XCX)*(X'*(C.*ytemp));
             
             warning('off', 'MATLAB:nearlySingularMatrix');
             warning('off', 'MATLAB:singularMatrix');
 
-            y_model = X*results(ii).coeffs; 
-
-            residuals = (ytemp - y_model).^2./vtemp;
+            y_model = X*results(ii).coeffs; % note we get the model for the entire dataset, including NaNs
             
-            results(ii).chi2 = sum(residuals); 
+            results(ii).coeffs = results(ii).coeffs';
+            results(ii).variance = nanvar(ydata - y_model); 
+            
+            if isempty(input.variances) % vdata is calculated from the data, needs to be updated... 
+                vdata = ones(size(ydata,1),1).*results(ii).variance; 
+            end
+            
+            residuals = (ydata - y_model).^2./vdata;
+            
+            results(ii).chi2 = nansum(residuals); 
             
             results(ii).ndof = numel(ytemp)-input.order;
             
-            results(ii).variance = var(ytemp - y_model); 
-
             % remove outliers 
-            bad_idx = residuals>input.sigma.^2;
+            bad_idx = bad_idx + residuals>input.sigma.^2;
 
-            xtemp(bad_idx) = [];
-            ytemp(bad_idx) = [];
-            vtemp(bad_idx) = [];
-            y_model(bad_idx) = [];
-
-            results(ii).x = xtemp;
-            results(ii).y = ytemp;
-            results(ii).v = vtemp;
-            results(ii).ym = y_model;            
-            
-            vtemp = vtemp./mean(vtemp,1,'omitnan').*results(ii).variance;
+%             vtemp = vtemp./mean(vtemp,1,'omitnan').*results(ii).variance;
             
             if input.plotting
                 
@@ -138,7 +133,7 @@ function results = polyfit(x,y,varargin)
                     input.axes = gca;
                 end
                 
-                plot(input.axes, xtemp, ytemp, '.', xtemp, y_model, '-');
+                plot(input.axes, xdata, ydata, '.', xdata, y_model, '-');
                 
                 pause(input.pause);
                 
@@ -148,9 +143,15 @@ function results = polyfit(x,y,varargin)
                 break;
             end
             
-        end
+        end % for jj (iterations)
+                
+        results(ii).x = xdata;
+        results(ii).y = ydata;
+        results(ii).v = vdata;
+        results(ii).ym = y_model;            
+        results(ii).bad_idx = bad_idx; 
         
-    end
+    end % for ii (fluxes)
     
 end
 
