@@ -1249,7 +1249,7 @@ classdef Andor < file.AstroData
             timeout = max([1, obj.expT.*2]); % if exposure time is short, set timeout to 1 second, otherwise set it to 2*expT
             
 %             [rc] = obs.cam.sdk.AT_QueueBuffer(obj.hndl,obj.imageSizeBytes); obs.cam.sdk.AT_CheckWarning(rc);
-            obs.cam.mex_new.buffer(obj.hndl, 'queue'); 
+%             obs.cam.mex_new.buffer(obj.hndl, 'queue'); 
             
 %             if strcmp(obj.getTriggerModeHW, 'Software') % I think we can just give a SoftwareTrigger which is ignored in any other mode
 %                 [rc] = obs.cam.sdk.AT_Command(obj.hndl,'SoftwareTrigger'); obs.cam.sdk.AT_CheckWarning(rc);
@@ -1260,28 +1260,28 @@ classdef Andor < file.AstroData
             
             for ii = 1:obj.batch_size
                 
-                buf = [];
+%                 buf = [];
                 
 %                 [rc, buf] = obs.cam.sdk.AT_WaitBuffer(obj.hndl, timeout*1000); % timeout in milliseconds! 
                 buf = obs.cam.mex_new.buffer(obj.hndl, 'wait', timeout*1000); 
-                
+                          
+                temp_images(:,:,ii) = buf; % collect all images in the batch
+                    
 %                 if rc==0 % if we did not timeout or other error
                 try
-                    if ii<obj.batch_size
+%                     if ii<obj.batch_size
 %                         if strcmp(obj.getTriggerModeHW, 'Software') % I think we can just give a SoftwareTrigger which is ignored in any other mode
 %                             [rc] = obs.cam.sdk.AT_Command(obj.hndl,'SoftwareTrigger'); obs.cam.sdk.AT_CheckWarning(rc);
-                           obs.cam.mex_new.command(obj.hndl, 'trigger'); 
-
+                           
 %                             [rc] = obs.cam.sdk.AT_QueueBuffer(obj.hndl, obj.imageSizeBytes); obs.cam.sdk.AT_CheckWarning(rc); 
-                           obs.cam.mex_new.buffer(obj.hndl, 'queue'); 
- 
+                            obs.cam.mex_new.buffer(obj.hndl, 'queue'); 
+                            obs.cam.mex_new.command(obj.hndl, 'trigger'); 
+
 %                         end
-                    end
+%                     end
                     
 %                     [rc,buf2] = obs.cam.sdk.AT_ConvertMono16ToMatrix(buf, obj.AOIheight_c, obj.AOIwidth_c, obj.AOIstride); obs.cam.sdk.AT_CheckWarning(rc); % convert the raw buffer to a matrix we can use
-                                        
-                    temp_images(:,:,ii) = buf; % collect all images in the batch
-                    
+                              
                     % Get timestamp and convert it into seconds
 %                     [rc,ticks] = obs.cam.sdk.AT_GetTimeStamp(buf, obj.imageSizeBytes); obs.cam.sdk.AT_CheckWarning(rc);
 %                     obj.timestamps(ii) = double(ticks)./double(obj.clockFreq);
@@ -1313,18 +1313,24 @@ classdef Andor < file.AstroData
         
         function restart_sync(obj) % stop the camera and restart the acquisition (only using the synchronuous SDK tools)
             
-            [rc] = obs.cam.sdk.AT_Command(obj.hndl,'AcquisitionStop'); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc] = obs.cam.sdk.AT_Command(obj.hndl,'AcquisitionStop'); obs.cam.sdk.AT_CheckWarning(rc);
+            obs.cam.mex_new.command(obj.hndl, 'stop'); 
             
-            [rc] = obs.cam.sdk.AT_Flush(obj.hndl); obs.cam.sdk.AT_CheckWarning(rc); % flush existing hardware buffers
+%             [rc] = obs.cam.sdk.AT_Flush(obj.hndl); obs.cam.sdk.AT_CheckWarning(rc); % flush existing hardware buffers
+            obs.cam.mex_new.buffer(obj.hndl, 'release'); 
             
-            for X = 1:10 % setup new hardware buffers
-                [rc] = obs.cam.sdk.AT_QueueBuffer(obj.hndl, obj.imageSizeBytes); obs.cam.sdk.AT_CheckWarning(rc);
-            end
-                        
-            [rc] = obs.cam.sdk.AT_Command(obj.hndl, 'AcquisitionStart'); obs.cam.sdk.AT_CheckWarning(rc);
+%             for X = 1:10 % setup new hardware buffers
+%                 [rc] = obs.cam.sdk.AT_QueueBuffer(obj.hndl, obj.imageSizeBytes); obs.cam.sdk.AT_CheckWarning(rc);
+%             end
+            
+            obs.cam.mex_new.buffer(obj.hndl, 'allocate'); 
+            
+%             [rc] = obs.cam.sdk.AT_Command(obj.hndl, 'AcquisitionStart'); obs.cam.sdk.AT_CheckWarning(rc);
+            obs.cam.mex_new.command(obj.hndl, 'start'); 
             
 %             if strcmp(obj.getTriggerModeHW, 'Software') % I think we can just give a SoftwareTrigger which is ignored in any other mode
-                [rc] = obs.cam.sdk.AT_Command(obj.hndl,'SoftwareTrigger'); obs.cam.sdk.AT_CheckWarning(rc);
+%                 [rc] = obs.cam.sdk.AT_Command(obj.hndl,'SoftwareTrigger'); obs.cam.sdk.AT_CheckWarning(rc);
+                obs.cam.mex_new.command(obj.hndl, 'trigger'); 
 %             end
         end
         
@@ -1350,20 +1356,24 @@ classdef Andor < file.AstroData
         
         function val = getTemperatureHW(obj) % sensor temperature
            
-            [rc, val] = obs.cam.sdk.AT_GetFloat(obj.hndl, 'SensorTemperature'); obs.cam.sdk.AT_CheckWarning(rc);
-             
+%             [rc, val] = obs.cam.sdk.AT_GetFloat(obj.hndl, 'SensorTemperature'); obs.cam.sdk.AT_CheckWarning(rc);
+            val = obs.cam.mex_new.get(obj.hndl, 'temperature'); 
+
         end
         
         function val = getExpTimeHW(obj) % actual value as given to camera
            
-            [rc, val] = obs.cam.sdk.AT_GetFloat(obj.hndl, 'ExposureTime'); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, val] = obs.cam.sdk.AT_GetFloat(obj.hndl, 'ExposureTime'); obs.cam.sdk.AT_CheckWarning(rc);
+            val = obs.cam.mex_new.get(obj.hndl, 'exposure time'); 
                         
         end
         
         function [val_min, val_max] = getExpTimeLimitsHW(obj)
            
-            [rc, val_min] = obs.cam.sdk.AT_GetFloatMin(obj.hndl, 'ExposureTime'); obs.cam.sdk.AT_CheckWarning(rc);
-            [rc, val_max] = obs.cam.sdk.AT_GetFloatMax(obj.hndl, 'ExposureTime'); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, val_min] = obs.cam.sdk.AT_GetFloatMin(obj.hndl, 'ExposureTime'); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, val_max] = obs.cam.sdk.AT_GetFloatMax(obj.hndl, 'ExposureTime'); obs.cam.sdk.AT_CheckWarning(rc);
+            val_min = obs.cam.mex_new.get(obj.hndl, 'exposure time', 'min'); 
+            val_max = obs.cam.mex_new.get(obj.hndl, 'exposure time', 'max'); 
             
         end
         
@@ -1373,11 +1383,13 @@ classdef Andor < file.AstroData
                 error('Must input a valid exposure time');
             end
             
-            rc = obs.cam.sdk.AT_SetFloat(obj.hndl, 'ExposureTime', val); obs.cam.sdk.AT_CheckWarning(rc);
-            
+%             rc = obs.cam.sdk.AT_SetFloat(obj.hndl, 'ExposureTime', val); obs.cam.sdk.AT_CheckWarning(rc);
+            obs.cam.mex_new.set(obj.hndl, 'exposure time', val); 
+
             if strcmp(obj.getTriggerModeHW, 'Internal')
                 [~, f_max] = obj.getFrameRateLimitsHW;
-                rc = obs.cam.sdk.AT_SetFloat(obj.hndl, 'FrameRate', f_max*0.95); obs.cam.sdk.AT_CheckWarning(rc);
+%                 rc = obs.cam.sdk.AT_SetFloat(obj.hndl, 'FrameRate', f_max*0.95); obs.cam.sdk.AT_CheckWarning(rc);
+                obs.cam.mex_new.set(obj.hndl, 'frame rate', f_max.*0.95); 
             end
         end
         
@@ -1386,15 +1398,19 @@ classdef Andor < file.AstroData
             if ~util.text.cs(obj.getTriggerModeHW, 'internal') % if we are not in "internal" trigger mode, there is no meaning to "frame rate"
                 val = [];
             else
-                [rc, val] = obs.cam.sdk.AT_GetFloat(obj.hndl, 'FrameRate'); obs.cam.sdk.AT_CheckWarning(rc);
+%                 [rc, val] = obs.cam.sdk.AT_GetFloat(obj.hndl, 'FrameRate'); obs.cam.sdk.AT_CheckWarning(rc);
+                val = obs.cam.mex_new.get(obj.hndl, 'frame rate'); 
             end
             
         end
         
         function [val_min, val_max] = getFrameRateLimitsHW(obj)
            
-            [rc, val_min] = obs.cam.sdk.AT_GetFloatMin(obj.hndl, 'FrameRate'); obs.cam.sdk.AT_CheckWarning(rc);
-            [rc, val_max] = obs.cam.sdk.AT_GetFloatMax(obj.hndl, 'FrameRate'); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, val_min] = obs.cam.sdk.AT_GetFloatMin(obj.hndl, 'FrameRate'); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, val_max] = obs.cam.sdk.AT_GetFloatMax(obj.hndl, 'FrameRate'); obs.cam.sdk.AT_CheckWarning(rc);
+            val_min = obs.cam.mex_new.get(obj.hndl, 'frame rate', 'min'); 
+            val_max = obs.cam.mex_new.get(obj.hndl, 'frame rate', 'max'); 
+            
             
         end
         
@@ -1413,17 +1429,22 @@ classdef Andor < file.AstroData
                 obj.setTriggerModeHW('software');
             else
                 obj.setTriggerModeHW('internal');
-                rc = obs.cam.sdk.AT_SetFloat(obj.hndl, 'FrameRate', val); obs.cam.sdk.AT_CheckWarning(rc);
+%                 rc = obs.cam.sdk.AT_SetFloat(obj.hndl, 'FrameRate', val); obs.cam.sdk.AT_CheckWarning(rc);
+                obs.cam.mex_new.set(obj.hndl, 'frame rate', val); 
             end
             
         end
         
         function val = getROI_HW(obj) % from hardware. ROI is defined as [top, left, height, width]. 
             
-            [rc, t] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOITop'); obs.cam.sdk.AT_CheckWarning(rc);
-            [rc, l] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOILeft'); obs.cam.sdk.AT_CheckWarning(rc);
-            [rc, h] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOIHeight'); obs.cam.sdk.AT_CheckWarning(rc);
-            [rc, w] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOIWidth'); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, t] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOITop'); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, l] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOILeft'); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, h] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOIHeight'); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, w] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOIWidth'); obs.cam.sdk.AT_CheckWarning(rc);
+            t = obs.cam.mex_new.get(obj.hndl, 'top'); 
+            l = obs.cam.mex_new.get(obj.hndl, 'left');
+            h = obs.cam.mex_new.get(obj.hndl, 'height'); 
+            w = obs.cam.mex_new.get(obj.hndl, 'width'); 
             
             val = [l, t, w, h]; % flip axis from C to matlab
             
@@ -1432,8 +1453,10 @@ classdef Andor < file.AstroData
         function val = is_zoomed_HW(obj) % check if ROI is smaller than max width/height
             
             % flip axis from C to matlab
-            [rc, w] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOIHeight'); obs.cam.sdk.AT_CheckWarning(rc);
-            [rc, h] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOIWidth'); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, w] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOIHeight'); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, h] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOIWidth'); obs.cam.sdk.AT_CheckWarning(rc);
+            w = obs.cam.mex_new.get(obj.hndl, 'height'); % flip axis from C to matlab
+            h = obs.cam.mex_new.get(obj.hndl, 'width'); % flip axis from C to matlab
             
             if h==obj.max_height && w==obj.max_width
                 val = 0;
@@ -1445,14 +1468,16 @@ classdef Andor < file.AstroData
         
         function val = maxWidthHW(obj) % gets maximum width from hardware
             
-            [rc, val] = obs.cam.sdk.AT_GetIntMax(obj.hndl, 'AOIHeight'); obs.cam.sdk.AT_CheckWarning(rc); % flip axis from C to matlab
+%             [rc, val] = obs.cam.sdk.AT_GetIntMax(obj.hndl, 'AOIHeight'); obs.cam.sdk.AT_CheckWarning(rc); % flip axis from C to matlab
+            val = obs.cam.mex_new.get(obj.hndl, 'height', 'max'); % flip axis from C to matlab
             
         end
         
         function val = maxHeightHW(obj) % gets maximum height from hardware
             
-            [rc, val] = obs.cam.sdk.AT_GetIntMax(obj.hndl, 'AOIWidth'); obs.cam.sdk.AT_CheckWarning(rc); % flip axis from C to matlab
-            
+%             [rc, val] = obs.cam.sdk.AT_GetIntMax(obj.hndl, 'AOIWidth'); obs.cam.sdk.AT_CheckWarning(rc); % flip axis from C to matlab
+            val = obs.cam.mex_new.get(obj.hndl, 'width', 'max'); % flip axis from C to matlab
+
         end
         
         function setROI_HW(obj, varargin) % input 4-element vector or 4 inputs. ROI is defined as [top, left, height, width]. 
@@ -1474,18 +1499,26 @@ classdef Andor < file.AstroData
 %             fprintf('l= %f | t= %f | w= %f | h= %f\n', l, t, w, h);
             
             % flip axis from C to matlab
-            rc = obs.cam.sdk.AT_SetInt(obj.hndl, 'AOIHeight', w); obs.cam.sdk.AT_CheckError(rc);
-            rc = obs.cam.sdk.AT_SetInt(obj.hndl, 'AOIWidth', h); obs.cam.sdk.AT_CheckError(rc);
-            rc = obs.cam.sdk.AT_SetInt(obj.hndl, 'AOITop', l); obs.cam.sdk.AT_CheckError(rc);
-            rc = obs.cam.sdk.AT_SetInt(obj.hndl, 'AOILeft', t); obs.cam.sdk.AT_CheckError(rc);
+%             rc = obs.cam.sdk.AT_SetInt(obj.hndl, 'AOIHeight', w); obs.cam.sdk.AT_CheckError(rc);
+%             rc = obs.cam.sdk.AT_SetInt(obj.hndl, 'AOIWidth', h); obs.cam.sdk.AT_CheckError(rc);
+%             rc = obs.cam.sdk.AT_SetInt(obj.hndl, 'AOITop', l); obs.cam.sdk.AT_CheckError(rc);
+%             rc = obs.cam.sdk.AT_SetInt(obj.hndl, 'AOILeft', t); obs.cam.sdk.AT_CheckError(rc);
+            
+             % flip axis from C to matlab
+            obs.cam.mex_new.set(obj.hndl, 'height', w); 
+            obs.cam.mex_new.set(obj.hndl, 'width', h); 
+            obs.cam.mex_new.set(obj.hndl, 'top', l); 
+            obs.cam.mex_new.set(obj.hndl, 'left', t); 
             
         end
         
         function val = getCycleModeHW(obj) % should always be "continuous" but maybe set to "fixed" (fixed number of frames)
             
-            [rc, ind] = obs.cam.sdk.AT_GetEnumIndex(obj.hndl, 'CycleMode'); obs.cam.sdk.AT_CheckWarning(rc);
-            [rc, val] = obs.cam.sdk.AT_GetEnumStringByIndex(obj.hndl, 'CycleMode', ind , 100); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, ind] = obs.cam.sdk.AT_GetEnumIndex(obj.hndl, 'CycleMode'); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, val] = obs.cam.sdk.AT_GetEnumStringByIndex(obj.hndl, 'CycleMode', ind , 100); obs.cam.sdk.AT_CheckWarning(rc);
             
+            val = obs.cam.mex_new.get(obj.hndl, 'cycle mode'); 
+
         end
         
         function setCycleModeHW(obj, mode) % should always be "continuous" but can also be set to "fixed" (fixed number of frames)
@@ -1500,14 +1533,16 @@ classdef Andor < file.AstroData
                 error(['unknown cycle mode: ' mode ]);
             end
             
-            rc = obs.cam.sdk.AT_SetEnumString(obj.hndl, 'CycleMode', mode); obs.cam.sdk.AT_CheckWarning(rc);
+%             rc = obs.cam.sdk.AT_SetEnumString(obj.hndl, 'CycleMode', mode); obs.cam.sdk.AT_CheckWarning(rc);
+            obs.cam.mex_new.set(obj.hndl, 'cycle mode', mode); 
             
         end 
         
         function val = getTriggerModeHW(obj) % when in "software", camera takes images as soon as it can. In "internal", camera maintains constant frame rate
             
-            [rc, ind] = obs.cam.sdk.AT_GetEnumIndex(obj.hndl, 'TriggerMode'); obs.cam.sdk.AT_CheckWarning(rc);
-            [rc, val] = obs.cam.sdk.AT_GetEnumStringByIndex(obj.hndl, 'TriggerMode', ind , 100); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, ind] = obs.cam.sdk.AT_GetEnumIndex(obj.hndl, 'TriggerMode'); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, val] = obs.cam.sdk.AT_GetEnumStringByIndex(obj.hndl, 'TriggerMode', ind , 100); obs.cam.sdk.AT_CheckWarning(rc);
+            val = obs.cam.mex_new.get(obj.hndl, 'trigger mode'); 
             
         end
         
@@ -1523,14 +1558,15 @@ classdef Andor < file.AstroData
                 error(['unknown trigger mode: ' mode ]);
             end
             
-            rc = obs.cam.sdk.AT_SetEnumString(obj.hndl, 'TriggerMode', mode); obs.cam.sdk.AT_CheckWarning(rc);
-            
+%             rc = obs.cam.sdk.AT_SetEnumString(obj.hndl, 'TriggerMode', mode); obs.cam.sdk.AT_CheckWarning(rc);
+            obs.cam.mex_new.set(obj.hndl, 'trigger mode', mode); 
+
         end
         
         function val = getTimestampHW(obj) % get timestamp (in seconds), directly from camera clock
             
-            [rc, ticks] = obs.cam.sdk.AT_GetInt(obj.hndl, 'TimestampClock'); obs.cam.sdk.AT_CheckWarning(rc)
-            
+%             [rc, ticks] = obs.cam.sdk.AT_GetInt(obj.hndl, 'TimestampClock'); obs.cam.sdk.AT_CheckWarning(rc)
+            ticks = obs.cam.mex_new.get(obj.hndl, 'timestamp'); 
             val = double(ticks)/obj.clockFreq;
             
         end
@@ -1544,7 +1580,8 @@ classdef Andor < file.AstroData
         
         function val = getCameraNameHW(obj) % get name from camera directly
             
-            [rc, val] = obs.cam.sdk.AT_GetString(obj.hndl, 'CameraName', 100); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, val] = obs.cam.sdk.AT_GetString(obj.hndl, 'CameraName', 100); obs.cam.sdk.AT_CheckWarning(rc);
+            val = obs.cam.mex_new.get(obj.hndl, 'name'); 
             
         end
         
@@ -1574,6 +1611,13 @@ classdef Andor < file.AstroData
                 [rc, blemish] = obs.cam.sdk.AT_GetBool(obj.hndl, 'StaticBlemishCorrection'); obs.cam.sdk.AT_CheckWarning(rc);
                 [rc, cooling] = obs.cam.sdk.AT_GetBool(obj.hndl, 'SensorCooling'); obs.cam.sdk.AT_CheckWarning(rc);
 
+                baseline = obs.cam.mex_new.get(obj.hndl, 'baseline'); 
+                pixwidth = obs.cam.mex_new.get(obj.hndl, 'pixel width'); 
+                readtime = obs.cam.mex_new.get(obj.hndl, 'readout time'); 
+                noisefilter = obs.cam.mex_new.get(obj.hndl, 'noise'); 
+                blemish = obs.cam.mex_new.get(obj.hndl, 'blemish'); 
+                cooling = obs.cam.mex_new.get(obj.hndl, 'cooling'); 
+                
                 str2 = sprintf('baseline= %d | pixwidth= %f | readtime= %f | noise_filter= %d | blemish remove= %d | cooling= %d\n', baseline, pixwidth, readtime, noisefilter, blemish, cooling);
                 
                 str = [str str2];
@@ -1590,9 +1634,9 @@ classdef Andor < file.AstroData
         
         function val = getShutterModeHW(obj)
             
-            [rc, idx] = obs.cam.sdk.AT_GetEnumIndex(obj.hndl,'ElectronicShutteringMode'); obs.cam.sdk.AT_CheckWarning(rc);
-            
-            [rc, val] = obs.cam.sdk.AT_GetEnumStringByIndex(obj.hndl,'ElectronicShutteringMode', idx, 30); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, idx] = obs.cam.sdk.AT_GetEnumIndex(obj.hndl,'ElectronicShutteringMode'); obs.cam.sdk.AT_CheckWarning(rc);
+%             [rc, val] = obs.cam.sdk.AT_GetEnumStringByIndex(obj.hndl,'ElectronicShutteringMode', idx, 30); obs.cam.sdk.AT_CheckWarning(rc);
+            val = obs.cam.mex_new.get(obj.hndl, 'shutter mode'); 
 
         end
         
@@ -1601,9 +1645,11 @@ classdef Andor < file.AstroData
             if isempty(val) || ~ischar(val) 
                 error('Input a shutter mode, either "global" or "rolling"'); 
             elseif util.text.cs(val, 'global')
-                [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'ElectronicShutteringMode','Global'); obs.cam.sdk.AT_CheckWarning(rc);
+%                 [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'ElectronicShutteringMode','Global'); obs.cam.sdk.AT_CheckWarning(rc);
+                obs.cam.mex_new.set(obj.hndl, 'shutter mode', 'Global'); % maybe use Global - 100% Duty Cycle? 
             elseif util.text.cs(val, 'rolling')
-                [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'ElectronicShutteringMode','Rolling'); obs.cam.sdk.AT_CheckWarning(rc);
+%                 [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'ElectronicShutteringMode','Rolling'); obs.cam.sdk.AT_CheckWarning(rc);
+                obs.cam.mex_new.get(obj.hndl, 'shutter mode', 'Rolling'); % maybe use Rolling - 100% Duty Cycle?
             else
                 error('Unknown shutter mode: "%s". Use "global" or "rolling"', val);
             end

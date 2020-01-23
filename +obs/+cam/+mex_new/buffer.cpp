@@ -117,12 +117,13 @@ void BufferQueue::allocate(AT_H camera_handle, int num_images){
 	
 	arrays=new unsigned char*[num_images]; 
 
+	index=0;
 	for(int i=0;i<num_images;i++){
 	
 		arrays[i]=new unsigned char[im_size_bytes](); 
 		rc=AT_QueueBuffer(hndl, arrays[i], im_size_bytes); 
 		if(rc) throw_error("Problem when allocating buffers!", "allocate", rc); 
-	
+		index++; 
 	}
 	
 	latest_image=0;
@@ -132,6 +133,8 @@ void BufferQueue::allocate(AT_H camera_handle, int num_images){
 void BufferQueue::release(){
 
 	int rc=0; // return code
+	
+	latest_image=0;
 	
 	rc=AT_Command(hndl, L"AcquisitionStop"); 
 	if(rc) throw_error("Problem when stopping camera!", "release", rc); 
@@ -161,6 +164,9 @@ void BufferQueue::queue(){
 
 	int rc=0; // return code
 	
+	latest_image=0;
+	
+	if(index>num_arrays) index=0;
 	rc=AT_QueueBuffer(hndl, arrays[index], im_size_bytes); 
 	if(rc) throw_error("Problem when queuing buffers!", "queue", rc); 
 	index++;
@@ -206,17 +212,20 @@ mxArray *BufferQueue::getImageMatrix(){
 	// mxArray *matrix=mxCreateNumericMatrix(width, height, mxUINT16_CLASS, mxREAL); 
 	// unsigned short *ptr=(unsigned short*) mxGetData(matrix);
 	
-	mxArray *matrix=mxCreateNumericMatrix(im_size_bytes, 1, mxUINT8_CLASS, mxREAL); 
-	unsigned char *ptr=(unsigned char*) mxGetData(matrix);
+	// mxArray *matrix=mxCreateNumericMatrix(im_size_bytes, 1, mxUINT8_CLASS, mxREAL); 
+	// unsigned char *ptr=(unsigned char*) mxGetData(matrix);
+
+	mxArray *matrix=mxCreateNumericMatrix(width, height, mxUINT16_CLASS, mxREAL); 
+	unsigned short *ptr=(unsigned short*) mxGetData(matrix);
 	
 	if(latest_image==0) throw_error("Array 'latest_image' has not been filled!", "getImageMatrix"); 
-	
-	memcpy(ptr, latest_image, im_size_bytes); 
 	
 	// return matrix; 
 	// below is the correct code but for some reason it doesn't work
 	
-	rc=AT_ConvertBuffer(latest_image, (AT_U8*) ptr, width, height, stride, L"Mono16", L"Mono16"); 
+	// rc=AT_ConvertBuffer(latest_image, (AT_U8*) ptr, width, height, stride, L"Mono16", L"Mono16"); 
+	
+	memcpy(ptr, latest_image, im_size_bytes); 
 	
 	return matrix; 
 	// below this is old code

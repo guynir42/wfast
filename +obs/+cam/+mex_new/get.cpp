@@ -299,8 +299,16 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		
 	}
 	else if(cs(key, "clock frequency", "frequency")){
+		
 		rc=AT_GetInt(hndl, L"TimestampClockFrequency", &int_value);
 		plhs[0]=output_scalar(int_value);
+		
+	}
+	else if(cs(key, "timestamp")){
+	
+		rc=AT_GetInt(hndl, L"TimestampClock", &int_value);
+		plhs[0]=output_scalar(int_value);
+	
 	}
 	else if(cs(key, "metadata")){
 		
