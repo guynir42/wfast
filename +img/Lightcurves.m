@@ -103,6 +103,11 @@ classdef Lightcurves < handle
         use_skip_bad_times = 0; % if a large fraction of stars have NaN in this epoch, set all to NaN in this epoch
         bad_times_fraction = 0.1; % what fraction of stars need to be NaN to be considered bad times
         
+        % processing steps for fluxes_cal:
+        use_psf_correction = 1;
+        use_polynomial = 1;
+        use_zero_point = 1;
+        
         index_flux = 'end'; % which aperture to use, default "end" is for forced photometery with the largest aperture
         
         show_for = 'time'; % can also choose "stars" to get star by star stats
@@ -363,6 +368,8 @@ classdef Lightcurves < handle
                 
                 if isempty(obj.fluxes_sub_)
                     
+                    t_sub = tic;
+                    
                     obj.fluxes_sub_ = obj.fluxes(:,:,obj.index_flux_number); 
 
                     if obj.use_subtract_backgrounds
@@ -371,6 +378,8 @@ classdef Lightcurves < handle
                         obj.fluxes_sub_ = obj.fluxes_sub_ - a.*b;
                     end
                     
+                    if obj.debug_bit, fprintf('Time to get fluxes_sub was %f seconds\n', toc(t_sub)); end
+                
                 end
                 
                 val = obj.fluxes_sub_;
@@ -392,8 +401,9 @@ classdef Lightcurves < handle
                 
                 if isempty(obj.fluxes_rem_)
                     
-                    obj.fluxes_rem_ = obj.fluxes_sub;
+                    t_rem = tic;
                     
+                    obj.fluxes_rem_ = obj.fluxes_sub;
                     
                     if obj.use_skip_flagged
                         
@@ -427,6 +437,8 @@ classdef Lightcurves < handle
                         
                     end
                     
+                    if obj.debug_bit, fprintf('Time to get fluxes_rem was %f seconds\n', toc(t_rem)); end
+                
                 end
                 
                 val = obj.fluxes_rem_;
@@ -449,14 +461,54 @@ classdef Lightcurves < handle
             
                 if isempty(obj.fluxes_cal_)
                     
-                f = obj.fluxes_rem;
+                    t_cal = tic;
+                    
+                    f = obj.fluxes_rem;
 
-    %                 f_frames_average = median(f,2, 'omitnan'); 
-                    f_frames_average = nansum(f,2); 
-                    f_frames_average_norm = f_frames_average./nanmean(f_frames_average); 
-                    obj.fluxes_cal_ = f./f_frames_average_norm;
+                    if obj.use_psf_correction
+                        
+                        F = nanmean(obj.fluxes_rem); % average flux is used as weight
+                        W = nansum(F.*obj.widths(:,:,obj.index_flux_number),2)./nansum(F,2); % average PSF width, calculated per epoch over all stars
+                        
+                        Wclip = W;
+                        Wclip(abs((W-nanmean(W))./nanstd(W))>3) = NaN; % flag all widths beyond 3sigma from the mean
+                        
+                        for ii = 1:size(f,2) % each star separately
+                        
+                            r = util.fit.polyfit(Wclip, f(:,ii), 'double', 1, 'order', 5); % find the coefficients that best correspond W to this star's flux
+                        
+                            fw = r.func(Wclip); % calculate the best estimate for the flux based on the measure width
+                            
+                            M = nanmean(f(:,ii)); 
+                            
+%                             f(:,ii) = f(:,ii) - fw + M; % subtract the fit to the best estimate 
+                            
+                            rw = util.fit.polyfit(obj.timestamps, fw, 'double', 1, 'order', 5); 
+                            f(:,ii) = f(:,ii) - rw.ym + M; % subtract the fit to the best estimate 
+                            
+                        end
+                        
+                        
+                    end
+                    
+                    if obj.use_polynomial
+                        f = util.series.self_calibrate(f, obj.timestamps, 'zero point', false, 'welch', false, 'polynomial', true, 'order', 5); 
+                    end
+                    
+                    if obj.use_zero_point
+                        
+                        f_frames_average = nansum(f,2); 
+                        f_frames_average_norm = f_frames_average./nanmean(f_frames_average); 
+                        f = f./f_frames_average_norm;
+
+                    end
+                    
+                    obj.fluxes_cal_ = f;
+                    
+                    if obj.debug_bit, fprintf('Time to get fluxes_cal was %f seconds\n', toc(t_cal)); end
                     
                 end
+                
                 
                 val = obj.fluxes_cal_;
                 
@@ -865,6 +917,36 @@ classdef Lightcurves < handle
             
         end
         
+        function set.use_psf_correction(obj, val)
+            
+            if ~isequal(obj.use_psf_correction, val)
+                obj.use_psf_correction = val;
+                obj.fluxes_cal_ = [];
+                obj.clearPSD;
+            end
+            
+        end
+        
+        function set.use_polynomial(obj, val)
+            
+            if ~isequal(obj.use_polynomial, val)
+                obj.use_polynomial = val;
+                obj.fluxes_cal_ = [];
+                obj.clearPSD;
+            end
+            
+        end
+        
+        function set.use_zero_point(obj, val)
+            
+            if ~isequal(obj.use_zero_point, val)
+                obj.use_zero_point = val;
+                obj.fluxes_cal_ = [];
+                obj.clearPSD;
+            end
+            
+        end
+        
         function set.index_flux(obj, val)
             
             if ~isequal(obj.index_flux, val)
@@ -1121,7 +1203,7 @@ classdef Lightcurves < handle
                 
             end
             
-            xlabel(input.ax, 'timestamps (seconds)');
+            xlabel(input.ax, 'time (seconds)');
             
             if cs(obj.show_what, 'fluxes')
                 

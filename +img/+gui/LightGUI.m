@@ -102,20 +102,24 @@ classdef LightGUI < handle
             
             %%%%%%%%%%% panel process %%%%%%%%%%%%%%%%
             
-            obj.panel_process = GraphicPanel(obj.owner, [0 0.6 0.2 0.3], 'process');
-            obj.panel_process.number = 3;
+            obj.panel_process = GraphicPanel(obj.owner, [0 0.4 0.2 0.5], 'process');
+            obj.panel_process.number = 5;
             obj.panel_process.addButton('button_background', 'use_subtract_backgrounds', 'toggle', 'sub b/g', 'sub b/g', '', 0.5, obj.color_on);
             obj.panel_process.addButton('button_flagged', 'use_skip_flagged', 'toggle', 'skip flag', 'skip flag', '', 0.5, obj.color_on);
             obj.panel_process.addButton('button_outliers', 'use_remove_outliers', 'toggle', 'outliers', 'outliers', '', 0.5, obj.color_on);
             obj.panel_process.addButton('input_outlier_sigma', 'outlier_sigma', 'input', 'sig= ', '', '', 0.5);
             obj.panel_process.addButton('button_bad_times', 'use_skip_bad_times', 'toggle', 'bad times', 'bad times', '', 0.5, obj.color_on);
             obj.panel_process.addButton('input_fraction', 'bad_times_fraction', 'input', 'frac= ', '', '', 0.5);
+            obj.panel_process.addButton('button_psf_correction', 'use_psf_correction', 'toggle', 'PSF width', 'PSF width', '', 0.5, obj.color_on);
+            obj.panel_process.addButton('button_polynomial', 'use_polynomial', 'toggle', 'polynomial', 'polynomial', '', 0.5, obj.color_on);
+            obj.panel_process.addButton('button_zero_point', 'use_zero_point', 'toggle', 'zero point', 'zero point', '', 0.5, obj.color_on);
+            
             obj.panel_process.margin = [0.01 0.02];
             obj.panel_process.make;
             
             %%%%%%%%%%% panel display %%%%%%%%%%%%%%%%
             
-            obj.panel_display = GraphicPanel(obj.owner, [0 0.1 0.2 0.5], 'display');
+            obj.panel_display = GraphicPanel(obj.owner, [0 0.1 0.2 0.3], 'display');
             obj.panel_display.number = 5;
             obj.panel_display.addButton('button_show_what', 'show_what', 'picker', obj.owner.show_what, '', '', 0.7); 
             obj.panel_display.addButton('button_flux_type', 'show_flux_type', 'picker', obj.owner.show_flux_type, '', '', 0.3); 
@@ -130,7 +134,7 @@ classdef LightGUI < handle
             obj.panel_display.button_show_what.Callback = @obj.callback_show_what;
             
             obj.panel_display.button_flux_type.String = obj.owner.show_flux_type_list;
-            obj.panel_display.button_flux_type.Callback = @obj.callback_flux_cal;
+            obj.panel_display.button_flux_type.Callback = @obj.callback_flux_type;
             
             %%%%%%%%%%% panel info %%%%%%%%%%%%%%%%%%%
             
@@ -207,9 +211,9 @@ classdef LightGUI < handle
             
         end
         
-        function callback_flux_cal(obj, hndl, ~)
+        function callback_flux_type(obj, hndl, ~)
             
-            if obj.debug_bit, disp('callback: flux_cal'); end
+            if obj.debug_bit, disp('callback: flux_type'); end
             
             obj.owner.show_flux_type = hndl.String{hndl.Value};
 

@@ -84,7 +84,7 @@ function results = polyfit(x,y,varargin)
 
         xdata = fillmissing(xdata, 'linear'); % there shouldn't be any NaNs in the xdata!
         
-        bad_idx = isnan(ydata) | isnan(vdata);
+        bad_idx = isnan(xdata) | isnan(ydata) | isnan(vdata);
                 
         X = ones(length(xdata),1); 
         
@@ -101,15 +101,23 @@ function results = polyfit(x,y,varargin)
             C = 1./vtemp;
             XCX = Xtemp'*(C.*Xtemp); 
             
+            if any(isinf(XCX))
+                if ~input.double
+                    warning('Reached Inf in design matrix. Use higher precision with "double" set to true'); 
+                else
+                    warning('Reached Inf in design matrix. Problem seems to be ill constrained'); 
+                end
+            end
+            
             results(ii).coeffs = XCX\(Xtemp'*(C.*ytemp));
-            results(ii).model = print_model(input.order);
+            results(ii).model = print_model(input.order, results(ii).coeffs);
             
             warning('off', 'MATLAB:nearlySingularMatrix');
             warning('off', 'MATLAB:singularMatrix');
 
             y_model = X*results(ii).coeffs; % note we get the model for the entire dataset, including NaNs
             
-            results(ii).coeffs = results(ii).coeffs';
+%             results(ii).coeff_str = util.text.print_vec(results(ii).coeffs');
             results(ii).variance = nanvar(ydata - y_model); 
             
             if isempty(input.variances) % vdata is calculated from the data, needs to be updated... 
@@ -123,7 +131,7 @@ function results = polyfit(x,y,varargin)
             results(ii).ndof = numel(ytemp)-input.order;
             
             % remove outliers 
-            bad_idx = bad_idx + residuals>input.sigma.^2;
+            bad_idx = bad_idx & isnan(ydata) & isnan(vdata) & residuals>input.sigma.^2;
 
 %             vtemp = vtemp./mean(vtemp,1,'omitnan').*results(ii).variance;
             
@@ -150,23 +158,46 @@ function results = polyfit(x,y,varargin)
         results(ii).v = vdata;
         results(ii).ym = y_model;            
         results(ii).bad_idx = bad_idx; 
+        if any(isnan(results(ii).coeffs))
+            results(ii).func = @(x) NaN.*x;
+        else
+            results(ii).func = str2func(['@(x) ' results(ii).model(4:end)]);
+        end
         
     end % for ii (fluxes)
     
 end
 
-function str = print_model(order)
+function str = print_model(order, coeffs)
 
-    for ii = 1:order+1
+    if nargin<2 || isempty(coeffs)
 
-        if ii==1
-            str = 'y = coeff(1)';
-        elseif ii==2
-            str = [str ' + coeff(2)*x'];
-        else
-            str = sprintf('%s + coeff(%d)*x^%d', str, ii, ii-1);
+        for ii = 1:order+1
+
+            if ii==1
+                str = 'y = coeff(1)';
+            elseif ii==2
+                str = [str ' + coeff(2)*x'];
+            else
+                str = sprintf('%s + coeff(%d)*x^%d', str, ii, ii-1);
+            end
+
         end
 
+    else
+
+        for ii = 1:order+1
+
+            if ii==1
+                str = sprintf('y = %8.6g', coeffs(1));
+            elseif ii==2
+                str = sprintf('%s %+8.6g*x', str, coeffs(2));
+            else
+                str = sprintf('%s %+8.6g*x.^%d', str, coeffs(ii), ii-1);
+            end
+
+        end
+        
     end
     
 end
