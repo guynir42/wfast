@@ -9,6 +9,8 @@ classdef Simulator < handle
     properties
         
         pos;
+        tip;
+        tilt;
         best_pos = 5.5;
         
         step = 0.01;

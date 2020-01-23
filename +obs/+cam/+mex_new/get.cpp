@@ -428,9 +428,9 @@ mxArray *output_string(const AT_WC *str){
 	
 	int N=wcslen(str); 
 	
-	char *str2=new char[N];
+	char *str2=new char[N+1];
 	
-	wcstombs(str2, str, N);	
+	wcstombs(str2, str, N+1);	
 
 	mxArray *array=mxCreateCharMatrixFromStrings(1, (const char**) &str2);
 	

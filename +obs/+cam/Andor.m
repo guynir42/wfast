@@ -363,7 +363,13 @@ classdef Andor < file.AstroData
         function setupFocuser(obj) % try to connect to focuser
            
             try
-                obj.focuser = obs.focus.FocusSpider;
+                if exist('C:\Users\Public\PI\PI_MATLAB_Driver_GCS2', 'dir')
+                    obj.focuser = obs.focus.FocusSpider;
+                else
+                    obj.log.input('Cannot find PI actuator folder, setting up sim-focuser instead'); 
+                    disp(obj.log.report);
+                    obj.focuser = obs.focus.Simulator;
+                end
             catch ME
                 disp('Cannot connect to focuser, using simulator instead');
                 warning(ME.getReport);
@@ -605,6 +611,16 @@ classdef Andor < file.AstroData
             
             end
             
+            
+        end
+        
+        function val = get.clockFreq(obj)
+            
+            if isempty(obj.clockFreq)
+                obj.clockFreq = obs.cam.mex_new.get(obj.hndl, 'frequency');
+            end
+            
+            val = obj.clockFreq;
             
         end
         
@@ -1263,12 +1279,14 @@ classdef Andor < file.AstroData
 %                 buf = [];
                 
 %                 [rc, buf] = obs.cam.sdk.AT_WaitBuffer(obj.hndl, timeout*1000); % timeout in milliseconds! 
-                buf = obs.cam.mex_new.buffer(obj.hndl, 'wait', timeout*1000); 
-                          
-                temp_images(:,:,ii) = buf; % collect all images in the batch
-                    
+
 %                 if rc==0 % if we did not timeout or other error
                 try
+                    
+                    buf = obs.cam.mex_new.buffer(obj.hndl, 'wait', timeout*1000); 
+                
+                    temp_images(:,:,ii) = buf; % collect all images in the batch
+                    
 %                     if ii<obj.batch_size
 %                         if strcmp(obj.getTriggerModeHW, 'Software') % I think we can just give a SoftwareTrigger which is ignored in any other mode
 %                             [rc] = obs.cam.sdk.AT_Command(obj.hndl,'SoftwareTrigger'); obs.cam.sdk.AT_CheckWarning(rc);
@@ -1567,7 +1585,7 @@ classdef Andor < file.AstroData
             
 %             [rc, ticks] = obs.cam.sdk.AT_GetInt(obj.hndl, 'TimestampClock'); obs.cam.sdk.AT_CheckWarning(rc)
             ticks = obs.cam.mex_new.get(obj.hndl, 'timestamp'); 
-            val = double(ticks)/obj.clockFreq;
+            val = double(ticks)./obj.clockFreq;
             
         end
         

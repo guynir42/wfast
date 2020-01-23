@@ -115,6 +115,12 @@ void BufferQueue::allocate(AT_H camera_handle, int num_images){
 	rc=AT_GetInt(hndl, L"ImageSizeBytes", &im_size_bytes); // make sure to keep track of the size of each array
 	if(rc) throw_error("Cannot get the image size from camera handle", "allocate", rc); 
 	
+	rc=AT_Command(hndl, L"AcquisitionStop"); 
+	if(rc) throw_error("Problem when stopping camera!", "allocate", rc); 
+	
+	rc=AT_Flush(hndl); 
+	if(rc) throw_error("Problem when flushing buffers!", "allocate", rc); 
+	
 	arrays=new unsigned char*[num_images]; 
 
 	index=0;
@@ -133,9 +139,7 @@ void BufferQueue::allocate(AT_H camera_handle, int num_images){
 void BufferQueue::release(){
 
 	int rc=0; // return code
-	
-	latest_image=0;
-	
+		
 	rc=AT_Command(hndl, L"AcquisitionStop"); 
 	if(rc) throw_error("Problem when stopping camera!", "release", rc); 
 	
@@ -166,11 +170,11 @@ void BufferQueue::queue(){
 	
 	latest_image=0;
 	
-	if(index>num_arrays) index=0;
+	index++;
+	if(index>=num_arrays) index=0;
 	rc=AT_QueueBuffer(hndl, arrays[index], im_size_bytes); 
 	if(rc) throw_error("Problem when queuing buffers!", "queue", rc); 
-	index++;
-
+	
 }
 
 void BufferQueue::wait(long int timeout){
@@ -181,6 +185,8 @@ void BufferQueue::wait(long int timeout){
 	rc=AT_WaitBuffer(hndl, &latest_image, &buf_size, timeout); 
 	if(rc) throw_error("Problem when waiting for buffers!", "wait", rc); 
 
+	// printf("buf_size= %d\n", buf_size); 
+	
 	// do we want to verify that the same image we just got does not get queued again?
 
 }
@@ -200,7 +206,7 @@ mxArray *BufferQueue::getImageMatrix(){
 	AT_64 stride=0;
 	rc=AT_GetInt(hndl, L"AOIStride", &stride); 
 	if(rc) throw_error("Cannot get the AOI stride from camera!", "getImageMatrix", rc); 
-	printf("height= %d | width= %d | stride= %d | size= %d\n", height, width, stride, im_size_bytes); 
+	// printf("height= %d | width= %d | stride= %d | size= %d\n", height, width, stride, im_size_bytes); 
 	
 	// this will break if we are not using Mono16 encoding!
 	AT_WC wide_str[STRLN]={0};
@@ -216,16 +222,22 @@ mxArray *BufferQueue::getImageMatrix(){
 	// unsigned char *ptr=(unsigned char*) mxGetData(matrix);
 
 	mxArray *matrix=mxCreateNumericMatrix(width, height, mxUINT16_CLASS, mxREAL); 
-	unsigned short *ptr=(unsigned short*) mxGetData(matrix);
+//	unsigned short *ptr=(unsigned short*) mxGetData(matrix);
+	unsigned char *ptr=(unsigned char*) mxGetData(matrix);
 	
 	if(latest_image==0) throw_error("Array 'latest_image' has not been filled!", "getImageMatrix"); 
 	
-	// return matrix; 
-	// below is the correct code but for some reason it doesn't work
-	
 	// rc=AT_ConvertBuffer(latest_image, (AT_U8*) ptr, width, height, stride, L"Mono16", L"Mono16"); 
 	
-	memcpy(ptr, latest_image, im_size_bytes); 
+	// printf("sizeof(unsigned short)= %d | pixel values: %d %d %d %d %d\n", sizeof(unsigned short), latest_image[0], latest_image[1], latest_image[2], latest_image[3], latest_image[4]); 
+	
+	// printf("last pixel values in latest_image are: %d %d\n", latest_image[width*height*2-2], latest_image[width*height*2-1]); 
+	
+	// printf("last pixel values in matrix/ptr are: %d %d\n", latest_image[width*height*2-2], latest_image[width*height*2-1]); 
+	
+	for(int i=0;i<height;i++) for(int j=0;j<width*2;j++) ptr[i*width*2+j]=latest_image[i*width*2+j]; 
+	
+	// memcpy(ptr, latest_image, im_size_bytes); 
 	
 	return matrix; 
 	// below this is old code

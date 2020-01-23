@@ -35,8 +35,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	
 	mexPrintf("hndl= %ld\n", *hndl);
 	
-	//rc=AT_SetBool(hndl, L"SensorCooling", AT_True); 
-	//rc=AT_SetEnumString(hndl, L"FanSpeed", L"On");
+	rc=AT_SetBool(*hndl, L"SensorCooling", (bool) 1); 
+	rc=AT_SetEnumString(*hndl, L"FanSpeed", L"On");
 	
 	mwSize dims[2] = {1,1};
 	if(nlhs>0){
