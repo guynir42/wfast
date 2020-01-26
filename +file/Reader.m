@@ -850,6 +850,8 @@ classdef Reader < file.AstroData
                         loaded_positions = h5read(filename, sa('/', data_name)); % read the entire "positions" dataset, if it exists
                         obj.positions = loaded_positions(:,:,end); % to handle cases where we accidentally saved coordinates and positions together... 
                         
+                        obj.getAttribute(filename, data_name, att_names, 'obj_idx');
+                        
                     elseif any(strcmp(data_name, obj.dataset_names.coordinates)) && all(data_size) % data_names.coordinates may be a cell array of different optional names
                         
                         obj.coordinates = h5read(filename, sa('/', data_name)); % read the entire "cordinates" dataset, if it exists
@@ -911,7 +913,12 @@ classdef Reader < file.AstroData
                         
                         num_frames = min(num_frames, num_images_on_file); % make sure we don't ask for more frames than we have on file
                         
-                        loaded_fluxes = h5read(filename, sa('/', data_name), [frame_start 1 1], [num_frames Inf Inf]); % must check the dimensions on file fit what I think I am saving...
+                        if length(data_size)==2
+                            loaded_fluxes = h5read(filename, sa('/', data_name), [frame_start 1], [num_frames Inf]); % must check the dimensions on file fit what I think I am saving...
+                        elseif length(data_size)==3
+                            loaded_fluxes = h5read(filename, sa('/', data_name), [frame_start 1 1], [num_frames Inf Inf]); % must check the dimensions on file fit what I think I am saving...
+                        end
+                        
                         obj.fluxes = cat(1, obj.fluxes, loaded_fluxes); % append to the existing images
                         
                     elseif any(strcmp(data_name, obj.dataset_names.pars)) 

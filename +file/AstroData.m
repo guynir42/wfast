@@ -18,6 +18,7 @@ classdef AstroData < dynamicprops
         
         cutouts; % this is raw cutouts and it is usually what we save on file
         positions; % only for cutouts. a 2xN matrix (X then Y, N is the number of cutouts). 
+        obj_idx; % what is the index of the star closest to the run's intended RA/DEC 
         coordinates; % match each star/cutout position with RA/DEC (in degrees)
         magnitudes; % each star's magnitude (from catalog)
         temperatures; % each star's temperature in K (from catalog)

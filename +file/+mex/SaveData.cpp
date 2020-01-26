@@ -52,12 +52,13 @@ void SaveData::parseVararginPairs(int N, const mxArray *vars[]){
 		else if(cs(keyword, "t_end_stamp", "file_write_timestamp", 17)) timestamps.attributes.push_back(MyAttribute("t_end_stamp", value));
 		else if(cs(keyword, "cutouts")) cutouts.input("cutouts", value, 1);
 		else if(cs(keyword, "positions")) positions.input("positions", value, 0);
+		else if(cs(keyword, "obj_idx", "object_idx")) positions.attributes.push_back(MyAttribute("obj_idx", value));
 		else if(cs(keyword, "coordinates")) coordinates.input("coordinates", value, 0);
 		else if(cs(keyword, "magnitudes")) magnitudes.input("magnitudes", value, 0);
 		else if(cs(keyword, "temperatures")) temperatures.input("temperature", value, 0);
 		else if(cs(keyword, "fluxes")) fluxes.input("fluxes", value, 0);
-		else if(cs(keyword, "cutouts_bg")) cutouts.input("cutouts", value, 1);
-		else if(cs(keyword, "positions_bg")) positions.input("positions", value, 0);
+		else if(cs(keyword, "cutouts_bg")) cutouts_bg.input("cutouts_bg", value, 1);
+		else if(cs(keyword, "positions_bg")) positions_bg.input("positions_bg", value, 0);
 		else if(cs(keyword, "backgrounds")) fluxes.input("backgrounds", value, 0);
 		else if(cs(keyword, "stack")) stack.input("stack", value, 1);
 		else if(cs(keyword, "num_sum")) stack.attributes.push_back(MyAttribute("num_sum", value));
@@ -86,6 +87,7 @@ void SaveData::readStruct(const mxArray *buf){
 	names.push_back("t_end_stamp");
 	names.push_back("cutouts");
 	names.push_back("positions");
+	names.push_back("obj_idx");
 	names.push_back("coordinates");
 	names.push_back("magnitudes");
 	names.push_back("temperatures");
@@ -117,6 +119,7 @@ void SaveData::readStruct(const mxArray *buf){
 			else if(cs(keyword, "t_end_stamp", "file_write_timestamp", 17)) timestamps.attributes.push_back(MyAttribute("t_end_stamp", value));
 			else if(cs(keyword, "cutouts", 8)) cutouts.input("cutouts", value, 1);
 			else if(cs(keyword, "positions", 9)) positions.input("positions", value, 0);
+			else if(cs(keyword, "obj_idx", "object_idx")) positions.attributes.push_back(MyAttribute("obj_idx", value)); 
 			else if(cs(keyword, "coordinates")) coordinates.input("coordinates", value, 0);
 			else if(cs(keyword, "magnitudes")) magnitudes.input("magnitudes", value, 0);
 			else if(cs(keyword, "temperatures")) temperatures.input("temperature", value, 0);
