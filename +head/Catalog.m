@@ -19,6 +19,9 @@ classdef Catalog < handle
         
         image; % input image or stack
         
+        offset_RA;
+        offset_Dec;
+        
         positions;
         magnitudes;
         coordinates;
@@ -46,6 +49,11 @@ classdef Catalog < handle
         
         use_matched_only = 0; % only keep stars that are matched to a proper GAIA star
         use_psf_width = 1; % only keep stars that have the best response to the correct PSF width
+        
+        RA_scan_step = 0.5;
+        RA_scan_range = 3;
+        Dec_scan_step = 0.5;
+        Dec_scan_range = 0;
         
         min_star_temp;
         num_stars;
@@ -212,26 +220,71 @@ classdef Catalog < handle
             
             addpath(fullfile(getenv('DATA'), 'GAIA/DR2')); 
 
-            try 
-            [R,S2] = astrometry(S, 'RA', obj.pars.RA, 'Dec', obj.pars.Dec, 'Scale', obj.pars.SCALE, ...
-                'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', [3000 3000], 'ApplyPM', false, ...
-                'MinRot', -20, 'MaxRot', 20, 'CatColMag', 'Mag', 'ImSize', [obj.pars.NAXIS1, obj.pars.NAXIS2]);
-            catch ME
-                warning(ME.getReport);
-                return; % with success==0
-            end
+            % scan a few values of RA/DE outside the values suggested by pars object
+            DE = obj.pars.DEC_DEG;
+            list_DE = (-obj.Dec_scan_range:obj.Dec_scan_step:obj.Dec_scan_range);
+            [~,idx] = sort(abs(list_DE));
+            list_DE = list_DE(idx) + DE; 
             
-            % what should we do with R? check a correct match maybe? 
-            obj.mextractor_sim = update_coordinates(S2, 'ColNameRA', 'Im_RA', 'ColNameDec', 'Im_Dec'); 
+            RA = obj.pars.RA_DEG;
+            list_RA = (-obj.RA_scan_range:obj.RA_scan_step:obj.RA_scan_range);
+            list_RA = list_RA./abs(cosd(DE)); % adjust for high DE targets, where a change of few degrees in RA can be still smaller than the FOV
+            [~,idx] = sort(abs(list_RA));
+            list_RA = list_RA(idx) + RA; 
             
-            obj.catalog_matched = catsHTM.sources_match('GAIADR2',obj.mextractor_sim, 'ColRA', {'Im_RA'}, 'ColDec', {'Im_Dec'});
+            for ii = 1:length(list_DE)
             
-            obj.wcs_object = ClassWCS.populate(S);
-            
-            obj.makeCatalog;
-            
-            % add tests for matching fraction and magnitude range, etc
-            obj.success = 1;
+                for jj = 1:length(list_RA)
+                    
+                    try 
+
+                        warning('off', 'MATLAB:polyfit:PolyNotUnique')
+                        warning('off', 'MATLAB:lscov:RankDefDesignMat');
+
+                        [R,S2] = astrometry(S, 'RA', list_RA(jj), 'UnitsRA', 'deg', 'Dec', list_DE(ii), 'UnitsDec', 'deg', 'Scale', obj.pars.SCALE, ...
+                            'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', [3000 3000], 'ApplyPM', false, ...
+                            'MinRot', -20, 'MaxRot', 20, 'CatColMag', 'Mag', 'ImSize', [obj.pars.NAXIS1, obj.pars.NAXIS2]);
+
+                        warning('on', 'MATLAB:polyfit:PolyNotUnique')
+                        warning('on', 'MATLAB:lscov:RankDefDesignMat');
+
+                    catch ME
+                        if ~isequal(ME.identifier, 'MATLAB:badsubscript')
+                            warning(ME.getReport);
+                        end
+                        continue; % with success==0
+                    end
+
+                    % what should we do with R? check a correct match maybe? 
+                    obj.mextractor_sim = update_coordinates(S2, 'ColNameRA', 'Im_RA', 'ColNameDec', 'Im_Dec'); 
+
+                    obj.catalog_matched = catsHTM.sources_match('GAIADR2',obj.mextractor_sim, 'ColRA', {'Im_RA'}, 'ColDec', {'Im_Dec'});
+
+                    obj.wcs_object = ClassWCS.populate(S);
+
+                    obj.makeCatalog;
+
+                    % add tests for matching fraction and magnitude range, etc
+
+                    m = obj.magnitudes;
+
+                    m(m>obj.mag_limit+0.5) = NaN; % a star above the mag_limit (with 0.5 margin) is likely a bad match
+
+                    if nnz(isnan(m))/numel(m)>0.8 % more than 80% bad matches is not a successfull astronetry run
+                        obj.success = 0;
+                        continue; 
+                    end
+
+                    obj.success = 1;
+                    break;
+                    
+                end % for jj (list_RA)
+                
+                if obj.success==1
+                    break;
+                end
+
+            end % for ii (list_DE)
             
         end
         
@@ -389,7 +442,7 @@ classdef Catalog < handle
             
         end
         
-        function idx = findNearestObject(obj, RA, Dec)
+        function [idx, dist] = findNearestObject(obj, RA, Dec)
             
             if nargin<2 || isempty(RA)
                 RA = obj.pars.RA_DEG;
@@ -407,10 +460,12 @@ classdef Catalog < handle
                 Dec = head.Ephemeris.sex2deg(Dec);
             end
             
-            delta_RA = (RA-obj.data{:,'RA'}).^2;
+            delta_RA = ((RA-obj.data{:,'RA'}).*cosd(Dec)).^2;
             delta_Dec = (Dec-obj.data{:,'Dec'}).^2;
             
-            [~, idx] = min(delta_RA+delta_Dec); 
+            [dist, idx] = min(delta_RA+delta_Dec); 
+            
+            dist = sqrt(dist); 
             
         end
         
@@ -539,9 +594,12 @@ classdef Catalog < handle
             coordinates = obj.coordinates;
             temperatures = obj.temperatures;
             
-            if obj.debug_bit, disp(['Saving catalog file to ' filename]); end
-            
-            save(filename, 'Sim', 'MatchedCat', 'WCS', 'CatTable', 'positions', 'magnitudes', 'coordinates', 'temperatures', '-v7.3');
+            if obj.success
+                if obj.debug_bit, disp(['Saving catalog file to ' filename]); end
+                save(filename, 'Sim', 'MatchedCat', 'WCS', 'CatTable', 'positions', 'magnitudes', 'coordinates', 'temperatures', '-v7.3');
+            else
+                if obj.debug_bit, disp('Cannot save catalog without a good astrometry match'); end
+            end
             
         end
         

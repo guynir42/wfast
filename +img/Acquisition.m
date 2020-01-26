@@ -1818,7 +1818,11 @@ classdef Acquisition < file.AstroData
 
            obj.pars.MAG_LIMIT = obj.cat.detection_limit; 
             
-           obj.obj_idx = obj.cat.findNearestObject;
+           [obj.obj_idx, dist] = obj.cat.findNearestObject;
+           
+           if dist>5/3600
+               obj.obj_idx = []; % if the closest star found is more than 5" from the required position, it is not really a good match! 
+           end
            
         end
         
