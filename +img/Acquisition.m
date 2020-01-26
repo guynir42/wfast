@@ -1472,9 +1472,10 @@ classdef Acquisition < file.AstroData
                         filename = obj.buf.getReadmeFilename;
                         util.oop.save(obj, filename, 'name', 'acquisition'); 
                         
-                        filename = fullfile(obj.buf.directory, 'catalog.mat');
-                        if obj.debug_bit, fprintf('Saving catalog file to %s\n', filename); end
-                        obj.cat.saveMAT(filename);
+                        if obj.cat.success
+                            filename = fullfile(obj.buf.directory, 'catalog.mat');
+                            obj.cat.saveMAT(filename);
+                        end
                         
                     catch ME
                         warning(ME.getReport);
@@ -1813,14 +1814,12 @@ classdef Acquisition < file.AstroData
 
                 obj.positions = obj.cat.positions; % usually we will already have positions so this should do nothing (unless this analysis is on full frame rate images)
                 
-                if obj.use_save
-                    
-                end
-            
             end
 
            obj.pars.MAG_LIMIT = obj.cat.detection_limit; 
             
+           obj.obj_idx = obj.cat.findNearestObject;
+           
         end
         
         function findStarsMAAT(obj)
@@ -1854,7 +1853,7 @@ classdef Acquisition < file.AstroData
             obj.magnitudes = T{:,'Mag_G'};
             obj.coordinates = [T.RA T.Dec];
             
-            obj.object_idx = obj.cat.findNearestObject;
+            obj.obj_idx = obj.cat.findNearestObject;
             
         end
         

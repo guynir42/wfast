@@ -103,9 +103,9 @@ classdef Lightcurves < handle
         bad_times_fraction = 0.1; % what fraction of stars need to be NaN to be considered bad times
         
         % processing steps for fluxes_cal:
-        use_psf_correction = 1;
-        use_polynomial = 1;
-        use_zero_point = 1;
+        use_psf_correction = 0;
+        use_polynomial = 0;
+        use_zero_point = 0;
         
         index_flux = 'end'; % which aperture to use, default "end" is for forced photometery with the largest aperture
         

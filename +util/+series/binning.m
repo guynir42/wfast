@@ -22,7 +22,7 @@ function f_out = binning(f, varargin)
 
     import util.text.cs;
 
-    if nargin==0, help('util.vec.binning'); return; end
+    if nargin==0, help('util.series.binning'); return; end
     
     input = util.text.InputVars;
     input.use_ordered_numeric = 1;
@@ -45,6 +45,10 @@ function f_out = binning(f, varargin)
         error('Cannot calculate var/std on binning factor less than 2!'); 
     elseif input.factor~=floor(input.factor)
         error('Must use integer binning factor!');
+    end
+    
+    if isvector(f) && size(f,1)==1
+        f = f'; % make sure f is a column vector! 
     end
     
     S = size(f); % keep track of the original size of the input
