@@ -84,8 +84,7 @@ classdef Lightcurves < handle
     properties % inputs/outputs
         
         frame_index = 1;
-        num_frames = 0;
-        
+                
     end
     
     properties % switches/controls
@@ -316,6 +315,12 @@ classdef Lightcurves < handle
             else
                 val = 1;
             end
+            
+        end
+        
+        function val = num_frames(obj)
+            
+            val = obj.frame_index - 1;
             
         end
         

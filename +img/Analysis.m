@@ -190,7 +190,8 @@ classdef Analysis < file.AstroData
                 
 %                 obj.light_original = img.Lightcurves; 
 %                 obj.light_basic = img.Lightcurves; obj.light_basic.signal_method = 'square'; obj.light_basic.background_method = 'corners';
-                obj.lightcurves = img.Lightcurves; obj.lightcurves.signal_method = 'aperture'; obj.lightcurves.background_method = 'annulus';
+                obj.lightcurves = img.Lightcurves; 
+%                 obj.lightcurves.signal_method = 'aperture'; obj.lightcurves.background_method = 'annulus';
 %                 obj.light_gauss = img.Lightcurves; obj.light_gauss.signal_method = 'gauss'; obj.light_gauss.background_method = 'annulus';
                 
                 obj.model_psf = img.ModelPSF;
