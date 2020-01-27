@@ -820,7 +820,7 @@ classdef Andor < file.AstroData
                     
                     if obj.brake_bit, break; end
                     
-                    if ~obj.use_save && obj.num_batches>1 && ~obj.gui.check
+                    if ~obj.use_save && obj.num_batches>1 && (isempty(obj.gui) || ~obj.gui.check)
                         disp('Breaking out of live view!'); 
                         break; % in case we are in live view and GUI is closed 
                     end
@@ -1262,7 +1262,7 @@ classdef Andor < file.AstroData
             temp_images = zeros(obj.AOIwidth_c, obj.AOIheight_c, obj.batch_size, 'uint16'); % notice the axes are inverted because this is C vs. Matlab! 
             obj.timestamps = zeros(obj.batch_size,1);
             
-            timeout = max([1, obj.expT.*2]); % if exposure time is short, set timeout to 1 second, otherwise set it to 2*expT
+            timeout = max([3, obj.expT.*2]); % if exposure time is short, set timeout to 1 second, otherwise set it to 2*expT
             
 %             [rc] = obs.cam.sdk.AT_QueueBuffer(obj.hndl,obj.imageSizeBytes); obs.cam.sdk.AT_CheckWarning(rc);
 %             obs.cam.mex_new.buffer(obj.hndl, 'queue'); 

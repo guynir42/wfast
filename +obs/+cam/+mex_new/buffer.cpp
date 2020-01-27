@@ -235,9 +235,9 @@ mxArray *BufferQueue::getImageMatrix(){
 	
 	// printf("last pixel values in matrix/ptr are: %d %d\n", latest_image[width*height*2-2], latest_image[width*height*2-1]); 
 	
-	for(int i=0;i<height;i++) for(int j=0;j<width*2;j++) ptr[i*width*2+j]=latest_image[i*width*2+j]; 
+	// for(int i=0;i<height;i++) for(int j=0;j<width*2;j++) ptr[i*width*2+j]=latest_image[i*width*2+j]; 
 	
-	// memcpy(ptr, latest_image, im_size_bytes); 
+	memcpy(ptr, latest_image, width*height*2); 
 	
 	return matrix; 
 	// below this is old code

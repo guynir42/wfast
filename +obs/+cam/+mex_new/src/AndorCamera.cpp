@@ -2,7 +2,7 @@
 
 AndorCamera::AndorCamera(){
 	
-	// mexPrintf("this is AndorCamera default constructor!\n");
+	// printf("this is AndorCamera default constructor!\n");
 
 }
 
@@ -83,7 +83,7 @@ void AndorCamera::loadFromBuffers(mxArray *buffers){ // load mex flags and data 
 			if(waitForWriting(b)) return; // just making sure we are not allocating over data that is getting written
 			
 			// assuming MATLAB uses memory aligned to 8-byte boundary...
-			if(debug_bit>2) mexPrintf("Allocating a new matrix...\n");
+			if(debug_bit>2) printf("Allocating a new matrix...\n");
 
 			//images_ptrs[b]=(unsigned short int*) mxCalloc((int) (height*width*batch_size), 2); // use 2 to initialize a uint16
 			mwSize dims[3] = {(mwSize) width, (mwSize) height, (mwSize) batch_size}; // width <-> height exchanged for C <-> matlab conversion
@@ -148,7 +148,7 @@ void AndorCamera::loadFromOptionsStruct(const mxArray *options){ // load additio
 
 void AndorCamera::startup(){
 	
-	if(debug_bit) mexPrintf("starting Andor camera...\n");
+	if(debug_bit) printf("starting Andor camera...\n");
 	
 	AT_64 ImageSizeBytes; AT_GetInt((AT_H) hndl, L"ImageSizeBytes", &ImageSizeBytes); 
 	//cast so that the value can be used in the AT_QueueBuffer function 
@@ -484,7 +484,7 @@ int AndorCamera::waitForWriting(int idx){ // make sure buffer is not locked whil
 			
 	}
 		
-	printf("Camera: waitForWriting timeout after %d milliseconds...\n", N);
+	if(debug_bit) printf("Camera: waitForWriting timeout after %d milliseconds...\n", N);
 	return 1;
 	
 }
@@ -520,6 +520,8 @@ void AndorCamera::report_error(const char *string, int error_value, double *mex_
 }
 
 void AndorCamera::save_error(const char *string, int error_value, int batch_number){ // save error flag in vector of errors
+	
+	return; // debug only
 	
 	printf("ERROR in %s: return value %d... ", string, error_value);
 	

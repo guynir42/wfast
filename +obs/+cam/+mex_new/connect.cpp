@@ -26,14 +26,14 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	if(rc) mexErrMsgIdAndTxt( "MATLAB:obs:cam:mex:connect:deviceCount", "Got error code %d when getting DeviceCount!", rc);
 	if(num_devices<=0) mexErrMsgIdAndTxt( "MATLAB:obs:cam:mex:connect:numDevices", "Found %d devices...", num_devices);
 	
-	mexPrintf("sizeof(AT_H)= %d | sizeof(long int)= %d\n", sizeof(AT_H), sizeof(long int));
+	printf("sizeof(AT_H)= %d | sizeof(long int)= %d\n", sizeof(AT_H), sizeof(long int));
 	
 	AT_H *hndl=(AT_H*)mxCalloc(1,sizeof(AT_H));
 	
 	rc = AT_Open(0, hndl);
 	if(rc) mexErrMsgIdAndTxt( "MATLAB:obs:cam:mex:connect:open", "Got error code %d when using AT_Open!", rc);
 	
-	mexPrintf("hndl= %ld\n", *hndl);
+	printf("hndl= %ld\n", *hndl);
 	
 	rc=AT_SetBool(*hndl, L"SensorCooling", (bool) 1); 
 	rc=AT_SetEnumString(*hndl, L"FanSpeed", L"On");
@@ -45,9 +45,9 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	}
 	else{ 
 	
-		mexPrintf("Successfully connected to camera with handle %d\n", *hndl);
+		printf("Successfully connected to camera with handle %d\n", *hndl);
 		
-		mexPrintf("Disconnecting from camera!\n");
+		printf("Disconnecting from camera!\n");
 		
 		rc = AT_Close(*hndl); 
 		if(rc) mexErrMsgIdAndTxt("MATLAB:obs:cam:disconnect:cannotClose", "Unable to close handl %ld. Received error code %d", *hndl, rc);
