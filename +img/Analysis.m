@@ -519,29 +519,23 @@ classdef Analysis < file.AstroData
 
                 v = abs(obj.finder.snr_values);
 
-                fprintf(fid, 'S/N for the last %d batches is distrubuted: min= %f median= %f max= %f\n',...
-                    numel(v), min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
+                fprintf(fid, 'S/N for the last %d batches is distrubuted: min= %f median= %f max= %f\n', numel(v), nanmin(v), nanmedian(v), nanmax(v));
 
                 v = abs([obj.finder.all_events.snr]);
 
-                fprintf(fid, 'S/N for %d triggered events is distrubuted: min= %f median= %f max= %f\n',...
-                    numel(v), min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
+                fprintf(fid, 'S/N for %d triggered events is distrubuted: min= %f median= %f max= %f\n', numel(v), nanmin(v), nanmedian(v), nanmax(v));
 
                 v = abs([obj.finder.kept_events.snr]);
 
-                fprintf(fid, 'S/N for %d kept events is distrubuted: min= %f median= %f max= %f\n',...
-                    numel(v), min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
+                fprintf(fid, 'S/N for %d kept events is distrubuted: min= %f median= %f max= %f\n', numel(v), nanmin(v), nanmedian(v), nanmax(v));
 
                 fprintf(fid, 'Number of events: total= %d | kept= %d\n', length(obj.finder.all_events), length(obj.finder.kept_events));
             
-                fprintf(fid, 'Star hours above stellar S/N of %4.2f: total= %4.2f | lost= %4.2f | kept= %4.2f\n', obj.finder.min_star_snr, ...
-                    obj.finder.star_hours_total, obj.finder.star_hours_lost, obj.finder.star_hours_total-obj.finder.star_hours_lost);
+                fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr, obj.finder.star_hours_total);
                 
-                fprintf(fid, 'Star hours above stellar S/N of %4.2f: total= %4.2f | lost= %4.2f | kept= %4.2f\n', obj.finder.min_star_snr*2, ...
-                    obj.finder.star_hours_total_better, obj.finder.star_hours_lost_better, obj.finder.star_hours_total_better-obj.finder.star_hours_lost_better);
+                fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr*2, obj.finder.star_hours_total_better);
                 
-                fprintf(fid, 'Star hours above stellar S/N of %4.2f: total= %4.2f | lost= %4.2f | kept= %4.2f\n', obj.finder.min_star_snr*4, ...
-                    obj.finder.star_hours_total_best, obj.finder.star_hours_lost_best, obj.finder.star_hours_total_best-obj.finder.star_hours_lost_best);
+                fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr*4, obj.finder.star_hours_total_best);
                 
             end
             
@@ -1484,6 +1478,10 @@ classdef Analysis < file.AstroData
 
             if obj.debug_bit>1, fprintf('Time to find events: %f seconds\n', toc(t)); end
 
+            if ~isempty(obj.finder.gui) && obj.finder.gui.check
+                obj.finder.gui.update;
+            end
+            
         end
         
         function analysisSaveFITS(obj)

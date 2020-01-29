@@ -100,7 +100,24 @@ classdef CircularBuffer < dynamicprops
                 return;
             end
             
-            val = vertcat(obj.data(obj.idx:end,:), obj.data(1:obj.idx-1,:));
+            % the following code gives to subsref a 1st dim with the correct 
+            % order (start at obj.idx, loop back around to obj.idx-1), and
+            % the other dims are just ':', as many as needed...
+            idx_end = size(obj.data,1); 
+            
+            S1 = struct('type', '()', 'subs', obj.idx:idx_end); 
+            S2 = struct('type', '()', 'subs', 1:obj.idx-1); 
+            
+            S1.subs = {S1.subs}; 
+            S2.subs = {S2.subs}; 
+            
+            for ii = 2:ndims(obj.data)
+                S1.subs{end+1} = ':';
+                S2.subs{end+1} = ':';
+            end
+            
+%             val = vertcat(obj.data(obj.idx:end,:), obj.data(1:obj.idx-1,:));
+            val = vertcat(subsref(obj.data, S1), subsref(obj.data, S2));
             
         end
         

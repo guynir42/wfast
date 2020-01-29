@@ -132,8 +132,8 @@ classdef FinderGUI < handle
             obj.panel_statistics.addButton('button_num_batches', 'total_batches', 'info', 'Nbtch= ', '', 'small', 1/3, [], [], 'Total number of batches processed');
             obj.panel_statistics.addButton('button_num_events', 'num_events', 'info', 'Nev= ', '', 'small', 1/3, [], [], 'Total number of found events');
             obj.panel_statistics.addButton('button_num_kept', 'num_kept', 'info', 'Nkept= ', '', 'small', 1/3, [], [], 'Number of kept events');
-            obj.panel_statistics.addButton('button_star_hours', 'star_hours_total', 'info', 'star hours= ', '', 'small', 2/3, [], [], 'How may star hours were scanned, total');
-            obj.panel_statistics.addButton('button_star_hours_lost', 'star_hours_lost', 'info', 'lost= ', '', 'small', 1/3, [], [], 'How may star hours were lost due to overlap with events');
+            obj.panel_statistics.addButton('button_star_hours', 'star_hours_total', 'info', 'star hours= ', '', 'small', 1, [], [], 'How may star hours were scanned, total');
+%             obj.panel_statistics.addButton('button_star_hours_lost', 'star_hours_lost', 'info', 'lost= ', '', 'small', 1/3, [], [], 'How may star hours were lost due to overlap with events');
             obj.panel_statistics.addButton('button_make_histogram', 'histogram', 'push', 'show hist', '', '', 1, [], [], 'Plot a histogram of all S/N results');
             obj.panel_statistics.number = num_buttons;
             

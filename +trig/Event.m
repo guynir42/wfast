@@ -263,7 +263,7 @@ classdef Event < handle
             val = obj.time_index;
             
             if util.text.cs(obj.which_batch, 'second')
-                val = val + size(obj.cutouts_first,3);
+                val = val - size(obj.cutouts_first,3);
             end
             
         end
@@ -342,7 +342,7 @@ classdef Event < handle
             end
             
             % check if there are too many NaNs in the offsets
-            Nidx = isnan(obj.offsets_x_at_star) | isnan(obj.offsets_y_at_star); 
+            Nidx = isnan(obj.offsets_x_at_star(obj.time_indices)) | isnan(obj.offsets_y_at_star(obj.time_indices)); 
             if nnz(Nidx)>=obj.max_num_nans && ~all(Nidx) % if all frames have NaN offsets (i.e., forced photometry), it is ok. If some of them do, it is bad shape
                 obj.keep = 0;
                 obj.is_nan_offsets = 1;
@@ -395,7 +395,7 @@ classdef Event < handle
                 obj.addNote(sprintf('signal is correlated with aperture area at a %f level', corr));
             end
             
-            % check for correlation with area
+            % check for correlation with PSF width
             corr = obj.correlation(obj.widths_at_star);
             if abs(corr)>obj.max_corr
                 obj.keep = 0;
@@ -423,7 +423,7 @@ classdef Event < handle
             Mv = mean(v_temp, 'omitnan'); % get the mean outside the event
             vector = vector - Mv;
             
-            val = sum(f(t).*vector(t), 'omitnan')./sqrt(sum(f(t).^2, 'omitnan').*sum(vector(t).^2, 'omitnan'));
+            val = nansum(f(t).*vector(t))./sqrt(nansum(f(t).^2).*nansum(vector(t).^2));
             
         end
         
@@ -507,7 +507,7 @@ classdef Event < handle
             
             delete(input.parent.Children);
             
-            ax1 = axes('Parent', input.parent, 'Position', [0.1 0.3 0.35 0.4]);
+            ax1 = axes('Parent', input.parent, 'Position', [0.1 0.25 0.35 0.5]);
             obj.showFlux('ax', ax1);
             
             ax2 = axes('Parent', input.parent, 'Position', [0.48 0.3 0.20 0.4]);
@@ -556,16 +556,14 @@ classdef Event < handle
             h5 = plot(input.ax, obj.timestamps, obj.backgrounds_at_star, '--'); 
             h5.DisplayName = 'background';
             
+            h6 = plot(input.ax, obj.timestamps, obj.widths_at_star, 'p', 'MarkerSize', 3);
+            h6.DisplayName = 'PSF width';
+            
             h6 = plot(input.ax, obj.timestamps, obj.offsets_x_at_star, 'x', 'MarkerSize', 4);
             h6.DisplayName = 'offset x';
             
-            h7 = plot(input.ax, obj.timestamps, obj.offsets_y_at_star, '+', 'MarkerSize', 4);
-            h7.DisplayName = 'offset y';
-            
-            h8 = plot(input.ax, obj.timestamps, obj.widths_at_star, 'p', 'MarkerSize', 3);
-            h8.DisplayName = 'PSF width';
-            
-            
+            h8 = plot(input.ax, obj.timestamps, obj.offsets_y_at_star, '+', 'MarkerSize', 4);
+            h8.DisplayName = 'offset y';
             
 %             h8 = bar(input.ax, obj.timestamps, obj.bad_pixels_at_star-mean(obj.bad_pixels_at_star)-5, 'BaseValue', -5, 'FaceAlpha', 0.5);
 %             h8.DisplayName = 'relative bad pixels';
@@ -579,10 +577,10 @@ classdef Event < handle
 %                 lh = legend(input.ax, 'Location', 'SouthWest');
 %             end
 
-            lh = legend(input.ax, 'Location', 'South', 'Orientation', 'Vertical');
+            lh = legend(input.ax, 'Location', 'NorthOutside', 'Orientation', 'Vertical');
             
-            lh.FontSize = input.font_size-4;
-            lh.NumColumns = 2;
+            lh.FontSize = input.font_size;
+            lh.NumColumns = 3;
 
             title(input.ax, obj.notes, 'FontSize', input.font_size);
             
@@ -590,8 +588,12 @@ classdef Event < handle
                 obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.star_snr),...
                 'ax', input.ax, 'Position', 'NorthWest', 'FontSize', input.font_size);
             
-            input.ax.YLim(2) = max(abs(input.ax.YLim));
-            input.ax.YLim(1) = -max(abs(input.ax.YLim))-2;
+            mx = max(max(abs(obj.flux_filtered)), max(abs(obj.flux_detrended))); 
+            
+            input.ax.YLim = [-1 1].*1.2.*mx;
+            
+%             input.ax.YLim(2) = max(abs(input.ax.YLim));
+%             input.ax.YLim(1) = -max(abs(input.ax.YLim))-2;
             
             input.ax.XLim = [obj.timestamps(1) obj.timestamps(end)];
 
