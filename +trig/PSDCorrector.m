@@ -139,7 +139,7 @@ classdef PSDCorrector < handle
                 
                 obj.fluxes_deredened = obj.fluxes_input; 
                 obj.stds_deredened = std(obj.fluxes_input); 
-                obj.fluxes_blued = obj.stds_deredened;
+                obj.fluxes_blued = obj.fluxes_deredened;
                 obj.stds_blued = obj.stds_deredened; 
                 
             end
