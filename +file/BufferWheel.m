@@ -293,6 +293,20 @@ classdef BufferWheel < file.AstroData
             
         end
         
+        function remakeBuffers(obj, num_buffers)
+            
+            if nargin<2 || isempty(num_buffers)
+                num_buffers = length(obj.buf); % the default is to remake with the same number of buffers
+            end
+            
+            obj.buf = struct([]);
+            
+            for ii = 1:num_buffers
+                obj.addBuffer; % this generates each buffer with all the data it needs (based on file.AstroData class)
+            end
+            
+        end
+        
         function clearImages(obj) % get rid of full frame images only (to be depricated!)
             
             obj.images = [];

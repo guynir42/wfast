@@ -286,7 +286,7 @@ classdef Reader < file.AstroData
             
             obj.dataset_names.psfs = {'psfs'};
             obj.attribute_names.psf_sampling = {'psf_sampling', 'psf_binning'};
-            
+            obj.attribute_names.obj_idx = {'obj_idx', 'object_idx', 'obj_index', 'object_index'}; 
             obj.dataset_names.fluxes = {'fluxes', 'lightcurves'};
             
             obj.dataset_names.pars = {'pars'};
@@ -746,7 +746,9 @@ classdef Reader < file.AstroData
                 for ii = 1:length(obj.info.Datasets) % go over all datasets in file, load each to the right matrix
                     
                     data_name = obj.info.Datasets(ii).Name; % the specific field we are now reading
-                    data_size = obj.info.Datasets(ii).Dataspace.Size;
+%                     data_size = obj.info.Datasets(ii).Dataspace.Size;
+                    in = h5info(filename, ['/', data_name]); 
+                    data_size = in.Dataspace.Size; % for some reason, this is more accurate than obj.info.Datasets(ii).Dataspace.Size
                     
                     if isempty(obj.info.Datasets(ii).Attributes)
                         att_names = {};
@@ -1061,7 +1063,7 @@ classdef Reader < file.AstroData
         function startup(obj, varargin) % begin a new run (or continue the same run)
             
             obj.latest_input = obj.makeInputVars(varargin{:});
-            
+            obj.info = []; % this is lazy loaded for each new file
 %             obj.reset;
             obj.brake_bit = 0;
             
