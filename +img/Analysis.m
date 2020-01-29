@@ -1329,7 +1329,7 @@ classdef Analysis < file.AstroData
             obj.back_buf.input(mean(obj.phot.backgrounds,1,'omitnan'));
             obj.width_buf.input(mean(obj.phot.widths,1,'omitnan'));
             
-            obj.calcSkyParameters;
+%             obj.calcSkyParameters; % there's a lot of problems with this function!
             
             if obj.debug_bit>1, fprintf('Time to calculate sky parameters: %f seconds\n', toc(t)); end
             

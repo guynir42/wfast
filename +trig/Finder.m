@@ -127,7 +127,7 @@ classdef Finder < handle
     properties(Dependent=true)
         
         total_batches;
-        kept_events;
+        kept_events; % vector of only the kept events
         
     end
     
@@ -426,7 +426,7 @@ classdef Finder < handle
                 
                 if isempty(obj.sim_bank.filtered_bank) || numel(obj.sim_bank.filtered_bank)~=numel(obj.bank.kernels)*obj.sim_bank.num_pars
                     
-                    if obj.debug_bit, fprintf('Cross filtering all kernels in ShuffleBank (%d) with all templates in FilterBank (%d)...', size(obj.bank.kernels,2), obj.sim_bank.num_pars); end
+                    if obj.debug_bit, fprintf('Cross filtering all kernels in ShuffleBank (%d) with all templates in FilterBank (%d)...\n', size(obj.bank.kernels,2), obj.sim_bank.num_pars); end
                     
                     obj.sim_bank.filtered_bank = util.vec.convolution(obj.bank.kernels, permute(obj.sim_bank.bank-1, [1,6,2,3,4,5])); 
                     

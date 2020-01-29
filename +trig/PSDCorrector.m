@@ -118,7 +118,7 @@ classdef PSDCorrector < handle
             f = obj.fluxes_input;
             f = util.img.pad2size(f, [2 1].*size(f)); % zero pad the fluxes! 
             
-            obj.psd = pwelch(obj.fluxes_raw, 200, [], size(obj.fluxes_input,1)*2, 'twosided');
+            obj.psd = pwelch(obj.fluxes_raw, min(200, size(obj.fluxes_raw,1)), [], size(obj.fluxes_input,1)*2, 'twosided');
                         
             obj.fluxes_deredened = util.img.crop2size(ifft(fft(f./sqrt(obj.psd))), size(obj.fluxes_input)); 
             obj.stds_deredened = std(obj.fluxes_deredened); 
