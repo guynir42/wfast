@@ -11,7 +11,7 @@
 void mexFunction( int nlhs, mxArray *plhs[],
                   int nrhs, const mxArray *prhs[] ){
 
-	printf("Trying to connect to Andor camera!\n"); 
+	printf("Connecting to Andor camera!\n"); 
 				  
 	int rc=0; // return code! 
 	
@@ -26,14 +26,14 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	if(rc) mexErrMsgIdAndTxt( "MATLAB:obs:cam:mex:connect:deviceCount", "Got error code %d when getting DeviceCount!", rc);
 	if(num_devices<=0) mexErrMsgIdAndTxt( "MATLAB:obs:cam:mex:connect:numDevices", "Found %d devices...", num_devices);
 	
-	printf("sizeof(AT_H)= %d | sizeof(long int)= %d\n", sizeof(AT_H), sizeof(long int));
+	// printf("sizeof(AT_H)= %d | sizeof(long int)= %d\n", sizeof(AT_H), sizeof(long int));
 	
 	AT_H *hndl=(AT_H*)mxCalloc(1,sizeof(AT_H));
 	
 	rc = AT_Open(0, hndl);
 	if(rc) mexErrMsgIdAndTxt( "MATLAB:obs:cam:mex:connect:open", "Got error code %d when using AT_Open!", rc);
 	
-	printf("hndl= %ld\n", *hndl);
+	// printf("hndl= %ld\n", *hndl);
 	
 	rc=AT_SetBool(*hndl, L"SensorCooling", (bool) 1); 
 	rc=AT_SetEnumString(*hndl, L"FanSpeed", L"On");
