@@ -824,8 +824,31 @@ classdef Analysis < file.AstroData
 
                     end
 
+                    camera = 'Zyla';
+                    project = 'WFAST'; 
+                    
+                    filenames = obj.reader.dir.match('*.h5*'); 
+                    
+                    if ~isempty(filenames)
+                        
+                        f = lower(filenames{1}); 
+                        
+                        if contains(f, {'balor'})
+                            camera = 'Balor';
+                        elseif contains(f, {'zyla'})
+                            camera = 'Zyla';
+                        end
+                        
+                        if contains(f, {'wfast', 'w-fast', 'w_fast'})
+                            project = 'WFAST';
+                        elseif contains(f, {'kraar'})
+                            project = 'Kraar';
+                        end
+                        
+                    end
+                    
                     if ~isempty(date)
-                        obj.cal.loadByDate(datestr(date, 'yyyy-mm-dd'), 0); % last argument is to NOT reload if date is consistent
+                        obj.cal.loadByDate(datestr(date, 'yyyy-mm-dd'), camera, project, 0); % last argument is to NOT reload if date is consistent
                     end
 
                 end
@@ -1339,12 +1362,14 @@ classdef Analysis < file.AstroData
                 
                 obj.sky_pars = struct;
 %                 pars.seeing = median(obj.width_buf.median,2,'omitnan').*obj.pars.SCALE.*2.355;
-                obj.sky_pars.seeing = median2(obj.phot.widths).*obj.pars.SCALE.*2.355;
+%                 obj.sky_pars.seeing = median2(obj.phot.widths).*obj.pars.SCALE.*2.355;
 %                 pars.background = median(obj.back_buf.median, 2,'omitnan');
-                obj.sky_pars.background = median2(obj.phot.backgrounds);
-                obj.sky_pars.area = median2(obj.phot.areas);
+%                 obj.sky_pars.background = median2(obj.phot.backgrounds);
+%                 obj.sky_pars.area = median2(obj.phot.areas);
+
                 
-                if ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) % this is a fairly good indicator that mextractor/astrometry worked
+                
+                if ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) && obj.cat.success==1
                     
 %                     S = double(obj.mean_buf.median)';
 %                     N = double(sqrt(obj.var_buf.median))';
@@ -1603,121 +1628,6 @@ classdef Analysis < file.AstroData
                 if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
 
             end
-            
-        end
-        
-        function S = runMextractor(obj, I)
-            
-            if isempty(which('mextractor'))
-                error('Cannot load the MAAT package. Make sure it is on the path...');
-            end
-            
-            if nargin<2 || isempty(I)
-                I = obj.stack_proc;
-            end
-            
-            if isempty(I)
-                error('Must supply an image to run mextractor (or fill stack_proc).');
-            end
-            
-            I = regionfill(I, isnan(I));
-            
-            S = SIM;
-            S.Im = I;
-            evalc('S = mextractor(S);');
-            
-            SN = S.Cat(:,find(strcmp(S.ColCell, 'SN')));
-            SN2 = S.Cat(:,find(strcmp(S.ColCell, 'SN_UNF')));
-            S.Cat = S.Cat(SN>SN2-2,:);
-            
-            obj.image_mextractor = S;
-            
-        end
-        
-        function SS = runAstrometry(obj, S)
-            
-            if isempty(which('astrometry'))
-                error('Cannot load the MAAT package. Make sure it is on the path...');
-            end
-            
-            if nargin<2 || isempty(S)
-                if ~isempty(obj.image_mextractor)
-                    S = obj.image_mextractor;
-                else
-                    error('Must supply a SIM object to run astrometry (or fill image_mextractor).');
-                end
-            end
-            
-%             addpath(fullfile(getenv('DATA'), 'GAIA\DR2'));
-            
-            [~,S]=astrometry(S, 'RA', obj.pars.RA_DEG/180*pi, 'Dec', obj.pars.DEC_DEG/180*pi, 'Scale', obj.pars.SCALE,...
-                'Flip',[1 1;1 -1;-1 1;-1 -1], 'RefCatMagRange', [7 17], 'BlockSize', [3000 3000], 'ApplyPM', false, ...
-                'MinRot', -25, 'MaxRot', 25);
-            
-            % update RA/Dec in catalog according to WCS
-            obj.image_mextractor = update_coordinates(S);
-            
-            %  Match sources with GAIA
-            SS = catsHTM.sources_match('GAIADR2',obj.image_mextractor);
-            
-            obj.matched_gaia = SS;
-            
-            
-            
-        end
-        
-        function T = makeCatalog(obj)
-            
-            S = obj.image_mextractor;
-            SS = obj.matched_gaia;
-            
-            T = array2table([SS.Cat, S.Cat], 'VariableNames', [SS.ColCell, S.ColCell]);
-            
-            T = T(~isnan(T{:,1}),:);
-             
-            [~, idx] = unique(T{:,1:2}, 'rows');
-            T = T(idx,:);
-
-%             T.Properties.VariableNames; % change variable names??
-
-            T.RA = T.RA.*180/pi;
-            T.Dec = T.Dec.*180/pi;
-            T.Dist = T.Dist.*180/pi*3600;
-            
-            T.ALPHAWIN_J2000 = T.ALPHAWIN_J2000.*180/pi;
-            T.DELTAWIN_J2000 = T.DELTAWIN_J2000.*180/pi;
-            
-            T.Properties.VariableUnits = {'deg', 'deg', 'year', '"', '"', '"', '"', '"', '"', '"', '"', '', '', '', ...
-                'mag', 'mag', 'mag', 'mag', 'mag', 'mag', 'km/s', 'km/s', '', 'K', 'K', 'K', '', '', '"', '',  ...
-                'pix', 'pix', 'pix', 'pix', 'pix', 'pix', 'pix', 'deg', '', ...
-                'deg', 'deg', 'counts', 'counts', '', '', '', '','', 'counts', 'counts', 'mag', 'mag', '', '', '', ...
-                'counts', 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', ...
-                'counts', 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', ...
-                '', '', 'arcsec'}; % input units for all variables
-            
-            obj.catalog = T;
-
-        end
-        
-        function findStarsMAAT(obj) % to be depricated! 
-            
-            if isempty(which('mextractor'))
-                error('Cannot load the MAAT package. Make sure it is on the path...');
-            end
-             
-            % add additional tests to remove irrelvant stars
-            
-            if obj.min_star_temp
-                T = T(T{:,'Teff'}>=obj.min_star_temp,:); % select only stars with temperature above minimal level (hotter stars have smaller angular scale)
-            end
-            
-            T = sortrows(T, 'Mag_G'); % sort stars from brightest to faintest
-            
-            obj.positions = [T.XPEAK_IMAGE T.YPEAK_IMAGE];
-            obj.clip.positions = obj.positions;
-            
-            obj.magnitudes = T{:,'Mag_G'};
-            obj.coordinates = [T.RA T.Dec];
             
         end
         
