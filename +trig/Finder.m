@@ -89,7 +89,8 @@ classdef Finder < handle
         
         lightcurve_type_index = 'end'; % for multiple photometry products choose the one that most suits you for event detection
         
-        use_psd_correction = 1;
+        use_psd_correction = 1; % use welch on a flux buffer to correct red noise
+        use_var_buf = 1; % normalize variance of each filtered flux
         
         min_star_snr = 5; % stars with lower S/N are not even tested for events
         snr_bin_width = 0.5; % for the star-hour histogram
@@ -106,8 +107,7 @@ classdef Finder < handle
         max_frames = 50; % maximum length of trigger area (very long events are disqualified)
         max_num_nans = 1;
         max_corr = 0.75;
-        
-        use_var_buf = 1; % use PSD tracking! 
+         
         
         num_hits_black_list = 4;
         
