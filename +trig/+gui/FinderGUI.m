@@ -129,11 +129,11 @@ classdef FinderGUI < handle
             num_buttons = 3;
             pos = pos-num_buttons;
             obj.panel_statistics = GraphicPanel(obj.owner, [0 pos/N_left 0.2 num_buttons/N_left], 'statistics', 1); % last input is for vertical (default)
-            obj.panel_statistics.addButton('button_num_batches', 'total_batches', 'info', 'Nbtch= ', '', 'small', 1/3, [], [], 'Total number of batches processed');
-            obj.panel_statistics.addButton('button_num_events', 'num_events', 'info', 'Nev= ', '', 'small', 1/3, [], [], 'Total number of found events');
-            obj.panel_statistics.addButton('button_num_kept', 'num_kept', 'info', 'Nkept= ', '', 'small', 1/3, [], [], 'Number of kept events');
-            obj.panel_statistics.addButton('button_star_hours', 'star_hours_total', 'info', 'star hours= ', '', 'small', 2/3, [], [], 'How may star hours were scanned, total');
-            obj.panel_statistics.addButton('button_star_hours_lost', 'star_hours_lost', 'info', 'lost= ', '', 'small', 1/3, [], [], 'How may star hours were lost due to overlap with events');
+            obj.panel_statistics.addButton('button_num_batches', 'total_batches', 'info', 'Nbtch= ', '', 'edit', 1/3, [], [], 'Total number of batches processed');
+            obj.panel_statistics.addButton('button_num_events', 'num_events', 'info', 'Nev= ', '', 'edit', 1/3, [], [], 'Total number of found events');
+            obj.panel_statistics.addButton('button_num_kept', 'num_kept', 'info', 'Nkept= ', '', 'edit', 1/3, [], [], 'Number of kept events');
+            obj.panel_statistics.addButton('button_star_hours', 'star_hours_total', 'info', 'star hours= ', '', 'edit', 1, [], [], 'How may star hours were scanned, total');
+%             obj.panel_statistics.addButton('button_star_hours_lost', 'star_hours_lost', 'info', 'lost= ', '', 'small', 1/3, [], [], 'How may star hours were lost due to overlap with events');
             obj.panel_statistics.addButton('button_make_histogram', 'histogram', 'push', 'show hist', '', '', 1, [], [], 'Plot a histogram of all S/N results');
             obj.panel_statistics.number = num_buttons;
             
@@ -168,7 +168,7 @@ classdef FinderGUI < handle
             
             num_buttons = 1; pos = pos - 1;
             obj.panel_obs_pars = GraphicPanel(obj.owner, [0.2 pos/N_middle 0.8 num_buttons/N_middle], 'observational parameters', 0); % last input is for horizontal
-            obj.panel_obs_pars.addButton('button_pars', 'obs_pars_str', 'info', ' ', '', 'small');
+            obj.panel_obs_pars.addButton('button_pars', 'obs_pars_str', 'info', ' ', '', 'edit');
             obj.panel_obs_pars.number = num_buttons;
             obj.panel_obs_pars.make;
             
@@ -176,7 +176,7 @@ classdef FinderGUI < handle
             
             num_buttons = 1; pos = pos - 1;
             obj.panel_phot_pars = GraphicPanel(obj.owner, [0.2 pos/N_middle 0.8 num_buttons/N_middle], 'photmetric parameters', 0); % last input is for horizontal
-            obj.panel_phot_pars.addButton('button_pars', 'phot_pars_str', 'info', ' ', '', 'small');
+            obj.panel_phot_pars.addButton('button_pars', 'phot_pars_str', 'info', ' ', '', 'edit');
             obj.panel_phot_pars.number = num_buttons;
             obj.panel_phot_pars.make;
             
@@ -184,7 +184,7 @@ classdef FinderGUI < handle
             
             num_buttons = 1; pos = pos - 1;
             obj.panel_phot_pars = GraphicPanel(obj.owner, [0.2 pos/N_middle 0.8 num_buttons/N_middle], 'event parameters', 0); % last input is for horizontal
-            obj.panel_phot_pars.addButton('button_pars', 'event_pars_str', 'info', ' ', '', 'small');
+            obj.panel_phot_pars.addButton('button_pars', 'event_pars_str', 'info', ' ', '', 'edit');
             obj.panel_phot_pars.number = num_buttons;
             obj.panel_phot_pars.make;
             

@@ -90,6 +90,7 @@ class Photometry{
 	bool use_gaussian=1; // decide if you want to use gaussians photometry at all
 	bool use_apertures=1; // decide if you want to use aperture photometry (wedding cake)
 	bool use_forced=1; // decide if you want to use forced photometry after finding the best offsets
+	bool use_median=1; // decide if you want to use median (instead of mean) to get the background value
 	
 	int debug_bit=0;
 	

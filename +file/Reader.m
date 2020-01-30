@@ -286,7 +286,7 @@ classdef Reader < file.AstroData
             
             obj.dataset_names.psfs = {'psfs'};
             obj.attribute_names.psf_sampling = {'psf_sampling', 'psf_binning'};
-            
+            obj.attribute_names.obj_idx = {'obj_idx', 'object_idx', 'obj_index', 'object_index'}; 
             obj.dataset_names.fluxes = {'fluxes', 'lightcurves'};
             
             obj.dataset_names.pars = {'pars'};
@@ -746,7 +746,9 @@ classdef Reader < file.AstroData
                 for ii = 1:length(obj.info.Datasets) % go over all datasets in file, load each to the right matrix
                     
                     data_name = obj.info.Datasets(ii).Name; % the specific field we are now reading
-                    data_size = obj.info.Datasets(ii).Dataspace.Size;
+%                     data_size = obj.info.Datasets(ii).Dataspace.Size;
+                    in = h5info(filename, ['/', data_name]); 
+                    data_size = in.Dataspace.Size; % for some reason, this is more accurate than obj.info.Datasets(ii).Dataspace.Size
                     
                     if isempty(obj.info.Datasets(ii).Attributes)
                         att_names = {};
@@ -850,6 +852,8 @@ classdef Reader < file.AstroData
                         loaded_positions = h5read(filename, sa('/', data_name)); % read the entire "positions" dataset, if it exists
                         obj.positions = loaded_positions(:,:,end); % to handle cases where we accidentally saved coordinates and positions together... 
                         
+                        obj.getAttribute(filename, data_name, att_names, 'obj_idx');
+                        
                     elseif any(strcmp(data_name, obj.dataset_names.coordinates)) && all(data_size) % data_names.coordinates may be a cell array of different optional names
                         
                         obj.coordinates = h5read(filename, sa('/', data_name)); % read the entire "cordinates" dataset, if it exists
@@ -911,7 +915,12 @@ classdef Reader < file.AstroData
                         
                         num_frames = min(num_frames, num_images_on_file); % make sure we don't ask for more frames than we have on file
                         
-                        loaded_fluxes = h5read(filename, sa('/', data_name), [frame_start 1], [num_frames Inf]); % must check the dimensions on file fit what I think I am saving...
+                        if length(data_size)==2
+                            loaded_fluxes = h5read(filename, sa('/', data_name), [frame_start 1], [num_frames Inf]); % must check the dimensions on file fit what I think I am saving...
+                        elseif length(data_size)==3
+                            loaded_fluxes = h5read(filename, sa('/', data_name), [frame_start 1 1], [num_frames Inf Inf]); % must check the dimensions on file fit what I think I am saving...
+                        end
+                        
                         obj.fluxes = cat(1, obj.fluxes, loaded_fluxes); % append to the existing images
                         
                     elseif any(strcmp(data_name, obj.dataset_names.pars)) 
@@ -1054,7 +1063,7 @@ classdef Reader < file.AstroData
         function startup(obj, varargin) % begin a new run (or continue the same run)
             
             obj.latest_input = obj.makeInputVars(varargin{:});
-            
+            obj.info = []; % this is lazy loaded for each new file
 %             obj.reset;
             obj.brake_bit = 0;
             

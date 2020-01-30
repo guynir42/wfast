@@ -76,15 +76,12 @@ classdef Finder < handle
         prev_flags;
         
         dt; 
-        coverage_total;
-        coverage_lost;
-        star_hours_total;
-        star_hours_total_better;
-        star_hours_total_best;
-        star_hours_lost;
-        star_hours_lost_better;
-        star_hours_lost_best;
+        
         snr_values;
+        
+        star_snr_histogram; % contains the number of star-hours for each star when it was at a given S/N 
+        hist_snr_edges; % a vector with the bin edges for the snr axis of the star_hours histogram 
+        hist_star_edges; % a vector with the bin edges for the star number axis of the star_hours histogram
         
     end
     
@@ -92,9 +89,13 @@ classdef Finder < handle
         
         lightcurve_type_index = 'end'; % for multiple photometry products choose the one that most suits you for event detection
         
-        use_psd_correction = 1;
+        use_psd_correction = 1; % use welch on a flux buffer to correct red noise
+        use_var_buf = 1; % normalize variance of each filtered flux
         
         min_star_snr = 5; % stars with lower S/N are not even tested for events
+        snr_bin_width = 0.5; % for the star-hour histogram
+        snr_bin_max = 100; % biggest value we expect to see in the star-hour histogram
+        
         threshold = 7.5; % threshold (in units of S/N) for peak of event 
         time_range_thresh = -2.5; % threshold for including area around peak (in continuous time)
         kern_range_thresh = -1; % area threshold (in kernels, discontinuous) NOTE: if negative this will be relative to "threshold"
@@ -106,8 +107,7 @@ classdef Finder < handle
         max_frames = 50; % maximum length of trigger area (very long events are disqualified)
         max_num_nans = 1;
         max_corr = 0.75;
-        
-        use_var_buf = 1; % use PSD tracking! 
+         
         
         num_hits_black_list = 4;
         
@@ -126,20 +126,23 @@ classdef Finder < handle
     
     properties(Dependent=true)
         
-        total_batches;
-        kept_events;
+        star_hours; % a vector for different S/N values
+        star_hours_total; % a sum of all star hours collected for stars above the minimal S/N
+        
+        total_batches; % how many batches were processed
+        kept_events; % vector of only the kept events
         
     end
     
     properties(Hidden=true)
-       
+        
         t_end;
         t_end_stamp;
         used_background_sub;
         aperture;
         gauss_sigma;
         
-        version = 1.02;
+        version = 1.03;
         
     end
     
@@ -200,14 +203,9 @@ classdef Finder < handle
             obj.prev_filename = [];
             
             obj.dt = []; 
-            obj.coverage_total = 0;
-            obj.coverage_lost = 0;
-            obj.star_hours_total = 0;
-            obj.star_hours_lost = 0;
-            obj.star_hours_total_better = 0;
-            obj.star_hours_lost_better = 0;
-            obj.star_hours_total_best = 0;
-            obj.star_hours_lost_best = 0;
+            
+            obj.star_snr_histogram = [];
+            
             obj.snr_values = [];
             
             obj.display_event_idx = [];
@@ -300,6 +298,56 @@ classdef Finder < handle
             
         end
         
+        function val = get.star_hours(obj)
+            
+            if isempty(obj.star_snr_histogram)
+                val = 0;
+            else
+                val = nansum(obj.star_snr_histogram); 
+            end
+            
+        end
+        
+        function val = get.star_hours_total(obj)
+            
+            if isempty(obj.star_snr_histogram)
+                val = 0;
+            else
+                val = util.stat.sum2(obj.star_snr_histogram); 
+            end
+            
+        end
+        
+        function val = star_hours_total_better(obj)
+            
+             if isempty(obj.star_snr_histogram)
+                val = 0;
+             else
+                idx = find(obj.min_star_snr*2>=obj.hist_snr_edges, 1, 'first');
+                if ~isempty(idx)
+                    val = util.stat.sum2(obj.star_snr_histogram(:,idx:end)); 
+                else
+                    val = 0;
+                end
+            end
+            
+        end
+        
+        function val = star_hours_total_best(obj)
+            
+             if isempty(obj.star_snr_histogram)
+                val = 0;
+             else
+                idx = find(obj.min_star_snr*4>=obj.hist_snr_edges, 1, 'first');
+                if ~isempty(idx)
+                    val = util.stat.sum2(obj.star_snr_histogram(:,idx:end)); 
+                else
+                    val = 0;
+                end
+            end
+            
+        end
+        
         function val = num_events(obj)
             
             val = length(obj.all_events);
@@ -320,9 +368,17 @@ classdef Finder < handle
                 if isempty(obj.pars.STARTTIME)
                     date_str = '';
                 else
-                    date_str = obj.pars.STARTTIME(1:10);
+                    date_str = obj.pars.STARTTIME(1:10); % get only date, no hours/minutes/seconds
                 end
-                val = sprintf('date: %s', date_str); % need to expand this...
+                
+                if isempty(obj.pars.RA)
+                   
+                else
+                    
+                end
+                
+                val = sprintf('date: %s | RA= %s | DE= %s | airmass= %4.2f | wind= %4.2f km/h | moon: %d%%, %d deg',...
+                    date_str, obj.pars.RA, obj.pars.DEC, obj.pars.AIRMASS, obj.pars.WIND_SPEED, round(100*obj.pars.MOONILL), round(obj.pars.MOONDIST));
             end
             
         end
@@ -333,12 +389,14 @@ classdef Finder < handle
                 val = '';
             else
                 
-                val = sprintf('aperture: %s pix | annulus: %s pix | iterations: %d', ...
+                val = sprintf('aperture: %s pix | annulus: %s pix | iterations: %d | var_buf: %d | PSD: %d ', ...
                     util.text.print_vec(obj.phot_pars.aperture_radii),...
                     util.text.print_vec(obj.phot_pars.annulus_radii),...
-                    obj.phot_pars.iterations);
-                                
+                    obj.phot_pars.iterations, obj.use_var_buf, obj.use_psd_correction);
+                
             end
+            
+%             val = sprintf('%s | var_buf= %d | PSD= %d', val, 
             
         end
         
@@ -426,7 +484,7 @@ classdef Finder < handle
                 
                 if isempty(obj.sim_bank.filtered_bank) || numel(obj.sim_bank.filtered_bank)~=numel(obj.bank.kernels)*obj.sim_bank.num_pars
                     
-                    if obj.debug_bit, fprintf('Cross filtering all kernels in ShuffleBank (%d) with all templates in FilterBank (%d)...', size(obj.bank.kernels,2), obj.sim_bank.num_pars); end
+                    if obj.debug_bit, fprintf('Cross filtering all kernels in ShuffleBank (%d) with all templates in FilterBank (%d)...\n', size(obj.bank.kernels,2), obj.sim_bank.num_pars); end
                     
                     obj.sim_bank.filtered_bank = util.vec.convolution(obj.bank.kernels, permute(obj.sim_bank.bank-1, [1,6,2,3,4,5])); 
                     
@@ -517,8 +575,11 @@ classdef Finder < handle
                     obj.psd.num_frames_to_add = size(obj.fluxes,1); % only add the first 100 measurements
                     obj.psd.input(obj.cal.fluxes_detrended);
                     
-                    obj.fluxes_corrected = obj.psd.fluxes_deredened;
-                    obj.stds_corrected = obj.psd.stds_deredened;
+%                     obj.fluxes_corrected = obj.psd.fluxes_deredened;
+%                     obj.stds_corrected = obj.psd.stds_deredened;
+                    obj.fluxes_corrected = obj.psd.fluxes_blued;
+                    obj.stds_corrected = obj.psd.stds_blued;
+
 
                     if obj.debug_bit>2, fprintf('PSD correction time: %f seconds.\n', toc(t)); end
 
@@ -579,7 +640,6 @@ classdef Finder < handle
                     
                 end
                 
-                
             end
             
             % store these for next time
@@ -601,7 +661,7 @@ classdef Finder < handle
             obj.prev_filename = obj.filename;
             
             if ~isempty(obj.bank.fluxes_filtered)
-                obj.var_buf.input(var(obj.bank.fluxes_filtered, [], 1, 'omitnan')); % PSD tracking: keep a running buffer of the variance of previous filter results
+                obj.var_buf.input(nanvar(obj.bank.fluxes_filtered)); % variance tracking: keep a running buffer of the variance of previous filter results
             end
             
         end
@@ -617,8 +677,8 @@ classdef Finder < handle
                 return;
             end
             
-            better_stars = obj.cal.star_snrs>obj.min_star_snr*2;
-            best_stars = obj.cal.star_snrs>obj.min_star_snr*4;
+%             better_stars = obj.cal.star_snrs>obj.min_star_snr*2;
+%             best_stars = obj.cal.star_snrs>obj.min_star_snr*4;
             
             t = tic; 
             
@@ -668,6 +728,8 @@ classdef Finder < handle
             
             obj.dt = median(diff(obj.timestamps));
             
+            batch_duration_seconds = obj.timestamps(end) - obj.timestamps(1) + obj.dt;
+            
             for ii = 1:obj.max_events
                 
                 t_max = tic;
@@ -696,6 +758,10 @@ classdef Finder < handle
 
                     ev.time_index = idx(1); 
                     ev.kern_index = idx(2);
+                    
+                    if idx(1)>length(obj.prev_timestamps)
+                        ev.which_batch = 'second';
+                    end
                     
                     if isempty(star_index_sim) % (note: in sim mode, idx(3)==1 by definition, but star_index is not!)
                         ev.star_index = idx(3);
@@ -726,17 +792,14 @@ classdef Finder < handle
 
                     ev.flux_detrended = obj.fluxes_corrected(:,ev.star_index); 
                     ev.std_flux = obj.stds_corrected(ev.star_index); 
-%                     ev.std_flux = std(ev.flux_detrended, [], 'omitnan');
+
                     ev.flux_raw_all = obj.cal.fluxes;
                     % somewhere around here we MUST make use of the flux errors
 
                     obj.new_events(end+1) = ev; % add this event to the list
 
-                    if ~obj.use_sim || obj.sim_bank.filtered_index==0 % only store star hours when not in sim-mode
-                        obj.coverage_lost = obj.coverage_lost + ev.duration; % how much time is "zeroed out"
-                        obj.star_hours_lost = obj.star_hours_lost + (ev.duration)*sum(good_stars)/3600;
-                        obj.star_hours_lost_better = obj.star_hours_lost + (ev.duration)*sum(better_stars)/3600;
-                        obj.star_hours_lost_best = obj.star_hours_lost + (ev.duration)*sum(best_stars)/3600;
+                    if util.text.cs(ev.which_batch, 'second')
+                        batch_duration_seconds = batch_duration_seconds - ev.duration; % only reduce star hours for events in the second batch
                     end
                     
                     if obj.debug_bit>3, fprintf('New event time: %f seconds.\n', toc(t_ev)); end
@@ -749,12 +812,41 @@ classdef Finder < handle
                 
             end
             
-            if isempty(star_index_sim) % only store star hours when not in sim-mode
-                obj.coverage_total = obj.coverage_total + obj.timestamps(end) - obj.timestamps(1) + obj.dt;
-                obj.star_hours_total = obj.star_hours_total + (obj.timestamps(end) - obj.timestamps(1) + obj.dt)*sum(good_stars)/3600;
-                obj.star_hours_total_better = obj.star_hours_total_better + (obj.timestamps(end) - obj.timestamps(1) + obj.dt)*sum(better_stars)/3600;
-                obj.star_hours_total_best = obj.star_hours_total_best + (obj.timestamps(end) - obj.timestamps(1) + obj.dt)*sum(best_stars)/3600;
+            if isempty(star_index_sim) % only store star hours and add batch black list when not in sim-mode
+                
+                if batch_duration_seconds<0 
+                    batch_duration_seconds = 0;
+                end
+                
+                if length(obj.new_events)>obj.num_hits_black_list % too many events in one batch, flag all events and cancel the star hours
+                    
+                    batch_duration_seconds = 0;
+                    
+                    obj.black_list_batches = [obj.black_list_batches obj.batch_index];
+                    
+                    for ii = 1:length(obj.new_events)
+                        obj.new_events(ii).keep = 0;
+                        obj.new_events(ii).is_bad_batch = 1;
+                        obj.new_events(ii).addNote(sprintf('batch %d is on black list', obj.batch_index));
+                    end
+                    
+                end
+                    
+                obj.hist_snr_edges = obj.min_star_snr:obj.snr_bin_width:obj.snr_bin_max; 
+                obj.hist_star_edges = 1:length(obj.cal.star_snrs); 
+                
+                h = histcounts2(obj.hist_star_edges, obj.cal.star_snrs, obj.hist_star_edges, obj.hist_snr_edges); % put one in the bin with the right S/N and star index
+                
+                h = h.*batch_duration_seconds./3600; % the duration of the second batch, subtracting the duration of all events in that part
+                
+                if isempty(obj.star_snr_histogram)
+                    obj.star_snr_histogram = h; % store the first star hours
+                else
+                    obj.star_snr_histogram = obj.star_snr_histogram + h; % store the added star hours
+                end
+                
                 sim_pars = [];
+                
             else
                 sim_pars = obj.sim_bank.sim_pars;
             end
@@ -977,11 +1069,12 @@ classdef Finder < handle
                 obj.black_list_stars = [obj.black_list_stars E(N>=obj.num_hits_black_list)];
             end
             
-            batches = [obj.all_events.batch_index];
-            if ~isempty(batches)
-                [N,E] = histcounts(batches, 'BinWidth', 1, 'BinLimits', [1 max(batches)+1]);
-                obj.black_list_batches = [obj.black_list_batches E(N>=obj.num_hits_black_list)];
-            end
+            % this is commented out because we already black list each batch as it occurs
+%             batches = [obj.all_events.batch_index];
+%             if ~isempty(batches)
+%                 [N,E] = histcounts(batches, 'BinWidth', 1, 'BinLimits', [1 max(batches)+1]);
+%                 obj.black_list_batches = [obj.black_list_batches E(N>=obj.num_hits_black_list)];
+%             end
             
             for ii = 1:length(obj.all_events)
                 
@@ -991,11 +1084,15 @@ classdef Finder < handle
                     obj.all_events(ii).addNote(sprintf('star %d is on black list', obj.all_events(ii).star_index));
                 end
                 
-                if ismember(obj.all_events(ii).batch_index, obj.black_list_stars)
-                    obj.all_events(ii).keep = 0;
-                    obj.all_events(ii).is_bad_batch = 1;
-                    obj.all_events(ii).addNote(sprintf('batch %d is on black list', obj.all_events(ii).batch_index));
+                if ~isempty(obj.black_list_stars)
+                    obj.star_snr_histogram(:,obj.black_list_stars) = NaN; % mark off all stars on the black list, their star-hours are useless
                 end
+                
+%                 if ismember(obj.all_events(ii).batch_index, obj.black_list_batches)
+%                     obj.all_events(ii).keep = 0;
+%                     obj.all_events(ii).is_bad_batch = 1;
+%                     obj.all_events(ii).addNote(sprintf('batch %d is on black list', obj.all_events(ii).batch_index));
+%                 end
                 
             end
             
@@ -1266,6 +1363,10 @@ classdef Finder < handle
             ax = axes('Parent', parent);
             
             histogram(ax, abs(obj.snr_values), 'BinWidth', 0.2);
+            
+            xlabel(ax, 'Best S/N value'); 
+            ylabel(ax, 'Number of batches');
+            ax.FontSize = 24; 
             
         end
         

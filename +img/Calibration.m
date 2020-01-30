@@ -102,6 +102,9 @@ classdef Calibration < handle
         flat_var; % variance of the flats (used for calculating gain, etc.)
         date_flat = '';
         
+        camera_name = 'Zyla';
+        project_name = 'WFAST'; 
+        
         flat_pixel_mean; % used for calculating gain
         flat_pixel_var; % used for calculating gain
         pixel_gain; % used for calculating gain
@@ -824,6 +827,9 @@ classdef Calibration < handle
                     end
 
                     reader.batch;
+                    
+                    obj.camera_name = reader.pars.INST;
+                    obj.project_name = reader.pars.PROJECT;
 
                     if cs(obj.mode, 'dark')
                         obj.addDark(reader.images);
@@ -1296,7 +1302,7 @@ classdef Calibration < handle
 
             if nargin<2 || isempty(filename)
                 
-                filename = sprintf('calibration_%s.mat', datestr(date, 'yyyy-mm-dd'));
+                filename = sprintf('calibration_%s_%s_%s.mat', datestr(date, 'yyyy-mm-dd'), obj.project_name, obj.camera_name);
                 
             end
             
@@ -1350,13 +1356,21 @@ classdef Calibration < handle
            
         end
         
-        function loadByDate(obj, date, force_reload)
+        function loadByDate(obj, date, camera, project, force_reload)
             
             if nargin<2 || isempty(date)
                 date = datestr(datetime('now', 'TimeZone', 'UTC'), 'yyyy-mm-dd'); 
             end
             
-            if nargin<3 || isempty(force_reload)
+            if nargin<3 || isempty(camera)
+                camera = 'Zyla';
+            end
+            
+            if nargin<4 || isempty(project)
+                project = 'WFAST';
+            end
+            
+            if nargin<5 || isempty(force_reload)
                 force_reload = 0;
             end
             
@@ -1403,17 +1417,37 @@ classdef Calibration < handle
                     date_cal(ii) = datetime(files{ii}(idx1:idx2));
                 end
                 
+                if contains(lower(files{ii}), {'balor'})
+                    this_cam = 'Balor';
+                elseif contains(lower(files{ii}), {'zyla'})
+                    this_cam = 'Zyla'; 
+                else
+                    this_cam = 'Zyla';
+                end
+                
+                if contains(lower(files{ii}), {'wfast', 'w-fast', 'w_fast'})
+                    this_proj = 'WFAST';
+                elseif contains(lower(files{ii}), {'kraar'})
+                    this_proj = 'Kraar'; 
+                else
+                    this_proj = 'WFAST';
+                end
+                
+                if ~strcmpi(camera, this_cam) || ~strcmpi(project, this_proj)
+                    date_cal(ii) = NaT;
+                end
+                
             end
             
             if all(isnat(date_cal))
-                error('Cannot find any files in directory: %s matching the pattern *YYYY-MM-DD*', dir);
+                error('Cannot find any files in directory: %s \n that match the pattern *YYYY-MM-DD* for camera: %s and project: %s', dir, camera, project);
             end
             
             deltas = days(date-date_cal); % days that passed between requested date and calibration time
             deltas(deltas<0)=NaN; % remove folders where calibration is taken AFTER the requested date
             
             if all(isnan(deltas))
-                error('Cannot find any calibration files after this date: %s', datestr(date, 'yyyy-mm-dd'));
+                error('Cannot find any calibration files before this date: %s for %s/%s', datestr(date, 'yyyy-mm-dd'), project, camera);
             end
             
             [min_days,idx] = min(deltas); % find closest calibration file that occured BEFORE requested date

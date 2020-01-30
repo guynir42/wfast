@@ -11,7 +11,7 @@ classdef PSDCorrector < handle
     properties % inputs/outputs
         
         fluxes_input;
-        fluxes_raw; 
+        flux_buffer; 
         psd; 
         
         fluxes_deredened;
@@ -27,7 +27,8 @@ classdef PSDCorrector < handle
         
         num_frames_to_add = 100; % how many frames from the input flux should be added to the PSD (in case we get multiple, overlapping batches)
         
-        N = 1000; % number of samples in the buffer
+        N_buf = 1000; % number of samples in the buffer
+        N_min = 500; % number of samples needed to apply PSD corrections
         
         debug_bit = 1;
         
@@ -65,7 +66,7 @@ classdef PSDCorrector < handle
         
         function reset(obj)
             
-            obj.fluxes_raw = [];
+            obj.flux_buffer = [];
             obj.psd = [];
             
             obj.clear;
@@ -103,10 +104,10 @@ classdef PSDCorrector < handle
             
             obj.fluxes_input = fluxes;
             
-            obj.fluxes_raw = vertcat(obj.fluxes_raw, fluxes(1:obj.num_frames_to_add,:));
+            obj.flux_buffer = vertcat(obj.flux_buffer, fluxes(1:obj.num_frames_to_add,:));
             
-            if size(obj.fluxes_raw,1)>obj.N
-                obj.fluxes_raw = obj.fluxes_raw(end-obj.N+1:end,:,:); % be careful with fluxes with more than 3 dimensions! 
+            if size(obj.flux_buffer,1)>obj.N_buf
+                obj.flux_buffer = obj.flux_buffer(end-obj.N_buf+1:end,:,:); % be careful with fluxes with more than 3 dimensions! 
             end
             
             obj.calculate;
@@ -114,19 +115,34 @@ classdef PSDCorrector < handle
         end
         
         function calculate(obj)
-           
-            f = obj.fluxes_input;
-            f = util.img.pad2size(f, [2 1].*size(f)); % zero pad the fluxes! 
             
-            obj.psd = pwelch(obj.fluxes_raw, 200, [], size(obj.fluxes_input,1)*2, 'twosided');
-                        
-            obj.fluxes_deredened = util.img.crop2size(ifft(fft(f./sqrt(obj.psd))), size(obj.fluxes_input)); 
-            obj.stds_deredened = std(obj.fluxes_deredened); 
-            
-            % these are divided twice by the sqrt(PSD) to account for the filter being deredened as well.
-            obj.fluxes_blued = util.img.crop2size(ifft(fft(f./(obj.psd))), size(obj.fluxes_input)); 
-            obj.stds_blued = std(obj.fluxes_blued); 
-            
+            if isempty(obj.N_min) || size(obj.flux_buffer,1)>=obj.N_min
+
+                f = obj.fluxes_input;
+
+                S = size(f);
+                S(1) = S(1)*2; % add padding twice the size of the data
+                f = util.img.pad2size(f, S); % zero pad the fluxes! 
+
+                obj.psd = pwelch(obj.flux_buffer, size(obj.fluxes_input, 1), [], S(1), 'twosided');
+
+                ff = fft(f);
+
+                obj.fluxes_deredened = util.img.crop2size(ifft(ff./sqrt(obj.psd)), size(obj.fluxes_input)); 
+                obj.stds_deredened = std(obj.fluxes_deredened); 
+
+                % these are divided twice by the sqrt(PSD) to account for the filter being deredened as well.
+                obj.fluxes_blued = util.img.crop2size(ifft(ff./obj.psd), size(obj.fluxes_input)); 
+                obj.stds_blued = std(obj.fluxes_blued); 
+
+            else % the flux buffer is not large enough to get a reasonable estimate for the PSD, just pass through the data
+                
+                obj.fluxes_deredened = obj.fluxes_input; 
+                obj.stds_deredened = std(obj.fluxes_input); 
+                obj.fluxes_blued = obj.fluxes_deredened;
+                obj.stds_blued = obj.stds_deredened; 
+                
+            end
             
         end
         

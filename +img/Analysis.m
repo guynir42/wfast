@@ -190,7 +190,8 @@ classdef Analysis < file.AstroData
                 
 %                 obj.light_original = img.Lightcurves; 
 %                 obj.light_basic = img.Lightcurves; obj.light_basic.signal_method = 'square'; obj.light_basic.background_method = 'corners';
-                obj.lightcurves = img.Lightcurves; obj.lightcurves.signal_method = 'aperture'; obj.lightcurves.background_method = 'annulus';
+                obj.lightcurves = img.Lightcurves; 
+%                 obj.lightcurves.signal_method = 'aperture'; obj.lightcurves.background_method = 'annulus';
 %                 obj.light_gauss = img.Lightcurves; obj.light_gauss.signal_method = 'gauss'; obj.light_gauss.background_method = 'annulus';
                 
                 obj.model_psf = img.ModelPSF;
@@ -518,29 +519,23 @@ classdef Analysis < file.AstroData
 
                 v = abs(obj.finder.snr_values);
 
-                fprintf(fid, 'S/N for the last %d batches is distrubuted: min= %f median= %f max= %f\n',...
-                    numel(v), min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
+                fprintf(fid, 'S/N for the last %d batches is distrubuted: min= %f median= %f max= %f\n', numel(v), nanmin(v), nanmedian(v), nanmax(v));
 
                 v = abs([obj.finder.all_events.snr]);
 
-                fprintf(fid, 'S/N for %d triggered events is distrubuted: min= %f median= %f max= %f\n',...
-                    numel(v), min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
+                fprintf(fid, 'S/N for %d triggered events is distrubuted: min= %f median= %f max= %f\n', numel(v), nanmin(v), nanmedian(v), nanmax(v));
 
                 v = abs([obj.finder.kept_events.snr]);
 
-                fprintf(fid, 'S/N for %d kept events is distrubuted: min= %f median= %f max= %f\n',...
-                    numel(v), min(v, [], 'omitnan'), median(v, 'omitnan'), max(v, [], 'omitnan'));
+                fprintf(fid, 'S/N for %d kept events is distrubuted: min= %f median= %f max= %f\n', numel(v), nanmin(v), nanmedian(v), nanmax(v));
 
                 fprintf(fid, 'Number of events: total= %d | kept= %d\n', length(obj.finder.all_events), length(obj.finder.kept_events));
             
-                fprintf(fid, 'Star hours above stellar S/N of %4.2f: total= %4.2f | lost= %4.2f | kept= %4.2f\n', obj.finder.min_star_snr, ...
-                    obj.finder.star_hours_total, obj.finder.star_hours_lost, obj.finder.star_hours_total-obj.finder.star_hours_lost);
+                fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr, obj.finder.star_hours_total);
                 
-                fprintf(fid, 'Star hours above stellar S/N of %4.2f: total= %4.2f | lost= %4.2f | kept= %4.2f\n', obj.finder.min_star_snr*2, ...
-                    obj.finder.star_hours_total_better, obj.finder.star_hours_lost_better, obj.finder.star_hours_total_better-obj.finder.star_hours_lost_better);
+                fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr*2, obj.finder.star_hours_total_better);
                 
-                fprintf(fid, 'Star hours above stellar S/N of %4.2f: total= %4.2f | lost= %4.2f | kept= %4.2f\n', obj.finder.min_star_snr*4, ...
-                    obj.finder.star_hours_total_best, obj.finder.star_hours_lost_best, obj.finder.star_hours_total_best-obj.finder.star_hours_lost_best);
+                fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr*4, obj.finder.star_hours_total_best);
                 
             end
             
@@ -829,8 +824,31 @@ classdef Analysis < file.AstroData
 
                     end
 
+                    camera = 'Zyla';
+                    project = 'WFAST'; 
+                    
+                    filenames = obj.reader.dir.match('*.h5*'); 
+                    
+                    if ~isempty(filenames)
+                        
+                        f = lower(filenames{1}); 
+                        
+                        if contains(f, {'balor'})
+                            camera = 'Balor';
+                        elseif contains(f, {'zyla'})
+                            camera = 'Zyla';
+                        end
+                        
+                        if contains(f, {'wfast', 'w-fast', 'w_fast'})
+                            project = 'WFAST';
+                        elseif contains(f, {'kraar'})
+                            project = 'Kraar';
+                        end
+                        
+                    end
+                    
                     if ~isempty(date)
-                        obj.cal.loadByDate(datestr(date, 'yyyy-mm-dd'), 0); % last argument is to NOT reload if date is consistent
+                        obj.cal.loadByDate(datestr(date, 'yyyy-mm-dd'), camera, project, 0); % last argument is to NOT reload if date is consistent
                     end
 
                 end
@@ -1316,7 +1334,7 @@ classdef Analysis < file.AstroData
                 'positions', obj.positions, 'variance', single(2.5)); % need to add the sky background too
 
             obj.lightcurves.getData(obj.phot);
-%             obj.lightcurves.getAperturesAndForced(obj.phot);
+
             if obj.lightcurves.gui.check, obj.lightcurves.gui.update; end
 
             if obj.debug_bit>1, fprintf('Time for photometry: %f seconds\n', toc(t)); end
@@ -1328,7 +1346,7 @@ classdef Analysis < file.AstroData
             obj.back_buf.input(mean(obj.phot.backgrounds,1,'omitnan'));
             obj.width_buf.input(mean(obj.phot.widths,1,'omitnan'));
             
-            obj.calcSkyParameters;
+%             obj.calcSkyParameters; % there's a lot of problems with this function!
             
             if obj.debug_bit>1, fprintf('Time to calculate sky parameters: %f seconds\n', toc(t)); end
             
@@ -1344,12 +1362,14 @@ classdef Analysis < file.AstroData
                 
                 obj.sky_pars = struct;
 %                 pars.seeing = median(obj.width_buf.median,2,'omitnan').*obj.pars.SCALE.*2.355;
-                obj.sky_pars.seeing = median2(obj.phot.widths).*obj.pars.SCALE.*2.355;
+%                 obj.sky_pars.seeing = median2(obj.phot.widths).*obj.pars.SCALE.*2.355;
 %                 pars.background = median(obj.back_buf.median, 2,'omitnan');
-                obj.sky_pars.background = median2(obj.phot.backgrounds);
-                obj.sky_pars.area = median2(obj.phot.areas);
+%                 obj.sky_pars.background = median2(obj.phot.backgrounds);
+%                 obj.sky_pars.area = median2(obj.phot.areas);
+
                 
-                if ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) % this is a fairly good indicator that mextractor/astrometry worked
+                
+                if ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) && obj.cat.success==1
                     
 %                     S = double(obj.mean_buf.median)';
 %                     N = double(sqrt(obj.var_buf.median))';
@@ -1483,6 +1503,10 @@ classdef Analysis < file.AstroData
 
             if obj.debug_bit>1, fprintf('Time to find events: %f seconds\n', toc(t)); end
 
+            if ~isempty(obj.finder.gui) && obj.finder.gui.check
+                obj.finder.gui.update;
+            end
+            
         end
         
         function analysisSaveFITS(obj)
@@ -1604,121 +1628,6 @@ classdef Analysis < file.AstroData
                 if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
 
             end
-            
-        end
-        
-        function S = runMextractor(obj, I)
-            
-            if isempty(which('mextractor'))
-                error('Cannot load the MAAT package. Make sure it is on the path...');
-            end
-            
-            if nargin<2 || isempty(I)
-                I = obj.stack_proc;
-            end
-            
-            if isempty(I)
-                error('Must supply an image to run mextractor (or fill stack_proc).');
-            end
-            
-            I = regionfill(I, isnan(I));
-            
-            S = SIM;
-            S.Im = I;
-            evalc('S = mextractor(S);');
-            
-            SN = S.Cat(:,find(strcmp(S.ColCell, 'SN')));
-            SN2 = S.Cat(:,find(strcmp(S.ColCell, 'SN_UNF')));
-            S.Cat = S.Cat(SN>SN2-2,:);
-            
-            obj.image_mextractor = S;
-            
-        end
-        
-        function SS = runAstrometry(obj, S)
-            
-            if isempty(which('astrometry'))
-                error('Cannot load the MAAT package. Make sure it is on the path...');
-            end
-            
-            if nargin<2 || isempty(S)
-                if ~isempty(obj.image_mextractor)
-                    S = obj.image_mextractor;
-                else
-                    error('Must supply a SIM object to run astrometry (or fill image_mextractor).');
-                end
-            end
-            
-%             addpath(fullfile(getenv('DATA'), 'GAIA\DR2'));
-            
-            [~,S]=astrometry(S, 'RA', obj.pars.RA_DEG/180*pi, 'Dec', obj.pars.DEC_DEG/180*pi, 'Scale', obj.pars.SCALE,...
-                'Flip',[1 1;1 -1;-1 1;-1 -1], 'RefCatMagRange', [7 17], 'BlockSize', [3000 3000], 'ApplyPM', false, ...
-                'MinRot', -25, 'MaxRot', 25);
-            
-            % update RA/Dec in catalog according to WCS
-            obj.image_mextractor = update_coordinates(S);
-            
-            %  Match sources with GAIA
-            SS = catsHTM.sources_match('GAIADR2',obj.image_mextractor);
-            
-            obj.matched_gaia = SS;
-            
-            
-            
-        end
-        
-        function T = makeCatalog(obj)
-            
-            S = obj.image_mextractor;
-            SS = obj.matched_gaia;
-            
-            T = array2table([SS.Cat, S.Cat], 'VariableNames', [SS.ColCell, S.ColCell]);
-            
-            T = T(~isnan(T{:,1}),:);
-             
-            [~, idx] = unique(T{:,1:2}, 'rows');
-            T = T(idx,:);
-
-%             T.Properties.VariableNames; % change variable names??
-
-            T.RA = T.RA.*180/pi;
-            T.Dec = T.Dec.*180/pi;
-            T.Dist = T.Dist.*180/pi*3600;
-            
-            T.ALPHAWIN_J2000 = T.ALPHAWIN_J2000.*180/pi;
-            T.DELTAWIN_J2000 = T.DELTAWIN_J2000.*180/pi;
-            
-            T.Properties.VariableUnits = {'deg', 'deg', 'year', '"', '"', '"', '"', '"', '"', '"', '"', '', '', '', ...
-                'mag', 'mag', 'mag', 'mag', 'mag', 'mag', 'km/s', 'km/s', '', 'K', 'K', 'K', '', '', '"', '',  ...
-                'pix', 'pix', 'pix', 'pix', 'pix', 'pix', 'pix', 'deg', '', ...
-                'deg', 'deg', 'counts', 'counts', '', '', '', '','', 'counts', 'counts', 'mag', 'mag', '', '', '', ...
-                'counts', 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', ...
-                'counts', 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', ...
-                '', '', 'arcsec'}; % input units for all variables
-            
-            obj.catalog = T;
-
-        end
-        
-        function findStarsMAAT(obj) % to be depricated! 
-            
-            if isempty(which('mextractor'))
-                error('Cannot load the MAAT package. Make sure it is on the path...');
-            end
-             
-            % add additional tests to remove irrelvant stars
-            
-            if obj.min_star_temp
-                T = T(T{:,'Teff'}>=obj.min_star_temp,:); % select only stars with temperature above minimal level (hotter stars have smaller angular scale)
-            end
-            
-            T = sortrows(T, 'Mag_G'); % sort stars from brightest to faintest
-            
-            obj.positions = [T.XPEAK_IMAGE T.YPEAK_IMAGE];
-            obj.clip.positions = obj.positions;
-            
-            obj.magnitudes = T{:,'Mag_G'};
-            obj.coordinates = [T.RA T.Dec];
             
         end
         

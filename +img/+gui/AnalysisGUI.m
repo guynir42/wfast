@@ -91,7 +91,7 @@ classdef AnalysisGUI < handle
             obj.fig.clear;
             obj.fig.bottom = 5;
             obj.fig.height = 16;
-            obj.fig.width = 25;
+            obj.fig.width = 30;
             movegui(obj.fig.fig, 'center');
             
             %%%%%%%%%%%%%%%%%%% MENUS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -211,7 +211,8 @@ classdef AnalysisGUI < handle
             obj.panel_info.addButton('button_seeing', 'seeing', 'info', 'seeing= ', '"', 'edit', 0.2);
             obj.panel_info.addButton('button_RA', 'pars.RA', 'info', 'RA= ', '', 'edit', 0.2); 
             obj.panel_info.addButton('button_DE', 'pars.DEC', 'info', 'DE= ', '', 'edit', 0.2); 
-            obj.panel_info.addButton('button_exptime', 'pars.EXPTIME', 'info', 'EXPTIME= ', 's', 'edit', 0.2); 
+            obj.panel_info.addButton('button_exptime', 'pars.EXPTIME', 'info', 'expT= ', 's', 'edit', 0.2); 
+            obj.panel_info.addButton('button_exptime', 'finder.num_kept', 'info', 'num kept= ', '', 'edit', 0.2); 
             obj.panel_info.margin = 0.00;
             obj.panel_info.make;
             
@@ -228,7 +229,8 @@ classdef AnalysisGUI < handle
             
             obj.input_num_rect = GraphicButton(obj.panel_image, [0.0 0.95 0.15 0.05], obj.owner, 'display_num_rect_stars', 'input', ' ', ' rect');
             obj.input_num_rect.Tooltip = 'How many rectangles (maximum) to show on screen';
-            
+            obj.input_num_rect = GraphicButton(obj.panel_image, [0.15 0.95 0.15 0.05], obj.owner, 'num_stars', 'info', ' ', ' stars');
+
             obj.button_reset_axes = GraphicButton(obj.panel_image, [0.85 0.95 0.15 0.05], obj.owner, '', 'custom', 'new axes', '');
             obj.button_reset_axes.Callback = @obj.makeAxes;
             obj.button_reset_axes.Tooltip = 'Create a new image axis, zoomed out and with default contrast limits'; 

@@ -42,7 +42,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	plhs[0]=mxCreateStructMatrix(1,1,6, (const char**) field_names); 
 		
 	mxSetFieldByNumber(plhs[0], 0, 0, photometry.outputStruct(photometry.output_raw)); 
-	if(photometry.use_forced) mxSetFieldByNumber(plhs[0], 0, 1, photometry.outputStruct(photometry.output_forced)); 
+	if(photometry.use_forced) mxSetFieldByNumber(plhs[0], 0, 1, photometry.outputStruct(photometry.output_forced, photometry.num_radii)); 
 	if(photometry.use_apertures) mxSetFieldByNumber(plhs[0], 0, 2, photometry.outputStruct(photometry.output_apertures, photometry.num_radii)); 
 	if(photometry.use_gaussian) mxSetFieldByNumber(plhs[0], 0, 3, photometry.outputStruct(photometry.output_gaussian)); 
 	mxSetFieldByNumber(plhs[0], 0, 4, photometry.outputAverages()); 
@@ -56,9 +56,9 @@ Photometry::Photometry(){ // class constructor
 
 	// start by initializing any default arrays we may have
 	ap_radii=new double[3];
-	ap_radii[0]=3;
-	ap_radii[1]=5;
-	ap_radii[2]=7; 
+	ap_radii[0]=5;
+	ap_radii[1]=7;
+	ap_radii[2]=9; 
 	num_radii=3; 
 
 }
@@ -166,7 +166,10 @@ mxArray *Photometry::outputMetadataStruct(){ // add a struct with some of the pa
 	dbl_ptr[1]=outer_radius;
 	mxSetFieldByNumber(struct_array, 0, num++, array);
 		
-	array=mxCreateDoubleScalar(forced_radius);
+	// array=mxCreateDoubleScalar(forced_radius);
+	array=mxCreateNumericMatrix(1, num_radii, mxDOUBLE_CLASS, mxREAL);
+	dbl_ptr=mxGetPr(array);
+	for(int i=0;i<num_radii;i++) dbl_ptr[i]=ap_radii[i];
 	mxSetFieldByNumber(struct_array, 0, num++, array);
 	
 	array=mxCreateDoubleScalar(gauss_sigma);
@@ -506,6 +509,19 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			}
 			
 		}
+		else if(cs(key, "use_median", "median")){
+			if(val==0 || mxIsEmpty(val)) use_median=1; // if no input, assume positive
+			else{
+				
+				bool value=0;
+				if(mxIsScalar(val) && (mxIsNumeric(val) || mxIsLogical(val))) value=(bool) mxGetScalar(val); 
+				else if(mxIsChar(val)) value=parse_bool(val); 
+				else mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry must be scalar or string", i+2);
+				use_median=value;
+				
+			}
+			
+		}
 		else if(cs(key, "debug_bit")){
 			if(val==0 || mxIsEmpty(val)) debug_bit=1; // if no input, assume positive
 			else{
@@ -575,11 +591,11 @@ void Photometry::makeAllOutputs(){ // generate all the output matrices needed
 	if(output_raw==0) allocateOutputArray(output_raw);
 	initializeOutputArray(output_raw);
 	
-	if(output_forced==0) allocateOutputArray(output_forced);	
-	initializeOutputArray(output_forced);
-	
 	if(output_apertures==0) allocateOutputArray(output_apertures, num_radii);
 	initializeOutputArray(output_apertures, num_radii);
+	
+	if(output_forced==0) allocateOutputArray(output_forced, num_radii);	
+	initializeOutputArray(output_forced, num_radii);
 	
 	if(output_gaussian==0) allocateOutputArray(output_gaussian); 
 	initializeOutputArray(output_gaussian);
@@ -903,7 +919,9 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 	int annulus_pixels=countNonNaNsIndices(image, annulus_indices, idx); // how many non-NaN do we have in this annulus?
 
 	// what happens if annulus_pixels is zero?
-	background[j]=medianIndices(image, annulus_indices, idx); 
+	if(use_median) background[j]=medianIndices(image, annulus_indices, idx); 
+	else background[j]=sumIndices(image, annulus_indices, idx)/annulus_pixels;
+	
 	variance[j]=sumIndices(image, background[j], image, background[j], annulus_indices, idx)/annulus_pixels; // subtract the average b/g then take the square, and sum all the values (then divide by number of pixels)
 	
 	error[j]=getError(flux[j]-area[j]*background[j], area[j]*variance[j], annulus_pixels*variance[j]); 
@@ -935,7 +953,10 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 
 		annulus_pixels=countNonNaNsIndices(image, annulus_indices, idx); // how many non-NaN do we have in this annulus?
 
-		float B=sumIndices(image, annulus_indices, idx)/annulus_pixels; // temporary background value
+		float B=0; // temporary background value
+		if(use_median) B=medianIndices(image, annulus_indices, idx); 
+		else B=sumIndices(image, annulus_indices, idx)/annulus_pixels; 
+		
 		float F=sumIndices(image, forced_indices, idx); 
 		int   A=countNonNaNsIndices(image, forced_indices, idx);
 
@@ -967,15 +988,24 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 		for(int k=0; k<num_iterations; k++){
 		
 			idx=getShiftIndex(best_offset_x[j],best_offset_y[j]); // the updated centroid
+			
 			annulus_pixels=countNonNaNsIndices(image, annulus_indices, idx); // how many non-NaN do we have in this annulus?
+			
 			area[j]=sumArrays(&gaussians[idx*N]); 
+			
 			flux[j]=sumArrays(image, &gaussians[idx*N]);
-			background[j]=sumIndices(image, annulus_indices, idx)/annulus_pixels; 	
+			
+			if(use_median) background[j]=medianIndices(image, annulus_indices, idx); 
+			else background[j]=sumIndices(image, annulus_indices, idx)/annulus_pixels; 	
+			
 			norm=flux[j]-area[j]*background[j];
+			
 			m1x=sumArrays(image, background[j], X, &gaussians[idx*N])/norm;
 			m1y=sumArrays(image, background[j], Y, &gaussians[idx*N])/norm;
+			
 			offset_x[j]=m1x;
 			offset_y[j]=m1y;
+			
 			best_offset_x[j]=m1x;
 			best_offset_y[j]=m1y;
 			
@@ -1016,7 +1046,10 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 		
 		// get the background reading for all concentric apertures
 		annulus_pixels=countNonNaNsIndices(image, annulus_indices, idx); // how many non-NaN do we have in this annulus?
-		background[j]=sumIndices(image, annulus_indices, idx)/annulus_pixels; 	
+		
+		if(use_median) background[j]=medianIndices(image, annulus_indices, idx); 
+		else background[j]=sumIndices(image, annulus_indices, idx)/annulus_pixels; 	
+		
 		variance[j]=sumIndices(image, background[j], image, background[j], annulus_indices, idx)/annulus_pixels; // subtract the average b/g then take the square, and sum all the values (then divide by number of pixels)
 		
 		float *partial_m1x=new float[num_radii];
@@ -1175,32 +1208,92 @@ void Photometry::calculateForced(int j){
 	float *flag=output[IDX_FLAG];
 	
 	int idx=getShiftIndex(average_offset_x[j], average_offset_y[j]); // the average centroid
-	
+	// get the background reading for all concentric apertures
+		
 	float annulus_pixels=countNonNaNsIndices(image, annulus_indices, idx); // how many non-NaN do we have in this annulus?
-	background[j]=sumIndices(image, annulus_indices, idx)/annulus_pixels; 	
+	
+	if(use_median) background[j]=medianIndices(image, annulus_indices, idx); 
+	else background[j]=sumIndices(image, annulus_indices, idx)/annulus_pixels; 	
+	
 	variance[j]=sumIndices(image, background[j], image, background[j], annulus_indices, idx)/annulus_pixels; // subtract the average b/g then take the square, and sum all the values (then divide by number of pixels)
+		
+	float *partial_m1x=new float[num_radii];
+	float *partial_m1y=new float[num_radii];
+	float *partial_m2x=new float[num_radii];
+	float *partial_m2y=new float[num_radii];
+	float *partial_mxy=new float[num_radii];
 	
-	flux[j]=sumIndices(image, aperture_indices, idx); 
-	area[j]=countNonNaNsIndices(image, aperture_indices, idx); 
+	for(int k=0;k<num_radii;k++){
+	
+		// the background/variance is the same for each aperture size, but 
+		// it is easier to just copy these out for each aperture than to clip the data or leave zeros... 
+		background[j+num_cutouts*k]=background[j];
+		variance[j+num_cutouts*k]=variance[j];
+	
+		flux[j+num_cutouts*k]=sumIndices(image, aperture_indices, idx+num_shifts*k); 
+		area[j+num_cutouts*k]=countNonNaNsIndices(image, aperture_indices, idx+num_shifts*k); 
+	
+		if(k>0){
+		
+			flux[j+num_cutouts*k]+=flux[j+num_cutouts*(k-1)];
+			area[j+num_cutouts*k]+=area[j+num_cutouts*(k-1)];
+		
+		}
+	
+		partial_m1x[k]=sumIndices(image, background[j], X, aperture_indices, idx+num_shifts*k);
+		partial_m1y[k]=sumIndices(image, background[j], Y, aperture_indices, idx+num_shifts*k);
+		
+		float m1x=0;
+		float m1y=0;
+		
+		for(int m=0; m<k+1; m++){ // sum all the partial moments
+			m1x+=partial_m1x[k-m];
+			m1y+=partial_m1y[k-m];
+		}
+		
+		float norm=flux[j+num_cutouts*k]-area[j+num_cutouts*k]*background[j];
+		
+		m1x/=norm;
+		m1y/=norm;
+		
+		offset_x[j+num_cutouts*k]=m1x;
+		offset_y[j+num_cutouts*k]=m1y;
+		
+		float m2x=0;
+		float m2y=0;
+		float mxy=0;
+		
+		partial_m2x[k]=sumIndices(image, background[j], X, m1x, X, m1x, aperture_indices, idx+num_shifts*k);
+		partial_m2y[k]=sumIndices(image, background[j], Y, m1y, Y, m1y, aperture_indices, idx+num_shifts*k);
+		partial_mxy[k]=sumIndices(image, background[j], X, m1x, Y, m1y, aperture_indices, idx+num_shifts*k);
+		
+		for(int m=0; m<k+1; m++){ // sum all the partial moments
+			m2x+=partial_m2x[k-m];
+			m2y+=partial_m2y[k-m];
+			mxy+=partial_mxy[k-m];
+		}
+		
+		m2x/=norm;
+		m2y/=norm;
+		mxy/=norm;
+		
+		error[j+num_cutouts*k]=getError(flux[j+num_cutouts*k]-area[j+num_cutouts*k]*background[j], area[j+num_cutouts*k]*variance[j], annulus_pixels*variance[j]);
+		width[j+num_cutouts*k]=getWidthFromMoments(m2x, m2y, mxy); 
 
-	float norm=flux[j]-area[j]*background[j];
-	float m1x=sumIndices(image, background[j], X, aperture_indices, idx)/norm;
-	float m1y=sumIndices(image, background[j], Y, aperture_indices, idx)/norm;
-	offset_x[j]=m1x;
-	offset_y[j]=m1y;
-	
-	float m2x=sumIndices(image, background[j], X, m1x, X, m1x, aperture_indices, idx)/norm;
-	float m2y=sumIndices(image, background[j], Y, m1y, Y, m1y, aperture_indices, idx)/norm;
-	float mxy=sumIndices(image, background[j], X, m1x, Y, m1y, aperture_indices, idx)/norm;
-	
-	error[j]=getError(flux[j]-background[j], variance[j]*area[j], variance[j]*annulus_pixels); 
-	
-	width[j]=getWidthFromMoments(m2x, m2y, mxy); 
-	
-	bad_pixels[j]=forced_indices[idx].size()-countNonNaNsIndices(image, forced_indices, idx);
-	
-	flag[j]=checkMoments(offset_x[j], offset_y[j], width[j]); 
+		if(k==0) bad_pixels[j]=aperture_indices[idx].size()-countNonNaNsIndices(image, aperture_indices, idx);
+		else bad_pixels[j+num_cutouts*k]+=aperture_indices[idx+num_shifts*k].size()
+										   -countNonNaNsIndices(image, aperture_indices, idx+num_shifts*k);
+		
+		flag[j+num_cutouts*k]=checkMoments(offset_x[j], offset_y[j], width[j]); 
 
+	}// for k
+
+	delete [] partial_m1x;
+	delete [] partial_m1y;
+	delete [] partial_m2x;
+	delete [] partial_m2y;
+	delete [] partial_mxy;
+	
 }
 
 int Photometry::getShiftIndex(float x, float y){ // find the index closest to the specific shift value x and y in the shift matrices (dx and dy)
