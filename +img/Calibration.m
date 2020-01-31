@@ -1289,17 +1289,22 @@ classdef Calibration < handle
         
         function save(obj, filename, directory)
 
-            if isempty(obj.date_flat) || isempty(obj.date_dark)
-                error('Must provide dates for calibration files: "date_dark" and "date_flat"');
+            if isempty(obj.date_flat) && isempty(obj.date_dark)
+                error('Must provide dates for calibration files: "date_dark" or "date_flat"');
             end
 
-            date = datetime(obj.date_flat); 
-            date2 = datetime(obj.date_dark);
-
-            if date<date2
+            date = datetime(char(obj.date_flat)); % if date_flat is empty, output NaT
+            
+            date2 = datetime(char(obj.date_dark)); % if date_dark is empty, output NaT
+            
+            if date<date2 % if any of them is NaT, this will not trigger an error! 
                 error('Date of dark (%s) is later than date of flat (%s)', obj.date_flat, obj.date_dark)
             end
 
+            if isnat(date)
+                date = date2; % if we only have dark, overwrite the flat date and use the dark date instead
+            end
+            
             if nargin<2 || isempty(filename)
                 
                 filename = sprintf('calibration_%s_%s_%s.mat', datestr(date, 'yyyy-mm-dd'), obj.project_name, obj.camera_name);
