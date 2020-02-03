@@ -115,8 +115,14 @@ void BufferQueue::allocate(AT_H camera_handle, int num_images){
 	rc=AT_GetInt(hndl, L"ImageSizeBytes", &im_size_bytes); // make sure to keep track of the size of each array
 	if(rc) throw_error("Cannot get the image size from camera handle", "allocate", rc); 
 	
-	rc=AT_Command(hndl, L"AcquisitionStop"); 
-	if(rc) throw_error("Problem when stopping camera!", "allocate", rc); 
+	AT_BOOL bool_value=0;
+	rc=AT_GetBool(hndl, L"CameraAcquiring", &bool_value); 
+	if(rc) throw_error("Problem when checking if camera is running!", "allocate", rc); 
+
+	if(bool_value){
+		rc=AT_Command(hndl, L"AcquisitionStop"); 
+		if(rc) throw_error("Problem when stopping camera!", "allocate", rc); 
+	}
 	
 	rc=AT_Flush(hndl); 
 	if(rc) throw_error("Problem when flushing buffers!", "allocate", rc); 
@@ -140,8 +146,14 @@ void BufferQueue::release(){
 
 	int rc=0; // return code
 		
-	rc=AT_Command(hndl, L"AcquisitionStop"); 
-	if(rc) throw_error("Problem when stopping camera!", "release", rc); 
+	AT_BOOL bool_value=0;
+	rc=AT_GetBool(hndl, L"CameraAcquiring", &bool_value); 
+	if(rc) throw_error("Problem when checking if camera is running!", "release", rc); 
+
+	if(bool_value){
+		rc=AT_Command(hndl, L"AcquisitionStop"); 
+		if(rc) throw_error("Problem when stopping camera!", "release", rc); 
+	}
 	
 	rc=AT_FinaliseUtilityLibrary();
 	if(rc) throw_error("Cannot release utilities library!", "allocate", rc); 

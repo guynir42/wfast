@@ -322,7 +322,7 @@ void AndorCamera::batch(int idx){
 		
 		if(ret!=AT_SUCCESS){ // This is a special error case. We report it but also restart the acquisition... 
 			// report_error("batch>wait buffer", ret, mex_flag_cam); 
-			// printf("WARNING: batch>wait buffer: return value %d... restarting acquisition!\n", ret); 
+			if(debug_bit>1) printf("WARNING: batch>wait buffer: return value %d... restarting acquisition!\n", ret); 
 			save_error("batch>wait buffer", ret, current_batch); 
 			restart();
 			i--;
