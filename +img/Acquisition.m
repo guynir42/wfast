@@ -1547,6 +1547,8 @@ classdef Acquisition < file.AstroData
             
             obj.buf.directory_override = '';
             
+            obj.lightcurves.finishup;
+            
             obj.is_running = 0;
             
             if ~isempty(obj.gui) && obj.gui.check

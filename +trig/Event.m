@@ -66,6 +66,9 @@ classdef Event < handle
         previous_std; % average rms of previous batches
         is_positive; % is the filter-response positive (typically for occultations)
         
+        was_psd_corrected;
+        was_var_buffered;
+        
         notes = ''; % why this event was not kept
         keep = 1; % only keep the "real" events that are not duplicates
         
@@ -73,6 +76,7 @@ classdef Event < handle
     
     properties % switches/controls
         
+        corr_flux = 'raw'; 
         max_corr;
         max_num_nans;
         
@@ -376,9 +380,7 @@ classdef Event < handle
                 obj.is_corr_offsets = 1;
                 obj.addNote(sprintf('signal is correlated with size of offsets at a %f level', corr));
             end
-            
-            
-            
+                        
             % check for negative correlation with the background
             corr = obj.correlation(obj.backgrounds_at_star);
             if corr<-obj.max_corr
@@ -408,9 +410,25 @@ classdef Event < handle
             
         end
         
-        function val = correlation(obj, vector)
+        function val = correlation(obj, vector, flux)
             
-            f = obj.flux_detrended;
+            if nargin<3 || isempty(flux)
+                flux = obj.flux_detrended;
+            end
+            
+            if ischar(flux)
+                
+                if util.text.cs(flux, 'detrended')
+                    flux = obj.flux_detrended;
+                elseif util.text.cs(flux, 'raw')
+                    flux = obj.flux_raw_all(:,obj.star_index); 
+                else
+                    error('Unknown flux option "%s". Try "detrended" or "raw"', flux); 
+                end
+
+            end
+            
+            f = flux;
             t = obj.time_indices;
             
             f_temp = f;
@@ -588,7 +606,7 @@ classdef Event < handle
                 obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.star_snr),...
                 'ax', input.ax, 'Position', 'NorthWest', 'FontSize', input.font_size);
             
-            mx = max(max(abs(obj.flux_filtered)), max(abs(obj.flux_detrended))); 
+            mx = max(max(abs(obj.flux_filtered)), max(abs(f./s))); 
             
             input.ax.YLim = [-1 1].*1.2.*mx;
             

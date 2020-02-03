@@ -739,6 +739,8 @@ classdef Analysis < file.AstroData
                 end
             end
             
+            obj.lightcurves.finishup;
+            
             if obj.debug_bit, disp(['Finished run with ' num2str(obj.batch_counter) ' batches.']); end
             
         end

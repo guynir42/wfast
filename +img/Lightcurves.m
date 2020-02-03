@@ -178,7 +178,7 @@ classdef Lightcurves < handle
         show_what_list = {'fluxes', 'areas', 'backgrounds', 'variances', 'centroids', 'offsets', 'widths', 'bad_pixels', 'power spectra'};
         show_flux_type_list = {'raw', 'sub', 'rem', 'cal', 'all'};
         
-        version = 1.07;
+        version = 1.08;
         
     end
     
@@ -1085,6 +1085,23 @@ classdef Lightcurves < handle
             Av = nanmean(obj.(type) .* ~obj.flags, 2); % maybe replace this with the flux weighted sum?
             
             flux_corr = obj.fluxes.*rho./(Av./nanmean(Av));
+            
+        end
+        
+        function finishup(obj)
+            
+            obj.fluxes_full = obj.fluxes; 
+            obj.errors_full = obj.errors;
+            obj.areas_full = obj.areas;
+            obj.backgrounds_full = obj.backgrounds;
+            obj.variances_full = obj.variances;
+            obj.centroids_x_full = obj.centroids_x;
+            obj.centroids_y_full = obj.centroids_y;
+            obj.offsets_x_full = obj.offsets_x;
+            obj.offsets_y_full = obj.offsets_y;
+            obj.widths_full = obj.widths;
+            obj.bad_pixels_full = obj.bad_pixels;
+            obj.flags_full = obj.flags; 
             
         end
         
