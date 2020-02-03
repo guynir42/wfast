@@ -969,6 +969,20 @@ classdef Analysis < file.AstroData
             
             obj.analysisStack;
             
+            if obj.batch_counter==0 && (isempty(obj.use_astrometry) || obj.use_astrometry)
+                try
+                    obj.analysisAstrometry;
+                catch ME
+                    warning(ME.getReport); % non essential to  successfully running the data analysis
+                end
+            end
+           
+            if ~isempty(obj.cat) % other tests??
+                obj.magnitudes = obj.cat.magnitudes;
+                obj.temperatures = obj.cat.temperatures;
+                obj.coordinates = obj.cat.coordinates;
+            end
+
             if obj.use_cutouts
                
                 obj.analysisCutouts;
@@ -1093,20 +1107,6 @@ classdef Analysis < file.AstroData
                 obj.findStars;
             end
 
-            if isempty(obj.use_astrometry) || obj.use_astrometry
-                try
-                    obj.analysisAstrometry;
-                catch ME
-                    warning(ME.getReport); % non essential to  successfully running the data analysis
-                end
-            end
-           
-            if ~isempty(obj.cat) % other tests??
-                obj.magnitudes = obj.cat.magnitudes;
-                obj.temperatures = obj.cat.temperatures;
-                obj.coordinates = obj.cat.coordinates;
-            end
-
             % cutouts of the stack
             obj.stack_cutouts = obj.clip.input(obj.stack_proc); 
             obj.stack_cutouts_bg = obj.clip_bg.input(obj.stack_proc); 
@@ -1174,8 +1174,6 @@ classdef Analysis < file.AstroData
             
             t = tic;
             
-            if obj.batch_counter==0
-            
                 ast = obj.use_astrometry;
 
                 if isempty(obj.use_astrometry)  % automatically determine if we need to run astrometry
@@ -1213,7 +1211,8 @@ classdef Analysis < file.AstroData
                             obj.cat.saveMAT(filename);
                         end
                         
-                        obj.pars.MAG_LIMIT = obj.cat.detection_limit; 
+                        obj.pars.THRESH_DETECTION = obj.cat.detection_threshold;
+                        obj.pars.LIMMAG_DETECTION = obj.cat.detection_limit; 
 
                         obj.magnitudes = obj.cat.magnitudes;
                         obj.coordinates = obj.cat.coordinates;
@@ -1222,9 +1221,7 @@ classdef Analysis < file.AstroData
                     end
 
                 end
-                
 
-            end
                         
             if obj.debug_bit>1, fprintf('Time for astrometry: %f seconds\n', toc(t)); end
             
@@ -1258,7 +1255,7 @@ classdef Analysis < file.AstroData
                     
                     if length(c)>1 && ~isempty(c{2}) && ~cs(c{2}, '[]') 
                         
-                        if cs(c{1}, 'detect_thresh')
+                        if cs(c{1}, 'detect_thresh', 'detection_threshold')
                             obj.cat.detection_threshold = str2double(c{2}); % consider a test if this field is already filled??
                         elseif cs(c{1}, 'NAXIS3')
                             obj.cat.detection_stack_number = str2double(c{2}); % consider a test if this field is already filled?? 
@@ -1345,12 +1342,12 @@ classdef Analysis < file.AstroData
             
             t = tic;
             
-            obj.mean_buf.input(mean(obj.phot.fluxes,1,'omitnan'));
-            obj.var_buf.input(var(obj.phot.fluxes,[],1,'omitnan'));
-            obj.back_buf.input(mean(obj.phot.backgrounds,1,'omitnan'));
-            obj.width_buf.input(mean(obj.phot.widths,1,'omitnan'));
+            obj.mean_buf.input(nanmean(obj.phot.fluxes));
+            obj.var_buf.input(nanvar(obj.phot.fluxes));
+            obj.back_buf.input(nanmean(obj.phot.backgrounds));
+            obj.width_buf.input(nanmean(obj.phot.widths));
             
-%             obj.calcSkyParameters; % there's a lot of problems with this function!
+            obj.calcSkyParameters; % get an estimate of the zero point, seeing, background, limiting magnitude, etc. 
             
             if obj.debug_bit>1, fprintf('Time to calculate sky parameters: %f seconds\n', toc(t)); end
             
@@ -1358,100 +1355,86 @@ classdef Analysis < file.AstroData
         
         function calcSkyParameters(obj) % take the photometery (and possible the catalog) and calculate seeing, background and zeropoint
             
-            import util.stat.median2;
-            
-            if isempty(obj.mean_buf) % any other tests??
-                obj.sky_pars = [];
-            else
-                
-                obj.sky_pars = struct;
-%                 pars.seeing = median(obj.width_buf.median,2,'omitnan').*obj.pars.SCALE.*2.355;
-%                 obj.sky_pars.seeing = median2(obj.phot.widths).*obj.pars.SCALE.*2.355;
-%                 pars.background = median(obj.back_buf.median, 2,'omitnan');
-%                 obj.sky_pars.background = median2(obj.phot.backgrounds);
-%                 obj.sky_pars.area = median2(obj.phot.areas);
+            if ~isempty(obj.mean_buf) && ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) && obj.cat.success==1
 
-                
-                
-                if ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) && obj.cat.success==1
-                    
-%                     S = double(obj.mean_buf.median)';
-%                     N = double(sqrt(obj.var_buf.median))';
+                S = nanmean(obj.phot.fluxes(:,:,end))'; % signal (instrumental)
+                N = nanstd(obj.phot.fluxes(:,:,end))'; % noise (instrumental)
+                M = obj.cat.magnitudes; % magnitude from catalog
 
-                    S = mean(obj.phot.fluxes(:,:,end), 1, 'omitnan')'; % signal
-                    N = std(obj.phot.fluxes(:,:,end), [], 1, 'omitnan')'; % noise
-                    M = obj.cat.magnitudes; % mag
-                    
-%                     pars.zero_point = median(obj.mean_buf.median.*10.^(0.4.*obj.cat.magnitudes') ,2,'omitnan');
-                    obj.sky_pars.zero_point = median2(S*10.^(0.4.*M'));
-                    
-                    thresh = 5; % minimal S/N
-                    
-                    idx = ~isnan(S) & ~isnan(N) & S./N>1.5; 
-                    S2 = S(idx);
-                    N2 = N(idx);
-                    M2 = M(idx);
-                    
-                    if isempty(S2)
-                        return;
-                    end
-                    
-                    T = table(-2.5*log10(S2./obj.sky_pars.zero_point), S2./N2, M2, 'VariableNames', {'Measured_mag', 'SNR', 'GAIA_mag'});
-                    T2 = util.vec.bin_table_stats(T, 30);
-                    T2 = T2(T2.N>=5,:);
-                    fr = util.fit.polyfit(T2.SNR_nanmedian, T2.Measured_mag_nanmedian, 'order', 2);
-                    
-                    obj.sky_pars.limiting_mag = fr.coeffs(1)+fr.coeffs(2).*thresh+fr.coeffs(3)*thresh.^2;
-                    
-                    if ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
-                        delete(obj.aux_figure.Children);
-                        ax = axes('Parent', obj.aux_figure);
-                        x_extrap = min(fr.x):-0.1:0;
-                        y_extrap = fr.coeffs(1)+fr.coeffs(2).*x_extrap + fr.coeffs(3).*x_extrap.^2;
-                        x_th = thresh;
-                        y_th = fr.coeffs(1)+fr.coeffs(2).*x_th + fr.coeffs(3).*x_th.^2;
-                        plot(ax, T2.SNR_nanmedian, T2.Measured_mag_nanmedian, 'p', fr.x, fr.ym, 'r-', ...
-                            x_extrap, y_extrap, 'r:', x_th, y_th, 'k+');
-                        xlabel(ax, 'measured flux/rms, binned'); 
-                        ylabel(ax, 'measured magnitude, binned'); 
-                        drawnow;
-                    end
-                    
-                    
-%                     M_adj = M2 + 2.5*log10(S2./N2./thresh); % adjust each star's magnitude by how much it is brighter/dimmer than the threshold
-%                     obj.sky_pars.limiting_mag = median(M_adj, 'omitnan');
-                    
-%                     idx = ~isnan(S) & ~isnan(N) & S./N>1.5 & S./N<8; 
-%                     S2 = S(idx);
-%                     N2 = N(idx);
-% 
-%                     if numel(S2)>10
-%                         
-%                         fr = util.fit.polyfit(S2, N2.^2, 'order', 2, 'sigma', 2, 'iterations', 10); 
-%                         obj.sky_pars.noise_level = sqrt(fr.coeffs(1));
-%                         
-%                         % solve the equation N(S) = c1 + c2*S + c3*S^2 == S/thresh
-%                         a = fr.coeffs(3)-1./thresh.^2;
-%                         b = fr.coeffs(2);
-%                         c = fr.coeffs(1);
-%                         
-%                         s1 = (-b-sqrt(b.^2-4*a*c))./(2*a);
-%                         s2 = (-b+sqrt(b.^2-4*a*c))./(2*a);
-%                         
-%                         obj.sky_pars.limiting_signal = min(s1,s2);
-%                         if obj.sky_pars.limiting_signal<0
-%                             obj.sky_pars.limiting_signal = max(s1,s2);
-%                         end
-%                         
-%                         if ~isreal(obj.sky_pars.limiting_signal) || isnan(obj.sky_pars.limiting_signal) || obj.sky_pars.limiting_signal<0
-%                             obj.sky_pars.limiting_mag = 2.5*log10(obj.sky_pars.zero_point./(obj.sky_pars.noise_level*thresh));
-%                         else
-%                             obj.sky_pars.limiting_mag = 2.5*log10(obj.sky_pars.zero_point./obj.sky_pars.limiting_signal);
-%                         end
-%                     end
+%                 obj.pars.ZEROPOINT = util.stat.median2(S*10.^(0.4.*M'));
+                instr_mag = -2.5*log10(S); 
+                instr_mag(S<0) = NaN;
+                instr_mag = real(instr_mag); 
+                
+                obj.pars.ZEROPOINT = nanmedian(M-instr_mag); 
+                
+                idx = ~isnan(S) & ~isnan(N) & S./N>1.5; % choose stars that are actually measureable 
+                S2 = S(idx);
+                N2 = N(idx);
+                M2 = M(idx);
 
+                if isempty(S2)
+                    return;
+                end
+
+                if isempty(obj.pars.THRESH_INDIVIDUAL)
+                    obj.pars.THRESH_INDIVIDUAL = obj.finder.min_star_snr;
                 end
                 
+                obj.pars.LIMMAG_INDIVIDUAL = head.limiting_magnitude(M2, S2./N2, obj.pars.THRESH_INDIVIDUAL, 'maximum', 10); 
+                
+                % consider allowing the user to choose the type of photometry to take (the 3rd index)
+                S_stack = obj.phot_stack.fluxes(:,:,end)'; % signal (instrumental)
+                N_stack = sqrt(obj.phot_stack.areas(:,:,end)'.*nanmedian(obj.phot_stack.variances(:,:,end))); % noise (instrumental)
+                
+                idx = S_stack./N_stack>1.5;
+                S_stack = S_stack(idx);
+                N_stack = N_stack(idx);
+                M_stack = M(idx);
+                
+                if isempty(obj.pars.THRESH_STACK)
+                    obj.pars.THRESH_STACK = obj.pars.THRESH_INDIVIDUAL*2;
+                end
+                
+                if ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
+                    delete(obj.aux_figure.Children);
+                    ax = axes('Parent', obj.aux_figure);
+                    obj.pars.LIMMAG_STACK = head.limiting_magnitude(M_stack, S_stack./N_stack, obj.pars.THRESH_STACK, 'maximum', 20, 'plot', 1, 'axes', ax); 
+                else
+                    obj.pars.LIMMAG_STACK = head.limiting_magnitude(M_stack, S_stack./N_stack, obj.pars.THRESH_STACK, 'maximum', 20); 
+                end
+                
+                drawnow;
+                
+                
+%                 T = table(-2.5*log10(S2)+obj.pars.ZEROPOINT, S2./N2, M2, 'VariableNames', {'Measured_mag', 'SNR', 'GAIA_mag'});
+%                 T2 = util.vec.bin_table_stats(T, 30);
+%                 T2 = T2(T2.N>=5,:);
+%                 fr = util.fit.polyfit(T2.SNR_nanmedian, T2.Measured_mag_nanmedian, 'order', 2);
+%                 SNR = S2./N2;
+%                 M3 = M2(SNR<10);
+%                 SNR = SNR(SNR<10); 
+%                 
+%                 fr = util.fit.polyfit(SNR, M3, 'order', 2, 'plot', 1); 
+%                 
+%                 obj.pars.MAG_LIMIT = fr.coeffs(1)+fr.coeffs(2).*thresh+fr.coeffs(3)*thresh.^2;
+%                 
+%                 if ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
+%                     delete(obj.aux_figure.Children);
+%                     ax = axes('Parent', obj.aux_figure);
+%                     x_extrap = min(fr.x):-0.1:0;
+%                     y_extrap = fr.coeffs(1)+fr.coeffs(2).*x_extrap + fr.coeffs(3).*x_extrap.^2;
+%                     x_th = thresh;
+%                     y_th = fr.coeffs(1)+fr.coeffs(2).*x_th + fr.coeffs(3).*x_th.^2;
+% %                     plot(ax, T2.SNR_nanmedian, T2.Measured_mag_nanmedian, 'p', fr.x, fr.ym, 'r-', ...
+% %                         x_extrap, y_extrap, 'r:', x_th, y_th, 'k+');
+%                     plot(ax, SNR, M3, 'p', fr.x, fr.ym, 'r-', ...
+%                         x_extrap, y_extrap, 'r:', x_th, y_th, 'k+');
+%                     xlabel(ax, 'measured flux/rms, binned'); 
+%                     ylabel(ax, 'measured magnitude, binned'); 
+%                     drawnow;
+%                 end
+
             end
             
         end
