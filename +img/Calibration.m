@@ -1324,12 +1324,12 @@ classdef Calibration < handle
             obj.clip.clear;
             deflate = 1;
             
-            if ~isempty(obj.reader_dark)
+            if ~isempty(obj.reader_dark) && obj.checkDark
                 if obj.debug_bit, disp(['saving calibration data to: ' fullfile(obj.reader_dark.dir.pwd, filename)]); end
                 util.oop.save(obj, fullfile(obj.reader_dark.dir.pwd, filename), 'name', 'cal', 'deflate', deflate);
             end
             
-            if ~isempty(obj.reader_flat)
+            if ~isempty(obj.reader_flat) && obj.checkFlat
                 if obj.debug_bit, disp(['saving calibration data to: ' fullfile(obj.reader_flat.dir.pwd, filename)]); end
                 util.oop.save(obj, fullfile(obj.reader_flat.dir.pwd, filename), 'name', 'cal', 'deflate', deflate);
             end
