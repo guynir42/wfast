@@ -56,8 +56,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
 %         frame_rate_measured;
         ACT_FRAMERATE; 
         
-        THRESHOLD; % detection threshold for findStars
-        MAG_LIMIT; % faintest star found by findStars, in GAIA_BP
+        THRESH_DETECTION; % detection threshold for findStars
+        THRESH_STACK; % detection threshold for stars on the stack (for calculating limiting magnitude)
+        THRESH_INDIVIDUAL; % threshold for using this star in the event finding algorithm
+        
+        LIMMAG_DETECTION; % the GAIA_BP magnitude of the faintest star from findStars
+        LIMMAG_STACK; % the limiting magnitude for a stack image 
+        LIMMAG_INDIVIDUAL; % the limiting magnitude for individual frames at 25 Hz
+        ZEROPOINT; % the conversion between flux and magnitude zero
+        BACKGROUND; % the estimated number of counts per pixel from the background
         
         FILTER = 'F505W'; 
         

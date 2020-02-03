@@ -241,13 +241,18 @@ classdef Catalog < handle
                         warning('off', 'MATLAB:polyfit:PolyNotUnique')
                         warning('off', 'MATLAB:lscov:RankDefDesignMat');
 
-                        [R,S2] = astrometry(S, 'RA', list_RA(jj), 'UnitsRA', 'deg', 'Dec', list_DE(ii), 'UnitsDec', 'deg', 'Scale', obj.pars.SCALE, ...
-                            'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', [3000 3000], 'ApplyPM', false, ...
+%                         [R,S2] = astrometry(S, 'RA', list_RA(jj), 'UnitsRA', 'deg', 'Dec', list_DE(ii), 'UnitsDec', 'deg', 'Scale', obj.pars.SCALE, ...
+                        [R,S2] = astrometry(S, 'RA', head.Ephemeris.deg2hour(list_RA(jj)), 'Dec', head.Ephemeris.deg2sex(list_DE(ii)), 'Scale', obj.pars.SCALE, ...
+                            'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', [3000 3000], 'ApplyPM', false, 'Flip', obj.flip, ...
                             'MinRot', -20, 'MaxRot', 20, 'CatColMag', 'Mag', 'ImSize', [obj.pars.NAXIS1, obj.pars.NAXIS2]);
 
                         warning('on', 'MATLAB:polyfit:PolyNotUnique')
                         warning('on', 'MATLAB:lscov:RankDefDesignMat');
 
+                        if ~isfield(R, 'Nsrc1') || R.Nsrc1<50
+                            continue;
+                        end
+                        
                     catch ME
                         if ~isequal(ME.identifier, 'MATLAB:badsubscript')
                             warning(ME.getReport);
