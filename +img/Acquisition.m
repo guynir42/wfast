@@ -1401,6 +1401,10 @@ classdef Acquisition < file.AstroData
                 obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
                 
                 obj.stash_parameters(input);
+
+                if isempty(obj.num_batches)
+                    error('Must input a number of batches!');
+                end
                 
 %                 if ~isempty(obj.total_runtime)
 %                     obj.num_batches = ceil(obj.total_runtime.*obj.convertRuntimeToSeconds.*obj.getFrameRateEstimate./obj.batch_size);
