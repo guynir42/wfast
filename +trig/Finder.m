@@ -89,7 +89,7 @@ classdef Finder < handle
         
         lightcurve_type_index = 'end'; % for multiple photometry products choose the one that most suits you for event detection
         
-        use_psd_correction = 1; % use welch on a flux buffer to correct red noise
+        use_psd_correction = 0; % use welch on a flux buffer to correct red noise
         use_var_buf = 1; % normalize variance of each filtered flux
         
         min_star_snr = 5; % stars with lower S/N are not even tested for events
@@ -107,7 +107,8 @@ classdef Finder < handle
         max_frames = 50; % maximum length of trigger area (very long events are disqualified)
         max_num_nans = 1;
         max_corr = 0.75;
-         
+        
+        which_flux_correlate = 'raw'; %can choose "raw" or "detrended" for which flux type to use when correlating against x/y width etc. 
         
         num_hits_black_list = 4;
         
@@ -794,6 +795,8 @@ classdef Finder < handle
                     ev.std_flux = obj.stds_corrected(ev.star_index); 
 
                     ev.flux_raw_all = obj.cal.fluxes;
+                    ev.corr_flux = obj.which_flux_correlate;
+                    
                     % somewhere around here we MUST make use of the flux errors
 
                     obj.new_events(end+1) = ev; % add this event to the list
@@ -1001,6 +1004,9 @@ classdef Finder < handle
                 
                 ev.max_num_nans = obj.max_num_nans;
                 ev.max_corr = obj.max_corr;
+                
+                ev.was_psd_corrected = obj.use_psd_correction; 
+                ev.was_var_buffered = obj.use_var_buf;
                 
                 if ~isempty(obj.cat) && ~isempty(obj.cat.data)
                     
