@@ -64,7 +64,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         LIMMAG_STACK; % the limiting magnitude for a stack image 
         LIMMAG_INDIVIDUAL; % the limiting magnitude for individual frames at 25 Hz
         ZEROPOINT; % the conversion between flux and magnitude zero
-        BACKGROUND; % the estimated number of counts per pixel from the background
+        BACKGROUND; % the estimated number of counts per pixel from the background (per frame, not stacked!)
         
         FILTER = 'F505W'; 
         

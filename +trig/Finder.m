@@ -222,6 +222,8 @@ classdef Finder < handle
                 obj.sim_bank.reset;
             end
             
+            obj.psd.reset;
+            
             obj.clear;
             
         end
