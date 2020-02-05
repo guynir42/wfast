@@ -104,13 +104,13 @@ classdef PSDCorrector < handle
             
             obj.fluxes_input = fluxes;
             
+            obj.calculate;
+            
             obj.flux_buffer = vertcat(obj.flux_buffer, fluxes(1:obj.num_frames_to_add,:));
             
             if size(obj.flux_buffer,1)>obj.N_buf
                 obj.flux_buffer = obj.flux_buffer(end-obj.N_buf+1:end,:,:); % be careful with fluxes with more than 3 dimensions! 
             end
-            
-            obj.calculate;
             
         end
         
