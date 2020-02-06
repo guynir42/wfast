@@ -578,7 +578,7 @@ classdef Acquisition < file.AstroData
             
             val = sprintf('%s\n PSF angle= %4.2f deg', val, obj.model_psf.angle);
             
-            val = sprintf('%s\n MAG_LIMIT= %4.2f', val, obj.pars.MAG_LIMIT); 
+            val = sprintf('%s\n LIMMAG_D= %4.2f', val, obj.pars.LIMMAG_DET); 
             
             if length(obj.average_offsets)==2
                 val = sprintf('%s\n dx/dy= %4.2f / %4.2f pix', val, obj.average_offsets(2), obj.average_offsets(1));
@@ -587,7 +587,9 @@ classdef Acquisition < file.AstroData
             val = sprintf('%s\n mean flux= %.1f', val, obj.average_flux);
             val = sprintf('%s\n mean background= %.1f', val, obj.average_background);
             
-            val = sprintf('%s\n focus point= %5.3f', val, obj.cam.focuser.pos);
+            if isprop(obj.cam, 'focuser')
+                val = sprintf('%s\n focus point= %5.3f', val, obj.cam.focuser.pos);
+            end
             
             val = sprintf('%s\n--------------------------------------', val);
             
