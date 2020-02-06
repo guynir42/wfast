@@ -1777,7 +1777,7 @@ classdef Acquisition < file.AstroData
             end
             
             if obj.use_arbitrary_pos
-                obj.clip.arbitraryPositions; % maybe add some input parameters?
+                obj.clip.arbitraryPositions('im_size', size(obj.stack)); % maybe add some input parameters?
                 obj.positions = obj.clip.positions;
             elseif obj.use_mextractor
                 obj.findStarsMAAT;
