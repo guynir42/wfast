@@ -922,8 +922,8 @@ classdef Andor < file.AstroData
                     for ii = 1:length(obj.buffers.buf)
                         util.vec.mex_change(obj.buffers.buf(ii).mex_flag_record, 1, 1); % lock all the buffers for recording, they will unlock once the camera fills them... 
                     end
-
-                    obs.cam.mex_new.startup(obj, obj.mex_flag, obj.buffers.buf, obj.buffers.index_rec_vec, obj.num_batches, obj.batch_size); % call the mex file for async recording
+                    fprintf('Andor: use_reset: %d\n', input.use_reset);
+                    obs.cam.mex_new.startup(obj, obj.mex_flag, obj.buffers.buf, obj.buffers.index_rec_vec, obj.num_batches, obj.batch_size, input.use_reset); % call the mex file for async recording
 
                 else % synchronous startup option
 
@@ -1102,6 +1102,7 @@ classdef Andor < file.AstroData
                 input.input_var('use_show', obj.use_show, 'show', 5); % if you want to show each batch's images/stack
                 input.input_var('use_save', obj.use_save, 'save', 5); % if you want to save each batch 
                 input.input_var('use_audio', obj.use_audio, 'audio', 5); % turn on/off audio signals
+                input.input_var('use_reset', true, 5); 
                 input.input_var('use_progress', obj.use_progress, 'progress', 5); % display a progress bar on screen
                 input.input_var('log_level', obj.log_level); % choose if and how much logging you want for this run (1 is only start of run). Errors are always logged. 
                 input.input_var('debug_bit', obj.debug_bit, 'debug');
@@ -1251,8 +1252,7 @@ classdef Andor < file.AstroData
             obj.copyFrom(obj.buffers); % copies the pointers to the data in "buf"
             
             if obj.debug_bit>5
-                disp(['reading out batch ' num2str(obj.batch_counter) ' from buffer '...
-                    num2str(obj.buffers.index) ' | read_flag: ' util.text.print_vec(obj.buffers.this_buf.mex_flag_read)]);
+                fprintf('Buffer: reading batch % 4d from buffer %d | read_flag: %s\n', obj.batch_counter, obj.buffers.index, util.text.print_vec(obj.buffers.this_buf.mex_flag_read));
             end
             
         end

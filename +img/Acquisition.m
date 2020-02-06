@@ -995,7 +995,7 @@ classdef Acquisition < file.AstroData
             else % use default values (load them from Acquisition object)
             
                 input = util.text.InputVars;
-                input.input_var('use_reset', 0, 'reset'); 
+                input.input_var('use_reset', false, 'reset'); 
                 input.input_var('start_index', []);
                 input.input_var('use_background', []);
                 input.input_var('use_refine_bg', []);
@@ -1436,7 +1436,7 @@ classdef Acquisition < file.AstroData
                     
                     obj.reset;
                     
-                    if obj.debug_bit, disp(['Starting run "' input.run_name '" for ' num2str(input.num_batches) ' batches.']); end
+                    if obj.debug_bit, disp(['Starting run "' input.run_name '" for ' num2str(obj.num_batches) ' batches.']); end
 
                 end
                 
@@ -1499,12 +1499,13 @@ classdef Acquisition < file.AstroData
                     obj.src.num_files_per_batch = 1;
                     % what if batch_size is bigger than 100??
                 end
-
-                obj.src.startup('use_save', 0, obj.pass_source{:});
+                
+                fprintf('Acquisition: use_reset: %d\n', input.use_reset);
+                obj.src.startup('use_save', 0, 'use_reset', input.use_reset, obj.pass_source{:});
 %                 obj.src.startup('use_save', 0, 'async', 1, obj.pass_source{:});
 
                 if obj.use_progress
-                    obj.prog.start(obj.num_batches);
+                    obj.prog.start(obj.num_batches); % maybe use continue if not restarting? 
                 end
                 
                 obj.brake_bit = 0;

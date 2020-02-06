@@ -85,6 +85,7 @@ class AndorCamera {
 	int use_async;
 	int debug_bit;
 	
+	bool restart_clock=1;
 	double expT=0;
 	double *error_log=0;
 	unsigned int current_batch=0;
