@@ -33,6 +33,8 @@ classdef Finder < handle
     
     properties % inputs/outputs
         
+%         f; % debug only
+        
         fluxes_corrected;
         stds_corrected
         
@@ -221,6 +223,8 @@ classdef Finder < handle
             if ~isempty(obj.sim_bank)
                 obj.sim_bank.reset;
             end
+            
+            obj.psd.reset;
             
             obj.clear;
             
@@ -639,6 +643,10 @@ classdef Finder < handle
                     obj.last_events = obj.new_events;
                     obj.all_events = [obj.all_events obj.new_events];
                     
+%                     if obj.num_kept
+%                         error('Found a real event!'); % debugging only!
+%                     end
+                    
                 end
                 
             end
@@ -663,6 +671,7 @@ classdef Finder < handle
             
             if ~isempty(obj.bank.fluxes_filtered)
                 obj.var_buf.input(nanvar(obj.bank.fluxes_filtered)); % variance tracking: keep a running buffer of the variance of previous filter results
+%                 obj.f = vertcat(obj.f, obj.bank.fluxes_filtered(:,138,1)); % debugging only!
             end
             
         end

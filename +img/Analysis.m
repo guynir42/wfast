@@ -1007,6 +1007,8 @@ classdef Analysis < file.AstroData
                 obj.analysisSaveFITS;
             end
             
+            obj.updatePars;
+            
             obj.analysisDisplayGUI;
             
         end
@@ -1357,7 +1359,7 @@ classdef Analysis < file.AstroData
             
             if ~isempty(obj.mean_buf) && ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) && obj.cat.success==1
 
-                S = nanmean(obj.phot.fluxes(:,:,end))'; % signal (instrumental)
+                S = nanmean(obj.phot.fluxes(:,:,end)-obj.phot.areas(:,:,end).*obj.phot.backgrounds(:,:,end))'; % signal (instrumental)
                 N = nanstd(obj.phot.fluxes(:,:,end))'; % noise (instrumental)
                 M = obj.cat.magnitudes; % magnitude from catalog
 
@@ -1380,32 +1382,54 @@ classdef Analysis < file.AstroData
                 if isempty(obj.pars.THRESH_INDIVIDUAL)
                     obj.pars.THRESH_INDIVIDUAL = obj.finder.min_star_snr;
                 end
-                
-                obj.pars.LIMMAG_INDIVIDUAL = head.limiting_magnitude(M2, S2./N2, obj.pars.THRESH_INDIVIDUAL, 'maximum', 10); 
+                if ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
+                    delete(obj.aux_figure.Children);
+                    ax = axes('Parent', obj.aux_figure);
+                    obj.pars.LIMMAG_INDIVIDUAL = head.limiting_magnitude(M2, S2./N2, obj.pars.THRESH_INDIVIDUAL, 'maximum', 10, 'plot', 1, 'axes', ax, 'marker', 'pm'); 
+                else
+                    obj.pars.LIMMAG_INDIVIDUAL = head.limiting_magnitude(M2, S2./N2, obj.pars.THRESH_INDIVIDUAL, 'maximum', 10); 
+                end
                 
                 % consider allowing the user to choose the type of photometry to take (the 3rd index)
-                S_stack = obj.phot_stack.fluxes(:,:,end)'; % signal (instrumental)
-                N_stack = sqrt(obj.phot_stack.areas(:,:,end)'.*nanmedian(obj.phot_stack.variances(:,:,end))); % noise (instrumental)
+                f = obj.phot_stack.fluxes(:,:,end)';
                 
-                idx = S_stack./N_stack>1.5;
+                b = nanmedian(squeeze(util.stat.median2(obj.stack_cutouts_bg))); % the background is attained by the median of the background cutouts
+                obj.pars.BACKGROUND = b./obj.pars.NAXIS3; % the background is given per frame, not for the stack! 
+                
+                v = obj.phot_stack.variances(:,:,end)'; % the variance per star
+                v(v==0) = NaN; % sometimes we get zero variance instead of NaN value
+                
+                a = obj.phot_stack.areas(:,:,end)'; % the area per star
+                
+                if ~obj.use_background_cutouts % if we didn't subtract background for the stack cutouts
+                    f = f-a.*b; % correct the fluxes for background values.
+                end
+                
+                S_stack = f; % signal (instrumental)
+                N_stack = sqrt(a.*v); % noise (instrumental)
+                
+                idx = ~isnan(S_stack./N_stack) & S_stack./N_stack>1.5;
                 S_stack = S_stack(idx);
                 N_stack = N_stack(idx);
                 M_stack = M(idx);
                 
                 if isempty(obj.pars.THRESH_STACK)
-                    obj.pars.THRESH_STACK = obj.pars.THRESH_INDIVIDUAL*2;
+                    obj.pars.THRESH_STACK = obj.pars.THRESH_INDIVIDUAL;
                 end
                 
                 if ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
-                    delete(obj.aux_figure.Children);
-                    ax = axes('Parent', obj.aux_figure);
-                    obj.pars.LIMMAG_STACK = head.limiting_magnitude(M_stack, S_stack./N_stack, obj.pars.THRESH_STACK, 'maximum', 20, 'plot', 1, 'axes', ax); 
+%                     delete(obj.aux_figure.Children);
+%                     ax = axes('Parent', obj.aux_figure);
+                    ax.NextPlot = 'add';
+                    obj.pars.LIMMAG_STACK = head.limiting_magnitude(M_stack, S_stack./N_stack, obj.pars.THRESH_STACK, 'maximum', Inf, 'var', 'snr', 'plot', 1, 'axes', ax); 
+                    ax.NextPlot = 'replace';
                 else
-                    obj.pars.LIMMAG_STACK = head.limiting_magnitude(M_stack, S_stack./N_stack, obj.pars.THRESH_STACK, 'maximum', 20); 
+                    obj.pars.LIMMAG_STACK = head.limiting_magnitude(M_stack, S_stack./N_stack, obj.pars.THRESH_STACK, 'maximum', Inf, 'var', 'snr'); 
                 end
                 
                 drawnow;
                 
+%                 fprintf('the flux ratio of LIMMAG for individual and stack is %4.2f\n', 10.^(0.4*(obj.pars.LIMMAG_STACK-obj.pars.LIMMAG_INDIVIDUAL))); 
                 
 %                 T = table(-2.5*log10(S2)+obj.pars.ZEROPOINT, S2./N2, M2, 'VariableNames', {'Measured_mag', 'SNR', 'GAIA_mag'});
 %                 T2 = util.vec.bin_table_stats(T, 30);
@@ -1615,6 +1639,12 @@ classdef Analysis < file.AstroData
                 if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
 
             end
+            
+        end
+        
+        function updatePars(obj)
+           
+            % to be updated...
             
         end
         

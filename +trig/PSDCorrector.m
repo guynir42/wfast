@@ -104,13 +104,13 @@ classdef PSDCorrector < handle
             
             obj.fluxes_input = fluxes;
             
+            obj.calculate;
+            
             obj.flux_buffer = vertcat(obj.flux_buffer, fluxes(1:obj.num_frames_to_add,:));
             
             if size(obj.flux_buffer,1)>obj.N_buf
                 obj.flux_buffer = obj.flux_buffer(end-obj.N_buf+1:end,:,:); % be careful with fluxes with more than 3 dimensions! 
             end
-            
-            obj.calculate;
             
         end
         
@@ -130,7 +130,7 @@ classdef PSDCorrector < handle
 
                 ff(1,:) = 0; % zero frequency contains just noise, and should be zero after detrending with linear fitter
                 
-                obj.fluxes_deredened = util.img.crop2size(ifft(ff./sqrt(obj.psd)), size(obj.fluxes_input)); 
+                obj.fluxes_deredened = real(util.img.crop2size(ifft(ff./sqrt(obj.psd)), size(obj.fluxes_input))); 
                 obj.stds_deredened = std(obj.fluxes_deredened); 
 
                 % these are divided twice by the sqrt(PSD) to account for the filter being deredened as well.
