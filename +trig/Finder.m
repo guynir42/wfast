@@ -34,6 +34,10 @@ classdef Finder < handle
     properties % inputs/outputs
         
 %         f; % debug only
+
+        fluxes_both; % built from prev_fluxes and fluxes
+        timestamps_both; % built from prev_timestamps and timestamps
+        star_snrs; % S/N of each star's flux (without any corrections)
         
         fluxes_corrected;
         stds_corrected
@@ -568,33 +572,39 @@ classdef Finder < handle
             %%%%%%%%%%%%%%% done parsing inputs %%%%%%%%%%%%%%%%%%%%%%%
             
             if ~isempty(obj.prev_fluxes) % skip first batch! 
-            
-                t = tic;
-                obj.cal.input(vertcat(obj.prev_fluxes, obj.fluxes), vertcat(obj.prev_errors, obj.errors), vertcat(obj.prev_timestamps, obj.timestamps)); 
-                if obj.debug_bit>2, fprintf('Calibration time: %f seconds.\n', toc(t)); end
                 
+                obj.fluxes_both = vertcat(obj.prev_fluxes, obj.fluxes);
+                obj.timestamps_both = vertcat(obj.prev_timestamps, obj.timestamps); 
+                                
+                obj.star_snrs = nanmean(obj.fluxes_both)./nanstd(obj.fluxes_both); 
+                              
                 if obj.use_psd_correction
                    
                     t = tic;
                     
                     obj.psd.num_frames_to_add = size(obj.fluxes,1); % only add the first 100 measurements
-                    obj.psd.input(obj.cal.fluxes_detrended);
+                    obj.psd.input(obj.fluxes_both);
                     
 %                     obj.fluxes_corrected = obj.psd.fluxes_deredened;
 %                     obj.stds_corrected = obj.psd.stds_deredened;
                     obj.fluxes_corrected = obj.psd.fluxes_blued;
                     obj.stds_corrected = obj.psd.stds_blued;
 
-
                     if obj.debug_bit>2, fprintf('PSD correction time: %f seconds.\n', toc(t)); end
 
                 else
+
+                    t = tic;
+                    obj.cal.input(obj.fluxes_both, vertcat(obj.prev_errors, obj.errors), obj.timestamps_both); % add errors_both later if we need to 
+                    if obj.debug_bit>2, fprintf('Calibration time: %f seconds.\n', toc(t)); end
+                    
                     obj.fluxes_corrected = obj.cal.fluxes_detrended;
                     obj.stds_corrected = obj.cal.stds_detrended;
+                    
                 end
                 
                 t = tic;
-                obj.bank.input(obj.fluxes_corrected, obj.stds_corrected, obj.cal.timestamps); % use the filter bank on the fluxes
+                obj.bank.input(obj.fluxes_corrected, obj.stds_corrected, obj.timestamps_both); % use the filter bank on the fluxes
                 
                 if nnz(~isnan(obj.bank.fluxes_filtered))==0
                     error('Filtered fluxes in ShuffleBank are all NaN!');
@@ -682,13 +692,10 @@ classdef Finder < handle
            
             ff = obj.bank.fluxes_filtered; % dim 1 is time, dim 2 is kernels, dim 3 is stars
             
-            good_stars = obj.cal.star_snrs>obj.min_star_snr;
+            good_stars = obj.star_snrs>obj.min_star_snr;
             if all(~good_stars)
                 return;
             end
-            
-%             better_stars = obj.cal.star_snrs>obj.min_star_snr*2;
-%             best_stars = obj.cal.star_snrs>obj.min_star_snr*4;
             
             t = tic; 
             
@@ -708,7 +715,7 @@ classdef Finder < handle
                 
                 % add the occultation on top of the data!
                 ff_sim = util.img.pad2size(obj.sim_bank.filtered_bank(:,:,obj.sim_bank.filtered_index), size(ff)); 
-                ff_sim = ff_sim.*obj.cal.star_snrs(star_index_sim); 
+                ff_sim = ff_sim.*obj.star_snrs(star_index_sim); 
                 max_shift = size(ff,1)-5;
                 shift_frames = randi(max_shift)-floor(max_shift/2); % shift by a random number of frames
                 ff_sim = util.img.shift(ff_sim, 0, shift_frames, 0);
@@ -767,7 +774,7 @@ classdef Finder < handle
                     ev.snr = mx; % note this is positive even for negative filter responses! 
 
                     ev.time_index = idx(1); 
-                    ev.kern_index = idx(2);
+                    ev.kern_index = idx(2); 
                     
                     if idx(1)>length(obj.prev_timestamps)
                         ev.which_batch = 'second';
@@ -796,6 +803,7 @@ classdef Finder < handle
                     end
 
                     ev.flux_filtered = ff(:,idx(2),idx(3));
+                    
                     if obj.use_var_buf && ~is_empty(obj.var_buf)
                         ev.previous_std = sqrt(obj.var_buf.mean(1,ev.kern_index, ev.star_index));
                     end
@@ -803,7 +811,7 @@ classdef Finder < handle
                     ev.flux_detrended = obj.fluxes_corrected(:,ev.star_index); 
                     ev.std_flux = obj.stds_corrected(ev.star_index); 
 
-                    ev.flux_raw_all = obj.cal.fluxes;
+                    ev.flux_raw_all = vertcat(obj.prev_fluxes, obj.fluxes);
                     ev.corr_flux = obj.which_flux_correlate;
                     
                     % somewhere around here we MUST make use of the flux errors
@@ -845,9 +853,9 @@ classdef Finder < handle
                 end
                     
                 obj.hist_snr_edges = obj.min_star_snr:obj.snr_bin_width:obj.snr_bin_max; 
-                obj.hist_star_edges = 1:length(obj.cal.star_snrs); 
+                obj.hist_star_edges = 1:length(obj.star_snrs); 
                 
-                h = histcounts2(obj.hist_star_edges, obj.cal.star_snrs, obj.hist_star_edges, obj.hist_snr_edges); % put one in the bin with the right S/N and star index
+                h = histcounts2(obj.hist_star_edges, obj.star_snrs, obj.hist_star_edges, obj.hist_snr_edges); % put one in the bin with the right S/N and star index
                 
                 h = h.*batch_duration_seconds./3600; % the duration of the second batch, subtracting the duration of all events in that part
                 
@@ -939,7 +947,7 @@ classdef Finder < handle
                 ev.time_range_thresh = obj.time_range_thresh;
                 ev.kern_range_thresh = obj.kern_range_thresh;
                 ev.star_range_thresh = obj.star_range_thresh;
-                ev.star_snr = obj.cal.star_snrs(ev.star_index);
+                ev.star_snr = obj.star_snrs(ev.star_index);
                 
                 % housekeeping data from photometry 
                 a = vertcat(obj.prev_areas, obj.areas);
