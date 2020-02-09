@@ -1500,7 +1500,6 @@ classdef Acquisition < file.AstroData
                     % what if batch_size is bigger than 100??
                 end
                 
-                fprintf('Acquisition: use_reset: %d\n', input.use_reset);
                 obj.src.startup('use_save', 0, 'use_reset', input.use_reset, obj.pass_source{:});
 %                 obj.src.startup('use_save', 0, 'async', 1, obj.pass_source{:});
 
