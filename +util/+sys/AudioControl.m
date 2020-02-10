@@ -1,7 +1,14 @@
-classdef AudioControl <handle
-% class that plays sound effects (e.g. when starting/ending analysis)
+classdef AudioControl < handle
+% Class that plays sound effects (e.g. when starting/ending analysis)
+% Loads several mp3 sound effect files from +util/audio_clips and plays 
+% them on demand. 
+% Will cut off the sound after "max_duration" has passed (in seconds). 
+% Use "master_switch" to turn sound on or off. 
 %
-% TEST PROTOCOL: a = util.sys.AudioControl; a.playTakeForever;
+% For a list of all possible sound effects, look at methods (audio control) 
+% block towards the end of this class. 
+%
+% Call "stop" method to cut out all sounds playing. 
     
     properties(SetAccess='protected')
        
@@ -22,11 +29,11 @@ classdef AudioControl <handle
     
     properties
         
-        master_switch = 1;
+        master_switch = 1; % this turns off all output sounds
         
-        max_duration = 25; % seconds
+        max_duration = 25; % cut short any sound effects longer than this (seconds)
         
-        stop_timer = timer;
+        stop_timer = timer; % triggered to make sure the audio is stopped after a few seconds
         
         debug_bit = 1;
         

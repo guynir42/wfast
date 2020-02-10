@@ -1,5 +1,5 @@
 classdef Logger < handle
-% Keeps text file with logging commands and errors from hardware.
+% Updates text file with logging user commands and errors.
 %
 % Constructor can be called with single text argument to set <name>. 
 %
@@ -13,8 +13,8 @@ classdef Logger < handle
 % Use obj.heartbeat(time_sec, owner) to make the logger check if its owner 
 % is still working, and add a line in the logfile to that effect. 
 % For checking to work, "owner" must implement "update" method and "status"
-% property. Without this (or with empty "owner") logger will just input a 
-% line with "heartbeat" and nothing more. 
+% property. Without this (or with empty "owner") logger will just write a 
+% line with time: "heartbeat" and nothing more. 
 %
 % Will generate a new file every day (day starts at 12:00 UTC). 
 %
@@ -22,7 +22,7 @@ classdef Logger < handle
 %   *name: the name of hardware/component/sensor (e.g., "mount")
 %   *base_dir: the folder where all logfiles are kept. 
 %    If left empty, will write to fullfile(getenv('DATA'),'WFAST/logfiles')
-%   *use_error_file: if non-zero, will write errors to main file and to 
+%   *use_error_file: if true, will write errors to main file and to 
 %    additional error file with same name, appended with _ERROR. 
 %
 % EXAMPLE: 
@@ -30,7 +30,7 @@ classdef Logger < handle
 % L.input('Connecting to mount');  % create logfile at C:\Dropbox\data\WFAST\logfiles 
 %                                  % with name 2019-04-29_mount-ASA.txt
 %                                  % with text: 15:27:34.123 Connecting to mount
-% L.error('Mount not responding'); % write this error message (with timestamp
+% L.error('Mount not responding'); % write this error message, with timestamp
 %                                  % and error banner to same file, and also
 %                                  % (optionally) to logfile 2019-04-29_mount-ASA_ERROR.txt
 % L.base_dir = 'D:\logifles';      % will overwrite the environmental variable 'DATA' 
@@ -126,7 +126,7 @@ classdef Logger < handle
             
         end
         
-        function delete(obj)
+        function delete(obj) % custom destructor to make sure file is closed
             
             try 
             
@@ -144,7 +144,7 @@ classdef Logger < handle
     
     methods % reset /clear
         
-        function reset(obj)
+        function reset(obj) % close all files and reset file handles and time object
             
             obj.time = datetime.empty;
             obj.filename = '';
@@ -274,13 +274,13 @@ classdef Logger < handle
             
         end
         
-        function error(obj, text)
+        function error(obj, text) % just call input(<text>, errflag=true)
             
             obj.input(text, 1); % use the errflag! 
             
         end
         
-        function makeFile(obj)
+        function makeFile(obj) % make the text file, folder (if needed) and keep the filename
             
             dir = obj.base_dir;
             
@@ -307,7 +307,7 @@ classdef Logger < handle
             
         end
         
-        function makeErrFile(obj)
+        function makeErrFile(obj) % if writing to extra error file, this makes it
             
             dir = obj.base_dir;
             
@@ -334,13 +334,13 @@ classdef Logger < handle
             
         end
         
-        function val = check_heartbeat(obj)
+        function val = check_heartbeat(obj) % check if heartbeat timer is running
             
             val = ~isempty(obj.timer) && isa(obj.timer, 'timer') && isvalid(obj.timer) && strcmp(obj.timer.Running, 'on');
             
         end
         
-        function heartbeat(obj, time_sec, owner)
+        function heartbeat(obj, time_sec, owner) % if owner exists, update it and check the status. Otherwise just print time: heartbeat
             
             if nargin<2 || isempty(time_sec)
                 time_sec = 300; % five minutes default interval
@@ -373,7 +373,7 @@ classdef Logger < handle
             
         end
         
-        function timer_callback(obj, ~, ~)
+        function timer_callback(obj, ~, ~) % This is called by the heartbeat timer
                 
             if ~isempty(obj.owner)
                 

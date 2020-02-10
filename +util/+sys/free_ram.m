@@ -1,5 +1,6 @@
 function RAM = free_ram(units)
-% Returns the number of bytes of free RAM on this machine. 
+% Usage: RAM = free_ram(units)
+% Returns the amount of free RAM on this machine. 
 % Tests indicate this is not a very accurate estimate. 
 % Use the input "units" to specify if you want it in bytes, KBs, MBs or GBs
 
@@ -7,12 +8,10 @@ function RAM = free_ram(units)
 
     if nargin==0, help('util.sys.free_ram'); return; end
     
-    if ispc        
+    if ispc 
         M = memory;
         RAM = M.MaxPossibleArrayBytes;
-    end
-    
-    if isunix
+    elseif isunix
         comm=' free | grep Mem | awk ''{print $4}'' ';
         [~, RAM] = unix(comm);
         RAM = str2num(RAM)*1024;        
