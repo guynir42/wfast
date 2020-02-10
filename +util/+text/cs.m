@@ -1,15 +1,31 @@
 function val = cs(str, varargin)
-% Compare strings. Usage: cs(str, varargin)
-% If the string "str" is a match for any of the character vectors in
-% varargin, then output is TRUE. 
-% arguments can be given as a list of strings or as a cell array of strings. 
+% Usage: val = cs(str, varargin)
+% Compare "str" to several optional strings, with loose matching conditions. 
+% This is useful for checking user input (e.g., varargin pairs) where the 
+% use can be lazy by not using capital letters, spaces or underscores, 
+% and only write the first few letters of the parameter name. 
+% 
+% Multiple match options are tested, if any of them match, returns true. 
+% Test strings can be given as a cell array of strings or as individual 
+% arguments to the function: 
+%   -cs('foo', 'bar', 'baz')
+%   -cs('foo', {'bar', 'baz'})
 %
-% Doesn't match the whole word, only the initial letters.
-% if any argument is numeric, that is used as the minimal number of letters
+% Removes spaces and underscores before comparing. Ignores case. 
+% 
+% Examples (all these are true):
+%   -cs('Use_plot', 'use plot')
+%   -cs('USEPLOT', 'use_plot')
+%   -cs('use plot', 'USEPLOT')
+%
+% Doesn't match the whole word, only the initial letters. 
+% if any argument is numeric, it is used as the minimal number of letters
 % needed to compare the string. If none is given (or zero) then the number
-% of letters in the given string is used. 
+% of letters in "str" is used. 
 %
-% Will remove spaces and underscores before comparing. Ignores case. 
+% Example: cs('font', 'font_size') returns true
+% Example: cs('font', 'font_size', 6) returns false
+% This is useful when several parameters have the same starting characters. 
 
     if nargin==0
         help('util.text.cs');

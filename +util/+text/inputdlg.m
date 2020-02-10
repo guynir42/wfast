@@ -1,10 +1,15 @@
-function [R] = inputdlg(str,value)
-% Usage: inputdlg(str, value=5)
+function R = inputdlg(str, value)
+% Usage: R = inputdlg(str, value=5)
 % Displays an input dialog with question text "str" and default value 5.
 % User may hit return after entering info.
 % 
-% taken shamelessly from https://www.mathworks.com/matlabcentral/newsreader/view_thread/295157
-% and also added a cancel button
+% The user prints a new number and hits Enter, then this function returns 
+% the number it reads from the input field. 
+%
+% If no number is given or if 'Cancel' is pressed, returns empty. 
+%
+% Taken shamelessly from https://www.mathworks.com/matlabcentral/newsreader/view_thread/295157
+% Also added a cancel button! 
 
 if nargin==0, help('util.text.inputdlg'); return; end
 

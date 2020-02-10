@@ -4,8 +4,8 @@ classdef SkyMap < handle
 %        This takes more than 24 hours on a fast computer. 
 %        Prefer to load this object from DATA/WFAST/saved/sky_map.mat
 %
-% Best thing is to make a GUI and play with it. Some of the options (also 
-% available when calling the show(...) function are: 
+% Best thing is to make a GUI and play with it. Some of the options, also 
+% available when calling the show(...) function, are: 
 % -axes or axis: plot into this axes object. (default is GUI axes)
 % -min_mag and max_mag: the brightest and faintest stars to show, respectively. Default is 10-17
 % -biggest_size: star size in micro arcseconds. Default is 1000. 
@@ -20,8 +20,13 @@ classdef SkyMap < handle
 %
 % To find good observing fields, choose the maximum size permitted by your 
 % Fresnel scale, the magnitude you can reach, and the south limit for your
-% southern most observations. Then look for something in the right RA and 
+% southern-most observations. Then look for something in the right RA and 
 % close enough to the ecliptic. 
+% NOTE: Plotting the map calls getMap() with whatever chosen variables. 
+%       When you change the magnitude or size limits it needs to 
+%       re-bin the data so it is slower than just changing display
+%       properties like "log" or "grid" or "south_limit". 
+%
 
     properties(Transient=true)
         
@@ -31,33 +36,33 @@ classdef SkyMap < handle
     
     properties % objects
         
-        bc@util.ast.BolometricCorrections;
-        dir@util.sys.WorkingDirectory;
-        prog@util.sys.ProgressBar;
+        bc@util.ast.BolometricCorrections; % used to calculate the physical size of stars based on color and brightness
+        dir@util.sys.WorkingDirectory; % to point to the GAIA location and get all the hdf5 files
+        prog@util.sys.ProgressBar; 
         
     end
     
     properties % inputs/outputs
         
-        RA_axis;
-        DE_axis;
-        mag_axis;
-        size_axis; 
+        RA_axis; % the x axis for the plot and for binning all sky positions (degrees)
+        DE_axis; % the y axis for the plot and for binning all sky positions (degrees)
+        mag_axis; % bin the magnitude data into these bin edges
+        size_axis; % bin the stellar size into these bin edges
         
         data; % a 4D matrix with the number of stars in each angle bin (RA/DE) and each magnitude and size bin
         
         % show the position in galactic/ecliptic coordinates (degrees)
-        ecliptic_long;
-        ecliptic_lat;
-        galactic_long;
-        galactic_lat;
+        ecliptic_long; % the ecliptic longitude of each bin in RA/Dec
+        ecliptic_lat; % the ecliptic latitude of each bin in RA/Dec
+        galactic_long; % the galactic longitude of each bin in RA/Dec
+        galactic_lat; % the galactic latitude of each bin in RA/Dec
         
-        col_cell = {};
-        col_units = {};
-        col_indices = [];
-        col_names = {};
+        col_cell = {}; % information from the HTM catalog
+        col_units = {}; % information from the HTM catalog
+        col_indices = []; % which column indices to load
+        col_names = {}; % what are the names of the loaded columns
         
-        latest_catalog;
+        latest_catalog; % the data from the latest file loaded 
         
     end
     
@@ -73,16 +78,16 @@ classdef SkyMap < handle
         use_partial_load = 0; % load only the required columns from each HDF5 file
         use_mex_binning = 0; % use mex function to make the histogram counts instead of 2 loops and histcounts2
         
-        show_brightest_magnitude; 
-        show_faintest_magnitude;
-        show_biggest_size;
-        show_south_limit;
+        show_brightest_magnitude; % maximum (lowest number) magnitude to show
+        show_faintest_magnitude; % minumum (highest number) magnitude to show
+        show_biggest_size; % largest stars to include in the map
+        show_south_limit; % most negative (southern) declination to show on the map
         
-        show_log = true;
-        show_ecliptic = false;
-        show_galactic = false;
-        show_ra_units = 'hours';
-        show_grid = false;
+        show_log = true; % show the star numbers mapped to color using logarithmic scale
+        show_ecliptic = false; % plot an overlay with ecliptic latitude
+        show_galactic = false; % plot an overlay with galactic latitude
+        show_ra_units = 'hours'; % choose to show the RA on the plot in "hours" or "degrees"
+        show_grid = false; % show an RA/Dec grid on top of the map
         
         debug_bit = 1;
         
@@ -248,7 +253,7 @@ classdef SkyMap < handle
     
     methods % calculations
         
-        function makeMap(obj)
+        function makeMap(obj) % generate the map from the GAIA catalog (this takes several hours!)
             
             if isempty(obj.bc.color_vec) || isempty(obj.bc.temp_vec)
                 obj.bc.makeSourceMatrix('BP', 'RP'); 
@@ -332,7 +337,7 @@ classdef SkyMap < handle
             
         end
         
-        function getColumns(obj)
+        function getColumns(obj) % find the columns and indices from the saved HTM files
             
             filename = obj.dir.match('GAIADR2_htmColCell.mat');
             load_struct = load(filename{1}); 
@@ -355,7 +360,7 @@ classdef SkyMap < handle
             
         end
         
-        function catalog = loadFile(obj, filename)
+        function catalog = loadFile(obj, filename) % read a single GAIA HTM file and produce all the relevant columns
             
             % index of column that hold magnitude so we can only take stars in the limit
             if obj.use_partial_load
@@ -408,7 +413,7 @@ classdef SkyMap < handle
             
         end
         
-        function calcCoordinates(obj)
+        function calcCoordinates(obj) % go over each bin in RA/Dec and calculate its galactic/ecliptic coordinates (takes more than an hour) 
             
             e = head.Ephemeris;
             
@@ -443,8 +448,12 @@ classdef SkyMap < handle
             
         end
                 
-        function val = getMap(obj, varargin)
-            
+        function val = getMap(obj, varargin) % integrate the 4D histogram along 3rd and 4th dimensions (magnitude and size) to give a 2D map (lazy loading when possible). 
+        % Usage: val = obj.getMap(varargin) 
+        % Can override the following internal parameters to load a different
+        % cut of the 4D histogram: min_mag, max_mag, biggest_size. 
+        %  
+        
             input = util.text.InputVars;
             input.input_var('min_mag', obj.show_brightest_magnitude, 'brightest_magnitude'); 
             input.input_var('max_mag', obj.show_faintest_magnitude, 'faintest_magnitude'); 
@@ -538,12 +547,37 @@ classdef SkyMap < handle
             
         end
         
-        function h_out = show(obj, varargin)
-            
+        function h_out = show(obj, varargin) % plot the map, with many optional inputs that override the internal parameters
+        % Usage: h_out obj.show(varargin)
+        % Plot the map with some optional arguments:
+        %   -axes: what plot axes to draw on, defaulting to gca(). 
+        %   -min_mag: brightest stars to include in the map
+        %   -max_mag: faintest stars to include in the map
+        %   -biggest_size: largest angular size of stars to include. 
+        %   -south_limit: how far south in declination to plot
+        %   -log: show colors on a logarithmic scale
+        %   -ecliptic: show an overlay with ecliptic latitude
+        %   -galactic: show an overlay with galactic latitude
+        %   -units: what units to use for RA: "hours" or "degrees"
+        %   -grid: add an RA/Dec grid overlay. 
+        %   -font_size: for the axis labels etc.
+        %
+        % NOTE: most of these have defaults in the object properties, 
+        %       so calling it without arguments just uses what is defined
+        %       by the object (and managed by the GUI). 
+        % 
+        % Output: if an output variable is given, returns a handle to the 
+        %         image graphic object: h = imagesc(...)
+        %
+        % NOTE: This function calls getMap() with whatever chosen variables. 
+        %       When you change the magnitude or size limits it needs to 
+        %       re-bin the data so it is slower than just changing display
+        %       properties like "log" or "grid" or "south_limit". 
+        
             import util.text.cs;
             
             input = util.text.InputVars;
-            input.input_var('ax', [], 'axes', 'axis');
+            input.input_var('ax', [], 'axes', 'axis'); 
             input.input_var('min_mag', obj.show_brightest_magnitude, 'brightest_magnitude'); 
             input.input_var('max_mag', obj.show_faintest_magnitude, 'faintest_magnitude'); 
             input.input_var('biggest_size', obj.show_biggest_size, 'biggest_star', 'largest_size', 'largest_star'); 
