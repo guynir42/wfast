@@ -1,6 +1,7 @@
 function Gb = disk_space(filename)
 % Usage: Gb = disk_space(filename)
 % Checks the amount of free space where file/folder is located. 
+% Output is in Gigabytes! 
     
     if nargin==0, help('util.sys.disk_space'); return; end
 

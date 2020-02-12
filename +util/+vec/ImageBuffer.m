@@ -1,12 +1,32 @@
-classdef ImageBuffer < dynamicprops
-    
+classdef ImageBuffer < handle
+% Stores a number of images, stacked in the 3rd dimension. 
+% After stacking "N" images, the first ones are over-written by new images
+% like a stack with a "first in, first out" rule. 
+% This is useful for maintaining a sample of the latest images, throwing 
+% away the old ones. 
+% All images must be 2D of the same size and class. 
+%
+% Input the size of the buffer "N" as an optional argument to the constructor
+% or to the reset() function, or set it in the object before filling it. 
+% The default is N=10. 
+% 
+% Use "last" to get the last image added to the buffer. 
+% Use "is_full" to test if the number of images reached or exceeded "N", 
+% and use "is_empty" to check if no images were given at all. 
+% 
+% The "counter" tells how many images were added since the last reset(). 
+% The "idx" tells what was the latest image index in the 3rd dimension. 
+%
+% The "im_size" gives the size of the 2D image dimensions.  
+% 
+ 
     properties
         
-        N = 10;
-        idx = 0;
-        counter = 0;
+        N = 10; % maximum number of images to store at any time
+        idx = 0; % the last index where an image was added
+        counter = 0; % the total number of images added since the last reset()
         
-        im_size = [];
+        im_size = []; % the size of the first 2 dimensions of the data
         
     end
     
@@ -25,7 +45,7 @@ classdef ImageBuffer < dynamicprops
     
     methods
         
-        function obj = ImageBuffer(varargin)
+        function obj = ImageBuffer(varargin) % optional argument sets "N"
             
             input = util.text.InputVars;
             input.input_var('N', obj.N, 'number', 'length');
@@ -36,7 +56,7 @@ classdef ImageBuffer < dynamicprops
             
         end
         
-        function reset(obj, N)
+        function reset(obj, N) % optional argument sets "N"
             
             if nargin>1 && ~isempty(N) && isnumeric(N) && N>0
                 obj.N = N;
@@ -49,7 +69,7 @@ classdef ImageBuffer < dynamicprops
             
         end
         
-        function input(obj, Im)
+        function input(obj, Im) % give a 2D matrix (all matrices must be the same size and class)
             
             if isempty(Im)
                 return;
@@ -89,7 +109,7 @@ classdef ImageBuffer < dynamicprops
             
         end
         
-        function val = get.data(obj)
+        function val = get.data(obj) 
             
             if isempty(obj.raw_data)
                 val = [];
@@ -99,7 +119,7 @@ classdef ImageBuffer < dynamicprops
             
         end
         
-        function val = get.last(obj)
+        function val = get.last(obj) % last image added to the buffer
             
             if isempty(obj.raw_data)
                 val = [];
@@ -115,13 +135,13 @@ classdef ImageBuffer < dynamicprops
             
         end
         
-        function val = is_full(obj)
+        function val = is_full(obj) % if the number of images equals or exceeds "N"
             
             val = obj.counter>=obj.N;
             
         end
         
-        function val = is_empty(obj)
+        function val = is_empty(obj) % if no images were added
             
             val = isempty(obj.data);
             

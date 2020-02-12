@@ -1,5 +1,6 @@
 function v_col = tocolumn(vector)
-% if input is not a column, tocolumn turns it to a column vector. 
+% Usage: v_col = tocolumn(vector)
+% If input is not a column, tocolumn turns it to a column vector. 
 % if input vector is a matrix, tocolumn does nothing but displays a warning
 
     if nargin==0

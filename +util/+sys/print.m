@@ -1,14 +1,21 @@
 function print(filename, varargin)
-% Print the current figure into pdf, png, and eps given the string filename.
 % Usage: print(filename, varargin)
-% filename is should be without extension (extensions are added for each file type). 
+% Print the current figure into pdf, png, and eps given the string filename.
+%
+% filename should be without extension (extensions are added for each file type). 
 % Optional arguments
 %   -use_export: use the new +fig package based on XPDF
 %   -resolution: for the old method
 %   -use_screen: for the old method, instead of width/height
 %   -height/width: for the old method, specify size of output. 
 %   -fig: which figure to print (default is gcf). 
-           
+%
+% This function requires the +util/+sys/+fig folder. 
+% It needs to have ghostscript installed and XPDF needs to be told where it 
+% was installed the first time (look for warning messages). 
+% See license and readme in +fig folder for more info. 
+
+
             import util.sys.fig.export_fig;
             import util.text.cs;
             import util.text.parse_bool;

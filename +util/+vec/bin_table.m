@@ -2,9 +2,19 @@ function [Tnew, edges] = bin_table(T, edges, varargin)
 % Usage: [Tnew, edges] = bin_table(T, edges, column_number=1, varargin)
 % Collects all entries from the chosen column (default is first one), that 
 % lie between two adjacent edges into one cell of a new table. 
-% 
+% The remaining columns of the table are combined according to the choise 
+% of the optional argument "function". 
+%
 % The "edges" input can be a numeric scalar to specify how many (equally
 % spaced) bins are required. 
+% 
+% OPTIONAL ARGUMENTS:
+%   -column: what column to use to bunch the table (default 1). 
+%   -function: what to do with the remaining columns. By default the function
+%              collects them into a cell array. 
+%              If "function" is specified, it is used to combine the contents
+%              e.g., function=mean will calculate the mean value of all the 
+%              elements in each column that are included in each bin. 
 
     if nargin==0, help('util.vec.bin_table'); return; end
     

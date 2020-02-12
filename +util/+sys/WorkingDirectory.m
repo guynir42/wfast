@@ -1,18 +1,37 @@
 classdef WorkingDirectory < handle
 % Keeps track of a directory in the filesystem. 
-% Lets you change dir, browse, and match files from the directory. 
+% Used as a bookmark that is a little like the matlab working directory, 
+% only you can keep many different places in the filesystem. 
+% 
+% You can change dir using cd(), browse() to choose a folder from the system
+% dialog, and match() to do glob matching. 
+% 
+% The constructor can take no arguments (use current working directory) or
+% take another WorkingDirectory object, or take a string with the location 
+% of the target directory in the file system. 
+% 
+% Use cd() like normal change directory, including '..' to go up one level. 
 %
-% TEST PROTOCOL: d=util.sys.WorkingDirectory; d.cd('..'); d.match('*.m'); d.pwd
+% Use back() to go back to the previous folder. 
+%
+% Use match(...) to get all the files that fit the given glob in the current
+% directory pointed to by the object. 
+%
+% Use browse() to change to a folder using a graphic interface. 
+%
+% 
+%
+% Examples: d=util.sys.WorkingDirectory; d.cd('..'); d.match('*.m'); d.pwd
 
     properties
     
-        cwd;
+        cwd; % current working directory! 
         
     end
     
     properties(Hidden=true)
        
-        prev_dir;
+        prev_dir; % to let the user do back()
         
     end
     
@@ -24,7 +43,7 @@ classdef WorkingDirectory < handle
     
     methods % constructor 
        
-        function obj = WorkingDirectory(start_at)
+        function obj = WorkingDirectory(start_at) % give starting folder as string or another such object (default is current dir)
             
             if nargin==0 || isempty(start_at)
                 obj.cwd = pwd;
@@ -44,7 +63,7 @@ classdef WorkingDirectory < handle
        
     methods % getters
     
-        function d = get.cwd(obj)
+        function d = get.cwd(obj) % always give back the current working directory without a trailing '/'
             
             if strcmp(obj.cwd(end),'/') || strcmp(obj.cwd(end),'/')
                 d = obj.cwd;
@@ -56,7 +75,7 @@ classdef WorkingDirectory < handle
             
         end
                   
-        function list = ls(obj, directory)
+        function list = ls(obj, directory) % list all files and folders in the directory (optional argument to list another directory in absolute/relative path)
             
             if nargin<2 || isempty(directory)
                 directory = obj.cwd;
@@ -73,7 +92,7 @@ classdef WorkingDirectory < handle
                         
         end
         
-        function lh(obj, directory)
+        function lh(obj, directory) % list the files and folder with last modification date and size (for files) in human readable format
             
             if nargin<2 || isempty(directory)
                 directory = obj.cwd;
@@ -88,15 +107,15 @@ classdef WorkingDirectory < handle
                 if ~strcmp(d(ii).name,'.') && ~strcmp(d(ii).name,'..')
                     
                     if d(ii).isdir
-                        fprintf('%-60s %-15s \n', d(ii).name, d(ii).date);
+                        fprintf('%-60s %-20s \n', d(ii).name, datestr(d(ii).datenum));
                     elseif d(ii).bytes>1024^3
-                        fprintf('%-60s %-15s %15f Gbs\n', d(ii).name, d(ii).date, d(ii).bytes/1024^3);
+                        fprintf('%-60s %-20s      %6.2f Gbs\n', d(ii).name, datestr(d(ii).datenum), d(ii).bytes/1024^3);
                     elseif d(ii).bytes>1024^2
-                        fprintf('%-60s %-15s %15f Mbs\n', d(ii).name, d(ii).date, d(ii).bytes/1024^2);
+                        fprintf('%-60s %-20s      %6.2f Mbs\n', d(ii).name, datestr(d(ii).datenum), d(ii).bytes/1024^2);
                     elseif d(ii).bytes>1024
-                        fprintf('%-60s %-15s %15f kbs\n', d(ii).name, d(ii).date, d(ii).bytes/1024^1);
+                        fprintf('%-60s %-20s      %6.2f kbs\n', d(ii).name, datestr(d(ii).datenum), d(ii).bytes/1024^1);
                     else
-                        fprintf('%-60s %-15s %15f bytess\n', d(ii).name, d(ii).date, d(ii).bytes/1024^0);
+                        fprintf('%-60s %-20s      % 6d bytes\n', d(ii).name, datestr(d(ii).datenum), d(ii).bytes);
                     end
                 end
                 
@@ -104,7 +123,7 @@ classdef WorkingDirectory < handle
                         
         end
         
-        function DN_out = dir(obj, directory, use_fullpath)
+        function DN_out = dir(obj, directory, use_fullpath) % return a cell array with all subfolders in "directory". "use_fullpath" specificies the path to each file
             
             if nargin<2 || isempty(directory)
                 directory = obj.cwd;
@@ -126,7 +145,7 @@ classdef WorkingDirectory < handle
             
         end
         
-        function DN = dir_private(obj, directory, use_fullpath)
+        function DN = dir_private(obj, directory, use_fullpath) % not sure why this is needed in addition to dir()
                         
             if nargin<2 || isempty(directory)
                 directory = obj.cwd;
@@ -158,7 +177,7 @@ classdef WorkingDirectory < handle
             
         end
         
-        function list = match(obj, expr, directory)
+        function list = match(obj, expr, directory) % use glob matching on all files in "directory" (default is cwd)
             
             if nargin<2 
                 expr = '';
@@ -181,7 +200,7 @@ classdef WorkingDirectory < handle
             
         end
         
-        function list = match_folders(obj, expr, directory)
+        function list = match_folders(obj, expr, directory) % same as match() only it looks at folders only
             
             if nargin<2 
                 expr = '';
@@ -204,7 +223,7 @@ classdef WorkingDirectory < handle
             
         end
         
-        function list = regexp(obj, expr, directory, files_or_dirs)
+        function list = regexp(obj, expr, directory, files_or_dirs) % search files in "directory" (default is cwd) using regular expressions. "files_or_dirs" specifies what to search (default is files only)
             
             if nargin<2 
                 expr = '';
@@ -237,7 +256,7 @@ classdef WorkingDirectory < handle
             
         end
         
-        function list = files(obj, directory, use_fullpath)
+        function list = files(obj, directory, use_fullpath) % output all files in "directory" (default is cwd). "use_fullpath" to append the path to each file
                         
             if nargin<2 || isempty(directory)
                 directory = obj.cwd;
@@ -249,7 +268,7 @@ classdef WorkingDirectory < handle
             
             directory = obj.check_dir(directory);
   
-            assert(~isempty(directory), ['no such directory: ' directory]);
+            assert(~isempty(directory), ['no such directory: ' directory]); 
             
             FL = obj.files_private(directory, use_fullpath);
             
@@ -261,17 +280,17 @@ classdef WorkingDirectory < handle
             
         end
         
-        function list = fullnames(obj, directory) % to be depricated! 
-            
-            list = obj.files;
-            
-            for ii = 1:length(list)
-                list{ii} = [obj.cwd list{ii}];
-            end
-            
-        end
+%         function list = fullnames(obj, directory) % to be depricated! 
+%             
+%             list = obj.files;
+%             
+%             for ii = 1:length(list)
+%                 list{ii} = [obj.cwd list{ii}];
+%             end
+%             
+%         end
         
-        function FL = files_private(obj, directory, use_fullpath)
+        function FL = files_private(obj, directory, use_fullpath) % not sure why we need this in addition to files()
                         
             if nargin<2 || isempty(directory)
                 directory = obj.cwd;
@@ -303,7 +322,7 @@ classdef WorkingDirectory < handle
             
         end
         
-        function list = walk(obj, directory)
+        function list = walk(obj, directory) % return a list starting with "directory" (default is cwd) with all subfolders added recursively
             
             if nargin<2 || isempty(directory)
                 directory = obj.cwd;
@@ -319,7 +338,7 @@ classdef WorkingDirectory < handle
             
         end
         
-        function d = pwd(obj)
+        function d = pwd(obj) % same as cwd (current working directory) only with '/' appended in the end
             
             d = obj.cwd;
             
@@ -329,13 +348,13 @@ classdef WorkingDirectory < handle
             
         end
         
-        function d = tail(obj)
+        function d = tail(obj) % print the last folder from the cwd full path
             
             [~, d] = fileparts(obj.pwd);
             
         end
         
-        function d = two_tail(obj)
+        function d = two_tail(obj) % print the last two folders of the full path (with '/' between)
             
             [a, b] = fileparts(obj.pwd);
             
@@ -348,7 +367,7 @@ classdef WorkingDirectory < handle
     
     methods % changing directory
              
-        function dir = browse(obj)
+        function dir = browse(obj) % load the system GUI for picking a folder, then change to that folder
            
             dir = uigetdir(obj.pwd);
             
@@ -358,7 +377,7 @@ classdef WorkingDirectory < handle
             
         end
         
-        function CWD = check_dir(obj, next_dir, CWD)
+        function CWD = check_dir(obj, next_dir, CWD) % check if a directory "next_dir" exists, by absolute path or relative to input CWD (default is object's cwd)
                         
             if nargin<3 || isempty(CWD)
                 CWD = obj.cwd;
@@ -446,7 +465,7 @@ classdef WorkingDirectory < handle
             
         end
 
-        function success = cd(obj, move_to)
+        function success = cd(obj, move_to) % change directory. Outputs failure if no such folder can be found
             
             if isempty(move_to)
                 success = 0;
@@ -476,7 +495,7 @@ classdef WorkingDirectory < handle
             
         end
         
-        function success = smart_cd(obj, str, CWD)
+        function success = smart_cd(obj, str, CWD) % same as cd(), only it changes to the first folder that contains expression "str" (change dir from CWD, defaulting to object's cwd)
            
             success = 0;
             
@@ -520,25 +539,25 @@ classdef WorkingDirectory < handle
             
         end
         
-        function here(obj) % change the OBJECT directory to current working dir
+        function here(obj) % change the OBJECT directory to matlab's current working dir
            
             obj.cwd = pwd;
             
         end
                 
-        function there(obj) % change the current working dir to the OBJECT cwd
+        function there(obj) % change matlab's current working dir to the OBJECT cwd
             
             cd(obj.cwd);
             
         end
     
-        function up(obj)
+        function up(obj) % go up one folder, equivalent to cd('..')
            
             obj.cd('..');
             
         end
         
-        function back(obj)
+        function back(obj) % return to the last folder this object pointed to before the latest cd() 
            
             if isempty(obj.prev_dir)
                 return;
@@ -552,15 +571,15 @@ classdef WorkingDirectory < handle
      
     methods % display
         
-        function disp(obj)
-            
-            if isempty(obj)
-                builtin('disp', obj);
-            else
-                display(obj.cwd);
-            end
-            
-        end
+%         function disp(obj) % override the built-in disp() function to display these objects like folders
+%             
+%             if isempty(obj)
+%                 builtin('disp', obj);
+%             else
+%                 display(['    CWD: ' obj.cwd]);
+%             end
+%             
+%         end
                 
     end
     

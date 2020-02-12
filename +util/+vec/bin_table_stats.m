@@ -1,4 +1,12 @@
 function [Tnew, edges] = bin_table_stats(T, edges, varargin)
+% Usage: [Tnew, edges] = bin_table_stats(T, edges, varargin)
+% Bin the table T along "edges" and calculate some basic statistics for each
+% bin (nanmean, nanmedianm nanstd). The results are added as new columns.
+%
+% The varargin is passed directly to bin_table(). 
+% 
+
+    if nargin==0, help('util.vec.bin_table_stats'); return; end
 
     T2 = util.vec.bin_table(T,edges, varargin{:});
     

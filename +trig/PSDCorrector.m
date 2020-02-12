@@ -11,6 +11,9 @@ classdef PSDCorrector < handle
     properties % inputs/outputs
         
         fluxes_input;
+        fluxes_calibrated; % removing a linear fit to the data
+        stds_calibrated; % from the fit, not including outliers! 
+        
         flux_buffer; 
         psd; 
         
@@ -100,13 +103,16 @@ classdef PSDCorrector < handle
             
             obj.clear;
             
-            fluxes = fillmissing(fluxes, 'spline'); 
+            obj.fluxes_input = fillmissing(fluxes, 'spline'); 
             
-            obj.fluxes_input = fluxes;
+            fr = util.fit.polyfit(1:size(obj.fluxes_input), obj.fluxes_input, 'order', 1); 
+
+            obj.fluxes_calibrated = obj.fluxes_input-[fr.ym]; % subtract the model 
+            obj.stds_calibrated = sqrt([fr.variance]); % the model variance is without outliers...  
             
             obj.calculate;
             
-            obj.flux_buffer = vertcat(obj.flux_buffer, fluxes(1:obj.num_frames_to_add,:));
+            obj.flux_buffer = vertcat(obj.flux_buffer, obj.fluxes_calibrated(1:obj.num_frames_to_add,:));
             
             if size(obj.flux_buffer,1)>obj.N_buf
                 obj.flux_buffer = obj.flux_buffer(end-obj.N_buf+1:end,:,:); % be careful with fluxes with more than 3 dimensions! 
@@ -118,7 +124,7 @@ classdef PSDCorrector < handle
             
             if isempty(obj.N_min) || size(obj.flux_buffer,1)>=obj.N_min
 
-                f = obj.fluxes_input;
+                f = obj.fluxes_calibrated;
 
                 S = size(f);
                 S(1) = S(1)*2; % add padding twice the size of the data
@@ -134,15 +140,16 @@ classdef PSDCorrector < handle
                 obj.stds_deredened = std(obj.fluxes_deredened); 
 
                 % these are divided twice by the sqrt(PSD) to account for the filter being deredened as well.
-                obj.fluxes_blued = util.img.crop2size(ifft(ff./obj.psd), size(obj.fluxes_input)); 
+                obj.fluxes_blued = real(util.img.crop2size(ifft(ff./obj.psd), size(obj.fluxes_input))); 
                 obj.stds_blued = std(obj.fluxes_blued); 
 
-            else % the flux buffer is not large enough to get a reasonable estimate for the PSD, just pass through the data
+            else % the flux buffer is not large enough to get a reasonable estimate for the PSD, just detrend them using polyfit
                 
-                obj.fluxes_deredened = obj.fluxes_input; 
-                obj.stds_deredened = std(obj.fluxes_input); 
-                obj.fluxes_blued = obj.fluxes_deredened;
-                obj.stds_blued = obj.stds_deredened; 
+                obj.fluxes_deredened = obj.fluxes_calibrated; % subtract the model 
+                obj.stds_deredened = obj.stds_calibrated;
+                
+                obj.fluxes_blued = obj.fluxes_calibrated;
+                obj.stds_blued = obj.stds_calibrated; 
                 
             end
             

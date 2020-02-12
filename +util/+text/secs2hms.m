@@ -1,16 +1,16 @@
 function time_string_out = secs2hms(time_in_secs)
-    % SECS2HMS - converts a time in seconds to a string giving the time in hours, minutes and second
-    % Usage TIMESTRING = SECS2HMS(TIME)]);
-    % Example 1: >> secs2hms(7261)
-    % >> ans = 2 hours, 1 min, 1.0 sec
-    % Example 2: >> tic; pause(61); disp(['program took ' secs2hms(toc)]);
-    % >> program took 1 min, 1.0 secs
-    % If no output argument is given, it just prints the information. 
+% Usage: time_string_out = secs2hms(time_in_secs);
+% Converts a time in seconds to a string giving the time in hours, minutes and seconds
+% Example 1: 
+% >> secs2hms(7261)
+%       2 hours, 1 min, 1.0 sec
+% Example 2: 
+% >> tic; pause(61); disp(['program took ' secs2hms(toc)]);
+%       program took 1 min, 1.0 secs
+%
+% If no output argument is given, it just prints the information. 
     
-    if nargin==0
-        help('util.text.secs2hms');
-        return;
-    end
+    if nargin==0, help('util.text.secs2hms'); return; end
     
     time_string='';
     nhours = 0;

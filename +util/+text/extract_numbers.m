@@ -1,5 +1,11 @@
 function numbers = extract_numbers(str)
-% extracts all numeric values from a string into a cell array. 
+% Usage: numbers = extract_numbers(str)
+% Extracts all numeric values from a string into a cell array. 
+% Example: extract_numbers('RA: 12.3 | Dec: -03.4') returns 12.3 and -3.4. 
+% 
+% Output is always a cell array, with one cell for each string. 
+% In each cell there will be a vector of numbers extracted. 
+% If there are no numbers the cell contains an empty vector. 
 
     if nargin==0
         help('util.text.extract_numbers');

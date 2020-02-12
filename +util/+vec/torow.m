@@ -1,6 +1,7 @@
 function v_row = torow(vector)
-% if input is not a row, torow turns it to a row vector. 
-% if input vector is a matrix, torow does nothing but displays a warning
+% Usage: v_row = torow(vector)
+% If input is not a row, torow turns it to a row vector. 
+% If input vector is a matrix, torow does nothing but displays a warning
 
     if nargin==0
         help('util.vec.torow');

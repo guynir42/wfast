@@ -3,16 +3,15 @@
 #define INDEX_INDEX 1
 #define INDEX_VALUE 2
 
+// Usage: mex_change(mex_vector, index, [value])
+
 void mexFunction( int nlhs, mxArray *plhs[],
                   int nrhs, const mxArray *prhs[] ){
 
 	if(nrhs<1){ // usage is detailed when function is called without arguments!
-		mexPrintf("Usage: mex_change(mex_vector, index, [value])\n");
-		mexPrintf("Change a value inside the vector 'mex_vector' without invoking copy-on-write...\n");
-		mexPrintf("INPUTS: -mex_vector is a vector or a uint64/double numeric value that can be de-referenced to a valid pointer.\n");
-		mexPrintf("        -index is the (1-based) index in the vector (if you give an illegal value matlab will crash...).\n");
-		mexPrintf("        -value is the new value to put in the vector (must be a scalar double).\n");
-		mexPrintf("         If no 'value' is given, just increase that element in the vector by 1.\n");
+		const char *string[1]={"util.vec.mex_change"};
+		mxArray *array[1]={mxCreateCharMatrixFromStrings(1, string)};
+		mexCallMATLAB(0,0,1,array,"help"); 
 		return;
 	}
 	

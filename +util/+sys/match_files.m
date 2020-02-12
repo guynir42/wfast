@@ -1,8 +1,8 @@
 function files = match_files(expr, directory, full_path)
 % Usage: files = match_files(expr, directory='', full_path=0)
 % Match the glob expression "expr" in "directory" (default is empty, i.e.,
-% the current dir). Set "full_path" to true to output a list of full paths
-% to the files. 
+% the current dir). Set "full_path" to true to output the list of files with 
+% full paths to each file. 
 %
 % Returns a cell array with all matched files. 
 

@@ -70,7 +70,7 @@ function [mu, sigma, values] = sigma_clipping(values, varargin)
             mu = phat.mu;
             sigma = phat.sigma;
         elseif cs(dist, {'weibull', 'max values'})
-            phat = evfit(-values); 
+            phat = evfit(-double(values)); 
             
             mu = -phat(1);
             sigma = phat(2);

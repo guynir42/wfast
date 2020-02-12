@@ -1,6 +1,43 @@
 classdef InputVars < dynamicprops
-% small utility that takes input variable names, default values and aliases
+% Small class that takes input variable names, default values and aliases
 % and then scans a list of keyword-arguments and sets the internal data. 
+%
+% Lets you define optional arguments and scan varargin pairs easily. 
+% Start by generating an input object at the entrance to a function. 
+% >> input = util.text.InputVars; 
+%
+% Then add parameters using input_var(keyword, def_value, alias1, alias2,...):
+% >> input.input_var('data'); 
+% >> input.input_var('size', [10 12]); 
+% >> input.input_var('axis', [], 'axes');
+%
+% The default value is [] unless specified otherwise, for each keyword. 
+% The remaining variables are other strings used as comparisons. 
+% If any of the alias strings is numeric it specifies how many letters are
+% needed to match to the different keywords. 
+% The first argument (keyword) and all the aliases are passed as arguments
+% to the util.text.cs() function, along with an optional numeric value for
+% the minimal number of letters. See the documentation of util.text.cs(). 
+%
+% After defining the keywords, use scan_vars to parse the varargin pairs:
+% >> input.scan_vars(varargin{:}); 
+% 
+% Keyword-value pairs are parsed using util.text.cs() and each match replaces
+% the default value of this object with the varargin value. 
+% 
+% To use these scanned/default values, just call them as properties of the 
+% InputVars object:
+% >> Z = zeros(input.size); % use the default size or the size given by user
+%
+% If many/all the inputs are numeric and have a preferred order, you can allow
+% the user to input only the values without text keywords. 
+% To do this, set "use_ordered_numeric" to true (default is false). 
+% In this case the order of calls to input_var() determine the expected order. 
+% Example, assuming flux, error and times are defined in order in func():
+% >> func('flux', [10 12 9], 'error', [0.1 0.2 0.3], 'times', [0.1 0.2 0.3])
+% >> func([10 12 9], [0.1 0.2 0.3], [0.1 0.2 0.3])
+% These two calls are equivalent when "use_ordered_numeric" is true.  
+% 
 
     properties
         
@@ -8,7 +45,7 @@ classdef InputVars < dynamicprops
         logical_dictionary; % keep track which parameter is logical (use parse_bool to scan inputs)
         number_dictionary; % keep track of the minimal number of letters required for util.text.cs to match
         
-        use_ordered_numeric = 0;
+        use_ordered_numeric = 0; % if true, will accept numeric variables in order without keywords
         list_added_properties = {}; % a list of keywords, in the order added when defining the object
         list_scan_properties = {}; % a list of keywords in the order they are given by the varargin pairs
         
@@ -28,10 +65,13 @@ classdef InputVars < dynamicprops
     
     methods % input and scan
         
-        function input_var(obj, name, default_value, varargin)
-        % add to the list of keyword-value pairs. 
-        % usage: obj.input_var(name, default_value, varargin)
+        function input_var(obj, name, default_value, varargin) % add keyword with default value and aliases
+        % Usage: obj.input_var(name, default_value, varargin)
+        % Add a keyword to the list of keyword-value pairs. 
+        % 
         % OPTIONAL_ARGUMENTS: use to add aliases to the parameter name. 
+        % Can also add a numeric value: the minimal number of characters 
+        % needed to match the keyword. 
         
             if nargin<2
                 help('util.text.InputVars.input_var');
@@ -81,7 +121,7 @@ classdef InputVars < dynamicprops
             
         end
         
-        function scan_vars(obj, varargin)
+        function scan_vars(obj, varargin) % scan the varargin
             
             if length(varargin)==1 && iscell(varargin{1})
                 varargin = varargin{1};
@@ -173,7 +213,7 @@ classdef InputVars < dynamicprops
             
         end
         
-        function printout(obj)
+        function printout(obj) % show the keywords and the current values
             
             keys = obj.alias_dictionary.keys;
             vals = obj.alias_dictionary.values;
@@ -208,7 +248,7 @@ classdef InputVars < dynamicprops
             
         end
         
-        function vars = output_vars(obj)
+        function vars = output_vars(obj) % make a cell array with varargin pairs as they are parsed (to pass to other functions)
             
             keys = obj.alias_dictionary.keys;
             
