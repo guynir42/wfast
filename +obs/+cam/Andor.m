@@ -922,7 +922,7 @@ classdef Andor < file.AstroData
                     for ii = 1:length(obj.buffers.buf)
                         util.vec.mex_change(obj.buffers.buf(ii).mex_flag_record, 1, 1); % lock all the buffers for recording, they will unlock once the camera fills them... 
                     end
-                    fprintf('Andor: use_reset: %d\n', input.use_reset);
+                    
                     obs.cam.mex_new.startup(obj, obj.mex_flag, obj.buffers.buf, obj.buffers.index_rec_vec, obj.num_batches, obj.batch_size, input.use_reset); % call the mex file for async recording
 
                 else % synchronous startup option
