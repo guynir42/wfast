@@ -3,17 +3,18 @@ function values_conv = convolution(kernels, values, varargin)
 % Run convolution or cross-correlation of "kernels" with "values". 
 % Both inputs can be any size vector or matrix, but any non-singleton dimensions
 % beyond dim1 must match (i.e., they are both padded to the same length in 
-% dimension 1 and then multiplied. This also gives the dimensions of the output. 
+% dimension 1 and then multiplied. This also gives the dimensions of the output).
 %
 % This function runs in Fourier space and requires a lot of memory if these 
 % are big matrices, especially if one has large dim2 and the other dim3 
-% (the output and intermediate matrices will have dim2*dim3 size). 
+% (the output and intermediate matrices will have dim1*dim2*dim3 size). 
 %
 % OPTIONAL ARGUMENTS:
-%  *cross: cross-correlation instead of convolution (i.e., use complex conjugate in Fourier space). Default is false. 
-%  *crop: what is the final region of the result. 
-%         "same" (default) outputs the same size, "valid" gives only the 
-%         region the has full overlap, "full" gives the joint size with mutual padding.
+%  *cross: cross-correlation instead of convolution (i.e., use complex 
+%          conjugate in Fourier space). Default is false. 
+%  *crop: what is the final region of the result. "same" (default) outputs 
+%         the same size, "valid" gives only the region the has full overlap, 
+%         "full" gives the joint size with mutual padding.
 %  *normalize: Use this option to subtract the mean and divide by the std, 
 %              for "values", "kernels", or "both". 
 %  *debug_bit: Level of verbosity (default 0). 

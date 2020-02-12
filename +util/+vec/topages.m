@@ -1,7 +1,8 @@
-function v_row = topages(vector)
-% if input is not a 3D vector (where all elements are in dim 3), 
-% topages turns it to a 3D vector. if input vector is a matrix, topages 
-% does nothing but displays a warning. 
+function v_page = topages(vector)
+% Usage: v_page = topages(vector)
+% If input is not a 3D vector (i.e., dim 1 & 2 singletons), 
+% topages() turns it into a 3D vector. 
+% If input vector is a matrix, topages does nothing but displays a warning. 
 
     if nargin==0
         help('util.vec.topages');
@@ -9,7 +10,7 @@ function v_row = topages(vector)
     end
     
     if isempty(vector)
-        v_row = vector;
+        v_page = vector;
         return;
     end
     
@@ -17,7 +18,7 @@ function v_row = topages(vector)
 
     if ~isvector(vector)
         disp(['warning: input to "topages" is a matrix of size ' num2str(size(vector))]);
-        v_row = vector;
+        v_page = vector;
         return;
     end
     
@@ -25,6 +26,6 @@ function v_row = topages(vector)
         vector = vector';
     end
     
-    v_row = permute(vector, [3,2,1]);
+    v_page = permute(vector, [3,2,1]);
 
 end

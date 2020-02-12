@@ -1,7 +1,11 @@
 function str_out = sa(str1, str2, ext)
-% Concatenates two strings, maiking sure they have a '/' between them. 
 % Usage: sa(str1, str2, [ext])
+% Concatenates two strings, maiking sure they have a '/' between them. 
+%
 % Optional argument "ext" adds an extension (as in, ".ext" to the string). 
+%
+% This function is slowly being removed from my code in favour of the built
+% in function fullfile(). 
 
     if nargin==0
         help('util.text.sa');

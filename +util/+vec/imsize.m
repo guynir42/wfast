@@ -2,16 +2,13 @@ function S = imsize(input, treat_as)
 % Usage: S = imsize(input, treat_as=[])    
 % Takes a scalar, vector or matrix and returns the 2 element image size 
 % If input is scalar, returns [1,1]*input
-% If input is a 2 element vector or empty, returns input. 
+% If input is a 2 element vector, or empty, returns input. 
 % If input is a row vector, returns first two elements. 
 % If input is column or a matrix, return the size of first 2 dimensions. 
-% Use "treat_as" secondary input to avoid confusion (e.g. if input image is
+% Use "treat_as" secondary input to avoid confusion (e.g. if input image 
 % somehow has a vector/scalar size). Use "size" or "matrix". 
 
-    if nargin==0
-        help('util.vec.imsize');
-        return;
-    end
+    if nargin==0, help('util.vec.imsize'); return; end
 
     if nargin<2
         treat_as = [];

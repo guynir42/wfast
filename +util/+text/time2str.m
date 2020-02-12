@@ -1,10 +1,13 @@
 function str = time2str(time)
-% turns a datetime object into a string (FITS format compliant)
+% Usage: str = time2str(time)
+% Convert a datetime object into a string (FITS format compliant)
+%
+% If given a single (scalar) datetime object, returns a string. 
+% If given a vector of datetime object, returns a cell array of strings. 
+%
+% Example output format: 2020-02-11T23:24:56
     
-    if nargin==0
-        help('util.text.time2str');
-        return;
-    end
+    if nargin==0, help('util.text.time2str'); return; end
 
     if builtin('isempty', time) || isempty(time)
         str = '';

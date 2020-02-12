@@ -1,6 +1,6 @@
 function C = unicode(name, number)
 % Usage: C = unicode(name, number=0)
-% Return the unicode character using its name. 
+% Return a unicode character using its name. 
 % Works for a bunch of names of things, clearly not all of them. 
 % 
 % If number is not zero, it will shift the resulting character from its
