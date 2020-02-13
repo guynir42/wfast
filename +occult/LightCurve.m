@@ -225,7 +225,7 @@ classdef LightCurve < handle
             input.input_var('snr', obj.pars.snr);
             input.scan_vars(varargin{:});
             
-            obj.noise = zeros(size(obj.flux,1), size(obj.flux,2), input.N.*length(input.snr));
+            obj.noise = zeros(size(obj.flux,1), size(obj.flux,2), input.N.*length(input.snr), 'like', obj.flux);
             
             for ii = 1:length(input.snr)
                 

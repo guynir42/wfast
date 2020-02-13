@@ -40,14 +40,14 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	if(mxGetClassID(M_in_place)!=mxGetClassID(M_new)) mexErrMsgIdAndTxt("MATLAB:util:vec:injectMatrix:InputsNotSameClass", "Inputs 1 and 2 must be the same class!");
 	if(mxIsComplex(M_new)) mexErrMsgIdAndTxt("MATLAB:util:vec:injectMatrix:InputComplex", "Input 2 to function cannot be complex! ");
 	
-	const size_t ndims_ip=mxGetNumberOfDimensions(M_in_place);
-	const size_t *dims_ip=mxGetDimensions(M_in_place);
+	const size_t ndims_ip_raw=mxGetNumberOfDimensions(M_in_place);
+	const size_t *dims_ip_raw=mxGetDimensions(M_in_place);
 	const size_t ndims_temp=mxGetNumberOfDimensions(M_new);
 	const size_t *dims_temp=mxGetDimensions(M_new);
-	size_t ndims_new=ndims_ip;
-	size_t *dims_new=(size_t*) mxCalloc(ndims_ip, sizeof(size_t));
+	size_t ndims_new=ndims_ip_raw;
+	size_t *dims_new=(size_t*) mxCalloc(ndims_ip_raw, sizeof(size_t));
 	for(int i=0;i<ndims_temp;i++) dims_new[i]=dims_temp[i]; // copy the first few dimensions
-	for(int i=ndims_temp; i<ndims_ip;i++) dims_new[i]=1; // add singleton dimensions if needed! 
+	for(int i=ndims_temp; i<ndims_ip_raw;i++) dims_new[i]=1; // add singleton dimensions if needed! 
 	
 	// printf("ndims_ip= %d\n", ndims_ip);
 	// printf("dims_ip= ");
@@ -68,27 +68,44 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		index=(size_t*) mxCalloc(index_dim, sizeof(size_t)); // integer vector for the index
 		for(int i=0;i<index_dim;i++) index[i]=(size_t) index_ptr[i]; 
 		
-		if(index_dim==1 && mxGetN(M_in_place)==1){ 
+		if(index_dim==1 && mxGetN(M_in_place)==1){ // input matrix is a column vector
 			index_dim=2;
 			index=(size_t*) mxCalloc(index_dim, sizeof(size_t));
 			index[0]=(size_t) index_ptr[0]; // use the single value given from Input 3 as the first value in the 2-element index vector
 			index[1]=1;
 		}
-		else if(index_dim==1 && mxGetM(M_in_place)==1){ 
+		else if(index_dim==1 && mxGetM(M_in_place)==1){ // input matrix is a row vector
 			index_dim=2;
 			index=(size_t*) mxCalloc(index_dim, sizeof(size_t));
 			index[0]=1;
 			index[1]=(size_t) index_ptr[0]; // use the single value given from Input 3 as the second value in the 2-element index vector
 		}
-		else if(index_dim!=ndims_ip) mexErrMsgIdAndTxt("MATLAB:util:vec:injectMatrix:IndexSizeMismatch", "Input 3 must have the same length as the number of dimesnions of input 1!");
+		else if(index_dim<ndims_ip_raw) mexErrMsgIdAndTxt("MATLAB:util:vec:injectMatrix:IndexSizeMismatch", "Input 3 must have a length as long as the number of dimesnions of input 1!");
 		
+		// check the values in "index" actually make sense... 
 		for(int i=0;i<index_dim;i++) if(index[i]<1 || index[i]!=round(index[i])) 
 			mexErrMsgIdAndTxt("MATLAB:util:vec:injectMatrix:IllegalIndex", "Input 3 must have integer, non-NaN values bigger than 0!");
 	}
-	else{ 
+	else{ // didn't get a third input "index", use a vector of ones as default
 		index_dim=mxGetNumberOfDimensions(M_in_place);
 		index=(size_t*) mxCalloc(index_dim, sizeof(size_t)); 
 		for(int i=0;i<index_dim;i++) index[i]=1; // use matlab style indices! 
+	}
+	
+	size_t ndims_ip=ndims_ip_raw;
+	size_t *dims_ip=(size_t*) dims_ip_raw; // shallow copy but why not (also, get rid of const) 
+	if(index_dim>ndims_ip_raw){ // if "index" has more elements than the dimensions of M_in_place, we need to add singleton dimensions to M_in_place
+		
+		dims_ip=(size_t*) mxCalloc(index_dim, sizeof(size_t));
+		for(int i=0;i<ndims_ip;i++) dims_ip[i]=dims_ip_raw[i]; // copy the first dimensions
+		for(int i=ndims_ip;i<index_dim;i++) dims_ip[i]=1; // singletons 
+		ndims_ip=index_dim; 
+		
+		ndims_new=ndims_ip; // update the M_new effective sizes with extra singletons, too!
+		dims_new=(size_t*) mxCalloc(ndims_ip, sizeof(size_t));
+		for(int i=0;i<ndims_new;i++) dims_new[i]=dims_temp[i]; // copy the first few dimensions
+		for(int i=ndims_temp; i<ndims_ip;i++) dims_new[i]=1; // add singleton dimensions to the new size of dims_ip
+		
 	}
 	
 	// printf("index= ");

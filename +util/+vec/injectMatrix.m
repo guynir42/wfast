@@ -18,6 +18,10 @@
 % Limitations: -Cannot handle complex numbers. 
 %              -The third input "index" must have a number of elements equal
 %               to the dimensions of M_in_place. 
+%               Exceptions to this rule are if M_in_place is 1 dimensional,
+%               then "index" can have 1 or 2 elements. 
+%               Also if "index" has trailing 1s, more than the actual number 
+%               of dimensions of M_in_place, they are simply truncated. 
 %              -The new matrix must fit into the old matrix when placed at 
 %               position "index" (top left corner in all dimensions). 
 % 
