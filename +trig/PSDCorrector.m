@@ -30,8 +30,8 @@ classdef PSDCorrector < handle
         
         num_frames_to_add = 100; % how many frames from the input flux should be added to the PSD (in case we get multiple, overlapping batches)
         
-        N_buf = 1000; % number of samples in the buffer
-        N_min = 500; % number of samples needed to apply PSD corrections
+        N_buf = 20000; % number of samples in the buffer
+        N_min = 5000; % number of samples needed to apply PSD corrections
         
         debug_bit = 1;
         
