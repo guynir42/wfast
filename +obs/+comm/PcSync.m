@@ -29,7 +29,7 @@ classdef PcSync < handle
     
     properties % switches/controls
         
-        remote_ip = '192.168.1.102';
+        remote_ip = '192.168.1.103';
         remote_port_rx = 4012;
         remote_port_tx = 4013;
         role = '';

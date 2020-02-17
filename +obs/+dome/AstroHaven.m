@@ -37,7 +37,7 @@ classdef AstroHaven < handle
         status = 0;
         id = 'dome';
         
-        port_name = 'COM29'; % change this later
+        port_name = 'COM4'; % change this later
         
         use_accelerometers = 0;
         
