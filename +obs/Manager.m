@@ -640,9 +640,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 
             obj.log.input(obj.report); % summary of observatory status
 
-            if ~isempty(obj.sync) && isfield(obj.sync.outgoing, 'stop_camera')
-                obj.sync.outgoing.stop_camera = 0; % if everything is cool, let the camera keep going
+            if ~isempty(obj.sync) 
+                
+                if obj.mount.tracking && obj.dome.is_closed==0
+                    obj.sync.outgoing.stop_camera = 0; % if everything is cool, let the camera keep going
+                end
+                
                 obj.sync.update;
+                
             end
             
             if obj.use_shutdown && obj.devices_ok==0 % critical device failure, must shut down

@@ -450,7 +450,7 @@ classdef SensorChecker < handle
     methods % this is called on t1, only update sensors without checking results
         
         function update(obj)
-            return
+            
             for ii = 1:length(obj.sensors)
                 if ismethod(obj.sensors{ii}, 'update')
                     try
@@ -774,6 +774,10 @@ classdef SensorChecker < handle
             end
             
             input.ax.NextPlot = 'replace'; 
+            
+            if ax_min<-10
+                ax_min = -10;
+            end
             
             input.ax.YLim = [ax_min, ax_max];
             

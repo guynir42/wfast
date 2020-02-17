@@ -239,7 +239,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     obj.ard.update;
                     
                 catch ME
-%                     obj.use_accelerometer = 0;
+                    obj.use_accelerometer = 0; % this prevents endless loops of reconnect but also doesn't allow multiple reconnects
                     warning(ME.getReport);
                 end
                 
@@ -991,7 +991,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     end
                     
                     if isempty(obj.ard) || ok==0
-                        obj.connectArduino;
+%                         obj.connectArduino;
                     end
                     
                 end

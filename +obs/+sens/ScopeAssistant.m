@@ -127,40 +127,45 @@ classdef ScopeAssistant < handle
             obj.hndl = Bluetooth(obj.bluetooth_name, 1); % second argument is channel==1
             obj.hndl.Timeout = obj.timeout;
             
-            if isempty(obj.bluetooth_id) || isnumeric(obj.bluetooth_id)
-                
-                in = instrhwinfo('bluetooth', obj.bluetooth_name);
-                
-                if isnumeric(obj.bluetooth_id) && obj.bluetooth_id>0
-                    idx = obj.bluetooth_id;
-                else
-                    idx = 1;
-                end
-                
-                if idx>length(in)
-                    error('Cannot open device number %d, there are only %d devices named "%s".', idx, length(in), obj.bluetooth_name);
-                end
-                
-                if isempty(in(idx).RemoteID)
-                    error('Device not found. Make sure to pair the device!');
-                end
-                
-                if obj.debug_bit
-                    fprintf('Found a bluetooth device with ID: %s\n', obj.bluetooth_id);
-                end
-                
-                obj.bluetooth_id = in(idx).RemoteID(9:end);
-                
-            end
-            
-            obj.hndl.RemoteID = obj.bluetooth_id; 
+%             if isempty(obj.bluetooth_id) || isnumeric(obj.bluetooth_id)
+%                 
+%                 in = instrhwinfo('bluetooth', obj.bluetooth_name);
+%                 
+%                 if isnumeric(obj.bluetooth_id) && obj.bluetooth_id>0
+%                     idx = obj.bluetooth_id;
+%                 else
+%                     idx = 1;
+%                 end
+%                 
+%                 if idx>length(in)
+%                     error('Cannot open device number %d, there are only %d devices named "%s".', idx, length(in), obj.bluetooth_name);
+%                 end
+%                 
+%                 if isempty(in(idx).RemoteID)
+%                     error('Device not found. Make sure to pair the device!');
+%                 end
+%                 
+%                 if obj.debug_bit
+%                     fprintf('Found a bluetooth device with ID: %s\n', obj.bluetooth_id);
+%                 end
+%                 
+%                 obj.bluetooth_id = in(idx).RemoteID(9:end);
+%                 
+%             end
+%             
+%             obj.hndl.RemoteID = obj.bluetooth_id; 
             
             try
                 fopen(obj.hndl);
             catch
-                t = datetime('now', 'TimeZone', 'UTC');
-                fprintf('%s: Cannot open bluetooth to ScopeAssistant!\n', t); 
-                delete(obj.hndl); 
+                try % try, try again
+                    fopen(obj.hndl);
+                catch 
+                    t = datetime('now', 'TimeZone', 'UTC');
+                    fprintf('%s: Cannot open bluetooth to ScopeAssistant!\n', t); 
+                    delete(obj.hndl); 
+                    obj.hndl = [];
+                end
             end
             
             pause(0.1);
@@ -310,7 +315,7 @@ classdef ScopeAssistant < handle
                 period = obj.default_period;
             end
             
-            if ~strcmp(obj.hndl.Status, 'open')
+            if isempty(obj.hndl) || ~isvalid(obj.hndl) || ~strcmp(obj.hndl.Status, 'open')
                 error('Device is closed, use fopen or connect function');
             end
             
