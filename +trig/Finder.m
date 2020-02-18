@@ -899,9 +899,9 @@ classdef Finder < handle
                 if idx<1, break; end
 
 %                 if any(abs(ff(idx, :, star_index))>=thresh)
-                if abs(ff(idx, kern_index, star_index))>=thresh
+                if abs(ff(idx, kern_index, star_index))>=thresh || jj<=obj.min_time_spread
                     time_range = [time_range, idx];
-                elseif jj>obj.min_time_spread
+                else
                     break;
                 end
 
@@ -916,9 +916,9 @@ classdef Finder < handle
                 if idx>N, break; end
 
 %                 if any(abs(ff(idx, :, star_index))>=thresh)
-                if abs(ff(idx, kern_index, star_index))>=thresh
+                if abs(ff(idx, kern_index, star_index))>=thresh || jj<=obj.min_time_spread 
                     time_range = [time_range, idx];
-                elseif jj>obj.min_time_spread 
+                else
                     break;
                 end
 
