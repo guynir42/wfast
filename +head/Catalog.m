@@ -623,6 +623,8 @@ classdef Catalog < handle
                 obj.pars.struct2obj(pars); 
             end
             
+            % add positions, magnitudes, coordinates and temperatures from the table
+            
         end
         
         function saveMAT_old(obj, filename) % to be depricated! 
@@ -645,7 +647,7 @@ classdef Catalog < handle
             
         end
         
-        function loadMAT(obj, filename)
+        function loadMAT_old(obj, filename) % to be depricated! 
             
             if obj.debug_bit, disp(['Loading catalog file from ' filename]); end
             
