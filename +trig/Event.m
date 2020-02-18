@@ -151,6 +151,20 @@ classdef Event < handle
         bad_pixels_time_average;
         bad_pixels_star_average;
         
+        corr_x; % correlation with offsets_x
+        corr_y; % correlation with offsets_y
+        corr_r; % correlation with offset size 
+        corr_b; % correlation with background
+        corr_a; % correlation with area
+        corr_w; % correlation with PSF width
+        
+        covar_x; % covariance with offsets_x
+        covar_y; % covariance with offsets_y
+        covar_r; % covariance with offset size 
+        covar_b; % covariance with background
+        covar_a; % covariance with area
+        covar_w; % covariance with PSF width
+        
         aperture; % aperture radius used by photometry (empty if not using aperture photometry)
         gauss_sigma; % gaussian width used by photometry (empty if not using PSF photometry)
         
@@ -169,7 +183,7 @@ classdef Event < handle
         t_end;
         t_end_stamp;
         
-        version = 1.03;
+        version = 1.04;
         
     end
     
@@ -349,26 +363,26 @@ classdef Event < handle
             
             % check if there are too many NaNs in the offsets
             Nidx = isnan(obj.offsets_x_at_star(obj.time_indices)) | isnan(obj.offsets_y_at_star(obj.time_indices)); 
-            if nnz(Nidx)>=obj.max_num_nans && ~all(Nidx) % if all frames have NaN offsets (i.e., forced photometry), it is ok. If some of them do, it is bad shape
+            if nnz(Nidx)>=obj.max_num_nans % && ~all(Nidx) % if all frames have NaN offsets (i.e., forced photometry), it is ok. If some of them do, it is bad shape
                 obj.keep = 0;
                 obj.is_nan_offsets = 1;
                 obj.addNote(sprintf('offsets with %d NaNs', nnz(Nidx)));
             end
             
             % check for correlation with offsets_x (negative or positive)
-            corr = obj.correlation(obj.offsets_x_at_star);
-            if abs(corr)>obj.max_corr
+            [obj.corr_x, obj.covar_x] = obj.correlation(obj.offsets_x_at_star);
+            if abs(obj.corr_x)>obj.max_corr
                 obj.keep = 0;
                 obj.is_corr_offsets = 1;
-                obj.addNote(sprintf('signal is correlated with offsets x at a %f level', corr));
+                obj.addNote(sprintf('correlation->offsets x= %f', obj.corr_x));
             end
             
             % check for correlation with offsets_y (negative or positive)
-            corr = obj.correlation(obj.offsets_y_at_star);
-            if abs(corr)>obj.max_corr
+            [obj.corr_y, obj.covar_y] = obj.correlation(obj.offsets_y_at_star);
+            if abs(obj.corr_y)>obj.max_corr
                 obj.keep = 0;
                 obj.is_corr_offsets = 1;
-                obj.addNote(sprintf('signal is correlated with offsets y at a %f level', corr));
+                obj.addNote(sprintf('correlation->offsets y= %f', obj.corr_y));
             end
             
             x = obj.offsets_x_at_star;
@@ -376,35 +390,35 @@ classdef Event < handle
             r = sqrt(x.^2+y.^2); 
             
             % check for correlation with size of offsets (x and y combined)
-            corr = obj.correlation(r);
-            if abs(corr)>obj.max_corr
+            [obj.corr_r, obj.covar_r] = obj.correlation(r);
+            if abs(obj.corr_r)>obj.max_corr
                 obj.keep = 0;
                 obj.is_corr_offsets = 1;
-                obj.addNote(sprintf('signal is correlated with size of offsets at a %f level', corr));
+                obj.addNote(sprintf('correlation->offset size= %f', obj.corr_r));
             end
                         
             % check for negative correlation with the background
-            corr = obj.correlation(obj.backgrounds_at_star);
-            if corr<-obj.max_corr
+            [obj.corr_b, obj.covar_b] = obj.correlation(obj.backgrounds_at_star);
+            if obj.corr_b<-obj.max_corr
                 obj.keep = 0;
                 obj.is_corr_bg = 1;
-                obj.addNote(sprintf('signal is anti correlated with background at a %f level', corr));
+                obj.addNote(sprintf('correlation->background= %f', obj.corr_b));
             end
             
             % check for correlation with area
-            corr = obj.correlation(obj.areas_at_star);
-            if corr>obj.max_corr
+            [obj.corr_a, obj.covar_a] = obj.correlation(obj.areas_at_star);
+            if obj.corr_a>obj.max_corr
                 obj.keep = 0;
                 obj.is_corr_area = 1;
-                obj.addNote(sprintf('signal is correlated with aperture area at a %f level', corr));
+                obj.addNote(sprintf('correlation->area= %f', obj.corr_a));
             end
             
             % check for correlation with PSF width
-            corr = obj.correlation(obj.widths_at_star);
-            if abs(corr)>obj.max_corr
+            [obj.corr_w, obj.covar_w] = obj.correlation(obj.widths_at_star);
+            if abs(obj.corr_w)>obj.max_corr
                 obj.keep = 0;
                 obj.is_corr_width = 1;
-                obj.addNote(sprintf('signal is correlated with PSF width at a %f level', corr));
+                obj.addNote(sprintf('correlation->width= %f', obj.corr_w));
             end
             
             % add any other checks you can think about
@@ -412,7 +426,7 @@ classdef Event < handle
             
         end
         
-        function val = correlation(obj, vector, flux)
+        function [corr, covar] = correlation(obj, vector, flux)
             
             if nargin<3 || isempty(flux)
                 flux = obj.flux_detrended;
@@ -435,15 +449,18 @@ classdef Event < handle
             
             f_temp = f;
             f_temp(t) = NaN;
-            Mf = mean(f_temp, 'omitnan'); % get the mean outside the event
-            f = f - Mf;
+            Mf = nanmean(f_temp); % get the mean outside the event
+            Sf = nanstd(f_temp); % get the std outside the event
+            f = (f - Mf)./Sf;
             
             v_temp = vector;
             v_temp(t) = NaN;
-            Mv = mean(v_temp, 'omitnan'); % get the mean outside the event
-            vector = vector - Mv;
+            Mv = nanmean(v_temp); % get the mean outside the event
+            Sv = nanstd(v_temp); % get the std outside the event
+            vector = (vector - Mv)./Sv;
             
-            val = nansum(f(t).*vector(t))./sqrt(nansum(f(t).^2).*nansum(vector(t).^2));
+            corr = nansum(f(t).*vector(t))./sqrt(nansum(f(t).^2).*nansum(vector(t).^2)); % ignore the STD normalization and just get the correlation coefficient (the normalized projection)
+            covar = nansum(f(t).*vector(t)); % get the covariance between the two vectors in the event region, normalized by the STD outside the event region
             
         end
         
