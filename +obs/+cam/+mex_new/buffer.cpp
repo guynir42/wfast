@@ -249,14 +249,11 @@ mxArray *BufferQueue::getImageMatrix(){
 	
 	// for(int i=0;i<height;i++) for(int j=0;j<width*2;j++) ptr[i*width*2+j]=latest_image[i*width*2+j]; 
 	
-	memcpy(ptr, latest_image, width*height*2); 
-	
-	return matrix; 
-	// below this is old code
+	// memcpy(ptr, latest_image, width*height*2); 
 	
 	for(int i=0;i<height;i++){ // copy each row
 		// memcpy(ptr+(i*width), latest_image+i*stride, width*2);
-		memcpy(ptr+(i*width), latest_image+i*stride, width*2);
+		memcpy(ptr+(i*width*2), latest_image+i*stride, width*2);
 
 	}
 	
