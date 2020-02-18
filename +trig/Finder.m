@@ -106,6 +106,8 @@ classdef Finder < handle
         time_range_thresh = -2.5; % threshold for including area around peak (in continuous time)
         kern_range_thresh = -1; % area threshold (in kernels, discontinuous) NOTE: if negative this will be relative to "threshold"
         star_range_thresh = -1; % area threshold (in stars, discontinuous) NOTE: if this is higher than "threshold" there will be no area around peak
+        min_time_spread = 2; % how many frames around the peak to keep, in both directions, even if the flux drops below threshold 
+        % (min event duration is 1+2*min_time_spread, unless at the edge) 
         
         % additional cuts on events
         max_events = 5; % how many events can we have triggered on the same 2-batch window?
@@ -786,7 +788,7 @@ classdef Finder < handle
                         ev.star_index = star_index_sim;
                     end
 
-                    ev.time_indices = obj.findTimeRange(ff, idx(1), idx(3)); % find continuous area that is above time_range_thresh
+                    ev.time_indices = obj.findTimeRange(ff, idx(1), idx(2), idx(3)); % find continuous area that is above time_range_thresh
 
                     ev.kern_indices = find(max(abs(ff(ev.time_indices, :, idx(3))))>obj.getKernThresh);
 
@@ -883,7 +885,7 @@ classdef Finder < handle
 
         end
         
-        function time_range = findTimeRange(obj, ff, time_index, star_index)
+        function time_range = findTimeRange(obj, ff, time_index, kern_index, star_index)
             
             N = size(ff,1); % time length
             
@@ -896,9 +898,10 @@ classdef Finder < handle
 
                 if idx<1, break; end
 
-                if any(abs(ff(idx, :, star_index))>=thresh)
+%                 if any(abs(ff(idx, :, star_index))>=thresh)
+                if abs(ff(idx, kern_index, star_index))>=thresh
                     time_range = [time_range, idx];
-                else 
+                elseif jj>obj.min_time_spread
                     break;
                 end
 
@@ -912,9 +915,10 @@ classdef Finder < handle
 
                 if idx>N, break; end
 
-                if any(abs(ff(idx, :, star_index))>=thresh)
+%                 if any(abs(ff(idx, :, star_index))>=thresh)
+                if abs(ff(idx, kern_index, star_index))>=thresh
                     time_range = [time_range, idx];
-                else 
+                elseif jj>obj.min_time_spread 
                     break;
                 end
 

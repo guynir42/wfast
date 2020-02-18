@@ -181,15 +181,11 @@ classdef Analysis < file.AstroData
                 obj.width_buf = util.vec.CircularBuffer;
                 
                 obj.lightcurves = img.Lightcurves; 
-                obj.lightcurves.pars = obj.pars;
-                obj.lightcurves.cat = obj.cat;                
 
                 obj.model_psf = img.ModelPSF;
                 
                 obj.finder = trig.Finder;
                 obj.finder.loadFilterBank;
-                obj.finder.pars = obj.pars;
-                obj.finder.cat = obj.cat;
                 
                 obj.prog = util.sys.ProgressBar;
                 obj.audio = util.sys.AudioControl;
@@ -197,6 +193,9 @@ classdef Analysis < file.AstroData
                 obj.pars = head.Parameters; % this also gives "pars" to all sub-objects
                 obj.cat = head.Catalog(obj.pars);
                 obj.finder.cat = obj.cat;
+                obj.finder.pars = obj.pars;
+                obj.lightcurves.pars = obj.pars;
+                obj.lightcurves.cat = obj.cat;
                 
                 util.oop.save_defaults(obj); % make sure each default_XXX property is updated with the current XXX property value. 
                 

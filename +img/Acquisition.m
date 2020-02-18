@@ -288,8 +288,6 @@ classdef Acquisition < file.AstroData
                 
                 obj.phot = img.Photometry;
                 obj.lightcurves = img.Lightcurves;
-                obj.lightcurves.pars = obj.pars;
-                obj.lightcurves.cat = obj.cat;
                 
                 obj.model_psf = img.ModelPSF;
                 
@@ -319,9 +317,10 @@ classdef Acquisition < file.AstroData
                 
                 obj.setupDefaults;
                 
-                obj.cat = head.Catalog;
-                
                 obj.pars = head.Parameters; % this also gives "pars" to all sub-objects
+                obj.cat = head.Catalog(obj.pars);
+                obj.lightcurves.pars = obj.pars;
+                obj.lightcurves.cat = obj.cat;
                 
                 util.oop.save_defaults(obj); % make sure each default_XXX property is updated with the current XXX property value. 
                 
