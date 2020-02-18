@@ -151,7 +151,7 @@ classdef AcqGUI < handle
             obj.menu_options.addButton('menu_photometry', '&Photometry', 'menu');
             obj.menu_options.menu_photometry.addButton('button_use_simple', '&Simple photometry', 'toggle', 'use_simple_photometry', 'just sum the cutouts, not using Photometry/Lightcurve objects');
             obj.menu_options.menu_photometry.addButton('button_model_psf', '&PSF model', 'toggle', 'use_model_psf', 'stack the cutouts and fit it to a PSF model');
-
+            obj.menu_options.menu_photometry.addButton('button_num_cutouts', '&Num cutouts', 'input', 'num_phot_cutouts', 'How many stars/cutouts to input to photomery and store in lightcurves');
             
             obj.menu_options.addButton('menu_sync', '&Synchronization', 'menu');
             obj.menu_options.menu_sync.addButton('button_use_sync', '&Use sync', 'toggle', 'use_sync', 'use the sync between the two computers');
