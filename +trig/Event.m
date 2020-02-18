@@ -8,6 +8,8 @@ classdef Event < handle
     
     properties % objects
         
+        pars@head.Parameters; % this doesn't have to be filled, but is useful to attach when saving events...
+        
         phot_pars; % a struct with some housekeeping about how the photometry was done
         
         fit_pars; % fit to the occultation parameters
@@ -661,7 +663,7 @@ classdef Event < handle
                     
                 end
                 
-                idx = obj.frame_index; 
+                idx = obj.time_index; 
                 
                 idx_start = idx - floor(input.number/2); 
                 idx_end = idx + ceil(input.number/2) - 1;

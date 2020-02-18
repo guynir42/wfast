@@ -86,6 +86,7 @@ classdef AnalysisGUI < handle
             import util.plot.MenuItem;
             
             obj.buttons = {};
+            obj.menus = {};
             
             obj.fig = util.plot.FigHandler('analysis');
             obj.fig.clear;
@@ -102,6 +103,8 @@ classdef AnalysisGUI < handle
             obj.menu_options.addButton('button_astrometry', '&Astrometry', 'toggle', 'use_astrometry'); 
             obj.menu_options.addButton('button_reset', '&Reset', 'push', 'reset'); 
             obj.menu_options.addButton('input_num_batches', '&Num batches', 'input', 'num_batches', '', 1); 
+            obj.menu_options.addButton('input_num_stars', 'Num &Stars', 'input', 'num_stars'); 
+            
             
             %%%%%%%%%%%%%%%%%%% LEFT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -274,6 +277,10 @@ classdef AnalysisGUI < handle
            
             for ii = 1:length(obj.buttons)
                 obj.buttons{ii}.update;
+            end
+            
+            for ii = 1:length(obj.menus)
+                obj.menus{ii}.update;
             end
             
             obj.panel_progress.button_progress.String = obj.owner.prog.show;

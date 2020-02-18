@@ -77,7 +77,7 @@ classdef Analysis < file.AstroData
     
     properties % switches/controls
         
-        num_stars = 500;
+        num_stars = []; % if this is empty, use all the stars
         cut_size = 21;
         saturation_value = 50000; % consider any pixels above this to be saturated
         

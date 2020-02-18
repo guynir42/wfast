@@ -31,7 +31,7 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     if nargin==0, help('util.img.quick_find_stars'); return; end
 
     input = util.text.InputVars;
-    input.input_var('number', Inf, 'max_number', 'num_stars'); 
+    input.input_var('number', [], 'max_number', 'num_stars'); 
     input.input_var('dilate', 9);
     input.input_var('psf_sigma', 2);
     input.input_var('mean', []);
@@ -45,6 +45,10 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     
     if isempty(input.edges)
         input.edges = input.dilate.*2;
+    end
+    
+    if isempty(input.number)
+        input.number = Inf;
     end
     
     if isempty(input.mean) || isempty(input.std)

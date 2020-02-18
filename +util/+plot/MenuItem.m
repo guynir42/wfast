@@ -474,9 +474,10 @@ classdef MenuItem < dynamicprops
             
             val = util.text.extract_numbers(val);
             
-            val = val{1};
-            
-            obj.setVariable(val); 
+            if ~isempty(val)
+                val = val{1};
+                obj.setVariable(val); 
+            end
             
             obj.gui.update;
             

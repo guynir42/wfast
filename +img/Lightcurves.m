@@ -92,7 +92,7 @@ classdef Lightcurves < handle
         % these controls are used for inputting the data:
         use_double_up = 0; % choose if you want to expand the data storage by factor of 2 each time when space runs out... 
         use_preallocate = 1; % if this is used, we preallocate the entire storage at the beginning (must call startup(N) with the number of frames)
-       
+        
         % processing steps for fluxes_sub:
         use_subtract_backgrounds = 1; % 
         
@@ -794,11 +794,32 @@ classdef Lightcurves < handle
 
             import util.text.print_vec;
 
-            str = sprintf('Nframes: %d | Nstars: %d | Cutous: %dx%d | ap: %s | ann: %s | f.ap: %s | gauss: %4.2f | iter: %d | shift_res: %4.2f', ...
-                obj.num_frames, obj.phot_pars.cutout_size(4), obj.phot_pars.cutout_size(1), obj.phot_pars.cutout_size(2), ...
-                print_vec(obj.phot_pars.aperture_radii), print_vec(obj.phot_pars.annulus_radii), print_vec(obj.phot_pars.forced_radius), ...
-                obj.phot_pars.gauss_sigma, obj.phot_pars.iterations, obj.phot_pars.shift_resolution); 
-
+            str = sprintf('Nframes: %d | Nstars: %d | Cutous: %dx%d ', obj.num_frames, obj.phot_pars.cutout_size(4), obj.phot_pars.cutout_size(1), obj.phot_pars.cutout_size(2));
+            
+            if isfield(obj.phot_pars, 'aperture_radius') && ~isempty(obj.phot_pars.aperture_radius)
+                str = sprintf('%s | ap: %s', str, print_vec(obj.phot_pars.aperture_radius));
+            end
+            
+            if isfield(obj.phot_pars, 'forced_radius') && ~isempty(obj.phot_pars.forced_radius)
+                str = sprintf('%s | f.ap: %s', str, print_vec(obj.phot_pars.forced_radius)); 
+            end
+            
+            if isfield(obj.phot_pars, 'gauss_sigma') && ~isempty(obj.phot_pars.gauss_sigma)
+                str = sprintf('%s | gauss: %4.2f', str, obj.phot_pars.gauss_sigma);
+            end
+            
+            if isfield(obj.phot_pars, 'annulus_radii') && ~isempty(obj.phot_pars.annulus_radii)
+                str = sprintf('%s | ann: %s', str, print_vec(obj.phot_pars.annulus_radii)); 
+            end
+            
+            if isfield(obj.phot_pars, 'iterations') && ~isempty(obj.phot_pars.iterations)
+                str = sprintf('%s | iter: %d', str, obj.phot_pars.iterations);
+            end
+            
+            if isfield(obj.phot_pars, 'shift_resolution') && ~isempty(obj.phot_pars.shift_resolution)
+                str = sprintf('%s | shift res: %4.2f', str, obj.phot_pars.shift_resolution); 
+            end
+            
             if nargout>0
                 str_out = str;
             else

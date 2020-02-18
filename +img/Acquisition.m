@@ -88,6 +88,7 @@ classdef Acquisition < file.AstroData
         use_remove_saturated = false; % remove all stars with any pixels above saturation value
         saturation_value = 50000; % consider any pixels above this to be saturated
         min_star_temp; % set a lower limit on temperature of stars for findStarsMAAT;
+        num_phot_cutouts; % limit the number of cutouts given to photomery (in the fast cadence) to save runtime and RAM in lightcurves
         
         use_quick_find_stars = true; % use new method that runs faster
         use_mextractor = false; % use mextractor to identify stars and find their WCS and catalog mag/temp
@@ -1978,25 +1979,27 @@ classdef Acquisition < file.AstroData
         
         function calcLightcurves(obj)
             
+            if isempty(obj.num_phot_cutouts) || any(isinf(obj.num_phot_cutouts)) || any(isnan(obj.num_phot_cutouts))
+                C = obj.cutouts_proc; 
+            elseif ischar(obj.num_phot_cutouts) && util.text.cs(obj.num_phot_cutouts, 'all')
+                C = obj.cutouts_proc;
+            elseif isnumeric(obj.num_phot_cutouts) && obj.num_phot_cutouts<=size(obj.cutouts_proc,4)
+                C = obj.cutouts_proc(:,:,:,1:obj.num_phot_cutouts); % in this case we only take some of the stars into the photometry/lightcurves pipeline
+            else
+                C = obj.cutouts_proc;
+            end
+            
             if obj.use_simple_photometry
                 
-                obj.fluxes = permute(util.stat.sum2(obj.cutouts_proc), [3,4,2,1]); 
-                
-%                 bad_pixels = util.stat.sum2(isnan(obj.cutouts_proc));
-%                 obj.lightcurves.input(obj.fluxes, 'bad_pixels', bad_pixels);
+                obj.fluxes = permute(util.stat.sum2(C), [3,4,2,1]); 
                 
             else % use extensive photometry method
             
-                obj.phot.input('images', obj.cutouts_proc, 'timestamps', obj.timestamps, 'positions', obj.positions); % add variance input? 
+                obj.phot.input('images', C, 'timestamps', obj.timestamps, 'positions', obj.positions); % add variance input? 
                 if ~isempty(obj.phot.gui) && obj.phot.gui.check, obj.phot.gui.update; end
 
                 obj.fluxes = obj.phot.fluxes;
                 obj.lightcurves.getData(obj.phot);
-                
-%                 obj.lightcurves.input(obj.timestamps, obj.phot.fluxes, obj.phot.erros, obj.phot.areas, ...
-%                     obj.phot.backgrounds, obj.phot.variances, ...
-%                     obj.phot.offsets_x, obj.phot.offsets_y, obj.phot.centroids_x, obj.phot.centroids_y, ...
-%                     obj.phot.widths, obj.phot.bad_pixels); % store the full lightcurves...
                 
             end
             

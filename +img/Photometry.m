@@ -62,13 +62,13 @@ classdef Photometry < handle
         use_basic = 1;
         use_centering = 1;
         use_gaussian = 1;
-        use_aperture = 1;
+        use_aperture = 0; % no need to do aperture because forced is much better
         use_forced = 1;
         
         corner_size = 0.15; % fraction of the cut_size or pixel value (must be smaller than cut_size!)
-        aperture = [5 7 9];
-        annulus = 10;
-        annulus_outer = 13; % empty means take the rest of the cutout
+        aperture = 9; % for now lets keep it short by using just the big aperture
+        annulus = 12;
+        annulus_outer = 15; % empty means take the rest of the cutout
         gauss_sigma = 2;
         gauss_thresh = 1e-6;
         

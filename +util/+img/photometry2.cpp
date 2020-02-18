@@ -129,10 +129,10 @@ mxArray *Photometry::outputMetadataStruct(){ // add a struct with some of the pa
 	std::vector<std::string> field_names_vector;
 	field_names_vector.push_back("cutout_size");
 	field_names_vector.push_back("cutout_type"); 
-	field_names_vector.push_back("aperture_radii"); 
-	field_names_vector.push_back("annulus_radii");
+	field_names_vector.push_back("aperture_radius"); 
 	field_names_vector.push_back("forced_radius");
 	field_names_vector.push_back("gauss_sigma");
+	field_names_vector.push_back("annulus_radii");
 	field_names_vector.push_back("iterations"); 
 	field_names_vector.push_back("gain");
 	field_names_vector.push_back("shift_resolution");
@@ -146,41 +146,50 @@ mxArray *Photometry::outputMetadataStruct(){ // add a struct with some of the pa
 	
 	int num=0;
 	mxArray *array=0;
+	
+	// the size of the cutouts matrix
 	array=mxCreateNumericMatrix(1,4,mxDOUBLE_CLASS, mxREAL);
 	double *dbl_ptr=mxGetPr(array);
 	for(int i=0;i<4;i++) dbl_ptr[i]=(double) dims[i];
 	mxSetFieldByNumber(struct_array, 0, num++, array);
 	
+	// this contains the class of the cutouts (by default this is single)
 	const char *cutouts_class[1]={"single"};
 	array=mxCreateCharMatrixFromStrings(1, cutouts_class);
 	mxSetFieldByNumber(struct_array, 0, num++, array);
 	
+	// this contains the aperture radius / radii used
+	array=mxCreateNumericMatrix(1, num_radii, mxDOUBLE_CLASS, mxREAL);
+	dbl_ptr=mxGetPr(array);
+	for(int i=0;i<num_radii;i++) dbl_ptr[i]=ap_radii[i];
+	mxSetFieldByNumber(struct_array, 0, num++, array);
+			
+	// this contains the forced radius / radii used (by default this is the same as aperture)
 	array=mxCreateNumericMatrix(1, num_radii, mxDOUBLE_CLASS, mxREAL);
 	dbl_ptr=mxGetPr(array);
 	for(int i=0;i<num_radii;i++) dbl_ptr[i]=ap_radii[i];
 	mxSetFieldByNumber(struct_array, 0, num++, array);
 	
+	// this contains the gauss sigma scalar
+	array=mxCreateDoubleScalar(gauss_sigma);
+	mxSetFieldByNumber(struct_array, 0, num++, array);
+	
+	// this contains the inner and outer radii of the annulus
 	array=mxCreateNumericMatrix(1, 2, mxDOUBLE_CLASS, mxREAL);
 	dbl_ptr=mxGetPr(array);
 	dbl_ptr[0]=inner_radius;
 	dbl_ptr[1]=outer_radius;
 	mxSetFieldByNumber(struct_array, 0, num++, array);
-		
-	// array=mxCreateDoubleScalar(forced_radius);
-	array=mxCreateNumericMatrix(1, num_radii, mxDOUBLE_CLASS, mxREAL);
-	dbl_ptr=mxGetPr(array);
-	for(int i=0;i<num_radii;i++) dbl_ptr[i]=ap_radii[i];
-	mxSetFieldByNumber(struct_array, 0, num++, array);
 	
-	array=mxCreateDoubleScalar(gauss_sigma);
-	mxSetFieldByNumber(struct_array, 0, num++, array);
-	
+	// the number of iterations
 	array=mxCreateDoubleScalar(num_iterations);
 	mxSetFieldByNumber(struct_array, 0, num++, array);
 	
+	// the gain used in estimating the errors
 	array=mxCreateDoubleScalar(gain);
 	mxSetFieldByNumber(struct_array, 0, num++, array);
 	
+	// the shift resolution
 	array=mxCreateDoubleScalar(resolution);
 	mxSetFieldByNumber(struct_array, 0, num++, array);
 	
