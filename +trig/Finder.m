@@ -106,7 +106,7 @@ classdef Finder < handle
         time_range_thresh = -2.5; % threshold for including area around peak (in continuous time)
         kern_range_thresh = -1; % area threshold (in kernels, discontinuous) NOTE: if negative this will be relative to "threshold"
         star_range_thresh = -1; % area threshold (in stars, discontinuous) NOTE: if this is higher than "threshold" there will be no area around peak
-        min_time_spread = 2; % how many frames around the peak to keep, in both directions, even if the flux drops below threshold 
+        min_time_spread = 4; % how many frames around the peak to keep, in both directions, even if the flux drops below threshold 
         % (min event duration is 1+2*min_time_spread, unless at the edge) 
         
         % additional cuts on events

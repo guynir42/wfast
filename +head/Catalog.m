@@ -597,6 +597,36 @@ classdef Catalog < handle
         
         function saveMAT(obj, filename)
             
+            CatTable = obj.data;
+            pars = obj.pars.obj2struct; 
+            
+            if obj.success
+                if obj.debug_bit, disp(['Saving catalog file to ' filename]); end
+                save(filename, 'CatTable', 'pars', '-v7.3');
+            else
+                if obj.debug_bit, disp('Cannot save catalog without a good astrometry match'); end
+            end
+            
+        end
+        
+        function loadMAT(obj, filename)
+            
+            load(filename);
+            
+            if exist('CatTable', 'var')
+                obj.data = CatTable;
+            end
+            
+            if exist('head', 'var')
+                obj.pars.struct2obj(head); 
+            elseif exist('pars', 'var')
+                obj.pars.struct2obj(pars); 
+            end
+            
+        end
+        
+        function saveMAT_old(obj, filename) % to be depricated! 
+            
             Sim = obj.mextractor_sim;
             MatchedCat = obj.catalog_matched;
             WCS = obj.wcs_object;

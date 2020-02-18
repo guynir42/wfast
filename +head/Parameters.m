@@ -15,7 +15,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         
         filter_obj; % must be a head.Filter (enforced in the setter...)
         ephem@head.Ephemeris;
-%         run_start_datetime;
         stars@head.Star;
         
         WCS@head.WorldCoordinates; % to be expanded later
@@ -24,9 +23,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
     
     properties 
         
-%         target_name = 'star1';
         OBJECT = 'star1';
-%         type = '';
         TYPE;
         
         COMMENT = '';
@@ -40,20 +37,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         ENDTIME;
         RUNSTART; 
         
-%         aperture = 57;
         TEL_APER = 57;
-%         f_number = 1.8947; 
         FOCLEN = 108;
         F_RATIO;
         
         PIXSIZE = 6.5; % microns
         SCALE; 
         
-%         expT;
         EXPTIME;
-%         frame_rate;
         FRAMERATE;
-%         frame_rate_measured;
         ACT_FRAMERATE; 
         
         THRESH_DETECTION; % detection threshold for findStars
@@ -68,9 +60,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         
         FILTER = 'F505W'; 
         
-%         batch_size;
-        
-%         im_size;
         NAXIS; 
         NAXIS1;
         NAXIS2;
@@ -82,11 +71,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         ROI; 
         CCDSEC;
         
-%         is_dark = 0;
-%         is_flat = 0;
-%         is_sim = 0;
-        
-%         gain;
         GAIN; 
         READNOISE;
         DARKCUR;
@@ -94,15 +78,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
         IS_DARK = 0;
         IS_FLAT = 0;
         IS_SIMULATED = 0;
-
-%         notes = '';
-               
+       
         FOCUS_POS;
         FOCUS_TIP;
         FOCUS_TILT;
          
         SEEING; % arcsec
-%         temperature; % celsius
         TEMP_DET; % detector temperature (celsius)
         TEMP_OUT; % outside temperature (celsius)
         
@@ -875,7 +856,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
     
     methods % save/load 
        
-        function save(obj, filename, varargin)
+        function save(obj, filename, varargin) % not yet implemented! 
         % saves the Parameters object to file named "filename". 
         % usage: pars.save(filename, varargin)
         % OPTIONAL PARAMETERS
@@ -900,7 +881,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
 
         end
         
-        function load(obj, filename)
+        function load(obj, filename) % not yet implemented! 
         % usage: pars.load(filename). 
         
             if nargin<2
@@ -977,6 +958,79 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Parameters < dynamicpr
             if ~isempty(obj.AIRMASS), matlab.io.fits.writeKey(file_ptr, 'AIRMASS', obj.AIRMASS); end
             if ~isempty(obj.INSTR), matlab.io.fits.writeKey(file_ptr, 'INSTRUME', obj.INSTR); end
             matlab.io.fits.writeKey(file_ptr, 'INPUTFMT', 'FITS');
+            
+        end
+        
+        function s = obj2struct(obj)
+            
+            warning('off', 'MATLAB:structOnObject');
+            
+            s = struct(obj); 
+            
+            list = properties(obj);
+            
+            for ii = 1:length(list)
+               
+                if isobject(obj.(list{ii}))
+                    
+                    % if any sub-object has embedded objects, must treat them individually
+                    if isa(obj.(list{ii}), 'head.Star') && ~isempty(obj.(list{ii}))
+                        s.(list{ii}) = []; % just until we figure this out
+                         % need to figure out how to save a vector of
+                         % structs and then add the primary_ref saved as
+                         % numeric and not as object... 
+                    elseif isa(obj.(list{ii}), 'head.gui.ParsGUI')
+                        s.(list{ii}) = [];
+                    else
+                        s.(list{ii}) = struct(obj.(list{ii})); % turn the sub-objects into structs as well 
+                    end
+                    
+                end
+                
+            end
+            
+        end
+        
+        function struct2obj(obj, s) % must first construct an object and then use the struct to update its properties
+            
+            list = properties(obj);
+            
+            for ii = 1:length(list)
+               
+                if isfield(s, list{ii})
+                    
+                    if isobject(obj.(list{ii}))
+                        
+                        if isprop(obj.(list{ii}), 'struct2obj')
+                            struct2obj(obj.(list{ii}), s.list{ii}); % call the sub-object method if it exists
+                        else
+                            
+                            list2 = properties(obj.(list{ii}));
+                            
+                            for jj = 1:length(list2)
+                            
+                                if isfield(s.(list{ii}), list2{jj})
+                                    
+                                    try 
+                                        obj.(list{ii}).(list2{jj}) = s.(list{ii}).(list2{jj}); 
+                                    end
+                                    
+                                end
+                                
+                            end
+                            
+                            
+                        end
+                        
+                    else % regular data types
+                        try % we can run into many problems trying to set unsetable properties
+                            obj.(list{ii}) = s.(list{ii}); 
+                        end
+                    end
+                    
+                end
+                
+            end
             
         end
         

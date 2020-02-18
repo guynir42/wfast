@@ -57,7 +57,7 @@ classdef Star < matlab.mixin.Copyable
         
     properties(Hidden=true)
        
-        primary_ref@head.Star;
+        primary_ref;
         default_anchor_x = 0.5;
         default_anchor_y = 0.5;
         
