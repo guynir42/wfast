@@ -348,8 +348,11 @@ void AndorCamera::batch(int idx){
 			if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
 		}
 		
-		memcpy(images_ptrs[idx]+pos, buf, height*width*2);
-		
+		// memcpy(images_ptrs[idx]+pos, buf, height*width*2);
+		for(int j=0;j<height;j++){ // copy each row
+			memcpy(images_ptrs[idx]+pos+(j*width), buf+j*stride, width*2);
+		}
+
 		clock=getTimestamps(buf, (int) ImageSizeBytes);
 		timestamps_ptrs[idx][i]=((double)clock)/clockFreq;
 		

@@ -67,7 +67,7 @@ class AndorCamera {
 	
 	long int hndl;
 	
-	static const int NBUF=30; // maximum number of buffers ever possible... 
+	static const int NBUF=256; // maximum number of buffers ever possible... 
 	
 	int num_buffers;
 	unsigned short int *images_ptrs[NBUF];
