@@ -188,24 +188,24 @@ classdef Filter < handle
             
         end
         
-        function disp(obj)
-            
-            if isempty(obj)
-                disp('empty filter');
-                return;
-            end
-            
-            if isempty(obj.name)
-                str = '';
-            else
-                str = ['"' obj.name '" '];
-            end
-            
-            str = [str '(' num2str(obj.wavelength) 'nm / ' num2str(obj.bandwidth) 'nm)'];
-            
-            disp(str);
-            
-        end
+%         function disp(obj)
+%             
+%             if isempty(obj)
+%                 disp('empty filter');
+%                 return;
+%             end
+%             
+%             if isempty(obj.name)
+%                 str = '';
+%             else
+%                 str = ['"' obj.name '" '];
+%             end
+%             
+%             str = [str '(' num2str(obj.wavelength) 'nm / ' num2str(obj.bandwidth) 'nm)'];
+%             
+%             disp(str);
+%             
+%         end
         
         function val = double(obj)
            

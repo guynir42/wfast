@@ -77,6 +77,9 @@ classdef Lightcurves < handle
     
     properties % objects
         
+        pars@head.Parameters; % keep a copy of the header metadata
+        cat@head.Catalog; % keep a copy of the star catalog
+        
         phot_pars; % a struct with some housekeeping about how the photometry was done
         
     end
@@ -1159,18 +1162,22 @@ classdef Lightcurves < handle
             
         end
         
-        function saveAsMAT(obj, filename, star_indices, frame_indices) % save only the data, in raw matrices, to a MAT file, along with phot_pars and a short readme. 
+        function saveAsMAT(obj, filename, star_indices, frame_indices, aperture_indices) % save only the data, in raw matrices, to a MAT file, along with phot_pars and a short readme. 
             
             if nargin<2 || isempty(filename)
-                disp('Must supply a filename! Usage: obj.saveAsMAT(filename, star_indices, frame_indices'); 
+                disp('Must supply a filename! Usage: obj.saveAsMAT(filename, star_indices, frame_indices, aperture_indices)'); 
             end
             
-            if nargin<3 || isempty(star_indices)
+            if nargin<3 || isempty(star_indices) || (ischar(star_indices) && strcmpi(star_indices, 'all'))
                 star_indices = [];
             end
             
-            if nargin<4 || isempty(frame_indices)
+            if nargin<4 || isempty(frame_indices) || (ischar(frame_indices) && strcmpi(frame_indices, 'all'))
                 frame_indices = [];
+            end
+            
+            if nargin<5 || isempty(aperture_indices) || (ischar(aperture_indices) && strcmpi(aperture_indices, 'all'))
+                aperture_indices = [];
             end
             
             timestamps = obj.timestamps;
@@ -1181,6 +1188,8 @@ classdef Lightcurves < handle
                 areas = obj.areas;
                 backgrounds = obj.backgrounds;
                 variances = obj.variances;
+                offsets_x = obj.offsets_x;
+                offsets_y = obj.offsets_y;
                 centroids_x = obj.centroids_x;
                 centroids_y = obj.centroids_y;
                 widths = obj.widths;
@@ -1192,6 +1201,8 @@ classdef Lightcurves < handle
                 areas = obj.areas(:,star_indices,:);
                 backgrounds = obj.backgrounds(:,star_indices,:);
                 variances = obj.variances(:,star_indices,:);
+                offsets_x = obj.offsets_x(:,star_indices,:);
+                offsets_y = obj.offsets_y(:,star_indices,:);
                 centroids_x = obj.centroids_x(:,star_indices,:);
                 centroids_y = obj.centroids_y(:,star_indices,:);
                 widths = obj.widths(:,star_indices,:);
@@ -1206,14 +1217,33 @@ classdef Lightcurves < handle
                 areas = areas(frame_indices,:,:);
                 backgrounds = backgrounds(frame_indices,:,:);
                 variances = variances(frame_indices,:,:);
+                offsets_x = offsets_x(frame_indices,:,:);
+                offsets_y = offsets_y(frame_indices,:,:);
                 centroids_x = centroids_x(frame_indices,:,:);
                 centroids_y = centroids_y(frame_indices,:,:);
                 widths = widths(frame_indices,:,:);
                 bad_pixels = bad_pixels(frame_indices,:,:);
                 flags = obj.flags(frame_indices,:,:);
                 
-                timestamps = timestamps(frame_indices,:);
+                timestamps = timestamps(frame_indices);
             
+            end
+            
+            if ~isempty(aperture_indices)
+                
+                fluxes = fluxes(:,:,aperture_indices);
+                errors = errors(:,:,aperture_indices);
+                areas = areas(:,:,aperture_indices);
+                backgrounds = backgrounds(:,:,aperture_indices);
+                variances = variances(:,:,aperture_indices);
+                offsets_x = offsets_x(:,:,aperture_indices);
+                offsets_y = offsets_y(:,:,aperture_indices);
+                centroids_x = centroids_x(:,:,aperture_indices);
+                centroids_y = centroids_y(:,:,aperture_indices);
+                widths = widths(:,:,aperture_indices);
+                bad_pixels = bad_pixels(:,:,aperture_indices);
+                flags = obj.flags(:,:,aperture_indices);
+                
             end
             
             readme = 'Some info about the data stored in this file:';
@@ -1223,13 +1253,55 @@ classdef Lightcurves < handle
             readme = sprintf('%s\n *areas: size of aperture, removing bad pixels and so on.', readme);
             readme = sprintf('%s\n *backgrounds: measured intensity, per pixel, in the annulus.', readme);
             readme = sprintf('%s\n *variances: measured noise variance, per pixel, in the annulus.', readme);
+            readme = sprintf('%s\n *offsets_x/y: distance from center of cutout (in pixels)', readme); 
             readme = sprintf('%s\n *centroids_x/y: position within image (in pixels)', readme);
             readme = sprintf('%s\n *widths: calculated using the 2nd moment, averaging the minor and major axis', readme);
             readme = sprintf('%s\n *bad_pixels: number of bad pixels in the aperture area.', readme);
             readme = sprintf('%s\n *flags: this is marked as non-zero if the photometry did not go well (e.g., large offsets, negative widths)', readme); 
             
+            phot_pars = obj.phot_pars;
+            
+            pars = obj.pars;
+            cat = obj.cat.data;
+            
             save(filename, 'timestamps', 'fluxes', 'errors', 'areas', 'backgrounds', 'variances',...
-                'centroids_x', 'centroids_y', 'widths', 'bad_pixels', 'readme', '-v7.3');
+                'offsets_x', 'offsets_y', 'centroids_x', 'centroids_y', 'widths', ...
+                'bad_pixels', 'readme', 'phot_pars', 'pars', 'cat', '-v7.3');
+            
+        end
+        
+        function loadFromMAT(obj, filename)
+            
+            if nargin<2 || isempty(filename)
+                disp('Must supply a filename!'); 
+            end
+            
+            loaded = load(filename); 
+            
+            if isfield(loaded, 'timestamp'), obj.timestamps_full = loaded.timestamps; end
+            if isfield(loaded, 'fluxes'), obj.fluxes_full = loaded.fluxes; end
+            if isfield(loaded, 'errors'), obj.errors_full = loaded.errors; end
+            if isfield(loaded, 'areas'), obj.areas_full = loaded.areas; end
+            if isfield(loaded, 'backgrounds'), obj.backgrounds_full = loaded.backgrounds; end
+            if isfield(loaded, 'variances'), obj.variances_full = loaded.variances; end
+            if isfield(loaded, 'offsets_x'), obj.offsets_x_full = loaded.offsets_x; end
+            if isfield(loaded, 'offsets_y'), obj.offsets_y_full = loaded.offsets_y; end
+            if isfield(loaded, 'centroids_x'), obj.centroids_x_full = loaded.centroids_x; end
+            if isfield(loaded, 'centroids_y'), obj.centroids_y_full = loaded.centroids_y; end
+            if isfield(loaded, 'widths'), obj.widths_full = loaded.widths; end
+            if isfield(loaded, 'bad_pixels'), obj.bad_pixels_full = loaded.bad_pixels; end
+            if isfield(loaded, 'flags'), obj.flags_full = loaded.flags; end
+            if isfield(loaded, 'phot_pars'), obj.phot_pars = loaded.phot_pars; end
+            
+            obj.pars = head.Parameters.empty;
+            if isfield(loaded, 'pars') && isa(loaded.pars, 'head.Parameters'), obj.pars = loaded.pars; end
+            if isfield(loaded, 'pars') && isa(loaded.pars, 'struct'), obj.pars.loadFromStruct(loaded.pars); end
+            
+            obj.cat = head.Catalog.empty;
+            if isfield(loaded, 'cat') && isa(loaded.cat, 'head.Catalog'), obj.cat = loaded.cat; end
+            if isfield(loaded, 'cat') && isa(loaded.cat, 'table'), obj.cat.loadFromTable(loaded.cat); end
+            
+            obj.frame_index = size(obj.timestamps,1) + 1; 
             
         end
         

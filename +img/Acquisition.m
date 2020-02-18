@@ -288,6 +288,8 @@ classdef Acquisition < file.AstroData
                 
                 obj.phot = img.Photometry;
                 obj.lightcurves = img.Lightcurves;
+                obj.lightcurves.pars = obj.pars;
+                obj.lightcurves.cat = obj.cat;
                 
                 obj.model_psf = img.ModelPSF;
                 

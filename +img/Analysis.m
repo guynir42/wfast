@@ -30,12 +30,7 @@ classdef Analysis < file.AstroData
         back_buf@util.vec.CircularBuffer;
         width_buf@util.vec.CircularBuffer;
         
-%         light_original@img.Lightcurves;
-%         light_basic@img.Lightcurves;
         lightcurves@img.Lightcurves;
-%         light_gauss@img.Lightcurves;
-%         light_cosqrt@img.Lightcurves;
-        % light_fit@img.Lightcurves;
         
         model_psf@img.ModelPSF;
         
@@ -177,9 +172,6 @@ classdef Analysis < file.AstroData
                 obj.clip_bg.use_adjust = 0; % this should be disabled and depricated!
                 obj.back = img.Background;
                 obj.phot = img.Photometry;
-%                 obj.phot.use_basic = 0;
-%                 obj.phot.use_aperture = 1;
-%                 obj.phot.use_gaussian = 1;
                 
                 obj.phot_stack = img.Photometry;
                 obj.flux_buf = util.vec.CircularBuffer;
@@ -188,16 +180,16 @@ classdef Analysis < file.AstroData
                 obj.back_buf = util.vec.CircularBuffer;
                 obj.width_buf = util.vec.CircularBuffer;
                 
-%                 obj.light_original = img.Lightcurves; 
-%                 obj.light_basic = img.Lightcurves; obj.light_basic.signal_method = 'square'; obj.light_basic.background_method = 'corners';
                 obj.lightcurves = img.Lightcurves; 
-%                 obj.lightcurves.signal_method = 'aperture'; obj.lightcurves.background_method = 'annulus';
-%                 obj.light_gauss = img.Lightcurves; obj.light_gauss.signal_method = 'gauss'; obj.light_gauss.background_method = 'annulus';
-                
+                obj.lightcurves.pars = obj.pars;
+                obj.lightcurves.cat = obj.cat;                
+
                 obj.model_psf = img.ModelPSF;
                 
                 obj.finder = trig.Finder;
                 obj.finder.loadFilterBank;
+                obj.finder.pars = obj.pars;
+                obj.finder.cat = obj.cat;
                 
                 obj.prog = util.sys.ProgressBar;
                 obj.audio = util.sys.AudioControl;
