@@ -90,8 +90,9 @@ classdef Lightcurves < handle
     properties % switches/controls
         
         % these controls are used for inputting the data:
-        use_double_up = 1; % choose if you want to expand the data storage by factor of 2 each time when space runs out... 
-        
+        use_double_up = 0; % choose if you want to expand the data storage by factor of 2 each time when space runs out... 
+        use_preallocate = 1; % if this is used, we preallocate the entire storage at the beginning (must call startup(N) with the number of frames)
+       
         % processing steps for fluxes_sub:
         use_subtract_backgrounds = 1; % 
         
@@ -966,6 +967,54 @@ classdef Lightcurves < handle
     
     methods % calculations
         
+        function startup(obj, num_frames, num_stars, num_apertures) % preallocate the required arrays
+            
+            if nargin<2 || isempty(num_frames)
+                num_frames = [];
+            end
+            
+            if nargin<3 || isempty(num_stars)
+                num_stars = [];
+            end
+            
+            if nargin<4 || isempty(num_apertures)
+                num_apertures = 1; 
+            end
+            
+            if obj.use_preallocate && obj.frame_index==1 && ~isempty(num_frames) && ~isempty(num_stars) && ~isempty(num_apertures)
+                obj.fluxes_full = NaN(num_frames, num_stars, num_apertures, 'single'); 
+                obj.errors_full = NaN(num_frames, num_stars, num_apertures, 'single');
+                obj.areas_full = NaN(num_frames, num_stars, num_apertures, 'single');
+                obj.backgrounds_full = NaN(num_frames, num_stars, num_apertures, 'single');
+                obj.variances_full = NaN(num_frames, num_stars, num_apertures, 'single');
+                obj.centroids_x_full = NaN(num_frames, num_stars, num_apertures, 'single');
+                obj.centroids_y_full = NaN(num_frames, num_stars, num_apertures, 'single');
+                obj.offsets_x_full = NaN(num_frames, num_stars, num_apertures, 'single');
+                obj.offsets_y_full = NaN(num_frames, num_stars, num_apertures, 'single');
+                obj.widths_full = NaN(num_frames, num_stars, num_apertures, 'single');
+                obj.bad_pixels_full = NaN(num_frames, num_stars, num_apertures, 'single');
+                obj.flags_full = NaN(num_frames, num_stars, num_apertures, 'single');
+            end
+            
+        end
+        
+        function finishup(obj) % truncate trailing (unused) NaN values in all arrays
+            
+            obj.fluxes_full = obj.fluxes; 
+            obj.errors_full = obj.errors;
+            obj.areas_full = obj.areas;
+            obj.backgrounds_full = obj.backgrounds;
+            obj.variances_full = obj.variances;
+            obj.centroids_x_full = obj.centroids_x;
+            obj.centroids_y_full = obj.centroids_y;
+            obj.offsets_x_full = obj.offsets_x;
+            obj.offsets_y_full = obj.offsets_y;
+            obj.widths_full = obj.widths;
+            obj.bad_pixels_full = obj.bad_pixels;
+            obj.flags_full = obj.flags; 
+            
+        end
+        
         function input(obj, varargin) % give the photometric results explicitely, they are added to the storage
             
             import util.vec.insert_matrix;
@@ -994,19 +1043,20 @@ classdef Lightcurves < handle
             
             N = size(input.fluxes,1);
             
-            obj.fluxes_full = insert_matrix(obj.fluxes_full, input.fluxes, [obj.frame_index,1,1], NaN, obj.use_double_up);
-            obj.errors_full = insert_matrix(obj.errors_full, input.errors, [obj.frame_index,1,1], NaN, obj.use_double_up);
-            obj.timestamps_full = insert_matrix(obj.timestamps_full, input.timestamps, [obj.frame_index,1,1], NaN, obj.use_double_up);
-            obj.areas_full = insert_matrix(obj.areas_full, input.areas, [obj.frame_index,1,1], NaN, obj.use_double_up);
-            obj.backgrounds_full = insert_matrix(obj.backgrounds_full, input.backgrounds, [obj.frame_index,1,1], NaN, obj.use_double_up);
-            obj.variances_full = insert_matrix(obj.variances_full, input.variances, [obj.frame_index,1,1], NaN, obj.use_double_up);
-            obj.centroids_x_full = insert_matrix(obj.centroids_x_full, input.centroids_x, [obj.frame_index,1,1], NaN, obj.use_double_up);
-            obj.centroids_y_full = insert_matrix(obj.centroids_y_full, input.centroids_y, [obj.frame_index,1,1], NaN, obj.use_double_up);
-            obj.offsets_x_full = insert_matrix(obj.offsets_x_full, input.offsets_x, [obj.frame_index,1,1], NaN, obj.use_double_up);
-            obj.offsets_y_full = insert_matrix(obj.offsets_y, input.offsets_y, [obj.frame_index,1,1], NaN, obj.use_double_up);
-            obj.widths_full = insert_matrix(obj.widths_full, input.widths, [obj.frame_index,1,1], NaN, obj.use_double_up);
-            obj.bad_pixels_full = insert_matrix(obj.bad_pixels_full, input.bad_pixels, [obj.frame_index,1,1], NaN, obj.use_double_up);
-            obj.flags_full = insert_matrix(obj.flags_full, input.flags, [obj.frame_index,1,1], NaN, obj.use_double_up);
+            use_copy = 0; % the last input is zero telling insert_matrix NOT to make a copy of the big matrices and modify them in place
+            obj.fluxes_full = insert_matrix(obj.fluxes_full, input.fluxes, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
+            obj.errors_full = insert_matrix(obj.errors_full, input.errors, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
+            obj.timestamps_full = insert_matrix(obj.timestamps_full, input.timestamps, [obj.frame_index 1], NaN, obj.use_double_up, use_copy);
+            obj.areas_full = insert_matrix(obj.areas_full, input.areas, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
+            obj.backgrounds_full = insert_matrix(obj.backgrounds_full, input.backgrounds, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
+            obj.variances_full = insert_matrix(obj.variances_full, input.variances, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
+            obj.centroids_x_full = insert_matrix(obj.centroids_x_full, input.centroids_x, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
+            obj.centroids_y_full = insert_matrix(obj.centroids_y_full, input.centroids_y, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
+            obj.offsets_x_full = insert_matrix(obj.offsets_x_full, input.offsets_x, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
+            obj.offsets_y_full = insert_matrix(obj.offsets_y_full, input.offsets_y, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
+            obj.widths_full = insert_matrix(obj.widths_full, input.widths, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
+            obj.bad_pixels_full = insert_matrix(obj.bad_pixels_full, input.bad_pixels, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
+            obj.flags_full = insert_matrix(obj.flags_full, input.flags, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
             obj.frame_index = obj.frame_index + N;
             
             if ~isempty(input.pars_struct)
@@ -1085,23 +1135,6 @@ classdef Lightcurves < handle
             Av = nanmean(obj.(type) .* ~obj.flags, 2); % maybe replace this with the flux weighted sum?
             
             flux_corr = obj.fluxes.*rho./(Av./nanmean(Av));
-            
-        end
-        
-        function finishup(obj)
-            
-            obj.fluxes_full = obj.fluxes; 
-            obj.errors_full = obj.errors;
-            obj.areas_full = obj.areas;
-            obj.backgrounds_full = obj.backgrounds;
-            obj.variances_full = obj.variances;
-            obj.centroids_x_full = obj.centroids_x;
-            obj.centroids_y_full = obj.centroids_y;
-            obj.offsets_x_full = obj.offsets_x;
-            obj.offsets_y_full = obj.offsets_y;
-            obj.widths_full = obj.widths;
-            obj.bad_pixels_full = obj.bad_pixels;
-            obj.flags_full = obj.flags; 
             
         end
         

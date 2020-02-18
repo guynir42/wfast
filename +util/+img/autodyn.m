@@ -1,4 +1,4 @@
-function [dynamic_range_vector, image_reduced] = autodyn(image, filler)
+function [dynamic_range_vector, image_reduced] = autodyn(image, filler, sigma, saturation)
 % usage: [dynamic_range_vector, image_reduced] = autodyn(image, filler=median)
 % Uses "maskBadPixels" to remove outliers in the image and then returns the
 % dynamic range [min max] values in the image. Should be used to set CLim
@@ -19,9 +19,17 @@ function [dynamic_range_vector, image_reduced] = autodyn(image, filler)
         filler = [];
     end
     
-    image_reduced = image;
+    if nargin<3 || isempty(sigma)
+        sigma = [];
+    end
     
-%     image_reduced = maskBadPixels(image, filler);
+    if nargin<4 || isempty(saturation)
+        saturation = [];
+    end
+    
+%     image_reduced = image;
+    
+    image_reduced = maskBadPixels(image, filler, sigma, saturation);
 
 %     ker = ones(3)./8;
 %     ker(2,2) = 0;

@@ -995,7 +995,7 @@ classdef Acquisition < file.AstroData
             else % use default values (load them from Acquisition object)
             
                 input = util.text.InputVars;
-                input.input_var('use_reset', 0, 'reset'); 
+                input.input_var('use_reset', false, 'reset'); 
                 input.input_var('start_index', []);
                 input.input_var('use_background', []);
                 input.input_var('use_refine_bg', []);
@@ -1436,7 +1436,7 @@ classdef Acquisition < file.AstroData
                     
                     obj.reset;
                     
-                    if obj.debug_bit, disp(['Starting run "' input.run_name '" for ' num2str(input.num_batches) ' batches.']); end
+                    if obj.debug_bit, disp(['Starting run "' input.run_name '" for ' num2str(obj.num_batches) ' batches.']); end
 
                 end
                 
@@ -1454,6 +1454,12 @@ classdef Acquisition < file.AstroData
                     end
                     
                 end
+                
+                num_frames = obj.num_batches.*obj.batch_size;
+                num_stars = size(obj.positions,1);
+                num_apertures = length(obj.phot.aperture).*obj.phot.use_aperture + length(obj.phot.aperture).*obj.phot.use_forced; % can later change the second length() to the forced aperture list
+                
+                obj.lightcurves.startup(num_frames, num_stars, num_apertures); 
                 
 %                 obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
                 
@@ -1499,12 +1505,12 @@ classdef Acquisition < file.AstroData
                     obj.src.num_files_per_batch = 1;
                     % what if batch_size is bigger than 100??
                 end
-
-                obj.src.startup('use_save', 0, obj.pass_source{:});
+                
+                obj.src.startup('use_save', 0, 'use_reset', input.use_reset, obj.pass_source{:});
 %                 obj.src.startup('use_save', 0, 'async', 1, obj.pass_source{:});
 
                 if obj.use_progress
-                    obj.prog.start(obj.num_batches);
+                    obj.prog.start(obj.num_batches); % maybe use continue if not restarting? 
                 end
                 
                 obj.brake_bit = 0;
@@ -1777,7 +1783,7 @@ classdef Acquisition < file.AstroData
             end
             
             if obj.use_arbitrary_pos
-                obj.clip.arbitraryPositions; % maybe add some input parameters?
+                obj.clip.arbitraryPositions('im_size', size(obj.stack)); % maybe add some input parameters?
                 obj.positions = obj.clip.positions;
             elseif obj.use_mextractor
                 obj.findStarsMAAT;
@@ -1788,7 +1794,7 @@ classdef Acquisition < file.AstroData
                     error('Could not find any stars using quick_find_stars!');
                 end
                 
-                obj.pars.THRESHOLD = obj.detect_thresh; 
+                obj.pars.THRESH_DETECTION = obj.detect_thresh; 
                 
                 obj.clip.positions = T.pos;
                 obj.positions = T.pos;
@@ -1824,7 +1830,7 @@ classdef Acquisition < file.AstroData
                 
             end
 
-           obj.pars.MAG_LIMIT = obj.cat.detection_limit; 
+           obj.pars.LIMMAG_DETECTION = obj.cat.detection_limit; 
             
            [obj.obj_idx, dist] = obj.cat.findNearestObject;
            

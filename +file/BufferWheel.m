@@ -460,7 +460,7 @@ classdef BufferWheel < file.AstroData
                 val = obj.date_dir_override;                
             else
             
-                val = util.sys.date_dir; 
+                val = util.sys.date_dir(''); 
                 
             end
             

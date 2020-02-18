@@ -2,7 +2,7 @@
 
 AndorCamera::AndorCamera(){
 	
-	// mexPrintf("this is AndorCamera default constructor!\n");
+	// printf("this is AndorCamera default constructor!\n");
 
 }
 
@@ -83,7 +83,7 @@ void AndorCamera::loadFromBuffers(mxArray *buffers){ // load mex flags and data 
 			if(waitForWriting(b)) return; // just making sure we are not allocating over data that is getting written
 			
 			// assuming MATLAB uses memory aligned to 8-byte boundary...
-			if(debug_bit>2) mexPrintf("Allocating a new matrix...\n");
+			if(debug_bit>2) printf("Allocating a new matrix...\n");
 
 			//images_ptrs[b]=(unsigned short int*) mxCalloc((int) (height*width*batch_size), 2); // use 2 to initialize a uint16
 			mwSize dims[3] = {(mwSize) width, (mwSize) height, (mwSize) batch_size}; // width <-> height exchanged for C <-> matlab conversion
@@ -148,12 +148,19 @@ void AndorCamera::loadFromOptionsStruct(const mxArray *options){ // load additio
 
 void AndorCamera::startup(){
 	
-	if(debug_bit) mexPrintf("starting Andor camera...\n");
+	if(debug_bit>1) printf("starting Andor camera...\n");
+	
+	int ret=0;
+	
+	ret=AT_SetBool(hndl, L"MetadataEnable", 1); 
+	if(ret!=AT_SUCCESS){ report_error("startup>set metadata", ret, mex_flag_cam); return; }
+
+	ret=AT_SetBool(hndl, L"MetadataTimestamp", 1); 
+	if(ret!=AT_SUCCESS){ report_error("startup>set metadata timestamps", ret, mex_flag_cam); return; }
 	
 	AT_64 ImageSizeBytes; AT_GetInt((AT_H) hndl, L"ImageSizeBytes", &ImageSizeBytes); 
 	//cast so that the value can be used in the AT_QueueBuffer function 
 	image_size_bytes = (int) ImageSizeBytes;	
-	int ret=0;
 	
 	mex_flag_cam[0]=1;
 	
@@ -186,14 +193,18 @@ void AndorCamera::startup(){
 		
 	}
 	
-	ret = AT_Command((AT_H) hndl, L"TimestampClockReset");
-	if(ret!=AT_SUCCESS){ report_error("startup>clock reset", ret, mex_flag_cam); return; }
+	if(restart_clock){
+		ret = AT_Command((AT_H) hndl, L"TimestampClockReset");
+		if(ret!=AT_SUCCESS){ report_error("startup>clock reset", ret, mex_flag_cam); return; }
+	}
 	
 	// unsigned long long milliseconds_since_epoch =
     // std::chrono::system_clock::now().time_since_epoch() / std::chrono::milliseconds(1);
 	// printf("Current POSIX time is: %lld.%lld seconds\n", milliseconds_since_epoch/1000, milliseconds_since_epoch%1000);
 	
 	ret=AT_Command((AT_H) hndl, L"ACquisitionStart");
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	
 	if(ret!=AT_SUCCESS){ report_error("startup>acquisition start", ret, mex_flag_cam); return; }
 		
 }
@@ -202,7 +213,7 @@ void AndorCamera::finishup(){
 
 	int ret = 0;	
 	
-	if (debug_bit) printf("stopping Andor camera...\n");
+	if (debug_bit>1) printf("stopping Andor camera...\n");
 	
 	ret=AT_Command((AT_H) hndl, L"ACquisitionStop");	
 	if(ret!=AT_SUCCESS){ report_error("finishup>stop acquisition", ret, mex_flag_cam); return; }
@@ -223,7 +234,7 @@ void AndorCamera::finishup(){
 void AndorCamera::loop(){ // start producing images in a loop over batches
 	
 	if(mex_flag_cam[0]){
-		if(debug_bit) printf("Camera is already recording... \n"); 
+		if(debug_bit>1) printf("Camera is already recording... \n"); 
 		return; 
 	}
 	
@@ -240,7 +251,7 @@ void AndorCamera::loop(){ // start producing images in a loop over batches
 		if(mex_flag_cam[1]){ // get the signal to stop...
 			mex_flag_cam[0]=0; // unlock for later
 			mex_flag_cam[1]=0; // unlock for later
-			if(debug_bit) printf("Camera: Received stop flag after %d batches... \n", current_batch);
+			if(debug_bit>1) printf("Camera: Received stop flag after %d batches... \n", current_batch);
 			break;
 		} 
 		
@@ -250,12 +261,12 @@ void AndorCamera::loop(){ // start producing images in a loop over batches
 		
 		t_vec_ptrs[idx][0]=getPosixTime();
 		
-		if(mex_flag_read_ptrs[idx][0]==1) printf("THIS SHOULDNT HAPPEN!!!\n\n"); // we can only reach this point after buffer is released from reading
+		// if(mex_flag_read_ptrs[idx][0]==1) printf("THIS SHOULDNT HAPPEN!!!\n\n"); // we can only reach this point after buffer is released from reading
 		
 		// mex_flag_record_ptrs[idx][1]=; // not finished recording
 		mex_flag_record_ptrs[idx][0]=1; // recording
 		
-		if(debug_bit>5) printf("Camera: Recording batch %d on buffer %d | record flag: %d %d | read flag: %d %d\n", current_batch+1, idx+1, 
+		if(debug_bit>5) printf("Camera: Recording batch % 4d on buffer %d | record flag: %d %d | read flag: %d %d\n", current_batch+1, idx+1, 
 			(int) mex_flag_record_ptrs[idx][0], (int) mex_flag_record_ptrs[idx][1], 
 			(int) mex_flag_read_ptrs[idx][0], (int) mex_flag_read_ptrs[idx][1]);
 		
@@ -270,7 +281,7 @@ void AndorCamera::loop(){ // start producing images in a loop over batches
 		mex_flag_record_ptrs[idx][0]=0; // not recording
 		mex_flag_read_ptrs[idx][0]=1; // lock the buffer until it is read out...
 		
-		if(debug_bit>5) printf("Camera: finished recording to buffer %d... record_flag= %d %d | read_flag= %d %d\n", idx+1, 
+		if(debug_bit>5) printf("Camera: finished recording to buffer   %d | record_flag= %d %d | read_flag= %d %d\n", idx+1, 
 						(int) mex_flag_record_ptrs[idx][0], (int) mex_flag_record_ptrs[idx][1], 
 						(int) mex_flag_read_ptrs[idx][0], (int) mex_flag_read_ptrs[idx][1]);
 
@@ -283,7 +294,7 @@ void AndorCamera::loop(){ // start producing images in a loop over batches
 	
 	finishup();
 	mex_flag_cam[0]=0;// this tells use the camera is now ready to start recording again...
-	if(debug_bit) printf("Camera: Done looping on %d / %d batches...\n", current_batch, num_batches);
+	if(debug_bit>1) printf("Camera: Done looping on %d / %d batches...\n", current_batch, num_batches);
 	delete this; // must do a cleanup in the asynchronous function! 
 	
 }
@@ -300,19 +311,23 @@ void AndorCamera::batch(int idx){
 	unsigned char *buf=0;
 	int return_buf_size=0;
 	
-	ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
-	if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
+	// ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
+	// if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
 	
 	AT_64 clock=0;
-	
+
+	ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
+	if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
+
 	for(unsigned int i=0; i<batch_size; i++){
 		
 		int error_counter=0; // to make sure we are not in an endless loop... 
-		
+
 		ret=AT_WaitBuffer((AT_H) hndl, &buf, &return_buf_size, getTimeout());
+		
 		if(ret!=AT_SUCCESS){ // This is a special error case. We report it but also restart the acquisition... 
 			// report_error("batch>wait buffer", ret, mex_flag_cam); 
-			// printf("WARNING: batch>wait buffer: return value %d... restarting acquisition!\n", ret); 
+			if(debug_bit>1) printf("WARNING: batch>wait buffer: return value %d... restarting acquisition!\n", ret); 
 			save_error("batch>wait buffer", ret, current_batch); 
 			restart();
 			i--;
@@ -321,23 +336,29 @@ void AndorCamera::batch(int idx){
 			continue;
 		}
 		
-		ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
-		if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
-		
+		// printf("i= %d | queue buffer...\n", i);
 		int pos=i*height*width; // where inside the buffer to start writing now... 		
 		// printf("height= %d | width= %d | stride= %d\n", height, width, stride);
-		ret=AT_ConvertBuffer(buf, (AT_U8*)(images_ptrs[idx]+pos), width, height, stride, L"Mono16", L"Mono16");
-		if(ret!=AT_SUCCESS){ report_error("batch>convert buffer", ret, mex_flag_cam); return; }
 		
+		// ret=AT_ConvertBuffer(buf, (AT_U8*)(images_ptrs[idx]+pos), width, height, stride, L"Mono16", L"Mono16");
+		//if(ret!=AT_SUCCESS){ report_error("batch>convert buffer", ret, mex_flag_cam); return; }
+		
+		if(i<batch_size-1){
+			ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
+			if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
+		}
+		
+		// memcpy(images_ptrs[idx]+pos, buf, height*width*2);
+		for(int j=0;j<height;j++){ // copy each row
+			memcpy(images_ptrs[idx]+pos+(j*width), buf+j*stride, width*2);
+		}
+
 		clock=getTimestamps(buf, (int) ImageSizeBytes);
 		timestamps_ptrs[idx][i]=((double)clock)/clockFreq;
 		
-		// unsigned short int *temp=(images_ptrs[idx]+pos); // debugging only!!!
-		// temp=(unsigned short int*) buf; // debugging only!!!
-		
-		// printf("i= %d | queue buffer...\n", i);
 		ret=AT_QueueBuffer((AT_H) hndl, buf, static_cast<int> (ImageSizeBytes));
 		if(ret!=AT_SUCCESS){ report_error("batch>queue buffer", ret, mex_flag_cam); return; }
+
 		
 	}
 	
@@ -354,7 +375,7 @@ void AndorCamera::batch(int idx){
 
 void AndorCamera::restart(){
 	
-	if (debug_bit) printf("restarting Andor camera...\n");
+	if (debug_bit>1) printf("restarting Andor camera...\n");
 	
 	int ret=0;
 	
@@ -382,39 +403,58 @@ void AndorCamera::restart(){
 unsigned long long int AndorCamera::getTimestamps(unsigned char *buf, int ImageSizeBytes){ // recover the timestamps from the metadata
 // this is copied pretty much as-is from AT_GetTimeStamp.m from the Andor matlab SDK.
 // I imagine their code is copied directly from the Solis source code (it looks a lot like C code to me)
+// Improved this for the Balor using the manual chapter 4.6 about metadata
 
 	unsigned long long int clock=0;
 
-	int LENGTH_FIELD_SIZE = 4;
-	int CID_FIELD_SIZE = 4;
-	int CID_FPGA_TICKS = 1;
+	int LENGTH_FIELD_SIZE=4;
+	int CID_FIELD_SIZE=4;
+	int CID_FRAME_INFO=7; 
+	int CID_FPGA_TICKS=1;
 	// int AT_SUCCESS = 0;
 	// int AT_ERR_NODATA = 11;
-
-	// Get length of timestamp
-	unsigned long int offset = (int) ImageSizeBytes - LENGTH_FIELD_SIZE;
-	int timeStampLength = (int) extractIntValue(buf, offset,LENGTH_FIELD_SIZE)- CID_FIELD_SIZE;
-
-	// Get Metadata identifier
-	offset = offset - CID_FIELD_SIZE;
-	int cid = (int) extractIntValue(buf, offset,CID_FIELD_SIZE);
-
-	// Extract Metadata if present
-	int rc=0;
-	if (cid == CID_FPGA_TICKS){
-		offset = offset - timeStampLength;
-		clock =  extractIntValue(buf, offset,timeStampLength);		
-	}
-	else{
-		clock=0;
-		report_error("batch>get timestamp", AT_ERR_NODATA, mex_flag_cam);
-	}
-
-	return clock;
 	
+	unsigned long int offset = (int) ImageSizeBytes; // the initial position is at the end of the buffer! 
+	
+	for(int i=0;i<10;i++){ // how many chunks can we expect to read here...?
+	
+		// Get length of this metadata chunk
+		offset-=LENGTH_FIELD_SIZE; // positition (in bytes) inside image buffer where we want to read the "length" block
+		int chunk_length = (int) extractIntValue(buf, offset, LENGTH_FIELD_SIZE); // read how many bytes are in the rest of the block, includng metadata+CID
+		if(offset<0) return 0;
+		
+		// Get Metadata identifier
+		offset-= CID_FIELD_SIZE;
+		int cid = (int) extractIntValue(buf, offset,CID_FIELD_SIZE);
+		if(offset<0) return 0;
+		
+		chunk_length-=CID_FIELD_SIZE; // now we want to know how much to go back, after already having moved back CID_FIELD_SIZE
+		offset-=chunk_length; // now we are at the position to read that metadata! 
+		if(offset<0) return 0;
+		
+		// Extract Metadata if present
+		int rc=0;
+		if(cid == CID_FRAME_INFO){ // includes frame height/width/stride and other useless stuff
+			continue;
+		}
+		else if (cid == CID_FPGA_TICKS){// this is what we actually want, the timestamp data! 
+			
+			clock =  extractIntValue(buf, offset, chunk_length); // chunk length should be 8 bytes, just for the FPGA clock counter
+			return clock; 
+		}
+		else if(cid == 0){ // we reached the image data block! 
+			clock=0;
+			report_error("batch>get timestamp", AT_ERR_NODATA, mex_flag_cam);
+			return 0;
+		}
+
+		return 0; // this shouldn't happen!
+		
+	}
+		
 }
 
-unsigned long long int AndorCamera::extractIntValue(unsigned char *buf, unsigned long int offset, int numBytes){ // get values from bits 
+unsigned long long int AndorCamera::extractIntValue(unsigned char *buf, unsigned long int offset, int numBytes){ // get values from bytes 
 	
 	unsigned long long int value=0;
 	
@@ -484,7 +524,7 @@ int AndorCamera::waitForWriting(int idx){ // make sure buffer is not locked whil
 			
 	}
 		
-	printf("Camera: waitForWriting timeout after %d milliseconds...\n", N);
+	if(debug_bit>1) printf("Camera: waitForWriting timeout after %d milliseconds...\n", N);
 	return 1;
 	
 }
@@ -498,7 +538,6 @@ double AndorCamera::getPosixTime(){ // get time from computer's clock
 
 unsigned int AndorCamera::getTimeout(){ // in milliseconds
 	
-	// printf("timeout= %d | expT= %f\n", timeout, expT);
 	if (timeout>expT*10000) return timeout;
 	else return (unsigned int) (expT*10000);
 
@@ -513,13 +552,15 @@ void AndorCamera::printout(){ // print to screen some info on the camera switche
 
 void AndorCamera::report_error(const char *string, int error_value, double *mex_flag_cam){ // print error on screen and set error flag
 	
-	//printf("ERROR in %s: return value %d... stopping camera! \n", string, error_value);
+	if(debug_bit>1) printf("ERROR in %s: return value %d... stopping camera! \n", string, error_value);
 	mex_flag_cam[1]=1;
 	mex_flag_cam[2]=error_value;
 	
 }
 
 void AndorCamera::save_error(const char *string, int error_value, int batch_number){ // save error flag in vector of errors
+	
+	return; // debug only
 	
 	printf("ERROR in %s: return value %d... ", string, error_value);
 	

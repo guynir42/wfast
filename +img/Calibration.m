@@ -136,7 +136,7 @@ classdef Calibration < handle
         replace_value = NaN;
         
         dark_mask_sigma = 5; % how hot a pixel must be (relative to dark noise) to be considered a "bad pixel"
-        dark_mask_var_thresh = 120; % pixels with variance above this value are bad pixels. 
+        dark_mask_var_thresh = []; % pixels with variance above this value are bad pixels. (see hidden variables for Zyla/Balor)
         dark_mask_var_sigma = 100; % how many "sigmas" above the mean variance value to cut (to be depricated)
         dark_mask_var_ratio = 0.99; % what fraction of pixel variance is considered "bad pixels" (to be depricated)
         
@@ -166,6 +166,9 @@ classdef Calibration < handle
     
         default_dark_mask_sigma;
         default_dark_mask_var_thresh;
+        dark_mask_var_thresh_zyla = 120;
+        dark_mask_var_thresh_balor = 50; 
+        
         default_dark_mask_var_sigma; % we're not using this anymore...
         default_dark_mask_var_ratio; % we're not using this anymore...
         
@@ -186,6 +189,12 @@ classdef Calibration < handle
             else
                 
                 if obj.debug_bit, fprintf('Calibration constructor v%4.2f\n', obj.version); end
+                
+                if isempty(obj.camera_name) || strcmpi(obj.camera_name, 'zyla')
+                    obj.dark_mask_var_thresh = obj.dark_mask_var_thresh_zyla;
+                elseif strcmpi(obj.camera_name, 'balor')
+                    obj.dark_mask_var_thresh = obj.dark_mask_var_thresh_balor;
+                end
                 
                 util.oop.save_defaults(obj);
                 
@@ -1324,12 +1333,12 @@ classdef Calibration < handle
             obj.clip.clear;
             deflate = 1;
             
-            if ~isempty(obj.reader_dark)
+            if ~isempty(obj.reader_dark) && obj.checkDark
                 if obj.debug_bit, disp(['saving calibration data to: ' fullfile(obj.reader_dark.dir.pwd, filename)]); end
                 util.oop.save(obj, fullfile(obj.reader_dark.dir.pwd, filename), 'name', 'cal', 'deflate', deflate);
             end
             
-            if ~isempty(obj.reader_flat)
+            if ~isempty(obj.reader_flat) && obj.checkFlat
                 if obj.debug_bit, disp(['saving calibration data to: ' fullfile(obj.reader_flat.dir.pwd, filename)]); end
                 util.oop.save(obj, fullfile(obj.reader_flat.dir.pwd, filename), 'name', 'cal', 'deflate', deflate);
             end
@@ -1524,7 +1533,10 @@ classdef Calibration < handle
                 obj.flat_pixel_mean = temp.flat_pixel_mean;
                 obj.flat_pixel_var = temp.flat_pixel_var;
                 obj.pixel_gain = temp.pixel_gain;
-
+                
+                obj.camera_name = temp.camera_name;
+                obj.project_name = temp.project_name; 
+                
                 obj.gain = temp.gain;
 
                 obj.num_pixels_removed = temp.num_pixels_removed;

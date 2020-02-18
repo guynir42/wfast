@@ -415,9 +415,8 @@ classdef AcqGUI < handle
                 lastwarn('');
                                 
                 try
-                    obj.owner.reset;
                     obj.owner.use_save = 1;
-                    obj.owner.run;
+                    obj.owner.run('reset', 1);
                 catch ME
                     obj.latest_error = util.text.eraseTags(ME.getReport());
                     obj.update;
@@ -441,9 +440,8 @@ classdef AcqGUI < handle
             lastwarn('');
 
             try
-                obj.owner.reset;
                 obj.owner.use_save = 0;
-                obj.owner.run;
+                obj.owner.run('reset', 1);
             catch ME
                 obj.latest_error = util.text.eraseTags(ME.getReport());
                 obj.update;

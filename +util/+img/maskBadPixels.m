@@ -1,5 +1,5 @@
-function [image_reduced, mask] = maskBadPixels(image, filler, sigma)
-% usage: [image_reduced, mask] = maskBadPixels(image, filler=median2, sigma=3)
+function [image_reduced, mask] = maskBadPixels(image, filler, sigma, saturation)
+% usage: [image_reduced, mask] = maskBadPixels(image, filler=median2, sigma=3, saturation=50000)
 % Removes very bright (or very negative) pixels from an image. 
 % Checks if each pixel is greater than <sigma> times the average of the 8
 % nearest neighboors. Can handle 3D or 4D (but in loops...). 
@@ -16,6 +16,7 @@ function [image_reduced, mask] = maskBadPixels(image, filler, sigma)
     if nargin==0, help('util.img.maskBadPixels'); return; end    
     if nargin<2, filler = []; end
     if nargin<3 || isempty(sigma), sigma = 5; end
+    if nargin<4 || isempty(saturation), saturation = 50000; end
     
     if size(image,4)>1 % handle 4D matrices
         
@@ -51,6 +52,10 @@ function [image_reduced, mask] = maskBadPixels(image, filler, sigma)
     image_conv = filter2(ker, double(abs(image)));
     
     mask = logical( abs(double(image))>abs(sigma.*(image_conv)) );
+    
+    if ~isempty(saturation)
+        mask = mask | image>saturation;
+    end
     
     image_reduced = image;
     image_reduced(mask) = filler;
