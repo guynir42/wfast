@@ -1455,6 +1455,12 @@ classdef Acquisition < file.AstroData
                     
                 end
                 
+                num_frames = obj.num_batches.*obj.batch_size;
+                num_stars = size(obj.positions,1);
+                num_apertures = length(obj.phot.aperture).*obj.phot.use_aperture + length(obj.phot.aperture).*obj.phot.use_forced; % can later change the second length() to the forced aperture list
+                
+                obj.lightcurves.startup(num_frames, num_stars, num_apertures); 
+                
 %                 obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
                 
                 obj.pars.RUNSTART = util.text.time2str(obj.pars.ephem.time);
@@ -1788,7 +1794,7 @@ classdef Acquisition < file.AstroData
                     error('Could not find any stars using quick_find_stars!');
                 end
                 
-                obj.pars.THRESHOLD = obj.detect_thresh; 
+                obj.pars.THRESH_DETECTION = obj.detect_thresh; 
                 
                 obj.clip.positions = T.pos;
                 obj.positions = T.pos;
@@ -1824,7 +1830,7 @@ classdef Acquisition < file.AstroData
                 
             end
 
-           obj.pars.MAG_LIMIT = obj.cat.detection_limit; 
+           obj.pars.LIMMAG_DETECTION = obj.cat.detection_limit; 
             
            [obj.obj_idx, dist] = obj.cat.findNearestObject;
            

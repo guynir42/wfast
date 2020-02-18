@@ -465,12 +465,19 @@ classdef Catalog < handle
                 Dec = head.Ephemeris.sex2deg(Dec);
             end
             
-            delta_RA = ((RA-obj.data{:,'RA'}).*cosd(Dec)).^2;
-            delta_Dec = (Dec-obj.data{:,'Dec'}).^2;
-            
-            [dist, idx] = min(delta_RA+delta_Dec); 
-            
-            dist = sqrt(dist); 
+            if isempty(obj.data)
+                idx = [];
+                dist = [];
+            else
+                
+                delta_RA = ((RA-obj.data{:,'RA'}).*cosd(Dec)).^2;
+                delta_Dec = (Dec-obj.data{:,'Dec'}).^2;
+
+                [dist, idx] = min(delta_RA+delta_Dec); 
+
+                dist = sqrt(dist); 
+
+            end
             
         end
         

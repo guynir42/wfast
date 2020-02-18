@@ -15,8 +15,10 @@ function val = date_dir(varargin)
 
     if nargin==0, help('util.sys.date_dir'); return; end
     
-    if length(varargin)==1 && isa(varargin{1}, 'datetime')
+    if length(varargin)==1 && isa(varargin{1}, 'datetime') && ~isempty(varargin{1})
         date = varargin{1}; 
+    elseif isempty(varargin{1})
+        date = datetime('now', 'TimeZone', 'UTC'); 
     else
         date = datetime(varargin{:});
     end
