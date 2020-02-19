@@ -746,6 +746,10 @@ classdef Andor < file.AstroData
         
         function live(obj, varargin) % run for up to 1e6 batches of sinlge image, showing each one, at a constant rate (without saving images)
             
+            if isempty(obj.gui) || ~obj.gui.check
+                obj.makeGUI;
+            end
+            
             obj.run('num_batches', 1e6, 'batch_size', 1, 'show', 1, 'save', 0,...
                 'audio', 0, 'async', 0, 'progress', 0, 'log_level', 0, ...
                 'frame rate', obj.frame_rate_live, varargin{:}); 
