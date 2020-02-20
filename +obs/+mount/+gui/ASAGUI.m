@@ -290,9 +290,13 @@ classdef ASAGUI < handle
                 obj.panel_object.button_pierside.Tooltip = [obj.panel_object.button_pierside.Tooltip ' (need to flip!)']; 
             end
             
-            if obj.owner.hndl.Slewing
-                obj.panel_slew.button_stop.BackgroundColor = 'red';
-            else
+            try 
+                if obj.owner.hndl.Slewing
+                    obj.panel_slew.button_stop.BackgroundColor = 'red';
+                else
+                    obj.panel_slew.button_stop.BackgroundColor = util.plot.GraphicButton.defaultColor;
+                end
+            catch
                 obj.panel_slew.button_stop.BackgroundColor = util.plot.GraphicButton.defaultColor;
             end
             

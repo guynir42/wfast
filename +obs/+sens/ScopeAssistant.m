@@ -106,7 +106,7 @@ classdef ScopeAssistant < handle
         function connectBluetooth(obj, name, id)
             
             if nargin>1 && ~isempty(name)
-                obj.bluetoot_name = name;
+                obj.bluetooth_name = name;
             end
             
             if nargin>2 && ~isempty(id)
@@ -165,6 +165,7 @@ classdef ScopeAssistant < handle
                     fprintf('%s: Cannot open bluetooth to ScopeAssistant!\n', t); 
                     delete(obj.hndl); 
                     obj.hndl = [];
+                    return; 
                 end
             end
             

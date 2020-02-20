@@ -401,43 +401,71 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function val = average_temperature(obj) % average of all sensors that can measure this
             
-            val = nanmean(obj.checker.temperature.now);
+            if ~isfield(obj.checker.temperature, 'func') || isempty(obj.checker.temperature.func)
+                val = nanmean(obj.checker.temperature.now);
+            else
+                val = util.stat.stat_eval(obj.checker.temperature.func, obj.checker.temperature.now, 2); 
+            end
             
         end
         
         function val = average_clouds(obj) % average of all sensors that can measure this
             
-            val = nanmean(obj.checker.clouds.now);
+            if ~isfield(obj.checker.clouds, 'func') || isempty(obj.checker.clouds.func)
+                val = nanmean(obj.checker.clouds.now);
+            else
+                val = util.stat.stat_eval(obj.checker.clouds.func, obj.checker.clouds.now, 2); 
+            end
             
         end
         
         function val = average_light(obj) % average of all sensors that can measure this
             
-            val = nanmean(obj.checker.light.now);
+            if ~isfield(obj.checker.light, 'func') || isempty(obj.checker.light.func)
+                val = nanmean(obj.checker.light.now);
+            else
+                val = util.stat.stat_eval(obj.checker.light.func, obj.checker.light.now, 2); 
+            end
             
         end
         
         function val = average_wind_speed(obj) % average of all sensors that can measure this
             
-            val = nanmean(obj.checker.wind_speed.now);
+            if ~isfield(obj.checker.wind_speed, 'func') || isempty(obj.checker.wind_speed.func)
+                val = nanmean(obj.checker.wind_speed.now);
+            else
+                val = util.stat.stat_eval(obj.checker.wind_speed.func, obj.checker.wind_speed.now, 2); 
+            end
             
         end
         
         function val = average_wind_dir(obj) % average of all sensors that can measure this
             
-            val = nanmean(obj.checker.wind_dir.now);
+            if ~isfield(obj.checker.wind_dir, 'func') || isempty(obj.checker.wind_dir.func)
+                val = nanmean(obj.checker.wind_dir.now);
+            else
+                val = util.stat.stat_eval(obj.checker.wind_dir.func, obj.checker.wind_dir.now, 2); 
+            end
             
         end
         
         function val = average_humidity(obj) % average of all sensors that can measure this
             
-            val = nanmean(obj.checker.humidity.now);
+            if ~isfield(obj.checker.humidity, 'func') || isempty(obj.checker.humidity.func)
+                val = nanmean(obj.checker.humidity.now);
+            else
+                val = util.stat.stat_eval(obj.checker.humidity.func, obj.checker.humidity.now, 2); 
+            end
             
         end
         
         function val = average_pressure(obj)
             
-            val = nanmean(obj.checker.pressure.now);
+            if ~isfield(obj.checker.pressure, 'func') || isempty(obj.checker.pressure.func)
+                val = nanmean(obj.checker.pressure.now);
+            else
+                val = util.stat.stat_eval(obj.checker.pressure.func, obj.checker.pressure.now, 2); 
+            end
         
         end
         

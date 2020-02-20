@@ -30,42 +30,6 @@ classdef SensorChecker < handle
         
         jd = [];
         
-%         light_now;
-%         light_ids;
-%         light_str;
-%         light_all;
-%         light_jul;
-%         
-%         clouds_now;
-%         clouds_ids;
-%         clouds_str;
-%         clouds_all;
-%         clouds_jul;
-%         
-%         temp_now;
-%         temp_ids;
-%         temp_str;
-%         temp_all;
-%         temp_jul;
-%         
-%         wind_now;
-%         wind_ids;
-%         wind_str;
-%         wind_all;
-%         wind_jul;
-%         
-%         wind_az_now;
-%         wind_az_ids;
-%         wind_az_str;
-%         wind_az_all;
-%         wind_az_jul;
-%         
-%         humid_now;
-%         humid_ids;
-%         humid_str;
-%         humid_all;
-%         humid_jul;
-        
         wise_data_raw;
         wise_data_struct;
         
@@ -238,15 +202,6 @@ classdef SensorChecker < handle
                 obj.(['reset_', obj.data_types{ii}]); 
             end
             
-%             obj.reset_light;
-%             obj.reset_clouds;
-%             obj.reset_temp;
-%             obj.reset_wind_speed;
-%             obj.reset_wind_dir;
-%             obj.reset_humid;
-%             obj.reset_pressure;
-%             obj.reset_rain;
-            
             obj.jd = [];
             
             obj.log.reset;
@@ -318,8 +273,8 @@ classdef SensorChecker < handle
             obj.wind_speed.jd = [];
             obj.wind_speed.units = 'km/h';
             obj.wind_speed.err_str = 'Wind too strong!';
-        
-            obj.wind_speed.max = 50; % km/h
+            obj.wind_speed.func = @nanmax; % for wind measurements we want the maximum of all sensors, not the average
+            obj.wind_speed.max = 40; % km/h
             
         end
         
@@ -605,7 +560,11 @@ classdef SensorChecker < handle
             if isprop(obj, type) || ~isa(obj.(type), 'struct')
                 
                 st = obj.(type);
-                value_now = nanmean(st.now); 
+                if ~isfield(obj.(type), 'func') || isempty(obj.(type).func)
+                    value_now = nanmean(st.now); 
+                else
+                    value_now = util.stat.stat_eval(obj.(type).func, st.now, 2); 
+                end
                 
                 if isempty(st.now)
                     val = 1;
@@ -746,8 +705,14 @@ classdef SensorChecker < handle
                     unit = ['-975 ' unit];
                 end
                 
+                if ~isfield(obj.(name), 'func') || isempty(obj.(name).func)
+                    combined_data = nanmean(v,2);
+                else
+                    combined_data = util.stat.stat_eval(obj.(name).func, v, 2); 
+                end
+                
                 if obj.use_only_plot_mean
-                    h = plot(input.ax, t, nanmean(v,2), '-', 'LineWidth', 2, 'DisplayName', sprintf('mean %s [%s]', strrep(name, '_', ' '), unit), 'Color', colors{ii}); 
+                    h = plot(input.ax, t, combined_data, '-', 'LineWidth', 2, 'DisplayName', sprintf('mean %s [%s]', strrep(name, '_', ' '), unit), 'Color', colors{ii}); 
                     input.ax.NextPlot = 'add';
                 else
 
@@ -764,7 +729,7 @@ classdef SensorChecker < handle
 
                     input.ax.NextPlot = 'add';
 
-                    plot(input.ax, t, nanmean(v,2), '-', 'LineWidth', 2, 'HandleVisibility', 'off', 'Color', h(1).Color); 
+                    plot(input.ax, t, combined_data, '-', 'LineWidth', 2, 'HandleVisibility', 'off', 'Color', h(1).Color); 
                 
                 end
                 

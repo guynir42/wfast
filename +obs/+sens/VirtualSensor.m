@@ -8,6 +8,8 @@ classdef VirtualSensor < dynamicprops
         use_this = 1; % is true get the data from this sensor. If not, ignore it and move on
         id = '';
         
+        weight = 1;
+        
         data_path = {}; 
         subsref_struct;
         data_struct = []; 

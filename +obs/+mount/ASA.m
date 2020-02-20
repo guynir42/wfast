@@ -335,13 +335,20 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function val = get.limit_alt(obj)
             
-            val = obj.hndl.AltitudeLimit;
-            
+            try
+                val = obj.hndl.AltitudeLimit;
+            catch
+                val = [];
+            end
         end
         
         function val = get.limit_flip(obj)
             
-            val = obj.hndl.MeridianFlipMaxAngle;
+            try
+                val = obj.hndl.MeridianFlipMaxAngle;
+            catch
+                val = [];
+            end
             
         end
         
@@ -545,7 +552,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function val = get.pier_side(obj)
             
-            val = obj.hndl.SideOfPier;
+            try
+                val = obj.hndl.SideOfPier;
+            catch ME
+                val = [];
+            end
             
         end
         
