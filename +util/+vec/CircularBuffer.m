@@ -150,7 +150,7 @@ classdef CircularBuffer < dynamicprops
         function val = get.mean(obj) % get the nanmean of each coloumn (lazy loaded!)
             
             if isempty(obj.mean)
-                obj.mean = nanmean(obj.data);
+                obj.mean = nanmean(obj.data, 1);
             end
             
             val = obj.mean;
@@ -160,7 +160,7 @@ classdef CircularBuffer < dynamicprops
         function val = get.median(obj) % get the nanmedian of each column (lazy loaded!)
             
             if isempty(obj.median)
-                obj.median = nanmedian(obj.data);
+                obj.median = nanmedian(obj.data, 1);
             end
             
             val = obj.median;
@@ -170,7 +170,7 @@ classdef CircularBuffer < dynamicprops
         function val = get.var(obj) % get the nanvar of each column (lazy loaded!)
             
             if isempty(obj.var)
-                obj.var = nanvar(obj.data);
+                obj.var = nanvar(obj.data, [], 1);
             end
             
             val = obj.var;
