@@ -1062,7 +1062,7 @@ classdef Analysis < file.AstroData
             if isempty(obj.clip_bg.positions)
                 obj.clip_bg.num_stars = 50;
                 obj.clip_bg.cut_size = 20;
-                obj.clip_bg.arbitraryPositions;
+                obj.clip_bg.arbitraryPositions('imsize', size(obj.stack));
                 obj.positions_bg = obj.clip_bg.positions;
             end
             
@@ -1092,6 +1092,9 @@ classdef Analysis < file.AstroData
             %%%%%%%%%%%%%%%%%%%%% STACK ANALYSIS %%%%%%%%%%%%%%%%%%%%%%%%%%
             
             t = tic;
+            
+            obj.cal.use_roi = 1;
+            obj.cal.ROI = obj.pars.ROI; 
             
             % calibrate the stack if needed
             if nnz(isnan(obj.stack)) % stack is already calibrated (has NaN values...)

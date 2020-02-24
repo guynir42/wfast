@@ -96,8 +96,12 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
         If_twice = filter2(k_twice, I2); % ./sqrt(util.stat.sum2(k_twice));
 
         BW = If>=thresholds(ii);
-
-        BW_dilated = imdilate(BW, ones(input.dilate));
+        
+        if input.dilate>0
+            BW_dilated = imdilate(BW, ones(input.dilate));
+        else
+            BW_dilated = BW;
+        end
 
         T = regionprops('table', BW, I, 'WeightedCentroid', 'PixelValues', 'PixelIdxList'); 
 
@@ -140,12 +144,12 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
             flag = vertcat(flag, f);
             table_props = vertcat(table_props, T);
 
+            I_reduced(BW_dilated) = NaN;
+        
             if height(table_props)>input.number
                 break; % shorten the run if we already found enough stars...
             end
             
-            I_reduced(BW_dilated) = NaN;
-        
         end
         
     end

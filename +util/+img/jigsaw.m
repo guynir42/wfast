@@ -24,6 +24,12 @@ function [cutouts, positions] = jigsaw(Im, varargin)
     input.input_var('squeeze', 1);
     input.scan_vars(varargin{:});
     
+    if isempty(Im)
+        cutouts = [];
+        positions = []; 
+        return;
+    end
+    
     t = input.tile;
     if isscalar(t)
         t = [t t];
