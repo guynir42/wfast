@@ -51,7 +51,7 @@ classdef Lightcurves < handle
 % statistical analysis. These are all lazy loaded as well. 
 %
 % The fourth job of this class is to calculate statistics on each star. 
-% This part needs to be expanded once we write the code! 
+% <This part needs to be expanded once we write the code!> 
 %
 % The last job of this class is to display the data in a useful way. 
 % *You can specify how many stars to show, or show a list of stars, using 
@@ -97,7 +97,7 @@ classdef Lightcurves < handle
         use_preallocate = 1; % if this is used, we preallocate the entire storage at the beginning (must call startup(N) with the number of frames)
         
         % processing steps for fluxes_sub:
-        use_subtract_backgrounds = 1; % 
+        use_subtract_backgrounds = 1; 
         
         % processing steps for fluxes_rem:
         use_skip_flagged = 0; % skip samples that have a bad photometry flag (for forced, this may be overkill)
@@ -109,7 +109,11 @@ classdef Lightcurves < handle
         % processing steps for fluxes_cal:
         use_psf_correction = 0;
         use_polynomial = 0;
-        use_zero_point = 0;
+        use_zero_point = 1;
+        missing_method = 'linear'; % can also choose 'previous', 'next', 'nearest', 'linear', 'spline', 'pchip', 'makima' (see the help section of fillmissing())
+        use_savitzky_golay = 1;
+        sg_order = 3;
+        sg_length = 125; % take 5 seconds as long enough to smooth over
         
         index_flux = 'end'; % which aperture to use, default "end" is for forced photometery with the largest aperture
         
@@ -472,56 +476,96 @@ classdef Lightcurves < handle
                     
                     t_cal = tic;
                     
-                    f = obj.fluxes_rem;
-
-                    if obj.use_psf_correction
-                        
-                        F = nanmean(obj.fluxes_rem); % average flux is used as weight
-                        W = nansum(F.*obj.widths(:,:,obj.index_flux_number),2)./nansum(F,2); % average PSF width, calculated per epoch over all stars
-                        
-                        Wclip = W;
-                        Wclip(abs((W-nanmean(W))./nanstd(W))>3) = NaN; % flag all widths beyond 3sigma from the mean
-                        
-                        for ii = 1:size(f,2) % each star separately
-                        
-                            r = util.fit.polyfit(Wclip, f(:,ii), 'double', 1, 'order', 5); % find the coefficients that best correspond W to this star's flux
-                        
-                            fw = r.func(Wclip); % calculate the best estimate for the flux based on the measure width
-                            
-                            M = nanmean(f(:,ii)); 
-                            
-%                             f(:,ii) = f(:,ii) - fw + M; % subtract the fit to the best estimate 
-                            
-                            rw = util.fit.polyfit(obj.timestamps, fw, 'double', 1, 'order', 5); 
-                            f(:,ii) = f(:,ii) - rw.ym + M; % subtract the fit to the best estimate 
-                            
-                        end
-                        
-                        
-                    end
-                    
-                    if obj.use_polynomial
-                        f = util.series.self_calibrate(f, obj.timestamps, 'zero point', false, 'welch', false, 'polynomial', true, 'order', 5); 
-                    end
-                    
-                    if obj.use_zero_point
-                        
-                        f_frames_average = nansum(f,2); 
-                        f_frames_average_norm = f_frames_average./nanmean(f_frames_average); 
-                        f = f./f_frames_average_norm;
-
-                    end
-                    
-                    obj.fluxes_cal_ = f;
+                    obj.fluxes_cal_ = util.series.self_calibrate(obj.fluxes_rem, 'use_zp', obj.use_zero_point, ...
+                        'use_sg', obj.use_savitzky_golay, 'sg_order', obj.sg_order, 'sg_length', obj.sg_length, ...
+                        'missing', obj.missing_method);
                     
                     if obj.debug_bit, fprintf('Time to get fluxes_cal was %f seconds\n', toc(t_cal)); end
                     
                 end
-                
-                
-                val = obj.fluxes_cal_;
-                
+                    
             end
+                
+            val = obj.fluxes_cal_;
+
+    % below is all the old code. Some of it has moved into 
+    % the util.serial.self_calibrate() function. 
+                    
+%                     f = obj.fluxes_rem;
+%                     
+%                     ff = fillmissing(f, 'linear'); % filled in the NaN values
+%                     
+%                     if obj.use_zero_point
+%                         
+%                         if obj.use_savitzky_golay
+%                             
+%                             fs = sgolayfilt(double(ff), obj.sg_order, obj.sg_length); % smoothed fluxes
+%                             
+%                         else
+%                             fs = ff; % skip smoothing
+%                         end
+%                         
+%                         for ii = 1:obj.zp_iterations
+%                             
+%                             if ii==1
+%                                 w = nanmean(fs); % the initial weight is given by the average flux of each star
+%                             else
+%                                 w = nanmean(fs)./nanstd(fs); % other iterations will use the measured rms of the corrected flux
+%                             end
+% 
+%                             f_average = nanmean(fs.*w,2); % weighted average of each frame
+%                             f_average_norm = f_average./nanmean(f_average); % normalize by the average of averages
+%                             f = f./f_average_norm; 
+%                             ff = ff./f_average_norm; 
+%                             fs = fs./f_average_norm; 
+%                             
+%                             % below is old method
+% %                             f_frames_average = nansum(fs,2);
+% %                             f_frames_average_norm = f_frames_average./nanmean(f_frames_average); 
+% %                             f = f./f_frames_average_norm;
+% 
+%                         end
+%                         
+%                     end
+%                     
+%                     if obj.use_psf_correction
+%                         
+%                         F = nanmean(f); % average flux is used as weight
+%                         W = nansum(F.*obj.widths(:,:,obj.index_flux_number),2)./nansum(F,2); % average PSF width, calculated per epoch over all stars
+%                         
+%                         Wclip = W;
+%                         Wclip(abs((W-nanmean(W))./nanstd(W))>3) = NaN; % flag all widths beyond 3sigma from the mean
+%                         
+%                         for ii = 1:size(f,2) % each star separately
+%                         
+%                             r = util.fit.polyfit(Wclip, f(:,ii), 'double', 1, 'order', 5); % find the coefficients that best correspond W to this star's flux
+%                         
+%                             fw = r.func(Wclip); % calculate the best estimate for the flux based on the measured width
+%                             
+%                             M = nanmean(f(:,ii)); 
+%                             
+% %                             f(:,ii) = f(:,ii) - fw + M; % subtract the fit to the best estimate 
+%                             
+%                             rw = util.fit.polyfit(obj.timestamps, fw, 'double', 1, 'order', 5); 
+%                             f(:,ii) = f(:,ii) - rw.ym + M; % subtract the fit to the best estimate 
+%                             
+%                         end
+%                         
+%                         
+%                     end
+%                     
+%                     if obj.use_polynomial
+%                         f = util.series.self_calibrate(fillmissing(f, 'next'), obj.timestamps, 'zero point', false, 'welch', false, 'polynomial', true, 'order', 5); 
+%                     end
+%                     
+%                     obj.fluxes_cal_ = f;
+%                     
+%                     if obj.debug_bit, fprintf('Time to get fluxes_cal was %f seconds\n', toc(t_cal)); end
+%                     
+%                 end
+%                 
+%                 
+%             end
             
         end
         
@@ -973,6 +1017,42 @@ classdef Lightcurves < handle
                 obj.use_zero_point = val;
                 obj.fluxes_cal_ = [];
                 obj.clearPSD;
+            end
+            
+        end
+        
+        function set.use_savitzky_golay(obj, val)
+            
+            if ~isequal(obj.use_savitzky_golay, val)
+                obj.use_savitzky_golay = val;
+                if obj.use_zero_point
+                    obj.fluxes_cal_ = [];
+                    obj.clearPSD;
+                end
+            end
+            
+        end
+        
+        function set.sg_order(obj, val)
+            
+            if ~isequal(obj.sg_order, val)
+                obj.sg_order = val;
+                if obj.use_zero_point
+                    obj.fluxes_cal_ = [];
+                    obj.clearPSD;
+                end
+            end
+            
+        end
+        
+        function set.sg_length(obj, val)
+            
+            if ~isequal(obj.sg_length, val)
+                obj.sg_length = val;
+                if obj.use_zero_point
+                    obj.fluxes_cal_ = [];
+                    obj.clearPSD;
+                end
             end
             
         end

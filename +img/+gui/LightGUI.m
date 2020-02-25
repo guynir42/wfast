@@ -110,9 +110,14 @@ classdef LightGUI < handle
             obj.panel_process.addButton('input_outlier_sigma', 'outlier_sigma', 'input', 'sig= ', '', '', 0.5);
             obj.panel_process.addButton('button_bad_times', 'use_skip_bad_times', 'toggle', 'bad times', 'bad times', '', 0.5, obj.color_on);
             obj.panel_process.addButton('input_fraction', 'bad_times_fraction', 'input', 'frac= ', '', '', 0.5);
-            obj.panel_process.addButton('button_psf_correction', 'use_psf_correction', 'toggle', 'PSF width', 'PSF width', '', 0.5, obj.color_on);
-            obj.panel_process.addButton('button_polynomial', 'use_polynomial', 'toggle', 'polynomial', 'polynomial', '', 0.5, obj.color_on);
             obj.panel_process.addButton('button_zero_point', 'use_zero_point', 'toggle', 'zero point', 'zero point', '', 0.5, obj.color_on);
+            obj.panel_process.addButton('button_zavitzky_golay', 'use_savitzky_golay', 'toggle', 'savitzky golay', 'savitzky golay', '', 0.5, obj.color_on); 
+            obj.panel_process.addButton('input_sg_order', 'sg_order', 'input', 'SG order= ', '', '', 0.5); 
+            obj.panel_process.addButton('input_sg_length', 'sg_length', 'input', 'SG len= ', '', '', 0.5);
+            obj.panel_process.addButton('input_missing', 'missing_method', 'input_text', 'miss= ', '', '', 0.5); 
+
+%             obj.panel_process.addButton('button_psf_correction', 'use_psf_correction', 'toggle', 'PSF width', 'PSF width', '', 0.5, obj.color_on);
+%             obj.panel_process.addButton('button_polynomial', 'use_polynomial', 'toggle', 'polynomial', 'polynomial', '', 0.5, obj.color_on);
             
             obj.panel_process.margin = [0.01 0.02];
             obj.panel_process.make;

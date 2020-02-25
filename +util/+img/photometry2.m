@@ -44,7 +44,7 @@
 %                            aperture photometry (in pixels!). The biggest 
 %                            radius is also used for recentering (see
 %                            below) and for forced photometry. 
-%                            Default is [3,5,7].
+%                            Default is [5,7,9].
 %       *gauss_sigma: the width of the gaussian used in PSF photometery.
 %                     Default is 2 pixels. 
 %       *annulus: a one or two element vector for the inner and outer
@@ -99,8 +99,7 @@
 % the largest aperture placed at the average offsets. 
 % In all cases the background is estimated from an annulus centered around 
 % at the position of the PSF/aperture. For raw-photometry it is centered
-% around the middle of the cutout (in this case only, we take median of the
-% annulus pixel values and not the mean). 
+% around the middle of the cutout.  
 %
 % To compile this function just do "mex photometry.cpp" (no prerequisits). 
 % Make sure you do this inside the correct directory (+util/+img). 

@@ -20,7 +20,7 @@ Optional arguments:
                             aperture photometry (in pixels!). The biggest 
                             radius is also used for recentering (see
                             below) and for forced photometry. 
-                            Default is [3,5,7].
+                            Default is [5,7,9].
        *gauss_sigma: the width of the gaussian used in PSF photometery.
                      Default is 2 pixels. 
        *annulus: a one or two element vector for the inner and outer
@@ -277,7 +277,8 @@ list of cutouts to work on by itself. Since all the threads
 need to access existing memory, and do not need to allocate
 any memory, there is little overhead to running multiple threads. 
 
-I will add a benchmark test on the new computer here. 
+The new computer manages to run 1000 cutouts of 13x13 pixels, 
+using 6 cores to do the photometry. 
 
 *Using value==value to check if a pixel is NaN:
 Turns out that "isnan()" is a really slow function. 
