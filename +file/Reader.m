@@ -639,7 +639,7 @@ classdef Reader < file.AstroData
             obj.filenames = obj.dir.match(obj.glob_string);
 
             if ~isempty(obj.filenames) && ~isempty(obj.filenames{1})
-                obj.readPars; % load the parameters only for first file
+                obj.readHeader; % load the parameters only for first file
             end
             
         end
@@ -940,7 +940,7 @@ classdef Reader < file.AstroData
                     end
                     
                     if any(strcmp(group_name, strcat('/', obj.dataset_names.header)))
-                        obj.loadParsHDF5(filename, loaded_header, group_name, att_names);
+                        obj.loadHeaderHDF5(filename, loaded_header, group_name, att_names);
                     end
                     
                 end
@@ -967,7 +967,7 @@ classdef Reader < file.AstroData
             try 
                 loaded_header = util.oop.load(obj.filenames{1}, 'location', '/header', 'class', class(obj.head));
             catch 
-                loaded_header = util.oop.load(obj.filenames{1}, 'location', '/pars', 'class', class(obj.head));
+                loaded_header = cast(util.oop.load(obj.filenames{1}, 'location', '/pars', 'class', class(obj.head)));
             end
             
             util.oop.copy_props(obj.head, loaded_header);  % make a shallow copy (sub-objects are referenced, then loaded_header is destroyed)
@@ -982,17 +982,24 @@ classdef Reader < file.AstroData
             location = sa('/', data_name);
             
             try
+                
                 loaded_header = util.oop.load(filename, 'location', location, 'class', class(obj.head));
 
+                if isa(loaded_header, 'head.Parameters')
+                    loaded_header = cast(loaded_header);
+                end
+                
                 loaded_header.ephem.time = util.text.str2time(loaded_header.STARTTIME); % fix the bug in read/write of datetime objects we used to have (only rely on times stored as strings)
                 loaded_header.ephem.updateSecondaryCoords;
+                
             catch ME
                 % if we can't read this it is OK, there is still the README file. Can't give warnings on every file now...
-                disp('Could not read parameter object...');
+                disp('Could not read header object...');
                 warning(getReport(ME));
             end
             
             if ~isempty(loaded_header)
+                
                 util.oop.copy_props(obj.head, loaded_header); % make a shallow copy (sub-objects are referenced, then loaded_header is destroyed)
                 
                 % additional loading of attributes (mostly Dependent) for backward compatibility with older files.

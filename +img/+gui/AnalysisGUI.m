@@ -212,9 +212,9 @@ classdef AnalysisGUI < handle
             obj.panel_info.addButton('button_filename', 'filename', 'info', ' ', '', 'small');
 %             obj.panel_info.addButton('button_fwhm', 'FWHM', 'info', 'FWHM= ', 'pix', '', 0.2); 
             obj.panel_info.addButton('button_seeing', 'seeing', 'info', 'seeing= ', '"', 'edit', 0.2);
-            obj.panel_info.addButton('button_RA', 'pars.RA', 'info', 'RA= ', '', 'edit', 0.2); 
-            obj.panel_info.addButton('button_DE', 'pars.DEC', 'info', 'DE= ', '', 'edit', 0.2); 
-            obj.panel_info.addButton('button_exptime', 'pars.EXPTIME', 'info', 'expT= ', 's', 'edit', 0.2); 
+            obj.panel_info.addButton('button_RA', 'head.RA', 'info', 'RA= ', '', 'edit', 0.2); 
+            obj.panel_info.addButton('button_DE', 'head.DEC', 'info', 'DE= ', '', 'edit', 0.2); 
+            obj.panel_info.addButton('button_exptime', 'head.EXPTIME', 'info', 'expT= ', 's', 'edit', 0.2); 
             obj.panel_info.addButton('button_exptime', 'finder.num_kept', 'info', 'num kept= ', '', 'edit', 0.2); 
             obj.panel_info.margin = 0.00;
             obj.panel_info.make;
@@ -301,7 +301,7 @@ classdef AnalysisGUI < handle
                 obj.owner.show('axes', obj.axes_image);
             end
             
-            if obj.owner.pars.EXPTIME>=0.1
+            if obj.owner.head.EXPTIME>=0.1
                 obj.panel_info.button_exptime.BackgroundColor = 'red';
             else
                 obj.panel_info.button_exptime.BackgroundColor = util.plot.GraphicButton.defaultColor;
