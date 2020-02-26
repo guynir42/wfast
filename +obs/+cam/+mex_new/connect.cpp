@@ -36,7 +36,19 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	// printf("hndl= %ld\n", *hndl);
 	
 	rc=AT_SetBool(*hndl, L"SensorCooling", (bool) 1); 
+	if(rc) mexErrMsgIdAndTxt( "MATLAB:obs:cam:mex:connect:setSensorCooling", "Got error code %d when setting sensor cooling!", rc);
+
 	rc=AT_SetEnumString(*hndl, L"FanSpeed", L"On");
+	if(rc) mexErrMsgIdAndTxt( "MATLAB:obs:cam:mex:connect:setFanSpeed", "Got error code %d when setting fan speed!", rc);
+
+	AT_BOOL bool_value=0;
+	rc=AT_IsWritable(*hndl, L"TargetSensorTemperature", &bool_value);
+	if(rc) mexErrMsgIdAndTxt( "MATLAB:obs:cam:mex:connect:checkTempIsWritable", "Got error code %d when checking if target temperature is writable!", rc);
+
+	if(bool_value){ 
+		rc=AT_SetFloat(*hndl, L"TargetSensorTemperature", 0); // set target temperature to zero. If it was set too low it causes a camera overheat! 
+		if(rc) mexErrMsgIdAndTxt( "MATLAB:obs:cam:mex:connect:setTargetTemperature", "Got error code %d when setting target temperature!", rc);
+	}
 	
 	mwSize dims[2] = {1,1};
 	if(nlhs>0){

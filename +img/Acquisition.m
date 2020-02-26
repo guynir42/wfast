@@ -1982,12 +1982,16 @@ classdef Acquisition < file.AstroData
             
             if isempty(obj.num_phot_cutouts) || any(isinf(obj.num_phot_cutouts)) || any(isnan(obj.num_phot_cutouts))
                 C = obj.cutouts_proc; 
+                P = obj.positions;
             elseif ischar(obj.num_phot_cutouts) && util.text.cs(obj.num_phot_cutouts, 'all')
                 C = obj.cutouts_proc;
+                P = obj.positions;
             elseif isnumeric(obj.num_phot_cutouts) && obj.num_phot_cutouts<=size(obj.cutouts_proc,4)
                 C = obj.cutouts_proc(:,:,:,1:obj.num_phot_cutouts); % in this case we only take some of the stars into the photometry/lightcurves pipeline
+                P = obj.positions(1:obj.num_phot_cutouts,:); 
             else
                 C = obj.cutouts_proc;
+                P = obj.positions;
             end
             
             if obj.use_simple_photometry
@@ -1996,7 +2000,7 @@ classdef Acquisition < file.AstroData
                 
             else % use extensive photometry method
             
-                obj.phot.input('images', C, 'timestamps', obj.timestamps, 'positions', obj.positions); % add variance input? 
+                obj.phot.input('images', C, 'timestamps', obj.timestamps, 'positions', P); % add variance input? 
                 if ~isempty(obj.phot.gui) && obj.phot.gui.check, obj.phot.gui.update; end
 
                 obj.fluxes = obj.phot.fluxes;

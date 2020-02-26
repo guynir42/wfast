@@ -426,7 +426,7 @@ classdef Deflator < file.AstroData
             obj.timer.Name = 'auto-deflate-timer';
             obj.timer.BusyMode = 'queue';
             
-            t = datetime(util.sys.date_dir);
+            t = datetime(util.sys.date_dir('now'));
             
             t = t + days(1); % deflate on the next morning!
             

@@ -94,6 +94,8 @@ function [flux_cal, flux_smoothed] = self_calibrate(flux, varargin)
         f = f./f_average_norm;
         fs = fs./f_average_norm; 
 
+    else
+        fs = f;
     end
     
     if input.use_poly
