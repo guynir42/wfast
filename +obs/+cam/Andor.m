@@ -106,7 +106,7 @@ classdef Andor < file.AstroData
     
     properties % objects
         
-        pars@head.Parameters; % parameters used in the observations
+        head@head.Header; % parameters used in the observations
         
         buffers@file.BufferWheel;
         
@@ -257,7 +257,7 @@ classdef Andor < file.AstroData
                 
                 try 
                     
-                    obj.pars = head.Parameters;
+                    obj.head = head.Header;
 
                     obj.setupBuffers;
                     
@@ -355,7 +355,7 @@ classdef Andor < file.AstroData
         
         function setupBuffers(obj) % creat a buffer wheel and give it the camera's mex_flag
             
-            obj.buffers = file.BufferWheel(5, obj.pars);
+            obj.buffers = file.BufferWheel(5, obj.head);
             obj.buffers.camera_mex_flag = obj.mex_flag;
 
         end
@@ -628,12 +628,12 @@ classdef Andor < file.AstroData
     
     methods % setters
         
-        function set.pars(obj, val) % make sure <pars> is given to <buffers> as well.
+        function set.head(obj, val) % make sure <pars> is given to <buffers> as well.
            
-            obj.pars = val;
+            obj.head = val;
             
             if ~isempty(obj.buffers)
-                obj.buffers.pars = val;
+                obj.buffers.head = val;
             end
         
         end
@@ -887,7 +887,7 @@ classdef Andor < file.AstroData
                 end
 
                 obj.check_inputs; % check the hardware/input configuration is compatible
-                obj.update_pars; % update the Parameter object
+                obj.update_header; % update the Header object
                 obj.update_buffers; % upodate the Buffer object
 
                 obj.num_restarts = 0; % how many times did the camera have to be restarted (synchronous mode only!)
@@ -1053,8 +1053,8 @@ classdef Andor < file.AstroData
             if ~isempty(obj.buffers.t_start)
                 
                 time = util.text.str2time(obj.buffers.t_start);
-                dt = seconds(time - obj.pars.ephem.time); % how much time passed since last update
-                obj.pars.ephem.time = time; % update the "pars" object with current start time
+                dt = seconds(time - obj.head.ephem.time); % how much time passed since last update
+                obj.head.ephem.time = time; % update the "head" object with current start time
                 
                 obj.runtime_buffer.input([size(obj.images,3), dt]); % how many images, how much time passed (total)
                 
@@ -1197,36 +1197,36 @@ classdef Andor < file.AstroData
             
         end
         
-        function update_pars(obj) % make sure "pars" object is updated with hardware values
+        function update_header(obj) % make sure "pars" object is updated with hardware values
             
-%             obj.pars.datapath = obj.buffers.base_dir;
+%             obj.head.datapath = obj.buffers.base_dir;
             
-            obj.pars.expT = obj.getExpTimeHW;
-            obj.pars.frame_rate = obj.getFrameRateHW;
+            obj.head.expT = obj.getExpTimeHW;
+            obj.head.frame_rate = obj.getFrameRateHW;
             
             if ~isempty(obj.focuser)
-                obj.pars.FOCUS_POS = obj.focuser.pos;
+                obj.head.FOCUS_POS = obj.focuser.pos;
             end
             
 %             roi = obj.getROI_HW;
-%             obj.pars.AOI_top = roi(1);
-%             obj.pars.AOI_left = roi(2);
-%             obj.pars.AOI_height = roi(3);
-%             obj.pars.AOI_width = roi(4);
+%             obj.head.AOI_top = roi(1);
+%             obj.head.AOI_left = roi(2);
+%             obj.head.AOI_height = roi(3);
+%             obj.head.AOI_width = roi(4);
             
-            obj.pars.ROI = obj.getROI_HW;
+            obj.head.ROI = obj.getROI_HW;
 
-            obj.pars.im_size = [obj.pars.ROI(3) obj.pars.ROI(4)];
+            obj.head.im_size = [obj.head.ROI(3) obj.head.ROI(4)];
             
-            obj.pars.batch_size = obj.batch_size;
-            obj.pars.gain = obj.getGain;
-            obj.pars.instrument = obj.getCameraNameHW;
+            obj.head.batch_size = obj.batch_size;
+            obj.head.gain = obj.getGain;
+            obj.head.instrument = obj.getCameraNameHW;
             
-            obj.pars.update; % get the current time etc
+            obj.head.update; % get the current time etc
             
-            obj.pars.type = obj.mode;
-            obj.pars.is_dark = util.text.cs(obj.mode, 'dark');
-            obj.pars.is_flat = util.text.cs(obj.mode, 'flat');
+            obj.head.type = obj.mode;
+            obj.head.is_dark = util.text.cs(obj.mode, 'dark');
+            obj.head.is_flat = util.text.cs(obj.mode, 'flat');
             
         end
         

@@ -9,7 +9,7 @@ classdef CameraControl < file.AstroData
     
     properties % objects and useful resources
         
-        pars@head.Parameters; % parameters used in the observations
+        head@head.Header; % parameters used in the observations
         cam; % this can be either a ZylaControl, a DhyanaControl or a SimCamera object
         buffers@file.BufferWheel;
         buf_live@file.BufferWheel;
@@ -136,7 +136,7 @@ classdef CameraControl < file.AstroData
             
             try % setup parameters
                
-                obj.pars = head.Parameters;
+                obj.head = head.Header;
                 
             catch ME
                 rethrow(ME);
@@ -194,9 +194,9 @@ classdef CameraControl < file.AstroData
                 
         function setupBuffers(obj)
 
-            obj.buffers = file.BufferWheel(5, obj.pars);
+            obj.buffers = file.BufferWheel(5, obj.head);
             obj.buffers.camera_mex_flag = obj.mex_flag;
-            obj.buf_live = file.BufferWheel(2, obj.pars);
+            obj.buf_live = file.BufferWheel(2, obj.head);
             obj.buf_live.camera_mex_flag = obj.mex_flag;
             
         end
@@ -274,7 +274,7 @@ classdef CameraControl < file.AstroData
         
         function clearStars(obj)
            
-            obj.pars.clearStars;
+            obj.head.clearStars;
             
         end
         
@@ -362,16 +362,16 @@ classdef CameraControl < file.AstroData
             
         end
         
-        function set.pars(obj, val)
+        function set.head(obj, val)
            
-            obj.pars = val;
+            obj.head = val;
             
             if ~isempty(obj.buffers)
-                obj.buffers.pars = val;
+                obj.buffers.head = val;
             end
             
             if ~isempty(obj.buf_live)
-                obj.buf_live.pars = val;
+                obj.buf_live.head = val;
             end
             
         end
@@ -381,7 +381,7 @@ classdef CameraControl < file.AstroData
             obj.expT = val;
             
             if obj.setExpTimeHW(val) % if you succeed in setting this parameter, update the "pars" object
-                obj.pars.expT = val;
+                obj.head.expT = val;
             end
             
         end
@@ -390,8 +390,8 @@ classdef CameraControl < file.AstroData
             
             obj.frame_rate = val;
             
-            if obj.setFrameRateHW(val) % if you succeed in setting this parameter, update the "pars" object
-                obj.pars.frame_rate = val;
+            if obj.setFrameRateHW(val) % if you succeed in setting this parameter, update the "head" object
+                obj.head.frame_rate = val;
             end
             
         end
@@ -401,7 +401,7 @@ classdef CameraControl < file.AstroData
             obj.height = val;
             
             if obj.setHeightHW(val) % if you succeed in setting this parameter, update the "pars" object
-                obj.pars.AOI_height = val;
+                obj.head.AOI_height = val;
             end
             
         end
@@ -410,8 +410,8 @@ classdef CameraControl < file.AstroData
             
             obj.width = val;
             
-            if obj.setWidthHW(val) % if you succeed in setting this parameter, update the "pars" object
-                obj.pars.AOI_width = val;
+            if obj.setWidthHW(val) % if you succeed in setting this parameter, update the "head" object
+                obj.head.AOI_width = val;
             end
             
         end
@@ -420,8 +420,8 @@ classdef CameraControl < file.AstroData
             
             obj.top = val;
             
-            if obj.setTopHW(val) % if you succeed in setting this parameter, update the "pars" object
-                obj.pars.AOI_top = val;
+            if obj.setTopHW(val) % if you succeed in setting this parameter, update the "head" object
+                obj.head.AOI_top = val;
             end
             
         end
@@ -430,28 +430,28 @@ classdef CameraControl < file.AstroData
             
             obj.left = val;
             
-            if obj.setLeftHW(val) % if you succeed in setting this parameter, update the "pars" object
-                obj.pars.AOI_left = val;
+            if obj.setLeftHW(val) % if you succeed in setting this parameter, update the "head" object
+                obj.head.AOI_left = val;
             end
             
         end
         
         function setCoordinates(obj, RA, DE)
            
-            obj.pars.RA = RA;
-            obj.pars.DE = DE;
+            obj.head.RA = RA;
+            obj.head.DE = DE;
             
         end
         
         function setTargetName(obj, name)
             
-            obj.pars.target_name = name;
+            obj.head.target_name = name;
             
         end
         
         function addStar(obj,varargin)
            
-            obj.pars.addStar(varargin{:});
+            obj.head.addStar(varargin{:});
             
         end
         
@@ -1180,7 +1180,7 @@ classdef CameraControl < file.AstroData
             obj.setTopHW(input.top);
             obj.setLeftHW(input.left);
             
-            obj.update_pars(input);
+            obj.update_header(input);
             
             if cs(obj.mode, 'stars')
                 if obj.checkIsZoomed
@@ -1193,50 +1193,50 @@ classdef CameraControl < file.AstroData
             elseif cs(obj.mode, 'dark')
                 obj.buffers.product_type = 'dark';
                 obj.cam.product_type = 'dark';
-                obj.pars.type = 'dark';
-                obj.pars.is_dark = 1;
+                obj.head.type = 'dark';
+                obj.head.is_dark = 1;
             elseif cs(obj.mode, 'flat')
                 obj.buffers.product_type = 'flat';
                 obj.cam.product_type = 'flat';
-                obj.pars.type = 'flat';
-                obj.pars.is_flat = 1;
+                obj.head.type = 'flat';
+                obj.head.is_flat = 1;
             else
                 error('Unknown camera mode: %s. Use stars, dark or flat...', obj.mode);
             end
             
             if cs(obj.cam_name, 'sim camera')
                 obj.buffers.product_type = [obj.buffers.product_type 'Sim'];
-                obj.pars.is_sim = 1;
+                obj.head.is_sim = 1;
             end
             
         end
         
-        function update_pars(obj, input) % verify HW settings are updated in parameter object
+        function update_header(obj, input) % verify HW settings are updated in header object
             
             import util.text.cs;
             
-            obj.pars.datapath = obj.buffers.base_dir;
+            obj.head.datapath = obj.buffers.base_dir;
             
-            obj.pars.expT = obj.getExpTimeHW;
-            obj.pars.frame_rate = obj.getFrameRateHW;
+            obj.head.expT = obj.getExpTimeHW;
+            obj.head.frame_rate = obj.getFrameRateHW;
             
-            obj.pars.focus = obj.focuser.pos;
+            obj.head.focus = obj.focuser.pos;
             
-            obj.pars.AOI_height = obj.getHeightHW;
-            obj.pars.AOI_top = obj.getTopHW;
-            obj.pars.AOI_width = obj.getWidthHW;
-            obj.pars.AOI_left = obj.getLeftHW;
+            obj.head.AOI_height = obj.getHeightHW;
+            obj.head.AOI_top = obj.getTopHW;
+            obj.head.AOI_width = obj.getWidthHW;
+            obj.head.AOI_left = obj.getLeftHW;
             
-            obj.pars.batch_size = input.batch_size;
-            obj.pars.gain = obj.cam.gain;
-            obj.pars.instrument = obj.cam.name;
+            obj.head.batch_size = input.batch_size;
+            obj.head.gain = obj.cam.gain;
+            obj.head.instrument = obj.cam.name;
             
-            obj.pars.update;
+            obj.head.update;
             
-            obj.pars.type = 'science';
-            obj.pars.is_dark = cs(obj.mode, 'dark');
-            obj.pars.is_flat = cs(obj.mode, 'flat');
-            obj.pars.is_sim = isa(obj.cam, 'obs.cam.SimCamera');
+            obj.head.type = 'science';
+            obj.head.is_dark = cs(obj.mode, 'dark');
+            obj.head.is_flat = cs(obj.mode, 'flat');
+            obj.head.is_sim = isa(obj.cam, 'obs.cam.SimCamera');
             
         end
         
@@ -1441,10 +1441,10 @@ classdef CameraControl < file.AstroData
 %             [MX,MN,SD,CM,CS,FR] = obj.getStats;
 %             obj.mean_frame_rate = FR.*size(I,3);
             
-            obj.pars.ephem.time = util.text.str2time(buf.t_start);
+            obj.head.ephem.time = util.text.str2time(buf.t_start);
             obj.end_times(obj.batch_counter) = toc(obj.start_time);
             obj.mean_frame_rate = obj.getMeanFrameRate;
-            obj.pars.frame_rate_measured = obj.getMeanFrameRate;
+            obj.head.frame_rate_measured = obj.getMeanFrameRate;
             obj.num_frames_in_last_batch = size(I,3);
             
             % check for clipping 

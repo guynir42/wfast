@@ -62,7 +62,7 @@ public:
 	~SaveDataHDF5();
 	virtual void writeData();
 	virtual void writeMatrix(MyFilePointer &file, MyMatrix matrix);
-	virtual void writePars();
+	virtual void writeHeader();
 	virtual void writeAttribute(MyAttribute att, hid_t group_or_dataset_id);
 
 

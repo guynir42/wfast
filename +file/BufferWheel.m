@@ -1,5 +1,5 @@
 classdef BufferWheel < file.AstroData
-% Usage: obj = BufferWheel(num_buffers=5, pars=[])
+% Usage: obj = BufferWheel(num_buffers=5, header=[])
 % Holds several (e.g., 5) Buffer structs and rotates them as they get filled
 % and emptied to file. 
 %
@@ -23,7 +23,7 @@ classdef BufferWheel < file.AstroData
 %
 % OBJECTS:
 %   -buf: vector of Buffer structs. 
-%   -pars: link back to parent object.
+%   -header: link back to parent object.
 %   -gui: Optional GUI object.
 %   -this_buf, next_buf, prev_buf: getters from "buf", based on index.
 %    (NOTE: these shortcuts can ONLY be used for READING data from buffers). 
@@ -33,12 +33,12 @@ classdef BufferWheel < file.AstroData
 %    fluxes? dark/flat? etc.). Will print this in the filename. 
 %   -base_dir: set to [] to use getenv('DATA_TEMP') or getenv('DATA') 
 %   -date_dir: set to [] to use this night's date dir. 
-%   -target_dir: set to [] to use "pars.target_name" as target_dir. 
+%   -target_dir: set to [] to use "head.target_name" as target_dir. 
 %     *** "full_path" is: base_dir/date_dir/target_dir. ***
 %   -dir_extension: overrides the automatic extension to the dir name. 
 %   -use_dir_type: automatically adds "product_type" to the dir name. 
 %   -use_overwrite: silently delete existing files (default is true).
-%   -use_write_pars: try to save the "pars" object into file.
+%   -use_write_header: try to save the "head" object into file.
 %   -use_deflate: if non-zero, use deflation (can be anything from 1 to 10)
 %   -use_async: write in separate thread (mex only!). 
 %   -use_mex: use the mex function to write to file (HDF5 only, for now). 
@@ -80,7 +80,7 @@ classdef BufferWheel < file.AstroData
 
     properties % objects
         
-        pars@head.Parameters; % link back to owner object's pars
+        head@head.Header; % link back to owner object's header
         buf@struct; % struct array with the actual data saved in each element's fields
         
     end
@@ -96,7 +96,7 @@ classdef BufferWheel < file.AstroData
         % write parameters
         use_save_raw_images = 1; % if set to 0, will not save to disk the full frame raw images! 
         use_overwrite = 1; % delete existing files (this should not happen in normal operations because of unique filenames) 
-        use_write_pars = 1; % write pars object to each file
+        use_write_header = 1; % write header object to each file
         use_deflate = 0; % also can specify how much deflation you want, between 1 to 10 (more than 1 is usually slow and doesn't change much)
         use_async = 1; % write files in a different thread (mex only)
         use_mex = 1; % use mex interface to write files (use 0 as backup if mex fails or if you want other file types)
@@ -137,7 +137,7 @@ classdef BufferWheel < file.AstroData
     properties(Hidden=true)
         
         index_rec_vec = [0 0]; % do not change this vector (interacts under the hood with camera mex file)
-        pars_struct_cell = {}; % transform the "pars" object into a cell of structs before saving it. 
+        head_struct_cell = {}; % transform the "head" object into a cell of structs before saving it. 
         
         % naming convention override (user can override any of these)
         base_dir_override; 
@@ -157,7 +157,7 @@ classdef BufferWheel < file.AstroData
         default_camera = 'Zyla';
         
         default_use_overwrite;
-        default_use_write_pars;
+        default_use_write_header;
         default_use_deflate;
         default_use_async;
         default_use_mex;
@@ -178,32 +178,32 @@ classdef BufferWheel < file.AstroData
     
     methods % constructor
         
-        function obj = BufferWheel(num_buffers, pars)
+        function obj = BufferWheel(num_buffers, header)
         % Constructor for BufferWheel. Default number of buffers is 5. 
-        % Second argument links the Parameters object with owner. Default
-        % is to create a new pars object. 
+        % Second argument links the Header object with owner. Default
+        % is to create a new header object. 
         
             if nargin<1 || isempty(num_buffers)
                 num_buffers = 5;
             end
             
-            if nargin<2 || isempty(pars) || ~isa(pars, 'head.Parameters')
-                pars = head.Parameters.empty;
+            if nargin<2 || isempty(header) || ~isa(header, 'head.Header')
+                header = head.Header.empty;
             end
             
             if obj.debug_bit
                 fprintf('BufferWheel constructor v%4.2f with %d buffers. ', obj.version, num_buffers);
-                if isempty(pars) 
-                    fprintf('Creating new pars object\n');
+                if isempty(header) 
+                    fprintf('Creating new header object\n');
                 else
-                    fprintf('Using input pars.\n');
+                    fprintf('Using input header.\n');
                 end
             end
             
-            if isempty(pars)
-                obj.pars = head.Parameters;
+            if isempty(header)
+                obj.head = head.Header;
             else
-                obj.pars = pars; % link to pars handle as given
+                obj.head = header; % link to header handle as given
             end
             
             for ii = 1:num_buffers
@@ -246,7 +246,7 @@ classdef BufferWheel < file.AstroData
         
             obj.unlockMexFlag;
             
-            obj.pars_struct_cell = {};
+            obj.head_struct_cell = {};
             
         end
                 
@@ -466,19 +466,19 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function val = get.target_dir(obj) % check for override. Default: get subfolder name from pars object (uses <target_name> or "dark" or "flat")
+        function val = get.target_dir(obj) % check for override. Default: get subfolder name from header object (uses <target_name> or "dark" or "flat")
             
             import util.text.cs;
             
             if ~isempty(obj.target_dir_override)
                 val = obj.target_dir_override;                
-            elseif ~isempty(obj.pars)
-                if cs(obj.pars.type, 'dark')
+            elseif ~isempty(obj.head)
+                if cs(obj.head.type, 'dark')
                     val = obj.dark_dir_name;
-                elseif cs(obj.pars.type, 'flat')
+                elseif cs(obj.head.type, 'flat')
                     val = obj.flat_dir_name;
                 else
-                    val = obj.pars.target_name;
+                    val = obj.head.target_name;
                 end
             else
                 val = 'run1';
@@ -542,9 +542,9 @@ classdef BufferWheel < file.AstroData
             
             time_str = datestr(date, 'yyyymmdd-HHMMSS-FFF'); % convert using matlab's own datetime functions 
             
-            if ~isempty(obj.pars)
-                project = obj.pars.project;
-                camera = obj.pars.cam_name;
+            if ~isempty(obj.head)
+                project = obj.head.project;
+                camera = obj.head.cam_name;
             else
                 project = obj.default_project;
                 camera = obj.default_camera;
@@ -553,8 +553,8 @@ classdef BufferWheel < file.AstroData
             field_id = 0; % default field is zero, which means observing on non-defined field
             
             filter_name = 'unknown';
-            if ~isempty(obj.pars) && ~isempty(obj.pars.filter)
-                filter_name = obj.pars.filter;
+            if ~isempty(obj.head) && ~isempty(obj.head.filter)
+                filter_name = obj.head.filter;
             end
             
             if cs(obj.file_type, 'hdf5', 'h5')
@@ -754,7 +754,7 @@ classdef BufferWheel < file.AstroData
             end
             
             if nargin<3 || isempty(timeout)
-                timeout = max([10, obj.pars.expT.*5*size(buf.images,3)]); % seconds
+                timeout = max([10, obj.head.expT.*5*size(buf.images,3)]); % seconds
             end
             
             if ~isempty(obj.camera_mex_flag) && obj.camera_mex_flag(1)==0
@@ -964,9 +964,9 @@ classdef BufferWheel < file.AstroData
             
             obj.vec2times(buf); % transform camera output posix time vectors into formatted time strings for saving
             
-            if ~isempty(obj.pars) % update the pars object when batch started/ended
-                obj.pars.t_start = buf.t_start;
-                obj.pars.t_end = buf.t_end;
+            if ~isempty(obj.head) % update the header object when batch started/ended
+                obj.head.t_start = buf.t_start;
+                obj.head.t_end = buf.t_end;
             end
             
             obj.buf(buf.buf_number).latest_filename = this_filename; % keep track of the latest filename writen to disk
@@ -977,25 +977,25 @@ classdef BufferWheel < file.AstroData
             
             if obj.use_mex
                 
-                if obj.use_write_pars && ~isempty(obj.pars) % need to replace this with util.oop.save to structure and then get mexWrite to 
-                    obj.pars_struct_cell = util.oop.save(obj.pars, 'w', 'name', 'pars', 'dependent', 1, 'hidden', 1, 'format', 'struct');
+                if obj.use_write_header && ~isempty(obj.head) % need to replace this with util.oop.save to structure and then get mexWrite to 
+                    obj.head_struct_cell = util.oop.save(obj.head, 'w', 'name', 'header', 'dependent', 1, 'hidden', 1, 'format', 'struct');
                 else
-                    obj.pars_struct_cell = {};
+                    obj.head_struct_cell = {};
                 end
                 
 %                 file.mex.write(this_filename, buf.mex_flag_write, 'images', buf.images, ...
 %                     'cutouts', buf.cutouts,  'positions', buf.positions,...
 %                     'stack', buf.stack, 'num_sum', buf.num_sum,...
 %                     'timestamps', buf.timestamps, 't_end_stamp', buf.t_end_stamp, 't_end', buf.t_end, 't_start', buf.t_start,...
-%                     'psfs', buf.psfs, 'sampling_psf', buf.sampling_psf, 'fluxes', buf.fluxes, 'parameters', obj.pars_struct_cell,...
+%                     'psfs', buf.psfs, 'sampling_psf', buf.sampling_psf, 'fluxes', buf.fluxes, 'header', obj.head_struct_cell,...
 %                     'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit);
                 
                 % right now mex write is only for HDF5 files    
                 if obj.use_save_raw_images
-                    file.mex.write(this_filename, buf.mex_flag_write, buf, 'parameters', obj.pars_struct_cell,...
+                    file.mex.write(this_filename, buf.mex_flag_write, buf, 'header', obj.head_struct_cell,...
                     'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit);
                 else
-                    file.mex.write(this_filename, buf.mex_flag_write, buf, 'parameters', obj.pars_struct_cell,...
+                    file.mex.write(this_filename, buf.mex_flag_write, buf, 'header', obj.head_struct_cell,...
                     'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit,...
                     'images', []); % last line overwrites the "images" in the buf and sets it to empty... 
                 end
@@ -1154,8 +1154,8 @@ classdef BufferWheel < file.AstroData
                 h5write(filename, '/fluxes', obj.fluxes);
             end
                         
-            if obj.use_write_pars && ~isempty(obj.pars)
-                util.oop.save(obj.pars, filename, 'name', 'pars', 'append', 1);
+            if obj.use_write_header && ~isempty(obj.head)
+                util.oop.save(obj.head, filename, 'name', 'head', 'append', 1);
             end
             
         end
@@ -1238,8 +1238,8 @@ classdef BufferWheel < file.AstroData
 
             end
 
-            if obj.use_write_pars && ~isempty(obj.pars)
-                obj.pars.writeFitsHeader(file_ptr);
+            if obj.use_write_header && ~isempty(obj.head)
+                obj.head.writeFitsHeader(file_ptr);
             end
 
         end
@@ -1274,7 +1274,7 @@ classdef BufferWheel < file.AstroData
       
     methods (Static=true) % static save (old, non-mex methods) to be depricated!!!
         
-        function ok = saveHDF5Static(filename, deflate, chunk, images, positions, timestamps, t_end_stamp, t_end, t_start, psfs, psf_sampling, fluxes, pars, use_write_pars, debug_bit)
+        function ok = saveHDF5Static(filename, deflate, chunk, images, positions, timestamps, t_end_stamp, t_end, t_start, psfs, psf_sampling, fluxes, header, use_write_header, debug_bit)
             
             ok = 0;
             
@@ -1293,8 +1293,8 @@ classdef BufferWheel < file.AstroData
             if nargin<10, psfs = []; end
             if nargin<11, psf_sampling = []; end
             if nargin<12, fluxes = []; end
-            if nargin<13, pars = []; end
-            if nargin<14 || isempty(use_write_pars), use_write_pars = 0; end            
+            if nargin<13, header = []; end
+            if nargin<14 || isempty(use_write_header), use_write_header = 0; end            
             if nargin<15 || isempty(debug_bit), debug_bit = 0; end
             
             chunk = [chunk chunk 1 1];
@@ -1371,15 +1371,15 @@ classdef BufferWheel < file.AstroData
                 h5write(filename, '/fluxes', fluxes);
             end
                         
-            if use_write_pars && ~isempty(pars)
-                util.oop.save(pars, filename, 'append', 1);
+            if use_write_header && ~isempty(header)
+                util.oop.save(header, filename, 'append', 1);
             end
                         
             ok = 1;
             
         end
         
-        function ok = saveFitsStatic(filename, deflate, chunk, images, positions, timestamps, t_end_stamp, t_end, t_start, psfs, psf_sampling, fluxes, pars, use_write_pars, debug_bit)
+        function ok = saveFitsStatic(filename, deflate, chunk, images, positions, timestamps, t_end_stamp, t_end, t_start, psfs, psf_sampling, fluxes, header, use_write_header, debug_bit)
                             
             if nargin<1
                 error(['cannot run saveFitsStatic without a filename!']);    
@@ -1396,8 +1396,8 @@ classdef BufferWheel < file.AstroData
             if nargin<10, psfs = []; end
             if nargin<11, psf_sampling = []; end
             if nargin<12, fluxes = []; end
-            if nargin<13, pars = []; end
-            if nargin<14, use_write_pars = 0; end            
+            if nargin<13, header = []; end
+            if nargin<14, use_write_header = 0; end            
             if nargin<15 || isempty(debug_bit), debug_bit = 0; end        
             
             if isempty(images), return; end
@@ -1481,8 +1481,8 @@ classdef BufferWheel < file.AstroData
                     
                 end
 
-                if use_write_pars && ~isempty(pars)
-                    pars.writeFitsHeader(file_ptr);
+                if use_write_header && ~isempty(header)
+                    header.writeFitsHeader(file_ptr);
                 end
 
                 if ~isempty(backup_filename)
@@ -1506,7 +1506,7 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function ok = saveMatFileStatic(filename, images, positions, timestamps, t_end_stamp, t_end, t_start, psfs, psf_sampling, fluxes, pars, use_save_pars, debug_bit)
+        function ok = saveMatFileStatic(filename, images, positions, timestamps, t_end_stamp, t_end, t_start, psfs, psf_sampling, fluxes, header, use_save_header, debug_bit)
             
             ok = 0;
             
@@ -1519,14 +1519,14 @@ classdef BufferWheel < file.AstroData
             if nargin<8, psfs = []; end
             if nargin<9, psf_sampling = []; end
             if nargin<10, fluxes = []; end
-            if nargin<11, pars = []; end
-            if nargin<12, use_save_pars = ''; end
+            if nargin<11, header = []; end
+            if nargin<12, use_save_header = ''; end
             if nargin<13 || isempty(debuf_bit), debug_bit = 0; end
             
             name = util.text.extension(filename, '.mat');
             
-            if use_save_pars
-                save(name, 'images', 'positions', 'timestamps', 'psfs', 'psf_sampling', 'fluxes', 'pars');
+            if use_save_header
+                save(name, 'images', 'positions', 'timestamps', 'psfs', 'psf_sampling', 'fluxes', 'header');
             else
                 save(name, 'images', 'positions', 'timestamps', 'psfs', 'psf_sampling', 'fluxes');
             end

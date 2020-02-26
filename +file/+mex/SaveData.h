@@ -29,11 +29,11 @@ class SaveData {
 	
 	virtual void write();
 	virtual void writeData()=0;
-	virtual void writePars()=0;
+	virtual void writeHeader()=0;
     	
 	void parseVararginPairs(int N, const mxArray *vars[]); // get data, metadata and switches from the keyword-value pairs
 	void readStruct(const mxArray *buf); // parse the metadata add-on varaibles kept inside the BufferWheel
-	void readParsCellArray(const mxArray *cell); // parse the output of util.oop.save when generating cell of address-struct pairs	
+	void readHeaderCellArray(const mxArray *cell); // parse the output of util.oop.save when generating cell of address-struct pairs	
 	void dataChecks();
 	void setFilename(const char *name);
 	static void print_help();
@@ -68,6 +68,7 @@ class SaveData {
 	static bool cs(const char *keyword, const char *compare_str, int num_letters=3);
 	static bool cs(const char *keyword, const char *str1, const char *str2, int num_letters=3);
 	static bool cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters=3);
+	static bool cs(const char *keyword, const char *str1, const char *str2, const char *str3, const char *str4, int num_letters=3);
 	
 };
 

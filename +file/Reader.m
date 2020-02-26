@@ -75,7 +75,7 @@ classdef Reader < file.AstroData
     
     properties % object
         
-        pars@head.Parameters;
+        head@head.Header;
         dir@util.sys.WorkingDirectory;
         
     end
@@ -289,7 +289,7 @@ classdef Reader < file.AstroData
             obj.attribute_names.obj_idx = {'obj_idx', 'object_idx', 'obj_index', 'object_index'}; 
             obj.dataset_names.fluxes = {'fluxes', 'lightcurves'};
             
-            obj.dataset_names.pars = {'pars'};
+            obj.dataset_names.header = {'header', 'head', 'pars'};
             
         end
         
@@ -326,7 +326,7 @@ classdef Reader < file.AstroData
             obj.brake_bit = 1; % when set to 1 the reader stops the run at the end of the batch...
             
 %             obj.dir = util.sys.WorkingDirectory;
-            obj.pars = head.Parameters;
+            obj.head = head.Parameters;
             
             obj.setupDataNames
             
@@ -726,7 +726,7 @@ classdef Reader < file.AstroData
             
             [~,~,ext] = fileparts(obj.this_filename);
             
-            loaded_pars = head.Parameters.empty;
+            loaded_header = head.Header.empty;
             
             if cs(ext, '.h5', '.h5z', '.hdf5')
                 
@@ -923,13 +923,13 @@ classdef Reader < file.AstroData
                         
                         obj.fluxes = cat(1, obj.fluxes, loaded_fluxes); % append to the existing images
                         
-                    elseif any(strcmp(data_name, obj.dataset_names.pars)) 
-                        obj.loadParsHDF5(filename, loaded_pars, data_name, att_names);
+                    elseif any(strcmp(data_name, obj.dataset_names.header)) 
+                        obj.loadHeaderHDF5(filename, loaded_header, data_name, att_names);
                     end
                     
                 end % scan all datasets
                 
-                for ii = 1:length(obj.info.Groups) % go over all groups in file, looking for a "pars" object
+                for ii = 1:length(obj.info.Groups) % go over all groups in file, looking for a "header" object
                     
                     group_name = obj.info.Groups(ii).Name; % the specific field we are now reading
                     
@@ -939,8 +939,8 @@ classdef Reader < file.AstroData
                         att_names = {obj.info.Groups(ii).Attributes.Name};
                     end
                     
-                    if any(strcmp(group_name, strcat('/', obj.dataset_names.pars)))
-                        obj.loadParsHDF5(filename, loaded_pars, group_name, att_names);
+                    if any(strcmp(group_name, strcat('/', obj.dataset_names.header)))
+                        obj.loadParsHDF5(filename, loaded_header, group_name, att_names);
                     end
                     
                 end
@@ -962,14 +962,19 @@ classdef Reader < file.AstroData
             end
         end
         
-        function readPars(obj)
+        function readHeader(obj)
             
-            loaded_pars = util.oop.load(obj.filenames{1}, 'location', '/pars', 'class', class(obj.pars));
-            util.oop.copy_props(obj.pars, loaded_pars);  % make a shallow copy (sub-objects are referenced, then loaded_pars is destroyed)
+            try 
+                loaded_header = util.oop.load(obj.filenames{1}, 'location', '/header', 'class', class(obj.head));
+            catch 
+                loaded_header = util.oop.load(obj.filenames{1}, 'location', '/pars', 'class', class(obj.head));
+            end
+            
+            util.oop.copy_props(obj.head, loaded_header);  % make a shallow copy (sub-objects are referenced, then loaded_header is destroyed)
             
         end
         
-        function loadParsHDF5(obj, filename, loaded_pars, data_name, att_names)
+        function loadHeaderHDF5(obj, filename, loaded_header, data_name, att_names)
             
             import util.text.cs;
             import util.text.sa;
@@ -977,18 +982,18 @@ classdef Reader < file.AstroData
             location = sa('/', data_name);
             
             try
-                loaded_pars = util.oop.load(filename, 'location', location, 'class', class(obj.pars));
+                loaded_header = util.oop.load(filename, 'location', location, 'class', class(obj.head));
 
-                loaded_pars.ephem.time = util.text.str2time(loaded_pars.STARTTIME); % fix the bug in read/write of datetime objects we used to have (only rely on times stored as strings)
-                loaded_pars.ephem.updateSecondaryCoords;
+                loaded_header.ephem.time = util.text.str2time(loaded_header.STARTTIME); % fix the bug in read/write of datetime objects we used to have (only rely on times stored as strings)
+                loaded_header.ephem.updateSecondaryCoords;
             catch ME
                 % if we can't read this it is OK, there is still the README file. Can't give warnings on every file now...
                 disp('Could not read parameter object...');
                 warning(getReport(ME));
             end
             
-            if ~isempty(loaded_pars)
-                util.oop.copy_props(obj.pars, loaded_pars); % make a shallow copy (sub-objects are referenced, then loaded_pars is destroyed)
+            if ~isempty(loaded_header)
+                util.oop.copy_props(obj.head, loaded_header); % make a shallow copy (sub-objects are referenced, then loaded_header is destroyed)
                 
                 % additional loading of attributes (mostly Dependent) for backward compatibility with older files.
                 props = {'RA_DEG', 'DEC_DEG'};
@@ -997,9 +1002,9 @@ classdef Reader < file.AstroData
                     for jj = 1:length(props)                        
                         if cs(att_names{ii}, props{jj})
                             try 
-                                loaded_pars.(props{jj}) = h5readatt(filename, location, att_names{ii});
-                                if iscell(loaded_pars.(props{jj}))
-                                    loaded_pars.(props{jj}) = loaded_pars.(props{jj}){1};
+                                loaded_header.(props{jj}) = h5readatt(filename, location, att_names{ii});
+                                if iscell(loaded_header.(props{jj}))
+                                    loaded_header.(props{jj}) = loaded_header.(props{jj}){1};
                                 end
                             end
                         end
@@ -1008,8 +1013,8 @@ classdef Reader < file.AstroData
                 
             end
             
-            loaded_pars.ephem.time = util.text.str2time(loaded_pars.STARTTIME); % fix the bug in read/write of datetime objects we used to have (only rely on times stored as strings)
-            loaded_pars.ephem.updateSecondaryCoords;
+            loaded_header.ephem.time = util.text.str2time(loaded_header.STARTTIME); % fix the bug in read/write of datetime objects we used to have (only rely on times stored as strings)
+            loaded_header.ephem.updateSecondaryCoords;
             
         end
         
@@ -1067,7 +1072,7 @@ classdef Reader < file.AstroData
 %             obj.reset;
             obj.brake_bit = 0;
             
-            % read pars from text file? 
+            % read header from text file? 
             
         end
         
@@ -1140,19 +1145,19 @@ classdef Reader < file.AstroData
                 obj.batch;
                 
                 if ~isempty(input.RA)
-                    obj.pars.RA = input.RA;
+                    obj.head.RA = input.RA;
                 end
 
                 if ~isempty(input.DE)
-                    obj.pars.DE = input.DE;
+                    obj.head.DE = input.DE;
                 end
 
                 if ~isempty(input.name)
-                    obj.pars.target_name = input.name;
+                    obj.head.target_name = input.name;
                 end
                 
                 if ~isempty(input.filter)
-                    obj.pars.filter = input.filter;
+                    obj.head.filter = input.filter;
                 end
                 
                 [~, name, ~] = fileparts(obj.prev_filename);
@@ -1180,7 +1185,7 @@ classdef Reader < file.AstroData
                     
                     fitswrite(I, filename, 'WriteMode', 'overwrite', 'Compression', 'gzip');
                     
-                    obj.pars.writeFITS(filename, obj.timestamps(jj)-obj.timestamps(1));
+                    obj.head.writeFITS(filename, obj.timestamps(jj)-obj.timestamps(1));
                     
                     drawnow;
                     

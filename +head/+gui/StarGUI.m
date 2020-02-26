@@ -71,8 +71,8 @@ classdef StarGUI < handle
             
             obj.fig.reset;
             obj.fig.left = 6;
-            if ~isempty(obj.owner.pars.gui)
-                obj.fig.left = obj.owner.pars.gui.fig.left+obj.owner.pars.gui.fig.width;
+            if ~isempty(obj.owner.head.gui)
+                obj.fig.left = obj.owner.head.gui.fig.left+obj.owner.head.gui.fig.width;
             end
             obj.fig.bottom = 4;
             obj.fig.height = 16;
@@ -129,7 +129,7 @@ classdef StarGUI < handle
                 return;
             end
             
-            obj.input_number.String = [num2str(obj.owner.index) '/' num2str(length(obj.owner.pars.stars))];
+            obj.input_number.String = [num2str(obj.owner.index) '/' num2str(length(obj.owner.head.stars))];
             
             if isempty(obj.owner.primary_index)
                 obj.panel_input.button_coord.String = 'x,y:';
@@ -171,12 +171,12 @@ classdef StarGUI < handle
             num = obj.owner.index;
             
             if num==1
-                num = length(obj.owner.pars.stars);
+                num = length(obj.owner.head.stars);
             else
                 num = num - 1;
             end
             
-            obj.owner = obj.owner.pars.stars(num);
+            obj.owner = obj.owner.head.stars(num);
             
             obj.update;
             
@@ -186,13 +186,13 @@ classdef StarGUI < handle
             
             num = obj.owner.index;
             
-            if num==length(obj.owner.pars.stars)
+            if num==length(obj.owner.head.stars)
                 num = 1;
             else
                 num = num + 1;
             end
             
-            obj.owner = obj.owner.pars.stars(num);
+            obj.owner = obj.owner.head.stars(num);
             
             obj.update;
             
@@ -203,8 +203,8 @@ classdef StarGUI < handle
             values = util.text.extract_numbers(hndl.String);
             num = values{1};
             
-            if num>0 && num<=length(obj.owner.pars.stars)
-                obj.owner = obj.owner.pars.stars(num);
+            if num>0 && num<=length(obj.owner.head.stars)
+                obj.owner = obj.owner.head.stars(num);
             end
             
             obj.update;
@@ -245,7 +245,7 @@ classdef StarGUI < handle
            
             if obj.debug_bit, disp('callback: close'); end
             
-            obj.owner.pars.gui.update;
+            obj.owner.head.gui.update;
             
             delete(obj.fig.fig);
             

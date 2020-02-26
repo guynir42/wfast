@@ -32,7 +32,7 @@ void SaveDataHDF5::writeData(){ // write to file all the main data sets (images,
 	
 }
 
-void SaveDataHDF5::writePars(){ // write to file the head.Parameters object
+void SaveDataHDF5::writeHeader(){ // write to file the head.Header object
 	
 	for(int i=0;i<parameter_addresses_vector.size();i++){
 
@@ -41,6 +41,7 @@ void SaveDataHDF5::writePars(){ // write to file the head.Parameters object
 		for(int j=0;j<parameter_attributes_2D_vector[i].size();j++){
 			
 			writeAttribute(parameter_attributes_2D_vector[i][j], g.id);
+			
 		}
 		
 	}// for i

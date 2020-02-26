@@ -62,8 +62,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         sidereal_time_type = 'mean'; % can also choose "apparent"
         
-        latitude = 30.59678; % from my phone inside the dome (using whatsmylocation.net)
-        longitude = 34.76202; % from my phone inside the dome (using whatsmylocation.net)
+        % measured to an accuracy of about 10m with "GPS data" app on my LG G6 phone, with an open dome, at 2020 Feb 16
+        elevation = 876; % meters above sea level
+        latitude = 30.596806899999997; % degrees North
+        longitude = 34.762054900000003; % degrees East
+        
+%         latitude = 30.59678; % from my phone inside the dome (using whatsmylocation.net)
+%         longitude = 34.76202; % from my phone inside the dome (using whatsmylocation.net)
         
 %         latitude = 30.5968322; % from my phone (outside the dome)
 %         longitude = 34.7619663; % from my phone (outside the dome)

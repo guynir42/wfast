@@ -154,7 +154,7 @@ classdef CamGUI < handle
             obj.panel_objects = GraphicPanel(obj.owner, [0.8 0/15 0.2 5/15], 'objects');
             obj.panel_objects.addButton('button_camera', 'cam', 'push', 'Cam HW GUI');
             obj.panel_objects.addButton('button_buffers', 'buffers', 'push', 'Buffers');
-            obj.panel_objects.addButton('button_pars', 'pars', 'push', 'Parameters');
+            obj.panel_objects.addButton('button_header', 'head', 'push', 'Header');
             obj.panel_objects.number = 5;
             obj.panel_objects.make;
             

@@ -15,7 +15,7 @@ classdef Analysis < file.AstroData
     
     properties % objects
         
-        pars@head.Parameters;
+        head@head.Header;
         cat@head.Catalog;
         reader@file.Reader;
         cal@img.Calibration;
@@ -190,11 +190,11 @@ classdef Analysis < file.AstroData
                 obj.prog = util.sys.ProgressBar;
                 obj.audio = util.sys.AudioControl;
                 
-                obj.pars = head.Parameters; % this also gives "pars" to all sub-objects
-                obj.cat = head.Catalog(obj.pars);
+                obj.head = head.Header; % this also gives "head" to all sub-objects
+                obj.cat = head.Catalog(obj.head);
                 obj.finder.cat = obj.cat;
-                obj.finder.pars = obj.pars;
-                obj.lightcurves.pars = obj.pars;
+                obj.finder.head = obj.head;
+                obj.lightcurves.head = obj.head;
                 obj.lightcurves.cat = obj.cat;
                 
                 util.oop.save_defaults(obj); % make sure each default_XXX property is updated with the current XXX property value. 
@@ -308,10 +308,10 @@ classdef Analysis < file.AstroData
         
         function val = seeing(obj)
             
-            if isempty(obj.pars)
+            if isempty(obj.head)
                 val = obj.FWHM.*1.24;
             else
-                val = obj.FWHM.*obj.pars.SCALE;
+                val = obj.FWHM.*obj.head.SCALE;
             end
             
         end
@@ -360,21 +360,21 @@ classdef Analysis < file.AstroData
     
     methods % setters
         
-        function set.pars(obj,val)
+        function set.head(obj,val)
             
-            obj.pars = val;
+            obj.head = val;
             
             list = properties(obj);
             
             for ii = 1:length(list)
                 
                 try
-                    if isobject(obj.(list{ii})) && ~isempty(obj.(list{ii})) && ~istable(obj.(list{ii})) && isprop(obj.(list{ii}), 'pars') 
-                        obj.(list{ii}).pars = val;
+                    if isobject(obj.(list{ii})) && ~isempty(obj.(list{ii})) && ~istable(obj.(list{ii})) && isprop(obj.(list{ii}), 'head') 
+                        obj.(list{ii}).head = val;
                     end
                 catch ME
                     
-                    disp(['trouble setting "pars" into variable: ' list{ii}]);
+                    disp(['trouble setting "head" into variable: ' list{ii}]);
                     warning(ME.getReport);
                     
                 end
@@ -438,7 +438,7 @@ classdef Analysis < file.AstroData
             fid = fopen(filename, 'at');
             on_cleanup = onCleanup(@() fclose(fid));
             
-            obs_date = obj.pars.STARTTIME;
+            obs_date = obj.head.STARTTIME;
             read_date = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
             
             if isempty(str)
@@ -485,7 +485,7 @@ classdef Analysis < file.AstroData
             % add parsing of varargin later
             
             
-            name = obj.pars.OBJECT;
+            name = obj.head.OBJECT;
             
             obj.lightcurves.saveAsMAT(fullfile(dirname, ['lightcurves_' name]));
             
@@ -498,7 +498,7 @@ classdef Analysis < file.AstroData
         
         function saveSummary(obj, dirname)
             
-            filename = ['summary_' obj.pars.OBJECT '.txt'];
+            filename = ['summary_' obj.head.OBJECT '.txt'];
             
             fid = fopen(fullfile(dirname, filename), 'wt');
             
@@ -508,7 +508,7 @@ classdef Analysis < file.AstroData
 
                 onc = onCleanup(@() fclose(fid));
 
-                fprintf(fid, 'Summary for run %s, with %d batches.\n', obj.pars.OBJECT, obj.batch_counter);
+                fprintf(fid, 'Summary for run %s, with %d batches.\n', obj.head.OBJECT, obj.batch_counter);
 
                 v = abs(obj.finder.snr_values);
 
@@ -1002,7 +1002,7 @@ classdef Analysis < file.AstroData
                 obj.analysisSaveFITS;
             end
             
-            obj.updatePars;
+            obj.updateHeader;
             
             obj.analysisDisplayGUI;
             
@@ -1094,7 +1094,7 @@ classdef Analysis < file.AstroData
             t = tic;
             
             obj.cal.use_roi = 1;
-            obj.cal.ROI = obj.pars.ROI; 
+            obj.cal.ROI = obj.head.ROI; 
             
             % calibrate the stack if needed
             if nnz(isnan(obj.stack)) % stack is already calibrated (has NaN values...)
@@ -1211,8 +1211,8 @@ classdef Analysis < file.AstroData
                             obj.cat.saveMAT(filename);
                         end
                         
-                        obj.pars.THRESH_DETECTION = obj.cat.detection_threshold;
-                        obj.pars.LIMMAG_DETECTION = obj.cat.detection_limit; 
+                        obj.head.THRESH_DETECTION = obj.cat.detection_threshold;
+                        obj.head.LIMMAG_DETECTION = obj.cat.detection_limit; 
 
                         obj.magnitudes = obj.cat.magnitudes;
                         obj.coordinates = obj.cat.coordinates;
@@ -1361,12 +1361,12 @@ classdef Analysis < file.AstroData
                 N = nanstd(obj.phot.fluxes(:,:,end))'; % noise (instrumental)
                 M = obj.cat.magnitudes; % magnitude from catalog
 
-%                 obj.pars.ZEROPOINT = util.stat.median2(S*10.^(0.4.*M'));
+%                 obj.head.ZEROPOINT = util.stat.median2(S*10.^(0.4.*M'));
                 instr_mag = -2.5*log10(S); 
                 instr_mag(S<0) = NaN;
                 instr_mag = real(instr_mag); 
                 
-                obj.pars.ZEROPOINT = nanmedian(M-instr_mag); 
+                obj.head.ZEROPOINT = nanmedian(M-instr_mag); 
                 
                 idx = ~isnan(S) & ~isnan(N) & S./N>1.5; % choose stars that are actually measureable 
                 S2 = S(idx);
@@ -1377,22 +1377,22 @@ classdef Analysis < file.AstroData
                     return;
                 end
 
-                if isempty(obj.pars.THRESH_INDIVIDUAL)
-                    obj.pars.THRESH_INDIVIDUAL = obj.finder.min_star_snr;
+                if isempty(obj.head.THRESH_INDIVIDUAL)
+                    obj.head.THRESH_INDIVIDUAL = obj.finder.min_star_snr;
                 end
                 if ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
                     delete(obj.aux_figure.Children);
                     ax = axes('Parent', obj.aux_figure);
-                    obj.pars.LIMMAG_INDIVIDUAL = head.limiting_magnitude(M2, S2./N2, obj.pars.THRESH_INDIVIDUAL, 'maximum', 10, 'plot', 1, 'axes', ax, 'marker', 'pm'); 
+                    obj.head.LIMMAG_INDIVIDUAL = head.limiting_magnitude(M2, S2./N2, obj.head.THRESH_INDIVIDUAL, 'maximum', 10, 'plot', 1, 'axes', ax, 'marker', 'pm'); 
                 else
-                    obj.pars.LIMMAG_INDIVIDUAL = head.limiting_magnitude(M2, S2./N2, obj.pars.THRESH_INDIVIDUAL, 'maximum', 10); 
+                    obj.head.LIMMAG_INDIVIDUAL = head.limiting_magnitude(M2, S2./N2, obj.head.THRESH_INDIVIDUAL, 'maximum', 10); 
                 end
                 
                 % consider allowing the user to choose the type of photometry to take (the 3rd index)
                 f = obj.phot_stack.fluxes(:,:,end)';
                 
                 b = nanmedian(squeeze(util.stat.median2(obj.stack_cutouts_bg))); % the background is attained by the median of the background cutouts
-                obj.pars.BACKGROUND = b./obj.pars.NAXIS3; % the background is given per frame, not for the stack! 
+                obj.head.BACKGROUND = b./obj.head.NAXIS3; % the background is given per frame, not for the stack! 
                 
                 v = obj.phot_stack.variances(:,:,end)'; % the variance per star
                 v(v==0) = NaN; % sometimes we get zero variance instead of NaN value
@@ -1411,25 +1411,25 @@ classdef Analysis < file.AstroData
                 N_stack = N_stack(idx);
                 M_stack = M(idx);
                 
-                if isempty(obj.pars.THRESH_STACK)
-                    obj.pars.THRESH_STACK = obj.pars.THRESH_INDIVIDUAL;
+                if isempty(obj.head.THRESH_STACK)
+                    obj.head.THRESH_STACK = obj.head.THRESH_INDIVIDUAL;
                 end
                 
                 if ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
 %                     delete(obj.aux_figure.Children);
 %                     ax = axes('Parent', obj.aux_figure);
                     ax.NextPlot = 'add';
-                    obj.pars.LIMMAG_STACK = head.limiting_magnitude(M_stack, S_stack./N_stack, obj.pars.THRESH_STACK, 'maximum', Inf, 'var', 'snr', 'plot', 1, 'axes', ax); 
+                    obj.head.LIMMAG_STACK = head.limiting_magnitude(M_stack, S_stack./N_stack, obj.head.THRESH_STACK, 'maximum', Inf, 'var', 'snr', 'plot', 1, 'axes', ax); 
                     ax.NextPlot = 'replace';
                 else
-                    obj.pars.LIMMAG_STACK = head.limiting_magnitude(M_stack, S_stack./N_stack, obj.pars.THRESH_STACK, 'maximum', Inf, 'var', 'snr'); 
+                    obj.head.LIMMAG_STACK = head.limiting_magnitude(M_stack, S_stack./N_stack, obj.head.THRESH_STACK, 'maximum', Inf, 'var', 'snr'); 
                 end
                 
                 drawnow;
                 
-%                 fprintf('the flux ratio of LIMMAG for individual and stack is %4.2f\n', 10.^(0.4*(obj.pars.LIMMAG_STACK-obj.pars.LIMMAG_INDIVIDUAL))); 
+%                 fprintf('the flux ratio of LIMMAG for individual and stack is %4.2f\n', 10.^(0.4*(obj.head.LIMMAG_STACK-obj.head.LIMMAG_INDIVIDUAL))); 
                 
-%                 T = table(-2.5*log10(S2)+obj.pars.ZEROPOINT, S2./N2, M2, 'VariableNames', {'Measured_mag', 'SNR', 'GAIA_mag'});
+%                 T = table(-2.5*log10(S2)+obj.head.ZEROPOINT, S2./N2, M2, 'VariableNames', {'Measured_mag', 'SNR', 'GAIA_mag'});
 %                 T2 = util.vec.bin_table_stats(T, 30);
 %                 T2 = T2(T2.N>=5,:);
 %                 fr = util.fit.polyfit(T2.SNR_nanmedian, T2.Measured_mag_nanmedian, 'order', 2);
@@ -1439,7 +1439,7 @@ classdef Analysis < file.AstroData
 %                 
 %                 fr = util.fit.polyfit(SNR, M3, 'order', 2, 'plot', 1); 
 %                 
-%                 obj.pars.MAG_LIMIT = fr.coeffs(1)+fr.coeffs(2).*thresh+fr.coeffs(3)*thresh.^2;
+%                 obj.head.MAG_LIMIT = fr.coeffs(1)+fr.coeffs(2).*thresh+fr.coeffs(3)*thresh.^2;
 %                 
 %                 if ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
 %                     delete(obj.aux_figure.Children);
@@ -1545,7 +1545,7 @@ classdef Analysis < file.AstroData
             end
 
             fitswrite(I, fullname); 
-            obj.pars.writeFITS(fullname, [], obj.num_sum);
+            obj.head.writeFITS(fullname, [], obj.num_sum);
 
             
         end
@@ -1640,7 +1640,7 @@ classdef Analysis < file.AstroData
             
         end
         
-        function updatePars(obj)
+        function updateHeader(obj)
            
             % to be updated...
             

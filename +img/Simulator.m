@@ -6,7 +6,7 @@ classdef Simulator < file.AstroData
     
     properties % objects
         
-        pars;
+        head;
         src;
         focus; 
         

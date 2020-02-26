@@ -837,8 +837,8 @@ classdef Calibration < handle
 
                     reader.batch;
                     
-                    obj.camera_name = reader.pars.INST;
-                    obj.project_name = reader.pars.PROJECT;
+                    obj.camera_name = reader.head.INST;
+                    obj.project_name = reader.head.PROJECT;
 
                     if cs(obj.mode, 'dark')
                         obj.addDark(reader.images);
@@ -1279,12 +1279,12 @@ classdef Calibration < handle
             
             if ~isempty(reader.t_start)
                 val = reader.t_start(1:10);
-            elseif ~isempty(reader.pars) && ~isempty(reader.pars.RUNSTART)
-                val = reader.pars.RUNSTART(1:10);
-            elseif ~isempty(reader.pars) && ~isempty(reader.pars.STARTTIME)
-                val = reader.pars.STARTTIME(1:10);
-            elseif ~isempty(reader.pars) && ~isempty(reader.pars.run_start_datetime)
-                val = reader.pars.run_start_datetime(1:10);
+            elseif ~isempty(reader.head) && ~isempty(reader.head.RUNSTART)
+                val = reader.head.RUNSTART(1:10);
+            elseif ~isempty(reader.head) && ~isempty(reader.head.STARTTIME)
+                val = reader.head.STARTTIME(1:10);
+            elseif ~isempty(reader.head) && ~isempty(reader.head.run_start_datetime)
+                val = reader.head.run_start_datetime(1:10);
             else
                 warning('Cannot retrieve date from reader!');
                 val = '';

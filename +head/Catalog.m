@@ -10,7 +10,7 @@ classdef Catalog < handle
     
     properties % objects
         
-        pars@head.Parameters; % link back to parameters object! 
+        head@head.Header; % link back to header object! 
         data; % table with the final info
         
     end
@@ -85,7 +85,7 @@ classdef Catalog < handle
                 obj = util.oop.full_copy(varargin{1});
             elseif ~isempty(varargin) && isa(varargin{1}, 'head.Parameters')
                 if obj.debug_bit>1, fprintf('Catalog (pars) constructor v%4.2f\n', obj.version); end
-                obj.pars = varargin{1};
+                obj.head = varargin{1};
             else
                 if obj.debug_bit>1, fprintf('Catalog constructor v%4.2f\n', obj.version); end
             
@@ -139,30 +139,30 @@ classdef Catalog < handle
         
         function val = plate_scale(obj)
             
-            if isempty(obj.pars)
+            if isempty(obj.head)
                 val = 1.24;
             else
-                val = obj.pars.SCALE;
+                val = obj.head.SCALE;
             end
             
         end
         
         function val = RA(obj)
             
-            if isempty(obj.pars)
+            if isempty(obj.head)
                 val = [];
             else
-                val = obj.pars.RA_DEG/180*pi;
+                val = obj.head.RA_DEG/180*pi;
             end
             
         end
         
         function val = DE(obj)
             
-            if isempty(obj.pars)
+            if isempty(obj.head)
                 val = [];
             else
-                val = obj.pars.DEC_DEG/180*pi;
+                val = obj.head.DEC_DEG/180*pi;
             end
             
         end
@@ -185,13 +185,13 @@ classdef Catalog < handle
             obj.runAstrometry;
             obj.makeCatalog;
             
-            if ~isempty(obj.pars)
+            if ~isempty(obj.head)
                 
-                if isempty(obj.pars.WCS)
-                    obj.pars.WCS = head.WorldCoordinates;
+                if isempty(obj.head.WCS)
+                    obj.head.WCS = head.WorldCoordinates;
                 end
                 
-                obj.pars.WCS.input(obj.wcs_object); % make sure the WCS object is updated too
+                obj.head.WCS.input(obj.wcs_object); % make sure the WCS object is updated too
                 
             end
             
@@ -221,12 +221,12 @@ classdef Catalog < handle
             addpath(fullfile(getenv('DATA'), 'GAIA/DR2')); 
 
             % scan a few values of RA/DE outside the values suggested by pars object
-            DE = obj.pars.DEC_DEG;
+            DE = obj.head.DEC_DEG;
             list_DE = (-obj.Dec_scan_range:obj.Dec_scan_step:obj.Dec_scan_range);
             [~,idx] = sort(abs(list_DE));
             list_DE = list_DE(idx) + DE; 
             
-            RA = obj.pars.RA_DEG;
+            RA = obj.head.RA_DEG;
             list_RA = (-obj.RA_scan_range:obj.RA_scan_step:obj.RA_scan_range);
             list_RA = list_RA./abs(cosd(DE)); % adjust for high DE targets, where a change of few degrees in RA can be still smaller than the FOV
             [~,idx] = sort(abs(list_RA));
@@ -241,10 +241,10 @@ classdef Catalog < handle
                         warning('off', 'MATLAB:polyfit:PolyNotUnique')
                         warning('off', 'MATLAB:lscov:RankDefDesignMat');
 
-%                         [R,S2] = astrometry(S, 'RA', list_RA(jj), 'UnitsRA', 'deg', 'Dec', list_DE(ii), 'UnitsDec', 'deg', 'Scale', obj.pars.SCALE, ...
-                        [R,S2] = astrometry(S, 'RA', head.Ephemeris.deg2hour(list_RA(jj)), 'Dec', head.Ephemeris.deg2sex(list_DE(ii)), 'Scale', obj.pars.SCALE, ...
+%                         [R,S2] = astrometry(S, 'RA', list_RA(jj), 'UnitsRA', 'deg', 'Dec', list_DE(ii), 'UnitsDec', 'deg', 'Scale', obj.head.SCALE, ...
+                        [R,S2] = astrometry(S, 'RA', head.Ephemeris.deg2hour(list_RA(jj)), 'Dec', head.Ephemeris.deg2sex(list_DE(ii)), 'Scale', obj.head.SCALE, ...
                             'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', [3000 3000], 'ApplyPM', false, 'Flip', obj.flip, ...
-                            'MinRot', -20, 'MaxRot', 20, 'CatColMag', 'Mag', 'ImSize', [obj.pars.NAXIS1, obj.pars.NAXIS2]);
+                            'MinRot', -20, 'MaxRot', 20, 'CatColMag', 'Mag', 'ImSize', [obj.head.NAXIS1, obj.head.NAXIS2]);
 
                         warning('on', 'MATLAB:polyfit:PolyNotUnique')
                         warning('on', 'MATLAB:lscov:RankDefDesignMat');
@@ -331,7 +331,7 @@ classdef Catalog < handle
             [~,HWHM]=S.curve_growth_psf;
             obj.FWHM = 2.*HWHM; % pixels
             obj.width = obj.FWHM./2.355;
-            obj.seeing = obj.FWHM.*obj.pars.SCALE;
+            obj.seeing = obj.FWHM.*obj.head.SCALE;
             
             obj.mextractor_sim = S;
             
@@ -450,11 +450,11 @@ classdef Catalog < handle
         function [idx, dist] = findNearestObject(obj, RA, Dec)
             
             if nargin<2 || isempty(RA)
-                RA = obj.pars.RA_DEG;
+                RA = obj.head.RA_DEG;
             end
             
             if nargin<3 || isempty(Dec)
-                Dec = obj.pars.DEC_DEG;
+                Dec = obj.head.DEC_DEG;
             end
             
             if ischar(RA)
@@ -598,7 +598,7 @@ classdef Catalog < handle
         function saveMAT(obj, filename)
             
             CatTable = obj.data;
-            pars = obj.pars.obj2struct; 
+            pars = obj.head.obj2struct; 
             
             if obj.success
                 if obj.debug_bit, disp(['Saving catalog file to ' filename]); end
@@ -618,9 +618,9 @@ classdef Catalog < handle
             end
             
             if exist('head', 'var')
-                obj.pars.struct2obj(head); 
+                obj.head.struct2obj(head); 
             elseif exist('pars', 'var')
-                obj.pars.struct2obj(pars); 
+                obj.head.struct2obj(pars); 
             end
             
             % add positions, magnitudes, coordinates and temperatures from the table

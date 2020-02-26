@@ -24,11 +24,12 @@ void SaveData::write(){
 	mex_flag[0]=1; // lock 
 	// mex_flag[1]=0;
 	writeData();
-	writePars();
+	writeHeader();
 	mex_flag[0]=0; // release
 	delete this; // must do a cleanup in the asynchronous function! 
 	
 }
+
 void SaveData::parseVararginPairs(int N, const mxArray *vars[]){
 		
 	// if(nrhs%2==1) mexErrMsgIdAndTxt( "MATLAB:obs:mexWrite:vararginNotPairs", "varargin must be given as pairs!");
@@ -65,7 +66,7 @@ void SaveData::parseVararginPairs(int N, const mxArray *vars[]){
 		else if(cs(keyword, "psfs", 4)) psfs.input("psfs", value, 0);		
 		else if(cs(keyword, "sampling_psf",4)) psfs.attributes.push_back(MyAttribute("sampling_psf", value));
 		// add more names to the list if new data fields are added
-		else if(cs(keyword, "pars", "parameters", "cell")) readParsCellArray(value);
+		else if(cs(keyword, "header", "pars", "parameters", "cell")) readHeaderCellArray(value);
 		else if(cs(keyword, "debug_bit")) debug_bit=(int) mxGetScalar(value);
 		else if(cs(keyword, "deflate")) deflate=(int) mxGetScalar(value);
 		else if(cs(keyword, "chunk")) chunk_size=(int) mxGetScalar(value);
@@ -143,11 +144,11 @@ void SaveData::dataChecks(){
 	// add all other data checks...
 }
 
-void SaveData::readParsCellArray(const mxArray *cell){
+void SaveData::readHeaderCellArray(const mxArray *cell){
 	
 	size_t N=0;
 	if(mxIsEmpty(cell)) return; 
-	if(mxGetN(cell)>1 && mxGetM(cell)>1) mexErrMsgIdAndTxt( "MATLAB:file:mex:SaveData:readParsCellArray", "Cell array must be 1D...");
+	if(mxGetN(cell)>1 && mxGetM(cell)>1) mexErrMsgIdAndTxt( "MATLAB:file:mex:SaveData:readHeaderCellArray", "Cell array must be 1D...");
 	if(mxGetN(cell)>1) N=mxGetN(cell);
 	if(mxGetM(cell)>1) N=mxGetM(cell);
 	
@@ -156,7 +157,7 @@ void SaveData::readParsCellArray(const mxArray *cell){
 		const mxArray *s=mxGetCell(cell, i);
 		
 		if(mxIsEmpty(s) || mxIsScalar(s)==0 || mxIsStruct(s)==0 || mxGetNumberOfFields(s)<1) 
-			mexErrMsgIdAndTxt( "MATLAB:file:mex:SaveData:readParsCellArray", "Cell content must be a single struct with one field at least..");
+			mexErrMsgIdAndTxt( "MATLAB:file:mex:SaveData:readHeaderCellArray", "Cell content must be a single struct with one field at least..");
 		
 		parameter_addresses_vector.push_back(std::string(mxArrayToString(mxGetFieldByNumber(s,0,0)))); // the address of the parameter object (should be first field)
 		parameter_attributes_2D_vector.push_back(std::vector<MyAttribute>()); // an empty vector to be populated from the struct fields
@@ -200,7 +201,7 @@ void SaveData::print_help(){
 	mexPrintf("-psfs: if PSF data is given from WFS or from simulation.\n");
 	mexPrintf("-fluxes: photometry data for each cutout. \n");
 	// mexPrintf("-buffer: BufferWheel object used to extract add-on metadata.\n");
-	mexPrintf("-pars_cell: cell array of address-struct pairs with metadata for this exposure. \n");
+	mexPrintf("-header_cell: cell array of address-struct pairs with metadata for this exposure. \n");
 	mexPrintf("            (Use util.oop.save with output type 'struct').\n");
 	
 	// mexPrintf("\n");
@@ -291,5 +292,11 @@ bool SaveData::cs(const char *keyword, const char *str1, const char *str2, int n
 bool SaveData::cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters){
 
 	return cs(keyword, str1, num_letters) || cs(keyword, str2, num_letters) || cs(keyword, str3, num_letters);
+
+}
+
+bool SaveData::cs(const char *keyword, const char *str1, const char *str2, const char *str3, const char *str4, int num_letters){
+
+	return cs(keyword, str1, num_letters) || cs(keyword, str2, num_letters) || cs(keyword, str3, num_letters) || cs(keyword, str4, num_letters);
 
 }

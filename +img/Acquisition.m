@@ -14,11 +14,10 @@ classdef Acquisition < file.AstroData
     properties % objects
         
         % general objects
-        pars@head.Parameters;
+        head@head.Header;
         cat@head.Catalog;
         
         % input objects
-%         cam@obs.cam.CameraControl;
         cam; % can be obs.cam.CameraControl or obs.cam.Andor
         reader@file.Reader;
         sim; % later add the class for the simulator        
@@ -317,9 +316,9 @@ classdef Acquisition < file.AstroData
                 
                 obj.setupDefaults;
                 
-                obj.pars = head.Parameters; % this also gives "pars" to all sub-objects
-                obj.cat = head.Catalog(obj.pars);
-                obj.lightcurves.pars = obj.pars;
+                obj.head = head.Header; % this also gives "head" to all sub-objects
+                obj.cat = head.Catalog(obj.head);
+                obj.lightcurves.head = obj.head;
                 obj.lightcurves.cat = obj.cat;
                 
                 util.oop.save_defaults(obj); % make sure each default_XXX property is updated with the current XXX property value. 
@@ -406,8 +405,8 @@ classdef Acquisition < file.AstroData
 
         function val = get.run_name(obj)
             
-            if ~isempty(obj.pars)
-                val = obj.pars.target_name;
+            if ~isempty(obj.head)
+                val = obj.head.target_name;
             else
                 val = [];
             end
@@ -551,11 +550,11 @@ classdef Acquisition < file.AstroData
             
             val = sprintf('Observation parameters\n--------------------------------------');
             
-            if ~isempty(obj.pars)
+            if ~isempty(obj.head)
                 
-                val = sprintf('%s\n object: %s', val, obj.pars.OBJECT);
+                val = sprintf('%s\n object: %s', val, obj.head.OBJECT);
                 
-                val = sprintf('%s\n RA:    %s hours\n Dec: %s deg', val, obj.pars.RA, obj.pars.Dec);
+                val = sprintf('%s\n RA:    %s hours\n Dec: %s deg', val, obj.head.RA, obj.head.Dec);
             
                 val = sprintf('%s\n--------------------------------------', val);
             end
@@ -572,15 +571,15 @@ classdef Acquisition < file.AstroData
             
             val = sprintf('%s\n--------------------------------------', val);
             
-            if ~isempty(obj.pars) && ~isempty(obj.pars.SCALE)
-                val = sprintf('%s\n seeing= %4.2f"', val, obj.average_width.*obj.pars.SCALE.*2.355);
+            if ~isempty(obj.head) && ~isempty(obj.head.SCALE)
+                val = sprintf('%s\n seeing= %4.2f"', val, obj.average_width.*obj.head.SCALE.*2.355);
             end
             
             val = sprintf('%s\n PSF widths= %4.2f / %4.2f pix', val, obj.minor_axis, obj.major_axis);
             
             val = sprintf('%s\n PSF angle= %4.2f deg', val, obj.model_psf.angle);
             
-            val = sprintf('%s\n LIMMAG_D= %4.2f', val, obj.pars.LIMMAG_DET); 
+            val = sprintf('%s\n LIMMAG_D= %4.2f', val, obj.head.LIMMAG_DET); 
             
             if length(obj.average_offsets)==2
                 val = sprintf('%s\n dx/dy= %4.2f / %4.2f pix', val, obj.average_offsets(2), obj.average_offsets(1));
@@ -615,8 +614,8 @@ classdef Acquisition < file.AstroData
             
             if isprop(obj.src, 'expT')
                 val = obj.src.expT;
-            elseif ~isempty(obj.pars)
-                val = obj.pars.expT;
+            elseif ~isempty(obj.head)
+                val = obj.head.expT;
             else
                 val = [];
             end 
@@ -627,8 +626,8 @@ classdef Acquisition < file.AstroData
             
             if isprop(obj.src, 'frame_rate')
                 val = obj.src.frame_rate;
-            elseif ~isempty(obj.pars)
-                val = obj.pars.frame_rate;
+            elseif ~isempty(obj.head)
+                val = obj.head.frame_rate;
             else
                 val = [];
             end 
@@ -828,16 +827,16 @@ classdef Acquisition < file.AstroData
     
     methods % setters
         
-        function set.pars(obj,val)
+        function set.head(obj,val)
             
-            obj.pars = val;
+            obj.head = val;
             
             list = properties(obj);
             
             for ii = 1:length(list)
                 
-                if isobject(obj.(list{ii})) && ~isempty(obj.(list{ii})) && isprop(obj.(list{ii}), 'pars') 
-                    obj.(list{ii}).pars = val;
+                if isobject(obj.(list{ii})) && ~isempty(obj.(list{ii})) && isprop(obj.(list{ii}), 'head') 
+                    obj.(list{ii}).head = val;
                 end
                 
             end
@@ -858,8 +857,8 @@ classdef Acquisition < file.AstroData
         
         function set.run_name(obj, val)
             
-            if ~isempty(obj.pars)
-                obj.pars.target_name = val;
+            if ~isempty(obj.head)
+                obj.head.target_name = val;
             end
             
         end
@@ -1161,7 +1160,7 @@ classdef Acquisition < file.AstroData
                     if isempty(obj.cam) || ~isa(obj.cam.cam, 'obs.cam.ZylaControl')
 %                         obj.cam = obs.cam.CameraControl('zyla');
                         obj.cam = obs.cam.Andor;
-                        obj.cam.pars = obj.pars;
+                        obj.cam.head = obj.head;
                     end
                     
                     obj.src = obj.cam;
@@ -1170,7 +1169,7 @@ classdef Acquisition < file.AstroData
                     error('This camera is no longer supported...');
                     if isempty(obj.cam) || ~isa(obj.cam.cam, 'obs.DhyanaControl')
                         obj.cam = obs.CameraControl('dhyana');
-                        obj.cam.pars = obj.pars;
+                        obj.cam.head = obj.head;
                     end
                     
                     obj.src = obj.cam;
@@ -1179,7 +1178,7 @@ classdef Acquisition < file.AstroData
                     error('This camera is no longer supported...');
                     if isempty(obj.cam) || ~isa(obj.cam.cam, 'obs.cam.SimCamera')
                         obj.cam = obs.cam.CameraControl('sim');
-                        obj.cam.pars = obj.pars;
+                        obj.cam.head = obj.head;
                     end
                     obj.src = obj.cam;
                     
@@ -1188,7 +1187,7 @@ classdef Acquisition < file.AstroData
                     
                     if isempty(obj.sim)
                         obj.sim = img.Simulator;
-                        obj.sim.pars = obj.pars;
+                        obj.sim.head = obj.head;
                     end
                     
                     obj.src = obj.sim;
@@ -1197,7 +1196,7 @@ classdef Acquisition < file.AstroData
                     
                     if isempty(obj.reader)
                         obj.reader = file.Reader;
-                        obj.cam.pars = obj.pars;
+                        obj.cam.head = obj.head;
                     end
                     
                     obj.src = obj.reader;
@@ -1206,7 +1205,7 @@ classdef Acquisition < file.AstroData
                     if isempty(obj.cam)
 %                         obj.cam = obs.cam.CameraControl;
                         obj.cam = obs.cam.Andor;
-                        obj.cam.pars = obj.pars;
+                        obj.cam.head = obj.head;
                     end
                     obj.default_expT = obj.cam.default_expT;
                     obj.default_frame_rate = obj.cam.default_frame_rate;
@@ -1218,7 +1217,7 @@ classdef Acquisition < file.AstroData
             else
                 if isa(source, 'obs.cam.CameraControl') || isa(source, 'obs.cam.Andor') || isa(source, 'file.Reader') % add simulator check, too
                     obj.src = source;
-                    obj.src.pars = obj.pars;
+                    obj.src.head = obj.head;
                 else
                     warning(['unknown source class: ' class(source)]);
                 end
@@ -1292,7 +1291,7 @@ classdef Acquisition < file.AstroData
                     for ii = 1:length(list)
                         if isfield(s, list{ii})
                             try
-                                obj.pars.(list{ii}) = s.(list{ii});
+                                obj.head.(list{ii}) = s.(list{ii});
                             end
                         end
                     end
@@ -1368,15 +1367,15 @@ classdef Acquisition < file.AstroData
             if nargin>=2 && ~isempty(input) && isa(input, 'util.text.InputVars')
                 
                 if ~isempty(input.RA)
-                    obj.pars.RA = input.RA;
+                    obj.head.RA = input.RA;
                 end
 
                 if ~isempty(input.DE)
-                    obj.pars.DE = input.DE;
+                    obj.head.DE = input.DE;
                 end
 
                 if ~isempty(input.run_name)
-                    obj.pars.target_name = input.run_name;
+                    obj.head.target_name = input.run_name;
                 end
                 
             end
@@ -1385,7 +1384,7 @@ classdef Acquisition < file.AstroData
                 obj.getSyncData;
             end
             
-            obj.pars.update;
+            obj.head.update;
             
         end
         
@@ -1402,7 +1401,7 @@ classdef Acquisition < file.AstroData
 
                 input = obj.makeInputVars(varargin{:});
                 
-                obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
+                obj.update(input); % update header object to current time and input run name, RA/DE if given to input.
                 
                 obj.stash_parameters(input);
 
@@ -1463,9 +1462,9 @@ classdef Acquisition < file.AstroData
                 
                 obj.lightcurves.startup(num_frames, num_stars, num_apertures); 
                 
-%                 obj.update(input); % update pars object to current time and input run name, RA/DE if given to input.
+%                 obj.update(input); % update header object to current time and input run name, RA/DE if given to input.
                 
-                obj.pars.RUNSTART = util.text.time2str(obj.pars.ephem.time);
+                obj.head.RUNSTART = util.text.time2str(obj.head.ephem.time);
                 
                 if obj.use_save
                     try
@@ -1748,7 +1747,7 @@ classdef Acquisition < file.AstroData
                 if obj.batch_counter>5 && obj.use_sync && obj.use_autoguide && obj.sync.status && ~isempty(obj.getFrameRateEstimate)
                     % send the average adjustment back to mount controller (should we still adjust the cutouts though??)
                     rot = [cosd(obj.camera_angle) sind(obj.camera_angle); -sind(obj.camera_angle) cosd(obj.camera_angle)];
-                    vec = rot*(obj.average_offsets.*obj.pars.SCALE./obj.batch_size.*obj.getFrameRateEstimate)'; % units of arcsec/second
+                    vec = rot*(obj.average_offsets.*obj.head.SCALE./obj.batch_size.*obj.getFrameRateEstimate)'; % units of arcsec/second
                     vec = vec*0.7;
                     dRA = vec(1)/15; % convert from arcsec to RA seconds
                     dDE = vec(2);
@@ -1796,7 +1795,7 @@ classdef Acquisition < file.AstroData
                     error('Could not find any stars using quick_find_stars!');
                 end
                 
-                obj.pars.THRESH_DETECTION = obj.detect_thresh; 
+                obj.head.THRESH_DETECTION = obj.detect_thresh; 
                 
                 obj.clip.positions = T.pos;
                 obj.positions = T.pos;
@@ -1832,7 +1831,7 @@ classdef Acquisition < file.AstroData
                 
             end
 
-           obj.pars.LIMMAG_DETECTION = obj.cat.detection_limit; 
+           obj.head.LIMMAG_DETECTION = obj.cat.detection_limit; 
             
            [obj.obj_idx, dist] = obj.cat.findNearestObject;
            

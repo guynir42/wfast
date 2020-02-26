@@ -278,7 +278,7 @@ need to access existing memory, and do not need to allocate
 any memory, there is little overhead to running multiple threads. 
 
 The new computer manages to run 1000 cutouts of 13x13 pixels, 
-using 6 cores to do the photometry. 
+using 6 cores to do the photometry, at 25 Hz. 
 
 *Using value==value to check if a pixel is NaN:
 Turns out that "isnan()" is a really slow function. 

@@ -14,7 +14,7 @@ classdef Deflator < file.AstroData
     
     properties % objects and resources
         
-        pars@head.Parameters;
+        head@head.Header;
         
         src_dir@util.sys.WorkingDirectory;
         out_dir@util.sys.WorkingDirectory;
@@ -68,7 +68,7 @@ classdef Deflator < file.AstroData
                 
                 obj.setupDirs;
                 obj.setupBuffers;
-                obj.setupParameters;
+                obj.setupHeader;
                 obj.setupReader;
                 obj.setupProgressBar;
                 
@@ -76,9 +76,9 @@ classdef Deflator < file.AstroData
             
         end
         
-        function setupParameters(obj)
+        function setupHeader(obj)
            
-            obj.pars = head.Parameters;
+            obj.head = head.Header;
             
         end
         
@@ -123,7 +123,7 @@ classdef Deflator < file.AstroData
                 deflate_level = 1;
             end
             
-            obj.buffers = file.BufferWheel(num_buffers, obj.pars);
+            obj.buffers = file.BufferWheel(num_buffers, obj.head);
             
             obj.buffers.use_deflate = deflate_level;
             
@@ -183,11 +183,11 @@ classdef Deflator < file.AstroData
     
     methods % setters
         
-        function set.pars(obj, pars)
+        function set.head(obj, header)
             
-            obj.pars = pars;
+            obj.head= header;
 
-            obj.buffers.pars = pars;
+            obj.buffers.head= header;
                         
         end
         
@@ -489,7 +489,7 @@ classdef Deflator < file.AstroData
             
             obj.reader.batch;
             obj.copyFrom(obj.reader);
-            obj.pars = obj.reader.pars;
+            obj.head = obj.reader.head;
 
             obj.save;
             
@@ -507,7 +507,7 @@ classdef Deflator < file.AstroData
                 obj.buffers.gui.update;
             end
             
-%             obj.pars = head.Parameters(obj.reader.pars);
+%             obj.head = head.Header(obj.reader.head);
                         
             obj.buffers.directory = obj.out_subdir.pwd;
             

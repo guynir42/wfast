@@ -8,7 +8,7 @@ classdef Star < matlab.mixin.Copyable
         
     properties % objects
         
-        pars@head.Parameters;
+        head@head.Header;
         
     end
         
@@ -74,11 +74,11 @@ classdef Star < matlab.mixin.Copyable
                 obj = util.oop.full_copy(varargin{1});
             elseif ~isempty(varargin) && isa(varargin{1}, 'head.Parameters')
                 if obj.debug_bit>1, fprintf('Star constructor v%4.2f\n', obj.version); end
-                obj.pars = varargin{1};
-                if length(varargin)>1, obj.parse(varargin{2:end}); end
+                obj.head = varargin{1};
+                if length(varargin)>1, obj.heade(varargin{2:end}); end
             else
                 if obj.debug_bit>1, fprintf('Star constructor v%4.2f\n', obj.version); end                
-                obj.parse(varargin{:});
+                obj.heade(varargin{:});
             end
             
             
@@ -89,9 +89,9 @@ classdef Star < matlab.mixin.Copyable
 %             new_obj = copy(obj);
 %             
 %             if nargin<2 || isempty(pars) || ~isa(pars, 'head.Parameters')
-%                 new_obj.pars = copy(obj.pars);
+%                 new_obj.head = copy(obj.head);
 %             else
-%                 new_obj.pars = pars; % shared resource! 
+%                 new_obj.head = pars; % shared resource! 
 %             end
 % 
 %         end
@@ -124,7 +124,7 @@ classdef Star < matlab.mixin.Copyable
         
         function val = get.im_size(obj)
            
-            if isempty(obj.pars)
+            if isempty(obj.head)
 
                 if isempty(obj.im_size)
                     val = [];
@@ -135,15 +135,15 @@ classdef Star < matlab.mixin.Copyable
                 end
                 
             else
-                val = obj.pars.im_size;
+                val = obj.head.im_size;
             end
             
         end
           
         function val = get.plate_scale(obj)
            
-            if ~isempty(obj.pars)
-                val = obj.pars.plate_scale;
+            if ~isempty(obj.head)
+                val = obj.head.plate_scale;
             else
                 val = obj.plate_scale;
             end
@@ -559,8 +559,8 @@ classdef Star < matlab.mixin.Copyable
                 val = head.Star.empty;
             elseif isa(obj.primary_ref, 'head.Star')
                 val = obj.primary_ref;
-            elseif isnumeric(obj.primary_ref) && obj.primary_ref>0 && obj.primary_ref<=length(obj.pars.stars)
-                val = obj.pars.stars(obj.primary_ref);
+            elseif isnumeric(obj.primary_ref) && obj.primary_ref>0 && obj.primary_ref<=length(obj.head.stars)
+                val = obj.head.stars(obj.primary_ref);
             else
                 val = head.Star.empty;
             end
@@ -583,10 +583,10 @@ classdef Star < matlab.mixin.Copyable
 
             if isempty(obj) 
                 val = [];
-            elseif isempty(obj.pars)
+            elseif isempty(obj.head)
                 val = 1;
             else
-                val = find(obj==obj.pars.stars);
+                val = find(obj==obj.head.stars);
             end
             
         end
@@ -667,7 +667,7 @@ classdef Star < matlab.mixin.Copyable
                 elseif cs(key, {'ps', 'plate scale'})
                     obj.plate_scale = val;
                 elseif cs(key, {'pars', 'parameters'})
-                    obj.pars = val;
+                    obj.head = val;
                 end
                 
             end
@@ -688,10 +688,10 @@ classdef Star < matlab.mixin.Copyable
             
             if isempty(val) 
                 obj.primary_ref = head.Star.empty;
-            elseif isnumeric(val) && isscalar(val) && val>0 && val<=length(obj.pars.stars)
-                obj.primary_ref = obj.pars.stars(val);
+            elseif isnumeric(val) && isscalar(val) && val>0 && val<=length(obj.head.stars)
+                obj.primary_ref = obj.head.stars(val);
             else 
-                error(['Expected primary_index to be a number between 1 and ' num2str(length(obj.pars.stars))]);
+                error(['Expected primary_index to be a number between 1 and ' num2str(length(obj.head.stars))]);
             end
             
         end
@@ -709,14 +709,14 @@ classdef Star < matlab.mixin.Copyable
                 index = obj.index;
             end
 
-            stars = obj.pars.stars;
+            stars = obj.head.stars;
             
             if index<1 || index>length(stars)
                 error(['requested index= ' num2str(index) ' is outside the range of stars (1,' num2str(length(stars)) ')']);
             end
             
             if length(stars)==1
-                obj.pars.stars = head.Star.empty;
+                obj.head.stars = head.Star.empty;
                 return;
             end
             
@@ -728,7 +728,7 @@ classdef Star < matlab.mixin.Copyable
                 stars = [stars(1:index-1) stars(index+1:end)];
             end
             
-            obj.pars.stars = stars;
+            obj.head.stars = stars;
             
         end
         
@@ -752,7 +752,7 @@ classdef Star < matlab.mixin.Copyable
                 obj.gui = head.gui.StarGUI(obj);
             end
             
-            util.oop.setprop(obj.pars.stars, 'gui', obj.gui);
+            util.oop.setprop(obj.head.stars, 'gui', obj.gui);
             
             obj.gui.make;
             

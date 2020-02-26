@@ -8,7 +8,7 @@ classdef Event < handle
     
     properties % objects
         
-        pars@head.Parameters; % this doesn't have to be filled, but is useful to attach when saving events...
+        head@head.Header; % this doesn't have to be filled, but is useful to attach when saving events...
         
         phot_pars; % a struct with some housekeeping about how the photometry was done
         

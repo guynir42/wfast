@@ -1,8 +1,8 @@
-classdef ParsGUI < handle
+classdef HeaderGUI < handle
     
     properties 
         
-        owner@head.Parameters; % link back to containg object
+        owner@head.Header; % link back to containg object
 
         fig@util.plot.FigHandler;
              
@@ -39,17 +39,17 @@ classdef ParsGUI < handle
             
     methods % constructor
        
-        function obj = ParsGUI(owner)
+        function obj = HeaderGUI(owner)
             
             % later add other options like copy constructor
-            if isa(owner, 'head.Parameters')
+            if isa(owner, 'head.Header')
                 
-                if obj.debug_bit, fprintf('ParsGUI constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit, fprintf('HeaderGUI constructor v%4.2f\n', obj.version); end
                 
                 obj.owner = owner;
                                 
             else
-                error('Input a head.Parameters object to constructor of ParsGUI!');
+                error('Input a head.Header object to constructor of HeaderGUI!');
             end
             
         end
@@ -68,7 +68,7 @@ classdef ParsGUI < handle
             obj.buttons_stars = {};
             
             if isempty(obj.fig)
-                obj.fig = util.plot.FigHandler('Parameters');
+                obj.fig = util.plot.FigHandler('Header');
             end
             
             obj.fig.reset;

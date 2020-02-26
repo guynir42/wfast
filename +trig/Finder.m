@@ -10,7 +10,7 @@ classdef Finder < handle
     
     properties % objects
         
-        pars@head.Parameters;
+        head@head.Header;
         cat@head.Catalog;
         
         cal@trig.Calibrator;
@@ -373,23 +373,23 @@ classdef Finder < handle
         
         function val = obs_pars_str(obj)
             
-            if isempty(obj.pars)
+            if isempty(obj.head)
                 val = '';
             else
-                if isempty(obj.pars.STARTTIME)
+                if isempty(obj.head.STARTTIME)
                     date_str = '';
                 else
-                    date_str = obj.pars.STARTTIME(1:10); % get only date, no hours/minutes/seconds
+                    date_str = obj.head.STARTTIME(1:10); % get only date, no hours/minutes/seconds
                 end
                 
-                if isempty(obj.pars.RA)
+                if isempty(obj.head.RA)
                    
                 else
                     
                 end
                 
                 val = sprintf('date: %s | RA= %s | DE= %s | airmass= %4.2f | wind= %4.2f km/h | moon: %d%%, %d deg',...
-                    date_str, obj.pars.RA, obj.pars.DEC, obj.pars.AIRMASS, obj.pars.WIND_SPEED, round(100*obj.pars.MOONILL), round(obj.pars.MOONDIST));
+                    date_str, obj.head.RA, obj.head.DEC, obj.head.AIRMASS, obj.head.WIND_SPEED, round(100*obj.head.MOONILL), round(obj.head.MOONDIST));
             end
             
         end

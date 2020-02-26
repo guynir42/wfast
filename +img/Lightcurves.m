@@ -77,7 +77,7 @@ classdef Lightcurves < handle
     
     properties % objects
         
-        pars@head.Parameters; % keep a copy of the header metadata
+        head@head.Header; % keep a copy of the header metadata
         cat@head.Catalog; % keep a copy of the star catalog
         
         phot_pars; % a struct with some housekeeping about how the photometry was done
@@ -1342,12 +1342,12 @@ classdef Lightcurves < handle
             
             phot_pars = obj.phot_pars;
             
-            pars = obj.pars;
+            header = obj.head;
             cat = obj.cat.data;
             
             save(filename, 'timestamps', 'fluxes', 'errors', 'areas', 'backgrounds', 'variances',...
                 'offsets_x', 'offsets_y', 'centroids_x', 'centroids_y', 'widths', ...
-                'bad_pixels', 'readme', 'phot_pars', 'pars', 'cat', '-v7.3');
+                'bad_pixels', 'readme', 'phot_pars', 'header', 'cat', '-v7.3');
             
         end
         
@@ -1374,9 +1374,11 @@ classdef Lightcurves < handle
             if isfield(loaded, 'flags'), obj.flags_full = loaded.flags; end
             if isfield(loaded, 'phot_pars'), obj.phot_pars = loaded.phot_pars; end
             
-            obj.pars = head.Parameters.empty;
-            if isfield(loaded, 'pars') && isa(loaded.pars, 'head.Parameters'), obj.pars = loaded.pars; end
-            if isfield(loaded, 'pars') && isa(loaded.pars, 'struct'), obj.pars.loadFromStruct(loaded.pars); end
+            obj.head = head.Header.empty;
+            if isfield(loaded, 'pars') && isa(loaded.pars, 'head.Parameters'), obj.head = loaded.pars; end
+            if isfield(loaded, 'pars') && isa(loaded.pars, 'struct'), obj.head.loadFromStruct(loaded.pars); end 
+            if isfield(loaded, 'header') && isa(loaded.pars, 'head.Header'), obj.head = loaded.header; end
+            if isfield(loaded, 'header') && isa(loaded.pars, 'struct'), obj.head.loadFromStruct(loaded.header); end
             
             obj.cat = head.Catalog.empty;
             if isfield(loaded, 'cat') && isa(loaded.cat, 'head.Catalog'), obj.cat = loaded.cat; end
