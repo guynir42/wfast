@@ -490,6 +490,7 @@ classdef Lightcurves < handle
 
     % below is all the old code. Some of it has moved into 
     % the util.serial.self_calibrate() function. 
+    % some of it has not been ported so I leave it here for now! 
                     
 %                     f = obj.fluxes_rem;
 %                     
@@ -789,7 +790,7 @@ classdef Lightcurves < handle
         function val = get.fit_results(obj)
             
             if isempty(obj.fit_results_)
-                obj.fit_results_ = util.fit.polyfit(obj.timestamps, obj.fluxes_sub, 'order', 5, 'sigma', 3, 'double', 1); % must use double precision for the sizes and length of these fluxes!
+                obj.fit_results_ = util.fit.polyfit(obj.timestamps, abs(obj.fluxes_sub), 'order', 5, 'sigma', 3, 'double', 1); % must use double precision for the sizes and length of these fluxes!
             end
             
             val = obj.fit_results_;

@@ -131,7 +131,7 @@ function results = polyfit(x,y,varargin)
             results(ii).ndof = numel(ytemp)-input.order;
             
             % remove outliers 
-            bad_idx = bad_idx & isnan(ydata) & isnan(vdata) & residuals>input.sigma.^2;
+            bad_idx = bad_idx | isnan(ydata) | isnan(vdata) | residuals>input.sigma.^2;
 
 %             vtemp = vtemp./mean(vtemp,1,'omitnan').*results(ii).variance;
             
