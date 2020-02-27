@@ -40,6 +40,11 @@
 %         
 %
 % Optional Arguments:
+%       *index: choose which photometry object to use. There are several
+%               (usually 10) objects saved on global scope. When you want
+%               to run this code with different parameters or input sizes,
+%               it would save you some time allocating the output arrays if
+%               you keep each calculation on a different object. 
 %       *aperture or radius: a vector of aperture radii to be used for
 %                            aperture photometry (in pixels!). The biggest 
 %                            radius is also used for recentering (see

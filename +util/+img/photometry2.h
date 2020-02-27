@@ -16,7 +16,9 @@
 /* Usage: [outputs, arrays] = photometry2(cutouts, varargin)
 
 Optional arguments: 
-*aperture or radius: a vector of aperture radii to be used for
+		*index: choose the photometry object number out of the array (index starts at 1!). 
+		        This save preallocation of output arrays if you use photometry on different sized datasets in sequence. 
+		*aperture or radius: a vector of aperture radii to be used for
                             aperture photometry (in pixels!). The biggest 
                             radius is also used for recentering (see
                             below) and for forced photometry. 
@@ -59,7 +61,13 @@ Optional arguments:
 For more information about how to use this function, see photometry2.m
 
 Updates:
-
+2020-02-27 Guy: Added multiple objects in global scope, added parseIndex method to find which one to use. 
+                This prevents users that do photometry on multiple data sets of differing size from resetting
+				the whole preallocation mechanisms. 
+				E.g., one photometry object is used for stack photometry and one for full-cutouts. 
+				This way no need to reallocate the data twice each batch. 
+				
+				
 Original code by Guy Nir Dec 2019
 
 Additional developer notes after the header
@@ -71,6 +79,7 @@ bool cs(const char *keyword, const char *compare_str, int num_letters=3);
 bool cs(const char *keyword, const char *str1, const char *str2, int num_letters=3);
 bool cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters=3);
 bool parse_bool(mxArray *value);
+int parseIndex(int nrhs, const mxArray *prhs[]);
 
 class Photometry{
 	

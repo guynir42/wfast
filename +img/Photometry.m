@@ -52,6 +52,8 @@ classdef Photometry < handle
     
     properties % switches/controls
         
+        index = 1;
+        
         use_mex = 1; % use the (now old) mex function for faster processing 
         use_new_method = 1; % use the new mex function that is much faster and more accurate
         num_threads = 4; % for multithreaded mex photometry
@@ -343,7 +345,7 @@ classdef Photometry < handle
                     'radii', obj.aperture, 'annulus', [obj.annulus, obj.annulus_outer], 'sigma', obj.gauss_sigma, ...
                     'use_gaussian', obj.use_gaussian, 'use_centering', obj.use_centering, ...
                     'use_apertures', obj.use_aperture, 'use_forced', obj.use_forced, ...
-                    'threads', obj.num_threads, 'debug_bit', obj.debug_bit); 
+                    'threads', obj.num_threads, 'debug_bit', obj.debug_bit, 'index', obj.index); 
                 
                 obj.pars_struct = s.parameters;
                 
