@@ -36,7 +36,7 @@ classdef AstroData < dynamicprops
         centroids_y; % measured relative to the full image (in pixels)
         widths; % the second moment of the PSF
         bad_pixels; % how many bad pixels are included in the aperture
-        flag; % if any of the measurements (1st or 2nd order) don't make sense, it is flagged by the photometry pipeline.  
+        flags; % if any of the measurements (1st or 2nd order) don't make sense, it is flagged by the photometry pipeline.  
         
         cutouts_bg; % samples of the raw images at random locations to calculate the backgrounds
         positions_bg; % only for bg_cutouts. a 2xN matrix (X then Y, N is the number of cutouts). 

@@ -124,8 +124,8 @@ classdef AcqGUI < handle
             
             obj.menu_options.addButton('menu_header', '&Header', 'menu');
             obj.menu_options.menu_header.addButton('button_object', '&Object: %s', 'input_text', 'run_name', 'object or field name (used for naming the data folder');
-            obj.menu_options.menu_header.addButton('button_ra', '&RA: %s', 'input_text', 'pars.RA', 'object right ascention (hours)');
-            obj.menu_options.menu_header.addButton('button_dec', '&Dec: %s', 'input_text', 'pars.Dec', 'object declination (degrees)');
+            obj.menu_options.menu_header.addButton('button_ra', '&RA: %s', 'input_text', 'head.RA', 'object right ascention (hours)');
+            obj.menu_options.menu_header.addButton('button_dec', '&Dec: %s', 'input_text', 'head.Dec', 'object declination (degrees)');
             
             
             obj.menu_options.addButton('menu_find_stars', '&Find stars', 'menu');
@@ -169,7 +169,7 @@ classdef AcqGUI < handle
             
             obj.menu_objects = MenuItem(obj, 'O&bjects', 'menu');
             obj.menu_objects.addButton('button_camera', '&Camera', 'push', 'cam', 'Start the camera GUI'); 
-            obj.menu_objects.addButton('button_header', '&Header', 'push', 'pars', 'Start the header object GUI'); 
+            obj.menu_objects.addButton('button_header', '&Header', 'push', 'head', 'Start the header object GUI'); 
             obj.menu_objects.addButton('button_calibration', 'C&alibration', 'push', 'cal', 'Start the Calibration object GUI'); 
             obj.menu_objects.addButton('button_clipper', 'C&lipper', 'push', 'clip', 'Start the Clipper GUI'); 
             obj.menu_objects.addButton('button_photometry', '&Photometry', 'push', 'phot', 'Start the Photometry GUI'); 
