@@ -2003,6 +2003,17 @@ classdef Acquisition < file.AstroData
                 if ~isempty(obj.phot.gui) && obj.phot.gui.check, obj.phot.gui.update; end
 
                 obj.fluxes = obj.phot.fluxes;
+                obj.errors = obj.phot.errors;
+                obj.areas = obj.phot.areas;
+                obj.backgrounds = obj.phot.backgrounds;
+                obj.variances = obj.phot.variances;
+                obj.offsets_x = obj.phot.offsets_x;
+                obj.offsets_y = obj.phot.offsets_y;
+                obj.centroids_x = obj.phot.centroids_y;
+                obj.widths = obj.phot.widths;
+                obj.bad_pixels = obj.phot.bad_pixels;
+                obj.flags = obj.phot.flags;
+                
                 obj.lightcurves.getData(obj.phot);
                 
             end

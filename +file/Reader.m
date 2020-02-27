@@ -192,7 +192,7 @@ classdef Reader < file.AstroData
         default_frame_index_start; % in each file, start reading from this index
         default_frame_index_finish; % in each file, finish reading on this index (or to the end of file)
         
-        version = 1.01;
+        version = 1.02;
         
     end
     
@@ -287,7 +287,19 @@ classdef Reader < file.AstroData
             obj.dataset_names.psfs = {'psfs'};
             obj.attribute_names.psf_sampling = {'psf_sampling', 'psf_binning'};
             obj.attribute_names.obj_idx = {'obj_idx', 'object_idx', 'obj_index', 'object_index'}; 
-            obj.dataset_names.fluxes = {'fluxes', 'lightcurves'};
+
+            obj.dataset_names.fluxes = {'fluxes', 'flux', 'lightcurves'};
+            obj.dataset_names.errors = {'errors', 'error'};
+            obj.dataset_names.areas = {'areas', 'area'};
+            obj.dataset_names.backgrounds = {'backgrounds', 'background'};
+            obj.dataset_names.variances = {'variances', 'variance'};
+            obj.dataset_names.offsets_x = {'offsets_x', 'offset_x'}; 
+            obj.dataset_names.offsets_y = {'offsets_y', 'offset_y'};
+            obj.dataset_names.centroids_x = {'centroids_x', 'centroids_x'}; 
+            obj.dataset_names.centroids_y = {'centroids_y', 'centroids_y'}; 
+            obj.dataset_names.widths = {'widths', 'width'}; 
+            obj.dataset_names.bad_pixels = {'bad_pixels'};
+            obj.dataset_names.flags = {'flags', 'flag'};
             
             obj.dataset_names.header = {'header', 'head', 'pars'};
             
@@ -921,8 +933,162 @@ classdef Reader < file.AstroData
                             loaded_fluxes = h5read(filename, sa('/', data_name), [frame_start 1 1], [num_frames Inf Inf]); % must check the dimensions on file fit what I think I am saving...
                         end
                         
-                        obj.fluxes = cat(1, obj.fluxes, loaded_fluxes); % append to the existing images
+                        obj.fluxes = cat(1, obj.fluxes, loaded_fluxes); % append to the existing fluxes
                         
+                    elseif any(strcmp(data_name, obj.dataset_names.errors)) && data_size(1) % data_names.errors may be a cell array of different optional names
+                        
+                        num_images_on_file = data_size(1); % fluxes should be 2D with number of frames in the 1st dim
+                        
+                        num_frames = min(num_frames, num_images_on_file); % make sure we don't ask for more frames than we have on file
+                        
+                        if length(data_size)==2
+                            loaded_errors = h5read(filename, sa('/', data_name), [frame_start 1], [num_frames Inf]); % must check the dimensions on file fit what I think I am saving...
+                        elseif length(data_size)==3
+                            loaded_errors = h5read(filename, sa('/', data_name), [frame_start 1 1], [num_frames Inf Inf]); % must check the dimensions on file fit what I think I am saving...
+                        end
+                        
+                        obj.fluxes = cat(1, obj.fluxes, loaded_errors); % append to the existing errors
+                        
+                    elseif any(strcmp(data_name, obj.dataset_names.areas)) && data_size(1) % data_names.areas may be a cell array of different optional names
+                        
+                        num_images_on_file = data_size(1); % fluxes should be 2D with number of frames in the 1st dim
+                        
+                        num_frames = min(num_frames, num_images_on_file); % make sure we don't ask for more frames than we have on file
+                        
+                        if length(data_size)==2
+                            loaded_areas = h5read(filename, sa('/', data_name), [frame_start 1], [num_frames Inf]); % must check the dimensions on file fit what I think I am saving...
+                        elseif length(data_size)==3
+                            loaded_areas = h5read(filename, sa('/', data_name), [frame_start 1 1], [num_frames Inf Inf]); % must check the dimensions on file fit what I think I am saving...
+                        end
+                        
+                        obj.areas = cat(1, obj.areas, loaded_areas); % append to the existing areas
+                        
+                    elseif any(strcmp(data_name, obj.dataset_names.backgrounds)) && data_size(1) % data_names.backgrounds may be a cell array of different optional names
+                        
+                        num_images_on_file = data_size(1); % fluxes should be 2D with number of frames in the 1st dim
+                        
+                        num_frames = min(num_frames, num_images_on_file); % make sure we don't ask for more frames than we have on file
+                        
+                        if length(data_size)==2
+                            loaded_backgrounds = h5read(filename, sa('/', data_name), [frame_start 1], [num_frames Inf]); % must check the dimensions on file fit what I think I am saving...
+                        elseif length(data_size)==3
+                            loaded_backgrounds = h5read(filename, sa('/', data_name), [frame_start 1 1], [num_frames Inf Inf]); % must check the dimensions on file fit what I think I am saving...
+                        end
+                        
+                        obj.backgrounds = cat(1, obj.backgrounds, loaded_backgrounds); % append to the existing background
+                        
+                    elseif any(strcmp(data_name, obj.dataset_names.variances)) && data_size(1) % data_names.variances may be a cell array of different optional names
+                        
+                        num_images_on_file = data_size(1); % fluxes should be 2D with number of frames in the 1st dim
+                        
+                        num_frames = min(num_frames, num_images_on_file); % make sure we don't ask for more frames than we have on file
+                        
+                        if length(data_size)==2
+                            loaded_variances = h5read(filename, sa('/', data_name), [frame_start 1], [num_frames Inf]); % must check the dimensions on file fit what I think I am saving...
+                        elseif length(data_size)==3
+                            loaded_variances = h5read(filename, sa('/', data_name), [frame_start 1 1], [num_frames Inf Inf]); % must check the dimensions on file fit what I think I am saving...
+                        end
+                        
+                        obj.variances = cat(1, obj.variances, loaded_variances); % append to the existing variances
+                        
+                    elseif any(strcmp(data_name, obj.dataset_names.offsets_x)) && data_size(1) % data_names.offsets_x may be a cell array of different optional names
+                        
+                        num_images_on_file = data_size(1); % fluxes should be 2D with number of frames in the 1st dim
+                        
+                        num_frames = min(num_frames, num_images_on_file); % make sure we don't ask for more frames than we have on file
+                        
+                        if length(data_size)==2
+                            loaded_offsets_x = h5read(filename, sa('/', data_name), [frame_start 1], [num_frames Inf]); % must check the dimensions on file fit what I think I am saving...
+                        elseif length(data_size)==3
+                            loaded_offsets_x = h5read(filename, sa('/', data_name), [frame_start 1 1], [num_frames Inf Inf]); % must check the dimensions on file fit what I think I am saving...
+                        end
+                        
+                        obj.offsets_x = cat(1, obj.offsets_x, loaded_offsets_x); % append to the existing images
+                        
+                    elseif any(strcmp(data_name, obj.dataset_names.offsets_y)) && data_size(1) % data_names.offsets_y may be a cell array of different optional names
+                        
+                        num_images_on_file = data_size(1); % fluxes should be 2D with number of frames in the 1st dim
+                        
+                        num_frames = min(num_frames, num_images_on_file); % make sure we don't ask for more frames than we have on file
+                        
+                        if length(data_size)==2
+                            loaded_offsets_y = h5read(filename, sa('/', data_name), [frame_start 1], [num_frames Inf]); % must check the dimensions on file fit what I think I am saving...
+                        elseif length(data_size)==3
+                            loaded_offsets_y = h5read(filename, sa('/', data_name), [frame_start 1 1], [num_frames Inf Inf]); % must check the dimensions on file fit what I think I am saving...
+                        end
+                        
+                        obj.offsets_y = cat(1, obj.offsets_y, loaded_offsets_y); % append to the existing offsets_y
+                        
+                    elseif any(strcmp(data_name, obj.dataset_names.centroids_x)) && data_size(1) % data_names.centroids_x may be a cell array of different optional names
+                        
+                        num_images_on_file = data_size(1); % fluxes should be 2D with number of frames in the 1st dim
+                        
+                        num_frames = min(num_frames, num_images_on_file); % make sure we don't ask for more frames than we have on file
+                        
+                        if length(data_size)==2
+                            loaded_centroids_x = h5read(filename, sa('/', data_name), [frame_start 1], [num_frames Inf]); % must check the dimensions on file fit what I think I am saving...
+                        elseif length(data_size)==3
+                            loaded_centroids_x = h5read(filename, sa('/', data_name), [frame_start 1 1], [num_frames Inf Inf]); % must check the dimensions on file fit what I think I am saving...
+                        end
+                        
+                        obj.centroids_x = cat(1, obj.centroids_x, loaded_centroids_x); % append to the existing centroids_x
+                        
+                    elseif any(strcmp(data_name, obj.dataset_names.centroids_y)) && data_size(1) % data_names.centroids_y may be a cell array of different optional names
+                        
+                        num_images_on_file = data_size(1); % fluxes should be 2D with number of frames in the 1st dim
+                        
+                        num_frames = min(num_frames, num_images_on_file); % make sure we don't ask for more frames than we have on file
+                        
+                        if length(data_size)==2
+                            loaded_centroids_y = h5read(filename, sa('/', data_name), [frame_start 1], [num_frames Inf]); % must check the dimensions on file fit what I think I am saving...
+                        elseif length(data_size)==3
+                            loaded_centroids_y = h5read(filename, sa('/', data_name), [frame_start 1 1], [num_frames Inf Inf]); % must check the dimensions on file fit what I think I am saving...
+                        end
+                        
+                        obj.centroids_y = cat(1, obj.centroids_y, loaded_centroids_y); % append to the existing centroids_y
+                        
+                    elseif any(strcmp(data_name, obj.dataset_names.widths)) && data_size(1) % data_names.widths may be a cell array of different optional names
+                        
+                        num_images_on_file = data_size(1); % fluxes should be 2D with number of frames in the 1st dim
+                        
+                        num_frames = min(num_frames, num_images_on_file); % make sure we don't ask for more frames than we have on file
+                        
+                        if length(data_size)==2
+                            loaded_widths = h5read(filename, sa('/', data_name), [frame_start 1], [num_frames Inf]); % must check the dimensions on file fit what I think I am saving...
+                        elseif length(data_size)==3
+                            loaded_widths = h5read(filename, sa('/', data_name), [frame_start 1 1], [num_frames Inf Inf]); % must check the dimensions on file fit what I think I am saving...
+                        end
+                        
+                        obj.widths = cat(1, obj.widths, loaded_widths); % append to the existing widths
+                       
+                     elseif any(strcmp(data_name, obj.dataset_names.bad_pixels)) && data_size(1) % data_names.bad_pixels may be a cell array of different optional names
+                        
+                        num_images_on_file = data_size(1); % fluxes should be 2D with number of frames in the 1st dim
+                        
+                        num_frames = min(num_frames, num_images_on_file); % make sure we don't ask for more frames than we have on file
+                        
+                        if length(data_size)==2
+                            loaded_bad_pixels = h5read(filename, sa('/', data_name), [frame_start 1], [num_frames Inf]); % must check the dimensions on file fit what I think I am saving...
+                        elseif length(data_size)==3
+                            loaded_bad_pixels = h5read(filename, sa('/', data_name), [frame_start 1 1], [num_frames Inf Inf]); % must check the dimensions on file fit what I think I am saving...
+                        end
+                        
+                        obj.bad_pixels = cat(1, obj.bad_pixels, loaded_bad_pixels); % append to the existing widths
+                    
+                    elseif any(strcmp(data_name, obj.dataset_names.flags)) && data_size(1) % data_names.flags may be a cell array of different optional names
+                        
+                        num_images_on_file = data_size(1); % fluxes should be 2D with number of frames in the 1st dim
+                        
+                        num_frames = min(num_frames, num_images_on_file); % make sure we don't ask for more frames than we have on file
+                        
+                        if length(data_size)==2
+                            loaded_flags = h5read(filename, sa('/', data_name), [frame_start 1], [num_frames Inf]); % must check the dimensions on file fit what I think I am saving...
+                        elseif length(data_size)==3
+                            loaded_flags = h5read(filename, sa('/', data_name), [frame_start 1 1], [num_frames Inf Inf]); % must check the dimensions on file fit what I think I am saving...
+                        end
+                        
+                        obj.flags = cat(1, obj.flags, loaded_flags); % append to the existing widths
+                             
                     elseif any(strcmp(data_name, obj.dataset_names.header)) 
                         obj.loadHeaderHDF5(filename, loaded_header, data_name, att_names);
                     end
