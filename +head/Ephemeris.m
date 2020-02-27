@@ -561,6 +561,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         function val = sex2deg(str) % convert a DD:MM:SS string (sexagesimal) to degrees
             
+            str = strip(str);
+            
             num = util.text.extract_numbers(str);
             
             if isempty(num)
@@ -570,6 +572,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 degrees = num{1}(1);
                 s = 1;
                 if degrees<0, s=-1; end
+                if degrees==0 && str(1)=='-', s=-1; end
                 
                 degrees = abs(degrees);
                 

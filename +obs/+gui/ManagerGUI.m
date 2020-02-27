@@ -273,6 +273,9 @@ classdef ManagerGUI < handle
             obj.menu_options.menu_timers.addButton('button_period2', 'Period2= %ds', 'input', 'period2', 'Adjust the period of the second timer');
             obj.menu_options.menu_timers.addButton('button_period3', 'Period3= %ds', 'input', 'period3', 'Adjust the period of the third timer');
             
+            obj.menu_options.addButton('menu_weather', '&Weather', 'menu'); 
+            obj.menu_options.menu_weather.addButton('button_wise', 'Use &Wise', 'toggle', 'checker.use_wise_data', 'Close when the Wise observatory deems it dangerous to operate'); 
+            
             obj.menu_objects = MenuItem(obj, '&Device GUIs', 'menu');
             obj.menu_objects.addButton('button_dome', '&Dome', 'push', 'dome', 'dome GUI', 'Open the dome GUI');
             obj.menu_objects.addButton('button_mount', '&Mount', 'push', 'mount', 'mount GUI', 'Open the dome GUI');
