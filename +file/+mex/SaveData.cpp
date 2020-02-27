@@ -47,24 +47,40 @@ void SaveData::parseVararginPairs(int N, const mxArray *vars[]){
 		
 		// the third parameters tells MyMatrix if we want to deflate it (ignored if we are not using deflate at all)
 		if(cs(keyword, "images")) images.input("images", value, 1); 
+		
 		else if(cs(keyword, "timestamps")) timestamps.input("timestamps", value, 0);
 		else if(cs(keyword, "t_start", "file_start_datestring", 16)) timestamps.attributes.push_back(MyAttribute("t_start", value));
 		else if(cs(keyword, "t_end", "file_write_datestring", 16)) timestamps.attributes.push_back(MyAttribute("t_end", value));
 		else if(cs(keyword, "t_end_stamp", "file_write_timestamp", 17)) timestamps.attributes.push_back(MyAttribute("t_end_stamp", value));
+		
 		else if(cs(keyword, "cutouts")) cutouts.input("cutouts", value, 1);
+		
 		else if(cs(keyword, "positions")) positions.input("positions", value, 0);
 		else if(cs(keyword, "obj_idx", "object_idx")) positions.attributes.push_back(MyAttribute("obj_idx", value));
 		else if(cs(keyword, "coordinates")) coordinates.input("coordinates", value, 0);
 		else if(cs(keyword, "magnitudes")) magnitudes.input("magnitudes", value, 0);
 		else if(cs(keyword, "temperatures")) temperatures.input("temperature", value, 0);
-		else if(cs(keyword, "fluxes")) fluxes.input("fluxes", value, 0);
+		
 		else if(cs(keyword, "cutouts_bg")) cutouts_bg.input("cutouts_bg", value, 1);
 		else if(cs(keyword, "positions_bg")) positions_bg.input("positions_bg", value, 0);
-		else if(cs(keyword, "backgrounds")) fluxes.input("backgrounds", value, 0);
+		
 		else if(cs(keyword, "stack")) stack.input("stack", value, 1);
 		else if(cs(keyword, "num_sum")) stack.attributes.push_back(MyAttribute("num_sum", value));
 		else if(cs(keyword, "psfs", 4)) psfs.input("psfs", value, 0);		
 		else if(cs(keyword, "sampling_psf",4)) psfs.attributes.push_back(MyAttribute("sampling_psf", value));
+		
+		else if(cs(keyword, "fluxes")) fluxes.input("fluxes", value, 0);
+		else if(cs(keyword, "errors")) fluxes.input("errors", value, 0);
+		else if(cs(keyword, "areas")) fluxes.input("areas", value, 0);
+		else if(cs(keyword, "backgrounds")) fluxes.input("backgrounds", value, 0);
+		else if(cs(keyword, "variances")) fluxes.input("variances", value, 0);
+		else if(cs(keyword, "offsets_x")) fluxes.input("offsets_x", value, 0);
+		else if(cs(keyword, "offsets_y")) fluxes.input("offsets_y", value, 0);
+		else if(cs(keyword, "centroids_x")) fluxes.input("centroids_y", value, 0);
+		else if(cs(keyword, "widths")) fluxes.input("widths", value, 0);
+		else if(cs(keyword, "bad_pixels")) fluxes.input("bad_pixels", value, 0);
+		else if(cs(keyword, "flags")) fluxes.input("flags", value, 0);
+		
 		// add more names to the list if new data fields are added
 		else if(cs(keyword, "header", "pars", "parameters", "cell")) readHeaderCellArray(value);
 		else if(cs(keyword, "debug_bit")) debug_bit=(int) mxGetScalar(value);
@@ -82,24 +98,41 @@ void SaveData::readStruct(const mxArray *buf){
 	
 	std::vector<std::string> names;
 	names.push_back("images");
+	
 	names.push_back("timestamps");
 	names.push_back("t_start");
 	names.push_back("t_end");
 	names.push_back("t_end_stamp");
+	
 	names.push_back("cutouts");
+	
 	names.push_back("positions");
 	names.push_back("obj_idx");
 	names.push_back("coordinates");
 	names.push_back("magnitudes");
 	names.push_back("temperatures");
-	names.push_back("fluxes");
+	
 	names.push_back("cutouts_bg");
 	names.push_back("positions_bg");
-	names.push_back("backgrounds");
+	
 	names.push_back("stack");
 	names.push_back("num_sum");
 	names.push_back("psfs");
 	names.push_back("sampling_psf");
+	
+	names.push_back("fluxes");
+	names.push_back("errors"); 
+	names.push_back("areas"); 
+	names.push_back("backgrounds");
+	names.push_back("variances"); 
+	names.push_back("offsets_x"); 
+	names.push_back("offsets_y"); 
+	names.push_back("centroids_x"); 
+	names.push_back("centroids_y");
+	names.push_back("widths");
+	names.push_back("bad_pixels"); 
+	names.push_back("flags"); 
+	
 	// add more names to the list if new data fields are added
 	
 	mxArray *value=0;
@@ -114,24 +147,42 @@ void SaveData::readStruct(const mxArray *buf){
 			const char *keyword=names[i].c_str();
 			
 			if(cs(keyword, "images")) images.input("images", value, 1); 
+			
 			else if(cs(keyword, "timestamps")) timestamps.input("timestamps", value, 0);
 			else if(cs(keyword, "t_start", "file_start_datestring", 16)) timestamps.attributes.push_back(MyAttribute("t_start", value));
 			else if(cs(keyword, "t_end", "file_write_datestring", 16)) timestamps.attributes.push_back(MyAttribute("t_end", value));
 			else if(cs(keyword, "t_end_stamp", "file_write_timestamp", 17)) timestamps.attributes.push_back(MyAttribute("t_end_stamp", value));
+			
 			else if(cs(keyword, "cutouts", 8)) cutouts.input("cutouts", value, 1);
+			
 			else if(cs(keyword, "positions", 9)) positions.input("positions", value, 0);
 			else if(cs(keyword, "obj_idx", "object_idx")) positions.attributes.push_back(MyAttribute("obj_idx", value)); 
 			else if(cs(keyword, "coordinates")) coordinates.input("coordinates", value, 0);
 			else if(cs(keyword, "magnitudes")) magnitudes.input("magnitudes", value, 0);
 			else if(cs(keyword, "temperatures")) temperatures.input("temperature", value, 0);
-			else if(cs(keyword, "fluxes")) fluxes.input("fluxes", value, 0);
+			
 			else if(cs(keyword, "cutouts_bg", 8)) cutouts_bg.input("cutouts_bg", value, 1);
 			else if(cs(keyword, "positions_bg", 9)) positions_bg.input("positions_bg", value, 0);
-			else if(cs(keyword, "backgrounds")) backgrounds.input("backgrounds", value, 0);
+			
 			else if(cs(keyword, "stack")) stack.input("stack", value, 1);
 			else if(cs(keyword, "num_sum")) stack.attributes.push_back(MyAttribute("num_sum", value));
 			else if(cs(keyword, "psfs", 4)) psfs.input("psfs", value, 0);		
 			else if(cs(keyword, "sampling_psf",4)) psfs.attributes.push_back(MyAttribute("psf_sampling", value));
+			
+			else if(cs(keyword, "fluxes")) fluxes.input("fluxes", value, 0);
+			else if(cs(keyword, "errors")) errors.input("errors", value, 0);
+			else if(cs(keyword, "areas")) areas.input("areas", value, 0);
+			else if(cs(keyword, "backgrounds")) backgrounds.input("backgrounds", value, 0);
+			else if(cs(keyword, "variances")) variances.input("variances", value, 0);
+			else if(cs(keyword, "offsets_x")) offsets_x.input("offsets_x", value, 0);
+			else if(cs(keyword, "offsets_y")) offsets_y.input("offsets_y", value, 0);
+			else if(cs(keyword, "centroids_x")) centroids_x.input("centroids_x", value, 0);
+			else if(cs(keyword, "centroids_y")) centroids_y.input("centroids_y", value, 0);
+			else if(cs(keyword, "widths")) widths.input("widths", value, 0);
+			else if(cs(keyword, "bad_pixels")) bad_pixels.input("bad_pixels", value, 0);
+			else if(cs(keyword, "flags")) flags.input("flags", value, 0);
+			
+			
 			// add more names to the list if new data fields are added
 		}
 		

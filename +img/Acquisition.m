@@ -283,10 +283,18 @@ classdef Acquisition < file.AstroData
                 obj.clip_bg.use_adjust = 0;
                 
                 obj.phot_stack = img.Photometry;
+                obj.phot_stack.index = 2;
+                
                 obj.flux_buf = util.vec.CircularBuffer;
                 
                 obj.phot = img.Photometry;
                 obj.lightcurves = img.Lightcurves;
+                
+                % we don't want to start doing serious calibration on the
+                % lightcurves object during acquisition! 
+                obj.lightcurves.use_zero_point = 0;
+                obj.lightcurves.use_polynomial = 0;
+                obj.lightcurves.use_psf_correction =0;
                 
                 obj.model_psf = img.ModelPSF;
                 
@@ -2009,7 +2017,8 @@ classdef Acquisition < file.AstroData
                 obj.variances = obj.phot.variances;
                 obj.offsets_x = obj.phot.offsets_x;
                 obj.offsets_y = obj.phot.offsets_y;
-                obj.centroids_x = obj.phot.centroids_y;
+                obj.centroids_x = obj.phot.centroids_x;
+                obj.centroids_y = obj.phot.centroids_y;
                 obj.widths = obj.phot.widths;
                 obj.bad_pixels = obj.phot.bad_pixels;
                 obj.flags = obj.phot.flags;

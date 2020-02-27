@@ -49,12 +49,23 @@ class SaveData {
 	MyMatrix coordinates;
 	MyMatrix magnitudes;
 	MyMatrix temperatures;	
-	MyMatrix fluxes;
 	MyMatrix cutouts_bg;
 	MyMatrix positions_bg;
-	MyMatrix backgrounds;
 	MyMatrix stack;
 	MyMatrix psfs;
+	
+	MyMatrix fluxes;
+	MyMatrix errors;
+	MyMatrix areas;
+	MyMatrix backgrounds;
+	MyMatrix variances;
+	MyMatrix offsets_x;
+	MyMatrix offsets_y;
+	MyMatrix centroids_x;
+	MyMatrix centroids_y;
+	MyMatrix widths;
+	MyMatrix bad_pixels;
+	MyMatrix flags;
 	
 	// for writing parameters objects and other attribute/metadata classes:
 	std::vector< std::string > parameter_addresses_vector; // names of each struct 	

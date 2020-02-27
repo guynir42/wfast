@@ -23,12 +23,23 @@ void SaveDataHDF5::writeData(){ // write to file all the main data sets (images,
 	writeMatrix(file, coordinates);
 	writeMatrix(file, magnitudes);
 	writeMatrix(file, temperatures);
-	writeMatrix(file, fluxes);
 	writeMatrix(file, cutouts_bg);
 	writeMatrix(file, positions_bg);
-	writeMatrix(file, backgrounds);
 	writeMatrix(file, stack);
 	writeMatrix(file, psfs);
+	
+	writeMatrix(file, fluxes);
+	writeMatrix(file, errors);
+	writeMatrix(file, areas);
+	writeMatrix(file, backgrounds);
+	writeMatrix(file, variances);
+	writeMatrix(file, offsets_x);
+	writeMatrix(file, offsets_y);
+	writeMatrix(file, centroids_x);
+	writeMatrix(file, centroids_y);
+	writeMatrix(file, widths);
+	writeMatrix(file, bad_pixels);
+	writeMatrix(file, flags);
 	
 }
 
