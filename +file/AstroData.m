@@ -24,12 +24,22 @@ classdef AstroData < dynamicprops
         temperatures; % each star's temperature in K (from catalog)
         object_idx; % what is the index of the object closest to the coordinates given
         
-        
+        % these are photometric products for each batch
         fluxes; % amount of light (total) in each cutout
+        errors; % error estimate on the flux measurements
+        areas; % aperture area 
+        backgrounds; % value of the average number of photons per pixel (of the background)
+        variances; % value of the average variance per pixel (of the background)
+        offsets_x; % measured inside the cutout (in pixels)
+        offsets_y; % measured inside the cutout (in pixels)
+        centroids_x; % measured relative to the full image (in pixels)
+        centroids_y; % measured relative to the full image (in pixels)
+        widths; % the second moment of the PSF
+        bad_pixels; % how many bad pixels are included in the aperture
+        flags; % if any of the measurements (1st or 2nd order) don't make sense, it is flagged by the photometry pipeline.  
         
         cutouts_bg; % samples of the raw images at random locations to calculate the backgrounds
         positions_bg; % only for bg_cutouts. a 2xN matrix (X then Y, N is the number of cutouts). 
-        backgrounds; % value of the average number of photons per pixel (of the background)
         
         stack % sum of the full frame image
         num_sum; % if the images are summed, how many frames were added. If equal to 1, the sum is the same as the images. 

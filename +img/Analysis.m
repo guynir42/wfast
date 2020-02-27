@@ -172,8 +172,11 @@ classdef Analysis < file.AstroData
                 obj.clip_bg.use_adjust = 0; % this should be disabled and depricated!
                 obj.back = img.Background;
                 obj.phot = img.Photometry;
+                obj.phot.index = 1;
                 
                 obj.phot_stack = img.Photometry;
+                obj.phot_stack.index = 2;
+                
                 obj.flux_buf = util.vec.CircularBuffer;
                 obj.mean_buf = util.vec.CircularBuffer;
                 obj.var_buf = util.vec.CircularBuffer;

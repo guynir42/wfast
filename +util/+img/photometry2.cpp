@@ -2,7 +2,9 @@
 #include "matrix.h"
 #include "photometry2.h"
 
-Photometry photometry; 
+#define NUM_GLOBAL_OBJECTS 10
+
+Photometry photometry[NUM_GLOBAL_OBJECTS]; 
 
 void mexFunction( int nlhs, mxArray *plhs[],
                   int nrhs, const mxArray *prhs[] ){
@@ -24,10 +26,12 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		return;
 	}
 
-	photometry.parseInputs(nrhs, prhs);
-	photometry.makeArrays(); 
+	int idx=parseIndex(nrhs, prhs);
 	
-	photometry.run();
+	photometry[idx].parseInputs(nrhs, prhs);
+	photometry[idx].makeArrays(); 
+	
+	photometry[idx].run();
 
 	char *field_names[6];
 	for(int i=0;i<6;i++) field_names[i]=(char*) mxMalloc(STRLN);
@@ -41,14 +45,46 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	
 	plhs[0]=mxCreateStructMatrix(1,1,6, (const char**) field_names); 
 		
-	mxSetFieldByNumber(plhs[0], 0, 0, photometry.outputStruct(photometry.output_raw)); 
-	if(photometry.use_forced) mxSetFieldByNumber(plhs[0], 0, 1, photometry.outputStruct(photometry.output_forced, photometry.num_radii)); 
-	if(photometry.use_apertures) mxSetFieldByNumber(plhs[0], 0, 2, photometry.outputStruct(photometry.output_apertures, photometry.num_radii)); 
-	if(photometry.use_gaussian) mxSetFieldByNumber(plhs[0], 0, 3, photometry.outputStruct(photometry.output_gaussian)); 
-	mxSetFieldByNumber(plhs[0], 0, 4, photometry.outputAverages()); 
-	mxSetFieldByNumber(plhs[0], 0, 5, photometry.outputMetadataStruct());
+	mxSetFieldByNumber(plhs[0], 0, 0, photometry[idx].outputStruct(photometry[idx].output_raw)); 
+	if(photometry[idx].use_forced) mxSetFieldByNumber(plhs[0], 0, 1, photometry[idx].outputStruct(photometry[idx].output_forced, photometry[idx].num_radii)); 
+	if(photometry[idx].use_apertures) mxSetFieldByNumber(plhs[0], 0, 2, photometry[idx].outputStruct(photometry[idx].output_apertures, photometry[idx].num_radii)); 
+	if(photometry[idx].use_gaussian) mxSetFieldByNumber(plhs[0], 0, 3, photometry[idx].outputStruct(photometry[idx].output_gaussian)); 
+	mxSetFieldByNumber(plhs[0], 0, 4, photometry[idx].outputAverages()); 
+	mxSetFieldByNumber(plhs[0], 0, 5, photometry[idx].outputMetadataStruct());
 
-	if(nlhs>1) plhs[1]=photometry.outputArraysStruct();
+	if(nlhs>1) plhs[1]=photometry[idx].outputArraysStruct();
+	
+}
+
+int parseIndex(int nrhs, const mxArray *prhs[]){
+	
+	int index=1; // the default is to use the first (zero index after conversion to C++)
+	mxArray *val=0;
+		
+	for(int i=1;i<nrhs;i+=2){ // parse varargin
+		
+		char key[STRLN];
+		if(mxIsChar(prhs[i])==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotChar", "Input %d to photometry is not a string...", i+1);
+		mxGetString(prhs[i], key, STRLN); // copy the string data
+		
+		if(i+1<nrhs) val=(mxArray*) prhs[i+1]; // if the varargin is odd numbered, leave val=0 as default
+		
+		if(cs(key, "index")){
+			
+			if(val==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for '%s' at input", key, i+2);
+			if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not a numeric scalar...", i+2);
+			index=(int) mxGetScalar(val);
+			
+		}
+		
+	}
+	
+	index--; // convert matlab one based index to C++ indexing
+	
+	if(index<0 || index>=NUM_GLOBAL_OBJECTS) 
+		mexErrMsgIdAndTxt("MATLAB:util:img:photometry:indexOutOfBounds", "Index given (%d) exceeds the range of the global object array (%d)", index, NUM_GLOBAL_OBJECTS);
+	
+	return index; 
 	
 }
 
