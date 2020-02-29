@@ -516,6 +516,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         end
         
+        function val = is_slewing(obj)
+            
+            try
+                val = obj.hndl.Slewing;
+            catch
+                val = [];
+            end
+            
+        end
+        
         function val = latitutde(obj)
             
 %             val = obj.hndl.SiteLatitude;
@@ -565,7 +575,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             if isempty(obj.objRA_deg) || isempty(obj.objDEC_deg)
                 val = '';
             else
-                val = obj.hndl.DestinationSideOfPier(obj.objRA_deg/15, obj.objDEC_deg);
+                try
+                    val = obj.hndl.DestinationSideOfPier(obj.objRA_deg/15, obj.objDEC_deg);
+                catch 
+                    val = '';
+                end
             end
             
         end

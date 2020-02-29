@@ -401,7 +401,7 @@ classdef ManagerGUI < handle
         
         function updateStopButton(obj)
             
-            if obj.owner.mount.hndl.Slewing
+            if obj.owner.mount.is_slewing
                 obj.panel_stop.button_stop.BackgroundColor = 'red';
             elseif obj.owner.dome.brake_bit==0
                 obj.panel_stop.button_stop.BackgroundColor = 'red';

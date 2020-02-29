@@ -670,7 +670,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 
             if ~isempty(obj.sync) 
                 
-                if obj.mount.tracking && obj.dome.is_closed==0
+                if ~isempty(obj.mount.tracking) && obj.mount.tracking && obj.dome.is_closed==0
                     obj.sync.outgoing.stop_camera = 0; % if everything is cool, let the camera keep going
                 end
                 
