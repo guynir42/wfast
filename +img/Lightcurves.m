@@ -117,6 +117,9 @@ classdef Lightcurves < handle
         
         index_flux = 'end'; % which aperture to use, default "end" is for forced photometery with the largest aperture
         
+        sampling_jump = 100; % how many data points to bin together when calculating RE on larger and larger time-intervals
+        num_points_rms = 20; % how many data points of binned data to use for calculating local relative error
+        
         show_for = 'time'; % can also choose "stars" to get star by star stats
         show_what = 'flux'; % can choose "flux", "areas", "backgrounds", "variances", "centroids", "offsets", "widths", "power spectra"
         show_flux_type = 'raw'; % can choose "raw" or "sub" or "rem" or "cal" or "all".
@@ -159,6 +162,10 @@ classdef Lightcurves < handle
         power_spectra; 
         psd_freq;
         
+        total_RE; % relative error calculated on the entire length of the data
+        local_RE; % relative error calculated on a short interval and averaged over all intervals
+        bin_widths_seconds; % the time-interval used for each calculation of RE, starting from the native time sampling
+        
     end
     
     properties(Hidden=true)
@@ -183,10 +190,10 @@ classdef Lightcurves < handle
         
         fit_results_; % save this from the polyfit (lazy load)
         
-        show_what_list = {'fluxes', 'areas', 'backgrounds', 'variances', 'centroids', 'offsets', 'widths', 'bad_pixels', 'power spectra'};
+        show_what_list = {'fluxes', 'areas', 'backgrounds', 'variances', 'centroids', 'offsets', 'widths', 'bad_pixels', 'power spectra', 'statistics'};
         show_flux_type_list = {'raw', 'sub', 'rem', 'cal', 'all'};
         
-        version = 1.08;
+        version = 1.09;
         
     end
     
@@ -217,6 +224,10 @@ classdef Lightcurves < handle
         
         power_spectra_; 
         psd_freq_;
+        
+        total_RE_;
+        local_RE_;
+        bin_widths_seconds_;
         
     end
     
@@ -303,6 +314,14 @@ classdef Lightcurves < handle
 
             obj.power_spectra_ = []; 
             obj.psd_freq_ = [];
+            
+        end
+        
+        function clearRE(obj)
+           
+            obj.total_RE_ = [];
+            obj.local_RE_ = [];
+            obj.bin_widths_seconds_ = [];
             
         end
         
@@ -829,12 +848,33 @@ classdef Lightcurves < handle
             
         end
         
-        function [pxx, freq] = calculatePSD(obj)
+        function val = get.local_RE(obj)
             
-            f = obj.fluxes_sub;
-            f = fillmissing(f, 'linear'); 
+            if isempty(obj.local_RE_)
+                obj.calculateRelativeError;
+            end
             
-            [pxx, freq] = pwelch(f, [], [], [], 1./median(diff(obj.timestamps))); 
+            val = obj.local_RE_;
+            
+        end
+        
+        function val = get.total_RE(obj)
+            
+            if isempty(obj.total_RE_)
+                obj.calculateRelativeError;
+            end
+            
+            val = obj.total_RE_;
+            
+        end
+        
+        function val = get.bin_widths_seconds(obj)
+            
+            if isempty(obj.bin_widths_seconds_)
+                obj.calculateRelativeError;
+            end
+            
+            val = obj.bin_widths_seconds_;
             
         end
         
@@ -888,6 +928,7 @@ classdef Lightcurves < handle
                 
                 obj.clearIntermidiate;
                 obj.clearPSD;
+                obj.clearRE; 
                 
             end
             
@@ -899,6 +940,7 @@ classdef Lightcurves < handle
             obj.clearFits;
             obj.clearFluxes;
             obj.clearPSD;
+            obj.clearRE;
             
         end
         
@@ -908,6 +950,7 @@ classdef Lightcurves < handle
             obj.clearFits;
             obj.clearFluxes;
             obj.clearPSD;
+            obj.clearRE;
             
         end
         
@@ -916,6 +959,7 @@ classdef Lightcurves < handle
             obj.backgrounds_full = val;
             obj.clearFluxes;
             obj.clearPSD;
+            obj.clearRE;
             
         end
         
@@ -924,6 +968,7 @@ classdef Lightcurves < handle
             obj.areas_full = val;
             obj.clearFluxes;
             obj.clearPSD;
+            obj.clearRE;
             
         end
         
@@ -933,6 +978,7 @@ classdef Lightcurves < handle
                 obj.use_subtract_backgrounds = val;
                 obj.clearFluxes;
                 obj.clearPSD;
+                obj.clearRE;
             end
             
         end
@@ -944,6 +990,7 @@ classdef Lightcurves < handle
                 obj.fluxes_rem_ = [];
                 obj.fluxes_cal_ = [];
                 obj.clearPSD;
+                obj.clearRE;
             end
             
         end
@@ -955,6 +1002,7 @@ classdef Lightcurves < handle
                 obj.fluxes_rem_ = [];
                 obj.fluxes_cal_ = [];
                 obj.clearPSD;
+                obj.clearRE;
             end
             
         end
@@ -966,6 +1014,7 @@ classdef Lightcurves < handle
                 obj.fluxes_rem_ = [];
                 obj.fluxes_cal_ = [];
                 obj.clearPSD;
+                obj.clearRE;
             end
             
         end
@@ -977,6 +1026,7 @@ classdef Lightcurves < handle
                 obj.fluxes_rem_ = [];
                 obj.fluxes_cal_ = [];
                 obj.clearPSD;
+                obj.clearRE;
             end
             
         end
@@ -988,6 +1038,7 @@ classdef Lightcurves < handle
                 obj.fluxes_rem_ = [];
                 obj.fluxes_cal_ = [];
                 obj.clearPSD;
+                obj.clearRE;
             end
             
         end
@@ -998,6 +1049,7 @@ classdef Lightcurves < handle
                 obj.use_psf_correction = val;
                 obj.fluxes_cal_ = [];
                 obj.clearPSD;
+                obj.clearRE;
             end
             
         end
@@ -1008,6 +1060,7 @@ classdef Lightcurves < handle
                 obj.use_polynomial = val;
                 obj.fluxes_cal_ = [];
                 obj.clearPSD;
+                obj.clearRE;
             end
             
         end
@@ -1018,6 +1071,7 @@ classdef Lightcurves < handle
                 obj.use_zero_point = val;
                 obj.fluxes_cal_ = [];
                 obj.clearPSD;
+                obj.clearRE;
             end
             
         end
@@ -1029,6 +1083,7 @@ classdef Lightcurves < handle
                 if obj.use_zero_point
                     obj.fluxes_cal_ = [];
                     obj.clearPSD;
+                    obj.clearRE;
                 end
             end
             
@@ -1053,6 +1108,7 @@ classdef Lightcurves < handle
                 if obj.use_zero_point
                     obj.fluxes_cal_ = [];
                     obj.clearPSD;
+                    obj.clearRE;
                 end
             end
             
@@ -1064,13 +1120,38 @@ classdef Lightcurves < handle
                 obj.index_flux = val;
                 obj.clearFluxes;
                 obj.clearPSD;
+                obj.clearRE;
+            end
+            
+        end
+        
+        function set.sampling_jump(obj, val)
+            
+            if ~isequal(obj.sampling_jump, val)
+               
+                obj.sampling_jump = val;
+                
+                obj.clearRE;
+                
+            end
+            
+        end
+        
+        function set.num_points_rms(obj, val)
+            
+            if ~isequal(obj.num_points_rms, val)
+               
+                obj.num_points_rms = val;
+                
+                obj.clearRE;
+                
             end
             
         end
         
     end
     
-    methods % calculations
+    methods % startup/finishup/get data functions
         
         function startup(obj, num_frames, num_stars, num_apertures) % preallocate the required arrays
             
@@ -1216,6 +1297,49 @@ classdef Lightcurves < handle
             
         end
         
+    end
+    
+    methods % calculations
+        
+        function [pxx, freq] = calculatePSD(obj)
+            
+            f = obj.fluxes_sub;
+            f = fillmissing(f, 'linear'); 
+            
+            [pxx, freq] = pwelch(f, [], [], [], 1./median(diff(obj.timestamps))); 
+            
+        end
+        
+        function calculateRelativeError(obj)
+            
+            import util.series.binning;
+            
+            obj.clearRE;
+            
+            f = obj.fluxes_cal;
+            t = obj.timestamps;
+            
+            F = nanmean(f); % the average flux is used to divide the rms and get the relative error (RE)
+            
+            for ii = 1:1e3 % arbitrary loop length with a break condition
+                
+                obj.bin_widths_seconds_(ii) = nanmedian(diff(t)); % get the average time sampling
+                
+                obj.local_RE_(ii,:) = nanmedian(binning(f, obj.num_points_rms, 'function', 'std'))./F; % the local relative error
+                
+                obj.total_RE_(ii,:) = nanstd(f)./F; % the relative error on the entire dataset
+                
+                f = binning(f, obj.sampling_jump); % downsample the lightcurves by a set factor 
+                t = binning(t, obj.sampling_jump); % make sure the timesteps are binned like the fluxes
+                
+                if size(f,1)<obj.num_points_rms
+                    break; % if the newly binned flux is too short to calculate local rms, there's no point to keep going! 
+                end
+                
+            end
+            
+        end
+        
         function rho = getCorrelationCoeff(obj, type) % calculate Pearson's coefficient with respect to flux and any other quantity
             
             f1 = obj.fluxes;
@@ -1242,6 +1366,10 @@ classdef Lightcurves < handle
             flux_corr = obj.fluxes.*rho./(Av./nanmean(Av));
             
         end
+        
+    end
+    
+    methods % load/save
         
         function saveAsMAT(obj, filename, star_indices, frame_indices, aperture_indices) % save only the data, in raw matrices, to a MAT file, along with phot_pars and a short readme. 
             
@@ -1484,15 +1612,15 @@ classdef Lightcurves < handle
                 ylabel(input.ax, 'power spectra (Welch)'); 
                 xlabel(input.ax, 'Frequency [Hz]'); 
                 
+            elseif cs(obj.show_what, 'stats', 'statistics')
+                obj.showStats('ax', input.ax, 'font_size', input.font_size);
             else
-                error('Unknown data to show "%s", use "fluxes" or "offset" etc...', obj.show_what);
+                error('Unknown option to to show_what: "%s", use "fluxes" or "offset" etc...', obj.show_what);
             end
             
             hold(input.ax, 'off');
             
             input.ax.FontSize = input.font_size;
-            
-            
             
             box(input.ax, 'on'); 
             
@@ -1559,6 +1687,64 @@ classdef Lightcurves < handle
                 
                 
             end
+            
+        end
+        
+        function showStats(obj, varargin)
+            
+            
+            input = util.text.InputVars;
+            input.input_var('font_size', 26); 
+            input.input_var('ax', [], 'axes', 'axis');
+            input.scan_vars(varargin{:});
+            
+            if isempty(input.ax)
+                if ~isempty(obj.gui) && obj.gui.check
+                    input.ax = obj.gui.axes_image;
+                else
+                    input.ax = gca;
+                end
+            end
+            
+            if ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) && size(obj.cat.magnitudes,1)==size(obj.fluxes,2)
+                x = obj.cat.magnitudes';
+                x(x>14) = NaN;
+                used_mag = 1;
+            elseif ~isempty(obj.cat) && ~isempty(obj.cat.data) && any(contains(obj.cat.data.Properties.VariableNames, 'Mag_BP')) && size(obj.cat.data.Mag_BP,1)==size(obj.fluxes,2)
+                x = obj.cat.data.Mag_BP';
+                x(x>14) = NaN;
+                used_mag = 1;
+            else
+                x = nanmean(obj.fluxes_cal_); % no magnitudes are given, use the average fluxes instead
+                used_mag = 0;
+            end
+            
+            h1 = plot(input.ax, x, obj.local_RE, '.', 'HandleVisibility', 'off');
+                        
+            input.ax.ColorOrderIndex = 1;
+            
+            input.ax.NextPlot = 'add';
+            
+            h2 = plot(input.ax, x, obj.total_RE, 'p'); 
+            
+            for ii = 1:length(h2)
+                h2(ii).DisplayName = sprintf('Bin width= %4.2f seconds', obj.bin_widths_seconds(ii));
+            end
+            
+            input.ax.NextPlot = 'replace';
+            
+            if used_mag
+                xlabel(input.ax, 'Magnitude'); 
+                input.ax.XScale = 'linear';
+                legend(input.ax, 'Location', 'SouthEast'); 
+            else
+                xlabel(input.ax, 'Flux [counts]'); 
+                input.ax.XScale = 'log';
+                legend(input.ax, 'Location', 'NorthEast');
+            end
+            
+            input.ax.YScale = 'log';
+            
             
         end
         

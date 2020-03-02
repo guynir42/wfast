@@ -96,7 +96,8 @@ classdef LightGUI < handle
             
             obj.panel_control = GraphicPanel(obj.owner, [0 0.9 0.2 0.1], 'control'); 
             obj.panel_control.number = 1;
-            obj.panel_control.addButton('button_double_up', 'use_double_up', 'toggle', 'double up', 'double up', '', [], obj.color_on);
+            obj.panel_control.addButton('button_preallocate', 'use_preallocate', 'toggle', 'preallocate', 'preallocate', '', 0.5, obj.color_on);
+            obj.panel_control.addButton('button_double_up', 'use_double_up', 'toggle', 'double up', 'double up', '', 0.5, obj.color_on);
             obj.panel_control.margin = [0.01 0.02];
             obj.panel_control.make;
             

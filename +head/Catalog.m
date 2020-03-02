@@ -83,8 +83,8 @@ classdef Catalog < handle
             if ~isempty(varargin) && isa(varargin{1}, 'head.Catalog')
                 if obj.debug_bit, fprintf('Catalog copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
-            elseif ~isempty(varargin) && isa(varargin{1}, 'head.Parameters')
-                if obj.debug_bit>1, fprintf('Catalog (pars) constructor v%4.2f\n', obj.version); end
+            elseif ~isempty(varargin) && isa(varargin{1}, 'head.Header')
+                if obj.debug_bit>1, fprintf('Catalog (head) constructor v%4.2f\n', obj.version); end
                 obj.head = varargin{1};
             else
                 if obj.debug_bit>1, fprintf('Catalog constructor v%4.2f\n', obj.version); end
