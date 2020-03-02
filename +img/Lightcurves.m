@@ -1323,9 +1323,9 @@ classdef Lightcurves < handle
             
             for ii = 1:1e3 % arbitrary loop length with a break condition
                 
-                obj.bin_widths_seconds_(ii) = nanmedian(diff(t)); % get the average time sampling
+                obj.bin_widths_seconds_(ii) = nanmedian(diff(t),1); % get the average time sampling
                 
-                obj.local_RE_(ii,:) = nanmedian(binning(f, obj.num_points_rms, 'function', 'std'))./F; % the local relative error
+                obj.local_RE_(ii,:) = nanmedian(binning(f, obj.num_points_rms, 'function', 'std'),1)./F; % the local relative error
                 
                 obj.total_RE_(ii,:) = nanstd(f)./F; % the relative error on the entire dataset
                 
@@ -1736,7 +1736,7 @@ classdef Lightcurves < handle
             if used_mag
                 xlabel(input.ax, 'Magnitude'); 
                 input.ax.XScale = 'linear';
-                legend(input.ax, 'Location', 'SouthEast'); 
+                legend(input.ax, 'Location', 'NorthWest'); 
             else
                 xlabel(input.ax, 'Flux [counts]'); 
                 input.ax.XScale = 'log';

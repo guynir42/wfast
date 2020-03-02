@@ -69,19 +69,19 @@ function f_out = binning(f, varargin)
     f = reshape(f, [input.factor size(f,1)./input.factor size(f,2)]);
     
     if cs(input.func, 'mean')
-        f = nanmean(f); 
+        f = nanmean(f,1); 
     elseif cs(input.func, 'median')
-        f = nanmedian(f);
+        f = nanmedian(f,1);
     elseif cs(input.func, 'sum')
-        f = nansum(f);
+        f = nansum(f,1);
     elseif cs(input.func, 'std')
-        f = nanstd(f);
+        f = nanstd(f,[],1);
     elseif cs(input.func, 'var')
-       f = nanvar(f);
+       f = nanvar(f, [], 1);
     elseif cs(input.func, 'min')
-        f = nanmin(f);
+        f = nanmin(f, [], 1);
     elseif cs(input.func, 'max')
-        f = nanmax(f);
+        f = nanmax(f, [], 1);
     else
         error('Unknown function option: "%s". Use "mean", "median", "sum", "std", "var", "min" or "max"...', input.func); 
     end
