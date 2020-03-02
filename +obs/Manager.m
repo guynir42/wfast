@@ -121,7 +121,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             end
             
             if obj.use_mount
-                obj.connectMount; % ASA mount
+%                 obj.connectMount; % ASA mount
             end
             
             if obj.use_weather
@@ -324,7 +324,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             try 
             
-                if obj.mount.tracking
+                if isempty(obj.mount) || isempty(obj.mount.tracking) || obj.mount.tracking
                     val = 0;
                     return;
                 end
@@ -395,7 +395,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function val = get.tracking(obj)
             
-            val = obj.mount.tracking;
+            if isempty(obj.mount)
+                val = [];
+            else
+                val = obj.mount.tracking;
+            end
             
         end
         

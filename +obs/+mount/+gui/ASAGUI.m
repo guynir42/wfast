@@ -419,8 +419,10 @@ classdef ASAGUI < handle
 %             obj.owner.hndl.MoveAxis(0,0);
 %             obj.owner.hndl.MoveAxis(1,0);
             
-            obj.owner.hndl.AbortSlew;
-            obj.owner.hndl.Tracking = obj.owner.was_tracking; % go around the ASA.set.tracking function 
+            try
+                obj.owner.hndl.AbortSlew;
+                obj.owner.hndl.Tracking = obj.owner.was_tracking; % go around the ASA.set.tracking function 
+            end
             
             delete(obj.fig.fig);
             
