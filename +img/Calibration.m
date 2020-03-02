@@ -1377,7 +1377,7 @@ classdef Calibration < handle
             end
             
             if nargin<3 || isempty(camera)
-                camera = 'Zyla';
+                camera = obj.camera_name;
             end
             
             if nargin<4 || isempty(project)

@@ -738,7 +738,7 @@ classdef Lightcurves < handle
                 obj.centroids_y_ = obj.centroids_y_full(1:obj.frame_index-1,:,:);
             end
             
-            val = obj.centroids_y_full;
+            val = obj.centroids_y_;
             
             if all(isnan(val))
                 val = [];

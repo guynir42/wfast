@@ -339,14 +339,14 @@ classdef Acquisition < file.AstroData
 
         function setupDefaults(obj)
 
-            obj.total_runtime = 4;
             obj.runtime_units = 'hours';
+            obj.total_runtime = 4;
 %             obj.num_batches = 500;
             obj.batch_size = 100;
             
-            obj.num_stars = 1000;
-            obj.cut_size = 25;
-            obj.avoid_edges = 100;
+            obj.num_stars = 2500;
+            obj.cut_size = 15;
+            obj.avoid_edges = 50;
             
             obj.num_backgrounds = 50;
             obj.cut_size_bg = 32;
@@ -1231,6 +1231,8 @@ classdef Acquisition < file.AstroData
                 end
             end
            
+            obj.update;
+            
         end
         
         function chooseDir(obj, dirname)
@@ -1393,6 +1395,13 @@ classdef Acquisition < file.AstroData
             end
             
             obj.head.update;
+            
+            if isa(obj.src, 'obs.cam.Andor')
+                obj.head.INST = obs.cam.mex_new.get(obj.src.hndl, 'name'); 
+                obj.head.PIXSIZE = obs.cam.mex_new.get(obj.src.hndl, 'pixel width'); 
+            end
+            
+            obj.cal.camera_name = obj.head.INST;
             
         end
         
@@ -1826,16 +1835,26 @@ classdef Acquisition < file.AstroData
             obj.cat.detection_stack_number = obj.num_sum;
             obj.cat.detection_exposure_time = obj.expT;
             
-            obj.cat.inputPositions(obj.positions); 
+            obj.cat.inputPositions(obj.positions);
+            
             obj.positions = obj.cat.positions; % if used some filter on the stars we found
             obj.ref_positions = obj.cat.positions;
             obj.clip.positions = obj.cat.positions;
             
             if ~isempty(obj.cat.data) && obj.cat.success % successfully filled the catalog
 
+                coor_deg = obj.cat.mextractor_sim.WCS.WCS.CRVAL;
+                
+                if obj.debug_bit, fprintf('Successfully solved astrometry! Coordinates: %s %s\n', ...
+                        head.Ephemeris.deg2hour(coor_deg(1)), head.Ephemeris.deg2sex(coor_deg(2))); end % need to pull the coordinates in a more serious way
+                
                 obj.cat.num_stars = obj.num_stars;
 
                 obj.positions = obj.cat.positions; % usually we will already have positions so this should do nothing (unless this analysis is on full frame rate images)
+                
+                if obj.use_save
+                    
+                end
                 
             end
 

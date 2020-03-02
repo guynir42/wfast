@@ -754,7 +754,7 @@ classdef BufferWheel < file.AstroData
             end
             
             if nargin<3 || isempty(timeout)
-                timeout = max([10, obj.head.expT.*5*size(buf.images,3)]); % seconds
+                timeout = max([10, obj.head.EXPTIME.*5*size(buf.images,3)]); % seconds
             end
             
             if ~isempty(obj.camera_mex_flag) && obj.camera_mex_flag(1)==0
