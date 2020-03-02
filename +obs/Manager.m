@@ -684,18 +684,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             if obj.use_shutdown && obj.devices_ok==0 % critical device failure, must shut down
                 if obj.is_shutdown==0 % if already shut down, don't need to do it again
+                    fprintf('%s: Device problems... %s \n', datestr(obj.log.time), obj.checker.report); 
                     obj.shutdown;
                 end
             end
 
             if obj.use_shutdown && obj.sensors_ok==0 % critical device failure, must shut down
                 if obj.is_shutdown==0 % if already shut down, don't need to do it again
+                    fprintf('%s: Bad weather... %s \n', datestr(obj.log.time), obj.checker.report); 
                     obj.shutdown;
                 end
             end
             
             if obj.use_shutdown && obj.checkDayTime % check if the system clock says it is day time
                 if obj.is_shutdown==0 % if already shut down, don't need to do it again
+                    fprintf('%s: Day time... %s \n', datestr(obj.log.time), obj.checker.report); 
                     obj.shutdown;
                 end
             end
