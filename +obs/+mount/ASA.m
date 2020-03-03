@@ -722,7 +722,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
     end
     
-    methods % calculations / commands
+    methods % parsing targets
         
         function inputTarget(obj, varargin)
             
@@ -740,26 +740,137 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function parseTargetString(obj, str)
+        function C_out = scanTargetList(obj, filename)
+            
+            if ~exist(filename, 'file')
+                error('Cannot find filename "%s".', filename);
+            end
+            
+            f = fopen(filename, 'r'); 
+            clean_up_file = onCleanup(@() fclose(f));
+            
+            C = {};
+            
+            for ii = 1:1e3 % arbitrary loop length with break inside
+                
+                L = fgetl(f); 
+                
+                if isnumeric(L)
+                    break;
+                end
+                
+                [name, RA, Dec ] = obj.parseTargetString(L); 
+                
+                if isempty(RA) || isempty(Dec)
+                    str = name;
+                elseif isempty(name)
+                    str = sprintf('{%s, %s}', RA, Dec);
+                else
+                    str = sprintf('%s {%s, %s}', name, RA, Dec);
+                end
+                
+                C{end+1} = str;
+                
+            end
+            
+            if nargout==0
+                
+                if length(C)>obj.num_prev_objects
+                    obj.num_prev_objects = length(C);
+                end
+                    
+                for ii = length(C):-1:1
+                    obj.addTargetList(C{ii}); 
+                end
+               
+            else
+                C_out = C;
+            end
+            
+        end
+        
+        function [name, RA, Dec] = parseTargetString(obj, str)
+            
+            e = head.Ephemeris; % use this to format the RA/Dec inputs
             
             C = strip(strsplit(str, {'{','}',','}));
             
             C = C(~cellfun(@isempty,C));
             
-            if length(C)==2
-                obj.objName = '';
-                obj.objRA = C{1};
-                obj.objDEC = C{2};
-            elseif length(C)==3
-                obj.objRA = C{2};
-                obj.objDEC = C{3};
-                obj.objName = C{1};
-            else
-                error('Wrong number of extracted strings (%d).', length(C));
+            for ii = 1:min(2,length(C))
+                
+                if contains(C{ii}, '+')
+                    new_cells = strip(strsplit(C{ii}, '+'));
+                    new_cells{2} = ['+' new_cells{2}];
+                elseif contains(C{ii}, '-')
+                    new_cells = strip(strsplit(C{ii}, '-'));
+                    new_cells{2} = ['-' new_cells{2}];
+                else
+                    new_cells = C{ii}; 
+                end
+                
+                if ii<length(C)
+                    C = [C(1:ii-1) new_cells C(ii+1:end)];
+                else
+                    C = [C(1:ii-1) new_cells];
+                end
+                
             end
             
+            if length(C)==1
+                name = C{1};
+                RA = '';
+                Dec = '';
+            elseif length(C)==2
+                name = '';
+                RA = C{1};
+                Dec = C{2};
+            elseif length(C)==3
+                name = C{1};
+                RA = C{2};
+                Dec = C{3};
+            end
+            
+            if ~isempty(RA)
+                e.RA = RA;
+                RA = e.RA; 
+            end
+            
+            if ~isempty(Dec)
+                e.Dec = Dec;
+                Dec = e.Dec; 
+            end
+            
+            if isempty(RA) || isempty(Dec)
+                e.input(name, []);
+                if ~isnan(e.RA_deg) && ~isnan(e.Dec_deg)
+                    RA = e.RA;
+                    Dec = e.Dec;
+                end
+            end
+            
+            if nargout==0
+                obj.objRA = RA;
+                obj.objDEC = Dec;
+                obj.objName = name;
+            end
             
         end
+        
+        function addTargetList(obj, str)
+            
+            if isempty(obj.prev_objects) || all(~strcmp(str, obj.prev_objects)) % check this string is not on the list already... 
+                obj.prev_objects = [str obj.prev_objects]; % add new items up front
+                if length(obj.prev_objects)>obj.num_prev_objects % clip the end of the list if needed
+                    obj.prev_objects = obj.prev_objects(1:obj.num_prev_objects);
+                end
+            end
+            
+        end
+        
+    end
+    
+    methods % calculations / commands
         
         function val = check_before_slew(obj)
             
@@ -868,13 +979,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 end
                 
                 try % keep a history of all targets
-                    str = [obj.objName ' {' obj.objRA ',' obj.objDEC '}'];
-                    if isempty(obj.prev_objects) || all(~strcmp(str, obj.prev_objects))
-                        obj.prev_objects = [str obj.prev_objects];
-                        if length(obj.prev_objects)>obj.num_prev_objects
-                            obj.prev_objects = obj.prev_objects(1:obj.num_prev_objects);
-                        end
-                    end
+                    str = [obj.objName ' {' obj.objRA ', ' obj.objDEC '}'];
+                    obj.addTargetList(str);
                 catch ME
                     rethrow(ME);
                 end
