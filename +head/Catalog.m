@@ -72,7 +72,7 @@ classdef Catalog < handle
     
     properties(Hidden=true)
        
-        version = 1.00;
+        version = 1.01;
         
     end
     
@@ -434,7 +434,7 @@ classdef Catalog < handle
             obj.coordinates = [obj.data.RA obj.data.Dec];
             obj.temperatures = obj.data.Teff;
             
-            obj.detection_limit = nanmax(obj.magnitudes); 
+            obj.detection_limit = nanmax(obj.magnitudes); % must find a better way to estimate this (there's lots of accidental matches with the wrong flux)
             
         end
         
@@ -601,11 +601,12 @@ classdef Catalog < handle
         function saveMAT(obj, filename)
             
             CatTable = obj.data;
-            pars = obj.head.obj2struct; 
+            header = obj.head.obj2struct; 
+            version = obj.version;
             
             if obj.success
                 if obj.debug_bit, disp(['Saving catalog file to ' filename]); end
-                save(filename, 'CatTable', 'pars', '-v7.3');
+                save(filename, 'CatTable', 'header', '-v7.3');
             else
                 if obj.debug_bit, disp('Cannot save catalog without a good astrometry match'); end
             end
@@ -620,13 +621,33 @@ classdef Catalog < handle
                 obj.data = CatTable;
             end
             
-            if exist('head', 'var')
+            if exist('header', 'var')
+                obj.head.struct2obj(header); 
+            elseif exist('head', 'var')
                 obj.head.struct2obj(head); 
             elseif exist('pars', 'var')
                 obj.head.struct2obj(pars); 
             end
             
+            if exist('version', 'var')
+                % what to do with this...?
+            end
+            
             % add positions, magnitudes, coordinates and temperatures from the table
+            obj.positions = [obj.data.X obj.data.Y];
+            obj.magnitudes = obj.data.Mag_BP;
+            obj.temperatures = obj.data.Teff;
+            obj.coordinates = [obj.data.RA obj.data.Dec];
+            
+            obj.central_RA = obj.head.OBSRA_DEG;
+            obj.central_Dec = obj.head.OBSDEC_DEG;
+            
+            obj.detection_limit = obj.head.LIMMAG_DETECTION;
+            obj.detection_threshold = obj.head.THRESH_DETECTION;
+            obj.detection_stack_number = obj.head.NAXIS3;
+            obj.detection_exposure_time = obj.head.EXPTIME;
+            
+            success = 1; % assume that a saved catalog is a successful catalog... maybe add some tests? 
             
         end
         

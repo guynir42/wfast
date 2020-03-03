@@ -903,6 +903,12 @@ classdef Reader < file.AstroData
                         obj.getAttribute(filename, data_name, att_names, 't_end');
                         obj.getAttribute(filename, data_name, att_names, 't_end_stamp');
                         
+                        obj.head.END_STAMP = obj.t_end_stamp;
+                        
+                        J = juliandate(util.text.str2time(obj.t_end));
+                        
+                        obj.juldates = J + (obj.timestamps - a.t_end_stamp)/24/3600; 
+                        
                     elseif any(strcmp(data_name, obj.dataset_names.psfs)) && all(data_size) % data_names.psfs may be a cell array of different optional names
                         
                         num_images_on_file = data_size(3);

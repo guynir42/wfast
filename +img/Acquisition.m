@@ -1613,6 +1613,12 @@ classdef Acquisition < file.AstroData
             
             obj.copyFrom(obj.src); % get the data into this object
             
+            obj.head.END_STAMP = obj.t_end_stamp;
+                        
+            J = juliandate(util.text.str2time(obj.t_end));
+                        
+            obj.juldates = J + (obj.timestamps - a.t_end_stamp)/24/3600; 
+            
             % if src is using ROI, must update the calibration object to do the same
             if isprop(obj.src, 'use_roi') && obj.src.use_roi 
                 
@@ -2031,7 +2037,7 @@ classdef Acquisition < file.AstroData
                 
             else % use extensive photometry method
             
-                obj.phot.input('images', C, 'timestamps', obj.timestamps, 'positions', P); % add variance input? 
+                obj.phot.input('images', C, 'timestamps', obj.timestamps, 'positions', P, 'juldates', obj.juldates); % add variance input? 
                 if ~isempty(obj.phot.gui) && obj.phot.gui.check, obj.phot.gui.update; end
 
                 obj.fluxes = obj.phot.fluxes;
@@ -2048,6 +2054,7 @@ classdef Acquisition < file.AstroData
                 obj.flags = obj.phot.flags;
                 
                 obj.lightcurves.getData(obj.phot);
+                obj.lightcurves.juldates = obj.juldates;
                 
             end
             

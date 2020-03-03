@@ -24,6 +24,7 @@ classdef Photometry < handle
         gain; % can be scalar or a map of the same size as cutouts
         
         timestamps;
+        juldates; 
         
         psf; % either given or found from the image (to be depricated)
         
@@ -323,6 +324,7 @@ classdef Photometry < handle
             input.input_var('gain', [], 'gain_map', 'gain_scalar');
             input.input_var('positions', []);
             input.input_var('timestamps', [], 'times');
+            input.input_var('juldates', [], 'juliandates'); 
             input.scan_vars(varargin{:});
             
             if isa(input.cutouts, 'single')

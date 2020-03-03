@@ -16,6 +16,8 @@ classdef AstroData < dynamicprops
         t_end; % absolute date and time (UTC) when batch is finished
         t_end_stamp; % timestamp when batch is finished (hopefully, this is the same time that t_end is recorded). 
         
+        juldates; % translation of timestamps to julian date using t_end_stamp
+        
         cutouts; % this is raw cutouts and it is usually what we save on file
         positions; % only for cutouts. a 2xN matrix (X then Y, N is the number of cutouts). 
         obj_idx; % what is the index of the star closest to the run's intended RA/DEC 
@@ -161,7 +163,8 @@ classdef AstroData < dynamicprops
             obj.t_start = [];
             obj.t_end = [];
             obj.t_end_stamp = [];
-
+            obj.juldates = [];
+            
             obj.cutouts = [];
             
             obj.positions = [];

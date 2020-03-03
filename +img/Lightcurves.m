@@ -1272,6 +1272,7 @@ classdef Lightcurves < handle
             end
             
             input.input_var('timestamps', photometry.timestamps);
+            input.input_var('juldates', photometry.juldates);
             input.input_var('pars_struct', photometry.pars_struct);
             
             obj.input(input);

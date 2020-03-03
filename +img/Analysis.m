@@ -1335,7 +1335,7 @@ classdef Analysis < file.AstroData
             t = tic;
 
             obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps, ...
-                'positions', obj.positions, 'variance', single(2.5)); % need to add the sky background too
+                'juldates', obj.juldates, 'positions', obj.positions, 'variance', single(2.5)); % need to add the sky background too
 
             obj.lightcurves.getData(obj.phot);
 

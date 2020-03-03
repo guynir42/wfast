@@ -37,6 +37,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         ENDTIME;
         RUNSTART; 
         
+        END_STAMP;
+        
         TEL_APER = 57;
         FOCLEN = 108;
         F_RATIO;
