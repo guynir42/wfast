@@ -82,7 +82,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
 %         latitude = 31.907867; % of the observatory
 %         longitude = 34.811363; % of the observatory
                 
-        version = 1.03;
+        default_fields; % save a few default places to goto when no explicite targets are given
+        star_density; % an estimate for the number of stars (right now this is only available for default fields)
+        
+        version = 1.04;
         
     end
     
@@ -501,6 +504,87 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 obj.ecliptic_lambda = [];
                 obj.ecliptic_beta = [];
             end
+            
+        end
+        
+        function val = calcObsTimeMinutes(obj, alt_limit)
+            
+            if nargin<2 || isempty(alt_limit)
+                alt_limit = 25;
+            end
+            
+            val = NaN; % to be continued! 
+            
+        end
+        
+        function gotoDefaultField(obj, type, number)
+            
+            import util.text.cs;
+            
+            if isempty(obj.default_fields)
+                obj.makeDefaultFields;
+            end
+            if number<1 || number>obj.numberDefaultFields(type)
+                error('Requested field number %d is out of bounds for type %s (limited to %d fields).', number, type, obj.numberDefaultFields(type)); 
+            end
+            
+            if cs(type, 'kbos', 'kuiper belt object', 'ecliptic')
+                s = obj.default_fields(strcmp({obj.default_fields.type}, 'ecliptic'));
+                s = s(number);
+                obj.RA_deg = s.RA;
+                obj.Dec_deg = s.Dec;
+                obj.star_density = s.stars;
+                obj.updateSecondaryCoords;
+            % add other default field types...
+            else
+                error('Unknown default field type "%s". Try "ecliptic"... ', type); 
+            end
+            
+        end
+        
+        function val = numberDefaultFields(obj, type)
+            
+            import util.text.cs;
+            
+            if isempty(obj.default_fields)
+                obj.makeDefaultFields;
+            end
+            
+            if cs(type, 'kbos', 'kuiper belt object', 'ecliptic')
+                val = nnz(strcmp({obj.default_fields.type}, 'ecliptic'));
+            % add other default field types...
+            else
+                error('Unknown default field type "%s". Try "ecliptic"... ', type); 
+            end
+            
+        end
+        
+        function makeDefaultFields(obj)
+            
+%             obj.default_fields = struct('type', [], 'stars', [], 'RA', [], 'Dec', [], 'ECL_LAT', [], 'GAL_LAT', []);
+            
+            obj.default_fields = [];
+  
+            s = struct;
+            
+            s.type = 'ecliptic';
+            s.stars = 6000;
+            s.RA = 276;
+            s.Dec = -25;
+            s.ECL_LAT = -1.67;
+            s.GAL_LAT = -5.53;
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'ecliptic';
+            s.stars = 1000;
+            s.RA = 97.5;
+            s.Dec = +22;
+            s.ECL_LAT = -1.25;
+            s.GAL_LAT = 5.37;
+            obj.default_fields = [obj.default_fields; s];
+            
+            % add more fields! 
+            
             
         end
         

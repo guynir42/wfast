@@ -110,7 +110,7 @@ classdef SkyGUI < handle
             obj.panel_controls.addButton('button_min_mag', 'show_biggest_size', 'input', 'size= ', ' uas', '', 1, '', '', 'Biggest size of stars to show (micro arcsec)'); 
             obj.panel_controls.addButton('button_south', 'show_south_limit', 'input', 'south limit= ', ' deg', '', 1, '', '', 'How far south in declination to draw the map'); 
             obj.panel_controls.addButton('button_log', 'show_log', 'toggle', 'linear scale', 'log scale', '', 0.5, '', '', 'Show the map in linear/log scale');
-            obj.panel_controls.addButton('button_placeholder', '', 'custom', '', '', '', 0.5, '', '', '');
+            obj.panel_controls.addButton('button_cosine', 'use_cosine', 'toggle', 'cosine', 'cosine', '', 0.5, 'blue', '', '');
             obj.panel_controls.addButton('button_ecliptic', 'show_ecliptic', 'toggle', 'ecliptic', 'ecliptic', '', 0.5, 'blue', '', 'Show the ecliptic coordinates grid overlay');
             obj.panel_controls.addButton('button_ecliptic', 'show_galactic', 'toggle', 'galactic', 'galactic', '', 0.5, 'blue', '', 'Show the galactic coordinates grid overlay');            
             obj.panel_controls.addButton('button_ra_units', 'show_ra_units', 'custom', '', '', '', 0.5, '', '', 'Choose "degrees" or "hours" for the RA coordinate axis');

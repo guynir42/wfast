@@ -78,6 +78,8 @@ classdef SkyMap < handle
         use_partial_load = 0; % load only the required columns from each HDF5 file
         use_mex_binning = 0; % use mex function to make the histogram counts instead of 2 loops and histcounts2
         
+        use_cosine = 1; % add the adjustment to declination (divide by cosine(dec)) to show the star density
+        
         show_brightest_magnitude; % maximum (lowest number) magnitude to show
         show_faintest_magnitude; % minumum (highest number) magnitude to show
         show_biggest_size; % largest stars to include in the map
@@ -612,6 +614,11 @@ classdef SkyMap < handle
             [~, idx_de] = min(abs(obj.DE_axis-input.south_limit)); 
             
             M = M(idx_de:end,:); 
+            
+            if obj.use_cosine 
+                M = M./cosd(y)'; 
+                M(isinf(M)) = NaN;
+            end
             
             h = imagesc(input.ax, M); 
             
