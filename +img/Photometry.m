@@ -337,6 +337,7 @@ classdef Photometry < handle
             obj.var_map = input.variance;
             obj.gain = input.gain;
             obj.timestamps = input.timestamps;
+            obj.juldates = input.juldates;
             
             obj.cut_size_latest = size(input.cutouts);
             obj.cut_size_latest = obj.cut_size(1:2);

@@ -127,6 +127,8 @@ classdef Lightcurves < handle
         show_num_stars = 10; % up to this number of stars are shown.
         show_indices = []; % if this is not empty, it is used as a list of stars to show
         
+        use_show_datetime = 1; % instead of timestamps, if there are juldates available
+        
         use_smooth = 1; % smoothing is applied to the plotted data only! 
         smooth_interval = 10; % how many samples to average over when smoothing
         
@@ -139,6 +141,7 @@ classdef Lightcurves < handle
     properties(Dependent=true)
         
         timestamps;
+        juldates;
         
         fluxes;
         errors;
@@ -174,6 +177,7 @@ classdef Lightcurves < handle
         % filled with NaN, to allow less allocations of the data. 
         % To use the actual data call the same names without "_full". 
         timestamps_full;
+        juldates_full;
         
         fluxes_full;
         errors_full;
@@ -204,6 +208,7 @@ classdef Lightcurves < handle
         % into the XXX_full matrices is slow when they are large. 
         % These are not saved if the object is dumped to memory. 
         timestamps_;
+        juldates_;
         
         fluxes_;
         errors_;
@@ -251,9 +256,11 @@ classdef Lightcurves < handle
         
         function reset(obj) % remove the long term storage for the entire run
             
+            obj.timestamps_full = [];
+            obj.juldates_full = [];
+            
             obj.fluxes_full = [];
             obj.errors_full = [];
-            obj.timestamps_full = [];
             obj.areas_full = [];
             obj.backgrounds_full = [];
             obj.variances_full = [];
@@ -277,7 +284,8 @@ classdef Lightcurves < handle
         function clearIntermidiate(obj) % clear all the data sliced from the full matrices
             
             obj.timestamps_ = [];
-
+            obj.juldates_ = [];
+            
             obj.fluxes_ = [];
             obj.fluxes_sub_ = [];
             obj.fluxes_cal_ = [];
@@ -369,6 +377,21 @@ classdef Lightcurves < handle
                 return;
             end
             
+        end
+        
+        function val = get.juldates(obj)
+            
+            if isempty(obj.juldates_full)
+                val = [];
+                return;
+            end
+            
+            if isempty(obj.juldates_)
+                obj.juldates_ = obj.juldates_full(1:obj.frame_index-1);
+            end
+            
+            val = obj.juldates_;
+                        
         end
         
         function val = get.fluxes(obj)
@@ -1168,6 +1191,8 @@ classdef Lightcurves < handle
             end
             
             if obj.use_preallocate && obj.frame_index==1 && ~isempty(num_frames) && ~isempty(num_stars) && ~isempty(num_apertures)
+                obj.timestamps_full = NaN(num_frames, 1, 'single'); 
+                obj.juldates_full = NaN(num_frames, 1, 'double'); 
                 obj.fluxes_full = NaN(num_frames, num_stars, num_apertures, 'single'); 
                 obj.errors_full = NaN(num_frames, num_stars, num_apertures, 'single');
                 obj.areas_full = NaN(num_frames, num_stars, num_apertures, 'single');
@@ -1185,6 +1210,9 @@ classdef Lightcurves < handle
         end
         
         function finishup(obj) % truncate trailing (unused) NaN values in all arrays
+            
+            obj.timestamps_full = obj.timestamps;
+            obj.juldates_full = obj.juldates;
             
             obj.fluxes_full = obj.fluxes; 
             obj.errors_full = obj.errors;
@@ -1211,6 +1239,7 @@ classdef Lightcurves < handle
                 input = util.text.InputVars;
                 input.use_ordered_numeric = 1;
                 input.input_var('timestamps', [], 'times');
+                input.input_var('juldates', [], 'juliandates'); 
                 input.input_var('fluxes', [], 'fluxes_raw');
                 input.input_var('errors', []);
                 input.input_var('areas', []);
@@ -1230,9 +1259,12 @@ classdef Lightcurves < handle
             N = size(input.fluxes,1);
             
             use_copy = 0; % the last input is zero telling insert_matrix NOT to make a copy of the big matrices and modify them in place
+            
+            obj.timestamps_full = insert_matrix(obj.timestamps_full, input.timestamps, [obj.frame_index 1], NaN, obj.use_double_up, use_copy);
+            obj.juldates_full = insert_matrix(obj.juldates_full, input.juldates, [obj.frame_index, 1], NaN, obj.use_double_up, use_copy); 
+
             obj.fluxes_full = insert_matrix(obj.fluxes_full, input.fluxes, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
             obj.errors_full = insert_matrix(obj.errors_full, input.errors, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
-            obj.timestamps_full = insert_matrix(obj.timestamps_full, input.timestamps, [obj.frame_index 1], NaN, obj.use_double_up, use_copy);
             obj.areas_full = insert_matrix(obj.areas_full, input.areas, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
             obj.backgrounds_full = insert_matrix(obj.backgrounds_full, input.backgrounds, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
             obj.variances_full = insert_matrix(obj.variances_full, input.variances, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
@@ -1243,6 +1275,7 @@ classdef Lightcurves < handle
             obj.widths_full = insert_matrix(obj.widths_full, input.widths, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
             obj.bad_pixels_full = insert_matrix(obj.bad_pixels_full, input.bad_pixels, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
             obj.flags_full = insert_matrix(obj.flags_full, input.flags, [obj.frame_index,1,1], NaN, obj.use_double_up, use_copy);
+            
             obj.frame_index = obj.frame_index + N;
             
             if ~isempty(input.pars_struct)
@@ -1563,7 +1596,11 @@ classdef Lightcurves < handle
                 
             end
             
-            xlabel(input.ax, 'time (seconds)');
+            if obj.use_show_datetime && ~isempty(obj.juldates)
+                xlabel(input.ax, ''); 
+            else
+                xlabel(input.ax, 'time (seconds)');
+            end
             
             if cs(obj.show_what, 'fluxes')
                 
@@ -1630,7 +1667,11 @@ classdef Lightcurves < handle
         function addPlots(obj, ax, data, x_axis, line_str) % internal function for adding another dataset to the plot
             
             if nargin<4 || isempty(x_axis)
-                x_axis = obj.timestamps;
+                if obj.use_show_datetime && ~isempty(obj.juldates)
+                    x_axis = datetime(obj.juldates, 'convertFrom', 'juliandate'); 
+                else
+                    x_axis = obj.timestamps;
+                end
             end
                         
             if nargin<5 || isempty(line_str)

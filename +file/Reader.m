@@ -907,7 +907,7 @@ classdef Reader < file.AstroData
                         
                         J = juliandate(util.text.str2time(obj.t_end));
                         
-                        obj.juldates = J + (obj.timestamps - a.t_end_stamp)/24/3600; 
+                        obj.juldates = J + (obj.timestamps - obj.t_end_stamp)/24/3600; 
                         
                     elseif any(strcmp(data_name, obj.dataset_names.psfs)) && all(data_size) % data_names.psfs may be a cell array of different optional names
                         
