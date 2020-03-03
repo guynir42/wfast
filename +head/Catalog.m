@@ -19,8 +19,8 @@ classdef Catalog < handle
         
         image; % input image or stack
         
-        offset_RA;
-        offset_Dec;
+        central_RA;
+        central_Dec;
         
         positions;
         magnitudes;
@@ -290,6 +290,9 @@ classdef Catalog < handle
                 end
 
             end % for ii (list_DE)
+            
+            obj.wcs_object = obj.mextractor_sim.WCS;
+            [obj.central_RA, obj.central_Dec] = obj.wcs_object.xy2coo(obj.head.ROI(3:4), 'OutUnits', 'deg'); 
             
         end
         

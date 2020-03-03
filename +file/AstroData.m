@@ -158,28 +158,38 @@ classdef AstroData < dynamicprops
             obj.images = [];
             
             obj.timestamps = [];
-            
+            obj.t_start = [];
+            obj.t_end = [];
+            obj.t_end_stamp = [];
+
             obj.cutouts = [];
+            
             obj.positions = [];
             obj.coordinates = [];
             obj.magnitudes = [];
             obj.temperatures = [];
         
-            obj.fluxes = [];
-            
             obj.cutouts_bg = [];
             obj.positions_bg = [];
-            obj.backgrounds = [];
             
             obj.stack = [];
             obj.num_sum = [];
             
-            obj.t_start = [];
-            obj.t_end = [];
-            obj.t_end_stamp = [];
-
             obj.psfs = [];
             obj.sampling_psf = [];
+            
+            obj.fluxes = [];
+            obj.errors = [];
+            obj.areas = [];
+            obj.backgrounds = [];
+            obj.variances = [];
+            obj.offsets_x = [];
+            obj.offsets_y = [];
+            obj.centroids_x = [];
+            obj.centroids_y = [];
+            obj.widths = [];
+            obj.bad_pixels = [];
+            obj.flags = [];
             
         end
                 

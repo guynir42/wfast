@@ -1502,10 +1502,10 @@ classdef Acquisition < file.AstroData
                         filename = obj.buf.getReadmeFilename;
                         util.oop.save(obj, filename, 'name', 'acquisition'); 
                         
-                        if obj.cat.success
-                            filename = fullfile(obj.buf.directory, 'catalog.mat');
-                            obj.cat.saveMAT(filename);
-                        end
+%                         if obj.cat.success
+%                             filename = fullfile(obj.buf.directory, 'catalog.mat');
+%                             obj.cat.saveMAT(filename);
+%                         end
                         
                     catch ME
                         warning(ME.getReport);
@@ -1853,7 +1853,12 @@ classdef Acquisition < file.AstroData
                 obj.positions = obj.cat.positions; % usually we will already have positions so this should do nothing (unless this analysis is on full frame rate images)
                 
                 if obj.use_save
-                    
+                    try
+                        filename = fullfile(obj.buf.directory, 'catalog.mat');
+                        obj.cat.saveMAT(filename);
+                    catch ME
+                        warning(ME.getReport);
+                    end
                 end
                 
             end
