@@ -892,11 +892,11 @@ classdef Reader < file.AstroData
                         num_frames = min(num_frames, num_images_on_file); % make sure we don't ask for more frames than we have on file
                         
                         if length(data_size)>1
-                            frame_start = [frame_start 1];
-                            num_frames = [num_frames 1];
+                            frame_start2 = [frame_start 1];
+                            num_frames2 = [num_frames 1];
                         end
                         
-                        loaded_timestamps = h5read(filename, sa('/', data_name), frame_start, num_frames);
+                        loaded_timestamps = h5read(filename, sa('/', data_name), frame_start2, num_frames2);
                         obj.timestamps = cat(1, obj.timestamps, loaded_timestamps); % append to the existing images
                         
                         obj.getAttribute(filename, data_name, att_names, 't_start');
