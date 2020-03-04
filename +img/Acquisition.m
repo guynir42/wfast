@@ -326,6 +326,11 @@ classdef Acquisition < file.AstroData
                 
                 obj.head = head.Header; % this also gives "head" to all sub-objects
                 obj.cat = head.Catalog(obj.head);
+                obj.cat.RA_scan_step = 2;
+                obj.cat.RA_scan_range = 4;
+                obj.cat.Dec_scan_step = 2;
+                obj.cat.Dec_scan_range = 2;
+                
                 obj.lightcurves.head = obj.head;
                 obj.lightcurves.cat = obj.cat;
                 
@@ -1617,7 +1622,7 @@ classdef Acquisition < file.AstroData
                         
             J = juliandate(util.text.str2time(obj.t_end));
                         
-            obj.juldates = J + (obj.timestamps - a.t_end_stamp)/24/3600; 
+            obj.juldates = J + (obj.timestamps - obj.t_end_stamp)/24/3600; 
             
             % if src is using ROI, must update the calibration object to do the same
             if isprop(obj.src, 'use_roi') && obj.src.use_roi 
@@ -2054,7 +2059,6 @@ classdef Acquisition < file.AstroData
                 obj.flags = obj.phot.flags;
                 
                 obj.lightcurves.getData(obj.phot);
-                obj.lightcurves.juldates = obj.juldates;
                 
             end
             
