@@ -21,6 +21,7 @@ classdef Catalog < handle
         
         central_RA;
         central_Dec;
+        rotation; 
         
         positions;
         magnitudes;
@@ -211,10 +212,12 @@ classdef Catalog < handle
                 P = P.pos; % if given a table from quick_find_stars, just take out the positions only
             end
             
+            if isempty(obj.head) || isempty(obj.head.RA_DEG) || isempty(obj.head.DEC_DEG)
+                error('Cannot run astrometry without RA/DEC in header!'); 
+            end
+            
             S = SIM;
             S.Cat = [P NaN(size(P,1), 3)]; 
-%             S.Col.X=1; S.Col.Y=2; S.Col.Mag=3; S.Col.RA=4; S.Col.Dec=5;
-%             S.ColCell = {'X', 'Y', 'Mag', 'RA', 'Dec'};
             S.Col.X=1; S.Col.Y=2; S.Col.Mag=3; S.Col.Im_RA=4; S.Col.Im_Dec=5;
             S.ColCell = {'X', 'Y', 'Mag', 'Im_RA', 'Im_Dec'};
             
@@ -295,6 +298,9 @@ classdef Catalog < handle
             
             obj.wcs_object = obj.mextractor_sim.WCS;
             [obj.central_RA, obj.central_Dec] = obj.wcs_object.xy2coo(obj.head.ROI(3:4), 'OutUnits', 'deg'); 
+            obj.head.WCS.input(obj.wcs_object); 
+            
+            obj.rotation = obj.head.WCS.rotation;
             
         end
         
