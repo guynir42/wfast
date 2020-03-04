@@ -1358,7 +1358,7 @@ classdef Analysis < file.AstroData
         
         function calcSkyParameters(obj) % take the photometery (and possible the catalog) and calculate seeing, background and zeropoint
             
-            if ~isempty(obj.mean_buf) && ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) && obj.cat.success==1
+            if ~isempty(obj.mean_buf) && ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) && ~isempty(obj.cat.success) && obj.cat.success==1
 
                 S = nanmean(obj.phot.fluxes(:,:,end)-obj.phot.areas(:,:,end).*obj.phot.backgrounds(:,:,end))'; % signal (instrumental)
                 N = nanstd(obj.phot.fluxes(:,:,end))'; % noise (instrumental)
