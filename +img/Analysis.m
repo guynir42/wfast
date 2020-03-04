@@ -1096,6 +1096,10 @@ classdef Analysis < file.AstroData
             
             t = tic;
             
+            if isempty(obj.stack)
+                return;
+            end
+            
             obj.cal.use_roi = 1;
             obj.cal.ROI = obj.head.ROI; 
             
@@ -1285,7 +1289,8 @@ classdef Analysis < file.AstroData
                     obj.cutouts = obj.clip.input(obj.images);
                     obj.cutouts_bg = obj.clip_bg.input(obj.images);
                 else
-                    error('Cannot produce cutouts without images!');
+%                     error('Cannot produce cutouts without images!');
+                    return;
                 end
             end
             
