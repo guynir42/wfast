@@ -236,6 +236,8 @@ classdef Catalog < handle
             
                 for jj = 1:length(list_RA)
                     
+                    if obj.debug_bit>0, fprintf('Scanning %s %s\n', head.Ephemeris.deg2hour(list_RA(jj)), head.Ephemeris.deg2sex(list_DE(ii))); end
+                    
                     try 
 
                         warning('off', 'MATLAB:polyfit:PolyNotUnique')
@@ -243,8 +245,8 @@ classdef Catalog < handle
 
 %                         [R,S2] = astrometry(S, 'RA', list_RA(jj), 'UnitsRA', 'deg', 'Dec', list_DE(ii), 'UnitsDec', 'deg', 'Scale', obj.head.SCALE, ...
                         [R,S2] = astrometry(S, 'RA', head.Ephemeris.deg2hour(list_RA(jj)), 'Dec', head.Ephemeris.deg2sex(list_DE(ii)), 'Scale', obj.head.SCALE, ...
-                            'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', [3000 3000], 'ApplyPM', false, 'Flip', obj.flip, ...
-                            'MinRot', -20, 'MaxRot', 20, 'CatColMag', 'Mag', 'ImSize', [obj.head.NAXIS1, obj.head.NAXIS2]);
+                            'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', [5000 5000], 'ApplyPM', false, 'Flip', obj.flip, ...
+                            'MinRot', -180, 'MaxRot', 180, 'CatColMag', 'Mag', 'ImSize', [obj.head.NAXIS1, obj.head.NAXIS2]);
 
                         warning('on', 'MATLAB:polyfit:PolyNotUnique')
                         warning('on', 'MATLAB:lscov:RankDefDesignMat');

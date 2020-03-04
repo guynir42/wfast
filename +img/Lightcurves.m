@@ -1191,7 +1191,7 @@ classdef Lightcurves < handle
             end
             
             if obj.use_preallocate && obj.frame_index==1 && ~isempty(num_frames) && ~isempty(num_stars) && ~isempty(num_apertures)
-                obj.timestamps_full = NaN(num_frames, 1, 'single'); 
+                obj.timestamps_full = NaN(num_frames, 1, 'double'); 
                 obj.juldates_full = NaN(num_frames, 1, 'double'); 
                 obj.fluxes_full = NaN(num_frames, num_stars, num_apertures, 'single'); 
                 obj.errors_full = NaN(num_frames, num_stars, num_apertures, 'single');
@@ -1338,6 +1338,7 @@ classdef Lightcurves < handle
         function [pxx, freq] = calculatePSD(obj)
             
             f = obj.fluxes_sub;
+            f(isinf(f)) = NaN;
             f = fillmissing(f, 'linear'); 
             
             [pxx, freq] = pwelch(f, [], [], [], 1./median(diff(obj.timestamps))); 
@@ -1574,28 +1575,6 @@ classdef Lightcurves < handle
             delete(allchild(input.ax));
             delete(findobj(input.ax.Parent, 'type', 'legend'));
             
-            if cs(obj.show_what, 'power spectra')
-                
-                input.ax.YScale = 'log';
-                
-                if obj.use_show_log
-                    input.ax.XScale = 'log';
-                else
-                    input.ax.XScale = 'linear';
-                end
-                
-            else
-                
-                input.ax.XScale = 'linear';
-                
-                if obj.use_show_log
-                    input.ax.YScale = 'log';
-                else
-                    input.ax.YScale = 'linear';
-                end
-                
-            end
-            
             if obj.use_show_datetime && ~isempty(obj.juldates)
                 xlabel(input.ax, ''); 
             else
@@ -1654,6 +1633,28 @@ classdef Lightcurves < handle
                 obj.showStats('ax', input.ax, 'font_size', input.font_size);
             else
                 error('Unknown option to to show_what: "%s", use "fluxes" or "offset" etc...', obj.show_what);
+            end
+            
+            if cs(obj.show_what, 'power spectra')
+                
+                input.ax.YScale = 'log';
+                
+                if obj.use_show_log
+                    input.ax.XScale = 'log';
+                else
+                    input.ax.XScale = 'linear';
+                end
+                
+            else
+                
+                input.ax.XScale = 'linear';
+                
+                if obj.use_show_log
+                    input.ax.YScale = 'log';
+                else
+                    input.ax.YScale = 'linear';
+                end
+                
             end
             
             hold(input.ax, 'off');

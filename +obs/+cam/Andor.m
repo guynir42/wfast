@@ -296,7 +296,23 @@ classdef Andor < file.AstroData
 %                 rc = obs.cam.sdk.AT_InitialiseLibrary; obs.cam.sdk.AT_CheckError(rc);
                     
 %                 [rc, obj.hndl] = obs.cam.sdk.AT_Open(0); obs.cam.sdk.AT_CheckError(rc);
+
+                current_dir = pwd;
+
+                try
+                
+                % I still don't know why we need to do this ritual but it works... 
+                cd(fullfile(getenv('WFAST'), '+obs/+cam/+mex_new')); 
+                obs.cam.mex_new.compile('connect'); 
+                               
                 obj.hndl = obs.cam.mex_new.connect; % the new mex code is better than the matlab SDK because...?
+                
+                catch ME
+                    cd(current_dir);
+                    rethrow(ME); 
+                end
+                
+                cd(current_dir);
                 
 %                 [rc] = obs.cam.sdk.AT_SetBool(obj.hndl, 'SensorCooling', 1); obs.cam.sdk.AT_CheckWarning(rc);        
                 obs.cam.mex_new.set(obj.hndl, 'cooling', 1); 
