@@ -647,7 +647,7 @@ classdef Catalog < handle
             obj.detection_stack_number = obj.head.NAXIS3;
             obj.detection_exposure_time = obj.head.EXPTIME;
             
-            success = 1; % assume that a saved catalog is a successful catalog... maybe add some tests? 
+            obj.success = 1; % assume that a saved catalog is a successful catalog... maybe add some tests? 
             
         end
         
