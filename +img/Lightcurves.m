@@ -1354,6 +1354,10 @@ classdef Lightcurves < handle
             f = obj.fluxes_cal;
             t = obj.timestamps;
             
+            if isempty(f) || isempty(t)
+                return;
+            end
+            
             F = nanmean(f); % the average flux is used to divide the rms and get the relative error (RE)
             
             for ii = 1:1e3 % arbitrary loop length with a break condition

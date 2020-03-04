@@ -40,7 +40,7 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     input.input_var('saturation', 5e6); % saturation by default for 100 images in a stack
     input.input_var('edges', []);
     input.input_var('fraction', 0.8); % fraction of MX_twice or MX_half that must surpass MX to be counted as point-source or extended-source
-    input.input_var('unflagged', 0); % only leave rows which have flag==0
+    input.input_var('unflagged', 0, 'flagged'); % only leave rows which have flag==0
     input.scan_vars(varargin{:});
     
     if isempty(input.edges)

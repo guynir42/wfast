@@ -203,7 +203,6 @@ classdef Acquisition < file.AstroData
         default_num_backgrounds;
         default_cut_size_bg;
         
-        
         slow_mode_expT = 3;
         slow_mode_frame_rate = 1/3; % try 0.03 if 1/3 doesn't work...
         slow_mode_batch_size = 1;
@@ -2365,8 +2364,11 @@ classdef Acquisition < file.AstroData
                 I_masked = I;
                 I_masked(~unmask{ii}) = M;
                 
-                T = util.img.quick_find_stars(I_masked, 'mean', M, 'std', sqrt(V), 'number', obj.af.num_stars_per_quadrant, varargin{:});
-            
+                T = util.img.quick_find_stars(I_masked, 'mean', M, 'std', sqrt(V), 'number', obj.af.num_stars_per_quadrant, ...
+                    'saturation', 4e4, 'flag', true, varargin{:});
+                
+                obj.af.quadrant_indices{end+1} = height(T_all)+(1:height(T)); 
+                
                 if ~isempty(T)
                     T_all = vertcat(T_all, T);
                 end

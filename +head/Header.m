@@ -1035,7 +1035,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         function makeGUI(obj)
             
             if isempty(obj.gui)
-                obj.gui = head.gui.ParsGUI(obj);
+                obj.gui = head.gui.HeaderGUI(obj);
             end
             
             obj.gui.make;

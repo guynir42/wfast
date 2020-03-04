@@ -20,6 +20,8 @@ classdef AutoFocus < handle
         xy_pos; % position of sampling points
         xy_pos_reduced; % positions of good points
         
+        quadrant_indices;
+        
         % need to update these at some point
         x_max = 2160;
         y_max = 2560;
@@ -46,7 +48,7 @@ classdef AutoFocus < handle
         use_loop_back = 0;
         num_stars_per_quadrant = 5;
         
-        use_model_psf = 1;
+        use_model_psf = 0;
         
         use_min_position = 1;
         
@@ -102,6 +104,8 @@ classdef AutoFocus < handle
             obj.weights_reduced = [];
             obj.xy_pos = [];
             obj.xy_pos_reduced = [];
+            
+            obj.quadrant_indices = {};
             
             obj.fit_results = {};
             obj.min_positions = [];
@@ -161,6 +165,23 @@ classdef AutoFocus < handle
             end
             
             obj.pos(idx) = position;
+            
+            if ~isempty(obj.quadrant_indices)
+                
+                for ii = 1:length(obj.quadrant_indices)
+                
+                    these_widths = widths(obj.quadrant_indices{ii});
+                    these_fluxes = fluxes(obj.quadrant_indices{ii});
+                    
+                    new_widths(ii) = nansum(these_widths.*these_fluxes)./nansum(these_fluxes); % flux weighted average
+                    new_fluxes(ii) = nansum(these_fluxes); 
+                    
+                end
+                
+                widths = new_widths;
+                fluxes = new_fluxes;
+                
+            end
             
             obj.widths(1:length(widths),idx) = util.vec.tocolumn(widths);
             obj.weights(1:length(fluxes),idx) = util.vec.tocolumn(fluxes);
