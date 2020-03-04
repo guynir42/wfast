@@ -95,7 +95,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             if ~isempty(varargin) && isa(varargin{1}, 'head.Ephemeris')
                 if obj.debug_bit, fprintf('Ephemeris copy-constructor v%4.2f\n', obj.version); end
-                util.oop.full_copy(varargin{1});
+                obj = util.oop.full_copy(varargin{1});
             else
                 if obj.debug_bit, fprintf('Ephemeris constructor v%4.2f\n', obj.version); end
                 
@@ -507,13 +507,41 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
-        function val = calcObsTimeMinutes(obj, alt_limit)
+        function val = calcObsTimeMinutes(obj, alt_limit, resolution_minutes)
             
             if nargin<2 || isempty(alt_limit)
                 alt_limit = 25;
             end
             
-            val = NaN; % to be continued! 
+            if nargin<3 || isempty(resolution_minutes)
+                resolution_minutes = 5;
+            end
+            
+            if obj.ALT<alt_limit
+                val = NaN; % we cannot observe this object at the given time, so it returns NaN
+            end
+            
+            if obj.HA_deg<0
+                val = round(abs(obj.HA_deg/15*60)/resolution_minutes)*resolution_minutes; 
+            else
+                
+                e = head.Ephemeris(obj); % copy the object! 
+                
+                val = 0;
+                
+                for ii = 1:1e3
+                    
+                    e.time = e.time + minutes(resolution_minutes); 
+                    
+                    if e.ALT>alt_limit
+                        val = val + resolution_minutes;
+                    else
+                        break;
+                    end
+                    
+                end
+                
+            end
             
         end
         
