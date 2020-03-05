@@ -69,17 +69,18 @@ void SaveData::parseVararginPairs(int N, const mxArray *vars[]){
 		else if(cs(keyword, "psfs", 4)) psfs.input("psfs", value, 0);		
 		else if(cs(keyword, "sampling_psf",4)) psfs.attributes.push_back(MyAttribute("sampling_psf", value));
 		
-		else if(cs(keyword, "fluxes")) fluxes.input("fluxes", value, 0);
-		else if(cs(keyword, "errors")) fluxes.input("errors", value, 0);
-		else if(cs(keyword, "areas")) fluxes.input("areas", value, 0);
-		else if(cs(keyword, "backgrounds")) fluxes.input("backgrounds", value, 0);
-		else if(cs(keyword, "variances")) fluxes.input("variances", value, 0);
-		else if(cs(keyword, "offsets_x")) fluxes.input("offsets_x", value, 0);
-		else if(cs(keyword, "offsets_y")) fluxes.input("offsets_y", value, 0);
-		else if(cs(keyword, "centroids_x")) fluxes.input("centroids_y", value, 0);
-		else if(cs(keyword, "widths")) fluxes.input("widths", value, 0);
-		else if(cs(keyword, "bad_pixels")) fluxes.input("bad_pixels", value, 0);
-		else if(cs(keyword, "flags")) fluxes.input("flags", value, 0);
+		else if(cs(keyword, "fluxes")) fluxes.input("fluxes", value, 0); 
+		else if(cs(keyword, "errors")) errors.input("errors", value, 0);
+		else if(cs(keyword, "areas")) areas.input("areas", value, 0);
+		else if(cs(keyword, "backgrounds")) backgrounds.input("backgrounds", value, 0);
+		else if(cs(keyword, "variances")) variances.input("variances", value, 0);
+		else if(cs(keyword, "offsets_x")) offsets_x.input("offsets_x", value, 0);
+		else if(cs(keyword, "offsets_y")) offsets_y.input("offsets_y", value, 0);
+		else if(cs(keyword, "centroids_x")) centroids_x.input("centroids_x", value, 0);
+		else if(cs(keyword, "centroids_y")) centroids_y.input("centroids_y", value, 0);
+		else if(cs(keyword, "widths")) widths.input("widths", value, 0);
+		else if(cs(keyword, "bad_pixels")) bad_pixels.input("bad_pixels", value, 0);
+		else if(cs(keyword, "flags")) flags.input("flags", value, 0);
 		
 		// add more names to the list if new data fields are added
 		else if(cs(keyword, "header", "pars", "parameters", "cell")) readHeaderCellArray(value);

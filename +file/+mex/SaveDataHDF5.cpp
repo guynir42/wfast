@@ -163,10 +163,8 @@ SaveDataHDF5::MyDataset::MyDataset(MyFilePointer &file, const char *location, My
 	if (matrix.use_deflate && deflate>0){ // if this matrix needs to be deflated and if we are using deflate (in general)
 		
 		hsize_t chunk_dims_matlab[4]={chunk, chunk, 1, 1};
-		//chunk_dims_matlab[0]=chunk;
-		//chunk_dims_matlab[1]=chunk;
-		//chunk_dims_matlab[2]=matrix.frames;
-		//chunk_dims_matlab[3]=1;
+		
+		if(chunk<chunk_size) chunk_dims_matlab[2] = matrix.frames; // for small datasets like cutouts we want all frames of the same cutout chunked together...
 		
 		hsize_t chunk_dims_c[4]={1};
 		for(int i=0;i<matrix.ndims;i++) chunk_dims_c[i]=chunk_dims_matlab[matrix.ndims-1-i];

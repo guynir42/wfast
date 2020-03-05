@@ -977,7 +977,7 @@ classdef BufferWheel < file.AstroData
             
             if obj.use_mex
                 
-                if obj.use_write_header && ~isempty(obj.head) % need to replace this with util.oop.save to structure and then get mexWrite to 
+                if obj.use_write_header && ~isempty(obj.head) 
                     obj.head_struct_cell = util.oop.save(obj.head, 'w', 'name', 'header', 'dependent', 1, 'hidden', 1, 'format', 'struct');
                 else
                     obj.head_struct_cell = {};

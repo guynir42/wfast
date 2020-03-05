@@ -12,6 +12,8 @@ MyMatrix::MyMatrix(const char *name, const mxArray *matrix, bool deflate){
 
 void MyMatrix::clear(){
 	
+	//printf("clearing MyMatrix for %s\n", data_name); 
+	
 	matrix_uint16=0;
 	matrix_double=0;
 	matrix_float=0;

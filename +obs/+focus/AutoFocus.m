@@ -354,7 +354,11 @@ classdef AutoFocus < handle
                 obj.ax.XLim = [min(obj.pos_range_vector), max(obj.pos_range_vector)];
             end
             
-%             legend(h, {'center', 'upper left', 'lower left', 'upper right', 'lower right'}, 'Parent', obj.fig);
+            if obj.use_model_psf
+                
+            else
+                legend(h, {'center', 'upper left', 'lower left', 'upper right', 'lower right'}, 'Parent', obj.fig);
+            end
             
         end
         

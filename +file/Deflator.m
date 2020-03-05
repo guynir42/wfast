@@ -313,6 +313,8 @@ classdef Deflator < file.AstroData
                         end
                     end
                     
+                    obj.buffers.serial = 1;
+                    
                     for ii = 1:100000 % go over image files
 
                         if obj.brake_bit
@@ -487,11 +489,17 @@ classdef Deflator < file.AstroData
         
         function batch(obj)
             
+            t1 = tic;
             obj.reader.batch;
             obj.copyFrom(obj.reader);
             obj.head = obj.reader.head;
-
+            read_time = toc(t1); 
+            
+            t2 = tic;
             obj.save;
+            save_time = toc(t2); 
+            
+%             fprintf('read time: %f | save time: %f\n', read_time, save_time); 
             
             if ~isempty(obj.gui)
                 obj.gui.updateGUI;
