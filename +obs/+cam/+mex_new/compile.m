@@ -32,8 +32,8 @@ function compile(varargin)
         
         if util.text.cs(c,'.cpp') && ~util.text.cs(b,'capture.cpp')
 
-%             str = 'mex CXXFLAGS="$CXXFLAGS -std=c++14 -static" COMPFLAGS="/MD"';
-            str = 'mex CXXFLAGS="$CXXFLAGS -std=c++14" ';
+            str = 'mex CXXFLAGS="$CXXFLAGS -std=c++14 -static" COMPFLAGS="/MD"';
+%             str = 'mex CXXFLAGS="$CXXFLAGS -std=c++14" ';
 
 %             str = [str ' -I"' getenv('ANDOR') '"'];
             str = [str ' -L"' d.pwd '"'];

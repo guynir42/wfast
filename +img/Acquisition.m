@@ -291,6 +291,7 @@ classdef Acquisition < file.AstroData
                 
                 % we don't want to start doing serious calibration on the
                 % lightcurves object during acquisition! 
+                obj.lightcurves.use_remove_outliers = 0;
                 obj.lightcurves.use_zero_point = 0;
                 obj.lightcurves.use_polynomial = 0;
                 obj.lightcurves.use_psf_correction =0;
@@ -380,6 +381,9 @@ classdef Acquisition < file.AstroData
                 
             end
 
+            obj.sync.outgoing.RA_rate_delta = 0;
+            obj.sync.outgoing.DE_rate_delta = 0;
+            
             obj.clear;
             
             obj.num_stars_found = [];
@@ -1581,6 +1585,9 @@ classdef Acquisition < file.AstroData
             
             obj.buf.directory_override = '';
             
+            obj.sync.outgoing.RA_rate_delta = 0;
+            obj.sync.outgoing.DE_rate_delta = 0;
+            
             obj.lightcurves.finishup;
             
             obj.is_running = 0;
@@ -1775,12 +1782,14 @@ classdef Acquisition < file.AstroData
                     % send the average adjustment back to mount controller (should we still adjust the cutouts though??)
                     rot = [cosd(obj.camera_angle) sind(obj.camera_angle); -sind(obj.camera_angle) cosd(obj.camera_angle)];
                     vec = rot*(obj.average_offsets.*obj.head.SCALE./obj.batch_size.*obj.getFrameRateEstimate)'; % units of arcsec/second
-                    vec = vec*0.5;
-                    dRA = vec(1)/15; % convert from arcsec to RA seconds
+                    vec = vec*0.7;
+                    dRA = vec(1)/15; % convert from arcsec to sidereal seconds
                     dDE = vec(2);
                     
                     obj.sync.outgoing.RA_rate_delta = dRA;
                     obj.sync.outgoing.DE_rate_delta = dDE;
+                    
+                    fprintf('dx= %6.4f | dy= %6.4f | dRA= %6.4f | dDE= %6.4f\n', obj.average_offsets(1), obj.average_offsets(2), dRA, dDE); 
                     
                     obj.sync.update;
                      
