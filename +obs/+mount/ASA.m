@@ -128,7 +128,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
        
         was_tracking = 0;
         default_move_rate;
-        
+
+        prev_dRA = 0;
+        prev_dDE = 0;
+
         num_prev_objects = 10; % how many prev_objects do we keep?
         
         version = 1.03;
@@ -885,7 +888,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             if obj.use_accelerometer
                 
-                if obj.ard.status==0
+                if ~isempty(obj.ard) && obj.ard.status==0
                     
                     ok = obj.ard.update;
                     
@@ -897,7 +900,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     
                 end
                 
-                if obj.ard.status==0
+                if isempty(obj.ard) || obj.ard.status==0
                     error('Cannot slew without a responsive ScopeAssistant (arduino)');
                 end
                 
@@ -1088,24 +1091,40 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     
                     direction = 1;
                     if strcmp(obj.pier_side, 'pierEast')
-                        direction  = -1;
+%                         direction  = -1;
                     end
                     
                     if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'RA_rate_delta') && ~isempty(obj.sync.incoming.RA_rate_delta)
                         dRA = obj.sync.incoming.RA_rate_delta;
                         if isempty(dRA) || isnan(dRA), dRA = 0; end
-                        obj.rate_RA = obj.rate_RA + direction*dRA;
-                        obj.sync.incoming.RA_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
+                        
+                        if ~isequal(dRA, obj.prev_dRA)
+                            obj.rate_RA = obj.rate_RA + direction*dRA;
+                            obj.prev_dRA = dRA;
+                            fprintf('dRA= %6.4f ', dRA); 
+                        end
+                        
+%                         obj.sync.incoming.RA_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
                         obj.sync.outgoing.RA_rate = obj.rate_RA;
+                        
                     end
                     
                     if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'DE_rate_delta') && ~isempty(obj.sync.incoming.DE_rate_delta)
                         dDE = obj.sync.incoming.DE_rate_delta;
                         if isempty(dDE) || isnan(dDE), dDE = 0; end
-                        obj.rate_DE = obj.rate_DE + direction*dDE;
-                        obj.sync.incoming.DE_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
+                        
+                        if ~isequal(dDE, obj.prev_dDE)
+                            obj.rate_DE = obj.rate_DE + direction*dDE;
+                            obj.prev_dDE = dDE;
+                            fprintf('| dDe= %6.4f\n', dDE); 
+                        end
+                        
+%                         obj.sync.incoming.DE_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
                         obj.sync.outgoing.DE_rate = obj.rate_DE;
+                        
                     end
+                    
+%                     fprintf('dRA= %6.4f | dDe= %6.4f\n', dRA, dDE); 
                     
                 else
                     % what to do here? reconnect or leave that to t1?
@@ -1146,7 +1165,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             obj.rate_RA = 0;
             obj.rate_DE = 0;
-                
+            
+            obj.prev_dRA = 0;
+            obj.prev_dDE = 0;
+            
+            obj.sync.incoming.RA_rate_delta = 0;
+            obj.sync.incoming.DE_rate_delta = 0;
+            
         end
         
         function adjustPosition(obj, RA_deg, DE_deg)
@@ -1429,7 +1454,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             if ~isempty(obj.guiding_history.data)
                 hold(ax, 'off');
-                plot(ax, obj.guiding_history.data_ordered(:,1), 'x');
+                plot(ax, obj.guiding_history.data_ordered(:,1)*15, 'x');
                 hold(ax, 'on');
                 plot(ax, obj.guiding_history.data_ordered(:,2), '+');
                 ylabel(ax, 'rates');
