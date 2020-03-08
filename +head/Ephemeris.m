@@ -52,6 +52,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     
     properties(Hidden=true)
         
+        % these are in current epoch (rather than in J2000) 
         RA_deg_now;
         Dec_deg_now;
         

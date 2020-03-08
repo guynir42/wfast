@@ -980,9 +980,9 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 	offset_y[j]=m1y;
 
 	// second moments
-	float m2x=sumArrays(image, background[j], X, m1x, X, m1x)/norm; // I*(X-m1x)^2
-	float m2y=sumArrays(image, background[j], Y, m1y, Y, m1y)/norm; // I*(Y-m1y)^2
-	float mxy=sumArrays(image, background[j], X, m1x, Y, m1y)/norm; // I*(X-m1x)*(Y-m1y)
+	float m2x=sumArrays(image, background[j], X, m1x, X, m1x)/norm; // I*(X-m1x)^2 / norm
+	float m2y=sumArrays(image, background[j], Y, m1y, Y, m1y)/norm; // I*(Y-m1y)^2 / norm
+	float mxy=sumArrays(image, background[j], X, m1x, Y, m1y)/norm; // I*(X-m1x)*(Y-m1y) / norm
 	
 	width[j]=getWidthFromMoments(m2x, m2y, mxy); 
 	
@@ -1391,15 +1391,17 @@ bool Photometry::checkMoments(float offset_x, float offset_y, float width){ // r
 float Photometry::getWidthFromMoments(float m2x, float m2y, float mxy){ // calculate the eigenvalues of the 2nd moments and from that find the average width
 // got this little nugget from: https://yutsumura.com/express-the-eigenvalues-of-a-2-by-2-matrix-in-terms-of-the-trace-and-determinant/
 
+	
+
 	float tr=m2x+m2y;
 	float det=m2x*m2y - mxy*mxy;
 	
-	if( (tr*tr-4*det) < 0) return 0;
+	if( (tr*tr-4*det) < 0) return std::nanf("");
 	
 	float r1=(tr-sqrt(tr*tr-4*det))/2;
 	float r2=(tr+sqrt(tr*tr-4*det))/2;
 
-	if(m2x<0 || m2y<0 || r1<0 || r2<0) return 0;	
+	if(m2x<0 || m2y<0 || r1<0 || r2<0) return std::nanf("");	
 	else return (sqrt(r1)+sqrt(r2))/2;
 
 }
