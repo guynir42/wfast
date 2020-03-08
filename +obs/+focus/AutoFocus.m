@@ -44,9 +44,11 @@ classdef AutoFocus < handle
         
         expT = 0.03;
         frame_rate = NaN;
-        batch_size = 10;
+        batch_size = 1;
         use_loop_back = 0;
         num_stars_per_quadrant = 5;
+        
+        num_repeats = 5;
         
         use_model_psf = 0;
         
@@ -74,7 +76,7 @@ classdef AutoFocus < handle
     
     properties(Hidden=true)
        
-        version = 1.00;
+        version = 1.01;
         
     end
     

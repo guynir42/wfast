@@ -2251,7 +2251,7 @@ classdef Acquisition < file.AstroData
 %                 obj.startup(input);
 %                 obj.src.startup('use_save', 0, 'use_async', 0, obj.pass_source{:});
                 
-                for ii = 1:length(p)
+                for ii = 1:length(p) % loop over all focus-positions in range
                     
                     if obj.brake_bit
                         return;
@@ -2267,15 +2267,30 @@ classdef Acquisition < file.AstroData
                         warning(ME.getReport);
                     end
                     
-                    check = obj.single;
-                    if check==0, return; end
+                    for jj = 1:obj.af.num_repeats
+                        
+                        check = obj.single;
+                        if check==0, return; end
+                    
+                        if obj.use_model_psf
+                            widths(jj,:) = [obj.model_psf.maj_axis obj.model_psf.min_axis];
+                            weights(jj,:) = [1 1]; % both minor and major axis would have the same weight
+                        else
+                            widths(jj,:) = obj.phot_stack.widths; % get the width directly from the 
+                            weights(jj,:) = obj.phot_stack.fluxes; % use the flux as the average for weighing the different measurements
+                        end
+                        
+                    end
+                    
+                    obj.af.input(ii, obj.cam.focuser.pos, nanmedian(widths,1), nanmedian(weights,1), obj.positions); % give the average over multiple batches to the AF code
+                    
                     obj.batch_counter = obj.batch_counter + 1;
                     
-                    if obj.use_model_psf
-                        obj.af.input(ii, obj.cam.focuser.pos, [obj.model_psf.maj_axis obj.model_psf.min_axis], [1 1], obj.positions);
-                    else
-                        obj.af.input(ii, obj.cam.focuser.pos, obj.phot_stack.widths, obj.phot_stack.fluxes, obj.positions);
-                    end
+%                     if obj.use_model_psf
+%                         obj.af.input(ii, obj.cam.focuser.pos, [obj.model_psf.maj_axis obj.model_psf.min_axis], [1 1], obj.positions);
+%                     else
+%                         obj.af.input(ii, obj.cam.focuser.pos, obj.phot_stack.widths, obj.phot_stack.fluxes, obj.positions);
+%                     end
                     
                     if obj.use_progress
                         obj.prog.showif(obj.batch_counter);

@@ -302,8 +302,8 @@ classdef Andor < file.AstroData
                 try
                 
                 % I still don't know why we need to do this ritual but it works... 
-%                 cd(fullfile(getenv('WFAST'), '+obs/+cam/+mex_new')); 
-%                 obs.cam.mex_new.compile('connect'); 
+                cd(fullfile(getenv('WFAST'), '+obs/+cam/+mex_new')); 
+                obs.cam.mex_new.compile('connect'); 
                                
                 obj.hndl = obs.cam.mex_new.connect; % the new mex code is better than the matlab SDK because...?
                 
