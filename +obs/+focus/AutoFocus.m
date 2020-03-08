@@ -359,8 +359,10 @@ classdef AutoFocus < handle
             if obj.use_model_psf
                 
             else
-                legend(h, {'center', 'upper left', 'lower left', 'upper right', 'lower right'}, 'Parent', obj.fig);
+                legend(h, {'center', 'top left', 'top right', 'bottom left', 'bottom right'}, 'Parent', obj.fig);
             end
+            
+            box(obj.ax, 'on'); 
             
         end
         

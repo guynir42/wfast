@@ -374,7 +374,7 @@ classdef Acquisition < file.AstroData
             for ii = 1:length(list)
                 
                 if isobject(obj.(list{ii})) && ~isempty(obj.(list{ii})) && ismethod(obj.(list{ii}), 'reset') 
-                    if ~util.text.cs(list{ii}, 'sync')
+                    if ~util.text.cs(list{ii}, 'sync', 'af')
                         obj.(list{ii}).reset;
                     end
                 end
@@ -605,7 +605,8 @@ classdef Acquisition < file.AstroData
             val = sprintf('%s\n mean background= %.1f', val, obj.average_background);
             
             if isprop(obj.cam, 'focuser')
-                val = sprintf('%s\n focus point= %5.3f', val, obj.cam.focuser.pos);
+                val = sprintf('%s\n focus pos= %5.3f | tip= %5.3f | tilt= %5.3f', ...
+                    val, obj.cam.focuser.pos, obj.cam.focuser.tip, obj.cam.focuser.tilt);
             end
             
             val = sprintf('%s\n--------------------------------------', val);
@@ -2212,6 +2213,8 @@ classdef Acquisition < file.AstroData
             
             try
                
+                obj.af.reset;
+                
                 if ~isempty(obj.gui) && obj.gui.check
                     obj.gui.update;
                 end
@@ -2366,22 +2369,50 @@ classdef Acquisition < file.AstroData
             
             T_all = table;
             
-            markers = round(S'.*[1/3 2/3]); % divide the sensor to 1/3rds 
+            idx_top = 1:round(S(1)/3); 
+            idx_middle = round(S(1)/3+1):round(S(1)*2/3);
+            idx_bottom = round(S(1)*2/3+1):S(1);
             
+            idx_left = 1:round(S(2)/3); 
+            idx_center = round(S(2)/3+1):round(S(2)*2/3);
+            idx_right = round(S(2)*2/3+1):S(2);
+
+            % unmask the central region
             unmask{1} = false(S);
-            unmask{1}(markers(1,1):markers(1,2), markers(2,1):markers(2,2)) = 1; % only the central part is unmasked
+            unmask{1}(idx_middle, idx_center) = true;
             
+            % unmask the top left corner
             unmask{2} = false(S);
-            unmask{2}(C:markers(1,1), C:markers(2,1)) = 1; % upper left corner
+            unmask{2}(idx_top, idx_left) = true;
             
+            % unmask the top right corner
             unmask{3} = false(S);
-            unmask{3}(markers(1,2):end-C+1, C:markers(2,1)) = 1; % lower left corner
+            unmask{3}(idx_top, idx_right) = true;
             
+            % unmask the bottom left corner
             unmask{4} = false(S);
-            unmask{4}(C:markers(1,1), markers(2,2):end-C+1) = 1; % upper right corner
-            
+            unmask{4}(idx_bottom, idx_left) = true;
+
+            % unmask the bottom right
             unmask{5} = false(S);
-            unmask{5}(markers(1,2):end-C+1, markers(2,2):end-C+1) = 1; % lower right corner
+            unmask{5}(idx_bottom, idx_right) = true;
+            
+%             markers = round(S'.*[1/3 2/3]); % divide the sensor to 1/3rds 
+% 
+%             unmask{1} = false(S);
+%             unmask{1}(markers(1,1):markers(1,2), markers(2,1):markers(2,2)) = 1; % only the central part is unmasked
+%             
+%             unmask{2} = false(S);
+%             unmask{2}(C:markers(1,1), C:markers(2,1)) = 1; % upper left corner
+%             
+%             unmask{3} = false(S);
+%             unmask{3}(markers(1,2):end-C+1, C:markers(2,1)) = 1; % lower left corner
+%             
+%             unmask{4} = false(S);
+%             unmask{4}(C:markers(1,1), markers(2,2):end-C+1) = 1; % upper right corner
+%             
+%             unmask{5} = false(S);
+%             unmask{5}(markers(1,2):end-C+1, markers(2,2):end-C+1) = 1; % lower right corner
             
             for ii = 1:5
             
