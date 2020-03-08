@@ -239,7 +239,7 @@ classdef Catalog < handle
             
                 for jj = 1:length(list_RA)
                     
-                    if obj.debug_bit>0, fprintf('Scanning %s %s\n', head.Ephemeris.deg2hour(list_RA(jj)), head.Ephemeris.deg2sex(list_DE(ii))); end
+                    if obj.debug_bit>1, fprintf('Running astrometry on coordinates %s %s\n', head.Ephemeris.deg2hour(list_RA(jj)), head.Ephemeris.deg2sex(list_DE(ii))); end
                     
                     try 
 

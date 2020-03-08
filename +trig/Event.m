@@ -16,6 +16,8 @@ classdef Event < handle
         
         sim_pars; % if simulated, this should contain the fit parameters...
         
+        gaia_data; % an object with all rows from the GAIA match (a cat.data table row)
+        
     end
     
     properties(Dependent=true)
@@ -183,7 +185,7 @@ classdef Event < handle
         t_end;
         t_end_stamp;
         
-        version = 1.04;
+        version = 1.05;
         
     end
     
@@ -455,11 +457,18 @@ classdef Event < handle
             
             v_temp = vector;
             v_temp(t) = NaN;
-            Mv = nanmean(v_temp); % get the mean outside the event
-            Sv = nanstd(v_temp); % get the std outside the event
+%             Mv = nanmean(v_temp); % get the mean outside the event
+            Mv = nanmean(vector(t)); % get the mean inside the event!
+            Sv = nanstd(v_temp); % get the std outside the event!
             vector = (vector - Mv)./Sv;
             
-            corr = nansum(f(t).*vector(t))./sqrt(nansum(f(t).^2).*nansum(vector(t).^2)); % ignore the STD normalization and just get the correlation coefficient (the normalized projection)
+            denom = sqrt(nansum(f(t).^2).*nansum(vector(t).^2));
+            if denom==0
+                corr = 0;
+            else
+                corr = nansum(f(t).*vector(t))./denom; % ignore the STD normalization and just get the correlation coefficient (the normalized projection)
+            end
+            
             covar = nansum(f(t).*vector(t)); % get the covariance between the two vectors in the event region, normalized by the STD outside the event region
             
         end

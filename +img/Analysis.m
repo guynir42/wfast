@@ -114,6 +114,8 @@ classdef Analysis < file.AstroData
         average_width;
         average_offsets;
         
+        num_stars_used; % min of num_stars and number of cutouts
+        
     end
     
     properties(Hidden=true)
@@ -143,13 +145,18 @@ classdef Analysis < file.AstroData
         cutout_adjustment_pixels = 0; % how many pixels to push (back or forward) relative to today's positions
         use_cutout_adjustment_floor = 0; % use floor of positions before (instead of) using round(). 
         
-        analysis_dir_save = 0;
-        analysis_dir_log = 0;
+        use_analysis_dir_save = 0; % do we want to save analysis results
+        use_analysis_dir_log = 0; % do we want analysis log file
+        
+        log_dir; % where to save the analysis results and log file
+        log_name; % name of log file
+        log_obj; % name of object text dump
         
         prev_average_width;
         
         num_batches_limit;
-        version = 1.02;
+        
+        version = 1.03;
         
     end
     
@@ -230,8 +237,8 @@ classdef Analysis < file.AstroData
             obj.ref_stack = [];
             obj.ref_positions = [];
             
-            obj.analysis_dir_save = 0;
-            obj.analysis_dir_log = 0;
+            obj.use_analysis_dir_save = 0;
+            obj.use_analysis_dir_log = 0;
             
             obj.failed_batch_counter = 0;
             
@@ -359,6 +366,16 @@ classdef Analysis < file.AstroData
             
         end
         
+        function val = get.num_stars_used(obj)
+            
+            if isempty(obj.num_stars)
+                val = size(obj.cutouts, 4);
+            else
+                val = min(obj.num_stars, size(obj.cutouts,4));
+            end
+            
+        end
+        
     end
     
     methods % setters
@@ -480,33 +497,48 @@ classdef Analysis < file.AstroData
             else
                 fprintf(fid, '%s: %s\n', read_date, str);
             end
-                
+            
+            % if there is no object-dump file, create one now! 
+            if ~exist(obj.log_obj, 'file')
+                util.oop.save(obj, obj.log_obj, 'hidden', 1); 
+            end
+            
         end
         
-        function saveResults(obj, dirname, varargin)
+        function saveResults(obj)
             
-            % add parsing of varargin later
-            
+            if ~exist(obj.log_dir, 'dir')
+                mkdir(obj.log_dir); % if we call this function we are ignoring "overwrite analysis folder" mechanism (from start of run() function) and creating a folder if needed!~
+            end
             
             name = obj.head.OBJECT;
             
-            obj.lightcurves.saveAsMAT(fullfile(dirname, ['lightcurves_' name]));
+            obj.lightcurves.saveAsMAT(fullfile(obj.log_dir, ['lightcurves_' name]));
             
             obj.finder.conserveMemory;
             
             finder = obj.finder;
-            save(fullfile(dirname, ['finder_' name]), 'finder', '-v7.3');
+            save(fullfile(obj.log_dir, ['finder_' name]), 'finder', '-v7.3');
+            
+            % if there is no object-dump file, create one now! 
+            if ~exist(obj.log_obj, 'file')
+                util.oop.save(obj, obj.log_obj, 'hidden', 1); 
+            end
             
         end
         
-        function saveSummary(obj, dirname)
+        function saveSummary(obj)
+            
+            if ~exist(obj.log_dir, 'dir')
+                mkdir(obj.log_dir); % if we call this function we are ignoring "overwrite analysis folder" mechanism (from start of run() function) and creating a folder if needed!~
+            end
             
             filename = ['summary_' obj.head.OBJECT '.txt'];
             
-            fid = fopen(fullfile(dirname, filename), 'wt');
+            fid = fopen(fullfile(obj.log_dir, filename), 'wt');
             
             if fid<0
-                warning('Cannot open file %s', fullfile(dirname, filename));
+                warning('Cannot open file %s', fullfile(obj.log_dir, filename));
             else
 
                 onc = onCleanup(@() fclose(fid));
@@ -533,6 +565,11 @@ classdef Analysis < file.AstroData
                 
                 fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr*4, obj.finder.star_hours_total_best);
                 
+            end
+            
+            % if there is no object-dump file, create one now! 
+            if ~exist(obj.log_obj, 'file')
+                util.oop.save(obj, obj.log_obj, 'hidden', 1); 
             end
             
         end
@@ -856,24 +893,28 @@ classdef Analysis < file.AstroData
                 end
 
                 % update hidden variables in case we use GUI to stop then continue this run
-                if ~isempty(input.logging), obj.analysis_dir_log = input.logging; end            
-                if ~isempty(input.save), obj.analysis_dir_save = input.save; end
+                if ~isempty(input.logging), obj.use_analysis_dir_log = input.logging; end            
+                if ~isempty(input.save), obj.use_analysis_dir_save = input.save; end
 
-                if obj.analysis_dir_log || obj.analysis_dir_save
+                % must be ready to save the analysis results event if the
+                % run started without this mode tunred on... 
+                log_time = datetime('now', 'TimeZone', 'UTC');
+                obj.log_dir = fullfile(obj.reader.dir.pwd, ['analysis_' char(log_time, 'yyyy-MM-dd')]);
+                obj.log_name = fullfile(obj.log_dir, 'analysis_log.txt');
+                obj.log_obj = fullfile(obj.log_dir, 'analysis_parameters.txt');
 
-                    log_time = datetime('now', 'TimeZone', 'UTC');
-                    log_dir = fullfile(obj.reader.dir.pwd, ['analysis_' char(log_time, 'yyyy-MM-dd')]);
-                    log_name = fullfile(log_dir, 'analysis_log.txt');
-                    log_obj = fullfile(log_dir, 'analysis_parameters.txt');
+                if obj.use_analysis_dir_log || obj.use_analysis_dir_save
                     
+                    % must check pre existing analysis folder for the same
+                    % date, and either overwrite or throw an error
                     if obj.batch_counter==0
-                        if exist(log_dir, 'dir') && input.overwrite==0
-                            error('Folder %s already exists! Is this run already being processed?', log_dir);
-                        elseif exist(log_dir, 'dir') && input.overwrite
-                            rmdir(log_dir, 's'); 
-                            mkdir(log_dir);
+                        if exist(obj.log_dir, 'dir') && input.overwrite==0
+                            error('Folder %s already exists! Is this run already being processed?', obj.log_dir);
+                        elseif exist(obj.log_dir, 'dir') && input.overwrite
+                            rmdir(obj.log_dir, 's'); 
+                            mkdir(obj.log_dir);
                         else
-                            mkdir(log_dir);
+                            mkdir(obj.log_dir);
                         end
                     end
 
@@ -890,11 +931,8 @@ classdef Analysis < file.AstroData
 
                     obj.batch;
 
-                    if obj.analysis_dir_log
-                        obj.write_log(log_name);
-                        if ~exist(log_obj, 'file')
-                            util.oop.save(obj, log_obj, 'hidden', 1); 
-                        end
+                    if obj.use_analysis_dir_log
+                        obj.write_log(obj.log_name);
                     end
 
                     if ~isempty(obj.func)
@@ -919,30 +957,30 @@ classdef Analysis < file.AstroData
                 % Skip this part in case the run is stopped mid way (e.g., by user input, but not by detecting flux is lost)
                 if obj.batch_counter>=obj.num_batches || obj.failed_batch_counter>obj.max_failed_batches
 
-                    if obj.analysis_dir_save
-                        obj.saveResults(log_dir);
+                    if obj.use_analysis_dir_save
+                        obj.saveResults;
                     end
 
-                    if obj.analysis_dir_log
-                        obj.saveSummary(log_dir);
+                    if obj.use_analysis_dir_log
+                        obj.saveSummary;
                     end
 
                 end
 
             catch ME
                 
-                if obj.analysis_dir_log
-                    obj.write_log(log_name, ME.getReport);
+                if obj.use_analysis_dir_log
+                    obj.write_log(obj.log_name, ME.getReport);
                 end
                 
                 if obj.batch_counter>100 % if we managed to go through a big part of the run, might as well save the results
                 
-                    if obj.analysis_dir_save
-                        obj.saveResults(log_dir);
+                    if obj.use_analysis_dir_save
+                        obj.saveResults;
                     end
 
-                    if obj.analysis_dir_log
-                        obj.saveSummary(log_dir);
+                    if obj.use_analysis_dir_log
+                        obj.saveSummary;
                     end
                     
                 end
@@ -1224,7 +1262,9 @@ classdef Analysis < file.AstroData
                         obj.magnitudes = obj.cat.magnitudes;
                         obj.coordinates = obj.cat.coordinates;
                         obj.temperatures = obj.cat.temperatures;
-                        
+                       
+                    elseif obj.cat.success==0
+                        fprintf('Warning: could not find an astrometric solution!'); 
                     end
 
                 end

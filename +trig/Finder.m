@@ -151,7 +151,7 @@ classdef Finder < handle
         aperture;
         gauss_sigma;
         
-        version = 1.03;
+        version = 1.04;
         
     end
     
@@ -1042,6 +1042,10 @@ classdef Finder < handle
                     
                 end
                 
+                if ~isempty(obj.cat) && ~isempty(obj.cat.success) && obj.cat.success % save the GAIA info on the star
+                    ev.gaia_data = table2struct(obj.cat.data(ev.star_index,:)); 
+                end
+                
                 % any other info that needs to be saved along with the event object?
                 % ...
                 
@@ -1393,6 +1397,9 @@ classdef Finder < handle
             
             xlabel(ax, 'Best S/N value'); 
             ylabel(ax, 'Number of batches');
+            
+            ax.YScale = 'log';
+            
             ax.FontSize = 24; 
             
         end
