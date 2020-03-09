@@ -1042,7 +1042,7 @@ classdef Photometry < handle
             F = obj.fluxes;
             
 %             idx = F>util.stat.max2(F).*obj.percentile & ~isnan(F) & ~obj.flags; % choose only good flux values
-            idx = F>nanmedian(F) & ~isnan(F) & ~obj.flags; % choose only good flux values
+            idx = F>util.stat.median2(F) & ~isnan(F) & ~obj.flags; % choose only good flux values
 
             % 1D vectors containing the good values only...
             F = obj.fluxes(idx);
@@ -1052,14 +1052,14 @@ classdef Photometry < handle
             DX = obj.offsets_x(idx);
             DY = obj.offsets_y(idx);
             
-            M = mean(F, 'omitnan'); % why not median too?
+            M = nanmean(F,1);
             
-            obj.average_flux = median(F, 'omitnan'); 
-            obj.average_background = median(B, 'omitnan');
-            obj.average_variance = median(V, 'omitnan');
-            obj.average_offset_x = median(F./M.*DX, 'omitnan');
-            obj.average_offset_y = median(F./M.*DY, 'omitnan');
-            obj.average_width = median(W.*F./M, 'omitnan');
+            obj.average_flux = nanmedian(F); 
+            obj.average_background = nanmedian(B);
+            obj.average_variance = nanmedian(V);
+            obj.average_offset_x = nanmedian(F./M.*DX);
+            obj.average_offset_y = nanmedian(F./M.*DY);
+            obj.average_width = nanmedian(W.*F./M);
             
         end
         

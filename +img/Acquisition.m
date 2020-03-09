@@ -605,7 +605,7 @@ classdef Acquisition < file.AstroData
             val = sprintf('%s\n mean background= %.1f', val, obj.average_background);
             
             if isprop(obj.cam, 'focuser')
-                val = sprintf('%s\n focus pos= %5.3f | tip= %5.3f | tilt= %5.3f', ...
+                val = sprintf('%s\n focus: %5.3f (%5.3f / %5.3f)', ...
                     val, obj.cam.focuser.pos, obj.cam.focuser.tip, obj.cam.focuser.tilt);
             end
             
@@ -1790,7 +1790,7 @@ classdef Acquisition < file.AstroData
                     obj.sync.outgoing.RA_rate_delta = dRA;
                     obj.sync.outgoing.DE_rate_delta = dDE;
                     
-                    fprintf('dx= %6.4f | dy= %6.4f | dRA= %6.4f | dDE= %6.4f\n', obj.average_offsets(1), obj.average_offsets(2), dRA, dDE); 
+%                     fprintf('dx= %6.4f | dy= %6.4f | dRA= %6.4f | dDE= %6.4f\n', obj.average_offsets(1), obj.average_offsets(2), dRA, dDE); 
                     
                     obj.sync.update;
                      

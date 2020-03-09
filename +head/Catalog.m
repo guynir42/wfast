@@ -296,11 +296,16 @@ classdef Catalog < handle
 
             end % for ii (list_DE)
             
-            obj.wcs_object = obj.mextractor_sim.WCS;
-            [obj.central_RA, obj.central_Dec] = obj.wcs_object.xy2coo(obj.head.ROI(3:4), 'OutUnits', 'deg'); 
-            obj.head.WCS.input(obj.wcs_object); 
+            if obj.success==1
+                
+                obj.wcs_object = obj.mextractor_sim.WCS;
+                obj.head.WCS.input(obj.wcs_object); 
             
-            obj.rotation = obj.head.WCS.rotation;
+                [obj.central_RA, obj.central_Dec] = obj.wcs_object.xy2coo(obj.head.ROI(3:4), 'OutUnits', 'deg'); 
+                
+                obj.rotation = obj.head.WCS.rotation;
+                
+            end
             
         end
         
