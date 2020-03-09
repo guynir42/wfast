@@ -141,7 +141,7 @@ classdef FinderGUI < handle
             
             %%%%%%%%%%% panel memory %%%%%%%%%%%%%%%
             
-            num_buttons = 1;
+            num_buttons = 2;
             pos = pos-num_buttons;
             obj.panel_memory = GraphicPanel(obj.owner, [0 pos/N_left 0.2 num_buttons/N_left], 'memory control', 1); % last input is for vertical (default)
             obj.panel_memory.addButton('button_clear', 'clearOneEventMemory', 'custom', 'clear mem ', '', '', 0.5, [], [], 'Remove images and raw fluxes for current event');
@@ -184,7 +184,7 @@ classdef FinderGUI < handle
             %%%%%%%%%%% panel star pars %%%%%%%%%%%%%%%%%%
             
             num_buttons = 1; pos = pos - 1;
-            obj.panel_phot_pars = GraphicPanel(obj.owner, [0.2 pos/N_middle 0.8 num_buttons/N_middle], 'event parameters', 0); % last input is for horizontal
+            obj.panel_phot_pars = GraphicPanel(obj.owner, [0.2 pos/N_middle 0.8 num_buttons/N_middle], 'star parameters', 0); % last input is for horizontal
             obj.panel_phot_pars.addButton('button_pars', '', 'custom', ' ', '', 'edit');
             obj.panel_phot_pars.number = num_buttons;
             obj.panel_phot_pars.make;

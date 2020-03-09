@@ -603,8 +603,8 @@ classdef Event < handle
         
         function str_out = print_gaia_data(obj)
             
-            if isempty(obj.gaia_data)
-                str = sprintf('Mag BP= %4.2f | Teff= % 5d', obj.gaia_data.Mag_BP, obj.gaia_data.Teff); 
+            if ~isempty(obj.gaia_data)
+                str = sprintf('Mag BP= %4.2f | Teff= % 5d', obj.gaia_data.Mag_BP, round(obj.gaia_data.Teff)); 
             else 
                 str = ''; 
             end
