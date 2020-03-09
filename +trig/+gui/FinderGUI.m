@@ -88,7 +88,7 @@ classdef FinderGUI < handle
             obj.fig.width = 25;
             movegui(obj.fig.fig, 'center');
             
-            N_left = 15; % number of buttons on left side
+            N_left = 16; % number of buttons on left side
             
             %%%%%%%%%%%%%%%%%%% LEFT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -146,6 +146,7 @@ classdef FinderGUI < handle
             obj.panel_memory = GraphicPanel(obj.owner, [0 pos/N_left 0.2 num_buttons/N_left], 'memory control', 1); % last input is for vertical (default)
             obj.panel_memory.addButton('button_clear', 'clearOneEventMemory', 'custom', 'clear mem ', '', '', 0.5, [], [], 'Remove images and raw fluxes for current event');
             obj.panel_memory.addButton('button_load', 'loadOneEventMemory', 'custom', 'load mem ', '', '', 0.5, [], [], 'Load from file images and raw fluxes for current event');
+            obj.panel_memory.addButton('button_save', 'this_event.saveDialog', 'push', 'save', '', '', 1, [], [], 'Save this event to file'); 
             obj.panel_memory.number = num_buttons;
             
             obj.panel_memory.make;
@@ -180,11 +181,11 @@ classdef FinderGUI < handle
             obj.panel_phot_pars.number = num_buttons;
             obj.panel_phot_pars.make;
             
-            %%%%%%%%%%% panel event pars %%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%% panel star pars %%%%%%%%%%%%%%%%%%
             
             num_buttons = 1; pos = pos - 1;
             obj.panel_phot_pars = GraphicPanel(obj.owner, [0.2 pos/N_middle 0.8 num_buttons/N_middle], 'event parameters', 0); % last input is for horizontal
-            obj.panel_phot_pars.addButton('button_pars', 'event_pars_str', 'info', ' ', '', 'edit');
+            obj.panel_phot_pars.addButton('button_pars', '', 'custom', ' ', '', 'edit');
             obj.panel_phot_pars.number = num_buttons;
             obj.panel_phot_pars.make;
             
@@ -222,7 +223,11 @@ classdef FinderGUI < handle
             for ii = 1:length(obj.buttons)
                 obj.buttons{ii}.update;
             end
-                        
+                   
+            if ~isempty(obj.owner.this_event)
+                obj.panel_phot_pars.button_pars.String = obj.owner.this_event.print_gaia_data;
+            end
+            
         end
                         
         function c = check(obj)

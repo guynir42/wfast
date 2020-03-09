@@ -536,6 +536,87 @@ classdef Event < handle
             
         end
         
+        function save(obj, filename)
+            
+            if nargin<2 || isempty(filename)
+                
+                filename = 'event'; 
+
+                run_name = ''; 
+
+                if ~isempty(obj.head) && ~isempty(obj.head.OBJECT)
+                    run_name = obj.head.OBJECT;
+                elseif ~isempty(obj.filename)
+                    [~, run_name] = fileparts(obj.filename); 
+                end
+
+                if ~isempty(run_name)
+                    filename = [filename '_' run_name];
+                end
+
+            end
+            
+            event = obj;
+            
+            save(filename, 'event'); 
+            
+        end
+        
+        function saveDialog(obj, filename)
+            
+            if nargin<2 || isempty(filename)
+                
+                filename = 'event'; 
+
+                run_name = ''; 
+
+                if ~isempty(obj.head) && ~isempty(obj.head.OBJECT)
+                    run_name = obj.head.OBJECT;
+                elseif ~isempty(obj.filename)
+                    [~, run_name] = fileparts(obj.filename); 
+                end
+
+                if ~isempty(run_name)
+                    filename = [filename '_' run_name];
+                end
+
+            end
+            
+            [filepath,filename,ext] = fileparts(filename);
+            
+            if ~isempty(ext)
+                filename = [filename ext];
+                filename = [filename '.mat']; 
+            end
+            
+            if isempty(filepath)
+                filepath = fullfile(getenv('DATA'), 'saved/events/'); 
+            end
+            
+            [filename, filepath] = uiputfile(fullfile(filepath, filename)); 
+            
+            if ~isequal(filename, 0)
+                obj.save(fullfile(filepath, filename)); 
+            end
+            
+        end
+        
+        function str_out = print_gaia_data(obj)
+            
+            if isempty(obj.gaia_data)
+                str = sprintf('Mag BP= %4.2f | Teff= % 5d', obj.gaia_data.Mag_BP, obj.gaia_data.Teff); 
+            else 
+                str = ''; 
+            end
+            
+            if nargout>0
+                str_out = str;
+            else
+                disp(str);
+            end
+            
+        end
+        
     end
     
     methods % plotting tools / GUI

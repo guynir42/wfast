@@ -215,7 +215,7 @@ classdef AnalysisGUI < handle
             obj.panel_info.addButton('button_RA', 'head.RA', 'info', 'RA= ', '', 'edit', 0.2); 
             obj.panel_info.addButton('button_DE', 'head.DEC', 'info', 'DE= ', '', 'edit', 0.2); 
             obj.panel_info.addButton('button_exptime', 'head.EXPTIME', 'info', 'expT= ', 's', 'edit', 0.2); 
-            obj.panel_info.addButton('button_exptime', 'finder.num_kept', 'info', 'num kept= ', '', 'edit', 0.2); 
+            obj.panel_info.addButton('button_kept', 'finder.num_kept', 'info', 'num kept= ', '', 'edit', 0.2); 
             obj.panel_info.margin = 0.00;
             obj.panel_info.make;
             

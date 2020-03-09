@@ -67,6 +67,7 @@ classdef Photometry < handle
         use_gaussian = 1;
         use_aperture = 0; % no need to do aperture because forced is much better
         use_forced = 1;
+        use_best_offsets_widths = 1; % if this is true, keep the offsets and widths from gaussian even if using aperture/forced 
         
         corner_size = 0.15; % fraction of the cut_size or pixel value (must be smaller than cut_size!)
         aperture = 9; % for now lets keep it short by using just the big aperture
@@ -436,9 +437,13 @@ classdef Photometry < handle
                     obj.errors = obj.errors_ap;
                     obj.backgrounds = obj.backgrounds_ap;
                     obj.variances = obj.variances_ap;
-                    obj.offsets_x = obj.offsets_x_ap;
-                    obj.offsets_y = obj.offsets_y_ap;
-                    obj.widths = obj.widths_ap;
+                    
+                    if obj.use_best_offsets_widths==0 && obj.use_gaussian % if we used gaussian and "use_best_offsets_widths" then save the gaussian offsets/widths instead of the aperture ones
+                        obj.offsets_x = obj.offsets_x_ap;
+                        obj.offsets_y = obj.offsets_y_ap;
+                        obj.widths = obj.widths_ap;
+                    end
+                    
                     obj.bad_pixels = obj.bad_pixels_ap;
                     obj.flags = obj.flags_ap;
                     

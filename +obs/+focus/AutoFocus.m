@@ -156,6 +156,13 @@ classdef AutoFocus < handle
             
         end
 
+        function input_new(obj, focus_pos, widths, star_positions_xy)
+            
+            
+            
+            
+        end
+        
         function input(obj, idx, position, widths, fluxes, xy_pos)
             
             if nargin<5 || isempty(fluxes)
