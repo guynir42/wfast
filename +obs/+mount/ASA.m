@@ -49,6 +49,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         timer; % timer object
         
         guiding_history@util.vec.CircularBuffer;
+        correct_history@util.vec.CircularBuffer; 
         
         log@util.sys.Logger; % keep track of all commands and errors
         
@@ -62,7 +63,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
     
     properties % switches/controls
         
-        use_guiding = 1;
+        use_guiding = 1;        
+        use_integral_guiding = 1;
+        use_pid_guiding = 0;
+        integral_number = 50; 
+        pid_P = 0.3;
+        pid_I = 0.6;
+        pid_D = 0.1;
+        
         use_accelerometer = 1; % make constant checks for altitude outside of the mounts own sensors
         use_ultrasonic = 0; % make constant checks that there is nothing in front of the telescope
         
@@ -151,6 +159,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             end
             
             obj.guiding_history = util.vec.CircularBuffer;
+            obj.correct_history = util.vec.CircularBuffer;
             
             obj.log = util.sys.Logger('ASA_mount', obj);
             
@@ -1091,38 +1100,72 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     
                     direction = 1;
                     if strcmp(obj.pier_side, 'pierEast')
-%                         direction  = -1;
+                        direction  = -1;
                     end
                     
-                    if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'RA_rate_delta') && ~isempty(obj.sync.incoming.RA_rate_delta)
+                    if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'RA_rate_delta') && ~isempty(obj.sync.incoming.RA_rate_delta)...
+                            && isfield(obj.sync.incoming, 'DE_rate_delta') && ~isempty(obj.sync.incoming.DE_rate_delta)
+                        
                         dRA = obj.sync.incoming.RA_rate_delta;
                         if isempty(dRA) || isnan(dRA), dRA = 0; end
                         
-                        if ~isequal(dRA, obj.prev_dRA)
-                            obj.rate_RA = obj.rate_RA + direction*dRA;
-                            obj.prev_dRA = dRA;
-                            fprintf('dRA= %6.4f ', dRA); 
-                        end
-                        
-%                         obj.sync.incoming.RA_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
-                        obj.sync.outgoing.RA_rate = obj.rate_RA;
-                        
-                    end
-                    
-                    if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'DE_rate_delta') && ~isempty(obj.sync.incoming.DE_rate_delta)
                         dDE = obj.sync.incoming.DE_rate_delta;
                         if isempty(dDE) || isnan(dDE), dDE = 0; end
                         
-                        if ~isequal(dDE, obj.prev_dDE)
-                            obj.rate_DE = obj.rate_DE + direction*dDE;
+                        if ~isequal(dRA, obj.prev_dRA) && ~isequal(dDE, obj.prev_dDE)
+                            
+                            obj.prev_dRA = dRA;
                             obj.prev_dDE = dDE;
-                            fprintf('| dDe= %6.4f\n', dDE); 
+%                             fprintf('dRA= %6.4f | dDE= %6.4f\n', dRA, dDE); 
+                            
+                            obj.correct_history.input([dRA, dDE]); 
+                            
+                            if obj.use_integral_guiding
+                                obj.rate_RA = direction*obj.correct_history.mean(1); 
+                                obj.rate_DE = direction*obj.correct_history.mean(2); 
+                            elseif obj.use_pid_guiding
+                                obj.rate_RA = obj.rate_RA + direction*obj.getPID_RA; 
+                                obj.rate_DE = obj.rate_DE + direction*obj.getPID_DE;
+                            else
+                                obj.rate_RA = obj.rate_RA + direction*dRA;
+                                obj.rate_DE = obj.rate_DE + direction*dDE;
+                            end
+                            
+                            
                         end
                         
-%                         obj.sync.incoming.DE_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
-                        obj.sync.outgoing.DE_rate = obj.rate_DE;
-                        
                     end
+                    
+%                     if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'RA_rate_delta') && ~isempty(obj.sync.incoming.RA_rate_delta)
+%                         dRA = obj.sync.incoming.RA_rate_delta;
+%                         if isempty(dRA) || isnan(dRA), dRA = 0; end
+%                         
+%                         if ~isequal(dRA, obj.prev_dRA)
+%                             obj.rate_RA = obj.rate_RA + direction*dRA;
+%                             obj.prev_dRA = dRA;
+%                             fprintf('dRA= %6.4f ', dRA); 
+%                         end
+%                         
+% %                         obj.sync.incoming.RA_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
+%                         
+%                         obj.sync.outgoing.RA_rate = obj.rate_RA;
+%                         
+%                     end
+%                     
+%                     if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'DE_rate_delta') && ~isempty(obj.sync.incoming.DE_rate_delta)
+%                         dDE = obj.sync.incoming.DE_rate_delta;
+%                         if isempty(dDE) || isnan(dDE), dDE = 0; end
+%                         
+%                         if ~isequal(dDE, obj.prev_dDE)
+%                             obj.rate_DE = obj.rate_DE + direction*dDE;
+%                             obj.prev_dDE = dDE;
+%                             fprintf('| dDE= %6.4f\n', dDE); 
+%                         end
+%                         
+% %                         obj.sync.incoming.DE_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
+%                         obj.sync.outgoing.DE_rate = obj.rate_DE;
+%                         
+%                     end
                     
 %                     fprintf('dRA= %6.4f | dDe= %6.4f\n', dRA, dDE); 
                     
@@ -1161,6 +1204,60 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
+        function val = getPID_RA(obj)
+            
+            P = obj.correct_history.data(obj.correct_history.idx,1); 
+            I = nansum(obj.correct_history.data(:,1)); 
+            
+            idx = obj.correct_history.idx;
+            idx = idx - 1;
+            if idx<1
+                idx = obj.correct_history.N;
+            end
+            
+            if idx>0 && idx<obj.correct_history.N
+                D = P-obj.correct_history.data(idx,1); 
+            else
+                D = 0;
+            end
+            
+            K_total = obj.pid_P + obj.pid_I + obj.pid_D;
+            
+            K_P = obj.pid_P/K_total;
+            K_I = obj.pid_I/K_total;
+            K_D = obj.pid_D/K_total;
+            
+            val = K_P.*P + K_I.*I + K_D.*D;
+            
+        end
+        
+        function val = getPID_DE(obj)
+            
+            P = obj.correct_history.data(obj.correct_history.idx,2); 
+            I = nansum(obj.correct_history.data(:,2)); 
+            
+            idx = obj.correct_history.idx;
+            idx = idx - 1;
+            if idx<1
+                idx = obj.correct_history.N;
+            end
+            
+            if idx>0 && idx<obj.correct_history.N
+                D = P-obj.correct_history.data(idx,2); 
+            else
+                D = 0;
+            end
+            
+            K_total = obj.pid_P + obj.pid_I + obj.pid_D;
+            
+            K_P = obj.pid_P/K_total;
+            K_I = obj.pid_I/K_total;
+            K_D = obj.pid_D/K_total;
+            
+            val = K_P.*P + K_I.*I + K_D.*D;
+            
+        end
+        
         function resetRate(obj)
             
             obj.rate_RA = 0;
@@ -1171,6 +1268,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             obj.sync.incoming.RA_rate_delta = 0;
             obj.sync.incoming.DE_rate_delta = 0;
+            
+            obj.guiding_history.reset;
+            obj.correct_history.reset(obj.integral_number);
             
         end
         

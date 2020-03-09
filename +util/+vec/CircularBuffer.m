@@ -127,12 +127,12 @@ classdef CircularBuffer < dynamicprops
             end
             
             % the following code gives to subsref a 1st dim with the correct 
-            % order (start at obj.idx, loop back around to obj.idx-1), and
+            % order (start at obj.idx+1, loop back around to obj.idx), and
             % the other dims are just ':', as many as needed...
             idx_end = size(obj.data,1); 
             
-            S1 = struct('type', '()', 'subs', obj.idx:idx_end); 
-            S2 = struct('type', '()', 'subs', 1:obj.idx-1); 
+            S1 = struct('type', '()', 'subs', obj.idx+1:idx_end); 
+            S2 = struct('type', '()', 'subs', 1:obj.idx); 
             
             S1.subs = {S1.subs}; 
             S2.subs = {S2.subs}; 
