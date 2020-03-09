@@ -51,6 +51,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         guiding_history@util.vec.CircularBuffer;
         correct_history@util.vec.CircularBuffer; 
         
+        reco@obs.comm.Reconnect;
+        
         log@util.sys.Logger; % keep track of all commands and errors
         
     end
@@ -161,6 +163,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             obj.guiding_history = util.vec.CircularBuffer;
             obj.correct_history = util.vec.CircularBuffer;
             
+            obj.reco =obs.comm.Reconnect;
+            
             obj.log = util.sys.Logger('ASA_mount', obj);
             
             try
@@ -186,37 +190,48 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function connect(obj)
             
-            obj.log.input('Connecting to mount');
-            
-            try 
-                
-                if ~isempty(obj.hndl)
-                    obj.disconnect;
-                    pause(0.1);
+            if obj.reco.should
+
+                obj.log.input('Connecting to mount');
+
+                try 
+
+                    if ~isempty(obj.hndl)
+                        obj.disconnect;
+                        pause(0.1);
+                    end
+
+                    obj.loadServer;
+
+                    pause(5);
+
+                    obj.hndl = actxserver('AstrooptikServer.Telescope');
+
+                    if ~obj.checkServer
+                        return;
+                    end
+
+                    obj.hndl.SiteLatitude  = obj.object.latitude;
+                    obj.hndl.SiteLongitude = obj.object.longitude;
+
+                    obj.hndl.Connected = 1;
+
+                    obj.hndl.MotorOn;
+
+                    obj.update;
+                    
+                    if obj.status==0
+                        error('Mount connected but status is 0...'); 
+                    end
+                    
+                    obj.reco.inputSuccess;
+
+                catch ME
+                    obj.reco.inputFailure(ME.getReport);
+                    obj.log.error(ME.getReport);
+                    rethrow(ME);
                 end
-                
-                obj.loadServer;
-                
-                pause(5);
-                
-                obj.hndl = actxserver('AstrooptikServer.Telescope');
-            
-                if ~obj.checkServer
-                    return;
-                end
-                
-                obj.hndl.SiteLatitude  = obj.object.latitude;
-                obj.hndl.SiteLongitude = obj.object.longitude;
-                
-                obj.hndl.Connected = 1;
-            
-                obj.hndl.MotorOn;
-                
-                obj.update;
-                
-            catch ME
-                obj.log.error(ME.getReport);
-                rethrow(ME);
+
             end
             
         end
@@ -251,7 +266,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     obj.ard.update;
                     
                 catch ME
-                    obj.use_accelerometer = 0; % this prevents endless loops of reconnect but also doesn't allow multiple reconnects
+%                     obj.use_accelerometer = 0; % this prevents endless loops of reconnect but also doesn't allow multiple reconnects
                     warning(ME.getReport);
                 end
                 
@@ -1184,7 +1199,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     end
                     
                     if isempty(obj.ard) || ok==0
-%                         obj.connectArduino;
+                        obj.connectArduino;
                     end
                     
                 end

@@ -121,7 +121,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             end
             
             if obj.use_mount
-%                 obj.connectMount; % ASA mount
+                obj.connectMount; % ASA mount
             end
             
             if obj.use_weather

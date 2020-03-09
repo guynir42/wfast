@@ -13,6 +13,8 @@ classdef PcSync < handle
         incoming; % struct with data that got received from other side
         outgoing; % struct with data to be sent to the other side
         
+        reco@obs.comm.Reconnect;
+        
         log@util.sys.Logger;
         
     end
@@ -98,6 +100,8 @@ classdef PcSync < handle
                         obj.log = util.sys.Logger(['comm_sync_' obj.role]);
                     end
                     
+                    obj.reco = obs.comm.Reconnect;
+                    
                     obj.reset;
                     
                 end
@@ -120,7 +124,7 @@ classdef PcSync < handle
             
             obj.incoming = struct;
             obj.outgoing = struct;
-            
+
         end
         
     end
@@ -153,31 +157,38 @@ classdef PcSync < handle
                 timeout = 10; % we will need to be smart about implementing this timeout, maybe using an extra worker
             end
             
-            obj.log.input(['Setting up new connection to ' obj.remote_ip ':' num2str(obj.remote_port_tx) '/' num2str(obj.remote_port_rx) ' with role: ' obj.role]);
+            if obj.reco.should
             
-            try
-                
-                if util.text.cs(obj.role, 'server')
-                    fprintf('Connecting to TCP/IP as server. There is no timeout! To break out hit Ctrl+C\n');
+                obj.log.input(['Setting up new connection to ' obj.remote_ip ':' num2str(obj.remote_port_tx) '/' num2str(obj.remote_port_rx) ' with role: ' obj.role]);
+
+                try
+
+                    if util.text.cs(obj.role, 'server')
+                        fprintf('Connecting to TCP/IP as server. There is no timeout! To break out hit Ctrl+C\n');
+                    end
+
+                    obj.disconnect;
+
+                    if strcmpi(obj.role, 'server')
+                        obj.hndl_rx = obj.connectSocket('rx');
+                        obj.hndl_tx = obj.connectSocket('tx');
+                    else
+                        obj.hndl_tx = obj.connectSocket('tx');
+                        obj.hndl_rx = obj.connectSocket('rx');
+                    end
+
+                    pause(0.1);
+
+                    obj.update;
+
+                    obj.reco.inputSuccess;
+                    
+                catch ME
+                    obj.log.error(ME.getReport);
+                    obj.reco.inputFailure(ME.getReport);
+                    rethrow(ME);
                 end
-                
-                obj.disconnect;
-                
-                if strcmpi(obj.role, 'server')
-                    obj.hndl_rx = obj.connectSocket('rx');
-                    obj.hndl_tx = obj.connectSocket('tx');
-                else
-                    obj.hndl_tx = obj.connectSocket('tx');
-                    obj.hndl_rx = obj.connectSocket('rx');
-                end
-                
-                pause(0.1);
-                
-                obj.update;
-                
-            catch ME
-                obj.log.error(ME.getReport);
-                rethrow(ME);
+
             end
             
         end
@@ -192,8 +203,9 @@ classdef PcSync < handle
 
             try
                 fopen(hndl);
-            catch
+            catch ME
                 delete(hndl); 
+                rethrow(ME);
             end
             
 %             hndl.BytesAvailableFcnCount = 32;

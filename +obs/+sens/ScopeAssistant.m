@@ -9,6 +9,7 @@ classdef ScopeAssistant < handle
         hndl; % serial object
         telescope; % link back to telescope object (e.g., for sending stop signal)
         data@util.vec.CircularBuffer;
+        reco@obs.comm.Reconnect;
         
     end
     
@@ -64,7 +65,7 @@ classdef ScopeAssistant < handle
     
     properties(Hidden=true)
        
-        version = 1.01;
+        version = 1.02;
         
     end
     
@@ -78,8 +79,15 @@ classdef ScopeAssistant < handle
             else
                 if obj.debug_bit, fprintf('ScopeAssistant constructor v%4.2f\n', obj.version); end
                 
-%                obj.connect(varargin{:});
                 obj.data = util.vec.CircularBuffer(100);
+                obj.reco = obs.comm.Reconnect;
+                
+                try 
+                    obj.connect(varargin{:});
+                catch ME
+                    warning(ME.getReport)
+                end
+                
                 obj.reset;
                 
             end
@@ -90,16 +98,29 @@ classdef ScopeAssistant < handle
             
 %             obj.connectUSB(varargin{:});
 
-            obj.disconnect;
+            if obj.reco.should
 
-            t = datetime('now', 'TimeZone', 'UTC');
-            fprintf('%s: connecting arduino bluetooth\n', t);
+                try
+                
+                    obj.disconnect;
 
-            obj.connectBluetooth(varargin{:});
-            
-            pause(0.1);
-            
-            obj.setupTimer(obj.default_period);
+                    t = datetime('now', 'TimeZone', 'UTC');
+                    fprintf('%s: connecting arduino bluetooth\n', t);
+
+                    obj.connectBluetooth(varargin{:});
+
+                    pause(0.1);
+
+                    obj.setupTimer(obj.default_period);
+
+                    obj.reco.inputSuccess;
+                
+                catch ME
+                    obj.reco.inputFailure(ME.getReport);
+                    rethrow(ME); 
+                end
+                
+            end
             
         end
         
@@ -342,14 +363,15 @@ classdef ScopeAssistant < handle
                 fprintf(obj.hndl, str);
                 ok = 1;
             catch ME
-                disp('Problem writing to Arduino'); 
+%                 disp('Problem writing to Arduino'); 
                 
                 try % try again
                     fprintf(obj.hndl, str);
                     ok = 1;
                 catch ME
-                    disp('Failed second attempt to write'); 
+%                     disp('Failed second attempt to write'); 
                     ok = 0;
+                    obj.status = 0;
                 end
                 
             end
