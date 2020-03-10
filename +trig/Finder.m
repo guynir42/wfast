@@ -1042,6 +1042,8 @@ classdef Finder < handle
                     
                 end
                 
+                ev.head = obj.head;
+                
                 if ~isempty(obj.cat) && ~isempty(obj.cat.success) && obj.cat.success % save the GAIA info on the star
                     ev.gaia_data = table2struct(obj.cat.data(ev.star_index,:)); 
                 end
