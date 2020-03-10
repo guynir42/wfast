@@ -57,6 +57,7 @@ classdef AcqGUI < handle
         button_show_what;
 %         button_src_status;
         button_flip;
+        button_show_switch;
         button_num_stars;
         axes_image;
         
@@ -269,7 +270,9 @@ classdef AcqGUI < handle
             obj.button_show_what.Callback = @obj.callback_show_what;
             obj.button_show_what.String = obj.owner.show_what_list;
             
-            obj.button_flip = GraphicButton(obj.panel_image, [0.9 0.00 0.1 0.05], obj.owner, 'use_flip', 'toggle', 'flip', '', 'small');
+            obj.button_flip = GraphicButton(obj.panel_image, [0.9 0.00 0.1 0.05], obj.owner, 'use_flip', 'toggle', 'no flip', 'flip', 'small');
+            obj.button_show_switch = GraphicButton(obj.panel_image, [0.8 0.00 0.1 0.05], obj.owner, 'use_show', 'toggle', 'no show', 'show', 'small');
+                        
             obj.button_num_stars = GraphicButton(obj.panel_image, [0.00 0.95 0.1 0.05], obj.owner, 'display_num_rect_stars', 'input', 'rect= ', '', 'small');
             
             obj.button_unlock = GraphicButton(obj.panel_image, [0.9 0.95 0.1 0.05], obj.owner, 'unlock', 'push', 'unlock');

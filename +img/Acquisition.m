@@ -117,7 +117,7 @@ classdef Acquisition < file.AstroData
         
         use_autodeflate = 1;
         
-        camera_angle = 15; % degrees between image top and cardinal south/north (when after meridian)
+        camera_angle = 60; % degrees between image top and cardinal south/north (when after meridian)
         
         % display parameters
         use_show = true;
@@ -130,6 +130,7 @@ classdef Acquisition < file.AstroData
         
         use_audio = 1;
         use_progress = 1;
+        use_print_timing = 0; % print a line each batch with the timing data for each part of the processing chain
         
         pass_source = {}; % parameters to pass to camera/reader/simulator
         pass_cal = {}; % parameters to pass to calibration object
@@ -249,7 +250,6 @@ classdef Acquisition < file.AstroData
         use_roi_;
         roi_size_;
         roi_center_;
-
         
         show_what_list = {'images', 'stack', 'stack_proc'};
         
@@ -287,6 +287,7 @@ classdef Acquisition < file.AstroData
                 obj.flux_buf = util.vec.CircularBuffer;
                 
                 obj.phot = img.Photometry;
+                obj.phot.num_threads = 6;
                 obj.lightcurves = img.Lightcurves;
                 
                 % we don't want to start doing serious calibration on the
@@ -327,9 +328,9 @@ classdef Acquisition < file.AstroData
                 obj.head = head.Header; % this also gives "head" to all sub-objects
                 obj.cat = head.Catalog(obj.head);
                 obj.cat.RA_scan_step = 2;
-                obj.cat.RA_scan_range = 4;
+                obj.cat.RA_scan_range = 0;
                 obj.cat.Dec_scan_step = 2;
-                obj.cat.Dec_scan_range = 2;
+                obj.cat.Dec_scan_range = 0;
                 
                 obj.lightcurves.head = obj.head;
                 obj.lightcurves.cat = obj.cat;
@@ -604,9 +605,9 @@ classdef Acquisition < file.AstroData
             val = sprintf('%s\n mean flux= %.1f', val, obj.average_flux);
             val = sprintf('%s\n mean background= %.1f', val, obj.average_background);
             
-            if isprop(obj.cam, 'focuser')
+            if isprop(obj.cam, 'focuser') && ~isempty(obj.cam.focus_pos_tip_tilt)
                 val = sprintf('%s\n focus: %5.3f (%5.3f / %5.3f)', ...
-                    val, obj.cam.focuser.pos, obj.cam.focuser.tip, obj.cam.focuser.tilt);
+                    val, obj.cam.focus_pos_tip_tilt(1), obj.cam.focus_pos_tip_tilt(2), obj.cam.focus_pos_tip_tilt(3));
             end
             
             val = sprintf('%s\n--------------------------------------', val);
@@ -1038,7 +1039,7 @@ classdef Acquisition < file.AstroData
                 input.input_var('debug_bit', []);
                 input.input_var('log_level', []);
                 
-                input.input_var('run_name', '', 'name', 'object', 'objname');
+%                 input.input_var('run_name', '', 'name', 'object', 'objname');
                 input.input_var('RA', [], 'right ascention', 'right ascension');
                 input.input_var('DE', [], 'declination');
                 input.input_var('expT', [], 'T', 'exposure time');
@@ -1393,10 +1394,6 @@ classdef Acquisition < file.AstroData
                     obj.head.DE = input.DE;
                 end
 
-                if ~isempty(input.run_name)
-                    obj.head.target_name = input.run_name;
-                end
-                
             end
             
             if ~isempty(obj.sync) && obj.use_sync && obj.use_ignore_manager==0
@@ -1408,6 +1405,10 @@ classdef Acquisition < file.AstroData
             if isa(obj.src, 'obs.cam.Andor')
                 obj.head.INST = obs.cam.mex_new.get(obj.src.hndl, 'name'); 
                 obj.head.PIXSIZE = obs.cam.mex_new.get(obj.src.hndl, 'pixel width'); 
+                obj.head.NAXIS1 = obs.cam.mex_new.get(obj.src.hndl, 'width');
+                obj.head.NAXIS2 = obs.cam.mex_new.get(obj.src.hndl, 'height');
+                obj.head.NAXIS3 = obj.batch_size;
+                obj.head.NAXIS4 = obj.num_stars;
             end
             
             obj.cal.camera_name = obj.head.INST;
@@ -1430,7 +1431,7 @@ classdef Acquisition < file.AstroData
                 obj.update(input); % update header object to current time and input run name, RA/DE if given to input.
                 
                 obj.stash_parameters(input);
-
+            
                 if isempty(obj.num_batches)
                     error('Must input a number of batches!');
                 end
@@ -1463,7 +1464,7 @@ classdef Acquisition < file.AstroData
                     
                     obj.reset;
                     
-                    if obj.debug_bit, disp(['Starting run "' input.run_name '" for ' num2str(obj.num_batches) ' batches.']); end
+                    if obj.debug_bit, disp(['Starting run "' obj.run_name '" for ' num2str(obj.num_batches) ' batches.']); end
 
                 end
                 
@@ -1491,6 +1492,7 @@ classdef Acquisition < file.AstroData
 %                 obj.update(input); % update header object to current time and input run name, RA/DE if given to input.
                 
                 obj.head.RUNSTART = util.text.time2str(obj.head.ephem.time);
+                obj.head.NAXIS4 = obj.num_stars_found;
                 
                 if obj.use_save
                     try
@@ -1606,12 +1608,14 @@ classdef Acquisition < file.AstroData
                 return;
             end
             
-            t = tic;
+            t0 = tic;
             
             obj.prev_stack = obj.stack_proc; % keep one stack from last batch
             obj.clear;
             
+            t_batch = tic;
             obj.src.batch; % produce the data (from camera, file, or simulator)
+            t_batch = toc(t_batch); 
             
             if obj.debug_bit>1, fprintf('Starting batch %d. Loaded %d images from "%s" source.\n', obj.batch_counter+1, size(obj.images,3), class(obj.src)); end
             
@@ -1623,12 +1627,14 @@ classdef Acquisition < file.AstroData
             
             obj.update;
             
+            t_copy = tic;
             obj.copyFrom(obj.src); % get the data into this object
+            t_copy = toc(t_copy);
             
             obj.head.END_STAMP = obj.t_end_stamp;
                         
             J = juliandate(util.text.str2time(obj.t_end));
-                        
+            
             obj.juldates = J + (obj.timestamps - obj.t_end_stamp)/24/3600; 
             
             % if src is using ROI, must update the calibration object to do the same
@@ -1642,16 +1648,27 @@ classdef Acquisition < file.AstroData
                 obj.cal.use_roi = 0;
             end
             
+            t_stack = tic;
             obj.calcStack;
+            t_stack = toc(t_stack);
             
             if obj.use_cutouts
+                t_cut = tic;
                 obj.calcCutouts;
+                t_cut = toc(t_cut);
+            
+                t_light = tic;
                 obj.calcLightcurves;
+                t_light = toc(t_light); 
+            
                 obj.calcTrigger;
+                
             end
             
             obj.positions = obj.clip.positions;
             obj.positions_bg = obj.clip_bg.positions;
+            
+            t_save = tic;
             
             if obj.use_save
                 obj.buf.input(obj);
@@ -1661,6 +1678,8 @@ classdef Acquisition < file.AstroData
                 % check triggering then call the camera save mode
                 
             end
+            
+            t_save = toc(t_save);
             
             if ismethod(obj.src, 'next')
                 obj.src.next;
@@ -1674,17 +1693,30 @@ classdef Acquisition < file.AstroData
             
             obj.start_index = obj.start_index + 1;
             
+            t_show = tic;
+            
             if obj.use_show
                 obj.show;
             end
+            
+            drawnow;
+            
+            t_show = toc(t_show);
+            
+            t_gui = tic;
             
             if ~isempty(obj.gui) && obj.gui.check
                 obj.gui.update; 
             end
             
-            drawnow;
+            t_gui = toc(t_gui);
             
-            obj.runtime_buffer.input([size(obj.images,3), toc(t)]);
+            obj.runtime_buffer.input([size(obj.images,3), toc(t0)]);
+            
+            if obj.use_print_timing
+                fprintf('TIMING: batch= %4.2f | copy= %4.2f | stack= %4.2f | cut= %4.2f | light= %4.2f | save= %4.2f | show= %4.2f | gui= %4.2f\n', ...
+                    t_batch, t_copy, t_stack, t_cut, t_light, t_save, t_show, t_gui); 
+            end
             
         end
         
@@ -1703,7 +1735,9 @@ classdef Acquisition < file.AstroData
             
             try 
                 
+                tic
                 obj.src.single; 
+                toc 
                 obj.prev_stack = obj.stack_proc; % keep one stack from last batch
                 obj.clear;
                 obj.copyFrom(obj.src); % get the data into this object
@@ -1764,7 +1798,7 @@ classdef Acquisition < file.AstroData
                 obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.clip.positions); % run photometry on the stack to verify flux and adjust positions
                 if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
 
-                if obj.use_check_positions
+                if obj.use_check_positions && obj.use_arbitrary_pos==0
                     obj.checkRealign;
                 end
                 

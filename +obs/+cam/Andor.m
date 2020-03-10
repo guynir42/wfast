@@ -206,6 +206,8 @@ classdef Andor < file.AstroData
         
         num_restarts; % how many times did the camera get stuck (synchronous mode only!)
         
+        focus_pos_tip_tilt; 
+        
         is_running = 0;
         brake_bit = 1; % when 1 the camera is stopped. Is set to 0 on "startup". 
         
@@ -911,6 +913,10 @@ classdef Andor < file.AstroData
 
                 obj.batch_counter = 0; % how many batches were already taken (for GUI display, etc)
 
+                if isprop(obj, 'focuser')
+                    obj.focus_pos_tip_tilt = [obj.focuser.pos, obj.focuser.tip, obj.focuser.tilt]; 
+                end
+                
                 if obj.use_save
                     filename = obj.buffers.getReadmeFilename;
                     util.oop.save(obj, filename, 'name', 'camera');  

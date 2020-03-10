@@ -36,12 +36,13 @@ classdef Deflator < file.AstroData
     properties % switches and controls
         
         auto_deflate_destination = getenv('DATA_EXTRAS');
+        auto_deflate_backup_dir = getenv('DATA_BACKUP'); 
         
         use_auto_delete = 0;
         
         use_parallel_auto_deflate = 1;
         
-        use_auto_backup = 0;
+        use_auto_backup = 1;
         
         use_copy_text_files = 1;
         use_copy_catalogs = 1;
@@ -260,7 +261,7 @@ classdef Deflator < file.AstroData
 
                     if obj.use_auto_backup
 
-                        temp_dir = sa(obj.out_dir_backup, d{jj});
+                        temp_dir = sa(obj.out_dir_backup.pwd, d{jj});
 
                         if ~exist(temp_dir, 'dir')
                             mkdir(temp_dir);
@@ -327,53 +328,27 @@ classdef Deflator < file.AstroData
                         
                         obj.clear;
                 
-                        [output_exists, output_filename] = obj.checkFileExists(obj.reader.this_filename, obj.out_subdir.pwd);
+                        origin_filename = obj.reader.this_filename;
+                        [output_exists, output_filename] = obj.checkFileExists(origin_filename, obj.out_subdir.pwd);
                         
-                        if ~obj.use_auto_backup
-
-                            if ~output_exists % load and write to output
-                                %  disp('loading and saving a batch!');
-%                                 obj.this_buffer.backup_dir = '';
-%                                 obj.this_buffer.use_auto_backup = 0;
+                        if ~output_exists % load and write to output
                                 obj.batch;
-                            else % file exits, skip it
-                                % disp('skipping to next file...');
-                                obj.reader.advanceFile; % if this file exists don't need to re-read it
-                            end
-
-                        else % if we do want to have an automatic backup
+                        else % file exists, check if we need to back it up too
+                            obj.reader.advanceFile; % if this file exists we don't need to re-read it
+                        end
+                        
+                        if obj.use_auto_backup 
                             
-                            error('We need to repair auto-backup. For now this doesnt work...');
-                            
-                            [backup_exists, backup_filename] = obj.checkFileExists(obj.reader.current_filename, obj.out_subdir_backup.pwd); % check if we need a backup too...
-
-                            if ~exist(obj.out_subdir_backup.pwd, 'dir')
-                                mkdir(obj.out_subdir_backup.pwd);
-                            end
-
-                            if ~output_exists && ~backup_exists
-                                %                     disp('loading and saving a batch!');
-                                obj.this_buffer.backup_dir = obj.out_subdir_backup.pwd;
-                                obj.this_buffer.use_auto_backup = 1;
-                                % can give the backup_filename explicitely but PhotoBuffer should be able to get it on its own...
-                                obj.batch;
-                            elseif output_exists && backup_exists % if both outputs exist
-                                %                     disp('skipping to next file...');
-                                obj.reader.advanceFile; % if this file exists don't need to re-read it
-                            else % if there is a first output but no backup or there is a backup but no first output
-
-                                if ~output_exists && backup_exists % if the backup exists but output doesn't, switch the roles!
-                                    temp_filename = backup_filename;
-                                    backup_filename = output_filename;
-                                    output_filename = temp_filename;
+                            [backup_exists, backup_filename] = obj.checkFileExists(origin_filename, obj.out_subdir_backup.pwd);
+                        
+                            if ~backup_exists % must make a backup of this file
+                                
+                                if ~exist(obj.out_subdir_backup.pwd, 'dir')
+                                    mkdir(obj.out_subdir_backup.pwd);
                                 end
-
-                                if obj.debug_bit, disp(['copying file to: ' backup_filename]); end
-                                copyfile(output_filename, backup_filename); % don't do the async because there's nothing else to do while it is running...
-
-                                obj.reader.advanceFile; % if this file exists don't need to re-read it
-
-
+                                
+                                copyfile(output_filename, backup_filename);
+                                
                             end
                             
                         end
@@ -449,10 +424,10 @@ classdef Deflator < file.AstroData
             
             for ii = 1:length(list)
                 
-                
                 obj.src_dir.cd(list{ii});
                 
                 dest = fullfile(obj.auto_deflate_destination, obj.src_dir.tail);
+                bkp = fullfile(obj.auto_deflate_backup_dir, obj.src_dir.tail); 
                 
                 if ~exist(dest, 'dir')
                     mkdir(dest);
@@ -460,7 +435,23 @@ classdef Deflator < file.AstroData
                 
                 obj.out_dir.cd(dest);
                 
-                fprintf('\nSRC DIR: %s\n\nDEST DIR: %s\n\n', obj.src_dir.pwd, obj.out_dir.pwd);
+                fprintf('\nSRC DIR: %s\n\nDEST DIR: %s', obj.src_dir.pwd, obj.out_dir.pwd);
+                
+                if obj.use_auto_backup && ~isempty(obj.auto_deflate_backup_dir)
+                    
+                    bkp = fullfile(obj.auto_deflate_backup_dir, obj.src_dir.tail); 
+                
+                    if ~exist(bkp, 'dir')
+                        mkdir(bkp);
+                    end
+
+                    obj.out_dir_backup.cd(bkp); 
+                    
+                    fprintf(' (backup: %s)', bkp); 
+                    
+                end
+                
+                fprintf('\n\n'); 
                 
                 if obj.use_parallel_auto_deflate
                     obj.run_async;
@@ -485,7 +476,7 @@ classdef Deflator < file.AstroData
         
     end
     
-    methods % internal utilities
+    methods % internal calculations
         
         function batch(obj)
             
@@ -544,7 +535,7 @@ classdef Deflator < file.AstroData
             
             [~, name, ext] = fileparts(file_src);
             
-            new_file = [util.text.sa(directory, name) ext 'z'];
+            new_file = [fullfile(directory, name) ext 'z'];
             if exist(new_file, 'file')
                 c = 1;
                 f1 = dir(file_src);
