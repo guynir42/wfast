@@ -1240,7 +1240,11 @@ classdef Acquisition < file.AstroData
                     warning(['unknown source class: ' class(source)]);
                 end
             end
-           
+            
+            if isa(obj.src, 'obs.cam.Andor')
+                obj.src.af = obj.af;
+            end
+            
             obj.update;
             
         end

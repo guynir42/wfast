@@ -56,6 +56,7 @@
 %                 radius of the background annulus. If second element is
 %                 not given or is smaller than the first, assume it is
 %                 infinite (so all pixels above the first radius are used).
+%                 Default is 10 (inner) and 0 (outer, equvalent to Inf). 
 %       *gain: This is used only to estimate the errors from source noise.
 %              Default is 1. 
 %       *scintillation_fraction: Used to estimate the additional noise

@@ -16,7 +16,6 @@ classdef AutoFocus < handle
         pos; % focuser position at each iteration
         widths; % one or multiple measurements per focus position
         weights; % weight of each sampling point (proportional to star flux)
-        weights_reduced; % sum all exposures, not including NaNs and negative values (and NaNs in min_positions)
         xy_pos; % position of sampling points
         xy_pos_reduced; % positions of good points
         
@@ -30,8 +29,10 @@ classdef AutoFocus < handle
         
         fit_results = {};
         min_positions; % minimum of curves for each star
+        min_weights; % the weight to give each star result
         min_positions_reduced; % replace NaNs with zeros
-        
+        min_weights_reduced; % average weights not including NaNs and negative values (and NaNs in min_positions)
+
         surface_coeffs;
         
         found_pos; % put your focuser to this position
@@ -45,7 +46,10 @@ classdef AutoFocus < handle
         expT = 0.03;
         frame_rate = NaN;
         batch_size = 1;
+        
         use_loop_back = 0;
+        
+        use_quadrants = 1;
         num_stars_per_quadrant = 5;
         
         num_repeats = 5;
@@ -103,7 +107,7 @@ classdef AutoFocus < handle
             obj.pos = [];
             obj.widths = [];
             obj.weights = [];
-            obj.weights_reduced = [];
+            obj.min_weights_reduced = [];
             obj.xy_pos = [];
             obj.xy_pos_reduced = [];
             
@@ -156,13 +160,6 @@ classdef AutoFocus < handle
             
         end
 
-        function input_new(obj, focus_pos, widths, star_positions_xy)
-            
-            
-            
-            
-        end
-        
         function input(obj, idx, position, widths, fluxes, xy_pos)
             
             if nargin<5 || isempty(fluxes)
@@ -175,20 +172,30 @@ classdef AutoFocus < handle
             
             obj.pos(idx) = position;
             
-            if ~isempty(obj.quadrant_indices)
+            if obj.use_quadrants 
                 
-                for ii = 1:length(obj.quadrant_indices)
-                
-                    these_widths = widths(obj.quadrant_indices{ii});
-                    these_fluxes = fluxes(obj.quadrant_indices{ii});
-                    
-                    new_widths(ii) = nansum(these_widths.*these_fluxes)./nansum(these_fluxes); % flux weighted average
-                    new_fluxes(ii) = nansum(these_fluxes); 
-                    
+                if ~isempty(obj.quadrant_indices)
+
+                    for ii = 1:length(obj.quadrant_indices)
+
+                        these_widths = widths(obj.quadrant_indices{ii});
+                        these_fluxes = fluxes(obj.quadrant_indices{ii});
+
+                        new_widths(ii) = nansum(these_widths.*these_fluxes)./nansum(these_fluxes); % flux weighted average
+                        new_fluxes(ii) = nansum(these_fluxes); 
+
+                    end
+
+                    widths = new_widths;
+                    fluxes = new_fluxes;
+
                 end
                 
-                widths = new_widths;
-                fluxes = new_fluxes;
+            else
+                
+                widths = nanmean(widths, 1); 
+                weights = nanmean(fluxes, 1); 
+                weights = weights./nansum(weights); 
                 
             end
             
@@ -201,8 +208,20 @@ classdef AutoFocus < handle
             
             if obj.use_min_position
                 
-                [~,idx] = min(mean(obj.widths, 1, 'omitnan'), [], 'omitnan');
+                [~,idx] = nanmin(nanmean(obj.widths, 1));
                 obj.found_pos = obj.pos(idx);
+                
+                [mn, idx] = nanmin(obj.widths, [], 2); % find the minimal value for each star
+                
+                obj.min_positions = obj.pos(idx); 
+                
+                obj.min_weights = nanmedian(obj.weights)./mn; % the average flux is one measure of the goodness of that star but also the smallness of the minimal widths! 
+                
+                bad_indices = isnan(obj.min_positions) | isnan(obj.min_weights) | obj.min_weights<=0;
+                
+                obj.min_positions_reduced = obj.min_positions(~bad_indices); 
+                obj.min_weights_reduced = obj.min_weights(~bad_indices); 
+                obj.xy_pos_reduced = obj.xy_pos(~bad_indices); 
                 
             else
                 
@@ -218,7 +237,7 @@ classdef AutoFocus < handle
             
         end
         
-        function fitCurves(obj)
+        function fitCurves(obj) %  not sure if we want to keep using a polynomial fit anymore
             
             obj.fit_results = {};
             
@@ -250,18 +269,18 @@ classdef AutoFocus < handle
                 
             end
             
-            obj.weights_reduced = sum(obj.weights,2);
+            obj.min_weights_reduced = sum(obj.weights,2);
             
-            bad_points = isnan(obj.min_positions) | obj.weights_reduced<=0 | isnan(obj.weights_reduced);
+            bad_points = isnan(obj.min_positions) | obj.min_weights_reduced<=0 | isnan(obj.min_weights_reduced);
             
             obj.min_positions_reduced = obj.min_positions(~bad_points);
-            obj.weights_reduced = obj.weights_reduced(~bad_points);
-            obj.weights_reduced = obj.weights_reduced./mean(obj.weights_reduced);
+            obj.min_weights_reduced = obj.min_weights_reduced(~bad_points);
+            obj.min_weights_reduced = obj.min_weights_reduced./mean(obj.min_weights_reduced);
             obj.xy_pos_reduced = obj.xy_pos(~bad_points,:);
             
         end
         
-        function val = checkFit(obj, x, y, fr)
+        function val = checkFit(obj, x, y, fr) %  not sure if we want to keep using a polynomial fit anymore
             
             if fr.p1<0 % no minimum
                 val = 0;
@@ -282,13 +301,12 @@ classdef AutoFocus < handle
         
         function fitSurface(obj)
             
-            % add check that there is anything to fit (maybe before the
-            % call to this function?)
+            % add check that there is anything to fit (maybe before the call to this function?)
             
             m = size(obj.xy_pos_reduced,1); % number of measurements
             
             B = obj.min_positions_reduced; % measured best position for each location
-            w = obj.weights_reduced;  % total flux of each position 
+            w = obj.min_weights_reduced;  % total flux of each position 
             
             % rotate to the direction of the actuators... 
             xy_rot = obj.xy_pos_reduced*[cosd(obj.angle), -sind(obj.angle); sind(obj.angle), cosd(obj.angle)]; 
@@ -365,7 +383,7 @@ classdef AutoFocus < handle
             
             if obj.use_model_psf
                 
-            else
+            elseif size(obj.widths,2)==5
                 legend(h, {'center', 'top left', 'top right', 'bottom left', 'bottom right'}, 'Parent', obj.fig);
             end
             
@@ -387,7 +405,7 @@ classdef AutoFocus < handle
             
             util.plot.show(obj.surface_coeffs(1) + obj.surface_coeffs(2).*Y + obj.surface_coeffs(3).*X);
             hold(obj.ax, 'on');
-            scatter(obj.xy_pos_reduced(:,1), obj.xy_pos_reduced(:,2), obj.weights_reduced*10, obj.min_positions_reduced, 'filled'); 
+            scatter(obj.xy_pos_reduced(:,1), obj.xy_pos_reduced(:,2), obj.min_weights_reduced*10, obj.min_positions_reduced, 'filled'); 
 %             axis(obj.ax, 'image');
 %             colorbar(obj.ax); 
 %             obj.ax.XLim = [1,obj.x_max];

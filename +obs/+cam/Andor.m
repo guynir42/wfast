@@ -114,6 +114,8 @@ classdef Andor < file.AstroData
         
         log@util.sys.Logger;
         
+        af@obs.focus.AutoFocus;
+        
         hndl; % pointer to the Andor SDK handle of the camera
         
     end
@@ -207,6 +209,11 @@ classdef Andor < file.AstroData
         num_restarts; % how many times did the camera get stuck (synchronous mode only!)
         
         focus_pos_tip_tilt; 
+        
+        focus_cut_size = 25;
+        focus_aperture = 9; 
+        focus_annulus = [12 0]; 
+        focus_gaussian = 5;
         
         is_running = 0;
         brake_bit = 1; % when 1 the camera is stopped. Is set to 0 on "startup". 
@@ -396,6 +403,8 @@ classdef Andor < file.AstroData
                 obj.focuser = obs.focus.Simulator;
                 
             end
+            
+            obj.af = obs.focus.AutoFocus; 
  
         end
         
@@ -790,9 +799,97 @@ classdef Andor < file.AstroData
             
         end
         
-        function autofocus(obj, varargin) % not yet implemented
+        function autofocus(obj, varargin)
             
-            error('This is not yet implemented!');
+            obj.log.input('Starting focus run'); 
+            
+            try 
+                
+                if isempty(obj.cam.focuser)
+                    error('must be connected to camera and focuser!');
+                end
+
+                if obj.is_running
+                    disp('Camera is already running. Set is_running to zero...');
+                    return;
+                else
+                    obj.is_running = 1;
+                end
+
+                % find stars, the quick version!
+                obj.single;                
+                T = util.img.quick_find_stars(util.stat.sum_single(obj.images), 'threshold', 30, 'saturation', 5e6, 'unflagged', 1); 
+                
+                % the focus positions to scan
+                p = obj.af.getPosScanValues(old_pos);
+
+                if obj.af.use_loop_back
+                    p = [p flip(p)];
+                end
+
+                old_pos = obj.focuser.pos;
+                obj.focuser.pos = p(1);
+                
+                % before we start the loop
+                obj.startup('async', 0, 'num_batches', length(p), 'batch_size', obj.af.batch_size, ...
+                    'reset', 1, 'frame_rate', obj.af.frame_rate, 'exp time', obj.af.expT, ...
+                    'save', 0, 'show', 1, 'log_level', 1, 'progress', 0, 'audio', 1, varargin{:});
+
+                % make sure finishup is called in the end
+                on_cleanup = onCleanup(@obj.finishup);
+                
+                for ii = 1:obj.num_batches
+                    
+                    if obj.brake_bit, break; end
+                    
+                    obj.focuser.pos = p(ii); 
+                    
+                    obj.batch;
+                    
+                    % do we want to quick find stars on each iteration...?
+                    C = util.img.mexCutout(obj.images, T.pos, obj.focus_cut_size, NaN); 
+                    
+                    phot_struct = util.img.photometry2(single(C), 'aperture', obj.focus_aperture, 'index', 3, 'threads', 4);
+                    
+                    widths = phot_struct.gaussian_photometry.width;
+                    fluxes = phot_struct.aperture_photometry.flux;
+                    
+                    obj.af.input(ii, p(ii), widths, fluxes, T.pos); 
+                    
+                    obj.af.plot;
+
+                    drawnow;
+                    
+                end
+                
+                obj.af.calculate;
+                % obj.af.fitSurface;
+                fprintf('FOCUSER RESULTS: pos= %f | tip= %f | tilt= %f\n', obj.af.found_pos, obj.af.found_tip, obj.af.found_tilt);
+                
+                if ~isnan(obj.af.found_pos)
+                    obj.cam.focuser.pos = obj.af.found_pos;
+                else
+                    disp('The location of new position is NaN. Choosing original position');
+                    obj.cam.focuser.pos = old_pos;
+                end
+                
+%                 if isprop(obj.cam.focuser, 'tip') && ~isempty(obj.af.found_tip)
+%                     obj.cam.focuser.tip = obj.cam.focuser.tip + obj.af.found_tip;
+%                 end
+% 
+%                 if isprop(obj.cam.focuser, 'tilt') && ~isempty(obj.af.found_tilt)
+%                     obj.cam.focuser.tilt = obj.cam.focuser.tilt + obj.af.found_tilt;
+%                 end
+
+                obj.af.plot;
+
+            catch ME
+                
+                obj.focuser.pos = old_pos;
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+                
+            end
             
         end
         
@@ -1121,7 +1218,7 @@ classdef Andor < file.AstroData
                 input.input_var('num_batches', obj.num_batches, 'Nbatches');
                 input.input_var('batch_size', obj.batch_size);
                 input.input_var('frame_rate', obj.frame_rate, 'frequency');
-                input.input_var('expT', obj.expT, 'exposure time', 'expT'); 
+                input.input_var('expT', obj.expT, 'exposure time', 'exp time'); 
                 input.input_var('use_roi', obj.use_roi); % turn on/off the ROI mode
                 input.input_var('im_size', obj.im_size); % set the height and width of the ROI
                 input.input_var('center_region', obj.center_region, 'center', 'center_ROI'); % set the center of the ROI (set to center of field if empty)
