@@ -536,19 +536,25 @@ classdef Event < handle
             
         end
         
+        function val = getRunName(obj)
+            
+            val = ''; 
+
+            if ~isempty(obj.head) && ~isempty(obj.head.OBJECT)
+                val = obj.head.OBJECT;
+            elseif ~isempty(obj.filename)
+                [~, val] = fileparts(fileparts(obj.filename)); 
+            end
+
+        end
+        
         function save(obj, filename)
             
             if nargin<2 || isempty(filename)
                 
                 filename = 'event'; 
 
-                run_name = ''; 
-
-                if ~isempty(obj.head) && ~isempty(obj.head.OBJECT)
-                    run_name = obj.head.OBJECT;
-                elseif ~isempty(obj.filename)
-                    [~, run_name] = fileparts(obj.filename); 
-                end
+                run_name = obj.getRunName;
 
                 if ~isempty(run_name)
                     filename = [filename '_' run_name];
@@ -570,11 +576,7 @@ classdef Event < handle
 
                 run_name = ''; 
 
-                if ~isempty(obj.head) && ~isempty(obj.head.OBJECT)
-                    run_name = obj.head.OBJECT;
-                elseif ~isempty(obj.filename)
-                    [~, run_name] = fileparts(obj.filename); 
-                end
+                run_name = obj.getRunName;
 
                 if ~isempty(run_name)
                     filename = [filename '_' run_name];
@@ -586,11 +588,12 @@ classdef Event < handle
             
             if ~isempty(ext)
                 filename = [filename ext];
+            else
                 filename = [filename '.mat']; 
             end
             
             if isempty(filepath)
-                filepath = fullfile(getenv('DATA'), 'saved/events/'); 
+                filepath = fullfile(getenv('DATA'), 'WFAST/saved/events/'); 
             end
             
             [filename, filepath] = uiputfile(fullfile(filepath, filename)); 
@@ -604,11 +607,23 @@ classdef Event < handle
         function str_out = print_gaia_data(obj)
             
             if ~isempty(obj.gaia_data)
-                str = sprintf('Mag BP= %4.2f | Teff= % 5d', obj.gaia_data.Mag_BP, round(obj.gaia_data.Teff)); 
-            else 
-                str = ''; 
+                Mag = obj.gaia_data.Mag_BP;
+                Teff = obj.gaia_data.Teff;
+            else
+                Mag = [];
+                Teff = [];
             end
             
+            if ~isempty(obj.head)
+                RA = obj.head.RA;
+                Dec = obj.head.DEC;
+            else
+                RA = '';
+                Dec = '';
+            end
+
+            str = sprintf('run: %s | RA= %s | Dec= %s | Mag BP= %4.2f | Teff= % 5d', obj.getRunName, RA, Dec, Mag, round(Teff)); 
+                        
             if nargout>0
                 str_out = str;
             else
