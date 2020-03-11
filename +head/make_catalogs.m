@@ -82,8 +82,12 @@ function make_catalogs(directory, varargin)
                 end
                 
                 h.NAXIS1 = size(I,1); 
-                h.NAXIS2 = size(I,1); 
+                h.NAXIS2 = size(I,2); 
                 
+            end
+            
+            if h.FOCLEN>108
+                h.FOCLEN = 108;
             end
             
             c.head = h;

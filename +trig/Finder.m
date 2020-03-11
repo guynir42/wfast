@@ -95,7 +95,7 @@ classdef Finder < handle
         
         lightcurve_type_index = 'end'; % for multiple photometry products choose the one that most suits you for event detection
         
-        use_psd_correction = 0; % use welch on a flux buffer to correct red noise
+        use_psd_correction = 1; % use welch on a flux buffer to correct red noise
         use_var_buf = 1; % normalize variance of each filtered flux
         
         min_star_snr = 5; % stars with lower S/N are not even tested for events

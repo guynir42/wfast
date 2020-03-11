@@ -83,7 +83,7 @@ classdef Analysis < file.AstroData
         use_check_flux = 1;
         max_failed_batches = 3; % if star flux is lost for more than this number of batches, quit the run
         
-        use_astrometry = 0;
+        use_astrometry = 1;
         use_cutouts = 1;
         use_photometry = 1;
         use_psf_model = 1;

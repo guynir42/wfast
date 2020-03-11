@@ -259,7 +259,7 @@ classdef Catalog < handle
                         end
                         
                     catch ME
-                        if ~isequal(ME.identifier, 'MATLAB:badsubscript')
+                        if ~isequal(ME.identifier, 'MATLAB:badsubscript') % || ~isequal(ME.identifier, 'MATLAB:dataread:TroubleReading')
                             warning(ME.getReport);
                         end
                         continue; % with success==0
@@ -301,7 +301,7 @@ classdef Catalog < handle
                 obj.wcs_object = obj.mextractor_sim.WCS;
                 obj.head.WCS.input(obj.wcs_object); 
             
-                [obj.central_RA, obj.central_Dec] = obj.wcs_object.xy2coo(obj.head.ROI(3:4), 'OutUnits', 'deg'); 
+                [obj.central_RA, obj.central_Dec] = obj.wcs_object.xy2coo([obj.head.NAXIS1, obj.head.NAXIS2], 'OutUnits', 'deg'); 
                 
                 obj.rotation = obj.head.WCS.rotation;
                 

@@ -737,21 +737,24 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 hours = hours(:,1);
             end
             
-            s = sign(hours);
-            hours = abs(hours);
+            
+%             s = sign(hours);
+%             hours = abs(hours);
+            
             total_secs = hours*3600 + minutes*60 + seconds;
+            total_secs = mod(total_secs, 24*3600); 
             
             hours   = floor(total_secs/3600);
             minutes = floor(mod(total_secs,3600)/60);
             seconds = mod(total_secs,60);
             
-            if s>0
-                sign_str = '';
-            else
-                sign_str = '-';
-            end
+%             if s>=0
+%                 sign_str = '';
+%             else
+%                 sign_str = '-';
+%             end
                 
-            str = sprintf('%s%02d:%02d:%04.1f', sign_str, hours, minutes, seconds);
+            str = sprintf('%02d:%02d:%04.1f', hours, minutes, seconds);
             
         end
         
@@ -796,7 +799,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             minutes = fix(mod(total_secs,3600)/60);
             seconds = mod(total_secs,60);
             
-            if s>0
+            if s>=0
                 sign_str = '+';
             else
                 sign_str = '-';
