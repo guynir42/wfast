@@ -246,7 +246,6 @@ classdef Catalog < handle
                         warning('off', 'MATLAB:polyfit:PolyNotUnique')
                         warning('off', 'MATLAB:lscov:RankDefDesignMat');
 
-%                         [R,S2] = astrometry(S, 'RA', list_RA(jj), 'UnitsRA', 'deg', 'Dec', list_DE(ii), 'UnitsDec', 'deg', 'Scale', obj.head.SCALE, ...
                         [R,S2] = astrometry(S, 'RA', head.Ephemeris.deg2hour(list_RA(jj)), 'Dec', head.Ephemeris.deg2sex(list_DE(ii)), 'Scale', obj.head.SCALE, ...
                             'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', [5000 5000], 'ApplyPM', false, 'Flip', obj.flip, ...
                             'MinRot', -180, 'MaxRot', 180, 'CatColMag', 'Mag', 'ImSize', [obj.head.NAXIS1, obj.head.NAXIS2]);
@@ -259,10 +258,17 @@ classdef Catalog < handle
                         end
                         
                     catch ME
-                        if ~isequal(ME.identifier, 'MATLAB:badsubscript') % || ~isequal(ME.identifier, 'MATLAB:dataread:TroubleReading')
+                        % a list of errors that are known and can be skipped
+                        if isequal(ME.identifier, 'MATLAB:badsubscript')  
+                            % do nothing
+                        elseif ~isempty(regexp(ME.message, 'Number of stars \(Nmatch=\d+\) is too low for solution'))
+                            % do nothing
+                        else
                             warning(ME.getReport);
                         end
+                        
                         continue; % with success==0
+                        
                     end
 
                     % what should we do with R? check a correct match maybe? 

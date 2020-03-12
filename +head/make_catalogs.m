@@ -19,6 +19,8 @@ function make_catalogs(directory, varargin)
     input.input_var('overwrite', false); 
     input.scan_vars(varargin{:}); 
     
+    t0 = tic;
+    
     d = util.sys.WorkingDirectory(directory); 
     c = head.Catalog;
     
@@ -42,6 +44,23 @@ function make_catalogs(directory, varargin)
         
         if ~isempty(files)
             
+            try % see if the file contains a header
+                
+                h = util.oop.load(files{1}, 'location', '/header'); 
+                
+            catch
+                try
+                    h = util.oop.load(files{1}, 'location', '/pars'); 
+                    h = cast(h);
+                end
+            end
+            
+            % maybe add another attempt to read the header from the text files? 
+            
+            if isempty(h) || isempty(h.RA) || isempty(h.DEC) || (h.RA_DEG==0 && h.DEC_DEG==0)
+                continue; % skip over empty headers or header without RA/DEC or headers that got some weird default to RA=DEC=0
+            end
+            
             try 
                 p = h5read(files{1}, '/positions');
             catch
@@ -56,17 +75,6 @@ function make_catalogs(directory, varargin)
                     
                 end
                 
-            end
-            
-            try 
-                
-                h = util.oop.load(files{1}, 'location', '/header'); 
-                
-            catch
-                try
-                    h = util.oop.load(files{1}, 'location', '/pars'); 
-                    h = cast(h);
-                end
             end
             
         end
@@ -97,5 +105,7 @@ function make_catalogs(directory, varargin)
         end
         
     end
+    
+    fprintf('\nTotal runtime was: %s\n', util.text.secs2hms(toc(t0))); 
     
 end
