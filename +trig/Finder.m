@@ -115,6 +115,7 @@ classdef Finder < handle
         max_frames = 50; % maximum length of trigger area (very long events are disqualified)
         max_num_nans = 1;
         max_corr = 0.75;
+        max_offsets = 5; 
         
         which_flux_correlate = 'raw'; %can choose "raw" or "detrended" for which flux type to use when correlating against x/y width etc. 
         
@@ -1025,6 +1026,7 @@ classdef Finder < handle
                 
                 ev.max_num_nans = obj.max_num_nans;
                 ev.max_corr = obj.max_corr;
+                ev.max_offsets = obj.max_offsets;
                 
                 ev.was_psd_corrected = obj.use_psd_correction; 
                 ev.was_var_buffered = obj.use_var_buf;

@@ -83,6 +83,7 @@ classdef Event < handle
         corr_flux = 'raw'; 
         max_corr;
         max_num_nans;
+        max_offsets; 
         
         debug_bit = 1;
         
@@ -104,6 +105,7 @@ classdef Event < handle
         is_corr_width = 0; % if there is a strong correlation to PSF width
         is_nan_flux = 0; % this event has too many NaN values in the raw flux around the peak
         is_nan_offsets = 0; % this event has too many NaN values in the offsets of x or y around the peak
+        is_large_offsets = 0; % this event has one of its offsets exceeding the maximum allowed around the peak
         is_simulated = 0; % we've added this event on purpose
         is_forced = 0; % we've forced the system to trigger on a subtrheshold event
         % ...
@@ -398,7 +400,7 @@ classdef Event < handle
                 obj.is_corr_offsets = 1;
                 obj.addNote(sprintf('correlation->offset size= %f', obj.corr_r));
             end
-                        
+            
             % check for negative correlation with the background
             [obj.corr_b, obj.covar_b] = obj.correlation(obj.backgrounds_at_star);
             if obj.corr_b<-obj.max_corr
@@ -423,6 +425,19 @@ classdef Event < handle
                 obj.addNote(sprintf('correlation->width= %f', obj.corr_w));
             end
             
+            t = obj.time_indices; % time indices inside the event area
+            if any(obj.offsets_x_at_star(t)>obj.max_offsets)
+                obj.keep = 0;
+                obj.is_large_offsets = 1;
+                obj.addNote(sprintf('offset x= %f', nanmax(obj.offsets_x_at_star(t))));
+            end
+            
+            if any(obj.offsets_y_at_star(t)>obj.max_offsets)
+                obj.keep = 0;
+                obj.is_large_offsets = 1;
+                obj.addNote(sprintf('offset y= %f', nanmax(obj.offsets_y_at_star(t))));
+            end
+            
             % add any other checks you can think about
             % ...
             
@@ -444,6 +459,17 @@ classdef Event < handle
                     error('Unknown flux option "%s". Try "detrended" or "raw"', flux); 
                 end
 
+            end
+            
+            if ischar(vector)
+                
+                str = [vector '_at_star']; 
+                if ~isprop(obj, str)
+                    error('Cannot find property "%s" in the Event object...', str); 
+                end
+                
+                vector = obj.(str); 
+                
             end
             
             f = flux;
