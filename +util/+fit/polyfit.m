@@ -69,7 +69,7 @@ function results = polyfit(x,y,varargin)
         end
 
         ydata = y(:,ii);
-        
+
         if isempty(input.variances)
             vdata = nanvar(ydata).*ones(size(ydata,1),1);             
         elseif isscalar(input.variances)
@@ -83,72 +83,95 @@ function results = polyfit(x,y,varargin)
         end
 
         xdata = fillmissing(xdata, 'linear'); % there shouldn't be any NaNs in the xdata!
-        
+
         bad_idx = isnan(xdata) | isnan(ydata) | isnan(vdata);
-                
-        X = ones(length(xdata),1); 
-        
-        for k = 1:input.order
-            X = [X xdata.^k];
-        end
-        
-        for jj = 1:input.iterations
 
-            ytemp = ydata(~bad_idx);
-            vtemp = vdata(~bad_idx);
-            Xtemp = X(~bad_idx,:); 
+        if all(ydata==ydata(1)) % if all input y's are the same values
             
-            C = 1./vtemp;
-            XCX = Xtemp'*(C.*Xtemp); 
+            results(ii).coeffs(1) = ydata(1); 
             
-            if any(isinf(XCX))
-                if ~input.double
-                    warning('Reached Inf in design matrix. Use higher precision with "double" set to true'); 
-                else
-                    warning('Reached Inf in design matrix. Problem seems to be ill constrained'); 
-                end
+            for jj = 2:input.order+1
+                results(ii).coeffs(jj) = 0; % set all higher orders of the polynomial to zero
             end
             
-            results(ii).coeffs = XCX\(Xtemp'*(C.*ytemp));
             results(ii).model = print_model(input.order, results(ii).coeffs);
+            results(ii).variance = 0;
+            results(ii).chi2 = 0;
+            results(ii).ndof = 0;
+            results(ii).x = xdata;
+            results(ii).y = ydata;
+            results(ii).v = vdata;
+            results(ii).ym = ydata;
+            results(ii).bad_idx = bad_idx; 
             
-            warning('off', 'MATLAB:nearlySingularMatrix');
-            warning('off', 'MATLAB:singularMatrix');
+        else
 
-            y_model = X*results(ii).coeffs; % note we get the model for the entire dataset, including NaNs
-            
-%             results(ii).coeff_str = util.text.print_vec(results(ii).coeffs');
-            results(ii).variance = nanvar(ydata - y_model); 
-            
-            if isempty(input.variances) % vdata is calculated from the data, needs to be updated... 
-                vdata = ones(size(ydata,1),1).*results(ii).variance; 
+            X = ones(length(xdata),1); 
+
+            for k = 1:input.order
+                X = [X xdata.^k];
             end
-            
-            residuals = (ydata - y_model).^2./vdata;
-            
-            results(ii).chi2 = nansum(residuals); 
-            
-            results(ii).ndof = numel(ytemp)-input.order;
-            
-            % remove outliers 
-            bad_idx = bad_idx | isnan(ydata) | isnan(vdata) | residuals>input.sigma.^2;
 
-%             vtemp = vtemp./mean(vtemp,1,'omitnan').*results(ii).variance;
-            
-            if input.plotting
-                
-                if isempty(input.axes)
-                    input.axes = gca;
+            for jj = 1:input.iterations
+
+                ytemp = ydata(~bad_idx);
+                vtemp = vdata(~bad_idx);
+                Xtemp = X(~bad_idx,:); 
+
+                C = 1./vtemp;
+                XCX = Xtemp'*(C.*Xtemp); 
+
+                if any(isinf(XCX))
+                    if ~input.double
+                        warning('Reached Inf in design matrix. Use higher precision with "double" set to true'); 
+                    else
+                        warning('Reached Inf in design matrix. Problem seems to be ill constrained'); 
+                    end
                 end
                 
-                plot(input.axes, xdata, ydata, '.', xdata, y_model, '-');
-                
-                pause(input.pause);
-                
-            end
             
-            if nnz(bad_idx)==0 % further iterations don't change the values in xtemp/ytemp
-                break;
+                results(ii).coeffs = XCX\(Xtemp'*(C.*ytemp));
+                results(ii).model = print_model(input.order, results(ii).coeffs);
+
+                warning('off', 'MATLAB:nearlySingularMatrix');
+                warning('off', 'MATLAB:singularMatrix');
+
+                y_model = X*results(ii).coeffs; % note we get the model for the entire dataset, including NaNs
+
+    %             results(ii).coeff_str = util.text.print_vec(results(ii).coeffs');
+                results(ii).variance = nanvar(ydata - y_model); 
+
+                if isempty(input.variances) % vdata is calculated from the data, needs to be updated... 
+                    vdata = ones(size(ydata,1),1).*results(ii).variance; 
+                end
+
+                residuals = (ydata - y_model).^2./vdata;
+
+                results(ii).chi2 = nansum(residuals); 
+
+                results(ii).ndof = numel(ytemp)-input.order;
+
+                % remove outliers 
+                bad_idx = bad_idx | isnan(ydata) | isnan(vdata) | residuals>input.sigma.^2;
+
+    %             vtemp = vtemp./mean(vtemp,1,'omitnan').*results(ii).variance;
+
+                if input.plotting
+
+                    if isempty(input.axes)
+                        input.axes = gca;
+                    end
+
+                    plot(input.axes, xdata, ydata, '.', xdata, y_model, '-');
+
+                    pause(input.pause);
+
+                end
+
+                if nnz(bad_idx)==0 % further iterations don't change the values in xtemp/ytemp
+                    break;
+                end
+            
             end
             
         end % for jj (iterations)

@@ -1395,7 +1395,11 @@ classdef Analysis < file.AstroData
             obj.back_buf.input(nanmean(obj.phot.backgrounds));
             obj.width_buf.input(nanmean(obj.phot.widths));
             
-            obj.calcSkyParameters; % get an estimate of the zero point, seeing, background, limiting magnitude, etc. 
+            try
+                obj.calcSkyParameters; % get an estimate of the zero point, seeing, background, limiting magnitude, etc. 
+            catch ME
+                warning(ME.getReport); 
+            end
             
             if obj.debug_bit>1, fprintf('Time to calculate sky parameters: %f seconds\n', toc(t)); end
             
@@ -1428,6 +1432,7 @@ classdef Analysis < file.AstroData
                 if isempty(obj.head.THRESH_INDIVIDUAL)
                     obj.head.THRESH_INDIVIDUAL = obj.finder.min_star_snr;
                 end
+                
                 if ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
                     delete(obj.aux_figure.Children);
                     ax = axes('Parent', obj.aux_figure);

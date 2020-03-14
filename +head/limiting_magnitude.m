@@ -68,9 +68,8 @@ function m0 = limiting_magnitude(mag, snr, varargin)
     else
         v2 = [];
     end
-
     
-    fr = util.fit.polyfit(log10(snr2), mag2, 'order', 1, 'sigma', 2, 'variances', v2);
+    fr = util.fit.polyfit(log10(snr2), mag2, 'order', 1, 'sigma', 2, 'variances', v2, 'double', 1);
     
     m0 = fr.func(log10(input.threshold));
     
