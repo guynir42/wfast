@@ -98,11 +98,7 @@ function results = polyfit(x,y,varargin)
             results(ii).variance = 0;
             results(ii).chi2 = 0;
             results(ii).ndof = 0;
-            results(ii).x = xdata;
-            results(ii).y = ydata;
-            results(ii).v = vdata;
-            results(ii).ym = ydata;
-            results(ii).bad_idx = bad_idx; 
+            y_model = ydata;
             
         else
 
