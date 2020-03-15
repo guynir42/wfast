@@ -2252,6 +2252,7 @@ classdef Acquisition < file.AstroData
             try
                
                 obj.af.reset;
+                obj.af.use_quadrants = 1;
                 
                 if ~isempty(obj.gui) && obj.gui.check
                     obj.gui.update;

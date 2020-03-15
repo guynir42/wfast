@@ -801,33 +801,35 @@ classdef Andor < file.AstroData
         
         function autofocus(obj, varargin)
             
+            if isempty(obj.focuser)
+                error('must be connected to camera and focuser!');
+            end
+            
+            old_pos = obj.focuser.pos;
+                
             obj.log.input('Starting focus run'); 
             
             try 
-                
-                if isempty(obj.cam.focuser)
-                    error('must be connected to camera and focuser!');
-                end
-
+            
                 if obj.is_running
                     disp('Camera is already running. Set is_running to zero...');
                     return;
-                else
-                    obj.is_running = 1;
                 end
 
                 % find stars, the quick version!
                 obj.single;                
                 T = util.img.quick_find_stars(util.stat.sum_single(obj.images), 'threshold', 30, 'saturation', 5e6, 'unflagged', 1); 
-                
+                height(T)
                 % the focus positions to scan
-                p = obj.af.getPosScanValues(old_pos);
+                p = obj.af.getPosScanValues(obj.focuser.pos);
 
                 if obj.af.use_loop_back
                     p = [p flip(p)];
                 end
 
-                old_pos = obj.focuser.pos;
+                obj.af.reset;
+                obj.af.use_quadrants = 0;
+                
                 obj.focuser.pos = p(1);
                 
                 % before we start the loop
@@ -849,10 +851,11 @@ classdef Andor < file.AstroData
                     % do we want to quick find stars on each iteration...?
                     C = util.img.mexCutout(obj.images, T.pos, obj.focus_cut_size, NaN); 
                     
-                    phot_struct = util.img.photometry2(single(C), 'aperture', obj.focus_aperture, 'index', 3, 'threads', 4);
+                    phot_struct = util.img.photometry2(single(C)-100, 'aperture', obj.focus_aperture, 'use_aperture', 1, ...
+                        'gauss_sigma', 5, 'use_gaussian', 1, 'index', 3, 'threads', 4);
                     
                     widths = phot_struct.gaussian_photometry.width;
-                    fluxes = phot_struct.aperture_photometry.flux;
+                    fluxes = phot_struct.apertures_photometry.flux - phot_struct.apertures_photometry.areas.*phot_struct.apertures_photometry.backgrounds;
                     
                     obj.af.input(ii, p(ii), widths, fluxes, T.pos); 
                     

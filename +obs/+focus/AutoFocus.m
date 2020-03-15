@@ -195,12 +195,12 @@ classdef AutoFocus < handle
                 
                 widths = nanmean(widths, 1); 
                 weights = nanmean(fluxes, 1); 
-                weights = weights./nansum(weights); 
+                weights = weights./nanmean(weights); 
                 
             end
             
-            obj.widths(1:length(widths),idx) = util.vec.tocolumn(widths);
-            obj.weights(1:length(fluxes),idx) = util.vec.tocolumn(fluxes);
+            obj.widths(:,idx) = util.vec.tocolumn(widths);
+            obj.weights(:,idx) = util.vec.tocolumn(weights);
             
         end
         
@@ -213,9 +213,9 @@ classdef AutoFocus < handle
                 
                 [mn, idx] = nanmin(obj.widths, [], 2); % find the minimal value for each star
                 
-                obj.min_positions = obj.pos(idx); 
+                obj.min_positions = util.vec.tocolumn(obj.pos(idx)); 
                 
-                obj.min_weights = nanmedian(obj.weights)./mn; % the average flux is one measure of the goodness of that star but also the smallness of the minimal widths! 
+                obj.min_weights = nanmedian(obj.weights,2)./mn; % the average flux is one measure of the goodness of that star but also the smallness of the minimal widths! 
                 
                 bad_indices = isnan(obj.min_positions) | isnan(obj.min_weights) | obj.min_weights<=0;
                 
@@ -356,6 +356,7 @@ classdef AutoFocus < handle
             N = min(size(obj.widths,1), 10); 
             
             for ii = 1:N
+                
                 try
                     h(ii) = plot(obj.ax, obj.pos, obj.widths(ii,:));
                 end
@@ -383,7 +384,7 @@ classdef AutoFocus < handle
             
             if obj.use_model_psf
                 
-            elseif size(obj.widths,2)==5
+            elseif obj.use_quadrants % size(obj.widths,2)==5
                 legend(h, {'center', 'top left', 'top right', 'bottom left', 'bottom right'}, 'Parent', obj.fig);
             end
             
