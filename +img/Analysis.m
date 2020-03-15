@@ -1138,8 +1138,12 @@ classdef Analysis < file.AstroData
                 return;
             end
             
-            obj.cal.use_roi = 1;
-            obj.cal.ROI = obj.head.ROI; 
+            if isempty(obj.head.ROI)
+                obj.cal.use_roi = 0;
+            else
+                obj.cal.use_roi = 1;
+                obj.cal.ROI = obj.head.ROI; 
+            end
             
             % calibrate the stack if needed
             if nnz(isnan(obj.stack)) % stack is already calibrated (has NaN values...)
@@ -1464,18 +1468,22 @@ classdef Analysis < file.AstroData
                 N_stack = N_stack(idx);
                 M_stack = M(idx);
                 
-                if isempty(obj.head.THRESH_STACK)
-                    obj.head.THRESH_STACK = obj.head.THRESH_INDIVIDUAL;
-                end
-                
-                if ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
-%                     delete(obj.aux_figure.Children);
-%                     ax = axes('Parent', obj.aux_figure);
-                    ax.NextPlot = 'add';
-                    obj.head.LIMMAG_STACK = head.limiting_magnitude(M_stack, S_stack./N_stack, obj.head.THRESH_STACK, 'maximum', Inf, 'var', 'snr', 'plot', 1, 'axes', ax); 
-                    ax.NextPlot = 'replace';
-                else
-                    obj.head.LIMMAG_STACK = head.limiting_magnitude(M_stack, S_stack./N_stack, obj.head.THRESH_STACK, 'maximum', Inf, 'var', 'snr'); 
+                if ~isempty(S_stack)
+
+                    if isempty(obj.head.THRESH_STACK)
+                        obj.head.THRESH_STACK = obj.head.THRESH_INDIVIDUAL;
+                    end
+
+                    if ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
+    %                     delete(obj.aux_figure.Children);
+    %                     ax = axes('Parent', obj.aux_figure);
+                        ax.NextPlot = 'add';
+                        obj.head.LIMMAG_STACK = head.limiting_magnitude(M_stack, S_stack./N_stack, obj.head.THRESH_STACK, 'maximum', Inf, 'var', 'snr', 'plot', 1, 'axes', ax); 
+                        ax.NextPlot = 'replace';
+                    else
+                        obj.head.LIMMAG_STACK = head.limiting_magnitude(M_stack, S_stack./N_stack, obj.head.THRESH_STACK, 'maximum', Inf, 'var', 'snr'); 
+                    end
+
                 end
                 
                 drawnow;

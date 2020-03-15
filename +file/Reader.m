@@ -907,7 +907,9 @@ classdef Reader < file.AstroData
                         
                         J = juliandate(util.text.str2time(obj.t_end));
                         
-                        obj.juldates = J + (obj.timestamps - obj.t_end_stamp)/24/3600; 
+                        if ~isempty(obj.t_end_stamp)
+                            obj.juldates = J + (obj.timestamps - obj.t_end_stamp)/24/3600; 
+                        end
                         
                     elseif any(strcmp(data_name, obj.dataset_names.psfs)) && all(data_size) % data_names.psfs may be a cell array of different optional names
                         
@@ -1161,8 +1163,10 @@ classdef Reader < file.AstroData
                     loaded_header = cast(loaded_header);
                 end
                 
-                loaded_header.ephem.time = util.text.str2time(loaded_header.STARTTIME); % fix the bug in read/write of datetime objects we used to have (only rely on times stored as strings)
-                loaded_header.ephem.updateSecondaryCoords;
+                if isempty(loaded_header.STARTTIME) && ischar(loaded_header.STARTTIME)
+                    loaded_header.ephem.time = util.text.str2time(loaded_header.STARTTIME); % fix the bug in read/write of datetime objects we used to have (only rely on times stored as strings)
+                    loaded_header.ephem.updateSecondaryCoords;
+                end
                 
             catch ME
                 % if we can't read this it is OK, there is still the README file. Can't give warnings on every file now...
@@ -1192,8 +1196,10 @@ classdef Reader < file.AstroData
                 
             end
             
-            loaded_header.ephem.time = util.text.str2time(loaded_header.STARTTIME); % fix the bug in read/write of datetime objects we used to have (only rely on times stored as strings)
-            loaded_header.ephem.updateSecondaryCoords;
+            if isempty(loaded_header.STARTTIME) && ischar(loaded_header.STARTTIME)
+                loaded_header.ephem.time = util.text.str2time(loaded_header.STARTTIME); % fix the bug in read/write of datetime objects we used to have (only rely on times stored as strings)
+                loaded_header.ephem.updateSecondaryCoords;
+            end
             
         end
         
