@@ -121,7 +121,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             end
             
             if obj.use_mount
+                try
                 obj.connectMount; % ASA mount
+                catch ME
+                    warning(ME.getReport); 
+                end
             end
             
             if obj.use_weather
@@ -324,7 +328,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             try 
             
-                if isempty(obj.mount) || isempty(obj.mount.tracking) || obj.mount.tracking
+                if ~isempty(obj.mount) && obj.mount.status && obj.mount.tracking
                     val = 0;
                     return;
                 end
@@ -494,8 +498,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         function set.sync(obj, val)
             
             obj.sync = val;
-            obj.mount.sync = val;
-            obj.dome.sync = val;
+            
+            if ~isempty(obj.mount) && isa(obj.mount, 'obs.mount.ASA')
+                obj.mount.sync = val;
+            end
+            
+            if ~isempty(obj.dome) && isa(obj.dome, 'obs.dome.AstroHaven')
+                obj.dome.sync = val;
+            end
             
         end
         
@@ -684,7 +694,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             if obj.use_shutdown && obj.devices_ok==0 % critical device failure, must shut down
                 if obj.is_shutdown==0 % if already shut down, don't need to do it again
-                    fprintf('%s: Device problems... %s \n', datestr(obj.log.time), obj.checker.report); 
+                    fprintf('%s: Device problems... %s \n', datestr(obj.log.time), obj.devices_report); 
                     obj.shutdown;
                 end
             end
@@ -752,7 +762,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             try 
                 
-                if ~obj.sync.is_connected % || ~obj.sync.status
+                if ~obj.sync.is_connected || ~obj.sync.status
                     obj.sync.connect;
                 end
 

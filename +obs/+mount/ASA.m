@@ -171,7 +171,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
                 obj.object = head.Ephemeris;
 
-                obj.connect;
+                try
+                    obj.connect;
+                catch ME
+                    warning(ME.getReport); 
+                end
 
                 obj.update;
 
@@ -703,6 +707,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function set.tracking(obj, val)
             
+            if isempty(obj.hndl) || obj.status==0
+                return;
+            end
+            
             try 
                 
                 obj.was_tracking = val;
@@ -737,13 +745,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function set.rate_RA(obj, val)
             
-            obj.hndl.RightAscensionRate = val;
+            if ~isempty(obj.hndl) && obj.status
+                obj.hndl.RightAscensionRate = val;
+            end
             
         end
         
         function set.rate_DE(obj, val)
             
-            obj.hndl.DeclinationRate = val;
+            if ~isempty(obj.hndl) && obj.status
+                obj.hndl.DeclinationRate = val;
+            end
             
         end
         
@@ -1469,14 +1481,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             try 
                 
                 obj.brake_bit = 1;
-            
-                obj.hndl.AbortSlew;
-                obj.hndl.tracking = 0;
+                
+                if ~isempty(obj.hndl) && obj.status
+                    obj.hndl.AbortSlew;
+                    obj.hndl.tracking = 0;
+                end
+                
                 obj.resetRate;
                 
                 if ~isempty(obj.sync)
 
-                    if obj.sync.outgoing.stop_camera==0
+                    if isfield(obj.sync.outgoing, 'stop_camera') && obj.sync.outgoing.stop_camera==0
                         obj.log.input('Telescope stopped, sending camera stop command');
                         disp(obj.log.report);
                     end
