@@ -256,7 +256,8 @@ classdef CircularBuffer < dynamicprops
                 
                 s = size(matrix);
                 if any(obj.size_vec(2:end)~=s(2:end))
-                    error('Size mismatch: size(data)= %d %d, size(matrix)= %d %d', obj.size_vec, size(matrix));
+                    error('Size mismatch: size(data)= %s, size(matrix)= %s', ...
+                        util.text.print_vec(obj.size_vec, 'x'), util.text.print_vec(size(matrix),'x'));
                 end
                 
             end

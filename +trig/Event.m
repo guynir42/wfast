@@ -586,6 +586,8 @@ classdef Event < handle
                     filename = [filename '_' run_name];
                 end
 
+                filename = sprintf('%s_id%03d', filename, obj.serial); 
+                
             end
             
             event = obj;
@@ -607,7 +609,9 @@ classdef Event < handle
                 if ~isempty(run_name)
                     filename = [filename '_' run_name];
                 end
-
+                
+                filename = sprintf('%s_id%03d', filename, obj.serial);
+                
             end
             
             [filepath,filename,ext] = fileparts(filename);

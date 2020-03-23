@@ -75,10 +75,10 @@ classdef Star < matlab.mixin.Copyable
             elseif ~isempty(varargin) && isa(varargin{1}, 'head.Parameters')
                 if obj.debug_bit>1, fprintf('Star constructor v%4.2f\n', obj.version); end
                 obj.head = varargin{1};
-                if length(varargin)>1, obj.heade(varargin{2:end}); end
+                if length(varargin)>1, obj.parse(varargin{2:end}); end
             else
                 if obj.debug_bit>1, fprintf('Star constructor v%4.2f\n', obj.version); end                
-                obj.heade(varargin{:});
+                obj.parse(varargin{:});
             end
             
             

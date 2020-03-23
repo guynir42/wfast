@@ -798,7 +798,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         function set.stars(obj, val)
             
             if ~isempty(val)            
-                util.oop.setprop(val, 'pars', obj); % make sure all stars share the same "pars" object
+                util.oop.setprop(val, 'head', obj); % make sure all stars share the same "pars" object
                 if ~isempty(obj.stars) && ~isempty(obj.stars(1).gui)
                     util.oop.setprop(val, 'gui', obj.stars(1).gui); % make sure all stars share the same "pars" object                
                 end
