@@ -214,6 +214,7 @@ class Photometry{
 	float sumIndices(const float *array1, float offset1, const float *array2, float offset2, const std::vector<int> *vector, int idx);
 	float sumIndices(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3, const std::vector<int> *vector, int idx);
 	float medianIndices(const float *array, const std::vector<int> *vector, int idx); // find the median of the array points indicated by vector[idx]
+	// float medianIndicesDebug(const float *array, const std::vector<int> *vector, int idx); // find the median of the array points indicated by vector[idx]
 	
 	// print on screen
 	void printMatrix(const int *array, const char *name);

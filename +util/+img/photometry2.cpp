@@ -1251,7 +1251,7 @@ void Photometry::calculateForced(int j){
 	float *width=output[IDX_WD];
 	float *bad_pixels=output[IDX_BAD];
 	float *flag=output[IDX_FLAG];
-	
+		
 	int idx=getShiftIndex(average_offset_x[j], average_offset_y[j]); // the average centroid
 	// get the background reading for all concentric apertures
 		
@@ -1764,12 +1764,12 @@ float Photometry::medianIndices(const float *array, const std::vector<int> *vect
 	
 	std::vector<float> values=std::vector<float>(); // an empty vector 
 	
-	for(int i=0;i<vector[idx].size(); i++) if(array[i]==array[i]) values.push_back(array[vector[idx][i]]); 
+	for(int i=0;i<vector[idx].size(); i++) if(array[vector[idx][i]]==array[vector[idx][i]]) values.push_back(array[vector[idx][i]]); 
 	
 	if(values.size()==0) return 0; 
 	
 	std::sort(values.begin(), values.end()); 
-	
+		
 	if(values.size()%2==1){ // odd number (pick middle value)
 		
 		return values[values.size()/2];
@@ -1781,6 +1781,37 @@ float Photometry::medianIndices(const float *array, const std::vector<int> *vect
 		
 	}
 }
+
+// float Photometry::medianIndicesDebug(const float *array, const std::vector<int> *vector, int idx){ // find the median of the array points indicated by vector[idx]
+	
+	// printf("DEBUG: ");
+	
+	// std::vector<float> values=std::vector<float>(); // an empty vector 
+	
+	// for(int i=0;i<vector[idx].size(); i++) if(array[vector[idx][i]]==array[vector[idx][i]]) values.push_back(array[vector[idx][i]]); 
+	
+	// if(values.size()==0) return 0; 
+	
+	// for(int i=0;i<values.size();i++) printf("%f ", values[i]); 
+	// printf("\n"); 
+	
+	// std::sort(values.begin(), values.end()); 
+	
+	// printf("SORTED:");
+	// for(int i=0;i<values.size();i++) printf("%f ", values[i]); 
+	// printf("\n"); 
+	
+	// if(values.size()%2==1){ // odd number (pick middle value)
+		
+		// return values[values.size()/2];
+		
+	// }
+	// else{ // even number (take average of two middle values)
+		
+		// return (values[values.size()/2] + values[values.size()/2+1])/2;
+		
+	// }
+// }
 
 // UTILITIES
 
