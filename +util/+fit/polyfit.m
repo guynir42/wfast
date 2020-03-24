@@ -78,13 +78,19 @@ function results = polyfit(x,y,varargin)
             vdata = input.variances;
         elseif size(input.variances,1)==1 && size(input.variances,2)==size(y,2)
             vdata = ones(size(ytemp,1),1).*input.variances(1,ii);
+        elseif size(input.variances,1)==1 && size(input.variances,2)==size(y,1)
+            vdata = input.variances';
         else
             vdata = input.variances(:,ii);
         end
 
+        xdata(isinf(xdata)) = NaN;
+        ydata(isinf(ydata)) = NaN;
+        
         xdata = fillmissing(xdata, 'linear'); % there shouldn't be any NaNs in the xdata!
-
-        bad_idx = isnan(xdata) | isnan(ydata) | isnan(vdata);
+        
+        
+        bad_idx = isnan(xdata) | isnan(ydata) | isnan(vdata) | isinf(xdata) | isinf(ydata) | isinf(vdata);
 
         if all(ydata==ydata(1)) % if all input y's are the same values
             
@@ -142,7 +148,7 @@ function results = polyfit(x,y,varargin)
                 end
 
                 residuals = (ydata - y_model).^2./vdata;
-
+                
                 results(ii).chi2 = nansum(residuals); 
 
                 results(ii).ndof = numel(ytemp)-input.order;
@@ -158,7 +164,9 @@ function results = polyfit(x,y,varargin)
                         input.axes = gca;
                     end
 
-                    plot(input.axes, xdata, ydata, '.', xdata, y_model, '-');
+                    [x_sorted, sort_idx] = sort(xdata);
+                    
+                    plot(input.axes, xdata, ydata, '.', x_sorted, y_model(sort_idx), '-', xdata(bad_idx), ydata(bad_idx), 'og');
 
                     pause(input.pause);
 

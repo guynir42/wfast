@@ -102,6 +102,8 @@ classdef Calibration < handle
         flat_var; % variance of the flats (used for calculating gain, etc.)
         date_flat = '';
         
+        lightcurve_flat = [];
+        
         camera_name = 'Zyla';
         project_name = 'WFAST'; 
         
@@ -143,7 +145,9 @@ classdef Calibration < handle
         use_remove_empty_frames = 1;
         
         % switches for making darks/flats (can we get rid of this??)
+        use_calc_lightcurve = 1;
         use_calc_gain = 0;
+        use_calc_covariance = 0;
         use_mv_points = 0; % choose if to collect mean and variance data when making flats (used for calculating gain)
         
         mode = ''; % keeps track if we are looping (calculating) dark or flat
@@ -243,6 +247,8 @@ classdef Calibration < handle
             obj.flat_mean = [];
             obj.flat_var = [];
             obj.date_flat = '';
+            
+            lightcurve_flat = [];
             
         end
         
@@ -778,21 +784,32 @@ classdef Calibration < handle
             f_sum = sum(images,3, 'omitnan');
             f_sum(mask) = 0; % maybe leave it as NaNs? or put in the mean values?
             obj.flat_mean = runningMean(obj.flat_mean, obj.num_flats, f_sum, current_frames); 
-                        
-            if obj.use_calc_gain % NOT FINISHED:
+            
+            if obj.use_calc_lightcurve
                 
-                % flat var
-                m = util.stat.mean2(images); % 3D vector of the mean of each frame (to de-trend before calculating variance across frames)
-                m = m./mean(m);
-                f_var = var(images./m, [], 3)*current_frames;
-                f_var(mask) = 0; % maybe leave it as NaNs? or put in the mean values?          
-                obj.flat_var = runningMean(obj.flat_var, obj.num_flats, f_var, current_frames);
-
-                obj.flat_pixel_mean = cat(3, obj.flat_pixel_mean, obj.flat_mean);
-                obj.flat_pixel_var = cat(3, obj.flat_pixel_var, obj.flat_var);
+                obj.lightcurve_flat = vertcat(obj.lightcurve_flat, squeeze(util.stat.mean2(images))); 
                 
             end
-                        
+            
+            if obj.use_calc_gain
+                
+                m = util.stat.mean2(images); % 3D vector of the mean of each frame (to de-trend before calculating variance across frames)
+                m = m./mean(m);
+                f_var = nanvar(images./m, [], 3); % *current_frames;
+                f_var(mask) = NaN; 
+                obj.flat_var = runningMean(obj.flat_var, obj.num_flats, f_var, current_frames);
+
+                obj.flat_pixel_mean = cat(3, obj.flat_pixel_mean, f_mean);
+                obj.flat_pixel_var = cat(3, obj.flat_pixel_var, f_var);
+                
+            end
+            
+            if obj.use_calc_covariance
+                
+                
+                
+            end
+            
             % the flat field is the flat mean, normalized
             f_field = sum(images./norms, 3, 'omitnan'); % normalize to the mean of each image
             f_field(mask) = current_frames;
