@@ -1017,6 +1017,26 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             
         end
         
+        function val = run_identifier(obj)
+            
+            val = '';
+            
+            if length(obj.STARTTIME)>=10
+                val = obj.STARTTIME(1:10);
+            end
+            
+            if ~isempty(obj.OBJECT)
+                
+                if ~isempty(val)
+                    val = [val '_'];
+                end
+                
+                val = [val obj.OBJECT];
+                
+            end
+            
+        end
+        
     end
     
     methods (Static=true)

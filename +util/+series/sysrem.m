@@ -29,24 +29,36 @@ function [f_det, a, c, stats] = sysrem(f, varargin)
     input.input_var('magnitudes', false); % assume input is given as magnitudes, with negative values taken care of
     input.input_var('pedestal', true, 'use_pedestal', 'constant'); % add some constant to each flux measurement before turning it into magnitudes (instead of putting NaN in negative values)
     input.input_var('subtract', true, 'subtract_mean', 'use_subtract_mean', 'use_mean', 'mean'); % if true, will remove the mean of each flux f_ij to get residual r_ij
+    input.input_var('stars', [], 'star_black_list'); % which stars should be avoided when calculating 'a'
     input.scan_vars(varargin{:}); 
     
-    if isempty(input.errors)
-        input.errors = 1;
-    end
     
     if input.magnitudes
         m = f;
     else
         if input.pedestal
-            P = abs(util.stat.min2(f)*2); 
+            P = util.stat.min2(f)*2; 
+            if P<0
+                P = -P;
+            else
+                P = 0;
+            end
             m = -2.5.*log10(f+P);         
         else
             P = 0;
-            f(f<0) = NaN;
+            f(f<=0) = NaN;
             m = -2.5.*log10(f); 
+%             m = asinh(f); 
         end
         
+        if ~isempty(input.errors) % errors are given on the flux, not on the magnitudes! 
+            input.errors = input.errors./abs(nanmean(f,1)); % translate flux errors to mag errors (approximation of 2.5 to e)
+        end
+        
+    end
+    
+    if isempty(input.errors)
+        input.errors = ones(size(m), 'like', m); % uniform errors! 
     end
     
     if input.subtract
@@ -57,13 +69,27 @@ function [f_det, a, c, stats] = sysrem(f, varargin)
         r = m;
     end
     
+    if isempty(input.stars)
+        input.stars = false(1, size(f,2)); 
+    end
+    
+    input.errors(input.errors==0) = Inf;
+    
+%     if size(input.errors,1)==1
+%         input.errors = repmat(input.errors, [size(f,1),1]); 
+%     end
+%     
+%     if size(input.errors,2)==1
+%         input.errors = repmat(input.errors, [1, size(f,2)]); 
+%     end
+    
     if isempty(input.a) && isempty(input.c) % no 'a' or 'c' given, do a preliminary calculation to get both
         c = ones(1, size(f,2), 'like', f); % assume all stars have the same response coefficient! 
-        a = nansum(r.*c./input.errors.^2, 2)./nansum(c.^2./input.errors.^2, 2); % sum over 'i' is sum over stars
+        a = nansum(r(:,~input.stars).*c(~input.stars)./input.errors(:,~input.stars).^2, 2)./nansum(c(~input.stars).^2./input.errors(:,(~input.stars)).^2, 2); % sum over 'i' is sum over stars
         c = nansum(r.*a./input.errors.^2, 1)./nansum(a.^2./input.errors.^2, 1); % sum over 'j' is sum over frames
     elseif isempty(input.a) % only 'a' is empty, use 'c' to find 'a'
         c = input.c;
-        a = nansum(r.*c./input.errors.^2, 2)./nansum(c.^2./input.errors.^2, 2); % sum over 'i' is sum over stars
+        a = nansum(r(:,~input.stars).*c(~input.stars)./input.errors(:,~input.stars).^2, 2)./nansum(c(~input.stars).^2./input.errors(:,(~input.stars)).^2, 2); % sum over 'i' is sum over stars
     elseif isempty(input.c) % only 'c' is empty, use 'a' to find 'c' (this can happen if 'a' is given by airmass)
         a = input.a;
         c = nansum(r.*a./input.errors.^2, 1)./nansum(a.^2./input.errors.^2, 1); % sum over 'j' is sum over frames
@@ -73,7 +99,7 @@ function [f_det, a, c, stats] = sysrem(f, varargin)
     end
     
     for ii = 1:input.iterations
-        a = nansum(r.*c./input.errors.^2, 2)./nansum(c.^2./input.errors.^2, 2); % sum over 'i' is sum over stars
+        a = nansum(r(:,~input.stars).*c(~input.stars)./input.errors(:,~input.stars).^2, 2)./nansum(c(~input.stars).^2./input.errors(:,(~input.stars)).^2, 2); % sum over 'i' is sum over stars
         c = nansum(r.*a./input.errors.^2, 1)./nansum(a.^2./input.errors.^2, 1); % sum over 'j' is sum over frames
     end
     
@@ -82,7 +108,7 @@ function [f_det, a, c, stats] = sysrem(f, varargin)
     m_det = r_new + M; 
     
     f_det = 10.^(-0.4.*m_det) - P;
-    
+%     f_det = sinh(m_det);
     stats = [];
     
 end

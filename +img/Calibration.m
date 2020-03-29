@@ -102,7 +102,9 @@ classdef Calibration < handle
         flat_var; % variance of the flats (used for calculating gain, etc.)
         date_flat = '';
         
-        lightcurve_flat = [];
+        num_flat_lcs = 1; % how many regions of the flat field should be measured
+        lightcurves_flat = []; % lightcurves for different regions of the flat field
+        covariance_flat = [];
         
         camera_name = 'Zyla';
         project_name = 'WFAST'; 
@@ -248,7 +250,8 @@ classdef Calibration < handle
             obj.flat_var = [];
             obj.date_flat = '';
             
-            lightcurve_flat = [];
+            obj.lightcurves_flat = [];
+            obj.covariance_flat = [];
             
         end
         

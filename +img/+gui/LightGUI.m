@@ -24,9 +24,13 @@ classdef LightGUI < handle
         
         panel_control;
         
+        panel_process;
+        
+        panel_psd;
+        
         panel_display;
         
-        panel_process;
+        panel_stats;
         
         panel_info;
         
@@ -37,6 +41,7 @@ classdef LightGUI < handle
         button_reset_axes;
         button_log_scale
         button_cut_number; 
+        button_datetime;
         axes_image;
     
     end
@@ -92,18 +97,24 @@ classdef LightGUI < handle
 %             obj.panel_methods.make;
             
             
+            N = 15;
+            pos = N;
+
             %%%%%%%%%%% panel control %%%%%%%%%%%%%%%
             
-            obj.panel_control = GraphicPanel(obj.owner, [0 0.9 0.2 0.1], 'control'); 
+            pos = pos - 1;
+            obj.panel_control = GraphicPanel(obj.owner, [0 pos/N 0.2 1/N], 'control'); 
             obj.panel_control.number = 1;
             obj.panel_control.addButton('button_preallocate', 'use_preallocate', 'toggle', 'preallocate', 'preallocate', '', 0.5, obj.color_on);
             obj.panel_control.addButton('button_double_up', 'use_double_up', 'toggle', 'double up', 'double up', '', 0.5, obj.color_on);
             obj.panel_control.margin = [0.01 0.02];
             obj.panel_control.make;
             
+            
             %%%%%%%%%%% panel process %%%%%%%%%%%%%%%%
             
-            obj.panel_process = GraphicPanel(obj.owner, [0 0.4 0.2 0.5], 'process');
+            pos = pos - 5;
+            obj.panel_process = GraphicPanel(obj.owner, [0 pos/N 0.2 5/N], 'process');
             obj.panel_process.number = 5;
             obj.panel_process.addButton('button_background', 'use_subtract_backgrounds', 'toggle', 'sub b/g', 'sub b/g', '', 0.5, obj.color_on);
             obj.panel_process.addButton('button_back_median', 'use_background_median', 'toggle', 'b/g median', 'b/g median', '', 0.5, obj.color_on);
@@ -115,7 +126,8 @@ classdef LightGUI < handle
             obj.panel_process.addButton('button_zero_point', 'use_zero_point', 'toggle', 'zero point', 'zero point', '', 0.5, obj.color_on);
             obj.panel_process.addButton('button_sysrem', 'use_sysrem', 'toggle', 'sysrem', 'sysrem', '', 0.5, obj.color_on);
             obj.panel_process.addButton('input_sysrem_iter', 'sysrem_iterations', 'input', 'iter= ', '', '', 0.5);
-
+            
+            
 %             obj.panel_process.addButton('button_zavitzky_golay', 'use_savitzky_golay', 'toggle', 'savitzky golay', 'savitzky golay', '', 0.5, obj.color_on); 
 %             obj.panel_process.addButton('input_sg_order', 'sg_order', 'input', 'SG order= ', '', '', 0.5); 
 %             obj.panel_process.addButton('input_sg_length', 'sg_length', 'input', 'SG len= ', '', '', 0.5);
@@ -126,10 +138,11 @@ classdef LightGUI < handle
             
             obj.panel_process.margin = [0.01 0.02];
             obj.panel_process.make;
-            
+
             %%%%%%%%%%% panel display %%%%%%%%%%%%%%%%
             
-            obj.panel_display = GraphicPanel(obj.owner, [0 0.1 0.2 0.3], 'display');
+            pos = pos - 5;
+            obj.panel_display = GraphicPanel(obj.owner, [0 pos/N 0.2 5/N], 'display');
             obj.panel_display.number = 5;
             obj.panel_display.addButton('button_show_what', 'show_what', 'picker', obj.owner.show_what, '', '', 0.7); 
             obj.panel_display.addButton('button_flux_type', 'show_flux_type', 'picker', obj.owner.show_flux_type, '', '', 0.3); 
@@ -137,6 +150,7 @@ classdef LightGUI < handle
             obj.panel_display.addButton('input_show_indices', 'show_indices', 'input', 'idx= '); 
             obj.panel_display.addButton('button_smooth', 'use_smooth', 'toggle', 'smooth', 'smooth', '', 0.5, obj.color_on);
             obj.panel_display.addButton('input_smooth', 'smooth_interval', 'input', ' ', '', '', 0.5);
+            obj.panel_display.addButton('button_spawn', 'spawnFigure', 'push', 'spawn', '', '', 0.5); 
             obj.panel_display.margin = [0.01 0.02];
             obj.panel_display.make;
             
@@ -145,6 +159,26 @@ classdef LightGUI < handle
             
             obj.panel_display.button_flux_type.String = obj.owner.show_flux_type_list;
             obj.panel_display.button_flux_type.Callback = @obj.callback_flux_type;
+            
+            %%%%%%%%%%% panel psd %%%%%%%%%%%%%%%%%%%%
+                        
+            pos = pos - 1;
+            obj.panel_psd = GraphicPanel(obj.owner, [0 pos/N 0.2 1/N], 'display');
+            obj.panel_psd.number = 1;
+            obj.panel_psd.addButton('button_welch', 'use_welch', 'toggle', 'welch', 'welch', '', 0.5, obj.color_on);
+            obj.panel_psd.make;
+            
+            %%%%%%%%%%% panel statistics %%%%%%%%%%%%%
+            
+            pos = pos - 2;
+            obj.panel_stats = GraphicPanel(obj.owner, [0 pos/N 0.2 2/N], 'statistics');
+            obj.panel_stats.number = 2;
+            obj.panel_stats.addButton('input_jump', 'sampling_jump', 'input', 'jump= ', '', '', 0.5);
+            obj.panel_stats.addButton('input_rms_points', 'num_points_rms', 'input', 'rms pts= ', '', '', 0.5); 
+%             obj.panel_stats.addButton('button_bins', 'use_show_re_bins', 'toggle', 'show mag', 'show bin', '', 0.5);
+            obj.panel_stats.addButton('input_mag_limit', 'show_mag_limit', 'input', 'mag lim= ', '', '', 0.5);
+            obj.panel_stats.addButton('button_fits', 'use_show_bin_fits', 'toggle', 'show fits', 'show fits', '', 0.5, obj.color_on);
+            obj.panel_stats.make;
             
             %%%%%%%%%%% panel info %%%%%%%%%%%%%%%%%%%
             
@@ -160,17 +194,19 @@ classdef LightGUI < handle
             
             obj.makeAxes;
             
-            obj.button_reset_axes = GraphicButton(obj.panel_image, [0.9 0.95 0.1 0.05], obj.owner, '', 'custom', 'reset');
+            obj.button_reset_axes = GraphicButton(obj.panel_image, [0.9 0.95 0.1 0.05], obj.owner, '', 'custom', 'reset axis', '', 'small');
             obj.button_reset_axes.Callback = @obj.makeAxes;
             
             obj.button_log_scale = GraphicButton(obj.panel_image, [0.0 0.95 0.1 0.05], obj.owner, 'use_show_log', 'toggle', 'linear', 'log', 'small');
             
-            obj.button_cut_number = GraphicButton(obj.panel_image, [0.0 0.0 0.1 0.05], obj.owner, '', 'custom', 'cut= '); 
+            obj.button_cut_number = GraphicButton(obj.panel_image, [0.0 0.0 0.1 0.05], obj.owner, '', 'custom', 'star= '); 
+            
+            obj.button_datetime = GraphicButton(obj.panel_image, [0.9 0.0 0.1 0.05], obj.owner, 'use_show_datetime', 'toggle', 'seconds', 'datetime'); 
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
                         
-            obj.panel_close = uipanel('Position', [0 0 0.2 0.1]);
-            obj.button_close = GraphicButton(obj.panel_close, [0.1 0.1 0.8 0.8], obj.owner, '', 'custom', 'CLOSE');
+            obj.panel_close = uipanel('Position', [0 0 0.2 1/N]);
+            obj.button_close = GraphicButton(obj.panel_close, [0.1 0.1 0.8 0.8], obj.owner, '', 'custom', 'CLOSE GUI');
             obj.button_close.Callback = @obj.callback_close;
             
             obj.update;
@@ -183,10 +219,14 @@ classdef LightGUI < handle
             
             obj.axes_image = axes('Parent', obj.panel_image);
             
+            obj.owner.last_shown = '';
+            obj.owner.last_xlim = [];
+            obj.owner.last_ylim = [];
+            
             obj.update;
             
         end
-                
+        
         function update(obj,~,~)
                         
             if ~obj.check
@@ -196,6 +236,8 @@ classdef LightGUI < handle
             for ii = 1:length(obj.buttons)
                 obj.buttons{ii}.update;
             end
+            
+            obj.button_cut_number.String = 'star= ';
             
             obj.owner.show;
             

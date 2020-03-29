@@ -89,7 +89,6 @@ function results = polyfit(x,y,varargin)
         
         xdata = fillmissing(xdata, 'linear'); % there shouldn't be any NaNs in the xdata!
         
-        
         bad_idx = isnan(xdata) | isnan(ydata) | isnan(vdata) | isinf(xdata) | isinf(ydata) | isinf(vdata);
 
         if all(ydata==ydata(1)) % if all input y's are the same values

@@ -73,6 +73,8 @@ classdef Lightcurves < handle
         
         gui@img.gui.LightGUI; % graphic user interface
         
+        figures_spawned = {};
+        
     end
     
     properties % objects
@@ -87,7 +89,7 @@ classdef Lightcurves < handle
     properties % inputs/outputs
         
         frame_index = 1;
-                
+        
     end
     
     properties % switches/controls
@@ -120,6 +122,8 @@ classdef Lightcurves < handle
         
         index_flux = 'end'; % which aperture to use, default "end" is for forced photometery with the largest aperture
         
+        use_welch = 0;
+        
         sampling_jump = 100; % how many data points to bin together when calculating RE on larger and larger time-intervals
         num_points_rms = 20; % how many data points of binned data to use for calculating local relative error
         
@@ -136,6 +140,11 @@ classdef Lightcurves < handle
         smooth_interval = 10; % how many samples to average over when smoothing
         
         use_show_log = 0; % show the plot in log scale. Power spectra always shows log Y, but can toggle X. For others, toggles log Y only (X is linear). 
+        
+%         use_show_re_bins = 0;
+        show_mag_limit = 15; 
+        
+        use_show_bin_fits = 0;
         
         debug_bit = 1;
         
@@ -200,10 +209,17 @@ classdef Lightcurves < handle
         
         fit_results_; % save this from the polyfit (lazy load)
         
-        show_what_list = {'fluxes', 'areas', 'backgrounds', 'variances', 'centroids', 'offsets', 'widths', 'bad_pixels', 'power spectra', 'statistics'};
-        show_flux_type_list = {'raw', 'sub', 'rem', 'cal', 'all'};
+        show_what_list = {'fluxes', 'areas', 'backgrounds', 'variances', 'centroids', 'offsets', 'widths', 'bad_pixels', 'power spectra', 'statistics', 'binning'};
+        show_flux_type_list = {'raw', 'sub', 'rem', 'cal'};
         
-        version = 1.09;
+        sysrem_a_vec;
+        sysrem_c_vec; 
+        
+        last_shown = '';
+        last_xlim = [];
+        last_ylim = [];
+        
+        version = 1.10;
         
     end
     
@@ -242,6 +258,8 @@ classdef Lightcurves < handle
         
         RE_fit_results_;
         bad_star_indices_;
+        
+        
         
     end
     
@@ -547,24 +565,34 @@ classdef Lightcurves < handle
                     
                     if obj.use_sysrem
                         
-                        f = obj.fluxes_rem;
-                        a = [];
-                        c = [];
+%                         f = obj.fluxes_rem;
+%                         
+%                         idx = obj.bad_star_indices; 
+%                         % maybe add a search for bad batches?
+%                         
+% %                         f(:,idx) = NaN;
+%                         
+%                         a_vec = [];
+%                         c_vec = [];
+%                         
+%                         for ii = 1:obj.sysrem_iterations
+%                             
+%                             e = nanmedian(util.series.binning(f, 100, 'func', 'std'),1);
+%                             e(e==0 | isnan(e)) = Inf; 
+% %                             e = sqrt(1./nanmean(f));
+%                             [f,a,c] = util.series.sysrem(f, e, 'iterations', 5, 'stars', idx, 'ped', 1); 
+% 
+%                             a_vec(:,ii) = a;
+%                             c_vec(ii,:) = c;
+%                             
+%                         end
                         
-                        idx = obj.bad_star_indices; 
-                        % maybe add a search for bad batches?
-                        
-                        f(:,idx) = NaN;
-                        
-                        for ii = 1:obj.sysrem_iterations
-                            
-                            e = nanmedian(util.series.binning(f, 100, 'func', 'std'),1);
-                            e(e==0 | isnan(e)) = Inf; 
-                            [f,a,c] = util.series.sysrem(f, e, a, c, 'iterations', 3); 
-                            
-                        end
-                        
+                        [f, a_vec, c_vec] = obj.calculateSysrem(obj.fluxes_rem); 
+
                         obj.fluxes_cal_ = f;
+                        
+                        obj.sysrem_a_vec = a_vec;
+                        obj.sysrem_c_vec = c_vec;
                         
                     else % old methods...
                     
@@ -995,6 +1023,40 @@ classdef Lightcurves < handle
             
         end
         
+        function val = getFluxTypeIndex(obj, type)
+            
+            import util.text.cs;
+            
+            if cs(type, 'raw')
+                val = 1;
+            elseif cs(type, 'subtracted')
+                val = 2;
+            elseif cs(type, 'removed outliers')
+                val = 3;
+            elseif cs(type, 'calibrated')
+                val = 4;
+            else
+                error('Unknown flux type "%s"... Use "raw" or "sub" or "rem" or "cal".', type); 
+            end
+            
+        end
+        
+        function val = getFluxType(obj, index)
+            
+            if index==1
+                val = obj.fluxes;
+            elseif index==2
+                val = obj.fluxes_sub;
+            elseif index==3
+                val = obj.fluxes_rem;
+            elseif index==4
+                val = obj.fluxes_cal;
+            else
+                error('Unknown flux index %d, use a number in the range 1-4.', index); 
+            end
+            
+        end
+        
     end
     
     methods % setters
@@ -1134,6 +1196,17 @@ classdef Lightcurves < handle
                 obj.clearREfit;
                 obj.clearPSD;
                 obj.clearRE;
+            end
+            
+        end
+        
+        function set.use_welch(obj, val)
+            
+            if ~isequal(obj.use_welch, val)
+                
+                obj.use_welch = val;
+                obj.clearPSD;
+                
             end
             
         end
@@ -1441,14 +1514,129 @@ classdef Lightcurves < handle
     
     methods % calculations
         
+        function [flux, a_vec, c_vec] = calculateSysrem(obj, flux)
+            
+            idx = obj.bad_star_indices; 
+            % maybe add a search for bad batches?
+
+%            flux(:,idx) = NaN;
+
+            a_vec = [];
+            c_vec = [];
+
+            for ii = 1:obj.sysrem_iterations
+
+                e = nanmedian(util.series.binning(flux, 100, 'func', 'std'),1);
+                e(e==0 | isnan(e)) = Inf; 
+%                             e = sqrt(1./nanmean(f));
+                [flux,a,c] = util.series.sysrem(flux, e, 'iterations', 5, 'stars', idx, 'ped', 1); 
+
+                a_vec(:,ii) = a;
+                c_vec(ii,:) = c;
+
+            end
+            
+        end
+        
+        function [f, f_transits] = injectionTest(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('number', 10); 
+            input.input_var('depth', 0.05); 
+            input.input_var('width', 100); 
+            input.input_var('surround', 5); 
+            input.input_var('stars', 1, 'star_index', 'star_indices');
+            input.input_var('frames', [], 'frame_index', 'frame_indices'); 
+            input.input_var('font_size', 26); 
+            input.input_var('ax', [], 'axes', 'axis');
+            input.scan_vars(varargin{:});
+            
+            if isempty(input.stars)
+                input.stars = 1:size(obj.fluxes,2); 
+            end
+            
+            if isempty(input.frames)
+                input.frames = 1:size(obj.fluxes,1); 
+            end
+                        
+            if ~isequal(input.frames(1):input.frames(end), input.frames)
+                error('The input "frames" must be a continuous range of frame indices with step=1'); 
+            end
+            
+            if input.frames(end)>size(obj.fluxes,1)
+                error('Last frame index, %d, is out of bounds for the number of available frames, %d.', input.frames(end), size(obj.fluxes,1)); 
+            end
+            
+            if input.surround<3
+                error('Input "surround" must be at least 3, to allow space around the transit to get the linear fit'); 
+            end
+            
+            if length(input.frames)<input.width*input.surround*input.number
+                error('frame indices cover only %d data points, which is too short to use with width %d, surround %d and number %d (total length needed is %d). ', ...
+                    length(input.frames), input.width, input.surround, input.number, input.width.*input.surround.*input.number);
+            end
+            
+            if isempty(input.ax)
+                input.ax = gca;
+            end
+            
+            time_indices = 1:input.width.*input.surround:size(obj.fluxes,1); % all possible intervals that can fit a transit
+            
+            frames_picked = time_indices(randperm(length(time_indices)-1, input.number)); % transit frames are chosen without repitition
+            
+            stars_picked = input.stars(randi(length(input.stars), [1, input.number])); % star frames can be chosen with repitition
+            
+            f = obj.fluxes_rem; % get a copy of the data before calibration
+            
+            for ii = 1:input.number
+                
+                idx_region = ( frames_picked(ii):(frames_picked(ii)+ceil(input.width.*input.surround)-1) )';
+                f_region = f(idx_region, stars_picked(ii)); 
+                
+                fr = util.fit.polyfit(idx_region, f_region, 'order', 1);
+                                
+                start_frame = frames_picked(ii)+randi(ceil(input.width.*(input.surround-1)));
+                
+                idx_transit(:,ii) = (start_frame:(start_frame+ceil(input.width)-1)); 
+                
+                missing_light(:,ii) = input.depth.*fr.func(idx_transit(:,ii)); 
+                
+                f(idx_transit(:,ii), stars_picked(ii)) = f(idx_transit(:,ii), stars_picked(ii))-missing_light(:,ii);
+                
+            end
+            
+            f = obj.calculateSysrem(f); 
+            
+            f_transits = ones(size(f,1),1).*nanmedian(f,1); 
+            
+            for ii = 1:input.number
+                
+                f_transits(idx_transit(:,ii),stars_picked(ii)) = f_transits(idx_transit(:,ii),stars_picked(ii)).*(1-input.depth); 
+                
+            end
+            
+        end
+        
         function [pxx, freq] = calculatePSD(obj)
             
-            f = obj.fluxes_sub;
+            f = obj.fluxes_cal;
             f(isinf(f)) = NaN;
             f = fillmissing(f, 'linear'); 
             
-            [pxx, freq] = pwelch(f, [], [], [], 1./median(diff(obj.timestamps))); 
+            if obj.use_welch
             
+%                 [pxx, freq] = pwelch(f, [], [], size(f,1), 1./median(diff(obj.timestamps)), 'power'); 
+                [pxx, freq] = pwelch(f, [], [], size(f,1), 1./median(diff(obj.timestamps))); 
+                
+            else
+                pxx = abs(fft(f-nanmean(f,1)));
+                pxx = pxx(1:floor(size(f,1)/2)+1,:); 
+                T = (obj.timestamps(end)-obj.timestamps(1)); 
+                freq = (0:1/T:(size(pxx,1)-1)/T)';
+            end
+            
+            pxx = real(pxx); 
+                        
         end
         
         function calculateRelativeError(obj)
@@ -1456,31 +1644,36 @@ classdef Lightcurves < handle
             import util.series.binning;
             
             obj.clearRE;
-            
-            f = obj.fluxes_cal;
-            t = obj.timestamps;
-            
-            if isempty(f) || isempty(t)
-                return;
-            end
-            
-            F = nanmean(f); % the average flux is used to divide the rms and get the relative error (RE)
-            
-            for ii = 1:1e3 % arbitrary loop length with a break condition
-                
-                obj.bin_widths_seconds_(ii) = nanmedian(diff(t),1); % get the average time sampling
-                
-                obj.local_RE_(ii,:) = nanmedian(binning(f, obj.num_points_rms, 'function', 'std'),1)./F; % the local relative error
-                
-                obj.total_RE_(ii,:) = nanstd(f)./F; % the relative error on the entire dataset
-                
-                f = binning(f, obj.sampling_jump); % downsample the lightcurves by a set factor 
-                t = binning(t, obj.sampling_jump); % make sure the timesteps are binned like the fluxes
-                
-                if size(f,1)<obj.num_points_rms
-                    break; % if the newly binned flux is too short to calculate local rms, there's no point to keep going! 
+
+            for jj = 1:4 % go over flux types
+
+%                 f = obj.fluxes_cal;
+                f = obj.getFluxType(jj); 
+                t = obj.timestamps;
+
+                if isempty(f) || isempty(t)
+                    return;
                 end
-                
+
+                F = nanmean(f); % the average flux is used to divide the rms and get the relative error (RE)
+
+                for ii = 1:1e3 % arbitrary loop length with a break condition
+
+                    obj.bin_widths_seconds_(ii) = nanmedian(diff(t),1); % get the average time sampling
+
+                    obj.local_RE_(ii,:,jj) = nanmedian(binning(f, obj.num_points_rms, 'function', 'std'),1)./F; % the local relative error
+
+                    obj.total_RE_(ii,:,jj) = nanstd(f)./abs(F); % the relative error on the entire dataset
+
+                    f = binning(f, obj.sampling_jump); % downsample the lightcurves by a set factor 
+                    t = binning(t, obj.sampling_jump); % make sure the timesteps are binned like the fluxes
+
+                    if size(f,1)<obj.num_points_rms
+                        break; % if the newly binned flux is too short to calculate local rms, there's no point to keep going! 
+                    end
+
+                end
+
             end
             
         end
@@ -1711,6 +1904,19 @@ classdef Lightcurves < handle
             
         end
         
+        function saveFigures(obj)
+
+            idx = cellfun(@isvalid, obj.figures_spawned); 
+            obj.figures_spawned = obj.figures_spawned(idx); 
+            
+            d = fullfile(getenv('DATA'), '/WFAST/figures');
+            
+            for ii = 1:length(obj.figures_spawned)
+                savefig(fullfile(d, [strrep(obj.figures_spawned{ii}.UserData, {':','.'}, '_') '.fig']));
+            end
+            
+        end
+        
     end
     
     methods % plotting tools / GUI
@@ -1732,8 +1938,18 @@ classdef Lightcurves < handle
                 end
             end
             
-            delete(allchild(input.ax));
-            delete(findobj(input.ax.Parent, 'type', 'legend'));
+            if ~isempty(obj.last_shown)
+                obj.last_xlim = input.ax.XLim;
+                obj.last_ylim = input.ax.YLim;
+            end
+            
+            % this is from: http://undocumentedmatlab.com/articles/determining-axes-zoom-state
+            app_info = getappdata(input.ax, 'matlab_graphics_resetplotview'); % information about zoom state (empty if unzoomed!)
+            
+            cla(input.ax, 'reset'); 
+            
+%            delete(allchild(input.ax));
+%            delete(findobj(input.ax.Parent, 'type', 'legend'));
             
             if obj.use_show_datetime && ~isempty(obj.juldates)
                 xlabel(input.ax, ''); 
@@ -1785,12 +2001,18 @@ classdef Lightcurves < handle
                 ylabel(input.ax, 'number of bad pixels in aperture'); 
             elseif cs(obj.show_what, 'power spectra')
                 
-                obj.addPlots(input.ax, obj.power_spectra, obj.psd_freq);
-                ylabel(input.ax, 'power spectra (Welch)'); 
+                obj.addPlots(input.ax, sqrt(obj.power_spectra), obj.psd_freq);
+                if obj.use_welch
+                    ylabel(input.ax, 'Power spectrum^{(1/2)} (Welch)'); 
+                else
+                    ylabel(input.ax, 'Power spectrum^{(1/2)} (FFT)'); 
+                end
                 xlabel(input.ax, 'Frequency [Hz]'); 
                 
             elseif cs(obj.show_what, 'stats', 'statistics')
                 obj.showStats('ax', input.ax, 'font_size', input.font_size);
+            elseif cs(obj.show_what, 'binning')
+                obj.showBinning('ax', input.ax, 'font_size', input.font_size); 
             else
                 error('Unknown option to to show_what: "%s", use "fluxes" or "offset" etc...', obj.show_what);
             end
@@ -1805,6 +2027,8 @@ classdef Lightcurves < handle
                     input.ax.XScale = 'linear';
                 end
                 
+            elseif cs(obj.show_what, 'stats', 'statistics', 'binning')
+                % pass
             else
                 
                 input.ax.XScale = 'linear';
@@ -1817,15 +2041,51 @@ classdef Lightcurves < handle
                 
             end
             
+            if cs(obj.show_what, 'stats', 'statistics', 'binning')
+                use_restore_x = 0; % for the statistics plots we don't need to keep the zoom position
+            elseif isequal(obj.show_what, obj.last_shown) % same type of data, must restore x
+                use_restore_x = 1;
+            elseif ~cs(obj.show_what, 'power spectra', 'stats', 'statistics') && ~cs(obj.last_shown, 'power spectra', 'stats', 'statistics', 'binning') % data types like flux/background/bad_pixels are all time based
+                use_restore_x = 1;
+            else
+                use_restore_x = 0;
+            end
+
+            if use_restore_x && ~isempty(obj.last_xlim) && isequal(class(input.ax.XLim), class(obj.last_xlim))
+                
+                max_xlim = input.ax.XLim; 
+                input.ax.XLim = obj.last_xlim;
+                
+                if ~isempty(app_info) && ~isfield(app_info, 'XLim') % if previous plot held a manual zoom state, make sure to update it! 
+                    app_info.XLim = max_xlim;
+                end
+                
+            end
+            
+            if ~isempty(obj.last_ylim) && isequal(obj.show_what, obj.last_shown) && ~cs(obj.show_what, 'stats', 'statistics', 'binning') % only restore the same YLim if viewing the same data type (and not for stats!)
+                
+                max_ylim = input.ax.YLim; 
+                input.ax.YLim = obj.last_ylim;
+                
+                if ~isempty(app_info) && ~isfield(app_info, 'YLim') % if previous plot held a manual zoom state, make sure to update it! 
+                    app_info.YLim = max_ylim;
+                end
+                
+            end
+            
+            setappdata(input.ax, 'matlab_graphics_resetplotview', app_info);
+            
             hold(input.ax, 'off');
             
             input.ax.FontSize = input.font_size;
             
             box(input.ax, 'on'); 
             
+            obj.last_shown = obj.show_what;
+            
         end
         
-        function addPlots(obj, ax, data, x_axis, line_str) % internal function for adding another dataset to the plot
+        function h = addPlots(obj, ax, data, x_axis, line_str) % internal function for adding another dataset to the plot
             
             if nargin<4 || isempty(x_axis)
                 if obj.use_show_datetime && ~isempty(obj.juldates)
@@ -1852,15 +2112,15 @@ classdef Lightcurves < handle
                 idx_vec = obj.show_indices;
             end
             
-            for ii = idx_vec
+            for ii = 1:length(idx_vec)
                 
-                data_star = data(:,ii);
+                data_star = data(:,idx_vec(ii));
                 
 %                 if obj.use_skip_flagged
 %                     data_star(logical(obj.flags(:,ii,obj.index_flux_number))) = NaN;
 %                 end
                 
-                if obj.use_smooth
+                if obj.use_smooth && size(data,1)>obj.smooth_interval.*4 % at least 5 data points for smoothing! 
                     
                     data_smoothed = util.series.binning(data_star, obj.smooth_interval); 
                     time_smoothed = util.series.binning(x_axis, obj.smooth_interval); 
@@ -1869,8 +2129,7 @@ classdef Lightcurves < handle
                         data_smoothed(data_smoothed<0) = 0;
                     end
                     
-                    h = plot(ax, time_smoothed, data_smoothed, line_str, 'LineWidth', 1);
-                    if ii>min(idx_vec) && ~isempty(h), h.HandleVisibility = 'off'; end
+                    h(ii) = plot(ax, time_smoothed, data_smoothed, line_str, 'LineWidth', 1);
                     
                 else
                     
@@ -1878,14 +2137,15 @@ classdef Lightcurves < handle
                         data_star(data_star<0) = 0;
                     end
                     
-                    h = plot(ax, x_axis, data_star, line_str, 'LineWidth', 1);
-                    if ii>min(idx_vec) && ~isempty(h), h.HandleVisibility = 'off'; end                    
+                    h(ii) = plot(ax, x_axis, data_star, line_str, 'LineWidth', 1);
                 
                 end
                 
-                if ~isempty(h)
-                    h.UserData = ii;
-                    h.ButtonDownFcn = @obj.callback_cutout_number;
+                if idx_vec(ii)>1 && ~isempty(h(ii)), h(ii).HandleVisibility = 'off'; end
+
+                if ~isempty(h(ii))
+                    h(ii).UserData = idx_vec(ii);
+                    h(ii).ButtonDownFcn = @obj.callback_cutout_number;
                 end
                 
                 
@@ -1894,7 +2154,6 @@ classdef Lightcurves < handle
         end
         
         function showStats(obj, varargin)
-            
             
             input = util.text.InputVars;
             input.input_var('font_size', 26); 
@@ -1909,33 +2168,45 @@ classdef Lightcurves < handle
                 end
             end
             
+            flux_index = obj.getFluxTypeIndex(obj.show_flux_type); % which flux to use: raw, sub, rem, or cal
+            
+            bin_indices = [1 ceil(length(obj.bin_widths_seconds)/2) length(obj.bin_widths_seconds)]; % which bins to use (first, middle and last)
+            
+            % make the x axis based on magnitudes or fluxes (if there aren't any magnitudes)
             if ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) && size(obj.cat.magnitudes,1)==size(obj.fluxes,2)
                 x = obj.cat.magnitudes';
-                x(x>14) = NaN;
+                x(x>obj.show_mag_limit) = NaN;
                 used_mag = 1;
             elseif ~isempty(obj.cat) && ~isempty(obj.cat.data) && any(contains(obj.cat.data.Properties.VariableNames, 'Mag_BP')) && size(obj.cat.data.Mag_BP,1)==size(obj.fluxes,2)
                 x = obj.cat.data.Mag_BP';
-                x(x>14) = NaN;
+                x(x>obj.show_mag_limit) = NaN;
                 used_mag = 1;
             else
                 x = nanmean(obj.fluxes_cal_); % no magnitudes are given, use the average fluxes instead
                 used_mag = 0;
             end
-            
-            h1 = plot(input.ax, x, obj.local_RE, '.', 'HandleVisibility', 'off');
-                        
-            input.ax.ColorOrderIndex = 1;
-            
-            input.ax.NextPlot = 'add';
-            
-            h2 = plot(input.ax, x, obj.total_RE, 'p'); 
-            
-            for ii = 1:length(h2)
-                h2(ii).DisplayName = sprintf('Bin width= %4.2f seconds', obj.bin_widths_seconds(ii));
+
+            h1 = plot(input.ax, x, obj.local_RE(bin_indices,:,flux_index), '.', 'HandleVisibility', 'off');
+
+            for ii = 1:length(h1)
+                h1(ii).ButtonDownFcn = @obj.callback_local_RE;
+                h1(ii).UserData = ii;
             end
-            
+
+            input.ax.ColorOrderIndex = 1;
+
+            input.ax.NextPlot = 'add';
+
+            h2 = plot(input.ax, x, obj.total_RE(bin_indices,:,flux_index), 'p'); 
+
+            for ii = 1:length(h2)
+                h2(ii).ButtonDownFcn = @obj.callback_total_RE;
+                h2(ii).UserData = ii;
+                h2(ii).DisplayName = sprintf('Bin width= %4.2f seconds', obj.bin_widths_seconds(bin_indices(ii)));
+            end
+
             input.ax.NextPlot = 'replace';
-            
+
             if used_mag
                 xlabel(input.ax, 'Magnitude'); 
                 input.ax.XScale = 'linear';
@@ -1946,8 +2217,74 @@ classdef Lightcurves < handle
                 legend(input.ax, 'Location', 'NorthEast');
             end
             
+            ylabel(input.ax, 'Relative Error'); 
             input.ax.YScale = 'log';
+
+        end
+        
+        function showBinning(obj, varargin)
             
+            input = util.text.InputVars;
+            input.input_var('font_size', 26); 
+            input.input_var('ax', [], 'axes', 'axis');
+            input.scan_vars(varargin{:});
+            
+            if isempty(input.ax)
+                if ~isempty(obj.gui) && obj.gui.check
+                    input.ax = obj.gui.axes_image;
+                else
+                    input.ax = gca;
+                end
+            end
+            
+            flux_index = obj.getFluxTypeIndex(obj.show_flux_type); 
+            
+            h1 = obj.addPlots(input.ax, obj.total_RE(:,:,flux_index), obj.bin_widths_seconds, 'v');
+            xlabel(input.ax, 'Bin size [seconds]'); 
+            input.ax.XScale = 'log';
+
+            new_data = obj.total_RE(1,:,flux_index)./sqrt(obj.bin_widths_seconds'./obj.bin_widths_seconds(1)); 
+
+            h2 = obj.addPlots(input.ax, new_data, obj.bin_widths_seconds, ':'); 
+
+            ylabel(input.ax, 'Relative Error'); 
+            input.ax.YScale = 'log';
+
+            if obj.use_show_bin_fits
+                
+                fr = util.fit.polyfit(log10(obj.bin_widths_seconds'), log10(obj.total_RE(:,:,flux_index)), 'order', 3);
+                
+                h3 = obj.addPlots(input.ax, 10.^[fr.ym], obj.bin_widths_seconds, '--');
+                
+                str = {};
+                
+                for ii = 1:length(obj.show_indices)
+                    h1(ii).HandleVisibility = 'off';
+                    h2(ii).HandleVisibility = 'off';
+                    h3(ii).HandleVisibility = 'on';
+                    
+                    slope = fr(obj.show_indices(ii)).coeffs(2); % the linear part of the fit is used at proxy for the slope
+                    str{ii} = sprintf('slope= %4.2f', slope); 
+                    
+                end
+                
+                hl = legend(input.ax, str);
+                hl.FontSize = 12;
+                hl.Location = 'SouthWest';
+                
+%                 for ii = 1:length(obj.show_indices)
+%                     
+%                     slope = fr(obj.show_indices(ii)).coeffs(2); % the linear part of the fit is used at proxy for the slope
+%                     h = text(obj.bin_widths_seconds(1), obj.total_RE(1,obj.show_indices(ii),flux_index), sprintf('slope= %4.2f', slope));
+%                     aspect = log10(input.ax.DataAspectRatio(1)./input.ax.DataAspectRatio(2));
+%                     limits = diff(log10(input.ax.YLim))./diff(log10(input.ax.XLim)); 
+%                     h.VerticalAlignment = 'top';
+%                     h.Rotation = -atand(limits./aspect);
+%                     h.FontSize = 14;
+%                     
+%                 end
+                
+            end
             
         end
         
@@ -1957,6 +2294,49 @@ classdef Lightcurves < handle
                 obj.gui.button_cut_number.String = ['star: ' num2str(hndl.UserData)];
             else
                 disp(['Star number is ' num2str(hndl.UserData)]);
+            end
+            
+        end
+        
+        function callback_total_RE(obj, hndl, event) % add this callback to each line handle to make it display the star number of the specific point
+            
+%             M = event.IntersectionPoint(1);
+            RE = event.IntersectionPoint(2);
+
+            flux_index = obj.getFluxTypeIndex(obj.show_flux_type); 
+
+            idx = find(abs((RE-obj.total_RE(hndl.UserData,:,flux_index))./RE)<1e-5);
+            
+            if length(idx)>1 % two or more stars with the same RE?!
+                % check magnitudes or something 
+            end
+            
+            if obj.gui.check
+                obj.gui.button_cut_number.String = ['star: ' num2str(idx)];
+            else
+                disp(['Star number is ' num2str(idx)]);
+            end
+            
+        end
+        
+        function callback_local_RE(obj, hndl, event) % add this callback to each line handle to make it display the star number of the specific point
+            
+%             M = event.IntersectionPoint(1);
+            RE = event.IntersectionPoint(2);
+
+            flux_index = obj.getFluxTypeIndex(obj.show_flux_type); 
+
+            idx = find(abs((RE-obj.local_RE(hndl.UserData,:,flux_index))./RE)<1e-5);
+            
+            if length(idx)>1 % two or more stars with the same RE?!
+                % check magnitudes or something 
+                idx = [];
+            end
+            
+            if obj.gui.check
+                obj.gui.button_cut_number.String = ['star: ' num2str(idx)];
+            else
+                disp(['Star number is ' num2str(idx)]);
             end
             
         end
@@ -1972,6 +2352,47 @@ classdef Lightcurves < handle
             
         end
         
+        function h_out = plotAirmass(obj, varargin)
+            
+            if isempty(obj.head) || isempty(obj.juldates)
+                error('Cannot show the airmass without a header and the julian dates of all observations!'); 
+            end
+            
+            input = util.text.InputVars;
+            input.input_var('font_size', 26); 
+            input.input_var('ax', [], 'axes', 'axis');
+            input.scan_vars(varargin{:});
+            
+            if isempty(input.ax)
+                input.ax = gca;
+            end
+            
+            input.ax.NextPlot = 'replace';
+            
+            t = datetime(obj.juldates, 'convertFrom', 'juliandate');
+            
+            A = celestial.coo.airmass(obj.juldates, obj.head.RA, obj.head.DEC, [obj.head.longitude, obj.head.latitude]./180.*pi);
+            a = obj.sysrem_a_vec(:,1);
+            
+            if ~isempty(obj.sysrem_a_vec)
+                h = plot(input.ax, t, (a-nanmean(a))./nanstd(a).*nanstd(A)+nanmean(A), '.', t, A); 
+                hl = legend(input.ax, {'sysrem 1st a vector'}, 'Location', 'NorthWest', 'Airmass'); 
+            else
+                h = plot(input.ax, t, A); 
+            end
+            
+            input.ax.FontSize = input.font_size;
+            
+            ylabel(input.ax, 'Airmass'); 
+            
+            
+            
+            if nargout>0
+                h_out = h;
+            end
+                        
+        end
+        
         function makeGUI(obj)
             
             if isempty(obj.gui)
@@ -1979,6 +2400,74 @@ classdef Lightcurves < handle
             end
             
             obj.gui.make;
+            
+        end
+        
+        function spawnFigure(obj)
+            
+            if obj.gui.check
+                
+                f = figure;
+                f.Name = sprintf('spawned on %s', datetime('now'));
+                f.Units = obj.gui.fig.fig.Units;
+                f.Position = obj.gui.fig.fig.Position;
+
+                p2 = copyobj(obj.gui.panel_image, f); 
+                delete(findobj(p2.Children, 'type', 'UIControl'));
+                
+                p3 = copyobj(obj.gui.panel_info.panel, f); 
+                h = findobj(p3.Children, 'type', 'UIControl'); 
+                for ii = 1:length(h)
+                    h(ii).Enable = 'inactive';
+                end
+                
+                p4 = copyobj(obj.gui.panel_process.panel, f);
+                h = findobj(p4.Children, 'type', 'UIControl'); 
+                for ii = 1:length(h)
+                    h(ii).Enable = 'inactive';
+                end
+                
+                p5 = copyobj(obj.gui.panel_display.panel, f);
+                h = findobj(p5.Children, 'type', 'UIControl'); 
+                for ii = 1:length(h)
+                    h(ii).Enable = 'inactive';
+                end
+                
+                p6 = copyobj(obj.gui.panel_psd.panel, f);
+                h = findobj(p6.Children, 'type', 'UIControl'); 
+                for ii = 1:length(h)
+                    h(ii).Enable = 'inactive';
+                end
+                
+                p7 = copyobj(obj.gui.panel_stats.panel, f);
+                h = findobj(p7.Children, 'type', 'UIControl'); 
+                for ii = 1:length(h)
+                    h(ii).Enable = 'inactive';
+                end
+                
+                p_tag = uipanel(f, 'Position', obj.gui.panel_control.panel.Position);
+                c = uicontrol(p_tag, 'Units', 'Normalized', 'Position', [0 0 1 1], ...
+                    'Style', 'text', 'String', sprintf('Plot copy made on:\n %s', datetime('now')),...
+                    'FontSize', 16, 'FontWeight', 'bold', 'FontName', 'Times'); 
+                
+                if isempty(obj.head)
+                    identifier = 'unknown_run';
+                else
+                    identifier = obj.head.run_identifier;
+                end
+                                
+                f.UserData = sprintf('lightcurves_%s_spawned_%s', identifier, util.text.time2str(datetime('now'))); 
+                
+                % pop the GUI back on screen! 
+                figure(obj.gui.fig.fig); 
+                
+                % add to list of figures
+                idx = cellfun(@isvalid, obj.figures_spawned); 
+                obj.figures_spawned = obj.figures_spawned(idx); 
+                
+                obj.figures_spawned{end+1} = f; 
+                
+            end
             
         end
         

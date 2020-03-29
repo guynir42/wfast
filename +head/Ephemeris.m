@@ -227,7 +227,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
 %             val = obj.ha2alt(obj.HA_deg, obj.DEC_deg, obj.latitude);
 
-            val = asind(sind(obj.DEC_deg).*sind(obj.latitude) + cosd(obj.DEC_deg).*cosd(obj.latitude).*cosd(obj.HA_deg));
+            val = asind(sind(obj.Dec_deg).*sind(obj.latitude) + cosd(obj.Dec_deg).*cosd(obj.latitude).*cosd(obj.HA_deg));
             
         end
         
@@ -253,7 +253,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 val = []; 
             else
                 
-                SecZ = 1./cosd(90-obj.alt);
+                SecZ = 1./cosd(90-alt);
 
                 val = SecZ - 0.0018167.*(SecZ - 1) - 0.002875.*(SecZ - 1).*(SecZ - 1)...
                     - 0.0008083.*(SecZ - 1).*(SecZ - 1).*(SecZ - 1); % Hardie's polynomial formula
