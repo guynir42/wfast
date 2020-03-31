@@ -107,6 +107,7 @@ classdef Calibration < handle
         juldates_flat = [];
         
         correlation_flat = []; % covariance between each pixel and its neighboors
+        corr_single_flat = []; % covariance for a single batch
         corr_pvalue_flat = []; % alpha significance for each point in the covariance matrix
         positions_cov = []; % the positions of the centers of each tile used in covariance calculation
         
@@ -158,8 +159,6 @@ classdef Calibration < handle
         
         use_calc_covariance = 0;
         num_pixels_cov = [10 10]; % tile size for covariance calculation
-        
-        use_mv_points = 0; % choose if to collect mean and variance data when making flats (used for calculating gain)
         
         mode = ''; % keeps track if we are looping (calculating) dark or flat
         
@@ -227,13 +226,6 @@ classdef Calibration < handle
     end
     
     methods % reset and copy utilities
-             
-%         function reset(obj)
-% 
-%             obj.resetDark;
-%             obj.resetFlat;
-%             
-%         end
         
         function resetDark(obj)
             
@@ -263,16 +255,12 @@ classdef Calibration < handle
             obj.timestamps_flat = [];
             obj.juldates_flat = [];
             
-            obj.correlation_flat = [];
-            obj.corr_pvalue_flat = [];
-            
-        end
-        
-        function resetPixelMeanVar(obj)
-            
             obj.flat_pixel_mean = [];
             obj.flat_pixel_var = [];
             obj.pixel_gain = [];
+            
+            obj.correlation_flat = [];
+            obj.corr_pvalue_flat = [];
             
         end
         
@@ -854,6 +842,7 @@ classdef Calibration < handle
                     
                 end
                 
+                obj.corr_single_flat = cov_mat; 
                 obj.correlation_flat = runningMean(obj.correlation_flat, obj.num_flats, cov_mat*current_frames, current_frames); 
                 obj.corr_pvalue_flat = runningMean(obj.corr_pvalue_flat, obj.num_flats, alpha.*current_frames, current_frames); 
                 
@@ -998,10 +987,6 @@ classdef Calibration < handle
             
             obj.brake_bit = 0;
             
-            if obj.use_mv_points
-                obj.resetPixelMeanVar;
-            end
-                
             try
                 obj.audio.playTakeForever;
                 obj.prog.start(obj.reader_flat.getNumBatches);
