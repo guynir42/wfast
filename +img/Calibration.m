@@ -102,9 +102,13 @@ classdef Calibration < handle
         flat_var; % variance of the flats (used for calculating gain, etc.)
         date_flat = '';
         
-        num_flat_lcs = 1; % how many regions of the flat field should be measured
         lightcurves_flat = []; % lightcurves for different regions of the flat field
-        covariance_flat = [];
+        timestamps_flat = []; 
+        juldates_flat = [];
+        
+        correlation_flat = []; % covariance between each pixel and its neighboors
+        corr_pvalue_flat = []; % alpha significance for each point in the covariance matrix
+        positions_cov = []; % the positions of the centers of each tile used in covariance calculation
         
         camera_name = 'Zyla';
         project_name = 'WFAST'; 
@@ -148,8 +152,13 @@ classdef Calibration < handle
         
         % switches for making darks/flats (can we get rid of this??)
         use_calc_lightcurve = 1;
+        num_flat_sections = 5; % divide the flat field along these lines for lightcurves calculation (use 1 or 2 elements to denote how many rectangles on each side)
+
         use_calc_gain = 0;
+        
         use_calc_covariance = 0;
+        num_pixels_cov = [10 10]; % tile size for covariance calculation
+        
         use_mv_points = 0; % choose if to collect mean and variance data when making flats (used for calculating gain)
         
         mode = ''; % keeps track if we are looping (calculating) dark or flat
@@ -251,7 +260,11 @@ classdef Calibration < handle
             obj.date_flat = '';
             
             obj.lightcurves_flat = [];
-            obj.covariance_flat = [];
+            obj.timestamps_flat = [];
+            obj.juldates_flat = [];
+            
+            obj.correlation_flat = [];
+            obj.corr_pvalue_flat = [];
             
         end
         
@@ -781,7 +794,7 @@ classdef Calibration < handle
 
             images(mask_3d) = NaN;
 
-            norms = util.stat.mean2(images);
+            norms = util.stat.mean2(images); % the normalization of each image
             
             % flat mean
             f_sum = sum(images,3, 'omitnan');
@@ -790,18 +803,33 @@ classdef Calibration < handle
             
             if obj.use_calc_lightcurve
                 
-                obj.lightcurve_flat = vertcat(obj.lightcurve_flat, squeeze(util.stat.mean2(images))); 
+                if obj.num_flat_sections>1
+                    S = size(images);
+                    S = S(1:2); 
+                    cutouts = util.img.jigsaw(images, S./obj.num_flat_sections, NaN, 'squeeze', false); 
+                else
+                    cutouts = images;
+                end
+                
+                L = squeeze(util.stat.mean2(cutouts));
+                obj.lightcurves_flat = vertcat(obj.lightcurves_flat, L); 
+                
+                obj.timestamps_flat = vertcat(obj.timestamps_flat, obj.reader_flat.timestamps); 
+                
+                % add conversion to JD later...
                 
             end
             
+            m = norms; % 3D vector of the mean of each frame (to de-trend before calculating variance across frames)
+            m = m./mean(m);
+            f_var = nanvar(images./m, [], 3); % *current_frames;
+            f_var(mask) = NaN; 
+            obj.flat_var = runningMean(obj.flat_var, obj.num_flats, f_var, current_frames);
+
             if obj.use_calc_gain
                 
-                m = util.stat.mean2(images); % 3D vector of the mean of each frame (to de-trend before calculating variance across frames)
-                m = m./mean(m);
-                f_var = nanvar(images./m, [], 3); % *current_frames;
-                f_var(mask) = NaN; 
-                obj.flat_var = runningMean(obj.flat_var, obj.num_flats, f_var, current_frames);
-
+                f_mean = f_sum./current_frames;
+                
                 obj.flat_pixel_mean = cat(3, obj.flat_pixel_mean, f_mean);
                 obj.flat_pixel_var = cat(3, obj.flat_pixel_var, f_var);
                 
@@ -809,7 +837,25 @@ classdef Calibration < handle
             
             if obj.use_calc_covariance
                 
+                [cutouts, obj.positions_cov] = util.img.jigsaw(images./m, obj.num_pixels_cov, 'squeeze', false, 'partial', false);
                 
+                cov_mat = zeros(size(cutouts,1).*size(cutouts,2), size(cutouts,1).*size(cutouts,2), size(cutouts,4), 'like', cutouts);
+                alpha = zeros(size(cutouts,1).*size(cutouts,2), size(cutouts,1).*size(cutouts,2), size(cutouts,4), 'like', cutouts);
+                
+                for ii = 1:size(cutouts,4)
+                    
+                    C = cutouts(:,:,:,ii); 
+                    
+                    C = permute(C, [2,1,3]); % make the order of pixels row by row instead of column by column
+                    
+                    C = reshape(C, [size(C,1).*size(C,2), size(C,3)]); % linearize first and second dimension (each row is one pixel along multiple frames)
+                    
+                    [cov_mat(:,:,ii), alpha(:,:,ii)] = corrcoef(C'); % each column is now one pixel along multiple frames
+                    
+                end
+                
+                obj.correlation_flat = runningMean(obj.correlation_flat, obj.num_flats, cov_mat*current_frames, current_frames); 
+                obj.corr_pvalue_flat = runningMean(obj.corr_pvalue_flat, obj.num_flats, alpha.*current_frames, current_frames); 
                 
             end
             

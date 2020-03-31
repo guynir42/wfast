@@ -1850,7 +1850,7 @@ classdef Lightcurves < handle
             readme = sprintf('%s\n *variances: measured noise variance, per pixel, in the annulus.', readme);
             readme = sprintf('%s\n *offsets_x/y: distance from center of cutout (in pixels)', readme); 
             readme = sprintf('%s\n *centroids_x/y: position within image (in pixels)', readme);
-            readme = sprintf('%s\n *widths: calculated using the 2nd moment, averaging the minor and major axis', readme);
+            readme = sprintf('%s\n *widths: calculated using the 2nd moments, averaging the minor and major axis', readme);
             readme = sprintf('%s\n *bad_pixels: number of bad pixels in the aperture area.', readme);
             readme = sprintf('%s\n *flags: this is marked as non-zero if the photometry did not go well (e.g., large offsets, negative widths)', readme); 
             

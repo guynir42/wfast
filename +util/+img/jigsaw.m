@@ -13,15 +13,20 @@ function [cutouts, positions] = jigsaw(Im, varargin)
 %             singlton 3rd dimension. So using "squeeze" this dimension is
 %             removed. Default is true for convenience. If you expect to
 %             get 2D and 3D inputs, use squeeze=0 to get consistent output.
+%   *partial: keep the tiles on the edges of the image that don't fully fit
+%             into the size of the image (and get filled). Default true. 
+%             
 % 
 
     if nargin==0, help('util.img.jigsaw'); return; end
 
     input = util.text.InputVars;
+    input.use_ordered_numeric = 1;
     input.input_var('tile', 128, 'tile_size', 'size');
     input.input_var('pad_value', 0);
     input.input_var('overlap', []);
     input.input_var('squeeze', 1);
+    input.input_var('partial', true, 'keep_partial'); 
     input.scan_vars(varargin{:});
     
     if isempty(Im)
@@ -34,6 +39,8 @@ function [cutouts, positions] = jigsaw(Im, varargin)
     if isscalar(t)
         t = [t t];
     end
+    
+    t = ceil(t); % make sure tile sizes are integer! 
     
     S = util.vec.imsize(Im);
     
@@ -69,11 +76,18 @@ function [cutouts, positions] = jigsaw(Im, varargin)
             
             start_y = (ii-1)*t(1)+1;
             end_y = ii*t(1);
-            if end_y>S(1), end_y = S(1); end
             
             start_x = (jj-1)*t(2)+1;
             end_x = jj*t(2);
-            if end_x>S(2), end_x = S(2); end
+            
+            if input.partial
+                if end_y>S(1), end_y = S(1); end
+                if end_x>S(2), end_x = S(2); end
+            else
+                if end_x>S(2) || end_y>S(1)
+                    continue; % in this case just skip the partial tiles
+                end
+            end
             
             C = Im(start_y:end_y,start_x:end_x,:);
             cutouts(1:size(C,1),1:size(C,2),:,counter) = C;
@@ -85,6 +99,8 @@ function [cutouts, positions] = jigsaw(Im, varargin)
         end
     end
 
+    cutouts = cutouts(:,:,:,1:counter-1); 
+    
     if input.squeeze
         cutouts = squeeze(cutouts);
     end
