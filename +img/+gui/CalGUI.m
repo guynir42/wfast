@@ -7,9 +7,16 @@ classdef CalGUI < handle
         
         buttons = {};
         
-        font_size = 18;
-        edit_font_size = 14;
-        small_font_size = 12;
+%         font_size = 18;
+%         edit_font_size = 14;
+%         small_font_size = 12;
+
+        font_size = 13;
+        big_font_size = 16;
+        edit_font_size = 12;
+        small_font_size = 10;
+        
+        color_on = [0 0.3 1];
 
         debug_bit = 1;
         
@@ -31,9 +38,10 @@ classdef CalGUI < handle
         button_browse_flat;
         button_num_flat;
         
-        panel_utils;
-        button_use_mv_points;
+        panel_analysis;
         button_calc_gain;
+        button_calc_lightcurves
+        button_calc_covariance;
         
         panel_controls;
         button_use_flat;
@@ -162,12 +170,13 @@ classdef CalGUI < handle
                         
             %%%%%%%%%%%%%%%%%%%%%%% utils panel %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
-            obj.panel_utils = uipanel('Title', 'utilities', 'Units', 'Normalized', 'Position', [0.0 0.1 0.2 0.3]);
+            obj.panel_analysis = uipanel('Title', 'analysis', 'Units', 'Normalized', 'Position', [0.0 0.1 0.2 0.3]);
             
             num = 3;
             
-            obj.button_use_mv_points = GraphicButton(obj.panel_utils, [0 2/num 1 1/num], obj.cal, 'use_mv_points', 'toggle', 'no save MV', 'save MV');
-            obj.button_calc_gain = GraphicButton(obj.panel_utils, [0 1/num 1 1/num], obj.cal, 'calcGain', 'push', 'calcGain');
+            obj.button_calc_gain = GraphicButton(obj.panel_analysis, [0 2/num 1 1/num], obj.cal, 'use_calc_gain', 'toggle', 'no gain', 'calc gain');
+            obj.button_calc_lightcurves = GraphicButton(obj.panel_analysis, [0 1/num 1 1/num], obj.cal, 'use_calc_lightcurve', 'toggle', 'no lightcurves', 'calc lightcurves');
+            obj.button_calc_covariance = GraphicButton(obj.panel_analysis, [0 0/num 1 1/num], obj.cal, 'use_calc_covariance', 'toggle', 'no covariance', 'calc covariance');
                         
             %%%%%%%%%%%%%%%%%%%%%%% close panel %%%%%%%%%%%%%%%%%%%%%%%%%%%
             

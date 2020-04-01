@@ -1758,26 +1758,198 @@ classdef Calibration < handle
             
         end
         
-        function makeLooperDarkGUI(obj)
-           
-            if isempty(obj.reader_dark)
-                obj.reader_dark = img.FileLooper;
+        function showFlatAnalysis(obj) % this is used to produce plots for the user manual "flat analysis chapter" 
+            
+            font_size = 24;
+            
+            if ~isempty(obj.lightcurves_flat)
+            
+                f1 = util.plot.FigHandler('lightcurves');
+                f1.width = 30;
+                f1.height = 18; 
+                f1.clear;
+
+                ax1 = axes('parent', f1.fig, 'Position', [0.09 0.2 0.4 0.6]); 
+
+                plot(ax1, obj.timestamps_flat, obj.lightcurves_flat); 
+                
+                xlabel(ax1, 'Time [seconds]'); 
+                ylabel(ax1, 'Flux [mean counts]'); 
+                ax1.FontSize = font_size;
+                T = obj.timestamps_flat(end);
+                ax1.XLim = [-T.*0.05 T*1.05];
+                util.plot.inner_title('(a)', 'ax', ax1, 'Position', 'South', 'FontSize', ax1.FontSize, 'margin', 0.1); 
+                
+                ax2 = axes('parent', f1.fig, 'Position', [0.58 0.2 0.4 0.6]); 
+                
+                fs = util.series.sysrem(obj.lightcurves_flat); % flux after sysrem
+                plot(ax2, obj.timestamps_flat, fs); 
+                
+                ax2.YTick = [];
+                xlabel(ax2, 'Time [seconds]'); 
+                ax2.FontSize = ax1.FontSize;
+                ax2.XLim = ax1.XLim;
+                
+                ax2.YLim = [util.stat.min2(fs)*.995 util.stat.max2(fs)*1.005];
+                
+                util.plot.inner_title('(b)', 'ax', ax2, 'Position', 'South', 'FontSize', ax1.FontSize, 'margin', 0.1); 
+
+                f2 = util.plot.FigHandler('power spectrum');
+                f2.width = 30;
+                f2.height = 18; 
+                f2.clear;
+
+                ax = axes('Parent', f2.fig); 
+                
+                ps = abs(fft(fillmissing(fs, 'linear'))); 
+                ps = ps(1:floor(length(ps)/2+1), :); 
+                
+                dt = median(diff(obj.timestamps_flat));
+                
+                freq = 0:1/T:1/dt/2;
+                
+                loglog(ax, freq, ps); 
+                
+                ax.FontSize = font_size;
+                xlabel(ax, 'Frequency [Hz]'); 
+                ylabel(ax, 'Power spectrum^{(1/2)}'); 
+                
             end
             
-            obj.reader_dark.makeGUI;
-            
-        end
-        
-        function makeLooperFlatGUI(obj)
-           
-            if isempty(obj.reader_flat)
-                obj.reader_flat = img.FileLooper;
+            if ~isempty(obj.flat_mean)
+                
+                f3 = util.plot.FigHandler('flat mean');
+                f3.width = 30;
+                f3.height = 18;
+                f3.clear;
+                
+                I = obj.flat_mean; % image
+                
+                ax1 = axes('Parent', f3.fig, 'Position', [0.07 0.2 0.4 0.6]); 
+                util.plot.show(I, 'autodyn', 'on'); 
+                title(ax1, ''); 
+                ax1.FontSize = font_size;
+                colorbar(ax1, 'off'); 
+                
+                v = sort(I(:)); 
+                ax1.CLim = [v(floor(numel(v).*0.1)) v(floor(numel(v).*0.9))];
+                
+                ax2 = axes('Parent', f3.fig, 'Position', [0.53 0.2 0.44 0.6]); 
+                
+                x = 1:size(I,2);
+                sx = nanmean(I,1);
+                sx(abs(sx-nanmean(sx))./nanstd(sx)>4) = NaN;
+                
+                y = 1:size(I,1);
+                sy = nanmean(I,2);
+                sy(abs(sy-nanmean(sy))./nanstd(sy)>4) = NaN;
+                
+                plot(ax2, x, sx, y, sy); 
+                
+                ax2.YLim = ax2.YLim.*[1 1.01];
+                ax2.FontSize = font_size;
+                
+                hl = legend(ax2, {'x axis profile', 'y axis profile'}, 'Location', 'NorthEast'); 
+                hl.FontSize = font_size-4;
+                
+                ax3 = axes('Parent', f3.fig, 'Position', [ax2.Position(1)+ax2.Position(3)/4 0.22 ax2.Position(3)/2 0.25]); 
+                plot(ax3, x, sx-nanmean(sx), y, sy-nanmean(sy)); 
+                ax3.XTick = [];
+                ax3.YTick = [];
+                ax3.XLim = size(I,2)/2 + [-1 1].*100;
+                
+                fprintf('mid x rms= %6.4f | mid y rms= %6.4f \n', nanstd(sx(floor(size(I,2)/2)+(-100:100))), nanstd(sy(floor(size(I,1)/2) + (-100:100))));
+                
+                
             end
             
-            obj.reader_flat.makeGUI;
+            if ~isempty(obj.flat_var)
+                
+                f4 = util.plot.FigHandler('flat var');
+                f4.width = 30;
+                f4.height = 18;
+                f4.clear;
+                
+                I = obj.flat_var; % image
+                
+                ax1 = axes('Parent', f4.fig, 'Position', [0.07 0.2 0.4 0.6]); 
+                util.plot.show(I, 'autodyn', 'on'); 
+                title(ax1, ''); 
+                ax1.FontSize = font_size;
+                colorbar(ax1, 'off'); 
+                
+                v = sort(I(:)); 
+                ax1.CLim = [v(floor(numel(v).*0.1)) v(floor(numel(v).*0.9))];
+                
+                ax2 = axes('Parent', f4.fig, 'Position', [0.53 0.2 0.44 0.6]); 
+                
+                x = 1:size(I,2);
+                sx = nanmean(I,1);
+                sx(abs(sx-nanmean(sx))./nanstd(sx)>4) = NaN;
+                
+                y = 1:size(I,1);
+                sy = nanmean(I,2);
+                sy(abs(sy-nanmean(sy))./nanstd(sy)>4) = NaN;
+                
+                h = plot(ax2, y, sy, x, sx); 
+                
+                [h(1).Color, h(2).Color] = util.vec.swap(h(1).Color, h(2).Color); 
+                
+                ax2.YLim = ax2.YLim.*[0.9 1.05];
+                ax2.FontSize = font_size;
+                
+                hl = legend(ax2, {'y axis profile', 'x axis profile'}, 'Location', 'NorthEast'); 
+                hl.FontSize = font_size-4;
+                
+                ax3 = axes('Parent', f4.fig, 'Position', [ax2.Position(1)+ax2.Position(3)/4 0.22 ax2.Position(3)/2 0.25]); 
+                plot(ax3, x, sx-nanmean(sx), y, sy-nanmean(sy)); 
+                ax3.XTick = [];
+                ax3.YTick = [];
+                ax3.XLim = size(I,2)/2 + [-1 1].*100;
+                
+                fprintf('mid x rms= %6.4f | mid y rms= %6.4f \n', nanstd(sx(floor(size(I,2)/2)+(-100:100))), nanstd(sy(floor(size(I,1)/2) + (-100:100))));
+                
+            end
+            
+            if ~isempty(obj.corr_single_flat) && ~isempty(obj.correlation_flat)
+               
+                f5 = util.plot.FigHandler('flat correlation');
+                f5.width = 30;
+                f5.height = 18;
+                f5.clear;
+                
+                ax1 = axes('parent', f5.fig, 'Position', [0.07 0.2 0.4 0.6]); 
+                
+                idx = 1000; 
+                
+                I = obj.corr_single_flat(:,:,idx);
+                I(logical(eye(size(I)))) = NaN;
+                
+                util.plot.show(I); 
+                
+                title(ax1, ''); 
+
+                ax1.FontSize = font_size;
+                
+                util.plot.inner_title('(a)', 'ax', ax1, 'Position', 'South', 'FontSize', ax1.FontSize, 'margin', 0.1); 
+
+                ax2 = axes('parent', f5.fig, 'Position', [0.55 0.2 0.4 0.6]); 
+                
+                I = obj.correlation_flat(:,:,idx);
+                I(logical(eye(size(I)))) = NaN;
+                
+                util.plot.show(I); 
+                
+                title(ax2, ''); 
+
+                ax2.FontSize = font_size;
+                
+                util.plot.inner_title('(b)', 'ax', ax2, 'Position', 'South', 'FontSize', ax1.FontSize, 'margin', 0.1); 
+
+            end
             
         end
-        
+            
     end
     
 end
