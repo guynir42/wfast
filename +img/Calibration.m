@@ -1762,6 +1762,66 @@ classdef Calibration < handle
             
             font_size = 24;
             
+            if ~isempty(obj.flat_pixel_mean)  && ~isempty(obj.flat_pixel_var)
+            
+                f0 = util.plot.FigHandler('gain analysis');
+                f0.width = 30;
+                f0.height = 18; 
+                f0.clear;
+                
+                ax = axes('Parent', f0.fig); 
+                
+                subsample = 1; 
+                
+                M = obj.flat_pixel_mean(1:subsample:numel(obj.flat_pixel_mean)); 
+                V = obj.flat_pixel_var(1:subsample:numel(obj.flat_pixel_var)); 
+                
+                bad_idx = M<1e4 | M>6e4;
+                
+                M = M(~bad_idx); 
+                V = V(~bad_idx); 
+                
+                plot(ax, M, V, '.');
+                
+                % maybe there's a more reasonable way to find these values?
+                EX = 1.6e4:100:2.4e4;
+                EY = 1e4:100:10e4;
+                
+                N = histcounts2(M,V, EX, EY);
+                
+                N = N'; % switch x and y so we can plot this as an image
+                
+                % convert the edge vectors into x/y axes
+                x = EX(1:end-1);
+                y = EY(1:end-1); 
+                
+                ax.NextPlot = 'add';
+                
+                contour(ax, x,y,N); 
+                
+                peaks = nansum(N.*y')./nansum(N); % for each x, find the centroid of the distribution i y
+                
+                fr = util.fit.polyfit(x, peaks, 'order', 1, 'sigma', 3); 
+                
+                plot(ax, fr.x, fr.ym, 'LineWidth', 2); 
+                
+                ax.FontSize = font_size;
+                
+                ax.NextPlot = 'replace';
+                
+                xlabel(ax, 'Mean pixel values [counts]'); 
+                ylabel(ax, 'Pixel variance [counts^2]'); 
+                
+                hl = legend(ax, {'scatter', 'binned', sprintf('fit: V = %d + %4.2f * M', round(fr.coeffs(1)), fr.coeffs(2))}, 'Location', 'NorthWest');
+                hl.FontSize = font_size - 4;
+                
+                ax.XLim = [nanmin(fr.x) nanmax(fr.x)];
+%                 ax.YLim = [nanmin(V).*0.9 nanmax(V).*1.05];
+                ax.YLim = nanmean(V) + [-1 5].*nanstd(V); 
+                
+                
+            end
+            
             if ~isempty(obj.lightcurves_flat)
             
                 f1 = util.plot.FigHandler('lightcurves');
