@@ -1771,7 +1771,7 @@ classdef Calibration < handle
                 
                 ax = axes('Parent', f0.fig); 
                 
-                subsample = 1; 
+                subsample = 10; 
                 
                 M = obj.flat_pixel_mean(1:subsample:numel(obj.flat_pixel_mean)); 
                 V = obj.flat_pixel_var(1:subsample:numel(obj.flat_pixel_var)); 
@@ -1818,7 +1818,6 @@ classdef Calibration < handle
                 ax.XLim = [nanmin(fr.x) nanmax(fr.x)];
 %                 ax.YLim = [nanmin(V).*0.9 nanmax(V).*1.05];
                 ax.YLim = nanmean(V) + [-1 5].*nanstd(V); 
-                
                 
             end
             
