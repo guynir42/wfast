@@ -997,7 +997,13 @@ classdef Analysis < file.AstroData
         
         function batch(obj)
             
-            obj.getData;
+            try
+                obj.getData;
+            catch ME
+                warning(ME.getReport);
+                obj.reader.advanceFile;
+                return; % skip this batch, report it, and continue! 
+            end
             
             obj.analysisStack;
             
