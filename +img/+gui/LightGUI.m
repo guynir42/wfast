@@ -97,7 +97,7 @@ classdef LightGUI < handle
 %             obj.panel_methods.make;
             
             
-            N = 15;
+            N = 16;
             pos = N;
 
             %%%%%%%%%%% panel control %%%%%%%%%%%%%%%
@@ -113,19 +113,21 @@ classdef LightGUI < handle
             
             %%%%%%%%%%% panel process %%%%%%%%%%%%%%%%
             
-            pos = pos - 5;
-            obj.panel_process = GraphicPanel(obj.owner, [0 pos/N 0.2 5/N], 'process');
+            pos = pos - 6;
+            obj.panel_process = GraphicPanel(obj.owner, [0 pos/N 0.2 6/N], 'process');
             obj.panel_process.number = 5;
             obj.panel_process.addButton('button_background', 'use_subtract_backgrounds', 'toggle', 'sub b/g', 'sub b/g', '', 0.5, obj.color_on);
             obj.panel_process.addButton('button_back_median', 'use_background_median', 'toggle', 'b/g median', 'b/g median', '', 0.5, obj.color_on);
-            obj.panel_process.addButton('button_flagged', 'use_skip_flagged', 'toggle', 'skip flag', 'skip flag', '', 0.5, obj.color_on);
+%             obj.panel_process.addButton('button_flagged', 'use_skip_flagged', 'toggle', 'skip flag', 'skip flag', '', 0.5, obj.color_on);
             obj.panel_process.addButton('button_outliers', 'use_remove_outliers', 'toggle', 'outliers', 'outliers', '', 0.5, obj.color_on);
             obj.panel_process.addButton('input_outlier_sigma', 'outlier_sigma', 'input', 'sig= ', '', '', 0.5);
             obj.panel_process.addButton('button_bad_times', 'use_skip_bad_times', 'toggle', 'bad times', 'bad times', '', 0.5, obj.color_on);
             obj.panel_process.addButton('input_fraction', 'bad_times_fraction', 'input', 'frac= ', '', '', 0.5);
             obj.panel_process.addButton('button_zero_point', 'use_zero_point', 'toggle', 'zero point', 'zero point', '', 0.5, obj.color_on);
+            obj.panel_process.addButton('button_placeholder', '', 'custom', ' ', ' ', '', 0.5, obj.color_on);
             obj.panel_process.addButton('button_sysrem', 'use_sysrem', 'toggle', 'sysrem', 'sysrem', '', 0.5, obj.color_on);
             obj.panel_process.addButton('input_sysrem_iter', 'sysrem_iterations', 'input', 'iter= ', '', '', 0.5);
+            obj.panel_process.addButton('button_self_exclude', 'use_self_exclude', 'toggle', 'self', 'self', '', 0.5, obj.color_on); 
             
             
 %             obj.panel_process.addButton('button_zavitzky_golay', 'use_savitzky_golay', 'toggle', 'savitzky golay', 'savitzky golay', '', 0.5, obj.color_on); 

@@ -112,13 +112,15 @@ classdef Lightcurves < handle
         % processing steps for fluxes_cal:
         use_sysrem = 1;
         sysrem_iterations = 1;
+        use_self_exclude = 0;
+        
         use_psf_correction = 0;
-        use_polynomial = 0;
+%         use_polynomial = 0;
         use_zero_point = 1;
         missing_method = 'linear'; % can also choose 'previous', 'next', 'nearest', 'linear', 'spline', 'pchip', 'makima' (see the help section of fillmissing())
-        use_savitzky_golay = 1;
-        sg_order = 3;
-        sg_length = 125; % take 5 seconds as long enough to smooth over
+%         use_savitzky_golay = 1;
+%         sg_order = 3;
+%         sg_length = 125; % take 5 seconds as long enough to smooth over
         
         index_flux = 'end'; % which aperture to use, default "end" is for forced photometery with the largest aperture
         
@@ -513,7 +515,7 @@ classdef Lightcurves < handle
                     
                     if obj.use_remove_outliers
                         
-                        r = obj.fit_results;
+                        r = obj.fit_results; % polyfit to a 5th order polynomial with 3 sigma outlier rejection
                         
                         model = [r.ym];
                         
@@ -563,110 +565,15 @@ classdef Lightcurves < handle
                     
                     t_cal = tic;
                     
-                    if obj.use_sysrem
-                        
-%                         f = obj.fluxes_rem;
-%                         
-%                         idx = obj.bad_star_indices; 
-%                         % maybe add a search for bad batches?
-%                         
-% %                         f(:,idx) = NaN;
-%                         
-%                         a_vec = [];
-%                         c_vec = [];
-%                         
-%                         for ii = 1:obj.sysrem_iterations
-%                             
-%                             e = nanmedian(util.series.binning(f, 100, 'func', 'std'),1);
-%                             e(e==0 | isnan(e)) = Inf; 
-% %                             e = sqrt(1./nanmean(f));
-%                             [f,a,c] = util.series.sysrem(f, e, 'iterations', 5, 'stars', idx, 'ped', 1); 
-% 
-%                             a_vec(:,ii) = a;
-%                             c_vec(ii,:) = c;
-%                             
-%                         end
-                        
-                        [f, a_vec, c_vec] = obj.calculateSysrem(obj.fluxes_rem); 
-
-                        obj.fluxes_cal_ = f;
-                        
-                        obj.sysrem_a_vec = a_vec;
-                        obj.sysrem_c_vec = c_vec;
-                        
-                    else % old methods...
-                    
-                        obj.fluxes_cal_ = util.series.self_calibrate(obj.fluxes_rem, 'use_zp', obj.use_zero_point, ...
-                            'use_sg', obj.use_savitzky_golay, 'sg_order', obj.sg_order, 'sg_length', obj.sg_length, ...
-                            'missing', obj.missing_method);
-
-                    end
+                    obj.fluxes_cal_ = obj.calculateCalibration(obj.fluxes_rem); 
                     
                     if obj.debug_bit, fprintf('Time to get fluxes_cal was %f seconds\n', toc(t_cal)); end
                     
                 end
                     
-            end
+                val = obj.fluxes_cal_;
                 
-            val = obj.fluxes_cal_;
-
-        end
-        
-        function [idx, fr] = findOutliers(obj, mean_flux, mean_error, iterations, sigma)
-            
-            if nargin<2 || isempty(mean_flux)
-                mean_flux = nanmean(obj.fluxes_rem);
             end
-            
-            if nargin<3 || isempty(mean_error)
-                mean_error = nanmedian(util.series.binning(obj.fluxes_rem, 100, 'func', 'std'),1);
-            end
-            
-            if nargin<4 || isempty(iterations)
-                iterations = 2;
-            end
-            
-            if nargin<5 || isempty(sigma)
-                sigma = 3;
-            end
-            
-            F = mean_flux;
-            E = mean_error;
-            
-            idx = F<=0 | isnan(F) | isinf(F) | E<=0 | isnan(E) | isinf(E);
-            
-            % find outliers that have too many measurements equal zero!
-            frac_zero = nansum(obj.fluxes_rem==0, 1)./size(obj.fluxes_rem, 1); 
-            idx = idx | frac_zero>0.1;
-            
-            % find outliers with many bad pixels a serious fraction of the time
-            frac_bad_px = nansum(obj.bad_pixels>20, 1)./size(obj.bad_pixels, 1);
-            idx = idx | frac_bad_px>0.1;
-            
-            X = F;
-            Y = E./F;
-            err = 1./sqrt(F); 
-            
-            X(idx) = NaN;
-            Y(idx) = NaN;
-            err(idx) = NaN;
-            
-            for ii = 1:iterations
-
-                fr = util.fit.power_law(X, Y, err, 'slopes', [-1, 0], 'breaks', 1000);
-
-                relative_residuals = (fr.y-fr.func(fr.x))./fr.func(fr.x); 
-
-                rms_rr = nanstd(relative_residuals);
-
-                norm_residuals = abs(relative_residuals./rms_rr); 
-
-                idx = idx | norm_residuals>sigma; % outliers are more than 3 sigma from the curve
-
-            end
-            
-            obj.RE_fit_results = fr;
-            obj.bad_star_indices = idx;
             
         end
         
@@ -1057,6 +964,16 @@ classdef Lightcurves < handle
             
         end
         
+        function val = getAirmass(obj)
+            
+            if isempty(obj.juldates) || isempty(obj.head) || isempty(obj.head.RA) || isempty(obj.head.DEC)
+                val = [];
+            else
+                val = celestial.coo.airmass(obj.juldates, obj.head.RA, obj.head.DEC, [obj.head.longitude, obj.head.latitude]./180.*pi);
+            end
+            
+        end
+        
     end
     
     methods % setters
@@ -1222,16 +1139,16 @@ classdef Lightcurves < handle
             
         end
         
-        function set.use_polynomial(obj, val)
-            
-            if ~isequal(obj.use_polynomial, val)
-                obj.use_polynomial = val;
-                obj.fluxes_cal_ = [];
-                obj.clearPSD;
-                obj.clearRE;
-            end
-            
-        end
+%         function set.use_polynomial(obj, val)
+%             
+%             if ~isequal(obj.use_polynomial, val)
+%                 obj.use_polynomial = val;
+%                 obj.fluxes_cal_ = [];
+%                 obj.clearPSD;
+%                 obj.clearRE;
+%             end
+%             
+%         end
         
         function set.use_sysrem(obj, val)
             
@@ -1255,6 +1172,17 @@ classdef Lightcurves < handle
             
         end
         
+        function set.use_self_exclude(obj, val)
+            
+            if ~isequal(obj.use_self_exclude, val)
+                obj.use_self_exclude = val;
+                obj.fluxes_cal_ = [];
+                obj.clearPSD;
+                obj.clearRE;
+            end
+            
+        end
+        
         function set.use_zero_point(obj, val)
             
             if ~isequal(obj.use_zero_point, val)
@@ -1266,44 +1194,44 @@ classdef Lightcurves < handle
             
         end
         
-        function set.use_savitzky_golay(obj, val)
-            
-            if ~isequal(obj.use_savitzky_golay, val)
-                obj.use_savitzky_golay = val;
-                if obj.use_zero_point
-                    obj.fluxes_cal_ = [];
-                    obj.clearPSD;
-                    obj.clearRE;
-                end
-            end
-            
-        end
-        
-        function set.sg_order(obj, val)
-            
-            if ~isequal(obj.sg_order, val)
-                obj.sg_order = val;
-                if obj.use_zero_point
-                    obj.fluxes_cal_ = [];
-                    obj.clearPSD;
-                end
-            end
-            
-        end
-        
-        function set.sg_length(obj, val)
-            
-            if ~isequal(obj.sg_length, val)
-                obj.sg_length = val;
-                if obj.use_zero_point
-                    obj.fluxes_cal_ = [];
-                    obj.clearPSD;
-                    obj.clearRE;
-                end
-            end
-            
-        end
-        
+%         function set.use_savitzky_golay(obj, val)
+%             
+%             if ~isequal(obj.use_savitzky_golay, val)
+%                 obj.use_savitzky_golay = val;
+%                 if obj.use_zero_point
+%                     obj.fluxes_cal_ = [];
+%                     obj.clearPSD;
+%                     obj.clearRE;
+%                 end
+%             end
+%             
+%         end
+%         
+%         function set.sg_order(obj, val)
+%             
+%             if ~isequal(obj.sg_order, val)
+%                 obj.sg_order = val;
+%                 if obj.use_zero_point
+%                     obj.fluxes_cal_ = [];
+%                     obj.clearPSD;
+%                 end
+%             end
+%             
+%         end
+%         
+%         function set.sg_length(obj, val)
+%             
+%             if ~isequal(obj.sg_length, val)
+%                 obj.sg_length = val;
+%                 if obj.use_zero_point
+%                     obj.fluxes_cal_ = [];
+%                     obj.clearPSD;
+%                     obj.clearRE;
+%                 end
+%             end
+%             
+%         end
+%         
         function set.index_flux(obj, val)
             
             if ~isequal(obj.index_flux, val)
@@ -1514,6 +1442,97 @@ classdef Lightcurves < handle
     
     methods % calculations
         
+        function [idx, fr] = findOutliers(obj, mean_flux, mean_error, iterations, sigma)
+            
+            if nargin<2 || isempty(mean_flux)
+                mean_flux = nanmean(obj.fluxes_rem);
+            end
+            
+            if nargin<3 || isempty(mean_error)
+                mean_error = nanmedian(util.series.binning(obj.fluxes_rem, 100, 'func', 'std'),1);
+            end
+            
+            if nargin<4 || isempty(iterations)
+                iterations = 2;
+            end
+            
+            if nargin<5 || isempty(sigma)
+                sigma = 3;
+            end
+            
+            F = mean_flux;
+            E = mean_error;
+            
+            idx = F<=0 | isnan(F) | isinf(F) | E<=0 | isnan(E) | isinf(E);
+            
+            % find outliers that have too many measurements equal zero!
+            frac_zero = nansum(obj.fluxes_rem==0, 1)./size(obj.fluxes_rem, 1); 
+            idx = idx | frac_zero>0.1;
+            
+            % find outliers with many bad pixels a serious fraction of the time
+            frac_bad_px = nansum(obj.bad_pixels>20, 1)./size(obj.bad_pixels, 1);
+            idx = idx | frac_bad_px>0.1;
+            
+            X = F;
+            Y = E./F;
+            err = 1./sqrt(F); 
+            
+            X(idx) = NaN;
+            Y(idx) = NaN;
+            err(idx) = NaN;
+            
+            for ii = 1:iterations
+
+                fr = util.fit.power_law(X, Y, err, 'slopes', [-1, 0], 'breaks', 1000);
+
+                relative_residuals = (fr.y-fr.func(fr.x))./fr.func(fr.x); 
+
+                rms_rr = nanstd(relative_residuals);
+
+                norm_residuals = abs(relative_residuals./rms_rr); 
+
+                idx = idx | norm_residuals>sigma; % outliers are more than 3 sigma from the curve
+
+            end
+            
+            obj.RE_fit_results = fr;
+            obj.bad_star_indices = idx;
+            
+        end
+        
+        function flux = calculateCalibration(obj, flux)
+            
+            
+            if obj.use_zero_point
+                
+                w = nanmean(flux); % weights are given by the average flux of each star
+
+                f_average = nanmean(flux.*w,2); % weighted average of each frame
+                f_average_norm = f_average./nanmean(f_average); % normalize by the average of averages
+
+                flux = flux./f_average_norm;
+                
+            end
+            
+            if obj.use_psf_correction
+                
+                W = nanmean(obj.widths, 2); % the average width of each frame
+                
+                % need to continue this, maybe add another option for airmass removal
+                
+            end
+            
+            if obj.use_sysrem
+                                                
+                [flux, a_vec, c_vec] = obj.calculateSysrem(flux); 
+
+                obj.sysrem_a_vec = a_vec;
+                obj.sysrem_c_vec = c_vec;
+            
+            end
+            
+        end
+        
         function [flux, a_vec, c_vec] = calculateSysrem(obj, flux)
             
             idx = obj.bad_star_indices; 
@@ -1529,9 +1548,9 @@ classdef Lightcurves < handle
                 e = nanmedian(util.series.binning(flux, 100, 'func', 'std'),1);
                 e(e==0 | isnan(e)) = Inf; 
 %                             e = sqrt(1./nanmean(f));
-                [flux,a,c] = util.series.sysrem(flux, e, 'iterations', 5, 'stars', idx, 'ped', 1); 
+                [flux,a,c] = util.series.sysrem(flux, e, 'iterations', 3, 'stars', idx, 'self', obj.use_self_exclude, 'fft', 0); 
 
-                a_vec(:,ii) = a;
+                a_vec(:,ii) = nanmean(a,2);
                 c_vec(ii,:) = c;
 
             end
@@ -1580,7 +1599,7 @@ classdef Lightcurves < handle
                 input.ax = gca;
             end
             
-            time_indices = 1:input.width.*input.surround:size(obj.fluxes,1); % all possible intervals that can fit a transit
+            time_indices = 1:input.width*input.surround:size(obj.fluxes,1); % all possible intervals that can fit a transit
             
             frames_picked = time_indices(randperm(length(time_indices)-1, input.number)); % transit frames are chosen without repitition
             
@@ -1605,7 +1624,11 @@ classdef Lightcurves < handle
                 
             end
             
-            f = obj.calculateSysrem(f); 
+            t = tic; 
+            
+            f = obj.calculateCalibration(f); 
+            
+            fprintf('Time to recalibrate fluxes was %f seconds...\n', toc(t)); 
             
             f_transits = ones(size(f,1),1).*nanmedian(f,1); 
             
@@ -1655,7 +1678,7 @@ classdef Lightcurves < handle
                     return;
                 end
 
-                F = nanmean(f); % the average flux is used to divide the rms and get the relative error (RE)
+                F = nanmedian(f); % the average flux is used to divide the rms and get the relative error (RE)
 
                 for ii = 1:1e3 % arbitrary loop length with a break condition
 
@@ -2252,7 +2275,8 @@ classdef Lightcurves < handle
 
             if obj.use_show_bin_fits
                 
-                fr = util.fit.polyfit(log10(obj.bin_widths_seconds'), log10(obj.total_RE(:,:,flux_index)), 'order', 3);
+                x = log10(obj.bin_widths_seconds');
+                fr = util.fit.polyfit(x, log10(obj.total_RE(:,:,flux_index)), 'order', 3);
                 
                 h3 = obj.addPlots(input.ax, 10.^[fr.ym], obj.bin_widths_seconds, '--');
                 
@@ -2264,6 +2288,14 @@ classdef Lightcurves < handle
                     h3(ii).HandleVisibility = 'on';
                     
                     slope = fr(obj.show_indices(ii)).coeffs(2); % the linear part of the fit is used at proxy for the slope
+                    
+                    C = fr(obj.show_indices(ii)).coeffs;
+                    N = length(C); 
+                    
+                    derivative = sum((1:N-1).*C(2:N)'.*(x.^(0:N-2)),2);
+                    
+                    slope = derivative(1); 
+                    
                     str{ii} = sprintf('slope= %4.2f', slope); 
                     
                 end
@@ -2271,6 +2303,8 @@ classdef Lightcurves < handle
                 hl = legend(input.ax, str);
                 hl.FontSize = 12;
                 hl.Location = 'SouthWest';
+                
+                grid(input.ax, 'on'); 
                 
 %                 for ii = 1:length(obj.show_indices)
 %                     
@@ -2371,8 +2405,10 @@ classdef Lightcurves < handle
             
             t = datetime(obj.juldates, 'convertFrom', 'juliandate');
             
-            A = celestial.coo.airmass(obj.juldates, obj.head.RA, obj.head.DEC, [obj.head.longitude, obj.head.latitude]./180.*pi);
-            a = obj.sysrem_a_vec(:,1);
+            A = obj.getAirmass;
+            
+            a = 10.^(0.4.*obj.sysrem_a_vec(:,1));
+%             a = obj.sysrem_a_vec(:,1);
             
             if ~isempty(obj.sysrem_a_vec)
                 h = plot(input.ax, t, (a-nanmean(a))./nanstd(a).*nanstd(A)+nanmean(A), '.', t, A); 
@@ -2384,8 +2420,6 @@ classdef Lightcurves < handle
             input.ax.FontSize = input.font_size;
             
             ylabel(input.ax, 'Airmass'); 
-            
-            
             
             if nargout>0
                 h_out = h;

@@ -59,7 +59,8 @@ function f_out = binning(f, varargin)
         f = f(:,:); % linearize all higher dimensions... 
         
         if N~=size(f,1)
-            f = vertcat(f,NaN(N+input.factor - size(f,1),size(f,2)));
+            N = N+input.factor; % adjust N to the new size of the corrected dataset
+            f = vertcat(f,NaN(N - size(f,1),size(f,2)));
         end
         
     else
@@ -88,7 +89,7 @@ function f_out = binning(f, varargin)
     
     if input.repmat
         f = repmat(f, [input.factor, 1, 1]); 
-        f_out = reshape(f, [N+input.factor, S(2:end)]);
+        f_out = reshape(f, [N, S(2:end)]);
         f_out = f_out(1:S(1), :); 
     else
         f = permute(f, [2,3,1]); % get rid of dim 1 which we just integrated on
