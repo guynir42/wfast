@@ -626,6 +626,52 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
     end
     
+    methods % utilities
+        
+        function struct2obj(obj, s) % must first construct an object and then use the struct to update its properties
+            
+            list = properties(obj);
+            
+            for ii = 1:length(list)
+               
+                if isfield(s, list{ii})
+                    
+                    if isobject(obj.(list{ii}))
+                        
+                        if isprop(obj.(list{ii}), 'struct2obj')
+                            struct2obj(obj.(list{ii}), s.list{ii}); % call the sub-object method if it exists
+                        else
+                            
+                            list2 = properties(obj.(list{ii}));
+                            
+                            for jj = 1:length(list2)
+                            
+                                if isfield(s.(list{ii}), list2{jj})
+                                    
+                                    try 
+                                        obj.(list{ii}).(list2{jj}) = s.(list{ii}).(list2{jj}); 
+                                    end
+                                    
+                                end
+                                
+                            end
+                            
+                        end
+                        
+                    else % regular data types
+                        try % we can run into many problems trying to set unsetable properties
+                            obj.(list{ii}) = s.(list{ii}); 
+                        end
+                    end
+                    
+                end
+                
+            end
+            
+        end
+        
+    end
+    
     methods % produce and load default fields
         
         function gotoDefaultField(obj, type, number) % jump to one of the default fields by type and number

@@ -809,38 +809,87 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         function save(obj, filename, varargin) % not yet implemented! 
         % Usage: save(filename, varargin)
         % Saves the Header object to file named "filename". 
-        %
-        % OPTIONAL PARAMETERS
-        %   -type: HDF5 (default), fits, text, mat.
-        %   -location: (HDF5 only) where to save inside the file (default is '/').
-        %   -name: (HDF5 only) what to call the dataset (default is name of object, e.g. "pars").
-        %   -if_exist: overwrite (default), error, warning, nothing
+        % Simply calls the util.oop.save() function and passes it the 
+        % object and filename and any additional arguments. 
+        % The varargin is pre-appended with {'name', 'header'} which sets
+        % the object name and HDF5 group name (location) to "header", but
+        % this can be overwritten by specifying the 'name' property in the
+        % optional arguments. 
+        % 
+        % See the help for util.oop.save for more details. 
 
             if nargin<2
                 help('head.Header.save');
+                help('util.oop.save'); 
                 return;
             end
-
-            input = util.text.InputVars;
-            input.input_var('type', 'hdf5');
-            input.input_var('location', '/');
-            input.input_var('name', inputname(1), 'dataset name');
-            input.input_var('if_exists', 'overwrite', 'exists');
-            input.scan_vars(varargin);
-
-            warning('head.Parameters.save is not yet implemented!');
-
+            
+            % add the default name=header keyword-value pair (can be overwritten)
+            varargin = [{'name', 'header'}, varargin];            
+            
+            util.oop.save(obj, filename, varargin{:}); 
+            
         end
         
-        function load(obj, filename) % not yet implemented! 
-        % Usage: load(filename). 
+        function load(obj, filename, locations) % not yet implemented! 
+        % Usage: load(filename, locations={header, head, pars})
+        % Uses the util.oop.load() function to get the header information 
+        % from a file named "filename". 
+        % The function can understand from the file extension if it is a 
+        % text file, mat-file, or HDF5 file. 
+        % This function will try to get a header from a few different locations
+        % in the file: header, head, pars and maybe a few more. 
+        % User can overwrite this list by specifying a location string or 
+        % multiple locations as a cell of strings. 
+        % 
+        % The output from the loading will be cast into a Header object if 
+        % it is loaded as the older version Parameters object. 
+        % 
         
             if nargin<2
                 help('head.Header.load');
                 return;
             end
             
-            warning('head.Parameters.load is not yet implemented!');
+            if nargin<3 || isempty(locations)
+                locations = {'header', 'head', 'pars'}; 
+            end
+            
+            if ischar(locations)
+                locations = {locations};
+            end
+            
+            loaded_header = [];
+            
+            for ii = 1:length(locations)
+                
+                try
+                    
+                    try
+                        loaded_header = util.oop.load(filename, 'location', location{ii}); 
+                    catch
+                        if location{ii}(1)=='/'
+                            loaded_header = util.oop.load(filename, 'location', location{ii}(2:end)); % try without the / at the beginning
+                        else
+                            loaded_header = util.oop.load(filename, 'location', ['/' location{ii}]); % try after adding a / at the beginning
+                        end
+                    end
+                    
+                end
+                
+            end
+            
+            if isempty(loaded_header)
+                error('Could not find a header object in file: %s', filename);
+            else
+                
+                if isa(loaded_header, 'head.Parameters')
+                    loaded_header = cast(loaded_header); 
+                end
+                
+                util.oop.copy_props(obj, loaded_header); 
+                
+            end
             
         end
                 
@@ -903,7 +952,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             
         end
         
-        function s = obj2struct(obj)
+        function s = obj2struct(obj) % turn this object, and all sub objects, into structs
             
             warning('off', 'MATLAB:structOnObject');
             
@@ -960,7 +1009,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
                                 end
                                 
                             end
-                            
                             
                         end
                         
