@@ -1,54 +1,67 @@
 classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
 % This class contains all the useful information to be accessed by user
 % or saved as metadata for a specific observation. 
-% also lets you save or read metadata from file
+% 
+% The properties of this object are often saved as keywords to files, 
+% either as HDF5 or as text files. 
+%
+% A handle to this object should be given to any pipeline objects that 
+% need access to metadata (e.g., exposure time, plate scale or sky coordinates). 
+% Objects that calculate additional info can save it back into the header. 
+%
+% The header also contains a few objects (e.g., Ephemeris) that contain some
+% of the information or do some calculations. See the documentation for those
+% classes for more info. 
+% 
+% The properties can be called by shorter expressions: e.g., call PROJ instead
+% of PROJECT. Also you can use lower or upper case. 
+% Some keywords (property names) are accessible with older names for backward
+% compatibility (see the last two blocks of properties/methods).
+%
 
-    properties(Transient=true)
+
+    properties(Transient=true) 
         
-        gui@head.gui.HeaderGUI;
-        
-%         cat@head.Catalog; % this is transient right now because I don't know how to save tables (yet)
+        gui@head.gui.HeaderGUI; % GUI objects are never saved, and generated on demand
         
     end
 
     properties % objects 
         
         filter_obj; % must be a head.Filter (enforced in the setter...)
-        ephem@head.Ephemeris;
-        stars@head.Star;
+        ephem@head.Ephemeris; % all sky coordinates are managed through this object
+        stars@head.Star; % for keeping track of position/magnitude of a small number of stars
         
-        WCS@head.WorldCoordinates; % to be expanded later
+        WCS@head.WorldCoordinates; % transformation between sky and pixel coordinates. Reorganized version of Eran's WCS object
         
     end
     
     properties 
         
-        OBJECT = 'star1';
-        TYPE;
+        OBJECT = 'star1'; % the name of the target field or object
+        TYPE; % type of observation... choose science/dark/flat etc... 
         
-        COMMENT = '';
+        COMMENT = ''; % general comment
         
-        PROJECT = 'WFAST';
-        INST = 'Zyla_5.5';
+        PROJECT = 'WFAST'; % project can be Kraar or WFAST
+        INST = 'Zyla_5.5'; % The camera model used. In new headers this must be updated by hardware to Balor
         
-%         t_start; % most recent file (when it started filming)
-%         t_end; % most recent file (when it finished filming)
-        STARTTIME;
-        ENDTIME;
-        RUNSTART; 
+        STARTTIME; % start time of current batch of images (in YYYY-MM-DDThh:mm:ss.sss format)
+        ENDTIME; % end time of current batch of images (in YYYY-MM-DDThh:mm:ss.sss format)
+        RUNSTART;  % start time of the observation run (in YYYY-MM-DDThh:mm:ss.sss format)
         
-        END_STAMP;
+        END_STAMP; % the camera timestamp correspinding to ENDTIME
         
-        TEL_APER = 57;
-        FOCLEN = 108;
-        F_RATIO;
+        TEL_APER = 57; % telescope aperture in cm 
+        FOCLEN = 108; % telescope focal length in cm
+        F_RATIO; % focal ratio is FOCLEN/TEL_APER (updated automatically)
         
-        PIXSIZE = 6.5; % microns
-        SCALE; 
+        PIXSIZE = 6.5; % size of pixels (microns) 
+        SCALE; % plate scale in arcseconds per pixel
         
-        EXPTIME;
-        FRAMERATE;
-        ACT_FRAMERATE; 
+        EXPTIME; % exposure time (seconds)
+        FRAMERATE; % frame rate (Hz). If NaN or empty, camera tried to take images as fast as possible with current EXPTIME
+        ACT_FRAMERATE; % actual frame rate measured while taking images
         
         THRESH_DETECTION; % detection threshold for findStars
         THRESH_STACK; % detection threshold for stars on the stack (for calculating limiting magnitude)
@@ -60,47 +73,47 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         ZEROPOINT; % the conversion between flux and magnitude zero
         BACKGROUND; % the estimated number of counts per pixel from the background (per frame, not stacked!)
         
-        FILTER = 'F505W'; 
+        FILTER = 'F505W'; % optical filter installed on telescope
         
-        NAXIS; 
-        NAXIS1;
-        NAXIS2;
-        NAXIS3;
-        NAXIS4;
+        NAXIS; % number of axes for the full frame images
+        NAXIS1; % size of the y axis of the images
+        NAXIS2; % size of the x axis of the images
+        NAXIS3; % number of images per batch
+        NAXIS4; % not used right now
         
-        BINX = 1;
-        BINY = 1;
-        ROI; 
-        CCDSEC;
+        BINX = 1; % binning factor in x. Not currently used
+        BINY = 1; % binning factor in y. Not currently used
+        ROI; % region of interest: a 4-vector with [top left height width] in pixels
+        CCDSEC; % which CCD sector was used (not in use right now)
         
-        GAIN; 
-        READNOISE;
-        DARKCUR;
+        GAIN; % the camera gain in photons per ADU (0.6 for Zyla and 0.8 for Balor)
+        READNOISE; % estimated read noise per pixel (counts per pixel per frame)
+        DARKCUR; % estimated dark current (counts per pixel per second)
         
-        IS_DARK = 0;
-        IS_FLAT = 0;
-        IS_SIMULATED = 0;
+        IS_DARK = 0; % set this to 1 for dark exposures
+        IS_FLAT = 0; % set this to 1 for flat exposures
+        IS_SIMULATED = 0; % set this to 1 for simulation images
        
-        FOCUS_POS;
-        FOCUS_TIP;
-        FOCUS_TILT;
+        FOCUS_POS; % position of focuser (in mm, the average of all actuators)
+        FOCUS_TIP; % value of focus spider tip
+        FOCUS_TILT; % value of focus spider tilt
          
-        SEEING; % arcsec
+        SEEING; % arcsec FWHM of stars
         TEMP_DET; % detector temperature (celsius)
         TEMP_OUT; % outside temperature (celsius)
         
-        WIND_DIR;
-        WIND_SPEED;
-        HUMID_IN;
-        HUMID_OUT;
-        PRESSURE;
-        LIGHT;
+        WIND_DIR; % in km/h
+        WIND_SPEED; % in degrees
+        HUMID_IN; % humidity inside dome (percent)
+        HUMID_OUT; % humidity outside dome (percent)
+        PRESSURE; % pressure in mbar
+        LIGHT; % light value in arbitrary units (from Boltwood, max is 1024, dark is around 100)
 
         % hardware (mount) coordinates
-        TELRA;
-        TELDEC; 
-        TELRA_DEG;
-        TELDEC_DEG;
+        TELRA; % telescope RA reported from hardware in sexagesimal hour string
+        TELDEC; % telescope Dec reported from hardware in sexagesimal degree string
+        TELRA_DEG; % telescope RA reported from hardware in numeric degrees
+        TELDEC_DEG; % telescope Dec reported from hardware in numeric degrees
         
     end
     
@@ -108,67 +121,65 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         
         % ephemeris: time & coordinates
         
-        % measured from observations
-        OBSRA; 
-        OBSDEC;
-        OBSRA_DEG;
-        OBSDEC_DEG;
-        FIELDROT; % rotation of field vs. celestial north
+        % measured from observations (the data for these is in the WCS object)
+        OBSRA; % center of field RA as measured by fitting to GAIA, in sexagesimal hour string
+        OBSDEC; % center of field Dec as measured by fitting to GAIA, in sexagesimal degree string
+        OBSRA_DEG; % center of field RA as measured by fitting to GAIA, in numeric degrees
+        OBSDEC_DEG; % center of field Dec as measured by fitting to GAIA, in numeric degrees
+        FIELDROT; % rotation of field vs. celestial north (in degrees)
         
-        % given by scheduler
-        RA; % for the center of the image
-        DEC;% for the center of the image
-        RA_DEG;
-        DEC_DEG;
+        % the following properties are stored in the ephem object
+        RA; % this is the RA given to telescope by scheduler/user, in sexagesimal hour string
+        DEC; % this is the Dec given to telescope by scheduler/user, in sexagesimal degree string
+        RA_DEG; % this is the RA given to telescope by scheduler/user, in numeric degrees
+        DEC_DEG; % this is the Dec given to telescope by scheduler/user, in numeric degrees
         
+        HA; % hour angle, in sexagesimal hour string
+        HA_DEG; % hour angle, in numeric degrees
+        LST; % local sidereal time, in sexagesimal hour string
+        ALT; % altitude in numeric degrees
+        AZ; % azimuth in numeric degrees
+        AIRMASS; % length of atmosphere in the direction of center of field
         
-        HA;
-        HA_DEG;
-        LST;
-        ALT;
-        AZ;        
-        AIRMASS;
-        
-        MOONAZ;
-        MOONALT;
-        MOONILL;
-        MOONDIST;
+        MOONAZ; % azimuth of moon to observer, in numeric degrees
+        MOONALT; % altitude of moon above horizon, in numeric degrees
+        MOONILL; % illumination fraction of the moon
+        MOONDIST; % distance between center of field and moon, in numeric degrees
 
-        SUNAZ;
-        SUNALT;
+        SUNAZ; % azimuth of sun to observer, in numeric degrees
+        SUNALT; % altitude of sum above horizon, in numeric degrees
         
-        OBSLONG;
-        OBSLAT;
+        OBSLONG; % observatory longitude on the Earth, in numeric degrees
+        OBSLAT; % observatory latitude on the Earth, in numeric degrees
+        OBSEL; % observatory elevation above sea level, in meters
          
-        JD;
-        MJD;
-%         MIDJD;
+        JD; % julian day of start of observation
+        MJD; % modified julian day
         
-        % filter properties
-        FILT_WAVE;
-        FILT_WIDTH;
+        % filter properties from the filter_obj
+        FILT_WAVE; % central wavelength of the filter, in nano-meters
+        FILT_WIDTH; % bandwidth of the filter, in nano-meters
 
     end
     
     properties(Hidden=true) 
        
-        DEADTIME = 0;
-           
-%         pixel_size = 6.5; % microns
+        DEADTIME = 0; % time lost after each frame, in seconds (needs to be updated someday)
         
-        QE = 1;
+        QE = 1; % quantum efficiency (needs to be updated someday)
         
-        default_APERTURE;
+        % these are defaults used for recovering values when using the GUI
+        default_APERTURE; 
         default_F_RATIO;
         default_FILTER;
         default_OBJECT;
         
         filter_name_full; % for backward compatibility with older versions.
         
-        CAMS_VER;
-        TELS_VER;
+        CAMS_VER; % camera firmware version
+        TELS_VER; % telescope firmware version
         
-        debug_bit = 0;
+        debug_bit = 0; 
         version = 4.00;
           
     end
@@ -213,13 +224,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
     
     methods % reset methods
         
-        function clearStars(obj)
+        function clearStars(obj) % remove all stars from the stars vector
            
             obj.stars = head.Star.empty;
             
         end
         
-        function clearObsConditions(obj)
+        function clearObsConditions(obj) % remove all seeing and weather measurements
            
             obj.SEEING = [];
             obj.TEMP_DET = [];
@@ -233,14 +244,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         
         end
                 
-        function resetTarget(obj)
+        function resetTarget(obj) % reset the target name, the ephem object and all coordinates of the target
             
             obj.OBJECT = obj.default_OBJECT;
             obj.ephem.reset;
             
         end
         
-        function resetDrifts(obj)
+        function resetDrifts(obj) % reset drifts in the star objects
            
             util.oop.setprop(obj.stars, 'drift_x', []);
             util.oop.setprop(obj.stars, 'drift_y', []);
@@ -325,17 +336,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             val = obj.FILTER;
 
         end
-%         
-%         function val = get.filter_name_full(obj)
-%             
-%             if isempty(obj.filter_name_full) && ~isempty(obj.FILTER)
-%                 val = obj.FILTER;
-%             else
-%                 val = obj.filter_name_full;
-%             end
-%             
-%         end
-%         
+     
         function val = get.FILT_WAVE(obj)
             
             if isempty(obj.filter_obj)
@@ -383,7 +384,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         
         function val = get.OBSRA_DEG(obj)
             
-            if isempty(obj.WCS);
+            if isempty(obj.WCS)
                 val = [];
             else
                 val = obj.WCS.RA_deg_center;
@@ -646,6 +647,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             
         end
         
+        function val = get.OBSEL(obj)
+            
+            val = obj.ephem.elevation;
+            
+        end
+        
     end
            
     methods % setters
@@ -747,27 +754,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             end
             
         end
-%         
-%         function set.FILTER(obj, val)
-%             
-%             if ~util.text.cs('[1x1 head.Filter]', val) % patch for backward compatibility with older headers where "filter" was the object
-%             
-%             end
-%                 
-%             if ~strcmp(obj.FILTER, val)
-%                 
-%                 obj.FILTER = val;
-%                 
-%                 try
-%                     obj.filter_obj = head.Filter(val);
-%                 catch ME
-%                     disp(['Unknown filter name "' val '", cannot generate filter object']);
-%                 end
-%                 
-%             end
-%             
-%         end
-%         
+
         % ephemeris
         function set.RA(obj, val)
             
@@ -820,8 +807,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
     methods % save/load 
        
         function save(obj, filename, varargin) % not yet implemented! 
-        % saves the Parameters object to file named "filename". 
-        % usage: pars.save(filename, varargin)
+        % Usage: save(filename, varargin)
+        % Saves the Header object to file named "filename". 
+        %
         % OPTIONAL PARAMETERS
         %   -type: HDF5 (default), fits, text, mat.
         %   -location: (HDF5 only) where to save inside the file (default is '/').
@@ -829,7 +817,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         %   -if_exist: overwrite (default), error, warning, nothing
 
             if nargin<2
-                help('head.Parameters.save');
+                help('head.Header.save');
                 return;
             end
 
@@ -845,10 +833,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         end
         
         function load(obj, filename) % not yet implemented! 
-        % usage: pars.load(filename). 
+        % Usage: load(filename). 
         
             if nargin<2
-                help('head.Parameters.load');
+                help('head.Header.load');
                 return;
             end
             
@@ -856,16 +844,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             
         end
                 
-        function writeFITS(obj, filename, time_delay, num_sum) % write keywords into a FITS file
+        function writeFITS(obj, filename, time_delay, num_sum) % open a fits file and write keywords into it
             
             file_ptr = matlab.io.fits.openFile(filename,'readwrite');
-            cleanup = onCleanup(@() matlab.io.fits.closeFile(file_ptr));
+            cleanup = onCleanup(@() matlab.io.fits.closeFile(file_ptr)); % make sure file closes at the end
             
             if nargin<3 || isempty(time_delay)
-%                 timestamp = obj.obs_time_days;
-%                 if isempty(timestamp)
-%                     timestamp = datenum(clock);
-%                 end
                 time_delay = [];
             end
             
@@ -873,17 +857,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
                 num_sum = 1;
             end
             
-            try
-                
-                obj.writeFitsHeader(file_ptr, time_delay, num_sum);
-                
-            catch ME
-                rethrow(ME);
-            end
+            obj.writeFitsHeader(file_ptr, time_delay, num_sum);
             
         end
         
-        function writeFitsHeader(obj, file_ptr, time_delay, num_sum)
+        function writeFitsHeader(obj, file_ptr, time_delay, num_sum) % write keywords into an open FITS file 
             
             if nargin<3 || isempty(time_delay)
                 start_time_str = obj.t_start;
@@ -900,6 +878,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
                 matlab.io.fits.writeKey(file_ptr, 'DATE-OBS', start_time_str); 
             end
             
+            % this format was adopted from the work I did with microFUN, this is their standard header
             if ~isempty(obj.EXPTIME), matlab.io.fits.writeKey(file_ptr, 'EXPTIME',obj.EXPTIME.*num_sum, 'seconds'); end
             if ~isempty(obj.PIXSIZE), matlab.io.fits.writeKey(file_ptr, 'XPIXSZ',obj.PIXSIZE, 'microns'); end
             if ~isempty(obj.PIXSIZE), matlab.io.fits.writeKey(file_ptr, 'YPIXSZ',obj.PIXSIZE, 'microns'); end
@@ -1001,15 +980,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
     
     methods % update and utilities
         
-        function update(obj, varargin)
+        function update(obj, varargin) % update the ephem object and any other internal calculations
            
             obj.ephem.update;
             
         end
         
-        function val = stamp2str(obj, time_delay)
+        function val = stamp2str(obj, time_delay) % add some seconds to STARTTIME and return it as a string or cell array of strings
             
-            time = util.text.str2time(obj.t_start);
+            time = util.text.str2time(obj.STARTTIME);
             
             time = time + seconds(time_delay);
             
@@ -1017,7 +996,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             
         end
         
-        function val = run_identifier(obj)
+        function val = run_identifier(obj) % get the identifier for the current run (date+object name)
             
             val = '';
             
@@ -1041,7 +1020,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
     
     methods (Static=true)
         
-        function list = makeSyncList
+        function list = makeSyncList % list of parameters to give from dome-PC manager to the PcSync object (so it would be passed to the camera PC)
             
             list = {'OBJECT', 'RA', 'DEC', 'RA_DEG', 'DEC_DEG', 'TELRA', 'TELDEC', 'TELRA_DEG', 'TELDEC_DEG',...
                 'TEMP_IN', 'TEMP_OUT', 'WIND_DIR', 'WIND_SPEED', 'HUMID_IN', 'HUMID_OUT', 'PRESSURE', 'LIGHT'};

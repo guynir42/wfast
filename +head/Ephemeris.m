@@ -1,8 +1,36 @@
 classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
-
+% This class keeps track of a specific time and sky coordinate. 
+% Typically each observation would have a specific Ephemeris. 
+% It uses these three data (RA,DEC and time) to calculate all sorts of 
+% additional information such as LST, altitude, moon/sun positions, 
+% galactic and ecliptic coordinates and so on. 
+%
+% It can accept new targets using the input() function, that can get either
+% a pair of arguments (RA/DEC) or a name of a star which is resolved using
+% Eran's interface to SIMBAD. In this case give an empty DEC. Also, you can
+% sepcify the time of the observation as the third argument, or leave the 
+% time that the object was set to before. Use "now" to update to current time. 
+% IMPORTANT: the RA must be input as hours, in numeric value or sexagesimal. 
+%
+% If you use other ways to update the time/coordinates of the object, make 
+% sure to call update() or updateSecondaryCoords() to get the Jnow, ecliptic, 
+% galactic, and sun/moon positions updated to the new data. The difference
+% is that update() also moves the time to current time. 
+%
+% More useful functions include timeTravelHours() to move forward (or back)
+% in time to check observational conditions then. Use calcObsTimeMinutes()
+% to figure out how many minutes can the field be observed until reaching
+% either the meridien or the altitude limit (default is 25 degrees). 
+%
+% It also has a few static functions that convert strings to decimal degrees, 
+% using hour2deg for RA-type hour string, and sex2deg for DEC type sexagesimal 
+% degree string, converting them to numeric degrees (and the inverse functions). 
+%
+% 
+    
     properties % objects
         
-        time@datetime;
+        time@datetime; % time of the observation (could be past or future, usually sets to current time)
         moon; % structure with some details on the moon position etc
         sun; % structure with some details on the sun position etc
         
@@ -16,47 +44,46 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     
     properties % inputs/outputs
         
-        RA_deg;
-        Dec_deg;
+        RA_deg; % numeric value in degrees
+        Dec_deg; % numeric value in degrees
         
     end
     
     properties(Dependent=true)
         
-        RA;
-        Dec;
+        RA; % sexagesimal hour string
+        Dec; % sexagesimal degree string
         
-        STARTTIME;
-        JD;
-        MJD;
+        STARTTIME; % observation start
+        JD; % observation start in julian date
+        MJD; % modified julian date
 
-        LST;
-        LST_deg;
+        LST; % local sidereal time (sexagesimal hour string)
+        LST_deg; % in numeric degrees
         
-        HA;
-        HA_deg;
+        HA; % hour angle (sexagesimal hour string)
+        HA_deg; % in numeric degrees
         
-        Alt_deg;
+        Alt_deg; % altitude above horizon in numeric degrees
+        Az_deg; % azimut 
         
-        Az_deg;
+        AIRMASS; 
         
-        AIRMASS;
+        ECL_LAMBDA; % ecliptic longitude
+        ECL_BETA; % ecliptic latitude
         
-        ECL_LAMBDA;
-        ECL_BETA;
-        
-        GAL_Long;
-        GAL_Lat;
+        GAL_Long; % galactic longitude
+        GAL_Lat; % galactic latitude
         
     end
     
     properties(Hidden=true)
         
-        % these are in current epoch (rather than in J2000) 
-        RA_deg_now;
-        Dec_deg_now;
+        RA_deg_now; % in current epoch (rather than in J2000) 
+        Dec_deg_now; % in current epoch (rather than in J2000) 
         
-        ecliptic_lambda;
+        % these are updated when calling updateSecondaryCoords()
+        ecliptic_lambda; 
         ecliptic_beta;
         galactic_longitude;
         galactic_latitude;
@@ -118,12 +145,20 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     
     methods % reset/clear
         
-        function reset(obj)
+        function reset(obj) % remove all coordinate data, update to current time
             
             obj.RA_deg = [];
             obj.Dec_deg = [];
             obj.moon = [];
             obj.sun = [];
+            obj.RA_deg_now = [];
+            obj.Dec_deg_now = [];
+
+            % these are updated when calling updateSecondaryCoords()
+            obj.ecliptic_lambda = []; 
+            obj.ecliptic_beta = [];
+            obj.galactic_longitude = [];
+            obj.galactic_latitude = [];
             
             obj.update;
             
@@ -156,7 +191,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             if isempty(obj.STARTTIME)
                 val = [];
             else
-                val = juliandate(obj.STARTTIME, 'yyyy-mm-ddThh:MM:ss');
+                val = juliandate(obj.time); 
+%                 val = juliandate(obj.STARTTIME, 'yyyy-mm-ddThh:MM:ss');
             end
              
         end
@@ -205,7 +241,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
-        function val = get.LST(obj) % in text format (HH:MM:SS)
+        function val = get.LST(obj) % in sexagesimal format (HH:MM:SS)
             
             val = obj.deg2hour(obj.LST_deg);
             
@@ -302,7 +338,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     
     methods % setters
         
-        function set.RA(obj, val)
+        function set.RA(obj, val) % expect RA to be given in hours, not degrees! 
 
             if isempty(val)
                 obj.RA_deg = [];
@@ -341,13 +377,130 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
     end
     
+    methods % update moon/sun and coordinates
+        
+        function update(obj) % set to current time and update everything else
+            
+            obj.time = datetime('now', 'timezone', 'UTC');
+            
+            obj.updateSecondaryCoords;
+            
+        end
+        
+        function updateSecondaryCoords(obj) % update the moon/sun and secondary coordinates 
+            
+            obj.updateMoon;
+            obj.updateSun;
+            obj.updateEquatorialNow;
+            obj.updateEcliptic;
+            obj.updateGalactic; 
+            
+        end
+        
+        function updateSun(obj) % make a struct with sun properties
+            
+            RAD = pi./180;
+            
+            if ~isempty(which('celestial.SolarSys.get_sun'))
+                obj.sun = celestial.SolarSys.get_sun(obj.JD, [obj.longitude, obj.latitude].*pi./180);
+                obj.sun.RA = obj.sun.RA./RAD; % convert to degrees
+                obj.sun.Dec = obj.sun.Dec./RAD; % convert to degrees
+                obj.sun.Az = obj.sun.Az./RAD; % convert to degrees
+                obj.sun.Alt = obj.sun.Alt./RAD; % convert to degrees
+                obj.sun.dAzdt = obj.sun.dAzdt./RAD; % convert to degrees
+                obj.sun.dAltdt = obj.sun.dAltdt./RAD; % convert to degrees
+                
+            else
+                obj.sun = [];
+            end
+            
+        end
+        
+        function updateMoon(obj) % make a struct with moon properties
+            
+            RAD = pi./180;
+            
+            if ~isempty(which('celestial.SolarSys.get_moon'))
+                obj.moon = celestial.SolarSys.get_moon(obj.JD, [obj.longitude, obj.latitude].*RAD);
+                obj.moon.RA = obj.moon.RA./RAD; % convert to degrees
+                obj.moon.Dec = obj.moon.Dec./RAD; % convert to degrees
+                obj.moon.Az = obj.moon.Az./RAD; % convert to degrees
+                obj.moon.Alt = obj.moon.Alt./RAD; % convert to degrees
+                obj.moon.Phase = obj.moon.Phase./pi; % convert to fraction
+                obj.moon.Dist = obj.getMoonDistance; 
+            else
+                obj.moon = [];
+            end
+            
+        end
+        
+        function updateEquatorialNow(obj) % convert J2000 to current equinox
+           
+            if ~isempty(which('celestial.coo.coco')) && ~isempty(obj.RA_deg) && ~isempty(obj.Dec_deg)
+                
+                JY = convert.time(obj.JD,'JD','J');
+                CurrentEquinox = sprintf('J%8.3f',JY);
+                out_coord = celestial.coo.coco([obj.RA_deg, obj.Dec_deg], 'J2000', CurrentEquinox, 'd', 'd');
+
+                obj.RA_deg_now = out_coord(1);
+                obj.Dec_deg_now = out_coord(2);
+                
+            else
+                obj.RA_deg_now = [];
+                obj.Dec_deg_now = [];
+            end
+            
+        end
+        
+        function updateEcliptic(obj) % calculate ecliptic coordinates
+            
+            if ~isempty(which('celestial.coo.coco')) && ~isempty(obj.RA_deg) && ~isempty(obj.Dec_deg)
+                out_coord = celestial.coo.coco([obj.RA_deg, obj.Dec_deg], 'J2000', 'e', 'd', 'd');
+                obj.ecliptic_lambda = out_coord(1);
+                obj.ecliptic_beta = out_coord(2);
+            else
+                obj.ecliptic_lambda = [];
+                obj.ecliptic_beta = [];
+            end
+            
+        end
+        
+        function updateGalactic(obj) % calculate galactic coordinates
+            
+            if ~isempty(which('celestial.coo.coco')) && ~isempty(obj.RA_deg) && ~isempty(obj.Dec_deg)
+                out_coord = celestial.coo.coco([obj.RA_deg, obj.Dec_deg], 'J2000', 'g', 'd', 'd');
+                obj.galactic_longitude = out_coord(1);
+                obj.galactic_latitude = out_coord(2);
+            else
+                obj.ecliptic_lambda = [];
+                obj.ecliptic_beta = [];
+            end
+            
+        end
+        
+    end
+    
     methods % calculations
         
         function input(obj, RA, DEC, time) % give RA/DEC or RA=<star name>, DEC=[] (optional 3rd argument is time, can use "now")
+        % Usage: input(obj, RA, DEC, <time>) 
+        % Give the coordinates in one of two ways:
+        % (1) give the RA and Dec directly. This can be in numeric or string
+        %     format. In both formats RA is given in HOURS!
+        % (2) give the name of the object and leave DEC empty. 
+        %     Will use Eran's name resolver via SIMBAD. 
+        %
+        % An optional third parameter is the time of observation. This can 
+        % be one of several options: 
+        % (1) string "update" or "now" simply updates to current time. 
+        % (2) datetime object. Must use timezone UTC! 
+        % (3) string in YYYY-MM-DDThh:mm:ss.sss format. 
+        % (4) numeric value, interpreted as julian date. 
+        % 
+        % In either case, the secondary coordinates are updated to the new
+        % RA/Dec and time. 
             
-            if nargin<2
-                disp('Usage: input(RA,DEC,time)');
-            end
+            if nargin==1, help('head.Ephemeris.input'); return; end
             
             if nargin<3
                 DEC = [];
@@ -371,145 +524,47 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 
                 if isa(time, 'datetime')
                     obj.time = time;
+                    obj.updateSecondaryCoords;
                 elseif ischar(time) && util.text.cs(time, 'now', 'update')
                     obj.update;
                 elseif ischar(time)
                     obj.time = util.text.str2time(time);
+                    obj.updateSecondaryCoords;
                 elseif isnumeric(time) % juldate??
                     obj.time = datetime(time, 'ConvertFrom', 'juliandate', 'TimeZone', 'UTC');
+                    obj.updateSecondaryCoords;
                 end
                 
             end
             
         end
         
-        function update(obj)
-            
-            obj.time = datetime('now', 'timezone', 'UTC');
+        function timeTravelHours(obj, H) % move a few hours to the future (positive) or past (negative)
+        % Usage: timeTravelHours(obj, H)
+        % Push the time of this object by H hours. Positive H is to the future, 
+        % negative H is to the past. RA and Dec remain the same. 
+        % All other coordinates are adjusted accordingly. 
+        % 
+        % Use this to check what observing conditions would be for a future 
+        % observation, or check what they were for a past one. 
+        
+            if nargin==1, help('head.Ephemeris.timeTravelHours'); return; end
+        
+            obj.time = obj.time + hours(H);
             
             obj.updateSecondaryCoords;
             
         end
         
-        function updateSecondaryCoords(obj)
-            
-            obj.updateMoon;
-            obj.updateSun;
-            obj.updateEquatorialNow;
-            obj.updateEcliptic;
-            obj.updateGalactic; 
-            
-        end
+        function val = calcObsTimeMinutes(obj, alt_limit, resolution_minutes) % how much time is left until object reaches meridien or alt-limit (minutes)
+        % Usage: val = calcObsTimeMinutes(obj, alt_limit=25, resolution_minutes=5) 
+        % 
+        % Push the same coordinates forward in time until reaching the 
+        % meridien or until going under the "alt_limit" (default is 25 degrees). 
+        % Will return the time rounded to "resolution_minutes" (default 5). 
+        % The output is in minutes! 
+        % For objects below the alt_limit at the stored time, returns NaN. 
         
-        function timeTravelHours(obj, H)
-            
-            obj.time = obj.time + hours(H);
-            
-            obj.updateSecondaryCoords
-            
-        end
-        
-        function updateMoon(obj)
-            
-            RAD = pi./180;
-            
-            if ~isempty(which('celestial.SolarSys.get_moon'))
-                obj.moon = celestial.SolarSys.get_moon(obj.JD, [obj.longitude, obj.latitude].*RAD);
-                obj.moon.RA = obj.moon.RA./RAD; % convert to degrees
-                obj.moon.Dec = obj.moon.Dec./RAD; % convert to degrees
-                obj.moon.Az = obj.moon.Az./RAD; % convert to degrees
-                obj.moon.Alt = obj.moon.Alt./RAD; % convert to degrees
-                obj.moon.Phase = obj.moon.Phase./pi; % convert to fraction
-                obj.moon.Dist = obj.getMoonDistance; 
-            else
-                obj.moon = [];
-            end
-            
-        end
-        
-        function val = getMoonDistance(obj)
-            % reference: https://en.wikipedia.org/wiki/Haversine_formula
-            
-            if isempty(obj.moon) || isempty(obj.RA_deg) || isempty(obj.DEC_deg)
-                val = [];
-            else
-                
-                havTheta = sind((obj.DEC_deg-obj.moon.Dec)/2).^2 + cosd(obj.DEC_deg).*cosd(obj.moon.Dec).*sind((obj.RA_deg-obj.moon.RA)/2).^2;
-                
-                havTheta(havTheta>1) = 1;
-                havTheta(havTheta<-1) = -1;
-                
-                val = 2.*asind(sqrt(havTheta)); 
-                
-            end
-            
-        end
-        
-        function updateSun(obj)
-            
-            RAD = pi./180;
-            
-            if ~isempty(which('celestial.SolarSys.get_sun'))
-                obj.sun = celestial.SolarSys.get_sun(obj.JD, [obj.longitude, obj.latitude].*pi./180);
-                obj.sun.RA = obj.sun.RA./RAD; % convert to degrees
-                obj.sun.Dec = obj.sun.Dec./RAD; % convert to degrees
-                obj.sun.Az = obj.sun.Az./RAD; % convert to degrees
-                obj.sun.Alt = obj.sun.Alt./RAD; % convert to degrees
-                obj.sun.dAzdt = obj.sun.dAzdt./RAD; % convert to degrees
-                obj.sun.dAltdt = obj.sun.dAltdt./RAD; % convert to degrees
-                
-            else
-                obj.sun = [];
-            end
-            
-        end
-        
-        function updateEquatorialNow(obj)
-           
-            if ~isempty(which('celestial.coo.coco')) && ~isempty(obj.RA_deg) && ~isempty(obj.Dec_deg)
-                
-                JY = convert.time(obj.JD,'JD','J');
-                CurrentEquinox = sprintf('J%8.3f',JY);
-                out_coord = celestial.coo.coco([obj.RA_deg, obj.Dec_deg], 'J2000', CurrentEquinox, 'd', 'd');
-
-                obj.RA_deg_now = out_coord(1);
-                obj.Dec_deg_now = out_coord(2);
-                
-            else
-                obj.RA_deg_now = [];
-                obj.Dec_deg_now = [];
-            end
-            
-        end
-        
-        function updateEcliptic(obj)
-            
-            if ~isempty(which('celestial.coo.coco')) && ~isempty(obj.RA_deg) && ~isempty(obj.Dec_deg)
-                out_coord = celestial.coo.coco([obj.RA_deg, obj.Dec_deg], 'J2000', 'e', 'd', 'd');
-                obj.ecliptic_lambda = out_coord(1);
-                obj.ecliptic_beta = out_coord(2);
-            else
-                obj.ecliptic_lambda = [];
-                obj.ecliptic_beta = [];
-            end
-            
-        end
-        
-        function updateGalactic(obj)
-            
-            if ~isempty(which('celestial.coo.coco')) && ~isempty(obj.RA_deg) && ~isempty(obj.Dec_deg)
-                out_coord = celestial.coo.coco([obj.RA_deg, obj.Dec_deg], 'J2000', 'g', 'd', 'd');
-                obj.galactic_longitude = out_coord(1);
-                obj.galactic_latitude = out_coord(2);
-            else
-                obj.ecliptic_lambda = [];
-                obj.ecliptic_beta = [];
-            end
-            
-        end
-        
-        function val = calcObsTimeMinutes(obj, alt_limit, resolution_minutes)
-            
             if nargin<2 || isempty(alt_limit)
                 alt_limit = 25;
             end
@@ -520,6 +575,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             if obj.ALT<alt_limit
                 val = NaN; % we cannot observe this object at the given time, so it returns NaN
+                return; 
             end
             
             if obj.HA_deg<0
@@ -546,13 +602,40 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
-        function gotoDefaultField(obj, type, number)
+        function val = getMoonDistance(obj) % get distance between moon and target RA/Dec
+        % Usage: val = getMoonDistance(obj) 
+        % Calculate the distance of the moon (based on the latest call to 
+        % updateMoon()) and return that value, in degrees. 
+        % 
+        % reference: https://en.wikipedia.org/wiki/Haversine_formula
+            
+            if isempty(obj.moon) || isempty(obj.RA_deg) || isempty(obj.DEC_deg)
+                val = [];
+            else
+                
+                havTheta = sind((obj.DEC_deg-obj.moon.Dec)/2).^2 + cosd(obj.DEC_deg).*cosd(obj.moon.Dec).*sind((obj.RA_deg-obj.moon.RA)/2).^2;
+                
+                havTheta(havTheta>1) = 1;
+                havTheta(havTheta<-1) = -1;
+                
+                val = 2.*asind(sqrt(havTheta)); 
+                
+            end
+            
+        end
+        
+    end
+    
+    methods % produce and load default fields
+        
+        function gotoDefaultField(obj, type, number) % jump to one of the default fields by type and number
             
             import util.text.cs;
             
             if isempty(obj.default_fields)
                 obj.makeDefaultFields;
             end
+            
             if number<1 || number>obj.numberDefaultFields(type)
                 error('Requested field number %d is out of bounds for type %s (limited to %d fields).', number, type, obj.numberDefaultFields(type)); 
             end
@@ -571,7 +654,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
-        function val = numberDefaultFields(obj, type)
+        function val = numberDefaultFields(obj, type) % check how many default fields are available for this type
             
             import util.text.cs;
             
@@ -588,7 +671,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
-        function makeDefaultFields(obj)
+        function makeDefaultFields(obj) % make a few fields that we know are useful for certain types of survey
             
 %             obj.default_fields = struct('type', [], 'stars', [], 'RA', [], 'Dec', [], 'ECL_LAT', [], 'GAL_LAT', []);
             
@@ -623,21 +706,36 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
     end
     
-    methods (Static=true)
+    methods (Static=true) % conversion tools and some additional calculations I stole from Eran's code
         
         function str = deg2hour(number) % convert the degrees into hours then into HH:MM:SS string
+        % Usage: str = deg2hour(number)
+        % Convert numeric degrees to sexagesimal hour string
+        % Example: 180 --> '12:00:00.0'
+        
+            if nargin==0, help('head.Ephemeris.deg2hour'); return; end
             
             str = head.Ephemeris.numbers2hour(number/15); 
             
         end
         
         function str = deg2sex(number) % convert degrees into DD:MM:SS string
+        % Usage: str = deg2sex(number)
+        % Convert numeric degrees to sexagesimal degree string
+        % Example: -45.5 --> '-45:30:00.0'
+        
+            if nargin==0, help('head.Ephemeris.deg2sex'); return; end
             
             str = head.Ephemeris.numbers2sex(number);
             
         end
         
         function val = hour2deg(str) % convert an HH:MM:DD hour string to degrees
+        % Usage: val = hour2deg(str)
+        % Convert sexagesimal hour string numeric degrees
+        % Example: '18:26:30.0' --> 276.375 deg
+        
+            if nargin==0, help('head.Ephemeris.hour2deg'); return; end
             
             num = util.text.extract_numbers(str);
             
@@ -673,6 +771,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         end
         
         function val = sex2deg(str) % convert a DD:MM:SS string (sexagesimal) to degrees
+        % Usage: val = sex2deg(str)
+        % Convert sexagesimal degree string to numeric degrees
+        % Example: '22:33:44.5' --> 22.562375 deg
+        
+            if nargin==0, help('head.Ephemeris.sex2deg'); return; end 
             
             str = strip(str);
             
@@ -708,11 +811,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
-        function str = numbers2hour(hours, minutes, seconds)
-        % convert a number of hours (or hours, minutes, seconds) into a 
-        % string of right ascention. 
+        function str = numbers2hour(hours, minutes, seconds) % take hours or hours/minutes/seconds and produce sexagesimal hour string
+        % Usage: str = numbers2hour(hours, minutes, seconds) 
+        % Convert a number of hours (or hours, minutes, seconds) into a 
+        % string of sexagesimal hours (e.g., for RA). 
+        % Can input one number for the hours, or a vector with three components
+        % for [hour minute second] or just input them in three inputs. 
+        %
+        % The output is a string with HH:MM:SS.S format. 
         
-            if nargin==0, help('head.Ephemeris.num2ra'); return; end
+            if nargin==0, help('head.Ephemeris.numbers2hour'); return; end
         
             if isempty(hours)
                 str = '';
@@ -737,32 +845,28 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 hours = hours(:,1);
             end
             
-            
-%             s = sign(hours);
-%             hours = abs(hours);
-            
             total_secs = hours*3600 + minutes*60 + seconds;
             total_secs = mod(total_secs, 24*3600); 
             
             hours   = floor(total_secs/3600);
             minutes = floor(mod(total_secs,3600)/60);
             seconds = mod(total_secs,60);
-            
-%             if s>=0
-%                 sign_str = '';
-%             else
-%                 sign_str = '-';
-%             end
-                
+                            
             str = sprintf('%02d:%02d:%04.1f', hours, minutes, seconds);
             
         end
         
         function str = numbers2sex(degrees, minutes, seconds) 
-        % convert a number of degrees (or degrees, arcminutes, arcseconds) into a 
-        % string of sexidecimal degrees
+        % Usage: str = numbers2sex(degrees, minutes, seconds) 
+        % Convert a number of degrees (or degrees, arcminutes, arcseconds) 
+        % into a string of sexidecimal degrees. 
+        % Can input one parameter with the degrees, or a vector with three
+        % elements for [deg, arcmin, arcsec], or given these three inputs
+        % as individual input values. 
+        %
+        % Output is degrees in a sexagesimal string: +DD:MM:SS.S with + or -
         
-            if nargin==0, help('head.Ephemeris.num2dec'); return; end
+            if nargin==0, help('head.Ephemeris.numbers2sex'); return; end
             
             if isempty(degrees)
                 str = '';
@@ -976,14 +1080,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
     end
     
-    properties (Transient=true, Hidden=true, Dependent=true)
+    properties (Transient=true, Hidden=true, Dependent=true) % shortcuts to old property names, kept for backward compatibility
         
         DE;
         DE_deg;
         
     end
     
-    methods
+    methods % shortcuts to old property names, kept for backward compatibility
         
         function val = get.DE(obj)
             

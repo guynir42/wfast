@@ -1,5 +1,19 @@
 classdef Star < matlab.mixin.Copyable
-
+% Keep track of a single target star, including magnitude, sky position, 
+% image position, and additional physical data like distance and color or 
+% spectral type. 
+% 
+% The star can also be anchored to another star (by setting it to be this 
+% star's primary. In that case the separation and position angle can help 
+% find this stars xy position relative to the primary. 
+%
+% This is useful when manually inputing a handful of targets, particularly
+% visual binaries, when working at large magnifications, in high contrast 
+% imaging projects. 
+%
+% For keeping metadata on many objects in the field, like in normal W-FAST
+% operations, we will use the Catalog class. 
+    
     properties (Transient=true)
 
         gui@head.gui.StarGUI

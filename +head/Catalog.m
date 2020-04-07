@@ -1,10 +1,46 @@
 classdef Catalog < handle
+% This class takes the positions of stars in the field and matches them to 
+% the GAIA catalog (using Eran's astrometry function). 
+% It then organizes the data in a matlab table that can be saved to disk
+% or used in the analysis. 
+%
+% To use this object, give the star positions (1st column x, 2nd column y), 
+% to the function inputPositions(). 
+% If the astrometry succeeds, the "success" property will be 1. If the fit 
+% to catalog fails it would be 0. 
+% This object must have a handle to a valid Header object, that has a good
+% estimate of the RA/Dec of the field. 
+%
+% Some parameters are passed to astrometry, like the mag_limit and the flip. 
+% Additional choices can be made to scan multiple coordinates around the given
+% RA/Dec, so that mild sync errors would not ruin the fit. 
+%
+% The table contained in "data" holds columns for all the information from 
+% GAIA plus a few extra columns like the image xy positions as given. 
+% 
+% Information about the field itself (central_RA/Dec and rotation) are also
+% available. As are the magnitudes (Mag_BP), coordinates (RA/Dec in degrees) 
+% and temperatures (Teff) that are copied out from the table. 
+% detection_limit/threshold/stack_number/exposure_time are recorded for the 
+% faintest magnitude detected, along with the observational parameters used. 
+% 
+% Some selection parameters like "use_matched_only" or "min_star_temp" can 
+% be used to reject some stars, but this would require updating the positions 
+% matrix that was given to the Catalog. For now we recommend avoiding this. 
+%
+% There are still older functions that let mextractor find the stars and then
+% run astrometry. This is slower and finds more artefacts. The methods will 
+% be removed in future versions. 
+% Some properties correspond to mextractor input/outputs. They will be deprecated. 
 
-    properties(Transient=true)
+    properties(Transient=true, Hidden=true)
         
-        mextractor_sim;
-        catalog_matched;
-        wcs_object; 
+        % These objects are generated using Eran's MAAT and are needed for running astrometry. 
+        % All the useful information we could find in them is translated into properties of this class (and others). 
+        % We keep a copy of them for debugging but we don't really need them. 
+        mextractor_sim; % generate a SIM object from MAAT to run mextractor/astrometry
+        catalog_matched; % a MAAT type catalog with matches to GAIA
+        wcs_object; % a MAAT type object with the coordinate transformation (world coordinate system). 
         
     end
     
@@ -19,18 +55,20 @@ classdef Catalog < handle
         
         image; % input image or stack
         
-        central_RA;
-        central_Dec;
-        rotation; 
+        % field properties
+        central_RA; % RA of the center of the field, by matching GAIA (in degrees)
+        central_Dec; % Dec of the center of the field, by matching GAIA (in degrees)
+        rotation; % rotation of the field relative to North being up (in degrees)
         
-        positions;
-        magnitudes;
-        coordinates;
-        temperatures;
+        % These are shortcuts to the data table
+        positions; % xy positions of stars (two-column matrix). Can be shorter than input positions if using exclusion options
+        coordinates; % RA/Dec in degrees for each star matched in GAIA (two column matrix, NaNs for failed matches)
+        magnitudes; % GAIA Mag_BP for each star (or NaN for failed matches)
+        temperatures; % GAIA Teff for each star (or NaN for failed matches)
         
-        FWHM; % from mextractor
-        width; % equivalent to 1st moment (=FWHM/2.355)
-        seeing; % arcsec
+        FWHM; % from mextractor - to be deprecated
+        width; % equivalent to 1st moment (=FWHM/2.355) - to be deprecated
+        seeing; % arcsec - to be deprecated
         
         detection_limit; % faintest magnitude we can detect, based on the given stars
         detection_threshold; % what was the detection S/N
@@ -43,23 +81,29 @@ classdef Catalog < handle
     
     properties % switches/controls
         
-        threshold = 5; % used by mextractor to find stars
-        mag_limit = 17;
+        threshold = 5; % used by mextractor to find stars - to be deprecated
+        mag_limit = 17; % 
         
-        avoid_edges = 50; % how many pixels away from edge of image (need image to know the size!)
+        avoid_edges = 50; % how many pixels away from edge of image (need image to know the size!) - to be deprecated! 
         
         use_matched_only = 0; % only keep stars that are matched to a proper GAIA star
-        use_psf_width = 1; % only keep stars that have the best response to the correct PSF width
+        use_psf_width = 1; % only keep stars that have the best response to the correct PSF width - to be depricated
         
-        RA_scan_step = 0.5;
-        RA_scan_range = 3;
-        Dec_scan_step = 0.5;
-        Dec_scan_range = 0;
+        % Do a positive/negative jump to further and further out from the 
+        % given coordinates, until finding a good astrometric match. 
+        % This helps fix cases where the telescope had a mild sync error. 
+        % The first try is always zero correction (i.e., given coordinates). 
+        % Set both ranges to zero to turn off this scan. 
+        RA_scan_step = 0.5; % what jumps to use in RA (degrees)
+        RA_scan_range = 3; % maximal +-offset from center (degrees)
+        Dec_scan_step = 0.5; % what jumps to use in Dec (Degrees)
+        Dec_scan_range = 0; % maximal +-offset from center (degrees)
         
-        min_star_temp;
-        num_stars;
+        min_star_temp; % exclude stars cooler than this (for KBO surveys, faint stars are angularly larger) 
+        num_stars; % maximum number of stars to keep
+        
 %         flip = [1 1;1 -1;-1 1;-1 -1]; 
-        flip = [-1 1];
+        flip = [-1 1]; % possible flips of the field to try 
         
         debug_bit = 1;
         
@@ -79,7 +123,7 @@ classdef Catalog < handle
     
     methods % constructor
         
-        function obj = Catalog(varargin)
+        function obj = Catalog(varargin) % can give the constructor a Header object as input
             
             if ~isempty(varargin) && isa(varargin{1}, 'head.Catalog')
                 if obj.debug_bit, fprintf('Catalog copy-constructor v%4.2f\n', obj.version); end
@@ -98,25 +142,24 @@ classdef Catalog < handle
     
     methods % reset/clear
         
-        function reset(obj)
-            
-        obj.positions = [];
-        obj.magnitudes = [];
-        obj.coordinates = [];
-        obj.temperatures = [];
-        
-        obj.FWHM = [];
-        obj.width = [];
-        obj.seeing = [];
-        
-        obj.success = []; 
-        
-            
+        function reset(obj) % remove all data
+
+            obj.positions = [];
+            obj.magnitudes = [];
+            obj.coordinates = [];
+            obj.temperatures = [];
+
+            obj.FWHM = [];
+            obj.width = [];
+            obj.seeing = [];
+
+            obj.success = []; 
+
             obj.clear;
-            
+
         end
         
-        function clear(obj)
+        function clear(obj) % remove input image (this will be deprecated)
             
             obj.image = [];
             
@@ -126,9 +169,13 @@ classdef Catalog < handle
     
     methods % getters
         
-        function val = get.wcs_object(obj)
-            
-            % lazy load the example WCS object. One day I will know how to generate one for myself... 
+        function val = get.wcs_object(obj) % lazy load the example WCS object. 
+        % To run astrometry we need a MAAT WCS object that has some properties. 
+        % I don't know how to initialize it without running mextractor on an 
+        % image. Instead I just saved one example and load it from file when 
+        % needed. This done once and lazy loaded. 
+        % One day I will know how to generate one for myself... 
+        
             if isempty(obj.wcs_object)
                 load(fullfile(getenv('DATA'), 'WFAST/saved/WCS_example')); 
                 obj.wcs_object = w;
@@ -138,17 +185,17 @@ classdef Catalog < handle
             
         end
         
-        function val = plate_scale(obj)
+        function val = plate_scale(obj) % try to get plate_scale from the header
             
             if isempty(obj.head)
-                val = 1.24;
+                val = 1.24; % the WFAST/Zyla default. For Balor lets just hope we will always have a header object
             else
                 val = obj.head.SCALE;
             end
             
         end
         
-        function val = RA(obj)
+        function val = RA(obj) % try to get RA from header
             
             if isempty(obj.head)
                 val = [];
@@ -158,7 +205,7 @@ classdef Catalog < handle
             
         end
         
-        function val = DE(obj)
+        function val = DE(obj) % try to get Dec from the header
             
             if isempty(obj.head)
                 val = [];
@@ -176,31 +223,32 @@ classdef Catalog < handle
     
     methods % calculations
         
-        function input(obj, Im) % to be depricated! 
+        function input(obj, P) % shortcut to inputPositions
+        % See the help for head.Catalog.inputPositions. 
             
-            obj.success = 0; % change to 1 after all functions return normally 
+            if nargin==1, help('head.Catalog.inputPositions'); return; end
             
-            obj.image = Im;
-            
-            obj.runMextractor;
-            obj.runAstrometry;
-            obj.makeCatalog;
-            
-            if ~isempty(obj.head)
-                
-                if isempty(obj.head.WCS)
-                    obj.head.WCS = head.WorldCoordinates;
-                end
-                
-                obj.head.WCS.input(obj.wcs_object); % make sure the WCS object is updated too
-                
-            end
-            
-            obj.success = 1;
+            obj.inputPositions(P); 
             
         end
         
-        function inputPositions(obj, P)
+        function inputPositions(obj, P) % give the positions matrix, matches it to GAIA
+        % Usage: inputPositions(obj, P) 
+        % Input P must be a two-column matrix with x and y for each star found
+        % but the pipeline (typically, quick_find_stars). 
+        % Will match the positions to GAIA, and confirm by setting success=1. 
+        % If it cannot find a match, it may scan additional RA/Dec values
+        % around the coordinates given in the header. 
+        % (use RA_scan_range and Dec_scan_range to control this)
+        % If the full range is scanned and no successfull matches are made
+        % it would set success=0 and not fill the data. 
+        %
+        % Upon success it would fill the "data" property with information 
+        % from GAIA, and copy some results to "magnitudes", "coordinates", 
+        % and "temperatures". 
+        % Also fills "central_RA" and "central_Dec" and "rotation". 
+        
+            if nargin==1, help('head.Catalog.inputPositions'); return; end
             
             obj.success = 0; % change to 1 after all functions return normally 
             
@@ -216,12 +264,13 @@ classdef Catalog < handle
                 error('Cannot run astrometry without RA/DEC in header!'); 
             end
             
+            % we don't know how to run astrometry without a SIM object... 
             S = SIM;
             S.Cat = [P NaN(size(P,1), 3)]; 
             S.Col.X=1; S.Col.Y=2; S.Col.Mag=3; S.Col.Im_RA=4; S.Col.Im_Dec=5;
-            S.ColCell = {'X', 'Y', 'Mag', 'Im_RA', 'Im_Dec'};
+            S.ColCell = {'X', 'Y', 'Mag', 'Im_RA', 'Im_Dec'}; % make a false catalog 
             
-            addpath(fullfile(getenv('DATA'), 'GAIA/DR2')); 
+            addpath(fullfile(getenv('DATA'), 'GAIA/DR2')); % make sure astrometry can find GAIA
 
             % scan a few values of RA/DE outside the values suggested by pars object
             DE = obj.head.DEC_DEG;
@@ -235,14 +284,15 @@ classdef Catalog < handle
             [~,idx] = sort(abs(list_RA));
             list_RA = list_RA(idx) + RA; 
             
-            for ii = 1:length(list_DE)
+            for ii = 1:length(list_DE) % go over DE 
             
-                for jj = 1:length(list_RA)
+                for jj = 1:length(list_RA) % go over RA
                     
                     if obj.debug_bit>1, fprintf('Running astrometry on coordinates %s %s\n', head.Ephemeris.deg2hour(list_RA(jj)), head.Ephemeris.deg2sex(list_DE(ii))); end
                     
                     try 
-
+                        
+                        % turn off some common warnings from astrometry
                         warning('off', 'MATLAB:polyfit:PolyNotUnique')
                         warning('off', 'MATLAB:lscov:RankDefDesignMat');
 
@@ -305,17 +355,45 @@ classdef Catalog < handle
             if obj.success==1
                 
                 obj.wcs_object = obj.mextractor_sim.WCS;
-                obj.head.WCS.input(obj.wcs_object); 
+                obj.head.WCS.input(obj.wcs_object); % translate MAAT/WCS into my WorldCoordinates object
             
-                [obj.central_RA, obj.central_Dec] = obj.wcs_object.xy2coo([obj.head.NAXIS1, obj.head.NAXIS2], 'OutUnits', 'deg'); 
+                [obj.central_RA, obj.central_Dec] = obj.wcs_object.xy2coo([obj.head.NAXIS1/2, obj.head.NAXIS2/2], 'OutUnits', 'deg'); % center of the field
                 
-                obj.rotation = obj.head.WCS.rotation;
+                obj.rotation = obj.head.WCS.rotation; % field rotation from PV parameters
                 
             end
             
         end
         
-        function S = runMextractor(obj, I)
+    end
+    
+    methods(Hidden=true) % old methods scheduled for deletion
+        
+        function inputImage(obj, Im) % old method (used to be called input()), input an image and give it to mextractor. to be deprecated! 
+            
+            obj.success = 0; % change to 1 after all functions return normally 
+            
+            obj.image = Im;
+            
+            obj.runMextractor;
+            obj.runAstrometry;
+            obj.makeCatalog;
+            
+            if ~isempty(obj.head)
+                
+                if isempty(obj.head.WCS)
+                    obj.head.WCS = head.WorldCoordinates;
+                end
+                
+                obj.head.WCS.input(obj.wcs_object); % make sure the WCS object is updated too
+                
+            end
+            
+            obj.success = 1;
+            
+        end
+        
+        function S = runMextractor(obj, I) % old method to find coordinates from image using mextractor. To be deprecated
             
             if obj.debug_bit, disp('Running mextractor on input image...'); end
             
@@ -359,7 +437,7 @@ classdef Catalog < handle
             
         end
         
-        function SS = runAstrometry(obj, S, RA, Dec, plate_scale)
+        function SS = runAstrometry(obj, S, RA, Dec, plate_scale) % old method to find coordinates from image using mextractor. To be deprecated
             
             if obj.debug_bit, disp('Running astrometry on SIM image...'); end
             
@@ -413,7 +491,7 @@ classdef Catalog < handle
             
         end
         
-        function T = makeCatalog(obj)
+        function T = makeCatalog(obj) % old method to find coordinates from image using mextractor. To be deprecated
             
             S = obj.mextractor_sim;
             SS = obj.catalog_matched;
@@ -454,93 +532,6 @@ classdef Catalog < handle
             obj.temperatures = obj.data.Teff;
             
             obj.detection_limit = nanmax(obj.magnitudes); % must find a better way to estimate this (there's lots of accidental matches with the wrong flux)
-            
-        end
-        
-        function idx = findOutburst(obj)
-            
-            [~, idx] = max(obj.data{:,'Mag_G'}-obj.data{:,'MAG_PSF'});
-            
-        end
-        
-        function idx = findOccultation(obj)
-            
-            [~, idx] = min(obj.data{:,'Mag_G'}-obj.data{:,'MAG_PSF'});
-            
-        end
-        
-        function [idx, dist] = findNearestObject(obj, RA, Dec)
-            
-            if nargin<2 || isempty(RA)
-                RA = obj.head.RA_DEG;
-            end
-            
-            if nargin<3 || isempty(Dec)
-                Dec = obj.head.DEC_DEG;
-            end
-            
-            if ischar(RA)
-                RA = head.Ephemeris.hour2deg(RA);
-            end
-            
-            if ischar(Dec)
-                Dec = head.Ephemeris.sex2deg(Dec);
-            end
-            
-            if isempty(obj.data)
-                idx = [];
-                dist = [];
-            else
-                
-                delta_RA = ((RA-obj.data{:,'RA'}).*cosd(Dec)).^2;
-                delta_Dec = (Dec-obj.data{:,'Dec'}).^2;
-
-                [dist, idx] = min(delta_RA+delta_Dec); 
-
-                dist = sqrt(dist); 
-
-            end
-            
-        end
-        
-        function idx = findNearestXY(obj, pos_xy, min_radius)
-            
-            if nargin<3 || isempty(min_radius)
-                min_radius = 3; % minimal distance in pixels to give a match
-            end
-            
-            T = obj.data(:,{'Mag_BP', 'XWIN_IMAGE', 'YWIN_IMAGE'}); 
-            
-            T = [T table((1:height(T))')]; % add original indices
-            
-            T.Properties.VariableNames{end} = 'idx';
-            
-            T = sortrows(T, 'Mag_BP'); % now arranged from brightest to dimmest, keeping the original indices
-            
-            idx = NaN(size(pos_xy,1),1);
-            
-            for ii = 1:size(pos_xy,1)
-                
-                for jj = 1:height(T)
-                    
-                    dx = (pos_xy(ii,1)-T{jj,'XWIN_IMAGE'}).^2;
-                    dy = (pos_xy(ii,2)-T{jj,'YWIN_IMAGE'}).^2;
-                    dr = sqrt(dx+dy);
-                    
-                    if dr<=min_radius
-                        idx(ii) = T{jj,'idx'}; % get the table index
-                        T(jj,:) = [];
-                        if obj.debug_bit>1, fprintf('ii= %04d | dr= %f\n', ii, dr); end
-                        break;
-                    end
-                    
-                end
-                
-                if jj==height(T)
-                    if obj.debug_bit>1, fprintf('ii = %04d | Could not find match!\n', ii); end
-                end
-                
-            end
             
         end
         
@@ -615,9 +606,142 @@ classdef Catalog < handle
         
     end
     
+    methods % finding stars 
+        
+        function [idx, dist] = findNearestObject(obj, RA, Dec) % find object closest to a given RA/Dec (default from header)
+        % Usage: [idx, dist] = findNearestObject(obj, RA, Dec) 
+        % Get the index of the matched star that is closest to the header
+        % given RA/Dec coordinates. 
+        % This helps finding faint targets in crouded fields. 
+        % If the RA/Dec is not given, they are copied from the header, 
+        % with the assumption that the field is around the object of interest
+        % and that is updated in the header. 
+        % For arbitrary coordinates just input them as sexagesimal strings
+        % or as numeric degrees. Do not input RA as numeric hours! 
+        %
+        % Outputs: -idx is the index in the table/positions matrix. 
+        %          -dist is the distance from given coordinates to the star's
+        %           matched coordinates (in arcsec). 
+            
+            if nargin<2 || isempty(RA)
+                RA = obj.head.RA_DEG;
+            end
+            
+            if nargin<3 || isempty(Dec)
+                Dec = obj.head.DEC_DEG;
+            end
+            
+            if ischar(RA)
+                RA = head.Ephemeris.hour2deg(RA);
+            end
+            
+            if ischar(Dec)
+                Dec = head.Ephemeris.sex2deg(Dec);
+            end
+            
+            if isempty(obj.data)
+                idx = [];
+                dist = [];
+            else
+                
+                delta_RA = ((RA-obj.data{:,'RA'}).*cosd(Dec)).^2;
+                delta_Dec = (Dec-obj.data{:,'Dec'}).^2;
+
+                [dist, idx] = min(delta_RA+delta_Dec); 
+
+                dist = 3600*sqrt(dist); % convert to arcsec
+
+            end
+            
+        end
+        
+        function idx = findNearestXY(obj, pos_xy, min_radius) % find the brightest star(s) inside min_radius of the position(s) given in pos_xy
+            
+            if nargin<3 || isempty(min_radius)
+                min_radius = 3; % minimal distance in pixels to give a match
+            end
+            
+            T = obj.data(:,{'Mag_BP', 'XWIN_IMAGE', 'YWIN_IMAGE'}); 
+            
+            T = [T table((1:height(T))')]; % add original indices
+            
+            T.Properties.VariableNames{end} = 'idx';
+            
+            T = sortrows(T, 'Mag_BP'); % now arranged from brightest to dimmest, keeping the original indices
+            
+            idx = NaN(size(pos_xy,1),1);
+            
+            for ii = 1:size(pos_xy,1)
+                
+                for jj = 1:height(T)
+                    
+                    dx = (pos_xy(ii,1)-T{jj,'XWIN_IMAGE'}).^2;
+                    dy = (pos_xy(ii,2)-T{jj,'YWIN_IMAGE'}).^2;
+                    dr = sqrt(dx+dy);
+                    
+                    if dr<=min_radius
+                        idx(ii) = T{jj,'idx'}; % get the table index
+                        T(jj,:) = [];
+                        if obj.debug_bit>1, fprintf('ii= %04d | dr= %f\n', ii, dr); end
+                        break;
+                    end
+                    
+                end
+                
+                if jj==height(T)
+                    if obj.debug_bit>1, fprintf('ii = %04d | Could not find match!\n', ii); end
+                end
+                
+            end
+            
+        end
+        
+        function xy = coords2xy(obj, RA, Dec) % convert sky coordinates to xy on the image
+        % Usage: xy = coords2xy(obj, RA, Dec)
+        % Use the GAIA match to transform the given RA/Dec into xy on the 
+        % image plane. 
+        % Specify coordinates as hexagesimal strings or numeric degrees, 
+        % DO NOT GIVE RA AS NUMERIC HOURS!
+        % If no coordinates are given, uses the header's RA/Dec. 
+        % Outputs a vector with two elements, x and y. 
+        
+            if nargin<2 || isempty(RA)
+                RA = obj.head.RA_DEG;
+            end
+            
+            if nargin<3 || isempty(Dec)
+                Dec = obj.head.DEC_DEG;
+            end
+            
+            if ischar(RA)
+                RA = head.Ephemeris.hour2deg(RA);
+            end
+            
+            if ischar(Dec)
+                Dec = head.Ephemeris.sex2deg(Dec);
+            end
+            
+            xy = obj.head.wcs.coo2xy(RA, Dec); 
+            
+        end
+        
+        function idx = findOutburst(obj) % find the star with the biggest brightening relative to GAIA
+            
+            [~, idx] = max(obj.data{:,'Mag_G'}-obj.data{:,'MAG_PSF'});
+            
+        end
+        
+        function idx = findOccultation(obj) % find the star with biggest darkening relative to GAIA
+            
+            [~, idx] = min(obj.data{:,'Mag_G'}-obj.data{:,'MAG_PSF'});
+            
+        end
+        
+    end
+    
     methods % utilities
         
-        function saveMAT(obj, filename)
+        function saveMAT(obj, filename) % save catalog as table to MAT file
             
             CatTable = obj.data;
             header = obj.head.obj2struct; 
@@ -632,7 +756,7 @@ classdef Catalog < handle
             
         end
         
-        function loadMAT(obj, filename)
+        function loadMAT(obj, filename) % load catalog from MAT file
             
             load(filename);
             
@@ -670,7 +794,7 @@ classdef Catalog < handle
             
         end
         
-        function saveMAT_old(obj, filename) % to be depricated! 
+        function saveMAT_old(obj, filename) % to be deprecated! 
             
             Sim = obj.mextractor_sim;
             MatchedCat = obj.catalog_matched;
@@ -690,7 +814,7 @@ classdef Catalog < handle
             
         end
         
-        function loadMAT_old(obj, filename) % to be depricated! 
+        function loadMAT_old(obj, filename) % to be deprecated! 
             
             if obj.debug_bit, disp(['Loading catalog file from ' filename]); end
             

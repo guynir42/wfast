@@ -17,4 +17,20 @@ to convert magnitude to counts in the detector.
 *Star keeps track of the properties of stars in the field, 
 e.g., magnitude, color, xy position. A vector of Star objects
 is essentially like a catalog. 
+This is mostly unused now. 
+We used it when observing single or double stars
+when working on high contrast imaging. 
+
+*WorldCoordinates: keeps the info on the transformation
+between sky and image coordinates. 
+Can be used to give the field rotation and central coordinates.
+
+*Catalog: takes star positions and matches them, 
+using Eran's astrometry, to the GAIA catalog. 
+Saves the information in a matlab table that can 
+be used or saved to disk. 
+
+*Parameters: inherits all from Header, 
+and is used only for backward compatibility. 
+Use h = cast(p) to turn Parameters object into Header object. 
 

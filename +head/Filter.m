@@ -1,5 +1,18 @@
 classdef Filter < handle
-   
+% Maintain information about the filter used in an observation. 
+% There are two main modes this object can be in:
+%   (1) keep central wavelength and the bandwidth. 
+%   (2) keep a full lambda-transmission curve. 
+%
+% Using this information you can calculate conversions from a flux spectrum
+% to the number of counts. 
+% 
+% Some default filters (with wavelength/bandwidth data only) can be loaded
+% by calling the constructor with a string input. 
+% Some examples include: "R", "V", "B", "F505W" (which is used by W-FAST). 
+%
+% This class still needs some work and will be expanded if needed. 
+    
     properties
         
         name = '';
@@ -98,11 +111,14 @@ classdef Filter < handle
     methods % getters
         
         function F = getFlux(obj, mag)
-        % usage: getFlux(mag)
-            if nargin==0
-                help('head.Filter.getFlux')
-                return;
-            end
+        % Usage: getFlux(mag)
+        % Calculate the flux for a given magnitude, based on the zero point. 
+        % If the filter does not define a zero point, we use the default 
+        % value 3.64e-20. 
+        % Integrates over the bandwidth. 
+        % For lambda-transmission curves this needs to be updated. 
+        
+            if nargin==0, help('head.Filter.getFlux'); return; end
             
             if isempty(obj.zero_point)
                 zp = 3.64e-20; % ergs/cm^2/sec/Hz
@@ -118,12 +134,9 @@ classdef Filter < handle
         end
         
         function mag = getMagFromFlux(obj, flux)
-        % usage: getMagFromFlux(flux_erg_cm2_sec)
+        % Usage: getMagFromFlux(flux_erg_cm2_sec)
 
-            if nargin==0
-                help('head.Filter.getMagFromFlux');
-                return;
-            end
+            if nargin==0, help('head.Filter.getMagFromFlux'); return; end
             
             if isempty(obj.zero_point)
                 zp = 3.64e-20;
@@ -139,12 +152,9 @@ classdef Filter < handle
         end
         
         function C = getCount(obj, mag, area_cm2, expT)
-            % usage: getCount(mag, area_cm2=1, expT=1)
+            % Usage: getCount(mag, area_cm2=1, expT=1)
             
-            if nargin==0
-                help('head.Filter.getCount');
-                return;
-            end
+            if nargin==0, help('head.Filter.getCount'); return; end
             
             if nargin<3 || isempty(area_cm2)
                 area_cm2 = 1;
@@ -164,12 +174,9 @@ classdef Filter < handle
         end
         
         function mag = getMagFromCount(obj, count, area_cm2, expT)
-            % usage: getMagFromCount(count, area_cm2=1, expT=1)
+            % Usage: getMagFromCount(count, area_cm2=1, expT=1)
             
-            if nargin==0
-                help('head.Filter.getMagFromCount');
-                return;
-            end
+            if nargin==0, help('head.Filter.getMagFromCount'); return; end
             
             if nargin<3 || isempty(area_cm2)
                 area_cm2 = 1;
@@ -207,7 +214,7 @@ classdef Filter < handle
 %             
 %         end
         
-        function val = double(obj)
+        function val = double(obj) % convert the filter object to the central wavelength
            
             val = obj.wavelength;
             

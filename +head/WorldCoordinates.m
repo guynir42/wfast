@@ -22,7 +22,7 @@ classdef WorldCoordinates < handle
         CRPIX = []; % pixel position of transformation anchor 
         CRVAL = []; % RA/Dec position of transformation anchor 
         CDELT = []; % shift between anchors
-        CD = []; % rotation matrix
+        CD = []; % rotation matrix (and pixel scale)
         PV = []; % values of the polynomials needed for TPV transformation. Column 1 is for X, column 2 is for Y
         
         RA_deg_center;
@@ -86,6 +86,12 @@ classdef WorldCoordinates < handle
             else
                 val = acotd(obj.PV(2,1)./obj.PV(3,1));
             end
+            
+        end
+        
+        function val = SCALE_DEG(obj) % plate scale in degrees
+            
+            val = obj.CD(1); % for different scales on x and y we will also need CD(4)
             
         end
         
@@ -180,7 +186,7 @@ classdef WorldCoordinates < handle
             
         end
         
-        function RA_Dec = xy2coo(obj, x, y)
+        function RA_Dec = xy2coo(obj, x, y) % find the RA and Dec for the image xy positions
             
             if nargin<3 || isempty(y)
                 if size(x,2)==2
@@ -224,9 +230,24 @@ classdef WorldCoordinates < handle
 
         end
         
-        function XY = coo2xy(obj, RA, Dec)
+        function XY = coo2xy(obj, RA, Dec) % invertion of xy2coo by calling fminsearch and calculating the point nearest to RA/Dec
             
-            error('Not yet implemented!');
+            if ischar(RA)
+                RA = head.Ephemeris.hour2deg(RA);
+            end
+            
+            if ischar(Dec)
+                Dec = head.Ephemeris.sex2deg(Dec);
+            end
+            
+            func = @(xy) sum(([RA, Dec] - obj.xy2coo(xy(1), xy(2)) ).^2); % minimization function
+            
+            XY = fminsearch(func, obj.CRPIX); % initial guess is middle of field 
+                        
+            % This is from Eran's coo2xy but it doesn't account for the corrections in the PV parameters (i.e., it doesn't include the GAIA match!)
+%             DEG = 180/pi;
+            
+%             XY = obj.CRPIX + obj.SCALE_DEG*DEG*celestial.proj.pr_gnomonic(RA/DEG, Dec/DEG, 1, obj.CRVAL./DEG); 
             
         end
         
