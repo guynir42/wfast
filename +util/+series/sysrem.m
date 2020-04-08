@@ -138,11 +138,11 @@ function [f_det, a, c, stats] = sysrem(f, varargin)
     
     if isempty(input.a) && isempty(input.c) % no 'a' or 'c' given, do a preliminary calculation to get both
         c = ones(1, size(f,2), 'like', f); % assume all stars have the same response coefficient! 
-        a = calculateAirmass(r, input.errors, c, input.self); 
+        a = calculateAirmass(r, input.errors, c, input.self, input.fft); 
         c = calculateColors(r, input.errors, a); 
     elseif isempty(input.a) % only 'a' is empty, use 'c' to find 'a'
         c = input.c;
-        a = calculateAirmass(r, input.errors, c, input.self); 
+        a = calculateAirmass(r, input.errors, c, input.self, input.fft); 
     elseif isempty(input.c) % only 'c' is empty, use 'a' to find 'c' (this can happen if 'a' is given by airmass)
         a = input.a;
         c = calculateColors(r, input.errors, a); % sum over 'j' is sum over frames
@@ -152,7 +152,7 @@ function [f_det, a, c, stats] = sysrem(f, varargin)
     end
     
     for ii = 1:input.iterations
-        a = calculateAirmass(r, input.errors, c, input.self); 
+        a = calculateAirmass(r, input.errors, c, input.self, input.fft); 
         c = calculateColors(r, input.errors, a); 
     end
     
@@ -180,7 +180,7 @@ function [f_det, a, c, stats] = sysrem(f, varargin)
     
 end
 
-function a = calculateAirmass(residuals, errors, c, use_self_exclude) % sum over 'i' is sum over stars
+function a = calculateAirmass(residuals, errors, c, use_self_exclude, use_fft) % sum over 'i' is sum over stars
     
     p1 = residuals.*c./errors.^2; % product 1
     s1 = nansum(p1, 2); % sum 1
@@ -193,7 +193,11 @@ function a = calculateAirmass(residuals, errors, c, use_self_exclude) % sum over
         s2 = s2 - p2; 
     end
     
-    a = real(s1./s2); % this is for dealing with complex values in case we use fft
+    a = s1./s2; 
+    
+    if use_fft
+        a = abs(a); 
+    end
     
 end
 
