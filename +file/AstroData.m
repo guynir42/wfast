@@ -4,6 +4,13 @@ classdef AstroData < dynamicprops
 % several objects (file.Reader, file.BufferWheel, file.Deflator,
 % img.PipeLine, etc.) it is helpful to keep these outputs all in one place.
 % 
+% These properties are all meant to contain data for a single batch, 
+% so it would have one image in the "stack", 100 images and timestamps, etc. 
+%
+% NOTE: this object and all its sub-clasess (inheritors) get the dynamicprops
+%       ability to add properties when needed. This is useful when doing 
+%       custom analysis and need temporary variables to be stored with the 
+%       regular data products. 
 
     properties % these include all the images, cutouts, lightcurves, etc that we use in image analysis
         
@@ -20,7 +27,6 @@ classdef AstroData < dynamicprops
         
         cutouts; % this is raw cutouts and it is usually what we save on file
         positions; % only for cutouts. a 2xN matrix (X then Y, N is the number of cutouts). 
-        obj_idx; % what is the index of the star closest to the run's intended RA/DEC 
         coordinates; % match each star/cutout position with RA/DEC (in degrees)
         magnitudes; % each star's magnitude (from catalog)
         temperatures; % each star's temperature in K (from catalog)
@@ -83,54 +89,39 @@ classdef AstroData < dynamicprops
     end
     
     methods % getters
-%         
-%         function val = get.positions(obj)
-%             
-%             val = obj.getPositions;
-%             
-%         end
-%         
-%         function val = get.positions_bg(obj)
-%             
-%             val = obj.getPositionsBG;
-%             
-%         end
-        
+
     end
     
     methods % setters
-        
-%         function set.positions(obj, val)
-%             
-%             obj.setPositions(val);
-%             
-%         end
-%         
-%         function set.positions_bg(obj, val)
-%             
-%             obj.setPositionsBG(val);
-%             
-%         end
         
     end 
     
     methods % other utilities
         
-        function takeFrom(obj, other)
-            error('Do not use this!');
-            obj.copyFrom(other);
-            other.clear; % this is very dangerous, especially when taking from BufferWheel, as it resets the buffers as well... 
-            
-        end
+%         function takeFrom(obj, other)
+%             error('Do not use this!');
+%             obj.copyFrom(other);
+%             other.clear; % this is very dangerous, especially when taking from BufferWheel, as it resets the buffers as well... 
+%             
+%         end
         
-        function copyTo(obj, other)
+        function copyTo(obj, other) % moves all the data from this object to another object
             
             copyFrom(other, obj);
             
         end
         
-        function copyFrom(obj, other)
-            
+        function copyFrom(obj, other) % moves all the data from another object to this one
+        % Usage: copyFrom(obj, other)
+        % Takes all the data products (defined as the list of properties of 
+        % the AstroData class) and copies them from one object to another. 
+        % The two objects must be of AstroData type or any class that 
+        % inherits from it. 
+        % For example, the Analysis object can simply copyFrom the Reader 
+        % object, and it is guaranteed to get all the data products. 
+        
+            if nargin==1, help('file.AstroData.copyFrom'); return; end
+        
             if nargin<2 || isempty(other)
                 error('must give a non-empty argument to "copyFrom"');
             end
@@ -149,13 +140,13 @@ classdef AstroData < dynamicprops
             
         end
         
-        function reset(obj)
+        function reset(obj) % the same as clear at this point
             
             obj.clear;
             
         end
         
-        function clear(obj)
+        function clear(obj) % set to empty all the data products, and get ready for a new batch
             
             obj.images = [];
             
@@ -196,34 +187,6 @@ classdef AstroData < dynamicprops
             
         end
                 
-    end
-    
-    methods(Access=protected)
-%         
-%         function val = getPositions(obj)
-%             
-%             val = obj.positions_;
-%             
-%         end
-%         
-%         function setPositions(obj, val)
-%             
-%             obj.positions_ = val;
-%             
-%         end
-%         
-%         function val = getPositionsBG(obj)
-%             
-%             val = obj.positions_bg_;
-%             
-%         end
-%         
-%         function setPositionsBG(obj, val)
-%             
-%             obj.positions_bg_ = val;
-%             
-%         end
-%         
     end
     
 end

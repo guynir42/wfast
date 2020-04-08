@@ -1,7 +1,28 @@
 classdef Reader < file.AstroData
 % Reads images (and other data) from HDF5 files. Usually used when there is
 % more data than fits into memory and the processing is to be done in a
-% loop. There are two main work modes:
+% loop. 
+% 
+% Interface (useful functions):
+%-------------------------------
+% -Use browseDir() or choose the directory yourself using the
+% WorkingDirectory object. Then use loadFiles(). 
+% 
+% -You should use the startup() and finishup() commands at the beginning and
+% end of each run (which also calls loadFiles()). This conforms to the
+% generic API (like the camera and analysis objects).
+% 
+% -After that (if there are any files that match the "glob_string") use
+% batch() to load the images into memory. This automatically advances the 
+% file index. If you want to read a single file without advancing down the 
+% list just do readFile(). 
+% 
+% -The loop() command simply runs batch() until the object is done reading
+% all files (by setting "is_finished=1"), then calls finishup(). The
+% command run() is the same but also uses startup() before the loop(). 
+%
+% There are two main work modes:
+%--------------------------------
 % (1) Single file (default): when "num_files_per_batch==1" only one file is
 %     loaded for every call to "batch". User can limit the number of frames
 %     (and effectively load one file in multiple batches) by using
@@ -16,54 +37,81 @@ classdef Reader < file.AstroData
 %     limits such as "frame_index_start" and "_finish" are still respected.
 %     Note that in both modes, the "frame_index" limits mean some images
 %     are not read at all. 
-% 
-% Interface (API):
-% Use "browseDir" or choose the directory yourself using the
-% WorkingDirectory object. Then use "loadFiles". 
-% You should use the "startup" and "finishup" commands at the beginning and
-% end of each run (which also calls "loadFiles"). This conforms to the
-% generic API (like the camera and simulator).
-% After that (if there are any files that match the "glob_string") use
-% "batch" to load the images into memory. This advances the files
-% internally and automatically. 
-% The "loop" command simply runs "batch" until the object is done reading
-% all files (by setting "is_finished=1"), then calls "finishup". The
-% command "run" also uses "startup" before the loop. 
 %
 % OUTPUTS: 
-% -images: for older type files, but will also be a copy of what is saved
-%  in any other images type (see next items) by the order: raw, cut, sum. 
-%  If saving calibrated, full-frame images they could be saved here. 
-% -images_raw: images straight from camera. This includes AOI images. 
-% -images_cal: images after dark and flat calibration. 
-% -cutouts_raw: cutouts in a 4D matrix. Without calibration.
-% -cutouts_cal: calibrated cutouts. 
-% -full_sum: sum of images in a batch. This should be calibrated. 
+%----------
+% -images: if the full frame images were saved. Uncalibrated unint16.  
+% -cutouts: the uncalibrated cutouts (usually a 4D matrix, uint16). 
+% -stack: sum of images in a batch. Also uncalibrated, single prec. float. 
 % -num_sum: how many images were put into the sum (for housekeeping). 
 % -positions: a 2xN matrix of x and y positions of each cutout. 
 % -timestamps: the starting time of each image in the batch (in seconds).
 % -t_start: time of beginning of batch (can be Julian date or time-string).
 % -t_end: time of end of batch (can be Julian date or time-string).
-% -t_end_stamp: timestamp of the time of end of batch (to calibrate
-%  timestamps to absolute time). 
+% -t_end_stamp: timestamp of the time of end of batch (to calibrate the
+%               timestamps to absolute time). 
 % -psf: image of the PSF if it was measured / simulated. 
 % -psf_sampling: in units of lambda/D per pixel (default is 2-> Nyquist).
-% -fluxes: values of the amount of light extracted per star/cutout. 
 %
-% Other useful parameters incude:
+% -fluxes: values of the amount of light extracted per star/cutout. 
+%          The size should be number of frames X number of stars. 
+%          In case multiple apertures are used, there would be a third dim
+%          to keep the data for various photometries. 
+%          This is in single precision float. 
+%          The following data products all share this size and type. 
+% -errors: estimated error on the flux. 
+% -areas: the aperture area after removing image edge and bad pixels. 
+% -backgrounds: the estimated count/pixel from the annulus. 
+% -variances: the estimated variance [counts^2/pixel] from the annulus. 
+% -offsets_x: the centroid offset relative to the cutout in x. 
+% -offsets_y: the centroid offset relative to the cutout in y. 
+% -centroids_x: the centroid position relative to the image in x. 
+% -centroids_y: the centroid position relative to the image in y. 
+% -widths: the PSF width, estimated by the average 2nd moment. 
+% -bad_pixels: the number of bad pixels in the aperture in that frame. 
+% -flags: if moments calculations go wrong (or other problems in the 
+%         photometry) this star/frame is flagged as bad measurement. 
+%         NOTE: it is possible that a flagged frame still contains useful 
+%               flux measurement, but the width/offsets are probably wrong. 
+%
+% -cutouts_bg: we also save some randomly placed cutouts to sample the background. 
+% -positions_bg: the centers of the cutouts_bg. 
+%
+% -magnitudes: if we matched to GAIA catalog this will contain the Mag_BP. 
+% -temperatures: if we matched to GAIA this will have the Teff. 
+% -coordinates: a 2xN matrix with the RA/Dec of each star, in degrees. 
+%      NOTE: any stars without a proper match will have NaN values. 
+%
+% Other useful parameters for reading files: 
+%--------------------------------------------
 % -glob_string (default= "*.h5*"): This string is used in glob-expansion to
 % select only the correct files for reading. Other useful strings could be:
 %  "Kraar*.h5*" | "WFAST*.h5*" | *.h5z* 
-% -use_transpose: for images accidentally saved with row-columns flipped.
+%
+% -use_transpose: for images accidentally saved with rows-columns flipped.
+%
 % -use_reshape: for images accidentally saved with wrong number of rows and
 %  columns (bugs in going from 1D array in C to 3D matrix in matlab). 
-% -custom_code: if user requires some additional pre-processing of images
-%  from file before they are used, add matlab code in this cell array. 
-% -custom_text: if custom_code needs embedded strings, pass them through
-%  this cell array. 
+%
+% -custom_func: if user requires some additional pre-processing of images
+%  from file before they are used, functions that accept as sole input this
+%  object, and do not return an output. 
+%  NOTE: to store function outputs add a property to the reader using 
+%        the interface of matlab's dynamicprops class. 
 % 
 % A Graphic User Interface (GUI) for this class is also included in the 
-% sub-package +gui. It is invoked using obj.makeGUI. 
+% sub-package +gui. It is invoked using reader.makeGUI. 
+% 
+% A note on backward compatibility: 
+%-----------------------------------
+% Many of the older files use different names for some of the data products. 
+% To keep the ability to read them and put the information in the right place
+% we use some structures with various keywords that were used in the past
+% for each current data product. 
+% E.g, for "images" you can match "images" or "images_raw". 
+% The keywords are saved in the structure "dataset_names" and the same is 
+% saved for attributes (metadata) in "attribute_names". 
+% Both are defined in the function setupDataNames(). 
 
     properties (Transient=true)
         
@@ -75,50 +123,16 @@ classdef Reader < file.AstroData
     
     properties % object
         
-        head@head.Header;
-        dir@util.sys.WorkingDirectory;
+        head@head.Header; % this should be a handle to the same object as the analysis object
+        dir@util.sys.WorkingDirectory; % point this to where the data files are stored
         
     end
     
-    properties % file outputs
+    properties % file outputs (most are defined in the AstroData class)
         
-%         % make sure anything you add is added to clear...
-%         images; % older files will just have generic "images" dataset
-%         
-%         images_raw;
-%         images_cal;
-%         
-%         cutouts_raw;
-%         cutouts_cal;
-%         positions; % only for cutouts. a 2xN matrix (X then Y, N is the number of cutouts). 
-%         
-%         full_sum; % sum of the full frame image
-%         num_sum; % if the images are summed, how many frames were added
-%         
-%         timestamps; % output timestamps (if available)
-%         t_start; % absolute date and time (UTC) when first image is taken
-%         t_end; % absolute date and time (UTC) when batch is finished
-%         t_end_stamp; % timestamp when batch is finished
-%                 
-%         psfs; % output PSFs from file (if available)        
-%         psf_sampling; % if loaded PSFs need to be binned (this is the binning factor)
-%         
-%         fluxes;
+        filenames; % cell array of file names that match the "glob_string"
         
-        filenames; % cell array of file names that match
-        
-        input_filename = '';
-        
-    end
-    
-    properties % internal counters and indices (for stopping and continuing)
-        
-        latest_batch_size = 100; % number of frames in each batch (default is 100, changes with latest file or by set batch limits)
-        this_file_index = 1; % the next file to be read
-        this_frame_index = 1; % the next frame inside the file (num_files_per_batch==1)
-        counter_files = 0; % number of files that have been read completely. 
-        counter_frames = 0; % number of frames read
-        counter_batches = 0; % number of batches loaded
+%         input_filename = '';
         
     end
     
@@ -133,14 +147,14 @@ classdef Reader < file.AstroData
         num_files_per_batch = 1; % number of files to load each batch
         file_index_start = 1; % start from this file on the list
         file_index_finish = []; % stop reading after you get to this file on the list (including)
-        use_wrap_around = 0;        
+        use_wrap_around = 0; % reader will continue to read the same files until stopped from outside
         
         % frame limits
         num_frames_per_batch = []; % how many frames to read in each batch (works only when num_files_per_batch==1)
         frame_index_start = 1; % in each file, start reading from this index
         frame_index_finish = []; % in each file, finish reading on this index (or to the end of file)
         
-        % Area Of Interest (to be depricated)
+        % Area Of Interest (we need to integrate this with the ROI parameter)
         AOI_left;
         AOI_width;
         AOI_top;
@@ -151,10 +165,9 @@ classdef Reader < file.AstroData
         use_transpose = 0; % switches rows for columns
         use_reshape = 0; % for files saved with the wrong row/column sizes (correct data, wrong division into rows/columns)
         
-        use_images_generic = 1; % if true, will put in "images" a copy of "images_cal" or "images_raw" or "images_sum" or "cutouts_cal" or "cutouts_raw" (in that order). 
-        
         custom_code = {}; % after each batch, run eval on each cell. 
         custom_text = {}; % if you need to call some text in the eval, reference these cells.
+        custom_func = {}; % run a list of custom functions that accept this object as the sole input. 
         
         brake_bit = 1; % when set to 1 the reader stops the run at the end of the batch...
         
@@ -172,6 +185,14 @@ classdef Reader < file.AstroData
     end
     
     properties(Hidden=true)
+        
+        % internal counters and indices (for stopping and continuing)
+        latest_batch_size = 100; % number of frames in each batch (default is 100, changes with latest file or by set batch limits)
+        this_file_index = 1; % the next file to be read
+        this_frame_index = 1; % the next frame inside the file (num_files_per_batch==1)
+        counter_files = 0; % number of files that have been read completely. 
+        counter_frames = 0; % number of frames read
+        counter_batches = 0; % number of batches loaded
         
         info; % lazy load this from h5info
         
@@ -385,7 +406,7 @@ classdef Reader < file.AstroData
             
             clear@file.AstroData(obj);
 
-            obj.input_filename = '';
+%             obj.input_filename = '';
             
         end
                 
@@ -401,28 +422,6 @@ classdef Reader < file.AstroData
     end
     
     methods % getters
-        
-%         function val = get.images(obj)
-%             
-%             if ~isempty(obj.images)
-%                 val = obj.images;
-%             elseif obj.use_images_generic==0
-%                 val = [];
-%             elseif ~isempty(obj.images_cal)
-%                 val = obj.images_cal;
-%             elseif ~isempty(obj.images_raw)
-%                 val = obj.images_raw;
-%             elseif ~isempty(obj.full_sum)
-%                 val = obj.full_sum;
-%             elseif ~isempty(obj.cutouts_cal)
-%                 val = obj.cutouts_cal;
-%             elseif ~isempty(obj.cutouts_raw)
-%                 val = obj.cutouts_raw;
-%             else
-%                 val = [];
-%             end
-%             
-%         end
         
         function val = getNumBatches(obj) % an estimate of the number of batches to be loaded in this run
             
@@ -636,7 +635,7 @@ classdef Reader < file.AstroData
     
     methods % actions
         
-        function dir = browseDir(obj)
+        function dir = browseDir(obj) % open a system dialog to choose a folder
            
             dir = obj.dir.browse;
             
@@ -646,17 +645,19 @@ classdef Reader < file.AstroData
             
         end
         
-        function loadFiles(obj)
+        function loadFiles(obj) % load the list of files from the folder
             
             obj.filenames = obj.dir.match(obj.glob_string);
 
             if ~isempty(obj.filenames) && ~isempty(obj.filenames{1})
-                obj.readHeader; % load the parameters only for first file
+                
+                obj.readHeader(obj.filenames{1}, {'header', 'pars'}); 
+                
             end
             
         end
         
-        function advanceFile(obj)
+        function advanceFile(obj) % push the file index one file forward
             
             obj.info = []; % this is lazy loaded for each new file
             
@@ -677,7 +678,7 @@ classdef Reader < file.AstroData
             
         end
         
-        function getAttribute(obj, filename, data_name, att_list, att_name)
+        function getAttribute(obj, filename, data_name, att_list, att_name) % find an attribute in the HDF5 file
             
             for jj = 1:length(att_list) % search for important attributes
             
@@ -695,8 +696,11 @@ classdef Reader < file.AstroData
             
         end
         
-        function readFile(obj)
-            
+        function readFile(obj) % read a single file for all the relevant data products
+        % Usage: readFile(obj)
+        % Reads the file with name stored in "this_filename", and loads all
+        % the data products, and updates the header. 
+        
             import util.text.cs;
             import util.text.sa;
             
@@ -715,7 +719,7 @@ classdef Reader < file.AstroData
                 disp(['Loading file: ' filename]);
             end
             
-            obj.input_filename = filename;
+%             obj.input_filename = filename;
             
             % check how many frames we need to read
             if obj.temp_num_files_per_batch>1 || isempty(obj.temp_num_frames_per_batch) || isinf(obj.temp_num_frames_per_batch)
@@ -738,7 +742,7 @@ classdef Reader < file.AstroData
             
             [~,~,ext] = fileparts(obj.this_filename);
             
-            loaded_header = head.Header.empty;
+%             loaded_header = head.Header.empty;
             
             if cs(ext, '.h5', '.h5z', '.hdf5')
                 
@@ -1098,7 +1102,7 @@ classdef Reader < file.AstroData
                         obj.flags = cat(1, obj.flags, loaded_flags); % append to the existing widths
                              
                     elseif any(strcmp(data_name, obj.dataset_names.header)) 
-                        obj.loadHeaderHDF5(filename, loaded_header, data_name, att_names);
+                        obj.readHeader(filename, data_name, att_names);
                     end
                     
                 end % scan all datasets
@@ -1114,7 +1118,7 @@ classdef Reader < file.AstroData
                     end
                     
                     if any(strcmp(group_name, strcat('/', obj.dataset_names.header)))
-                        obj.loadHeaderHDF5(filename, loaded_header, group_name, att_names);
+                        obj.readHeader(filename, group_name, att_names);
                     end
                     
                 end
@@ -1136,31 +1140,39 @@ classdef Reader < file.AstroData
             end
         end
         
-        function readHeader(obj)
-            
-            try 
-                loaded_header = util.oop.load(obj.filenames{1}, 'location', '/header', 'class', class(obj.head));
-            catch 
-                loaded_header = cast(util.oop.load(obj.filenames{1}, 'location', '/pars', 'class', class(obj.head)));
-            end
-            
-            util.oop.copy_props(obj.head, loaded_header);  % make a shallow copy (sub-objects are referenced, then loaded_header is destroyed)
-            
-        end
+        function readHeader(obj, filename, data_name, att_names) % read the header data only
+        % Usage: readHeader(obj, filename, data_name, att_names)
+        % Updates the object header with the data from file. 
+        % Will look for this information in /header or /pars. 
+        % You can specify a different "data_name" argument to look in other
+        % places. 
+        % Use "att_names" to specify a list of additional attributes
+        % for this dataset/group. Some of these need to be read again in old
+        % files to overwrite the header properties that come out wrong when 
+        % calling load(). Right now this is just RA_DEG/DEC_DEG.
         
-        function loadHeaderHDF5(obj, filename, loaded_header, data_name, att_names)
-            
             import util.text.cs;
             import util.text.sa;
             
-            location = sa('/', data_name);
+            if nargin<3 || isempty(data_name)
+                data_name = {'/header', '/pars'}; 
+            end
+            
+            if nargin<4 || isempty(att_names)
+                att_names = {};
+            end
+            
+            loaded_header = []; 
             
             try
                 
-                loaded_header = util.oop.load(filename, 'location', location, 'class', class(obj.head));
+                loaded_header = util.oop.load(filename, 'location', data_name, 'class', class(obj.head));
 
                 if isa(loaded_header, 'head.Parameters')
                     loaded_header = cast(loaded_header);
+                    location = '/pars'; % older files contained a Parameters object
+                else
+                    location = '/header';
                 end
                 
                 if isempty(loaded_header.STARTTIME) && ischar(loaded_header.STARTTIME)
@@ -1171,12 +1183,10 @@ classdef Reader < file.AstroData
             catch ME
                 % if we can't read this it is OK, there is still the README file. Can't give warnings on every file now...
                 disp('Could not read header object...');
-                warning(getReport(ME));
+%                 warning(getReport(ME));
             end
             
             if ~isempty(loaded_header)
-                
-                util.oop.copy_props(obj.head, loaded_header); % make a shallow copy (sub-objects are referenced, then loaded_header is destroyed)
                 
                 % additional loading of attributes (mostly Dependent) for backward compatibility with older files.
                 props = {'RA_DEG', 'DEC_DEG'};
@@ -1193,17 +1203,19 @@ classdef Reader < file.AstroData
                         end
                     end
                 end
-                
-            end
-            
-            if isempty(loaded_header.STARTTIME) && ischar(loaded_header.STARTTIME)
-                loaded_header.ephem.time = util.text.str2time(loaded_header.STARTTIME); % fix the bug in read/write of datetime objects we used to have (only rely on times stored as strings)
-                loaded_header.ephem.updateSecondaryCoords;
+
+                if isempty(loaded_header.STARTTIME) && ischar(loaded_header.STARTTIME)
+                    loaded_header.ephem.time = util.text.str2time(loaded_header.STARTTIME); % fix the bug in read/write of datetime objects we used to have (only rely on times stored as strings)
+                    loaded_header.ephem.updateSecondaryCoords;
+                end
+
+                util.oop.copy_props(obj.head, loaded_header); % make a shallow copy (sub-objects are referenced, then loaded_header is destroyed)
+
             end
             
         end
         
-        function batch(obj)
+        function batch(obj) % read one or more files and advance the file counter
             
             if obj.is_finished
                 obj.brake_bit = 1;
@@ -1225,6 +1237,19 @@ classdef Reader < file.AstroData
             
             if num_frames_in_batch
                 obj.latest_batch_size = num_frames_in_batch;
+            end
+            
+            if ~isempty(obj.custom_func)
+                
+                if ~iscell(obj.custom_func)
+                    obj.custom_func = {obj.custom_func}; 
+                end
+                
+                for ii = 1:length(obj.custom_func)
+                    func = obj.custom_func{ii};
+                    func(obj); % run the custom functions with a single input which is this object
+                end
+                
             end
             
             if obj.gui.check
@@ -1299,7 +1324,7 @@ classdef Reader < file.AstroData
             
         end
         
-        function convert2fits(obj, varargin)
+        function convert2fits(obj, varargin) % convert the images into individual FITS files
             
             input = util.text.InputVars;
             input.input_var('RA', [], 'right ascention');
@@ -1382,7 +1407,7 @@ classdef Reader < file.AstroData
             
         end
         
-        function val = is_finished(obj)
+        function val = is_finished(obj) % checks if all files were read out
                         
             if obj.counter_batches >= obj.num_batches
                 val = 1;

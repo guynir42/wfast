@@ -79,12 +79,38 @@ function obj = load(filename, varargin)
         
     end
     
-    if cs(input.format, 'hdf5', 'h5', 'h5z')
-        obj = loadHDF5(filename, input);
-    elseif cs(input.format, 'text', 'txt')
-        obj = loadText(filename, input);
+    % allow for list of locations:
+    obj = [];
+    
+    if iscell(input.location)
+        location_list = input.location;
     else
-        error(['Unknown file format "' input.format '". Use HDF5 or TXT or MAT...']); 
+        location_list = {input.location};
+    end
+    
+    for ii = 1:length(location_list)
+        
+        input.location = location_list{ii};
+        
+        try 
+            if cs(input.format, 'hdf5', 'h5', 'h5z')
+                obj = loadHDF5(filename, input);
+            elseif cs(input.format, 'text', 'txt')
+                obj = loadText(filename, input);
+            else
+                error(['Unknown file format "' input.format '". Use HDF5 or TXT or MAT...']); 
+            end
+        
+        catch ME
+            if ~strcmp(ME.identifier, 'MATLAB:imagesci:h5info:unableToFind') % if we couldn't find this object in that location, try others
+                rethrow(ME); 
+            end
+        end
+        
+    end
+    
+    if isempty(obj)
+        rethrow(ME); 
     end
     
 end
@@ -96,6 +122,10 @@ function obj = loadHDF5(filename, input)
     
     fid = H5F.open(filename);
     fid_cleanup = onCleanup(@() H5F.close(fid));
+    
+    if input.location(1)~='/'
+        input.location = ['/' input.location];
+    end
     
     info = h5info(filename, input.location); % lists sub-groups, datasets and attributes...
         

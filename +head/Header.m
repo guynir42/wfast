@@ -34,6 +34,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         
         WCS@head.WorldCoordinates; % transformation between sky and pixel coordinates. Reorganized version of Eran's WCS object
         
+        % NOTE: do not share the handles to objects in this class. They are
+        % often replaced to other handles when loading Header from file. 
+        
     end
     
     properties 
