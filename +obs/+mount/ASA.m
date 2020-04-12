@@ -2,15 +2,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 % Control ASA mount. 
 % This class works mainly by giving an "object" and then letting the mount
 % slew to that object. It also has shortcut fields to change various 
-% parameters in the mount object itself (which is in "hndl"). 
+% parameters in the ASCOM mount object itself (which is in "hndl"). 
 %
 % To give a target use inputTarget(star_name) or inputTarget(RA,DEC). 
 % Make sure the target parmeters are correctly translated to the object 
-% coordinates objRA and objDEC. Also make sure the objALT is big enough. 
+% coordinates objRA and objDEC. Also make sure the objALT is high enough. 
 % To make the telescope go to target just use "slew" without arguments. 
 % 
-% NOTE: All parameters of the mount / target are given in degrees or in 
-%       sexagesimal strings (HH:MM:SS for RA and DD:MM:SS for DEC). 
+% NOTE: All parameters of the mount / target are given in hours/degrees as
+%       numeric values or sexagesimal strings (HH:MM:SS or DD:MM:SS). 
 %
 % NOTE: this class performs some tests on the target object before the slew
 %       and during the movement, and will stop the motion in case there's 
@@ -26,11 +26,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 
     properties(Transient=true)
         
-        gui@obs.mount.gui.ASAGUI;
+        gui@obs.mount.gui.ASAGUI; 
         
-        audio@util.sys.AudioControl;
+        audio@util.sys.AudioControl; % to play warning sound when slewing
         
-        prev_objects = {}; 
+        prev_objects = {}; % list of latest objects 
         
     end
     
@@ -38,22 +38,22 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         hndl; % ASCOM object
         
-        owner@obs.Manager;
+        owner@obs.Manager; % link back to the Manager object
         
-        object@head.Ephemeris; % all position and time calculations done using Ephemeris class
+        object@head.Ephemeris; % the object/target/field that we want to point at. 
         
         ard@obs.sens.ScopeAssistant; % connect to accelerometer and ultrasonic sensor
         
-        sync@obs.comm.PcSync; % to be given from Manager to pass data on to camera computer
+        cam_pc@obs.comm.PcSync; % communications object to camera PC, to be given from Manager to pass data on to camera computer
         
         timer; % timer object
         
-        guiding_history@util.vec.CircularBuffer;
-        correct_history@util.vec.CircularBuffer; 
+        guiding_history@util.vec.CircularBuffer; % latest values from camera guiding system
+        correct_history@util.vec.CircularBuffer; % latest corrections applied when guiding
         
-        reco@obs.comm.Reconnect;
+        reco@obs.comm.Reconnect; % controls reconnection attempts, and prevents recurring failed attempts
         
-        log@util.sys.Logger; % keep track of all commands and errors
+        log@util.sys.Logger; % writes all commands and errors to text file
         
     end
     
@@ -65,9 +65,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
     
     properties % switches/controls
         
-        use_guiding = 1;        
-        use_integral_guiding = 1;
-        use_pid_guiding = 0;
+        use_guiding = 1; % apply the corrections from cam_pc
+        use_integral_guiding = 1; % use integration over previous guiding data to adjust rates
+        use_pid_guiding = 0; % use more complicated 
         integral_number = 50; 
         pid_P = 0.3;
         pid_I = 0.6;
@@ -136,15 +136,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
     
     properties(Hidden=true)
        
-        was_tracking = 0;
-        default_move_rate;
+        was_tracking = 0; % when pressing the NSEW buttons, to temporarily turn off tracking (and maybe bring it back on)
+        default_move_rate; % move rate for the NSEW buttons (in degrees/second)
 
-        prev_dRA = 0;
-        prev_dDE = 0;
+        prev_dRA = 0; % tracking rate used before
+        prev_dDE = 0; % tracking rate used before
 
         num_prev_objects = 10; % how many prev_objects do we keep?
         
-        version = 1.03;
+        version = 1.04;
         
     end
     
@@ -278,7 +278,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function val = checkServer(obj)
+        function val = checkServer(obj) % check if the Autoslew application is running
             
             val = 0;
             
@@ -299,7 +299,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function loadServer(obj)
+        function loadServer(obj) % restart the Autoslew application
             
 %             system('C:\Program Files (x86)\Autoslew\AstroOptikServer.exe &'); % call the system command to load the server outside of matlab 
 %             system('D:\matlab\wfast\+obs\+mount\launch_server.bat &'); % call the batch file to load the server then exit the cmd
@@ -322,7 +322,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function disconnect(obj)
+        function disconnect(obj) % remove the server and clear the hndl
             
             obj.log.input('Disconnecting from mount');
             
@@ -338,7 +338,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function killServer(obj)
+        function killServer(obj) % kill the applications using the system "taskkill" command
             
             [ret, str] = system('taskkill /fi "imagename eq AstroOptikServer.exe" /f'); % force killing of the server.
             
@@ -354,7 +354,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function resetPrevObjects(obj)
+        function resetPrevObjects(obj) % clear recent target list
             
             obj.prev_objects = {};
             
@@ -385,10 +385,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function val = get.objName(obj)
             
-            if isempty(obj.sync) || isempty(obj.sync.outgoing) || ~isfield(obj.sync.outgoing, 'OBJECT')
+            if isempty(obj.cam_pc) || isempty(obj.cam_pc.outgoing) || ~isfield(obj.cam_pc.outgoing, 'OBJECT')
                 val = '';
             else
-                val = obj.sync.outgoing.OBJECT;
+                val = obj.cam_pc.outgoing.OBJECT;
             end
             
         end
@@ -633,8 +633,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function set.objName(obj, val)
             
-            if ~isempty(obj.sync)
-                obj.sync.outgoing.OBJECT = val;
+            if ~isempty(obj.cam_pc)
+                obj.cam_pc.outgoing.OBJECT = val;
             end
             
         end
@@ -763,7 +763,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
     
     methods % parsing targets
         
-        function inputTarget(obj, varargin)
+        function inputTarget(obj, varargin) % pass the arguments to the Ephemeris object (give RA and Dec or object name)
             
             if isempty(varargin) && isempty(obj.objName)
                 error('Must supply an object name or coordinates (or fill objName field)');
@@ -779,7 +779,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function C_out = scanTargetList(obj, filename)
+        function C_out = scanTargetList(obj, filename) % read list of targets from text file
             
             if ~exist(filename, 'file')
                 error('Cannot find filename "%s".', filename);
@@ -828,7 +828,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function [name, RA, Dec] = parseTargetString(obj, str)
+        function [name, RA, Dec] = parseTargetString(obj, str) % get a single line of text and turn it into a target for the list
             
             e = head.Ephemeris; % use this to format the RA/Dec inputs
             
@@ -896,7 +896,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function addTargetList(obj, str)
+        function addTargetList(obj, str) % add an object to the list of recent targets
             
             if isempty(obj.prev_objects) || all(~strcmp(str, obj.prev_objects)) % check this string is not on the list already... 
                 obj.prev_objects = [str obj.prev_objects]; % add new items up front
@@ -911,7 +911,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
     
     methods % calculations / commands
         
-        function val = check_before_slew(obj)
+        function val = check_before_slew(obj) % check object is inside limits etc.
             
             val = 0;
             
@@ -957,7 +957,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function val = check_while_moving(obj)
+        function val = check_while_moving(obj) % altitude check to be done while slewing
             
             val = 0;
             
@@ -982,7 +982,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function val = check_need_flip(obj)
+        function val = check_need_flip(obj) % check if target is on the other side of the pier
             
             if strcmp(obj.obj_pier_side, 'pierUnknown')
                 error('Mount cannot find PierSide for this object!');
@@ -992,7 +992,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function slew(obj, varargin)
+        function slew(obj, varargin) % begin slewing after doing pre-checks
             
             if isempty(obj.object.RA) || isempty(obj.object.DE) 
                 error('Please provide a target with viable RA/DE');
@@ -1043,16 +1043,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 obj.tracking = 1;
                 
-                if ~isempty(obj.sync)
-                    obj.sync.outgoing.stop_camera = 0; % need to tell cam-pc to start working! 
+                if ~isempty(obj.cam_pc)
+                    obj.cam_pc.outgoing.stop_camera = 0; % need to tell cam-pc to start working! 
                     obj.updateCamera;
-                    obj.sync.update;
+                    obj.cam_pc.update;
                 end
                 
                 obj.setup_timer;
                 
-                if ~isempty(obj.sync)
-                    obj.sync.incoming = struct;
+                if ~isempty(obj.cam_pc)
+                    obj.cam_pc.incoming = struct;
                 end
                 
                 obj.guiding_history.reset;
@@ -1068,7 +1068,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function slewWithoutPrechecks(obj, ra_hours_Jnow, dec_deg_Jnow)
+        function slewWithoutPrechecks(obj, ra_hours_Jnow, dec_deg_Jnow) % internal command to move, to be called after doing pre-checks
             
             obj.brake_bit = 0;
             
@@ -1096,7 +1096,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 
         end
         
-        function setup_timer(obj, ~, ~)
+        function setup_timer(obj, ~, ~) % start the timer that checks Arduino and updates GUI
             
             if ~isempty(obj.timer) && isa(obj.timer, 'timer') && isvalid(obj.timer)
                 if strcmp(obj.timer.Running, 'on')
@@ -1123,20 +1123,20 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             try 
             
-                if obj.use_guiding && ~isempty(obj.tracking) && obj.tracking % && obj.sync.status
+                if obj.use_guiding && ~isempty(obj.tracking) && obj.tracking % && obj.cam_pc.status
                     
                     direction = 1;
                     if strcmp(obj.pier_side, 'pierEast')
                         direction  = -1;
                     end
                     
-                    if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'RA_rate_delta') && ~isempty(obj.sync.incoming.RA_rate_delta)...
-                            && isfield(obj.sync.incoming, 'DE_rate_delta') && ~isempty(obj.sync.incoming.DE_rate_delta)
+                    if ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'RA_rate_delta') && ~isempty(obj.cam_pc.incoming.RA_rate_delta)...
+                            && isfield(obj.cam_pc.incoming, 'DE_rate_delta') && ~isempty(obj.cam_pc.incoming.DE_rate_delta)
                         
-                        dRA = obj.sync.incoming.RA_rate_delta;
+                        dRA = obj.cam_pc.incoming.RA_rate_delta;
                         if isempty(dRA) || isnan(dRA), dRA = 0; end
                         
-                        dDE = obj.sync.incoming.DE_rate_delta;
+                        dDE = obj.cam_pc.incoming.DE_rate_delta;
                         if isempty(dDE) || isnan(dDE), dDE = 0; end
                         
                         if ~isequal(dRA, obj.prev_dRA) && ~isequal(dDE, obj.prev_dDE)
@@ -1163,8 +1163,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                         
                     end
                     
-%                     if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'RA_rate_delta') && ~isempty(obj.sync.incoming.RA_rate_delta)
-%                         dRA = obj.sync.incoming.RA_rate_delta;
+%                     if ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'RA_rate_delta') && ~isempty(obj.cam_pc.incoming.RA_rate_delta)
+%                         dRA = obj.cam_pc.incoming.RA_rate_delta;
 %                         if isempty(dRA) || isnan(dRA), dRA = 0; end
 %                         
 %                         if ~isequal(dRA, obj.prev_dRA)
@@ -1173,14 +1173,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 %                             fprintf('dRA= %6.4f ', dRA); 
 %                         end
 %                         
-% %                         obj.sync.incoming.RA_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
+% %                         obj.cam_pc.incoming.RA_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
 %                         
-%                         obj.sync.outgoing.RA_rate = obj.rate_RA;
+%                         obj.cam_pc.outgoing.RA_rate = obj.rate_RA;
 %                         
 %                     end
 %                     
-%                     if ~isempty(obj.sync.incoming) && isfield(obj.sync.incoming, 'DE_rate_delta') && ~isempty(obj.sync.incoming.DE_rate_delta)
-%                         dDE = obj.sync.incoming.DE_rate_delta;
+%                     if ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'DE_rate_delta') && ~isempty(obj.cam_pc.incoming.DE_rate_delta)
+%                         dDE = obj.cam_pc.incoming.DE_rate_delta;
 %                         if isempty(dDE) || isnan(dDE), dDE = 0; end
 %                         
 %                         if ~isequal(dDE, obj.prev_dDE)
@@ -1189,8 +1189,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 %                             fprintf('| dDE= %6.4f\n', dDE); 
 %                         end
 %                         
-% %                         obj.sync.incoming.DE_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
-%                         obj.sync.outgoing.DE_rate = obj.rate_DE;
+% %                         obj.cam_pc.incoming.DE_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
+%                         obj.cam_pc.outgoing.DE_rate = obj.rate_DE;
 %                         
 %                     end
                     
@@ -1231,7 +1231,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function val = getPID_RA(obj)
+        function val = getPID_RA(obj) % Proportional-Integral-Differential control of RA rate
             
             P = obj.correct_history.data(obj.correct_history.idx,1); 
             I = nansum(obj.correct_history.data(:,1)); 
@@ -1258,7 +1258,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function val = getPID_DE(obj)
+        function val = getPID_DE(obj) % Proportional-Integral-Differential control of Dec rate
             
             P = obj.correct_history.data(obj.correct_history.idx,2); 
             I = nansum(obj.correct_history.data(:,2)); 
@@ -1285,7 +1285,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function resetRate(obj)
+        function resetRate(obj) % clear guiding history 
             
             obj.rate_RA = 0;
             obj.rate_DE = 0;
@@ -1293,15 +1293,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             obj.prev_dRA = 0;
             obj.prev_dDE = 0;
             
-            obj.sync.incoming.RA_rate_delta = 0;
-            obj.sync.incoming.DE_rate_delta = 0;
+            obj.cam_pc.incoming.RA_rate_delta = 0;
+            obj.cam_pc.incoming.DE_rate_delta = 0;
             
             obj.guiding_history.reset;
             obj.correct_history.reset(obj.integral_number);
             
         end
         
-        function adjustPosition(obj, RA_deg, DE_deg)
+        function adjustPosition(obj, RA_deg, DE_deg) % not working yet
             
             error('This doesnt work, dont use it');
             
@@ -1352,7 +1352,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
         end
         
-        function engineeringSlew(obj,Alt,Az)
+        function engineeringSlew(obj,Alt,Az) % alternative way to slew to Alt/Az
             
             try 
 
@@ -1393,29 +1393,29 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function syncToTarget(obj)
+        function syncToTarget(obj) % this is still not working! 
             
 %             obj.hndl.SyncToTarget;
             obj.hndl.SyncToCoordinates;
             
         end
         
-        function park(obj)
+        function park(obj) % go to parking position 
             
             obj.hndl.Park;
             obj.tracking = 0;
             
         end
         
-        function zenith_west(obj)
+        function zenith_west(obj) % not yet implemented
             
         end
         
-        function zenith_east(obj)
+        function zenith_east(obj) % not yet implemented
             
         end
         
-        function update(obj)
+        function update(obj) % check connection to hardware and set status to 0 or 1
             
             obj.object.update;
             
@@ -1474,7 +1474,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function stop(obj)
+        function stop(obj) % stop moving the telescope, reset guiding, stop tracking, during normal operations (does not log this)
             
 %             obj.log.input('stopping telescope');
             
@@ -1489,14 +1489,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 obj.resetRate;
                 
-                if ~isempty(obj.sync)
+                if ~isempty(obj.cam_pc)
 
-                    if isfield(obj.sync.outgoing, 'stop_camera') && obj.sync.outgoing.stop_camera==0
+                    if isfield(obj.cam_pc.outgoing, 'stop_camera') && obj.cam_pc.outgoing.stop_camera==0
                         obj.log.input('Telescope stopped, sending camera stop command');
                         disp(obj.log.report);
                     end
 
-                    obj.sync.outgoing.stop_camera = 1;
+                    obj.cam_pc.outgoing.stop_camera = 1;
                     
                 end
                 
@@ -1507,7 +1507,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function emergency_stop(obj)
+        function emergency_stop(obj) % stops slew, tracking and guiding and reports it on log
             
             obj.log.input('stopping telescope');
             
@@ -1517,38 +1517,38 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function updateCamera(obj)
+        function updateCamera(obj) % send details on object coordinates to cam_pc
             
-            obj.sync.outgoing.RA = obj.objRA;
-            obj.sync.outgoing.DEC = obj.objDEC;            
-            obj.sync.outgoing.RA_DEG = obj.objRA_deg;
-            obj.sync.outgoing.DEC_DEG = obj.objDEC_deg;
-            obj.sync.outgoing.TELRA = obj.telRA;
-            obj.sync.outgoing.TELDEC = obj.telDEC;
-            obj.sync.outgoing.TELRA_DEG = obj.telRA_deg;
-            obj.sync.outgoing.TELDEC_DEG = obj.telDEC_deg;
+            obj.cam_pc.outgoing.RA = obj.objRA;
+            obj.cam_pc.outgoing.DEC = obj.objDEC;            
+            obj.cam_pc.outgoing.RA_DEG = obj.objRA_deg;
+            obj.cam_pc.outgoing.DEC_DEG = obj.objDEC_deg;
+            obj.cam_pc.outgoing.TELRA = obj.telRA;
+            obj.cam_pc.outgoing.TELDEC = obj.telDEC;
+            obj.cam_pc.outgoing.TELRA_DEG = obj.telRA_deg;
+            obj.cam_pc.outgoing.TELDEC_DEG = obj.telDEC_deg;
             
             if isempty(obj.tracking) || obj.tracking==0 || (~isempty(obj.objRA_deg) && abs(obj.objRA_deg-obj.telRA_deg)>1) % if mount stops tracking or is 4 time-minutes away from target RA, stop the camera (e.g., when reaching limit)
                 
-                if ~isempty(obj.sync) && isfield(obj.sync.outgoing, 'stop_camera') && obj.sync.outgoing.stop_camera==0
-                    obj.sync.outgoing.stop_camera = 1;
+                if ~isempty(obj.cam_pc) && isfield(obj.cam_pc.outgoing, 'stop_camera') && obj.cam_pc.outgoing.stop_camera==0
+                    obj.cam_pc.outgoing.stop_camera = 1;
                     obj.log.input('Telescope not tracking, stopping camera');
                     disp(obj.log.report); 
                 end
                 
             else
-%                 obj.sync.outgoing.stop_camera = 0;
+%                 obj.cam_pc.outgoing.stop_camera = 0;
             end
             
         end
         
-        function val = checkArduinoTime(obj)
+        function val = checkArduinoTime(obj) % check if arduino has been in contact in the last few minutes
             
             val = 1;
             
             if ~isempty(obj.log.time)
             
-                dt = seconds(obj.log.time- obj.ard.time);
+                dt = seconds(obj.log.time - obj.ard.time);
             
                 if dt>600 % arduino has not updated in a few minutes
                     val = 0;
@@ -1559,7 +1559,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function val = printout(obj)
+        function val = printout(obj) % quick summary of mount status
         
             val = sprintf('Status= %d, LST= %s, RA= %s, Dec= %s, HA= %s, ALT= %4.2f, %s', ...
                 obj.status, obj.LST, obj.telRA, obj.telDE, obj.telHA, obj.telALT, obj.pier_side); 
@@ -1580,7 +1580,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function plot_rate(obj, ax)
+        function plot_rate(obj, ax) % show the recent guiding rates on a graph
             
             if ~isempty(obj.guiding_history.data)
                 hold(ax, 'off');

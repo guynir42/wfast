@@ -1,17 +1,25 @@
 classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 % Top level class to control observatory. 
-% This class has 2 main roles: 
+% This class has 3 main roles: 
 % (1) To contain all hardware objects (e.g., dome, mount, weather station).
 % (2) To make various checks and shutdown the observatory if needed. 
+% (3) To open the observatory and start operations via scheduler
+%       (THIS IS NOT YET IMPLEMENTED!)
 %
 % Main features:
 %   -dome, and mount are objects connected to hardware for main operations. 
 %    If one of these devices fails, the observatory must shut down (or make 
-%    a call to get help. 
+%    a call to get help). 
 %   -weather, wind, etc: sensors that check the conditions are viable for 
 %    observation. 
 %   -checker: a SensorChecker object that collects all the weather sensor 
 %    information and makes a summary of the results for the manager. 
+%   -timers: each timer has a different time scale for checking the state 
+%            of the observatory. Timer t1 is each minute, collecting the 
+%            weather data only. Timer t2 runs every five minutes and 
+%            decides if the weather conditions are ok and closes/opens 
+%            accordingly (also checks t1 is alive). 
+%            Time t3 only checks that t2 is alive every half an hour.  
 % 
 % PLEASE READ THE COMMENTS ON PROPERTIES FOR MORE DETAIL!
     
@@ -40,7 +48,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         humidity; % humidity/temperature dog
         temperature; % additional temperature meters
         
-        sync@obs.comm.PcSync;
+        cam_pc@obs.comm.PcSync; % communications object to camera PC
         
     end
     
@@ -69,7 +77,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     properties % inputs/outputs
                 
         devices_ok = 1; % no critical failures in mount/dome/etc
-        devices_report = 'OK'; % if failure happens, specify it here
+        devices_report = 'OK'; % if failure happens, specify the reason
         
     end
     
@@ -92,7 +100,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     
     properties(Hidden=true)
        
-        version = 1.01;
+        version = 1.02;
         
     end
     
@@ -269,7 +277,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             try
                 
-                obj.sync = obs.comm.PcSync('client');
+                obj.cam_pc = obs.comm.PcSync('client');
                 
             catch ME
                 obj.log.error(ME.getReport);
@@ -397,7 +405,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function val = get.tracking(obj)
+        function val = get.tracking(obj) % shortcut to telescope
             
             if isempty(obj.mount)
                 val = [];
@@ -467,7 +475,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function val = average_pressure(obj)
+        function val = average_pressure(obj) % average of all sensors that can measure this
             
             if ~isfield(obj.checker.pressure, 'func') || isempty(obj.checker.pressure.func)
                 val = nanmean(obj.checker.pressure.now);
@@ -477,7 +485,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         end
         
-        function val = any_rain(obj)
+        function val = any_rain(obj) % check if any rain sensor is reporting rain
             
             val = any(obj.checker.rain.now); 
             
@@ -495,21 +503,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     
     methods % setters
         
-        function set.sync(obj, val)
+        function set.cam_pc(obj, val) % share the sync object with the telescope
             
-            obj.sync = val;
+            obj.cam_pc = val;
             
             if ~isempty(obj.mount) && isa(obj.mount, 'obs.mount.ASA')
-                obj.mount.sync = val;
+                obj.mount.cam_pc = val;
             end
             
             if ~isempty(obj.dome) && isa(obj.dome, 'obs.dome.AstroHaven')
-                obj.dome.sync = val;
+                obj.dome.cam_pc = val;
             end
             
         end
         
-        function set.tracking(obj, val)
+        function set.tracking(obj, val) % shortcut to mount
             
             obj.mount.tracking = val;
             
@@ -519,7 +527,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     
     methods % timer related
         
-        function stop_timers(obj)
+        function stop_timers(obj) % stop all three timers (for debugging only!) make sure to turn them back on! 
             
             obj.stop_t3;
             obj.stop_t2;
@@ -527,7 +535,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function start_timers(obj)
+        function start_timers(obj) % start all timers
             
             obj.setup_t3;
             obj.setup_t2;
@@ -558,7 +566,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function setup_t1(obj, ~, ~)
+        function setup_t1(obj, ~, ~) % start the timer t1 with period1
             
             if ~isempty(obj.t1) && isa(obj.t1, 'timer') && isvalid(obj.t1)
                 if strcmp(obj.t1.Running, 'on')
@@ -578,7 +586,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function stop_t1(obj, ~, ~)
+        function stop_t1(obj, ~, ~) % stop the timer t1
             
             stop(obj.t1);
             
@@ -602,7 +610,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function setup_t2(obj, ~, ~)
+        function setup_t2(obj, ~, ~) % start the timer t2 with period2
             
             if ~isempty(obj.t2) && isa(obj.t2, 'timer') && isvalid(obj.t2)
                 if strcmp(obj.t2.Running, 'on')
@@ -622,7 +630,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function stop_t2(obj, ~, ~)
+        function stop_t2(obj, ~, ~) % stop timer t2
             
             stop(obj.t2);
             
@@ -644,7 +652,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function setup_t3(obj, ~, ~)
+        function setup_t3(obj, ~, ~) % start the timer t3 with period3
             
             if ~isempty(obj.t3) && isa(obj.t3, 'timer') && isvalid(obj.t3)
                 if strcmp(obj.t3.Running, 'on')
@@ -664,7 +672,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function stop_t3(obj, ~, ~)
+        function stop_t3(obj, ~, ~) % stop timer t3
             
             stop(obj.t3);
             
@@ -676,22 +684,23 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function update(obj) % check devices and sensors and make a decision if to shut down the observatory
 
-            obj.updateDevices;
+            obj.updateDevices; % runs update() for each critical device (mount, dome) and checks its status
 
             obj.checker.decision_all; % collect weather data and make a decision
 
             obj.log.input(obj.report); % summary of observatory status
 
-            if ~isempty(obj.sync) 
+            if ~isempty(obj.cam_pc) 
                 
                 if ~isempty(obj.mount.tracking) && obj.mount.tracking && obj.dome.is_closed==0
-                    obj.sync.outgoing.stop_camera = 0; % if everything is cool, let the camera keep going
+                    obj.cam_pc.outgoing.stop_camera = 0; % if everything is cool, let the camera keep going
                 end
                 
-                obj.sync.update;
+                obj.cam_pc.update;
                 
             end
             
+            % the following conditions for shutting down
             if obj.use_shutdown && obj.devices_ok==0 % critical device failure, must shut down
                 if obj.is_shutdown==0 % if already shut down, don't need to do it again
                     fprintf('%s: Device problems... %s \n', datestr(obj.log.time), obj.devices_report); 
@@ -699,7 +708,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
             end
 
-            if obj.use_shutdown && obj.sensors_ok==0 % critical device failure, must shut down
+            if obj.use_shutdown && obj.sensors_ok==0 % one of the sensors reports bad weather, must shut down
                 if obj.is_shutdown==0 % if already shut down, don't need to do it again
                     fprintf('%s: Bad weather... %s \n', datestr(obj.log.time), obj.checker.report); 
                     obj.shutdown;
@@ -708,7 +717,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             if obj.use_shutdown && obj.checkDayTime % check if the system clock says it is day time
                 if obj.is_shutdown==0 % if already shut down, don't need to do it again
-                    fprintf('%s: Day time... %s \n', datestr(obj.log.time), obj.checker.report); 
+                    fprintf('%s: System clock says it is day time... %s \n', datestr(obj.log.time), obj.checker.report); 
                     obj.shutdown;
                 end
             end
@@ -758,12 +767,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function updateCameraComputer(obj)
+        function updateCameraComputer(obj) % send updates through the PcSync object to the camera-PC
             
             try 
                 
-                if ~obj.sync.is_connected || ~obj.sync.status
-                    obj.sync.connect;
+                if ~obj.cam_pc.is_connected || ~obj.cam_pc.status
+                    obj.cam_pc.connect;
                 end
 
             catch 
@@ -772,44 +781,44 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 % do nothing, as we can be waiting for ever for server to connect
             end
             
-            % obj.sync.outgoing.OBJECT = ???
+            % obj.cam_pc.outgoing.OBJECT = ???
             if ~isempty(obj.mount) && obj.use_mount
                 
-                if isempty(obj.mount.sync)
-                    obj.mount.sync = obj.sync; % share the handle to this object
+                if isempty(obj.mount.cam_pc)
+                    obj.mount.cam_pc = obj.cam_pc; % share the handle to this object
                 end
                 
                 obj.mount.updateCamera;
                 
             end
             
-            obj.sync.outgoing.TEMP_OUT = obj.average_temperature;
-            obj.sync.outgoing.WIND_DIR = obj.average_wind_dir;
-            obj.sync.outgoing.WIND_SPEED = obj.average_wind_speed;
-            obj.sync.outgoing.HUMID_OUT = obj.average_humidity;
-            obj.sync.outgoing.LIGHT = obj.average_light; 
-            obj.sync.outgoing.PRESSURE = obj.average_pressure; 
+            obj.cam_pc.outgoing.TEMP_OUT = obj.average_temperature;
+            obj.cam_pc.outgoing.WIND_DIR = obj.average_wind_dir;
+            obj.cam_pc.outgoing.WIND_SPEED = obj.average_wind_speed;
+            obj.cam_pc.outgoing.HUMID_OUT = obj.average_humidity;
+            obj.cam_pc.outgoing.LIGHT = obj.average_light; 
+            obj.cam_pc.outgoing.PRESSURE = obj.average_pressure; 
             
             if obj.dome.is_closed
                 
-                if ~isfield(obj.sync.outgoing, 'stop_camera') || obj.sync.outgoing.stop_camera==0
+                if ~isfield(obj.cam_pc.outgoing, 'stop_camera') || obj.cam_pc.outgoing.stop_camera==0
                     obj.log.input('Dome closed, sending camera stop command');
                     disp(obj.log.report);
                 end
                 
-                obj.sync.outgoing.stop_camera = 1;
+                obj.cam_pc.outgoing.stop_camera = 1;
             else
-%                 obj.sync.outgoing.stop_camera = 0;
+%                 obj.cam_pc.outgoing.stop_camera = 0;
             end
             
             
             % add additional parameters and some commands like "start run"
             
-            obj.sync.update;
+            obj.cam_pc.update;
             
         end
         
-        function closeDome(obj)
+        function closeDome(obj) % shortcut to closing both sides of the dome
             
             obj.dome.closeBothFull;
             
@@ -829,8 +838,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 
                 obj.closeDome;
 
-                obj.sync.outgoing.stop_camera = 1; % make sure camera stops running also
-                obj.sync.update;
+                obj.cam_pc.outgoing.stop_camera = 1; % make sure camera stops running also
+                obj.cam_pc.update;
                 
                 % anything else we can do to put the dome to shutdown mode?
                 % ...

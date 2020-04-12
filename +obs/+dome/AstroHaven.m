@@ -1,16 +1,32 @@
-% AstroHaven class  
-% Package: +obs/+dome/
-% Description: A class for controlling the AstroHaven dome.
-%              The class opens a serial port to the instrument
-% Tested : Matlab R2018a
-%     By : Guy Nir                    Dec 2018
-%    URL : http://weizmann.ac.il/home/eofek/matlab/
-% Example: %
-% Reliable: ?
-%--------------------------------------------------------------------------
-
 classdef AstroHaven < handle
-    
+% Control the AstroHaven clamshell dome. 
+% The interface to the dome is via serial port. 
+% This is fairly convinient as long as the COM port does not change. 
+% Since this is a clamshell there are very few controls available. 
+% You can open each shutter using openEast(number) or openWest(number)
+% or openBoth(number). Same for closeXXX(number). 
+% The number is for how many keystrokes are sent to the serial controller, 
+% and correspond to degrees (very roughly). 
+% The default number for each side or both is saved in the object properties, 
+% so these commands can be called without arguments (e.g., from the GUI). 
+%
+% There are limit sensors telling the controller when each shutter is fully
+% closed or fully open. If it is in the middle, there is no sensor to tell
+% how closed it is, so we guess this using the time it takes to open and 
+% close, and then interpolate from that. This is not very accurate so take
+% the shutter position angle with a grain of salt. 
+%
+% The dome uses the same "brake_bit" strategy as other devices, so setting
+% that to 1 stops the dome, e.g., using the GUI stop button. 
+% Also, clicking Ctrl+C in the command line breaks out of the loop and stops
+% the dome from opening/closing. 
+%
+% In the future we will implement a timed open/close loop to slowly track 
+% the telescope from East to West. 
+% Also we plan to install accelerometers to know the real angle of each 
+% shutter, instead of trying to guess it. 
+
+
     properties(Transient=true)
         
         gui;
@@ -21,14 +37,14 @@ classdef AstroHaven < handle
         
         hndl; % serial port object
         
-        owner@obs.Manager;
+        owner@obs.Manager; % link back to the top level manager object
         
         acc_W@obs.sens.Accelerometer; % accelerometer for west shutter
         acc_E@obs.sens.Accelerometer; % accelerometer for east shutter
         
-        sync@obs.comm.PcSync;
+        cam_pc@obs.comm.PcSync; % communicate with the camera-PC
         
-        log@util.sys.Logger;
+        log@util.sys.Logger; % write reports to text file
         
     end
     
@@ -39,16 +55,16 @@ classdef AstroHaven < handle
         
         port_name = 'COM4'; % change this later
         
-        use_accelerometers = 0;
+        use_accelerometers = 0; % for future installation
         
-        max_fail_reply = 3;
-        max_fail_connect = 3;
+        max_fail_reply = 3; % how many sent messages to try before failing the command
+        max_fail_connect = 3; % how many reconnect attempts before failing to connect
         
-        reply = '';
+        reply = ''; % reply (single letter) from the serial controller
         
-        number_west = 50; 
-        number_east = 50;
-        number_both = 50;
+        number_west = 50; % default value to move West shutter
+        number_east = 50; % default value to move East shutter
+        number_both = 50; % default value to move both shutters
         
         brake_bit = 1;
         debug_bit = 1;
@@ -57,16 +73,17 @@ classdef AstroHaven < handle
     
     properties (Dependent = true)
         
-        is_closed;
-        shutter_west;
-        shutter_west_deg;
-        shutter_east;
-        shutter_east_deg;
+        is_closed; % if both shutter report being closed
+        shutter_west; % West shutter situation (string)
+        shutter_west_deg; % West shutter position angle (degrees)
+        shutter_east; % East shutter situation (string)
+        shutter_east_deg; % East shutter position angle (degrees)
         
     end
     
     properties (Hidden = true)
         
+        % accelerometer names (for future)
         acc_name = 'HC-06';
         acc_id_west = '';
         acc_id_east = '';
@@ -87,14 +104,11 @@ classdef AstroHaven < handle
         cal_open_time_east = 25;
         cal_close_time_east = 25;
         
-        timeout = 10; % how many seconds to wait before returning the control 
-        loop_res = 10; % how many times to call "open" or "close" when in a loop
-        
         default_number_west;
         default_number_east;
         default_number_both;
         
-        version = 1.02;
+        version = 1.03;
         
     end
     
@@ -117,12 +131,133 @@ classdef AstroHaven < handle
             
         end
         
-        function delete(obj)
+        function delete(obj) % make sure serial port is deleted when clearing this object
             
             obj.disconnect;
             
         end
         
+        function connect(obj) % connect to serial port
+            
+            try
+            
+                for ii = 1:obj.max_fail_connect
+
+                    str = sprintf('connecting to dome! attempt %d', ii);
+
+                    if obj.debug_bit>1, disp(str); end
+
+                    obj.log.input(str);
+
+                    if ~isempty(obj.hndl) && isvalid(obj.hndl)
+                        obj.disconnect;
+                    end
+
+                    delete(instrfind('Name', ['Serial-', obj.port_name])); % get rid of any leftover serial connections to this object's hndl
+                    
+                    pause(0.1);
+
+                    obj.hndl = serial(obj.port_name);
+
+                    obj.hndl.Terminator = '';
+
+                    try 
+                        fopen(obj.hndl);
+                    catch ME
+
+                        if strcmp(ME.identifier, 'MATLAB:serial:fopen:opfailed') % if this is the regular connection error, just report it and try again
+                            str = sprintf('failed to open serial port, attempt %d\n', ii); 
+                            if obj.debug_bit>1, disp(str); end 
+                            obj.log.input(str);
+                        else 
+                            rethrow(ME); % if this is some other error, throw it up the line
+                        end
+
+                    end
+
+                    if strcmp(obj.hndl.Status, 'open'), break; end % if we succeed, no need to continue with the loop
+
+                end
+
+                if strcmp(obj.hndl.Status, 'open') % if the loop ended with success
+
+                    if obj.debug_bit>1, disp('Successful reconnect!'); end
+
+                    obj.update;
+
+                    if obj.use_accelerometers
+                        obj.connectAccelerometers;
+                    end
+
+                else % failed to connect after so many tries
+
+                    if obj.debug_bit>1, disp('Giving up on opening serial port...'); end
+                    obj.log.input('Failed to connect to serial port :(');
+
+                    if ~isempty(obj.hndl)
+                        obj.disconnect
+                    end
+
+                end
+                
+                obj.send('R');
+                
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
+
+        end
+        
+        function disconnect(obj) % close, delete and clear the serial object "hndl"
+            
+            if obj.debug_bit>1, disp('disconnecting from dome!'); end
+            
+            obj.log.input('Disconnecting from dome');
+            
+            try 
+                if ~isempty(obj.hndl)
+                    fclose(obj.hndl);
+                    delete(obj.hndl);
+                end
+                obj.hndl = [];
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
+            
+        end
+        
+        function connectAccelerometers(obj) % for future installation
+            
+            obj.log.input('Connecting to accelerometers.');
+            
+            try
+                
+                obj.acc_W = obs.sens.Accelerometer(obj.acc_name, obj.acc_id_west);
+                
+            catch ME
+                
+                obj.log.error(ME.getReport);
+                obj.acc_E = obs.sens.Accelerometer.empty;
+                warning(ME.getWarning);
+                
+            end
+            
+            try
+                
+                obj.acc_E = obs.sens.Accelerometer(obj.acc_name, obj.acc_id_east);
+                
+            catch ME
+                
+                obj.log.error(ME.getReport);
+                obj.acc_E = obs.sens.Accelerometer.empty;
+                warning(ME.getWarning);
+                
+            end
+            
+        end
+
     end
     
     methods % resetters
@@ -203,9 +338,9 @@ classdef AstroHaven < handle
         
     end
     
-    methods % commands
+    methods % commands to move or stop shutters
                 
-        function emergencyClose(obj)
+        function emergencyClose(obj) % do everything you can to close dome (including sending the uncancelable 'C' command) 
             
             obj.log.input('Emergency close!');
             
@@ -221,7 +356,7 @@ classdef AstroHaven < handle
             
         end
         
-        function openBoth(obj, number)
+        function openBoth(obj, number) % open both shutters a certain amount
             
             if nargin<2 || isempty(number)
                 if ~isempty(obj.number_both) && obj.number_both>0
@@ -257,7 +392,7 @@ classdef AstroHaven < handle
             
         end
         
-        function closeBoth(obj, number)
+        function closeBoth(obj, number) % close both shutters a certain amount
             
             if nargin<2 || isempty(number)
                 if ~isempty(obj.number_both) && obj.number_both>0
@@ -292,8 +427,20 @@ classdef AstroHaven < handle
             end
             
         end
-                
-        function openWest(obj, number)
+            
+        function openBothFull(obj) % send command to both shutters until they are fully open
+            
+            obj.openBoth(1000);
+            
+        end
+        
+        function closeBothFull(obj) % send command to both shutters until they are fully open
+            
+            obj.closeBoth(1000);
+            
+        end
+            
+        function openWest(obj, number) % open West shutter a certain amount
             
             if nargin<2 || isempty(number)
                 if ~isempty(obj.number_west) && obj.number_west>0
@@ -328,7 +475,53 @@ classdef AstroHaven < handle
             
         end
         
-        function openEast(obj, number)
+        function closeWest(obj, number) % close West shutter a certain amount
+            
+            if nargin<2 || isempty(number)
+                if ~isempty(obj.number_west) && obj.number_west>0
+                    number = obj.number_west;
+                else
+                    number = 1;
+                end
+            end
+            
+            obj.log.input(['Close shutter West. N= ' num2str(number)]);
+            
+            try
+            
+                obj.update;
+                
+                t = tic;
+                
+                reply = obj.command('A', number); % can add a "max_duration" argument to allow the loop to stop after so long
+                
+                if isempty(reply)
+                    % what to do if a command didn't succeed? should this be an error?
+                else
+                    obj.close_time_west = obj.close_time_west + toc(t);
+                end
+                obj.update;
+
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
+            
+        end
+        
+        function openWestFull(obj) % send command to West shutter until it is fully open
+            
+            obj.openWest(1000);
+            
+        end
+        
+        function closeWestFull(obj) % send command to West shutter until it is fully closed
+            
+            obj.closeWest(1000);
+            
+        end
+        
+        function openEast(obj, number) % open East shutter a certain amount
             
             if nargin<2 || isempty(number)
                 if ~isempty(obj.number_east) && obj.number_east>0
@@ -363,41 +556,7 @@ classdef AstroHaven < handle
             
         end
         
-        function closeWest(obj, number)
-            
-            if nargin<2 || isempty(number)
-                if ~isempty(obj.number_west) && obj.number_west>0
-                    number = obj.number_west;
-                else
-                    number = 1;
-                end
-            end
-            
-            obj.log.input(['Close shutter West. N= ' num2str(number)]);
-            
-            try
-            
-                obj.update;
-                
-                t = tic;
-                
-                reply = obj.command('A', number); % can add a "max_duration" argument to allow the loop to stop after so long
-                
-                if isempty(reply)
-                    % what to do if a command didn't succeed? should this be an error?
-                else
-                    obj.close_time_west = obj.close_time_west + toc(t);
-                end
-                obj.update;
-
-            catch ME
-                obj.log.error(ME.getReport);
-                rethrow(ME);
-            end
-            
-        end
-        
-        function closeEast(obj, number)
+        function closeEast(obj, number) % close East shutter a certain amount
              
             if nargin<2 || isempty(number)
                 if ~isempty(obj.number_east) && obj.number_east>0
@@ -432,168 +591,23 @@ classdef AstroHaven < handle
             
         end
         
-        function openWestFull(obj)
-            
-            obj.openWest(1000);
-            
-        end
-        
-        function closeWestFull(obj)
-            
-            obj.closeWest(1000);
-            
-        end
-        
-        function openEastFull(obj)
+        function openEastFull(obj) % send command to East shutter until it is fully open
             
             obj.openEast(1000);
             
         end
         
-        function closeEastFull(obj)
+        function closeEastFull(obj) % send command to East shutter until it is fully closed
             
             obj.closeEast(1000);
             
         end
         
-        function openBothFull(obj)
-            
-            obj.openBoth(1000);
-            
-        end
-        
-        function closeBothFull(obj)
-            
-            obj.closeBoth(1000);
-            
-        end
-        
     end
     
-    methods % internal functions (to be made hidden/private)
+    methods(Hidden=true) % internal functions
         
-        function connect(obj)
-            
-            try
-            
-                for ii = 1:obj.max_fail_connect
-
-                    str = sprintf('connecting to dome! attempt %d', ii);
-
-                    if obj.debug_bit>1, disp(str); end
-
-                    obj.log.input(str);
-
-                    if ~isempty(obj.hndl) && isvalid(obj.hndl)
-                        obj.disconnect;
-                    end
-
-                    delete(instrfind('Name', ['Serial-', obj.port_name])); % get rid of any leftover serial connections to this object's hndl
-                    
-                    pause(0.1);
-
-                    obj.hndl = serial(obj.port_name);
-
-                    obj.hndl.Terminator = '';
-
-                    try 
-                        fopen(obj.hndl);
-                    catch ME
-
-                        if strcmp(ME.identifier, 'MATLAB:serial:fopen:opfailed') % if this is the regular connection error, just report it and try again
-                            str = sprintf('failed to open serial port, attempt %d\n', ii); 
-                            if obj.debug_bit>1, disp(str); end 
-                            obj.log.input(str);
-                        else 
-                            rethrow(ME); % if this is some other error, throw it up the line
-                        end
-
-                    end
-
-                    if strcmp(obj.hndl.Status, 'open'), break; end % if we succeed, no need to continue with the loop
-
-                end
-
-                if strcmp(obj.hndl.Status, 'open') % if the loop ended with success
-
-                    if obj.debug_bit>1, disp('Successful reconnect!'); end
-
-                    obj.update;
-
-                    if obj.use_accelerometers
-                        obj.connectAccelerometers;
-                    end
-
-                else % failed to connect after so many tries
-
-                    if obj.debug_bit>1, disp('Giving up on opening serial port...'); end
-                    obj.log.input('Failed to connect to serial port :(');
-
-                    if ~isempty(obj.hndl)
-                        obj.disconnect
-                    end
-
-                end
-                
-                obj.send('R');
-                
-            catch ME
-                obj.log.error(ME.getReport);
-                rethrow(ME);
-            end
-
-        end
-        
-        function disconnect(obj)
-            
-            if obj.debug_bit>1, disp('disconnecting from dome!'); end
-            
-            obj.log.input('Disconnecting from dome');
-            
-            try 
-                if ~isempty(obj.hndl)
-                    fclose(obj.hndl);
-                    delete(obj.hndl);
-                end
-                obj.hndl = [];
-            catch ME
-                obj.log.error(ME.getReport);
-                rethrow(ME);
-            end
-            
-        end
-        
-        function connectAccelerometers(obj)
-            
-            obj.log.input('Connecting to accelerometers.');
-            
-            try
-                
-                obj.acc_W = obs.sens.Accelerometer(obj.acc_name, obj.acc_id_west);
-                
-            catch ME
-                
-                obj.log.error(ME.getReport);
-                obj.acc_E = obs.sens.Accelerometer.empty;
-                warning(ME.getWarning);
-                
-            end
-            
-            try
-                
-                obj.acc_E = obs.sens.Accelerometer(obj.acc_name, obj.acc_id_east);
-                
-            catch ME
-                
-                obj.log.error(ME.getReport);
-                obj.acc_E = obs.sens.Accelerometer.empty;
-                warning(ME.getWarning);
-                
-            end
-            
-        end
-
-        function reply = command(obj, command_vector, number)
+        function reply = command(obj, command_vector, number) % generic interface to move shutters ("command_vector" is a string sent "number" of times to serial port)
             
             if nargin<3 || isempty(number)
                 number = 1;
@@ -668,7 +682,7 @@ classdef AstroHaven < handle
             
         end
         
-        function reply = send(obj, command)
+        function reply = send(obj, command) % send a single string to the serial port
             
             reply = ''; % empty reply means failed to send
             
@@ -697,7 +711,7 @@ classdef AstroHaven < handle
 
         end
         
-        function update(obj)
+        function update(obj) % communicate with hardware to make sure it is still connected
             
             if obj.debug_bit>1, fprintf('updating data...\n'); end
             
@@ -722,7 +736,7 @@ classdef AstroHaven < handle
 
         end
         
-        function reply = getReply(obj, ~, ~)
+        function reply = getReply(obj, ~, ~) % read the serial port
             
             warning('off', 'MATLAB:serial:fread:unsuccessfulRead');
             
@@ -758,7 +772,7 @@ classdef AstroHaven < handle
             
         end
         
-        function val = calcAngle(obj, shutter)
+        function val = calcAngle(obj, shutter) % calculate the shutter angle by interpolating the time it takes to open/close
 
             import util.text.cs;
             
@@ -816,7 +830,7 @@ classdef AstroHaven < handle
             
         end
         
-        function stop(obj)
+        function stop(obj) % stop the motion of the shutters
             
             obj.brake_bit = 1;
             

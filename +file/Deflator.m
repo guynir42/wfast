@@ -147,11 +147,14 @@ classdef Deflator < file.AstroData
             end
             
             if nargin<3 || isempty(output)
-                output = getenv('DATA');
+                output = getenv('DATA_EXTRAS');
+                if isempty(output)
+                    output = getenv('DATA');
+                end
             end
             
             if nargin<4 || isempty(backup)
-                backup = getenv('DATA_BACKUP');
+                backup = getenv('DATA_BACKUP'); 
                 if isempty(backup)
                     backup = getenv('DATA');
                 end
@@ -398,7 +401,7 @@ classdef Deflator < file.AstroData
                         end
                         
                         obj.clear;
-                
+                        
                         origin_filename = obj.reader.this_filename;
                         [output_exists, output_filename] = obj.checkFileExists(origin_filename, obj.out_subdir.pwd);
                         
@@ -606,7 +609,12 @@ classdef Deflator < file.AstroData
             
             [~, name, ext] = fileparts(file_src);
             
-            new_file = [fullfile(directory, name) ext 'z'];
+            if strcmpi(ext, '.h5')
+                new_file = [fullfile(directory, name) ext 'z'];
+            else
+                new_file = [fullfile(directory, name) ext];
+            end
+            
             if exist(new_file, 'file')
                 c = 1;
                 f1 = dir(file_src);
