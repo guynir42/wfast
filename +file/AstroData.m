@@ -18,12 +18,14 @@ classdef AstroData < dynamicprops
         images; % this is raw images and it is usually what we save on file
         
         timestamps; % output timestamps (if available)
-        
         t_start; % absolute date and time (UTC) when first image is taken
         t_end; % absolute date and time (UTC) when batch is finished
         t_end_stamp; % timestamp when batch is finished (hopefully, this is the same time that t_end is recorded). 
-        
+         
         juldates; % translation of timestamps to julian date using t_end_stamp
+        
+        stack % sum of the full frame image
+        num_sum; % if the images are summed, how many frames were added. If equal to 1, the sum is the same as the images. 
         
         cutouts; % this is raw cutouts and it is usually what we save on file
         positions; % only for cutouts. a 2xN matrix (X then Y, N is the number of cutouts). 
@@ -31,6 +33,12 @@ classdef AstroData < dynamicprops
         magnitudes; % each star's magnitude (from catalog)
         temperatures; % each star's temperature in K (from catalog)
         object_idx; % what is the index of the object closest to the coordinates given
+        
+        cutouts_bg; % samples of the raw images at random locations to calculate the backgrounds
+        positions_bg; % only for bg_cutouts. a 2xN matrix (X then Y, N is the number of cutouts). 
+        
+        psfs; % output PSFs from file (if available)
+        sampling_psf; % if loaded PSFs need to be binned (this is the binning factor)
         
         % these are photometric products for each batch
         fluxes; % amount of light (total) in each cutout
@@ -46,14 +54,6 @@ classdef AstroData < dynamicprops
         bad_pixels; % how many bad pixels are included in the aperture
         flags; % if any of the measurements (1st or 2nd order) don't make sense, it is flagged by the photometry pipeline.  
         
-        cutouts_bg; % samples of the raw images at random locations to calculate the backgrounds
-        positions_bg; % only for bg_cutouts. a 2xN matrix (X then Y, N is the number of cutouts). 
-        
-        stack % sum of the full frame image
-        num_sum; % if the images are summed, how many frames were added. If equal to 1, the sum is the same as the images. 
-         
-        psfs; % output PSFs from file (if available)
-        sampling_psf; % if loaded PSFs need to be binned (this is the binning factor)
         
     end
     

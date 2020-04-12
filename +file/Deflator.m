@@ -1,5 +1,63 @@
 classdef Deflator < file.AstroData
-   
+% This class brings together a file.Reader and file.BufferWheel, and loops 
+% over a list of files and folders, reading them from one location, and 
+% writing them to another location, after deflating them. 
+% This is done because we currently cannot deflate and save the files in 
+% asynchronuous mode. The idea is to run deflation during the day. 
+%
+% NOTE: deflator skips HDF5 files that already exist in the destination/backup
+%       folder, so if you accidentally deflate the same folder twice, it only
+%       re-copies the catalog, readme files and calibration files. 
+% 
+% Using the Deflator
+%--------------------
+% Manual control: Use the GUI or select the working directories to the places
+% where you are storing the source and output (and backup) files. 
+% You can use the WorkingDirectory's own cd() or browse() methods. 
+% Once these are selected, simply use run() or run_async() to loop over all 
+% the folders in "src_dir". 
+% 
+% Automated start: When the Acquisition class starts a run it sets up the 
+% deflator to a delayed start using setup_timer(hour=5), where hour is the 
+% time of day to start deflation (in UTC, whereas 5 is 7am or 8am). 
+% In this case you should make sure that "auto_deflate_destination" and
+% "auto_deflate_backup_dir" are all set to proper folders (these are strings
+% and not WorkingDirectory objects!). 
+% Also choose "use_parallel_auto_deflate" for doing the deflation using 
+% run() or run_async() (default is true --> use async). 
+% NOTE: this goes over all data in DATA_TEMP, but the deflator skips files 
+% that are already present in the destination. 
+% 
+% OTHER OPTIONS:
+%----------------
+% -use_auto_backup: make a third copy of the data (using matlab's copyfile).
+%                   This is stored to the "out_dir_backup" or subfolders of
+%                   the "auto_deflate_backup_dir". Default is true. 
+% 
+% -use_auto_delete: delete the original files after deflation. Default false. 
+%
+% -use_copy_text_files or _catalogs or _calibration: These are used to copy
+%                 over the auxiliary files generated with the data. 
+%                 The default is true for all three.
+% 
+% -auto_deflate_destination and _backup_dir: these are strings specifying the
+%              destination for autodeflate calls. This can be the same as 
+%              the main data folder but that would mean the Dropbox would
+%              need to be constantly uploading files (we can't do that). 
+%              Instead these are set, by default, to environmental variables
+%              DATA_EXTRAS and DATA_BACKUP, that should be on two separate 
+%              drives, outside the Dropbox folder. The backup should be to 
+%              a non-removable HDD. 
+%              Deflator will automatically make date-folders at those destinations
+%              for any existing date folders it finds inside DATA_TEMP. 
+%
+% -use_parallel_auto_deflate: when the automatic deflate timer goes off in 
+%                             the morning, use the async mode (Default true). 
+%
+% NOTE: the HDF5 files are deflated and then their extension changes from 
+%       .h5 to .h5z to show they have been compressed. 
+
+    
     properties (Transient=true)
         
         gui@file.gui.DeflatorGUI;
@@ -14,45 +72,41 @@ classdef Deflator < file.AstroData
     
     properties % objects and resources
         
-        head@head.Header;
+        head@head.Header; % link back to owner's header (also shared with reader and buffers)
         
-        src_dir@util.sys.WorkingDirectory;
-        out_dir@util.sys.WorkingDirectory;
-        out_dir_backup@util.sys.WorkingDirectory;
+        src_dir@util.sys.WorkingDirectory; % point this to a date-folder with the data you wish to deflate
+        out_dir@util.sys.WorkingDirectory; % point this to a new date-folder you generated and wish to deflate into
+        out_dir_backup@util.sys.WorkingDirectory; % point this to a new date-folder you generated and wish to copy the deflated files into
         
-        src_subdir@util.sys.WorkingDirectory;
-        out_subdir@util.sys.WorkingDirectory;
-        out_subdir_backup@util.sys.WorkingDirectory;
-        
-        reader@file.Reader;
-        buffers@file.BufferWheel;
-        
-    end
-    
-    properties(Dependent=true)
+        reader@file.Reader; % this object just reads the HDF5 files
+        buffers@file.BufferWheel; % this is used to deflate and write the data into new files
         
     end
     
     properties % switches and controls
         
-        auto_deflate_destination = getenv('DATA_EXTRAS');
-        auto_deflate_backup_dir = getenv('DATA_BACKUP'); 
+        auto_deflate_destination = getenv('DATA_EXTRAS'); % automatically create date-folders inside this destination (should be on removable HDD)
+        auto_deflate_backup_dir = getenv('DATA_BACKUP'); % automatically create date-folders inside this destination (should be on permanent HDD, outside Dropbox)
         
-        use_auto_delete = 0;
+        use_parallel_auto_deflate = 1; % when setting up a delayed, automatic defaltion, use run_asyn() instead of run()
         
-        use_parallel_auto_deflate = 1;
+        use_auto_delete = 0; % delete files from source after they are successfully deflated
         
-        use_auto_backup = 1;
+        use_auto_backup = 1; % use matlab's copyfile to make a second copy of newly deflated files
         
-        use_copy_text_files = 1;
-        use_copy_catalogs = 1;
-        use_copy_calibration = 1;
+        use_copy_text_files = 1; % make sure to copy the readme text files from each folder
+        use_copy_catalogs = 1; % make sure to copy the catalog MAT-files from each folder
+        use_copy_calibration = 1; % make sure to copy the calibration MAT-files from each folder
         
         debug_bit = 1;
         
     end
     
     properties(Hidden=true)
+        
+        src_subdir@util.sys.WorkingDirectory; % this is automatically pointed at subfolder of src_dir
+        out_subdir@util.sys.WorkingDirectory; % this is automatically pointed at subfolder of out_dir
+        out_subdir_backup@util.sys.WorkingDirectory; % this is automatically pointed at subfolder of out_dir_backup
         
         brake_bit = 1;
         
@@ -184,7 +238,7 @@ classdef Deflator < file.AstroData
     
     methods % setters
         
-        function set.head(obj, header)
+        function set.head(obj, header) % make sure all subobjects (reader/buffers) share this header
             
             obj.head= header;
 
@@ -196,7 +250,24 @@ classdef Deflator < file.AstroData
     
     methods % API
         
-        function run(obj, varargin)
+        function run(obj, varargin) % loop over all date-folders inside src_dir and make deflated copies in out_dir
+        % Usage: run(obj, varargin)
+        % Find all folders inside the src_dir and make copies of them into 
+        % the out_dir (possibly making a second copy to out_dir_backup). 
+        % 
+        % Will copy over text and MAT-files but will read HDF5 files and 
+        % write them back to disk after deflation is done. 
+        % Note that this is done using BufferWheel's use_async turned off. 
+        % 
+        % Ideally this should be called after setting the src_dir and out_dir
+        % to a date folder in the DATA_TEMP and in the DATA_EXTRAS folders. 
+        % 
+        % Optional Arguments:
+        %---------------------
+        % out_dir: supply a full path to the output directory (making it if
+        %          it does not exist yet. 
+        % src_dir: supply a full path to the source directory. 
+        %
             
             import util.text.sa;
             
@@ -332,7 +403,7 @@ classdef Deflator < file.AstroData
                         [output_exists, output_filename] = obj.checkFileExists(origin_filename, obj.out_subdir.pwd);
                         
                         if ~output_exists % load and write to output
-                                obj.batch;
+                            obj.batch;
                         else % file exists, check if we need to back it up too
                             obj.reader.advanceFile; % if this file exists we don't need to re-read it
                         end
@@ -377,9 +448,9 @@ classdef Deflator < file.AstroData
             
         end
         
-        function run_async(obj)
-            
-            obj.futures{end+1} = parfeval(@obj.run, 0); 
+        function run_async(obj, varargin) % same as run(), only it works on a parallel worker
+        
+            obj.futures{end+1} = parfeval(@obj.run, 0, varargin{:}); 
             
         end
         
@@ -411,7 +482,7 @@ classdef Deflator < file.AstroData
             
         end
         
-        function callback_timer(obj, ~, ~)
+        function callback_timer(obj, ~, ~) % this is called when the timer triggers
             
             disp('Running auto-deflate!');
             
@@ -478,17 +549,17 @@ classdef Deflator < file.AstroData
     
     methods % internal calculations
         
-        function batch(obj)
+        function batch(obj) % read one file and write it to disk after deflating it
             
-            t1 = tic;
+%             t1 = tic;
             obj.reader.batch;
             obj.copyFrom(obj.reader);
-            obj.head = obj.reader.head;
-            read_time = toc(t1); 
+            obj.head = obj.reader.head; % is this necessary?
+%             read_time = toc(t1); 
             
-            t2 = tic;
+%             t2 = tic;
             obj.save;
-            save_time = toc(t2); 
+%             save_time = toc(t2); 
             
 %             fprintf('read time: %f | save time: %f\n', read_time, save_time); 
             
@@ -500,7 +571,7 @@ classdef Deflator < file.AstroData
             
         end
                 
-        function save(obj)
+        function save(obj) % order the buffer object to save the file
                        
             if ~isempty(obj.gui) && ~isempty(obj.buffers.gui)
                 obj.buffers.gui.update;
@@ -531,7 +602,7 @@ classdef Deflator < file.AstroData
             
         end
                 
-        function [c, new_file] = checkFileExists(obj, file_src, directory)
+        function [c, new_file] = checkFileExists(obj, file_src, directory) % check if file exists in the destination directory
             
             [~, name, ext] = fileparts(file_src);
             

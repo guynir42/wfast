@@ -1,15 +1,15 @@
 classdef BufferWheel < file.AstroData
 % Usage: obj = BufferWheel(num_buffers=5, header=[])
 % Holds several (e.g., 5) Buffer structs and rotates them as they get filled
-% and emptied to file. 
+% and then dumped to file. 
 %
 % Uses index (and index_rec) to keep track of which buffer to use when
 % recording or reading and writing to file. Each buffer struct can have all 
 % the inputs and outputs (e.g. images, fluxes, psfs, etc.) as defined in 
 % file.AstroData class.
 %
-% Model 1: input data from camera/sim/pipeline using input method, then
-% immediately use save method which also brings up new buffer. If you try
+% Model 1: input data from camera/sim/pipeline using input() method, then
+% immediately use save method which also brings up a new buffer. If you try
 % to input to a buffer that is still saving, you get an error. 
 % (this is used by Acquisition and Deflator classes to save cutouts etc.).
 % 
@@ -19,11 +19,12 @@ classdef BufferWheel < file.AstroData
 % Run analysis on any buffers released from camera (if analysis slows down,
 % you may need to catch up or skip buffers). Keep track of which buffer is
 % under analysis at any time using "index". Use "save" to save current 
-% buffer, e.g., when there is a trigger in the buffer you are now analyzing. 
+% buffer, e.g., when there is a trigger in the buffer you are now analyzing, 
+% and you want to dump the full frame images to disk. 
 %
 % OBJECTS:
-%   -buf: vector of Buffer structs. 
-%   -header: link back to parent object.
+%   -buf: vector of buffer structs. 
+%   -header: link back to parent object's header. 
 %   -gui: Optional GUI object.
 %   -this_buf, next_buf, prev_buf: getters from "buf", based on index.
 %    (NOTE: these shortcuts can ONLY be used for READING data from buffers). 
@@ -33,10 +34,10 @@ classdef BufferWheel < file.AstroData
 %    fluxes? dark/flat? etc.). Will print this in the filename. 
 %   -base_dir: set to [] to use getenv('DATA_TEMP') or getenv('DATA') 
 %   -date_dir: set to [] to use this night's date dir. 
-%   -target_dir: set to [] to use "head.target_name" as target_dir. 
-%     *** "full_path" is: base_dir/date_dir/target_dir. ***
+%   -target_dir: set to [] to use "head.OBJECT" as target_dir. 
+%    NOTE:  "full_path" is: base_dir/date_dir/target_dir. 
 %   -dir_extension: overrides the automatic extension to the dir name. 
-%   -use_dir_type: automatically adds "product_type" to the dir name. 
+%   -use_dir_type: automatically adds "product_type" to the dir name. Default 0. 
 %   -use_overwrite: silently delete existing files (default is true).
 %   -use_write_header: try to save the "head" object into file.
 %   -use_deflate: if non-zero, use deflation (can be anything from 1 to 10)
@@ -54,7 +55,7 @@ classdef BufferWheel < file.AstroData
 % 3) Dark: Same as "Full", only for dark frames. These are always full raw. 
 % 4) Flat: Same as "Full", only for flat frames. These are always full raw. 
 % 5) Cutouts: including cutouts, positions, stacks, lightcurves, etc. This 
-%             is the main product type for normal W-FAST operations. 
+%             is the main product type for W-FAST operations in fast mode. 
 % 
 %   *Additional qualifiers may include "Sim" for simulated images, "cal" or 
 %    "proc" for calibrated/processed full or cutout frames. 
@@ -67,8 +68,8 @@ classdef BufferWheel < file.AstroData
 %       * writing to disk (i.e., by a separate thread using mex-write). 
 %       Each of these flags is a 2-element vector that is passed to mex
 %       functions that can read and change the value under the hood. That's
-%       why you must not change these vectors directly (then there will be
-%       a different vector for matlab and for the mex thread). 
+%       why you must not change these vectors directly (matlab will reallocate
+%       the memory leaving an orphaned vector in the mex thread). 
 %       The first element of each vector is the lock (0- open, 1-locked).
 %       The second is the number of seconds spent waiting for the lock. 
 
@@ -890,7 +891,7 @@ classdef BufferWheel < file.AstroData
     
     methods % actions!
         
-        function input(obj, varargin) % give data to the buffer (use "save" to dump data to disk)
+        function input(obj, varargin) % give data to the buffer (use save() to dump data to disk)
             
             if isempty(varargin)
                 return; % do not call clear (or anything) if you didn't get any data... 
@@ -923,7 +924,7 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function save(obj, buf) % dump existing data to disk
+        function save(obj, buf) % dump all data to disk
         
             import util.text.cs;
             
@@ -1029,7 +1030,7 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function saveHDF5(obj, filename)
+        function saveHDF5(obj, filename) % this needs to be update or deprecated!
             
             if nargin<2 || isempty(filename)
                 error('cannot run saveHDF5 without a filename!');
@@ -1272,9 +1273,9 @@ classdef BufferWheel < file.AstroData
         
     end
       
-    methods (Static=true) % static save (old, non-mex methods) to be depricated!!!
+    methods (Static=true) % static save (old, non-mex methods) to be deprecated!!!
         
-        function ok = saveHDF5Static(filename, deflate, chunk, images, positions, timestamps, t_end_stamp, t_end, t_start, psfs, psf_sampling, fluxes, header, use_write_header, debug_bit)
+        function ok = saveHDF5Static(filename, deflate, chunk, images, positions, timestamps, t_end_stamp, t_end, t_start, psfs, psf_sampling, fluxes, header, use_write_header, debug_bit) % this needs to be update or deprecated!
             
             ok = 0;
             
@@ -1379,7 +1380,7 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function ok = saveFitsStatic(filename, deflate, chunk, images, positions, timestamps, t_end_stamp, t_end, t_start, psfs, psf_sampling, fluxes, header, use_write_header, debug_bit)
+        function ok = saveFitsStatic(filename, deflate, chunk, images, positions, timestamps, t_end_stamp, t_end, t_start, psfs, psf_sampling, fluxes, header, use_write_header, debug_bit) % this needs to be update or deprecated!
                             
             if nargin<1
                 error(['cannot run saveFitsStatic without a filename!']);    
@@ -1506,7 +1507,7 @@ classdef BufferWheel < file.AstroData
             
         end
         
-        function ok = saveMatFileStatic(filename, images, positions, timestamps, t_end_stamp, t_end, t_start, psfs, psf_sampling, fluxes, header, use_save_header, debug_bit)
+        function ok = saveMatFileStatic(filename, images, positions, timestamps, t_end_stamp, t_end, t_start, psfs, psf_sampling, fluxes, header, use_save_header, debug_bit) % this needs to be update or deprecated!
             
             ok = 0;
             
