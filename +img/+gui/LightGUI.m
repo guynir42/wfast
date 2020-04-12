@@ -201,7 +201,7 @@ classdef LightGUI < handle
             
             obj.button_log_scale = GraphicButton(obj.panel_image, [0.0 0.95 0.1 0.05], obj.owner, 'use_show_log', 'toggle', 'linear', 'log', 'small');
             
-            obj.button_cut_number = GraphicButton(obj.panel_image, [0.0 0.0 0.1 0.05], obj.owner, '', 'custom', 'star= '); 
+            obj.button_cut_number = GraphicButton(obj.panel_image, [0.0 0.0 0.1 0.05], obj.owner, '', 'custom', 'star: '); 
             
             obj.button_datetime = GraphicButton(obj.panel_image, [0.9 0.0 0.1 0.05], obj.owner, 'use_show_datetime', 'toggle', 'seconds', 'datetime'); 
             

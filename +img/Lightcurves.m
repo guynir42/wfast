@@ -114,9 +114,11 @@ classdef Lightcurves < handle
         sysrem_iterations = 1;
         use_self_exclude = 0;
         
-        use_psf_correction = 0;
 %         use_polynomial = 0;
-        use_zero_point = 1;
+        use_zero_point = 0;
+        use_airmass_correct = 0;
+        use_psf_correction = 0;
+        
         missing_method = 'linear'; % can also choose 'previous', 'next', 'nearest', 'linear', 'spline', 'pchip', 'makima' (see the help section of fillmissing())
 %         use_savitzky_golay = 1;
 %         sg_order = 3;
@@ -126,7 +128,7 @@ classdef Lightcurves < handle
         
         use_welch = 0;
         
-        sampling_jump = 100; % how many data points to bin together when calculating RE on larger and larger time-intervals
+        sampling_jump = 2; % how many data points to bin together when calculating RE on larger and larger time-intervals
         num_points_rms = 20; % how many data points of binned data to use for calculating local relative error
         
         show_for = 'time'; % can also choose "stars" to get star by star stats
@@ -141,12 +143,12 @@ classdef Lightcurves < handle
         use_smooth = 1; % smoothing is applied to the plotted data only! 
         smooth_interval = 10; % how many samples to average over when smoothing
         
-        use_show_log = 0; % show the plot in log scale. Power spectra always shows log Y, but can toggle X. For others, toggles log Y only (X is linear). 
+        use_show_log = 1; % show the plot in log scale. Power spectra always shows log Y, but can toggle X. For others, toggles log Y only (X is linear). 
         
 %         use_show_re_bins = 0;
         show_mag_limit = 15; 
         
-        use_show_bin_fits = 0;
+        use_show_bin_fits = 1;
         
         debug_bit = 1;
         
