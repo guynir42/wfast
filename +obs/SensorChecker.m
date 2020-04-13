@@ -213,11 +213,11 @@ classdef SensorChecker < handle
             obj.light = struct(); 
             obj.light.names = {'light', 'light_value', 'daylight'};
             obj.light.data = [];
+            obj.light.jd = [];
             obj.light.sensors = {}; 
             obj.light.index = [];
             obj.light.now = [];
             obj.light.string = '';
-            obj.light.jd = [];
             obj.light.err_str = 'Light is too bright!'; 
             obj.light.units = '';
             
@@ -230,11 +230,11 @@ classdef SensorChecker < handle
             obj.clouds = struct();
             obj.clouds.names = {'clouds', 'temp_sky', 'sky_temp', 'skyAmbientTemp', 'skyAmbientTemperature'};
             obj.clouds.data = [];
+            obj.clouds.jd = [];
             obj.clouds.sensors = {};
             obj.clouds.index = [];
             obj.clouds.now = [];
             obj.clouds.string = '';
-            obj.clouds.jd = [];
             obj.clouds.units = 'C';
             obj.clouds.err_str = 'Sky is cloudy!'; 
             
@@ -247,11 +247,11 @@ classdef SensorChecker < handle
             obj.temperature = struct();
             obj.temperature.names = {'temperature', 'ambientTemp', 'ambientTemperature', 'outsideTemp', 'outsideTemperature'}; 
             obj.temperature.data = [];
+            obj.temperature.jd = [];
             obj.temperature.sensors = {};
             obj.temperature.index = [];
             obj.temperature.now = [];
             obj.temperature.string = '';
-            obj.temperature.jd = [];
             obj.temperature.units = 'C';
             obj.temperature.err_str = 'Temperature out of range!';
         
@@ -266,11 +266,11 @@ classdef SensorChecker < handle
             obj.wind_speed = struct(); 
             obj.wind_speed.names = {'wind', 'wind_speed', 'windSpeed'};
             obj.wind_speed.data = [];
+            obj.wind_speed.jd = [];
             obj.wind_speed.sensors = {};
             obj.wind_speed.index = [];
             obj.wind_speed.now = [];
             obj.wind_speed.string = '';
-            obj.wind_speed.jd = [];
             obj.wind_speed.units = 'km/h';
             obj.wind_speed.err_str = 'Wind too strong!';
             obj.wind_speed.func = @nanmax; % for wind measurements we want the maximum of all sensors, not the average
@@ -283,11 +283,11 @@ classdef SensorChecker < handle
             obj.wind_dir = struct(); 
             obj.wind_dir.names = {'wind_dir', 'wind_az', 'windDir'};
             obj.wind_dir.data = [];
+            obj.wind_dir.jd = [];
             obj.wind_dir.sensors = {};
             obj.wind_dir.index  = [];
             obj.wind_dir.now = [];
             obj.wind_dir.string = '';
-            obj.wind_dir.jd = [];
             obj.wind_dir.units = 'deg';
             
         end
@@ -297,11 +297,11 @@ classdef SensorChecker < handle
             obj.humidity = struct();
             obj.humidity.names = {'humid', 'humidity', 'outsideHumidity'}; 
             obj.humidity.data = [];
+            obj.humidity.jd = [];
             obj.humidity.sensors = {};
             obj.humidity.index = [];
             obj.humidity.now = [];
             obj.humidity.string = '';
-            obj.humidity.jd = [];
             obj.humidity.units = 'percent';
             obj.humidity.err_str = 'Humidity too high!'; 
             
@@ -314,11 +314,11 @@ classdef SensorChecker < handle
             obj.pressure = struct();
             obj.pressure.names = {'pressure', 'airPressure', 'barometer'}; 
             obj.pressure.data = [];
+            obj.pressure.jd = [];
             obj.pressure.sensors = {};
             obj.pressure.index = [];
             obj.pressure.now = [];
             obj.pressure.string = '';
-            obj.pressure.jd = [];
             obj.pressure.units = 'mbar'; 
             obj.pressure.err_str = 'Pressure out of range!'; 
             
@@ -329,11 +329,11 @@ classdef SensorChecker < handle
             obj.rain = struct();
             obj.rain.names = {'rain', 'rainRate'}; 
             obj.rain.data = [];
+            obj.rain.jd = [];
             obj.rain.sensors = {};
             obj.rain.index = [];
             obj.rain.now = [];
             obj.rain.string = '';
-            obj.rain.jd = [];
             obj.rain.good_if = false; % it is only OK to observe if this property is false! 
             obj.rain.err_str = 'It is raining!'; 
             

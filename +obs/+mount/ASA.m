@@ -993,12 +993,44 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         end
         
         function slew(obj, varargin) % begin slewing after doing pre-checks
+        % Usage: slew(obj, varargin)
+        % Begin slewing to the current coordinates in "object". 
+        % Will preform some prechecks (e.g., altitude of target) and then 
+        % start to slew, making additional checks during the motion. 
+        %
+        % To stop the slew, use the mount.stop() method, or set the value
+        % of "brake_bit" to 1 (e.g., by pressing the GUI stop button). 
+        %
+        % OPTIONAL ARGUMENTS:
+        %   -RA: input a different right ascention to the "object". Must be
+        %        in numeric hours or sexagesimal string of hours. 
+        %   -Dec: input a different declination to the "object". Must be in 
+        %         numeric degrees or sexagesimal degrees. 
+        %   -skip prechecks: do not perform the prechecks and continue directly
+        %                    to the slewing. Not recommended (default false). 
+        %   -history: use this to add the current target to the list of 
+        %             recent targets (default true). 
+        
+            input = util.text.InputVars;
+            input.input_var('ra', [], 'right ascention'); 
+            input.input_var('dec', [], 'declination'); 
+            input.input_var('skip', false, 'skip prechecks');
+            input.input_var('history', true, 'previous_targets'); 
+            input.scan_vars(varargin{:}); 
             
-            if isempty(obj.object.RA) || isempty(obj.object.DE) 
+            if ~isempty(input.ra)
+                obj.object.RA = input.ra;
+            end
+            
+            if ~isempty(input.dec)
+                obj.object.Dec = input.dec;
+            end
+            
+            if isempty(obj.object.RA) || isempty(obj.object.Dec) 
                 error('Please provide a target with viable RA/DE');
             end
             
-            obj.log.input(sprintf('Slewing to target. RA= %s | DE= %s | ALT= %4.2f', obj.object.RA, obj.object.DE, obj.object.ALT_deg));
+            obj.log.input(sprintf('Slewing to target. RA= %s | DE= %s | ALT= %4.2f', obj.object.RA, obj.object.Dec, obj.object.ALT_deg));
             
             try 
                 
@@ -1017,11 +1049,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     
                 end
                 
-                try % keep a history of all targets
-                    str = [obj.objName ' {' obj.objRA ', ' obj.objDEC '}'];
-                    obj.addTargetList(str);
-                catch ME
-                    rethrow(ME);
+                if input.history
+                    try % keep a history of all targets
+                        str = [obj.objName ' {' obj.objRA ', ' obj.objDEC '}'];
+                        obj.addTargetList(str);
+                    catch ME
+                        rethrow(ME);
+                    end
                 end
                 
                 ra_hours_Jnow = obj.object.RA_deg_now./15; % convert to hours! 
@@ -1538,6 +1572,43 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
             else
 %                 obj.cam_pc.outgoing.stop_camera = 0;
+            end
+            
+        end
+        
+        function stress_test(obj, varargin) % slew the telescope multiple times to random pointings to test for problems
+        % Usage: stress_test(obj, varargin) 
+        % Will choose random points in the sky, that are observable, using 
+        % the Ephemeris.random() method to choose coordinates. 
+        % It will slew and pause for a few seconds, then slew again. 
+        % This continues for several targets, testing that the telescope
+        % is working properly and does not run into any limits. 
+        %
+        % OPTIONAL ARGUMENTS:
+        %   -number: how many random targets to choose. Default 10. 
+        %   -pause: what length of delay between slews. Default 10 seconds. 
+        % 
+        % In addition to these, the varargin is also passed on to the 
+        % head.Ephemeris.random() function, which looks at:
+        %   -alt_limit: minimal altitude for targets. Default 25 degrees. 
+        %   -south: minimal declination in degrees. Default -20. 
+        %   -side: choose "east" or "west" or "south". Default "both". 
+        %   -meridian: distance (on both sides) from meridian. Default 5 deg. 
+        % 
+        
+            input = util.text.InputVars;
+            input.input_var('number', 10, 'iterations');
+            input.input_var('pause', 10, 'delay_time'); 
+            input.scan_vars(varargin{:});
+            
+            for ii = 1:input.number
+                
+                obj.object.random(varargin);
+                
+                obj.slew('history', false); 
+                
+                pause(input.pause);
+                
             end
             
         end

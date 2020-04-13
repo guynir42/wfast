@@ -250,12 +250,20 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         function val = get.HA_deg(obj)
             
             val = obj.LST_deg - obj.RA_deg;
+            
+            if val>180
+                val = val - 360;
+            end
 
         end
         
         function val = get.HA(obj)
             
-            val = obj.deg2hour(obj.HA_deg);
+            s = sign(obj.HA_deg);
+            val = obj.deg2hour(abs(obj.HA_deg));
+            if s<0
+                val = ['-' val]; 
+            end
             
         end
         
@@ -621,6 +629,58 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 val = 2.*asind(sqrt(havTheta)); 
                 
             end
+            
+        end
+        
+        function random(obj, varargin) % find a random point in the observable sky
+        % Usage: random(obj, varargin)
+        % Choose new values for RA/Dec somewhere in the sky that is observable. 
+        % Will choose random values until one of them is above the alt limit, 
+        % and above the south limit in declination (default is -20). 
+        % 
+        % OPTIONAL ARGUMENTS:
+        %   -alt_limit: choose the minimal altitude that is considered 
+        %               observable at the given time. Default 25 degrees. 
+        %   -south_limit: choose how far south in declination you wish to 
+        %                 use as valid target. Default -20 degrees. 
+        %   -side: choose "east" or "west" or "both". 
+        %   -meridian_distance: number of degrees from meridian (on either 
+        %                       side) that we want to avoid. Default 5 degrees. 
+        
+            input = util.text.InputVars;
+            input.input_var('alt_limit', 25); 
+            input.input_var('south', -20, 'south_limit');
+            input.input_var('side', 'both', 'hemisphere');
+            input.input_var('meridian', 5, 'meridian_distance', 'meridien_distance'); 
+            input.scan_vars(varargin{:}); 
+            
+            if util.text.cs(input.side, 'both')
+                min_RA = 6; 
+                range_RA = 12;
+            elseif util.text.cs(input.side, 'east')
+                min_RA = 6; 
+                range_RA = 6;
+            elseif util.text.cs(input.side, 'west')
+                min_RA = 0;
+                range_RA = 6;
+            else
+                error('Unknown side/hemisphere option "%s". Choose "east", "west" or "both"', input.side); 
+            end
+            
+            for ii = 1:100
+                
+                obj.RA = obj.LST_deg/15 + rand.*range_RA-min_RA; % random between min_RA and min_RA+range_RA (hours)
+                
+                obj.Dec = rand.*(90-input.south)+input.south; % between south_limit and 90
+                
+                if obj.Alt_deg > input.alt_limit && abs(obj.HA_deg)>input.meridian
+                    obj.updateSecondaryCoords;
+                    return;
+                end
+                
+            end
+            
+            error('Could not find a random pointing inside observational bounds!'); 
             
         end
         
