@@ -47,6 +47,8 @@ classdef SensorChecker < handle
         
         use_only_plot_mean = 0; % only display the mean of each weather data type
         
+        max_data_history_length = 1e4; % when reaching ~30 days of backlog, will drop the first half of the data (it is all saved in text log files)
+        
         debug_bit = 1;
         
     end
@@ -502,12 +504,20 @@ classdef SensorChecker < handle
                 end
                 
                 if ~isempty(values)
+                    
                     obj.(type).now = values;
                     obj.(type).sensors = ids; 
                     obj.(type).index = idx; 
-                    obj.(type).jd(end+1) = jd_now;
+                    obj.(type).jd(end+1,:) = jd_now;
                     obj.(type).data(end+1,:) = values;
                     obj.(type).string = str;
+                    
+                    if size(obj.(type).data,1)>obj.max_data_history_length
+                        new_start = ceil(obj.max_data_history_length/2);
+                        obj.(type).data = obj.(type).data(new_start:end,:);
+                        obj.(type).jd = obj.(type).jd(new_start:end,:);
+                    end
+                    
                 end
                 
             else
