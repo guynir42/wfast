@@ -1,5 +1,13 @@
 classdef VirtualSensor < dynamicprops 
-    
+% Connect this sensor to some instrument we are not directly connected to, 
+% like the other weather sensors around the Wise building. This makes those
+% sensors, that feed all their data to the main Wise computer, available as 
+% if they were regular sensors in the observatory. 
+% 
+% These sensors are initialized and added to the list of sensors in the 
+% SensorChecker class. See obs.SensorChecker.connectVirtualSensors(). 
+%
+
     properties
         
         owner@obs.SensorChecker; 

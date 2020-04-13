@@ -1,7 +1,31 @@
 classdef SensorChecker < handle
+% This class collects weather data from multiple sensors in the observatory
+% (and external data sources like Wise sensors). 
+% It then checks if any values are outside the limits, and outputs a report
+% that can be used to decide if the dome should be closed. 
+% On top of that it keeps track of the weather history and can plot it, 
+% and also prints the current weather data to a text log file. 
+%
+% The data comes from a cell array of sensors, each one being updated regularly. 
+% When the collect_all() method is called, each type of weather data is 
+% checked individually, and compared to its respective limit. 
+% Each weather data type has its own struct, e.g., light or humidity. 
+% That struct contains the current and previous weather data, the limits, 
+% the summary of results as a string and so on. 
 % 
+% The getWiseData() function uses a "curl" command to get the data from the
+% Wise computers, adding the sensors around the site as virtual sensors. 
+% The collect(type) checks all sensors (physical and virtual) for a specific
+% data type. Use collect_all() to get Wise data and collect all types of data.
+% Use decision_all() to check if any data type is out of limits, and also
+% check if the Wise general safety flag is ok. If the Wise observer manually
+% sets the "Wise-unsafe" flag, the checker will also report the dome should
+% be closed. To ignore the Wise data set use_wise_data=0. 
 %
-%
+% Use the plotWeather() function to show all data for the past few hours. 
+% 
+
+
     properties(Transient=true)
         
     end
