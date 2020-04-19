@@ -110,9 +110,9 @@ char *Timer::printout(){
 		break;
 	
 	case PULSED:	
-  
+	
 		if(getState()){
-		  
+		
 			time2hms(remaining, getTimeInPulse());
 			snprintf(_out_buf, Parser::MAXN, "%s (ON) | int= %s | pul: %s of %s ", getModeString(), interval, remaining, pulse);
 	  
@@ -168,8 +168,9 @@ char *Timer::printout(){
 float Timer::getRunningTime(){
  
 	long int milli_seconds_mod = (millis()-_start_time_milli); 
-	if (_current_mode==ALTER) milli_seconds_mod = milli_seconds_mod%((int) (_interval*2*1000) ); // keep this number inside the range of ON and OFF intervals (convert _interval to ms)
-	if (_current_mode==PULSED) milli_seconds_mod = milli_seconds_mod%((int)((_interval+_pulse_length)*1000)); // keep this number inside the range of OFF interval and ON pulse (convert _interval/_pulse_length to ms)
+	
+	if (_current_mode==ALTER) milli_seconds_mod = milli_seconds_mod%((long int) (_interval*2*1000) ); // keep this number inside the range of ON and OFF intervals (convert _interval to ms)
+	if (_current_mode==PULSED) milli_seconds_mod = milli_seconds_mod%((long int)((_interval+_pulse_length)*1000)); // keep this number inside the range of OFF interval and ON pulse (convert _interval/_pulse_length to ms)
 	
 	float time=((float) milli_seconds_mod)/1000.0; // convert to seconds!
 	if(_current_unit==Timer::MIN) time=time/60;
@@ -417,6 +418,14 @@ void Timer::getTimeUnitStr(char *buf){
 	
 }
 
+char Timer::getTimeUnitsChar(){
+	
+	if(_current_unit==Timer::SEC) return 's';
+	else if(_current_unit==Timer::MIN) return 'm';
+	else if(_current_unit==Timer::HOUR) return 'h';
+	
+}
+
 // setters
 void Timer::resetTime(){
   
@@ -455,7 +464,7 @@ void Timer::setUnit(int unit){
 }
 
 void Timer::setInterval(float interval){
- 
+  
   _interval=interval;
   
   if(_eeprom_pos_start>0 && _eeprom_pos_end>0){

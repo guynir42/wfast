@@ -30,6 +30,7 @@ public:
   char *getOutBuffer();
   bool getFirstPulse() const;
   void getTimeUnitStr(char *buf);
+  char getTimeUnitsChar(); 
   
   // setters
   void resetTime();
