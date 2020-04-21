@@ -1193,7 +1193,7 @@ classdef Calibration < handle
                                 
                 if obj.use_interp_mask % use regionfill for each bad pixel (the slow method!)
                     
-                    I2 = zeros(size(I));
+                    I2 = zeros(size(I), 'like', I);
                     
                     for ii = 1:size(I,3)
                         for jj = 1:size(I,4)
@@ -1205,7 +1205,7 @@ classdef Calibration < handle
                     
                 elseif obj.use_conv_mask % convolve with nearest neighbor average value
                                     
-                    I2 = zeros(size(I)); 
+                    I2 = zeros(size(I), 'like', I); 
                     k = ones(3);
                     k(2,2) = 0;
                     k = k./8;                    
