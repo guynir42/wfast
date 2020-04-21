@@ -7,3 +7,6 @@
 %
 % Note: This function rounds fractional pixel shifts. If you need
 % fractional shifts, use FourierShift2D in +util/+img.
+%
+% Currently supports only single, double and uint16. 
+% If using integers, filler will default to 0 instead of NaN. 
