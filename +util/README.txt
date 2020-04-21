@@ -4,6 +4,7 @@ Written by Guy Nir (guy.nir@weizmann.ac.il) with some code downloaded from other
 
 Orientation:
 --------------
+
 The +text sub-package is the most useful in +util. 
 It contains functions for parsing strings, formatting strings 
 and for unpacking keyword-value pairs in varargin using the InputVars class. 
@@ -39,6 +40,10 @@ and making a Gaussian PSF using util.img.gaussian2.
 The +vec sub-package has small utilities for manipulating vectors and matrices. 
 It allows conversion between rows, columns and 3rd dimension vectors, 
 inserting rows or columns and printing or comparing sizes of matrices. 
+
+The +series sub-package contains very useful and fast tools for handling
+time series data like lightcurves. 
+Notable mentions include the binning, folding and sysrem (self calibration) functions. 
   
 The +oop sub-package contains powerful tools for using objects. 
 The most useful tools are the util.oop.full_copy used to make deep copies of objects 
@@ -53,3 +58,14 @@ The +sys package contains functions and classes that implement system resources.
 Notable mentions are the WorkingDirectory class that keeps track of folders in the file-system, 
 the AudioControl class that gives audio signals to the user, 
 and ProgressBar that keeps track of runtime and prints it on screen. 
+
+The +ast sub-pacakge contains some useful functions and classes
+for purely astronomical stuff, like calculating bolometric corrections
+or checking the GAIA catalog for stars around some coordinates. 
+
+The +units sub-package includes functions for making non-trivial units conversions
+like flux to luptitudes (modified magnitude system based on sinh). 
+
+The +def sub-package has some function definitions. 
+
+The +fit sub-package contains functions for fitting curves. 
