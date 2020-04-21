@@ -17,7 +17,7 @@ classdef LightCurve < handle
 %       "flux", "flux_noisy" and "time" values. 
 %       The same for is_noise_updated==0, it means "noise" and "flux_noisy"
 %       are not updated and shouldn't be used.
-%       To update the LC, use occult.Generator. 
+%       To update the LC, use occult.CurveGenerator. 
 %       To make a new noise iteration just call "generateNoise". 
 %
 % Plotting can be done using "plot" command. It will show only "num_display"

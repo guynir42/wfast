@@ -42,7 +42,7 @@ if ~isempty(cal.flat_pixel_mean)  && ~isempty(cal.flat_pixel_var)
     
     contour(ax, x,y,N);
     
-    peaks = nansum(N.*y')./nansum(N); % for each x, find the centroid of the distribution i y
+    peaks = nansum(N.*y')./nansum(N); % for each x, find the centroid of the distribution in y
     
     fr = util.fit.polyfit(x, peaks, 'order', 1, 'sigma', 3);
     

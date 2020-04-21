@@ -90,6 +90,8 @@ classdef Lightcurves < handle
         
         frame_index = 1;
         
+        magnitudes; % keep a copy of the star magnitudes for doing statistics
+        
     end
     
     properties % switches/controls
@@ -110,14 +112,12 @@ classdef Lightcurves < handle
         bad_times_fraction = 0.1; % what fraction of stars need to be NaN to be considered bad times
         
         % processing steps for fluxes_cal:
+        use_airmass_correction = 0;
+        use_psf_correction = 0;
+        use_zero_point = 0;
         use_sysrem = 1;
         sysrem_iterations = 1;
         use_self_exclude = 0;
-        
-%         use_polynomial = 0;
-        use_zero_point = 0;
-        use_airmass_correct = 0;
-        use_psf_correction = 0;
         
         missing_method = 'linear'; % can also choose 'previous', 'next', 'nearest', 'linear', 'spline', 'pchip', 'makima' (see the help section of fillmissing())
 %         use_savitzky_golay = 1;
@@ -289,6 +289,7 @@ classdef Lightcurves < handle
             
             obj.timestamps_full = [];
             obj.juldates_full = [];
+            obj.magnitudes = [];
             
             obj.fluxes_full = [];
             obj.errors_full = [];
@@ -308,7 +309,9 @@ classdef Lightcurves < handle
             obj.clearIntermidiate;
             obj.clearFits;
             obj.clearFluxes;
-            obj.clearPSD
+            obj.clearPSD;
+            obj.clearRE;
+            obj.clearREfit;
             
         end
         
@@ -876,7 +879,8 @@ classdef Lightcurves < handle
                 str = sprintf('Nframes: %d ', obj.num_frames); 
             else
 
-                str = sprintf('Nframes: %d | Nstars: %d | Cutous: %dx%d ', obj.num_frames, obj.phot_pars.cutout_size(4), obj.phot_pars.cutout_size(1), obj.phot_pars.cutout_size(2));
+%                 str = sprintf('Nframes: %d | Nstars: %d | Cutous: %dx%d ', obj.num_frames, obj.phot_pars.cutout_size(4), obj.phot_pars.cutout_size(1), obj.phot_pars.cutout_size(2));
+                str = sprintf('Nframes: %d | Nstars: %d | Cutous: %dx%d ', obj.num_frames, size(obj.fluxes_full,2), obj.phot_pars.cutout_size(1), obj.phot_pars.cutout_size(2));
 
                 if isfield(obj.phot_pars, 'aperture_radius') && ~isempty(obj.phot_pars.aperture_radius)
                     str = sprintf('%s | ap: %s', str, print_vec(obj.phot_pars.aperture_radius));
@@ -1130,6 +1134,17 @@ classdef Lightcurves < handle
             
         end
         
+        function set.use_airmass_correction(obj, val)
+            
+            if ~isequal(obj.use_airmass_correction, val)
+                obj.use_airmass_correction = val;
+                obj.fluxes_cal_ = [];
+                obj.clearPSD;
+                obj.clearRE;
+            end
+            
+        end
+        
         function set.use_psf_correction(obj, val)
             
             if ~isequal(obj.use_psf_correction, val)
@@ -1141,16 +1156,16 @@ classdef Lightcurves < handle
             
         end
         
-%         function set.use_polynomial(obj, val)
-%             
-%             if ~isequal(obj.use_polynomial, val)
-%                 obj.use_polynomial = val;
-%                 obj.fluxes_cal_ = [];
-%                 obj.clearPSD;
-%                 obj.clearRE;
-%             end
-%             
-%         end
+        function set.use_zero_point(obj, val)
+            
+            if ~isequal(obj.use_zero_point, val)
+                obj.use_zero_point = val;
+                obj.fluxes_cal_ = [];
+                obj.clearPSD;
+                obj.clearRE;
+            end
+            
+        end
         
         function set.use_sysrem(obj, val)
             
@@ -1178,17 +1193,6 @@ classdef Lightcurves < handle
             
             if ~isequal(obj.use_self_exclude, val)
                 obj.use_self_exclude = val;
-                obj.fluxes_cal_ = [];
-                obj.clearPSD;
-                obj.clearRE;
-            end
-            
-        end
-        
-        function set.use_zero_point(obj, val)
-            
-            if ~isequal(obj.use_zero_point, val)
-                obj.use_zero_point = val;
                 obj.fluxes_cal_ = [];
                 obj.clearPSD;
                 obj.clearRE;
@@ -1336,6 +1340,12 @@ classdef Lightcurves < handle
             obj.bad_pixels_full = obj.bad_pixels;
             obj.flags_full = obj.flags; 
             
+            if ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) && size(obj.cat.magnitudes,1)>=size(obj.fluxes,2)
+                obj.magnitudes = obj.cat.magnitudes;
+            elseif ~isempty(obj.cat) && ~isempty(obj.cat.data) && any(contains(obj.cat.data.Properties.VariableNames, 'Mag_BP')) && size(obj.cat.data.Mag_BP,1)==size(obj.fluxes,2)
+                obj.magnitudes = obj.cat.data.Mag_BP;
+            end
+            
         end
         
         function input(obj, varargin) % give the photometric results explicitely, they are added to the storage
@@ -1440,6 +1450,63 @@ classdef Lightcurves < handle
             
         end
         
+        function keepStarIndices(obj, indices)
+            
+            obj.fluxes_full = obj.fluxes_full(:,indices,:);
+            obj.errors_full = obj.errors_full(:,indices,:);
+            obj.areas_full = obj.areas_full(:,indices,:);
+            obj.backgrounds_full = obj.backgrounds_full(:,indices,:);
+            obj.variances_full = obj.variances_full(:,indices,:);
+            obj.centroids_x_full = obj.centroids_x_full(:,indices,:);
+            obj.centroids_y_full = obj.centroids_y_full(:,indices,:);
+            obj.offsets_x_full = obj.offsets_x_full(:,indices,:);
+            obj.offsets_y_full = obj.offsets_y_full(:,indices,:);
+            obj.widths_full = obj.widths_full(:,indices,:);
+            obj.bad_pixels_full = obj.bad_pixels_full(:,indices,:);
+            obj.flags_full = obj.flags_full(:,indices,:);
+            
+            if ~isempty(obj.magnitudes)
+                obj.magnitudes = obj.magnitudes(indices); 
+            end
+            
+            obj.clearIntermidiate;
+            obj.clearFits;
+            obj.clearFluxes;
+            obj.clearPSD;
+            obj.clearRE;
+            obj.clearREfit;
+            
+        end
+            
+        function keepFrameIndices(obj, indices)
+            
+            obj.timestamps_full = obj.timestamps_full(indices);
+            obj.juldates_full = obj.juldates(indices);
+            
+            obj.fluxes_full = obj.fluxes_full(indices,:,:);
+            obj.errors_full = obj.errors_full(indices,:,:);
+            obj.areas_full = obj.areas_full(indices,:,:);
+            obj.backgrounds_full = obj.backgrounds_full(indices,:,:);
+            obj.variances_full = obj.variances_full(indices,:,:);
+            obj.centroids_x_full = obj.centroids_x_full(indices,:,:);
+            obj.centroids_y_full = obj.centroids_y_full(indices,:,:);
+            obj.offsets_x_full = obj.offsets_x_full(indices,:,:);
+            obj.offsets_y_full = obj.offsets_y_full(indices,:,:);
+            obj.widths_full = obj.widths_full(indices,:,:);
+            obj.bad_pixels_full = obj.bad_pixels_full(indices,:,:);
+            obj.flags_full = obj.flags_full(indices,:,:);
+            
+            obj.clearIntermidiate;
+            obj.clearFits;
+            obj.clearFluxes;
+            obj.clearPSD;
+            obj.clearRE;
+            obj.clearREfit;
+            
+        end
+        
+        % add a method to remove 3rd dimension?
+        
     end
     
     methods % calculations
@@ -1504,23 +1571,58 @@ classdef Lightcurves < handle
         
         function flux = calculateCalibration(obj, flux)
             
-            
-            if obj.use_zero_point
+            if obj.use_airmass_correction
                 
-                w = nanmean(flux); % weights are given by the average flux of each star
-
-                f_average = nanmean(flux.*w,2); % weighted average of each frame
-                f_average_norm = f_average./nanmean(f_average); % normalize by the average of averages
-
-                flux = flux./f_average_norm;
+                A = obj.getAirmass; 
+                
+                [L, b] = util.units.flux2lup(flux); % this also finds a reasonable estimate for the softening parameter b
+                
+                fr = util.fit.polyfit(A, L, 'order', 2, 'double', 1, 'sigma', 3); 
+                
+                model = [fr.ym]; 
+                
+                L_det = L - model + nanmean(L, 1); 
+                
+                flux = util.units.lup2flux(L_det, b); 
                 
             end
             
             if obj.use_psf_correction
                 
-                W = nanmean(obj.widths, 2); % the average width of each frame
+                F = nanmean(flux, 1); % weight for each star
                 
-                % need to continue this, maybe add another option for airmass removal
+                W = nansum(F.*obj.widths(:,:,obj.index_flux_number),2)./nansum(F,2); % weighted average PSF width
+                
+                % apply the same correction we applied to the fluxes before
+                if obj.use_airmass_correction 
+                    
+                    fr_w = util.fit.polyfit(A, W, 'order', 2, 'double', 1, 'sigma', 3); 
+                    
+                    W = W - fr_w.ym + nanmedian(W); 
+                
+                end
+                
+                [L, b] = util.units.flux2lup(flux); % this also finds a reasonable estimate for the softening parameter b
+                
+                fr = util.fit.polyfit(W, L, 'order', 2, 'double', 1, 'sigma', 3); 
+                
+                model = [fr.ym]; 
+                
+                L_det = L - model + nanmean(L, 1); 
+                
+                flux = util.units.lup2flux(L_det, b);
+                
+            end
+            
+            if obj.use_zero_point
+                
+                w = nanmean(flux); % weights are given by the average flux of each star
+
+%                 f_average = nanmean(flux.*w,2); % weighted average of each frame
+                f_average = nanmean(flux.*w,2); % simple average of each frame
+                f_average_norm = f_average./nanmean(f_average); % normalize by the average of averages
+
+                flux = flux./f_average_norm;
                 
             end
             
@@ -2197,13 +2299,8 @@ classdef Lightcurves < handle
             
             bin_indices = [1 ceil(length(obj.bin_widths_seconds)/2) length(obj.bin_widths_seconds)]; % which bins to use (first, middle and last)
             
-            % make the x axis based on magnitudes or fluxes (if there aren't any magnitudes)
-            if ~isempty(obj.cat) && ~isempty(obj.cat.magnitudes) && size(obj.cat.magnitudes,1)==size(obj.fluxes,2)
-                x = obj.cat.magnitudes';
-                x(x>obj.show_mag_limit) = NaN;
-                used_mag = 1;
-            elseif ~isempty(obj.cat) && ~isempty(obj.cat.data) && any(contains(obj.cat.data.Properties.VariableNames, 'Mag_BP')) && size(obj.cat.data.Mag_BP,1)==size(obj.fluxes,2)
-                x = obj.cat.data.Mag_BP';
+            if ~isempty(obj.magnitudes)
+                x = obj.magnitudes'; 
                 x(x>obj.show_mag_limit) = NaN;
                 used_mag = 1;
             else
@@ -2235,7 +2332,7 @@ classdef Lightcurves < handle
             if used_mag
                 xlabel(input.ax, 'Magnitude'); 
                 input.ax.XScale = 'linear';
-                legend(input.ax, 'Location', 'NorthWest'); 
+                legend(input.ax, 'Location', 'SouthEast'); 
             else
                 xlabel(input.ax, 'Flux [counts]'); 
                 input.ax.XScale = 'log';

@@ -73,7 +73,7 @@ class AndorCamera {
 	unsigned short int *images_ptrs[NBUF];
 	double *timestamps_ptrs[NBUF];
 	double *t_vec_ptrs[NBUF];
-	double *mex_flag_cam; // just one vector
+	double *mex_flag_cam; // just one vector. Elements are: [0] running/not running [1] brake command [2] error code [3] unused I think
 	double *mex_flag_record_ptrs[NBUF];
 	double *mex_flag_read_ptrs[NBUF];
 	double *mex_flag_write_ptrs[NBUF];

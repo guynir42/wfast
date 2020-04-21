@@ -22,7 +22,7 @@ function results = polyfit(x,y,varargin)
     input.input_var('iterations', 3); % how many iterations of removing outliers
     input.input_var('variances', []); % assume no covariance, only different variance per sample
     input.input_var('double', false); % use double precision
-    input.input_var('plotting', 0);
+    input.input_var('plotting', false);
     input.input_var('axes', [], 'axis');
     input.input_var('pause', 0.3);
     % add other options
@@ -189,6 +189,10 @@ function results = polyfit(x,y,varargin)
         else
             results(ii).func = str2func(['@(x) ' results(ii).model(4:end)]);
         end
+        
+        % get rid of white space and dot notation
+        results(ii).model = regexprep(results(ii).model, ' +','');
+        results(ii).model = regexprep(results(ii).model, '\.\^','^');
         
     end % for ii (fluxes)
     

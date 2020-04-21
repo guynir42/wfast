@@ -36,8 +36,8 @@ classdef CurveGenerator < handle
 % (i.e., that the flux matches the parameters). 
 % 
 % To make lightcurves the "source_matrix" must be loaded or generated. 
-% Generating it is very long, but once it exists, it can be interpolated to
-% any value of R and r that is needed. 
+% Generating it takes very long, but once it exists, it can be interpolated 
+% to any value of R and r that is needed. 
 % 
 % If you request the same values of R and r, the core lightcurves are lazy
 % loaded, which saves some time in the calculations (so make sure to loop 

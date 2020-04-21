@@ -107,6 +107,11 @@ function fr = power_law(x, y, varargin)
     
     end
     
+    fr.model = func2str(fr.func); 
+    fr.model = regexprep(fr.model, ' +','');
+    fr.model = regexprep(fr.model, '\.\^','^');
+    fr.model = regexprep(fr.model, '\.*','*');
+    
 end
 
 function [slope, norm, chi2, ndof] = fit_single(x, y, errors, sigma, use_plot, ax, duration)

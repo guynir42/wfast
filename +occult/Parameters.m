@@ -4,7 +4,7 @@ classdef Parameters < handle
 % The different parameters are divided into 3 groups: 
 % ***main group (can be scalars or vectors):
 %   -R (radius of background star, in FSU*).
-%   -r (radius of KBO is FSU). 
+%   -r (radius of KBO in FSU). 
 %   -b (impact parameter, or radius of closest approach, in FSU). 
 %   -v (KBO-Earth relative velocity, in FSU/second). 
 %   -t (time offset of closest approach from start of middle frame, in milliseconds). 
@@ -18,7 +18,8 @@ classdef Parameters < handle
 %   -snr (S/N of the star we are observing, e.g., 1/noise_sigma). 
 %   -Niter (number of noise iterations for each lightcurve and each snr value). 
 %
-% *FSU means Fresnel Scale Unit. For "R" it is the project FSU on distance of KBO. 
+% *FSU means Fresnel Scale Unit. For "R" it is the projected FSU at the 
+%  occulter distance. 
 %
 % The main group parameters can be scalars or row vectors. If a non-scalar
 % is given, the other parameters will be stretched (i.e., the last value will
@@ -43,16 +44,18 @@ classdef Parameters < handle
 
     properties
       
+        % these are not yet implemented
         base_wavelength = 600;
         wavelength;
         spectrum;
+        
         readout_time = 3; % time difference between 1/f and T (ms)
         is_updated = 0;
         is_noise_updated = 0;
         
-        chi2;
-        likelihood;
-        counts = 1;
+        chi2; % the results of fitting to this model 
+        likelihood; % the results of fitting to this model (translated to probability)
+        counts = 1; 
         
     end
     
