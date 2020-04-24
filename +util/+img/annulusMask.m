@@ -19,15 +19,15 @@ function M = annulusMask(ImSize, varargin)
     end
     
     R_min = 0;
-    R_max = floor(min(ImSize)/2)-1; 
+    R_max = [];
     feather = [];
     oversampling = [];
     
     for ii = 1:2:length(varargin)
         
-        if cs(varargin{ii}, {'minimum_radius', 'r_min'}, 3)
+        if cs(varargin{ii}, {'minimum_radius', 'r_min', 'r_inner'}, 3)
             R_min = varargin{ii+1};
-        elseif cs(varargin{ii}, {'maximum_radius', 'r_max'}, 3)
+        elseif cs(varargin{ii}, {'maximum_radius', 'r_max', 'r_outer'}, 3)
             R_max = varargin{ii+1};
         elseif cs(varargin{ii}, 'feather')
             feather = varargin{ii+1};
@@ -35,6 +35,10 @@ function M = annulusMask(ImSize, varargin)
             oversampling = varargin{ii+1};
         end
         
+    end
+    
+    if isempty(R_max)
+        R_max = floor(min(ImSize)/2)-1; 
     end
     
     if ~isempty(oversampling) && round(oversampling)~=oversampling
@@ -48,7 +52,7 @@ function M = annulusMask(ImSize, varargin)
     end
     
     if feather
-        k = gaussian2(feather,[],[],feather*2+1);
+        k = gaussian2('sigma', feather, 'size', feather*2+1);
         k = k./(sum2(k));
         ImSize = ImSize+size(k)-1;
     end
@@ -61,7 +65,7 @@ function M = annulusMask(ImSize, varargin)
         R_min = R_min*oversampling;
     end
     
-    [x,y] = meshgrid(1:ImSize(2), 1:ImSize(1));
+    [x,y] = meshgrid((1:ImSize(2)), (1:ImSize(1)));
 
     center = (ImSize/2)+0.5;
     
