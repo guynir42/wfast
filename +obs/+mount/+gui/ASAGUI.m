@@ -258,7 +258,9 @@ classdef ASAGUI < handle
                 obj.plot_axes = axes('Parent', obj.panel_rates);
             end
             
-            obj.owner.plot_rate(obj.plot_axes);
+            if ~isempty(obj.plot_axes) && isvalid(obj.plot_axes)
+                obj.owner.plot_rate(obj.plot_axes);
+            end
             
             if obj.owner.objALT<15
                 obj.panel_object.button_alt.BackgroundColor = 'red';

@@ -772,7 +772,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             try 
                 
                 if ~obj.cam_pc.is_connected || ~obj.cam_pc.status
-                    obj.cam_pc.connect;
+%                     obj.cam_pc.connect;
                 end
 
             catch 

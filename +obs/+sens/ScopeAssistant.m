@@ -134,7 +134,14 @@ classdef ScopeAssistant < handle
                 obj.bluetooth_id = id;
             end
             
-            % first, make sure to close existing connections...
+            % first try to find if there is an orphan Blluetooth object with the righ ID
+            inst=instrfind('RemoteID', bluetooth_name(9:end)); 
+            
+            if ~isempty(inst)
+                obj.hndl = inst;
+            end
+            
+            % make sure to close existing connections before opening a new one
             try
                 fclose(obj.hndl);
                 delete(obj.hndl);
@@ -147,34 +154,6 @@ classdef ScopeAssistant < handle
             % must be paired to the bluetooth device! 
             obj.hndl = Bluetooth(obj.bluetooth_name, 1); % second argument is channel==1
             obj.hndl.Timeout = obj.timeout;
-            
-%             if isempty(obj.bluetooth_id) || isnumeric(obj.bluetooth_id)
-%                 
-%                 in = instrhwinfo('bluetooth', obj.bluetooth_name);
-%                 
-%                 if isnumeric(obj.bluetooth_id) && obj.bluetooth_id>0
-%                     idx = obj.bluetooth_id;
-%                 else
-%                     idx = 1;
-%                 end
-%                 
-%                 if idx>length(in)
-%                     error('Cannot open device number %d, there are only %d devices named "%s".', idx, length(in), obj.bluetooth_name);
-%                 end
-%                 
-%                 if isempty(in(idx).RemoteID)
-%                     error('Device not found. Make sure to pair the device!');
-%                 end
-%                 
-%                 if obj.debug_bit
-%                     fprintf('Found a bluetooth device with ID: %s\n', obj.bluetooth_id);
-%                 end
-%                 
-%                 obj.bluetooth_id = in(idx).RemoteID(9:end);
-%                 
-%             end
-%             
-%             obj.hndl.RemoteID = obj.bluetooth_id; 
             
             try
                 fopen(obj.hndl);

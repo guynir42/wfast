@@ -517,7 +517,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function val = get.telHA(obj)
             
-            val = head.Ephemeris.deg2hour(obj.LST_deg - obj.telRA_deg);
+            ha = obj.LST_deg - obj.telRA_deg;
+            
+            if ha>180
+                ha = ha -360;
+            end
+            
+            val = head.Ephemeris.deg2hour(ha);
             
         end
         
