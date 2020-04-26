@@ -294,7 +294,6 @@ classdef Acquisition < file.AstroData
                 % lightcurves object during acquisition! 
                 obj.lightcurves.use_remove_outliers = 0;
                 obj.lightcurves.use_zero_point = 0;
-                obj.lightcurves.use_polynomial = 0;
                 obj.lightcurves.use_psf_correction =0;
                 
                 obj.model_psf = img.ModelPSF;
@@ -1923,10 +1922,10 @@ classdef Acquisition < file.AstroData
 
            obj.head.LIMMAG_DETECTION = obj.cat.detection_limit; 
             
-           [obj.obj_idx, dist] = obj.cat.findNearestObject;
+           [obj.object_idx, dist] = obj.cat.findNearestObject;
            
            if dist>5/3600
-               obj.obj_idx = []; % if the closest star found is more than 5" from the required position, it is not really a good match! 
+               obj.object_idx = []; % if the closest star found is more than 5" from the required position, it is not really a good match! 
            end
            
         end
