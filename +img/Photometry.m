@@ -67,7 +67,8 @@ classdef Photometry < handle
         use_gaussian = 1;
         use_aperture = 0; % no need to do aperture because forced is much better
         use_forced = 1;
-        use_best_offsets_widths = 1; % if this is true, keep the offsets and widths from gaussian even if using aperture/forced 
+        use_best_offsets = 1; % if this is true, keep the offsets from gaussian even if using aperture/forced 
+        use_best_widths = 0; % if this is true, keep the widths from gaussian even if using aperture/forced 
         
         corner_size = 0.15; % fraction of the cut_size or pixel value (must be smaller than cut_size!)
         aperture = 9; % for now lets keep it short by using just the big aperture
@@ -438,10 +439,17 @@ classdef Photometry < handle
                     obj.backgrounds = obj.backgrounds_ap;
                     obj.variances = obj.variances_ap;
                     
-                    if obj.use_best_offsets_widths==0 && obj.use_gaussian % if we used gaussian and "use_best_offsets_widths" then save the gaussian offsets/widths instead of the aperture ones
-                        obj.offsets_x = obj.offsets_x_ap;
-                        obj.offsets_y = obj.offsets_y_ap;
-                        obj.widths = obj.widths_ap;
+                    if obj.use_gaussian % if we used gaussian and "use_best_offsets/widths" then save the gaussian offsets/widths instead of these new values
+                        
+                        if obj.use_best_offsets==0
+                            obj.offsets_x = obj.offsets_x_ap;
+                            obj.offsets_y = obj.offsets_y_ap;
+                        end
+                        
+                        if obj.use_best_widths==0
+                            obj.widths = obj.widths_ap;
+                        end
+                        
                     end
                     
                     obj.bad_pixels = obj.bad_pixels_ap;
@@ -473,9 +481,20 @@ classdef Photometry < handle
                     obj.errors = cat(3, obj.errors_ap, obj.errors_forced);
                     obj.backgrounds = cat(3, obj.backgrounds_ap, obj.backgrounds_forced);
                     obj.variances = cat(3, obj.variances_ap, obj.variances_forced);
-                    obj.offsets_x = cat(3, obj.offsets_x_ap, obj.offsets_x_forced);
-                    obj.offsets_y = cat(3, obj.offsets_y_ap, obj.offsets_y_forced);
-                    obj.widths = cat(3, obj.widths_ap, obj.widths_forced);
+                    
+                    if obj.use_gaussian % if we used gaussian and "use_best_offsets/widths" then save the gaussian offsets/widths instead of these new values
+                        
+                        if obj.use_best_offsets==0
+                            obj.offsets_x = cat(3, obj.offsets_x_ap, obj.offsets_x_forced);
+                            obj.offsets_y = cat(3, obj.offsets_y_ap, obj.offsets_y_forced);
+                        end
+                        
+                        if obj.use_best_widths==0
+                            obj.widths = cat(3, obj.widths_ap, obj.widths_forced);
+                        end
+                        
+                    end
+                    
                     obj.bad_pixels = cat(3, obj.bad_pixels_ap, obj.bad_pixels_forced); 
                     obj.flags = cat(3, obj.flags_ap, obj.flags_forced);
                     
@@ -486,7 +505,7 @@ classdef Photometry < handle
                     obj.centroids_y = obj.offsets_y + obj.positions(:,2)';
                 end
                 
-            else
+            else % old methods
                 
                 if obj.use_basic
                     obj.calcBasic;
