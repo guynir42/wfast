@@ -135,7 +135,7 @@ classdef ScopeAssistant < handle
             end
             
             % first try to find if there is an orphan Blluetooth object with the righ ID
-            inst=instrfind('RemoteID', bluetooth_name(9:end)); 
+            inst=instrfind('RemoteID', obj.bluetooth_name(9:end)); 
             
             if ~isempty(inst)
                 obj.hndl = inst;
