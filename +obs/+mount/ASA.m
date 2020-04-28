@@ -136,6 +136,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
     
     properties(Hidden=true)
        
+        % the default alt-az is parking 2 (zenith west)
+        target_altitude = 90;
+        target_azimuth = 270;
+        default_target_altitude = 90;
+        default_target_azimuth = 270; 
+        
         was_tracking = 0; % when pressing the NSEW buttons, to temporarily turn off tracking (and maybe bring it back on)
         default_move_rate; % move rate for the NSEW buttons (in degrees/second)
 
@@ -1394,6 +1400,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function engineeringSlew(obj,Alt,Az) % alternative way to slew to Alt/Az
             
+            if nargin<2 || isempty(Alt)
+                Alt = obj.target_altitude;
+            end
+            
+            if nargin<3 || isempty(Az)
+                Az = obj.target_azimuth;
+            end
+            
             try 
 
                 if Alt<obj.limit_alt
@@ -1402,8 +1416,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 obj.brake_bit = 0;
                 
-                obj.tracking = 0;
-                obj.hndl.SlewToAltAzAsync(Alt, Az);
+                obj.hndl.SlewToAltAzAsync(Az, Alt); % note that in ASCOM, SlewToAltAz expects Az and then Alt !!!
                 
                 for ii = 1:100000
                     
@@ -1425,8 +1438,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     
                 end
             
+                obj.tracking = 0;
+
             catch ME
                 obj.log.error(ME.getReport);
+                obj.tracking = 0;
                 rethrow(ME);
             end
             

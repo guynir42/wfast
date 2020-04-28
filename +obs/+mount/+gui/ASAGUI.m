@@ -206,6 +206,9 @@ classdef ASAGUI < handle
             obj.panel_engineering = GraphicPanel(obj.owner, [0.6 (pos)/N 0.2 num_buttons/N], 'engineering slews', 1); % last input is for vertical 
             obj.panel_engineering.number = num_buttons;
             obj.panel_engineering.addButton('button_park', 'park', 'push', 'Park', '', '', [], '', '', 'Send the telescope to park 1 position'); 
+            obj.panel_engineering.addButton('button_altitude', 'target_altitude', 'input', 'Alt= ', '', '', 0.5, '', '', 'Input the altitude you want to go to in the next engineering slew'); 
+            obj.panel_engineering.addButton('button_azimuth', 'target_azimuth', 'input', 'Az= ', '', '', 0.5, '', '', 'Input the azimuth you want to go to in the next engineering slew'); 
+            obj.panel_engineering.addButton('button_slew', 'engineeringSlew', 'push', 'Eng. Slew', '', '', [], '', '', 'Send the telescope to Alt-Azimut specified'); 
             obj.panel_engineering.margin = [0.02 0.02];
             obj.panel_engineering.make;
             
