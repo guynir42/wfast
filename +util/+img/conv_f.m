@@ -3,7 +3,7 @@ function M_out = conv_f(kernel, image, varargin)
 % performs convolution/filter of image with kernel. 
 % will use FFT instead of brute force if it estimates it is faster. 
 % OPTIONAL ARGUMENTS:
-% -conjugate: do cross correlation instead of convolution. 
+% -conjugate: do cross correlation instead of convolution. Default false. 
 % -crop: which output size to use: same (default), full.
 % -fft: turn FFT on or off or set to auto (default). 
 % -mem_limit: if limit is exceeded, use loop instead of 3D matrices. 
@@ -19,7 +19,7 @@ function M_out = conv_f(kernel, image, varargin)
     % parse varargin
     
     conjugate = 0;
-    crop = 'full';
+    crop = 'same';
     mem_limit_gb = util.sys.free_ram('GBs');
     use_fft = [];
     

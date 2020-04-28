@@ -86,10 +86,12 @@ end
 
 if length(size(M)) > 2
 %   error('M must be a 2-d array or a vector')
-    maxel = zeros(1,1,size(M,3));
-    IJ = zeros(1,2,size(M,3));
+    maxel = zeros(1,1,size(M,3),size(M,4));
+    IJ = zeros(1,2,size(M,3),size(M,4));
     for ii = 1:size(M,3)
-        [maxel(:,:,ii), IJ(:,:,ii)] = max2(M(:,:,ii));
+        for jj = 1:size(M,4)
+            [maxel(:,:,ii,jj), IJ(:,:,ii,jj)] = max2(M(:,:,ii,jj));
+        end
     end
     return;
 end

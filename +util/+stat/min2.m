@@ -85,10 +85,12 @@ if (nargin<1) || (nargin>3)
 end
 
 if length(size(M)) > 2%   error('M must be a 2-d array or a vector')
-    minel = zeros(1,1,size(M,3));
-    IJ = zeros(1,2,size(M,3));
+    minel = zeros(1,1,size(M,3), size(M,4));
+    IJ = zeros(1,2,size(M,3), size(M,4));
     for ii = 1:size(M,3)
-        [minel(:,:,ii), IJ(:,:,ii)] = min2(M(:,:,ii));
+        for jj = 1:size(M,4)
+            [minel(:,:,ii,jj), IJ(:,:,ii,jj)] = min2(M(:,:,ii,jj));
+        end
     end
     return;
 end
