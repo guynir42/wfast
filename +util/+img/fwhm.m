@@ -40,6 +40,10 @@ function val = fwhm(I, varargin)
     import util.text.cs;
 
     if nargin==0, help('util.img.fwhm'); return; end
+
+    if ndims(I)>4
+        error('This function does not support arrays with more than 4 dimensions!'); 
+    end
     
     input = util.text.InputVars;
     input.input_var('oversample', []); 
@@ -112,7 +116,7 @@ function val = fwhm(I, varargin)
             if input.fft
                 If = util.img.conv_f(g, I); 
             else
-                If = reshape(filter2(g, I), size(I)); % reshape back to original size
+                If = reshape(filter2(g, reshape(I, [size(I,1), size(I,2).*size(I,3).*size(I,4)])), size(I)); % reshape back to original size
             end
             
             mx(:,:,ii) = permute(util.stat.max2(If), [3,4,1,2]); % the maximum in each cutout for each sigma

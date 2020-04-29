@@ -81,8 +81,12 @@ classdef Catalog < handle
     
     properties % switches/controls
         
+                
         threshold = 5; % used by mextractor to find stars - to be deprecated
-        mag_limit = 17; % 
+        
+        input_rotation = -60;
+        input_rot_range = 5; 
+        mag_limit = 16; % what stars to look for in the GAIA catalog
         
         avoid_edges = 50; % how many pixels away from edge of image (need image to know the size!) - to be deprecated! 
         
@@ -152,7 +156,11 @@ classdef Catalog < handle
             obj.FWHM = [];
             obj.width = [];
             obj.seeing = [];
-
+            obj.detection_limit = [];
+            obj.detection_threshold = [];
+            obj.detection_stack_number = [];
+            obj.detection_exposure_time = [];
+        
             obj.success = []; 
 
             obj.clear;
@@ -250,6 +258,8 @@ classdef Catalog < handle
         
             if nargin==1, help('head.Catalog.inputPositions'); return; end
             
+            t = tic;
+            
             obj.success = 0; % change to 1 after all functions return normally 
             
             if isempty(P)
@@ -298,7 +308,8 @@ classdef Catalog < handle
 
                         [R,S2] = astrometry(S, 'RA', head.Ephemeris.deg2hour(list_RA(jj)), 'Dec', head.Ephemeris.deg2sex(list_DE(ii)), 'Scale', obj.head.SCALE, ...
                             'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', [5000 5000], 'ApplyPM', false, 'Flip', obj.flip, ...
-                            'MinRot', -180, 'MaxRot', 180, 'CatColMag', 'Mag', 'ImSize', [obj.head.NAXIS1, obj.head.NAXIS2]);
+                            'MinRot', obj.input_rotation-obj.input_rot_range, 'MaxRot', obj.input_rotation+obj.input_rot_range, ...
+                            'CatColMag', 'Mag', 'ImSize', [obj.head.NAXIS1, obj.head.NAXIS2]);
 
                         warning('on', 'MATLAB:polyfit:PolyNotUnique')
                         warning('on', 'MATLAB:lscov:RankDefDesignMat');
@@ -321,14 +332,23 @@ classdef Catalog < handle
                         
                     end
 
-                    % what should we do with R? check a correct match maybe? 
                     obj.mextractor_sim = update_coordinates(S2, 'ColNameRA', 'Im_RA', 'ColNameDec', 'Im_Dec'); 
 
-                    obj.catalog_matched = catsHTM.sources_match('GAIADR2',obj.mextractor_sim, 'ColRA', {'Im_RA'}, 'ColDec', {'Im_Dec'});
+                    % test if the astrometric solution even makes sense... 
+                    if any(abs(cell2mat(obj.mextractor_sim.WCS.WCS.tpv.KeyVal))>5)
+%                         disp('failed to find a reasonable fit!'); 
+%                         abs(cell2mat(obj.mextractor_sim.WCS.WCS.tpv.KeyVal))
+                        obj.success = 0;
+                        continue; 
+                    end
+                    % what should we do with R? check a correct match maybe? 
+                    
+                    obj.catalog_matched = catsHTM.sources_match('GAIADR2', obj.mextractor_sim, 'ColRA', {'Im_RA'}, 'ColDec', {'Im_Dec'}, ...
+                        'MagLimit', 12, 'MagColumn', 'Mag_BP', 'UseSingle', true);
 
                     obj.wcs_object = ClassWCS.populate(S);
 
-                    obj.makeCatalog;
+                    obj.makeCatalog; % turn the MAAT objects into a table
 
                     % add tests for matching fraction and magnitude range, etc
 
@@ -362,6 +382,65 @@ classdef Catalog < handle
                 obj.rotation = obj.head.WCS.rotation; % field rotation from PV parameters
                 
             end
+            
+            fprintf('Total time to get astrometric fit is %f seconds.\n', toc(t));
+        
+        end
+        
+        function T = makeCatalog(obj) % old method to find coordinates from image using mextractor. To be deprecated
+            
+            S = obj.mextractor_sim;
+            SS = obj.catalog_matched;
+            
+            T = array2table([SS.Cat, S.Cat], 'VariableNames', [SS.ColCell, S.ColCell]);
+
+%             T.Properties.VariableNames; % change variable names??
+
+            T.RA = T.RA.*180/pi;
+            T.Dec = T.Dec.*180/pi;
+            T.Dist = T.Dist.*180/pi*3600;
+            
+            T.Im_RA = T.Im_RA.*180/pi;
+            T.Im_Dec = T.Im_Dec.*180/pi;
+            
+            % need to improve this some how...
+%             T.Properties.VariableUnits = {'deg', 'deg', 'year', '"', '"', '"', '"', '"', '"', '"', '"', '', '', '', ...
+%                 'mag', 'mag', 'mag', 'mag', 'mag', 'mag', 'km/s', 'km/s', '', 'K', 'K', 'K', '', '', '"', '',  ...
+%                 'pix', 'pix', 'pix', 'pix', 'pix', 'pix', 'pix', 'deg', '', ...
+%                 'deg', 'deg', 'counts', 'counts', '', '', '', '','', 'counts', 'counts', 'mag', 'mag', '', '', '', ...
+%                 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', ...
+%                 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', ...
+%                 '', '', 'arcsec'}; % input units for all variables
+            
+            if obj.use_matched_only
+                obj.data = T(~isnan(T.Mag_BP),:); 
+                [~, idx] = unique(T{:,1:2}, 'rows');
+                T = T(idx,:); % sort the table... 
+            else                
+                obj.data = T;
+            end
+            
+            obj.positions = [obj.data.X, obj.data.Y];
+            obj.magnitudes = obj.data.Mag_BP;
+            obj.coordinates = [obj.data.RA obj.data.Dec];
+            obj.temperatures = obj.data.Teff;
+            
+            [N,E] = histcounts(obj.magnitudes, 'BinWidth', 0.5);
+            [mx,idx] = max(N);
+            
+            if idx<length(N)
+                for ii = idx+1:length(N) 
+                    if(N(ii)<0.1*mx) % find the first bin with less than 10% of the peak
+                        idx = ii; 
+                        break; 
+                    end 
+                end
+            end
+            
+            obj.detection_limit = E(idx); % the lower edge of that bin is the limiting magnitudes
+            
+            
+%             obj.detection_limit = nanmax(obj.magnitudes); % must find a better way to estimate this (there's lots of accidental matches with the wrong flux)
             
         end
         
@@ -488,50 +567,6 @@ classdef Catalog < handle
             obj.catalog_matched = SS;
             
             obj.wcs_object = ClassWCS.populate(S);
-            
-        end
-        
-        function T = makeCatalog(obj) % old method to find coordinates from image using mextractor. To be deprecated
-            
-            S = obj.mextractor_sim;
-            SS = obj.catalog_matched;
-            
-            T = array2table([SS.Cat, S.Cat], 'VariableNames', [SS.ColCell, S.ColCell]);
-            
-%             T = T(~isnan(T{:,1}),:);
-
-
-%             T.Properties.VariableNames; % change variable names??
-
-            T.RA = T.RA.*180/pi;
-            T.Dec = T.Dec.*180/pi;
-            T.Dist = T.Dist.*180/pi*3600;
-            
-            T.Im_RA = T.Im_RA.*180/pi;
-            T.Im_Dec = T.Im_Dec.*180/pi;
-            
-%             T.Properties.VariableUnits = {'deg', 'deg', 'year', '"', '"', '"', '"', '"', '"', '"', '"', '', '', '', ...
-%                 'mag', 'mag', 'mag', 'mag', 'mag', 'mag', 'km/s', 'km/s', '', 'K', 'K', 'K', '', '', '"', '',  ...
-%                 'pix', 'pix', 'pix', 'pix', 'pix', 'pix', 'pix', 'deg', '', ...
-%                 'deg', 'deg', 'counts', 'counts', '', '', '', '','', 'counts', 'counts', 'mag', 'mag', '', '', '', ...
-%                 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', ...
-%                 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', 'counts', ...
-%                 '', '', 'arcsec'}; % input units for all variables
-            
-            if obj.use_matched_only
-                obj.data = T(~isnan(T.Mag_BP),:); 
-                [~, idx] = unique(T{:,1:2}, 'rows');
-                T = T(idx,:); % sort the table... 
-            else                
-                obj.data = T;
-            end
-            
-            obj.positions = [obj.data.X, obj.data.Y];
-            obj.magnitudes = obj.data.Mag_BP;
-            obj.coordinates = [obj.data.RA obj.data.Dec];
-            obj.temperatures = obj.data.Teff;
-            
-            obj.detection_limit = nanmax(obj.magnitudes); % must find a better way to estimate this (there's lots of accidental matches with the wrong flux)
             
         end
         

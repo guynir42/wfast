@@ -1247,6 +1247,13 @@ classdef Analysis < file.AstroData
                     
 %                     obj.cat.input(obj.stack_proc);
                     obj.cat.use_matched_only = 0; % cannot throw away stars with no match, we have cutouts already!! 
+                    
+                    if util.text.cs(obj.head.cam_name, 'balor')
+                        obj.cat.input_rotation = -60; 
+                    elseif util.text.cs(obj.head.cam_name, 'zyla')
+                        obj.cat.input_rotation = -15; 
+                    end
+                    
                     obj.cat.inputPositions(obj.positions); 
 
                     if ~isempty(obj.cat.data) && obj.cat.success % successfully filled the catalog
@@ -1274,7 +1281,7 @@ classdef Analysis < file.AstroData
                         obj.temperatures = obj.cat.temperatures;
                        
                     elseif obj.cat.success==0
-                        fprintf('Warning: could not find an astrometric solution!'); 
+                        fprintf('Warning: could not find an astrometric solution!\n'); 
                     end
 
                 end
@@ -1314,7 +1321,7 @@ classdef Analysis < file.AstroData
                         
                         if cs(c{1}, 'detect_thresh', 'detection_threshold')
                             obj.cat.detection_threshold = str2double(c{2}); % consider a test if this field is already filled??
-                        elseif cs(c{1}, 'NAXIS3')
+                        elseif cs(c{1}, 'NAXIS3', 6)
                             obj.cat.detection_stack_number = str2double(c{2}); % consider a test if this field is already filled?? 
                         elseif cs(c{1}, 'EXPTIME')
                             obj.cat.detection_exposure_time = str2double(c{2}); % consider a test if this field is already filled?? 

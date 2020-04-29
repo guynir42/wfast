@@ -1738,9 +1738,9 @@ classdef Acquisition < file.AstroData
             
             try 
                 
-                tic
+                
                 obj.src.single; 
-                toc 
+                
                 obj.prev_stack = obj.stack_proc; % keep one stack from last batch
                 obj.clear;
                 obj.copyFrom(obj.src); % get the data into this object
@@ -1917,7 +1917,9 @@ classdef Acquisition < file.AstroData
                         warning(ME.getReport);
                     end
                 end
-                
+
+            else
+                if obj.debug_bit, fprintf('Could not fit astrometric solution...\n'); end
             end
 
            obj.head.LIMMAG_DETECTION = obj.cat.detection_limit; 
@@ -2168,6 +2170,8 @@ classdef Acquisition < file.AstroData
             obj.frame_rate = obj.slow_mode_frame_rate;
             obj.batch_size = obj.slow_mode_batch_size;
             
+            obj.total_runtime = obj.total_runtime; % this triggers the setter and updates num_batches
+            
         end
         
         function setupFastMode(obj)
@@ -2175,6 +2179,8 @@ classdef Acquisition < file.AstroData
             obj.expT = obj.fast_mode_expT;
             obj.frame_rate = obj.fast_mode_frame_rate;
             obj.batch_size = obj.fast_mode_batch_size;
+            
+            obj.total_runtime = obj.total_runtime; % this triggers the setter and updates num_batches
             
         end
         
