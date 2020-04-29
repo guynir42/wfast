@@ -58,15 +58,15 @@ classdef AutoFocus < handle
         
         use_min_position = 1;
         
-        use_fit_tip_tilt = 0;
+        use_fit_tip_tilt = 1;
         
         step = 0.01;
         range = 0.15;
         
-        angle = 0; % between tip axis and pixel y axis (degrees)
-        spider_diameter = 100; % in cm
-        pixel_size = 6.5; % in microns
-        num_pixels = 2000; % across the sensor (roughly)
+        angle = -60; % between tip axis and pixel y axis (degrees)
+        spider_diameter = 150; % in cm
+        pixel_size = 12; % in microns
+        num_pixels = 2000; % across the sensor (roughly) to be deprecated
         
         debug_bit = 1;
         
@@ -221,18 +221,21 @@ classdef AutoFocus < handle
                 
                 obj.min_positions_reduced = obj.min_positions(~bad_indices); 
                 obj.min_weights_reduced = obj.min_weights(~bad_indices); 
-                obj.xy_pos_reduced = obj.xy_pos(~bad_indices); 
+                obj.xy_pos_reduced = obj.xy_pos(~bad_indices,:); 
                 
             else
                 
                 obj.fitCurves;
-                if obj.use_fit_tip_tilt
-                    obj.fitSurface;
-                    obj.findPosTipTilt;
-                else
-                    obj.findPosOnly;
-                end
                 
+            end
+            
+            
+            obj.fitSurface;
+                
+            if obj.use_fit_tip_tilt
+                obj.findPosTipTilt;
+            else
+                obj.findPosOnly;
             end
             
         end
@@ -314,7 +317,7 @@ classdef AutoFocus < handle
             A = [ones(m,1) xy_rot(:,1) xy_rot(:,2)]; % design matrix! 
 
             obj.surface_coeffs = lscov(A,B,w); % coeffs are: piston, x (tilt) and y (tip)
-            
+                        
         end
         
         function findPosOnly(obj)
@@ -327,10 +330,10 @@ classdef AutoFocus < handle
             
             obj.found_pos = obj.surface_coeffs(1);
             obj.found_pos = mean(obj.min_positions, 'omitnan');
-            if obj.debug_bit, fprintf('BEST POS: mean= %f | surface piston term= %f\n', mean(obj.min_positions, 'omitnan'), obj.surface_coeffs(1)); end
+            if obj.debug_bit, fprintf('BEST POS: mean= %f | surface piston term= %f\n', nanmean(obj.min_positions), obj.surface_coeffs(1)); end
             
-            obj.found_tilt = obj.surface_coeffs(2).*obj.spider_diameter.*1e4./obj.pixel_size;
-            obj.found_tip = obj.surface_coeffs(3).*obj.spider_diameter.*1e4./obj.pixel_size;
+            obj.found_tip = obj.surface_coeffs(2).*obj.spider_diameter.*1e4./obj.pixel_size; % in this case tip is X slope
+            obj.found_tilt = obj.surface_coeffs(3).*obj.spider_diameter.*1e4./obj.pixel_size; % in this case tip is Y slope
             
             if obj.debug_bit, fprintf('BEST TIP= %f | BEST tilt= %f\n', obj.found_tip, obj.found_tilt); end
             
@@ -404,9 +407,12 @@ classdef AutoFocus < handle
             
             [X,Y] = meshgrid(1:obj.x_max, 1:obj.y_max);
             
-            util.plot.show(obj.surface_coeffs(1) + obj.surface_coeffs(2).*Y + obj.surface_coeffs(3).*X);
+            util.plot.show(obj.surface_coeffs(1) + obj.surface_coeffs(2).*X + obj.surface_coeffs(3).*Y, 'ax', obj.ax);
+            
             hold(obj.ax, 'on');
-            scatter(obj.xy_pos_reduced(:,1), obj.xy_pos_reduced(:,2), obj.min_weights_reduced*10, obj.min_positions_reduced, 'filled'); 
+            
+            scatter(obj.ax, obj.xy_pos_reduced(:,1), obj.xy_pos_reduced(:,2), obj.min_weights_reduced*10, obj.min_positions_reduced, 'filled');
+
 %             axis(obj.ax, 'image');
 %             colorbar(obj.ax); 
 %             obj.ax.XLim = [1,obj.x_max];

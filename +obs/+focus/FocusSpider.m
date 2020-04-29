@@ -160,12 +160,27 @@ classdef FocusSpider < handle
                 val = obj.min_pos;
             end
             
-            p = obj.pos;
-            dp = val-p;
+            p_initial = obj.pos; % current position
+            dp_total = val-p_initial; % required relative motion
             
-            for ii = 1:obj.num_act
-                obj.actuators(ii).rel_move(dp);
-%                 obj.actuators(ii).move(val);
+            N = ceil(abs(dp_total)); % how many 1mm step we need to do to get to new location
+            
+            for ii = 1:N+1 % extra move to make sure we are at the right position
+                
+                p_now = obj.pos;
+                
+                if p_now==val
+                    break;
+                elseif p_now<val % need to move the focus up
+                    dp = min(1, val-p_now);
+                elseif p_now>val % need to move the focus down
+                    dp = max(-1, val-p_now); 
+                end
+                
+                for jj = 1:obj.num_act
+                    obj.actuators(jj).rel_move(dp);
+                end
+                
             end
             
         end

@@ -811,6 +811,20 @@ classdef Andor < file.AstroData
             
             try 
             
+                % update the object with the camera parameters
+                obj.af.x_max = obj.ROI(4);
+                obj.af.y_max = obj.ROI(3);
+                
+                obj.af.pixel_size = obj.head.PIXSIZE; 
+                
+                if ~isempty(obj.head.FIELDROT)
+                    obj.af.angle = obj.head.FIELDROT;
+                elseif util.text.cs(obj.head.cam_name, 'Zyla')
+                    obj.af.angle = -15;
+                elseif util.text.cs(obj.head.cam_name, 'Balor')
+                    obj.af.angle = -60;
+                end
+                
                 if obj.is_running
                     disp('Camera is already running. Set is_running to zero...');
                     return;
@@ -819,7 +833,7 @@ classdef Andor < file.AstroData
                 % find stars, the quick version!
                 obj.single;                
                 T = util.img.quick_find_stars(util.stat.sum_single(obj.images), 'threshold', 30, 'saturation', 5e6, 'unflagged', 1); 
-                height(T)
+                
                 % the focus positions to scan
                 p = obj.af.getPosScanValues(obj.focuser.pos);
 
@@ -849,13 +863,17 @@ classdef Andor < file.AstroData
                     obj.batch;
                     
                     % do we want to quick find stars on each iteration...?
-                    C = util.img.mexCutout(obj.images, T.pos, obj.focus_cut_size, NaN); 
+                    C = util.img.mexCutout(obj.images, T.pos, obj.focus_cut_size, NaN)-100; 
                     
-                    phot_struct = util.img.photometry2(single(C)-100, 'aperture', obj.focus_aperture, 'use_aperture', 1, ...
+                    C = single(nansum(C,3)); % can I replace this with sum_single?
+                    
+                    phot_struct = util.img.photometry2(C, 'aperture', obj.focus_aperture, 'use_aperture', 1, ...
                         'gauss_sigma', 5, 'use_gaussian', 1, 'index', 3, 'threads', 4);
                     
-                    widths = phot_struct.gaussian_photometry.width;
-                    fluxes = phot_struct.apertures_photometry.flux - phot_struct.apertures_photometry.areas.*phot_struct.apertures_photometry.backgrounds;
+                    fluxes = phot_struct.apertures_photometry.flux - phot_struct.apertures_photometry.area.*phot_struct.apertures_photometry.background;
+%                     widths = phot_struct.apertures_photometry.width;
+                    widths = util.img.fwhm(C, 'method', 'filters')/2.355; 
+                    widths(widths>10 | widths<0.1) = NaN;
                     
                     obj.af.input(ii, p(ii), widths, fluxes, T.pos); 
                     
@@ -870,10 +888,14 @@ classdef Andor < file.AstroData
                 fprintf('FOCUSER RESULTS: pos= %f | tip= %f | tilt= %f\n', obj.af.found_pos, obj.af.found_tip, obj.af.found_tilt);
                 
                 if ~isnan(obj.af.found_pos)
-                    obj.cam.focuser.pos = obj.af.found_pos;
+                    obj.focuser.pos = obj.af.found_pos;
+                    if obj.af.use_fit_tip_tilt
+                        obj.focuser.tipRelativeMove(obj.af.found_tip);
+                        obj.focuser.tiltRelativeMove(obj.af.found_tilt);
+                    end
                 else
                     disp('The location of new position is NaN. Choosing original position');
-                    obj.cam.focuser.pos = old_pos;
+                    obj.focuser.pos = old_pos;
                 end
                 
 %                 if isprop(obj.cam.focuser, 'tip') && ~isempty(obj.af.found_tip)

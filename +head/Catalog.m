@@ -343,8 +343,8 @@ classdef Catalog < handle
                     end
                     % what should we do with R? check a correct match maybe? 
                     
-                    obj.catalog_matched = catsHTM.sources_match('GAIADR2', obj.mextractor_sim, 'ColRA', {'Im_RA'}, 'ColDec', {'Im_Dec'}, ...
-                        'MagLimit', 12, 'MagColumn', 'Mag_BP', 'UseSingle', true);
+%                     obj.catalog_matched = catsHTM.sources_match('GAIADR2', obj.mextractor_sim, 'ColRA', {'Im_RA'}, 'ColDec', {'Im_Dec'}, 'MagColumn', 'Mag_BP', 'MagLimit', 20);
+                    obj.catalog_matched = catsHTM.sources_match('GAIADR2', obj.mextractor_sim, 'ColRA', {'Im_RA'}, 'ColDec', {'Im_Dec'});
 
                     obj.wcs_object = ClassWCS.populate(S);
 
