@@ -516,8 +516,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             end
             
             if ischar(RA) && isempty(DEC)
-
-                if ~isempty(which('celestial.coo.coo_resolver', 'function'))
+                if util.text.cs(RA, 'ecliptic', 'kbos')
+                    obj.gotoDefaultField('ecliptic'); 
+                    RA = obj.RA;
+                    DEC = obj.Dec;
+                elseif ~isempty(which('celestial.coo.coo_resolver', 'function'))
                     [RA, DEC] = celestial.coo.coo_resolver(RA, 'OutUnits', 'deg', 'NameServer', @VO.name.server_simbad);
                     RA = RA/15;
                 else
@@ -527,7 +530,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             end
             
             obj.RA = RA;
-            obj.DEC = DEC;
+            obj.Dec = DEC;
             
             if nargin>3 && ~isempty(time)
                 
@@ -685,6 +688,57 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
+        function val = better_than(obj, other, varargin) % find if this object has better observable conditions than that one
+        % Usage: val = better_than(obj, other, varargin)
+        % Check which target is better to observe right now. 
+        % Returns true when this object is better. 
+        % Must take two different Ephemeris objects. Assumes objects are 
+        % updated to the same time (this is up to the user). 
+        % 
+        % In the simplest case, the target with lower airmass will be better. 
+        %
+        % OPTIONAL ARGUMENTS:
+        %   -wind_speed: if wind is above some limit (20km/h) then this 
+        %                function will prefer the Eastern target regardless
+        %                of airmass. If both are on the same side, this is 
+        %                ignored. If not given (or empty) will skip this test. 
+        % 
+            
+            input = util.text.InputVars;
+            input.input_var('wind_speed', []); 
+            input.scan_vars(varargin{:}); 
+        
+            if isempty(other) || ~isa(other, 'head.Ephemeris') || obj==other
+                error('Must supply another Ephemeris object to this function!'); 
+            end
+            
+            if isempty(other.AIRMASS)
+                val = 1;
+                return; 
+            end
+            
+            if isempty(obj.AIRMASS)
+                val = 0;
+                return;
+            end
+            
+            val = obj.AIRMASS<=other.AIRMASS; % if this object has lower airmass, it is better
+            
+            % additional checks besides airmass
+            if ~isempty(input.wind_speed)
+                if input.wind_speed>20 % only prefer Eastern targets when the wind is strong
+                    if obj.HA_deg<0 && other.HA_deg>=0 % this is Eastern while other is Western
+                        val = 1;
+                    elseif obj.HA_deg>=0 && other.HA_deg<0 % this is Western while other is Eastern
+                        val = 0;
+                    else
+                        % pass: if both targets are on the same side, do not use wind as a deciding factor
+                    end
+                end
+            end
+            
+        end
+        
     end
     
     methods % utilities
@@ -735,35 +789,98 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     
     methods % produce and load default fields
         
-        function gotoDefaultField(obj, type, number) % jump to one of the default fields by type and number
-            
+        function gotoDefaultField(obj, type, varargin) % jump to one of the default fields by type and number
+        % Usage: gotoDefaultField(obj, type, number=[])
+        % Go to one of the default fields, from the given type. 
+        % Choose one of the types: KBOs, ...
+        % If the number is given, will go to that specific field. 
+        % (use numberDefaultFields(type) to know how many there are). 
+        % If no number is given, simply choose the best field. 
+        % 
+        % OPTIONAL ARGUMENTS are passed along to the better_than() function. 
+        
             import util.text.cs;
+            
+            if nargin==1, help('head.Ephemeris.gotoDefaultField'); return; end
+
+            input = util.text.InputVars;
+            input.use_ordered_numeric = 1;
+            input.input_var('number', []);
+            input.scan_vars(varargin{:}); 
+            
+            if ischar(input.number)
+                if cs(input.number, 'best')
+                    input.number=[];
+                else
+                    error('Wrong input for number: "%s". Use "best" or a numeric value.', input.number);
+                end
+            end
             
             if isempty(obj.default_fields)
                 obj.makeDefaultFields;
             end
             
-            if number<1 || number>obj.numberDefaultFields(type)
-                error('Requested field number %d is out of bounds for type %s (limited to %d fields).', number, type, obj.numberDefaultFields(type)); 
+            if ~isempty(input.number) && (input.number<1 || input.number>obj.numberDefaultFields(type))
+                error('Requested field number %d is out of bounds for type %s (limited to %d fields).', input.number, type, obj.numberDefaultFields(type)); 
             end
             
             if cs(type, 'kbos', 'kuiper belt object', 'ecliptic')
-                s = obj.default_fields(strcmp({obj.default_fields.type}, 'ecliptic'));
-                s = s(number);
-                obj.RA_deg = s.RA;
-                obj.Dec_deg = s.Dec;
-                obj.star_density = s.stars;
-                obj.updateSecondaryCoords;
+                s = obj.default_fields(strcmp({obj.default_fields.type}, 'ecliptic')); % get all the structs that fit this type of field
+                
             % add other default field types...
             else
                 error('Unknown default field type "%s". Try "ecliptic"... ', type); 
             end
             
+            
+            if isempty(input.number) % automatically choose the best field
+                
+                input.number = 1; % assume it is 1 and adjust it if a better field is found
+                
+                obj.RA_deg = s(1).RA;
+                obj.Dec_deg = s(1).Dec;
+                obj.star_density = s(1).stars;
+                obj.updateSecondaryCoords;
+                
+                e = head.Ephemeris; % make a test object 
+                e.time = obj.time;
+                
+                for ii = 2:length(s)
+                    
+                    e.RA_deg = s(ii).RA;
+                    e.Dec_deg = s(ii).Dec;
+                    e.star_density = s(ii).stars;
+                    e.updateSecondaryCoords;
+                    
+                    if better_than(e, obj) % found a better field, update to that one
+                        input.number = ii;
+                        obj.RA_deg = s(ii).RA;
+                        obj.Dec_deg = s(ii).Dec;
+                        obj.star_density = s(ii).stars;
+                        obj.updateSecondaryCoords; 
+                    end
+                    
+                end
+                
+            else
+                s = s(input.number);
+                obj.RA_deg = s.RA;
+                obj.Dec_deg = s.Dec;
+                obj.star_density = s.stars;
+                obj.updateSecondaryCoords;
+            end
+            
+            
+            
         end
         
         function val = numberDefaultFields(obj, type) % check how many default fields are available for this type
-            
+        % Usage: val = numberDefaultFields(obj, type)
+        % ...
+        
             import util.text.cs;
+            
+            if nargin==1, help('head.Ephemeris.numberDefaultFields'); return; end
             
             if isempty(obj.default_fields)
                 obj.makeDefaultFields;
@@ -786,23 +903,85 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
   
             s = struct;
             
-            s.type = 'ecliptic';
-            s.stars = 6000;
-            s.RA = 276;
-            s.Dec = -25;
-            s.ECL_LAT = -1.67;
-            s.GAL_LAT = -5.53;
+            % I chose these using the scripts/scan_ecliptic.m script and the sky map (down to 14th mag)
+            
+            %%%%%%%%%%%%%%%%%%%%%% Ecliptic fields %%%%%%%%%%%%%%%%%%%%%%%%
+            
+            s.type = 'ecliptic'; s.RA = 10.5; s.Dec = 6.0; s.ECL_LAT = 1.364; s.GAL_LAT = -56.793; s.stars = 1000;
             obj.default_fields = [obj.default_fields; s];
             
-            s.type = 'ecliptic';
-            s.stars = 1000;
-            s.RA = 97.5;
-            s.Dec = +22;
-            s.ECL_LAT = -1.25;
-            s.GAL_LAT = 5.37;
+            s.type = 'ecliptic'; s.RA = 29; s.Dec = 17.0; s.ECL_LAT = 4.642; s.GAL_LAT = -43.01; s.stars = 1000; 
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'ecliptic'; s.RA = 58.0; s.Dec = 22.0; s.ECL_LAT = 1.772; s.GAL_LAT = -24.28; s.stars = 2000;
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'ecliptic'; s.RA = 98.5; s.Dec = 21.5; s.ECL_LAT = -1.706; s.GAL_LAT = 5.98; s.stars = 15000;
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'ecliptic'; s.RA = 120.0; s.Dec = 19.0; s.ECL_LAT = -1.548; s.GAL_LAT = 23.357; s.stars = 4000;
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'ecliptic'; s.RA = 156.5; s.Dec = 8.0; s.ECL_LAT = -1.684; s.GAL_LAT = 50.643;s.stars = 1000;
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'ecliptic'; s.RA = 209.5; s.Dec = -10.5; s.ECL_LAT = 1.455; s.GAL_LAT = 49.055; s.stars = 1700;
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'ecliptic'; s.RA = 235.5; s.Dec = -19.5; s.ECL_LAT = 0.158; s.GAL_LAT = 27.706; s.stars = 4000;
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'ecliptic'; s.RA = 255.5; s.Dec = -24.5; s.ECL_LAT = -1.72; s.GAL_LAT = 10.55; s.stars = 9400;
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'ecliptic'; s.RA = 264.0; s.Dec = -18.0; s.ECL_LAT = 5.320; s.GAL_LAT = 7.625; s.stars = 7000;
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'ecliptic'; s.RA = 275; s.Dec = -25.0; s.ECL_LAT = -1.639; s.GAL_LAT = -4.727; s.stars = 20000;
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'ecliptic'; s.RA = 305.5; s.Dec = -17.5; s.ECL_LAT = 1.889; s.GAL_LAT = -27.636; s.stars = 5000;
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'ecliptic'; s.RA = 331.0; s.Dec = -10.5; s.ECL_LAT = 1.285; s.GAL_LAT = -47.294; s.stars = 2000;
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'ecliptic'; s.RA = 331.0; s.Dec = -10.5; s.ECL_LAT = 1.285; s.GAL_LAT = -47.294; s.stars = 2000;
+            obj.default_fields = [obj.default_fields; s];
+            
+            %%%%%%%%%%%%%%%%%%%%%% galactic fields %%%%%%%%%%%%%%%%%%%%%%%%
+            
+            s.type = 'galactic'; s.RA = 34.5; s.Dec = 53; s.ECL_LAT = 36.666; s.GAL_LAT = -7.683; s.stars = 9000; 
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'galactic'; s.RA = 89.5; s.Dec = 28.5 s.ECL_LAT = 5.061; s.GAL_LAT = 2.112; s.stars = 14112;
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'galactic'; s.RA = 119.0; s.Dec = -25.0; s.ECL_LAT = -44.672; s.GAL_LAT = 1.806; s.stars = 31235;
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'galactic'; s.RA = 150.0; s.Dec = -25.0; s.ECL_LAT = -34.611; s.GAL_LAT = 23.488; s.stars = 3815;
+            obj.default_fields = [obj.default_fields; s];
+
+            s.type = 'galactic'; s.RA= 209.5; s.Dec = -25.0; s.ECL_LAT = -12.135; s.GAL_LAT = 35.459; s.stars = 2585;
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'galactic'; s.RA = 281.5; s.Dec = -7.5; s.ECL_LAT = 15.468; s.GAL_LAT = -2.211; s.stars = 37437;
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'galactic'; s.RA = 300.0; s.Dec = 38.0; s.ECL_LAT= 56.753; s.GAL_LAT = 4.246; s.stars = 20534;
+            obj.default_fields = [obj.default_fields; s];
+            
+            s.type = 'galactic'; s.RA = 333.5; s.Dec = 51.5; s.ECL_LAT = 55.947; s.GAL_LAT = -4.101; s.stars = 19758;
             obj.default_fields = [obj.default_fields; s];
             
             % add more fields! 
+            
+            
+        end
+        
+        function printDefaultFields(obj, type)
+            
             
             
         end
