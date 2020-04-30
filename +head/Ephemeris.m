@@ -38,6 +38,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     
     properties % switches/controls
         
+        % observational constraints
+        alt_limit = 25; % minimal angle above horizon for being observable (degrees)
+        min_duration = 0.5; % minimal time until reaching meridian or horizon (hours)
+        
         debug_bit = 0;
         
     end
@@ -69,11 +73,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         AIRMASS; 
         
-        ECL_LAMBDA; % ecliptic longitude
-        ECL_BETA; % ecliptic latitude
+        ECL_long; % ecliptic longitude
+        ECL_lat; % ecliptic latitude
         
-        GAL_Long; % galactic longitude
-        GAL_Lat; % galactic latitude
+        GAL_long; % galactic longitude
+        GAL_lat; % galactic latitude
         
     end
     
@@ -319,25 +323,25 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
-        function val = get.ECL_LAMBDA(obj)
+        function val = get.ECL_long(obj)
             
             val = obj.ecliptic_lambda;
             
         end
         
-        function val = get.ECL_BETA(obj)
+        function val = get.ECL_lat(obj)
             
             val = obj.ecliptic_beta;
             
         end
         
-        function val = get.GAL_Long(obj)
+        function val = get.GAL_long(obj)
             
             val = obj.galactic_longitude;
             
         end
         
-        function val = get.GAL_Lat(obj)
+        function val = get.GAL_lat(obj)
             
             val = obj.galactic_latitude;
             
@@ -509,6 +513,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         % In either case, the secondary coordinates are updated to the new
         % RA/Dec and time. 
             
+            import util.text.cs;
+        
             if nargin==1, help('head.Ephemeris.input'); return; end
             
             if nargin<3
@@ -516,12 +522,20 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             end
             
             if ischar(RA) && isempty(DEC)
-                if util.text.cs(RA, 'ecliptic', 'kbos')
+                name = RA; 
+                if cs(name, 'ecliptic', 'kbos')
                     obj.gotoDefaultField('ecliptic'); 
                     RA = obj.RA;
                     DEC = obj.Dec;
+                elseif cs(name, 'galactic')
+                    obj.gotoDefaultField('galactic'); 
+                    RA = obj.RA;
+                    DEC = obj.Dec;
+                elseif cs(name, 'moon')
+                    RA = 0;
+                    DEC = 0;
                 elseif ~isempty(which('celestial.coo.coo_resolver', 'function'))
-                    [RA, DEC] = celestial.coo.coo_resolver(RA, 'OutUnits', 'deg', 'NameServer', @VO.name.server_simbad);
+                    [RA, DEC] = celestial.coo.coo_resolver(name, 'OutUnits', 'deg', 'NameServer', @VO.name.server_simbad);
                     RA = RA/15;
                 else
                     error('no name resolver has been found... try adding MAAT to the path.');
@@ -548,6 +562,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 end
                 
             end
+            
+            if cs(name, 'moon')
+                obj.RA = obj.moon.RA/15;
+                obj.Dec = obj.moon.Dec;
+            end
+            
             
         end
         
@@ -578,14 +598,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         % For objects below the alt_limit at the stored time, returns NaN. 
         
             if nargin<2 || isempty(alt_limit)
-                alt_limit = 25;
+                alt_limit = obj.alt_limit;
             end
             
             if nargin<3 || isempty(resolution_minutes)
                 resolution_minutes = 5;
             end
             
-            if obj.ALT<alt_limit
+            if obj.ALT_deg<alt_limit
                 val = NaN; % we cannot observe this object at the given time, so it returns NaN
                 return; 
             end
@@ -602,7 +622,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                     
                     e.time = e.time + minutes(resolution_minutes); 
                     
-                    if e.ALT>alt_limit
+                    if e.ALT_deg>alt_limit
                         val = val + resolution_minutes;
                     else
                         break;
@@ -652,7 +672,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         %                       side) that we want to avoid. Default 5 degrees. 
         
             input = util.text.InputVars;
-            input.input_var('alt_limit', 25); 
+            input.input_var('alt_limit', obj.alt_limit); 
             input.input_var('south', -20, 'south_limit');
             input.input_var('side', 'both', 'hemisphere');
             input.input_var('meridian', 5, 'meridian_distance', 'meridien_distance'); 
@@ -698,13 +718,32 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         % In the simplest case, the target with lower airmass will be better. 
         %
         % OPTIONAL ARGUMENTS:
+        %   -alt_limit: minimal altitude (angle) above horizon for a target
+        %               to be viable/observable. Default is 25 degrees.
+        %   -duration: minimal duration (in hours) that a target must be
+        %              observable, until meridian or horizon, to be valid. 
+        %              Default is 0.5 hours. 
+        %   -side: can only choose viable targets on the given side, that is
+        %          "East", "West", or "both" (default, same as empty). 
+        %          Note that this overwrides the "wind_speed" input. 
         %   -wind_speed: if wind is above some limit (20km/h) then this 
         %                function will prefer the Eastern target regardless
         %                of airmass. If both are on the same side, this is 
         %                ignored. If not given (or empty) will skip this test. 
         % 
+        % NOTE: if the other object is not observable, then this object is 
+        %       accepted as default (val==1), even if it isn't observable. 
+        %       If other is observable and this object isn't, only then is 
+        %       the other object preferred (val==0). 
             
+            import util.text.cs;
+        
+            if nargin==1, help('head.Ephemeris.better_than'); return; end
+        
             input = util.text.InputVars;
+            input.input_var('alt_limit', obj.alt_limit); 
+            input.input_var('duration', obj.min_duration); 
+            input.input_var('side', []); 
             input.input_var('wind_speed', []); 
             input.scan_vars(varargin{:}); 
         
@@ -712,19 +751,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 error('Must supply another Ephemeris object to this function!'); 
             end
             
-            if isempty(other.AIRMASS)
+            if isempty(other.AIRMASS) || other.ALT_deg<input.alt_limit || other.calcObsTimeMinutes(input.alt_limit)<input.duration*60
                 val = 1;
                 return; 
             end
             
-            if isempty(obj.AIRMASS)
+            if isempty(obj.AIRMASS) || obj.ALT_deg<input.alt_limit || obj.calcObsTimeMinutes(input.alt_limit)<input.duration*60
                 val = 0;
                 return;
             end
             
             val = obj.AIRMASS<=other.AIRMASS; % if this object has lower airmass, it is better
             
-            % additional checks besides airmass
+            %%%%%%%%% additional checks besides airmass / alt_limit %%%%%%%%%%
+            
+            % check if the wind is too high, prefer Eastern targets
             if ~isempty(input.wind_speed)
                 if input.wind_speed>20 % only prefer Eastern targets when the wind is strong
                     if obj.HA_deg<0 && other.HA_deg>=0 % this is Eastern while other is Western
@@ -735,6 +776,35 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                         % pass: if both targets are on the same side, do not use wind as a deciding factor
                     end
                 end
+            end
+            
+            % if given a side to prefer (to prevent meridian flips)
+            if ~isempty(input.side) && ~cs(input.side, 'both')
+                
+                if cs(input.side, 'east')
+                    
+                    if obj.HA_deg<0 && other.HA_deg>=0 % this is Eastern while other is Western
+                        val = 1;
+                    elseif obj.HA_deg>=0 && other.HA_deg<0 % this is Western while other is Eastern
+                        val = 0;
+                    else
+                        % pass: if both targets are on the same side, do not use wind as a deciding factor
+                    end
+                    
+                elseif cs(input.side, 'west')
+                    
+                    if obj.HA_deg>=0 && other.HA_deg<0 % this is Western while other is Eastern
+                        val = 1;
+                    elseif obj.HA_deg<0 && other.HA_deg>=0 % this is Eastern while other is Western
+                        val = 0;
+                    else
+                        % pass: if both targets are on the same side, do not use wind as a deciding factor
+                    end
+                    
+                else
+                    error('Unknown side "%s". Choose "East" or "West" or "both". ', input.side); 
+                end
+                
             end
             
         end
@@ -824,9 +894,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 error('Requested field number %d is out of bounds for type %s (limited to %d fields).', input.number, type, obj.numberDefaultFields(type)); 
             end
             
-            if cs(type, 'kbos', 'kuiper belt object', 'ecliptic')
+            if cs(type, 'kbos', 'kuiper belt objects', 'ecliptic')
                 s = obj.default_fields(strcmp({obj.default_fields.type}, 'ecliptic')); % get all the structs that fit this type of field
-                
+            elseif cs(type, 'galactic')
+                s = obj.default_fields(strcmp({obj.default_fields.type}, 'galactic')); % get all the structs that fit this type of field
             % add other default field types...
             else
                 error('Unknown default field type "%s". Try "ecliptic"... ', type); 
@@ -852,7 +923,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                     e.star_density = s(ii).stars;
                     e.updateSecondaryCoords;
                     
-                    if better_than(e, obj) % found a better field, update to that one
+                    if better_than(e, obj, varargin{:}) % found a better field, update to that one
                         input.number = ii;
                         obj.RA_deg = s(ii).RA;
                         obj.Dec_deg = s(ii).Dec;
@@ -886,8 +957,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 obj.makeDefaultFields;
             end
             
-            if cs(type, 'kbos', 'kuiper belt object', 'ecliptic')
+            if cs(type, 'kbos', 'kuiper belt objects', 'ecliptic')
                 val = nnz(strcmp({obj.default_fields.type}, 'ecliptic'));
+            elseif cs(type, 'galactic')
+                val = nnz(strcmp({obj.default_fields.type}, 'galactic'));
             % add other default field types...
             else
                 error('Unknown default field type "%s". Try "ecliptic"... ', type); 
@@ -896,11 +969,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         end
         
         function makeDefaultFields(obj) % make a few fields that we know are useful for certain types of survey
-            
-%             obj.default_fields = struct('type', [], 'stars', [], 'RA', [], 'Dec', [], 'ECL_LAT', [], 'GAL_LAT', []);
-            
-            obj.default_fields = [];
   
+            obj.default_fields = [];
+            
             s = struct;
             
             % I chose these using the scripts/scan_ecliptic.m script and the sky map (down to 14th mag)
@@ -954,25 +1025,25 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             s.type = 'galactic'; s.RA = 34.5; s.Dec = 53; s.ECL_LAT = 36.666; s.GAL_LAT = -7.683; s.stars = 9000; 
             obj.default_fields = [obj.default_fields; s];
             
-            s.type = 'galactic'; s.RA = 89.5; s.Dec = 28.5 s.ECL_LAT = 5.061; s.GAL_LAT = 2.112; s.stars = 14112;
+            s.type = 'galactic'; s.RA = 89.5; s.Dec = 28.5; s.ECL_LAT = 5.061; s.GAL_LAT = 2.112; s.stars = 14000;
             obj.default_fields = [obj.default_fields; s];
             
-            s.type = 'galactic'; s.RA = 119.0; s.Dec = -25.0; s.ECL_LAT = -44.672; s.GAL_LAT = 1.806; s.stars = 31235;
+            s.type = 'galactic'; s.RA = 119.0; s.Dec = -25.0; s.ECL_LAT = -44.672; s.GAL_LAT = 1.806; s.stars = 31000;
             obj.default_fields = [obj.default_fields; s];
             
-            s.type = 'galactic'; s.RA = 150.0; s.Dec = -25.0; s.ECL_LAT = -34.611; s.GAL_LAT = 23.488; s.stars = 3815;
+            s.type = 'galactic'; s.RA = 150.0; s.Dec = -25.0; s.ECL_LAT = -34.611; s.GAL_LAT = 23.488; s.stars = 4000;
             obj.default_fields = [obj.default_fields; s];
 
-            s.type = 'galactic'; s.RA= 209.5; s.Dec = -25.0; s.ECL_LAT = -12.135; s.GAL_LAT = 35.459; s.stars = 2585;
+            s.type = 'galactic'; s.RA= 209.5; s.Dec = -25.0; s.ECL_LAT = -12.135; s.GAL_LAT = 35.459; s.stars = 2600;
             obj.default_fields = [obj.default_fields; s];
             
-            s.type = 'galactic'; s.RA = 281.5; s.Dec = -7.5; s.ECL_LAT = 15.468; s.GAL_LAT = -2.211; s.stars = 37437;
+            s.type = 'galactic'; s.RA = 281.5; s.Dec = -7.5; s.ECL_LAT = 15.468; s.GAL_LAT = -2.211; s.stars = 37500;
             obj.default_fields = [obj.default_fields; s];
             
-            s.type = 'galactic'; s.RA = 300.0; s.Dec = 38.0; s.ECL_LAT= 56.753; s.GAL_LAT = 4.246; s.stars = 20534;
+            s.type = 'galactic'; s.RA = 300.0; s.Dec = 38.0; s.ECL_LAT= 56.753; s.GAL_LAT = 4.246; s.stars = 20500;
             obj.default_fields = [obj.default_fields; s];
             
-            s.type = 'galactic'; s.RA = 333.5; s.Dec = 51.5; s.ECL_LAT = 55.947; s.GAL_LAT = -4.101; s.stars = 19758;
+            s.type = 'galactic'; s.RA = 333.5; s.Dec = 51.5; s.ECL_LAT = 55.947; s.GAL_LAT = -4.101; s.stars = 20000;
             obj.default_fields = [obj.default_fields; s];
             
             % add more fields! 
@@ -980,9 +1051,34 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
-        function printDefaultFields(obj, type)
+        function printDefaultFields(obj, type) % print all fields of a specific type
             
+            import util.text.cs;
             
+            if cs(type, 'ecliptic', 'kbos', 'kuiper belt objects')
+                type = 'ecliptic';
+            elseif cs(type, 'galactic')
+                type = 'galactic';
+            else
+                error('Unknown default field type "%s". Try "ecliptic" or "galactic".', type);
+            end
+            
+            s = obj.default_fields;
+            
+            c = 1;
+            
+            for ii = 1:length(s)
+                
+                if cs(s(ii).type, type)
+                    
+                    fprintf('id= %02d | RA= %5.1f | Dec= %5.1f | ECL_LAT= %7.3f | GAL_LAT= %7.3f | stars= %d \n', ...
+                        c, s(ii).RA, s(ii).Dec, s(ii).ECL_LAT, s(ii).GAL_LAT, s(ii).stars); 
+                    
+                    c = c + 1;
+                    
+                end
+                    
+            end
             
         end
         
@@ -1378,6 +1474,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         DE;
         DE_deg;
         
+        ECL_LAMBDA;
+        ECL_BETA;
+        
     end
     
     methods % shortcuts to old property names, kept for backward compatibility
@@ -1403,6 +1502,30 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         function set.DE_deg(obj, val)
             
             obj.DEC_deg = val;
+            
+        end
+        
+        function val = get.ECL_LAMBDA(obj)
+            
+            val = obj.ECL_long;
+            
+        end
+        
+        function set.ECL_LAMBDA(obj, val)
+            
+            obj.ECL_long = val;
+            
+        end
+        
+        function val = get.ECL_BETA(obj)
+            
+            val = obj.ECL_lat;
+            
+        end
+        
+        function set.ECL_BETA(obj, val)
+            
+            obj.ECL_lat = val;
             
         end
         
