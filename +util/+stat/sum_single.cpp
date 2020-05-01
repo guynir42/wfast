@@ -16,66 +16,79 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		plhs[0]=mxCreateNumericArray(0,dims, mxSINGLE_CLASS, mxREAL); // return an empty array
 		return;
 	}
-
 	
-	mwSize *dims=(mwSize*)mxGetDimensions(prhs[0]); // dims[0] is the height while dims[1] is the width while dim[2] is the number of frames
+	
+	mwSize *dims=(mwSize*) mxGetDimensions(prhs[0]); // dims[0] is the height while dims[1] is the width while N_frames is the number of frames
 	int ndims=mxGetNumberOfDimensions(prhs[0]);	
 	
-	if(ndims>3) mexErrMsgIdAndTxt("MATLAB:util:stat:sum_singles:inputMoreThan3D", "Input 1 to sum_singles should have at most 3 dimensions...");
-	if(ndims<3){ 
-		plhs[0]=mxDuplicateArray(prhs[0]);
-		return;
-	}
+	if(ndims>4) mexErrMsgIdAndTxt("MATLAB:util:stat:sum_singles:inputMoreThan4D", "Input 1 to sum_singles should have at most 4 dimensions...");
 	
-	mwSize dims_out[2]={dims[0], dims[1]};
-	int N=dims_out[0]*dims_out[1]; // total size of output array 
+	mwSize N_frames=1;
+	mwSize N_cutouts=1;
+	if(ndims>=3) N_frames=dims[2];
+	if(ndims>=4) N_cutouts=dims[3];
 	
-	plhs[0]=mxCreateNumericArray(2, dims_out, mxSINGLE_CLASS, mxREAL); // create the output matrix (in matlab)
+	mwSize dims_out[4]={dims[0], dims[1],1,N_cutouts};
+	int N=dims_out[0]*dims_out[1]; // size of each image
+	
+	plhs[0]=mxCreateNumericArray(4, dims_out, mxSINGLE_CLASS, mxREAL); // create the output matrix (in matlab)
 	float *output=(float*) mxGetData(plhs[0]); // get the C type array 
 	
 	if(mxIsClass(prhs[0], "double")){
 		
 		double *matrix=(double*) mxGetData(prhs[0]);
 		
-		for(int j=0;j<dims[2];j++){// go over all frames
-		
-			for(int i=0;i<N;i++){ //  go over pixels in each image
-				
-				output[i]+=matrix[j*N+i];
-				
-			} // for i (pixels in image)
+		for(int k=0;k<N_cutouts;k++){
 			
-		} // for j (frames)
+			for(int j=0;j<N_frames;j++){// go over all frames
+			
+				for(int i=0;i<N;i++){ //  go over pixels in each image
+					
+					output[k*N+i]+=matrix[k*N*N_frames+j*N+i];
+					
+				} // for i (pixels in image)
+				
+			} // for j (frames)
+			
+		}// for k 
 		
 	}
 	else if(mxIsClass(prhs[0], "single")){
 		
 		float *matrix=(float*) mxGetData(prhs[0]);
 		
-		for(int j=0;j<dims[2];j++){// go over all frames
-		
-			for(int i=0;i<N;i++){ //  go over pixels in each image
-				
-				output[i]+=matrix[j*N+i];
-				
-			} // for i (pixels in image)
+		for(int k=0;k<N_cutouts;k++){
 			
-		} // for j (frames)
+			for(int j=0;j<N_frames;j++){// go over all frames
+			
+				for(int i=0;i<N;i++){ //  go over pixels in each image
+					
+					output[k*N+i]+=matrix[k*N*N_frames+j*N+i];
+					
+				} // for i (pixels in image)
+				
+			} // for j (frames)
+			
+		}// for k 
 		
 	}
 	else if(mxIsClass(prhs[0], "uint16")){
 		
 		short unsigned int *matrix=(short unsigned int*) mxGetData(prhs[0]);
 		
-		for(int j=0;j<dims[2];j++){// go over all frames
-		
-			for(int i=0;i<N;i++){ //  go over pixels in each image
-				
-				output[i]+=matrix[j*N+i];
-				
-			} // for i (pixels in image)
+		for(int k=0;k<N_cutouts;k++){
 			
-		} // for j (frames)
+			for(int j=0;j<N_frames;j++){// go over all frames
+			
+				for(int i=0;i<N;i++){ //  go over pixels in each image
+					
+					output[k*N+i]+=matrix[k*N*N_frames+j*N+i];
+					
+				} // for i (pixels in image)
+				
+			} // for j (frames)
+			
+		}// for k 
 		
 	}
 	else mexErrMsgIdAndTxt("MATLAB:util:stat:sum_singles:inputTypeUnrecognized", "Input 1 to sum_singles is not a double, single or uint16 array...");
