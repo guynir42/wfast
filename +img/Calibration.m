@@ -146,6 +146,7 @@ classdef Calibration < handle
         
         dark_mask_sigma = 5; % how hot a pixel must be (relative to dark noise) to be considered a "bad pixel"
         dark_mask_var_thresh = []; % pixels with variance above this value are bad pixels. (see hidden variables for Zyla/Balor)
+        dark_mask_var_min = 0.5; % pixels with variance below this are dead pixels
         dark_mask_var_sigma = 100; % how many "sigmas" above the mean variance value to cut (to be depricated)
         dark_mask_var_ratio = 0.99; % what fraction of pixel variance is considered "bad pixels" (to be depricated)
         
@@ -523,6 +524,14 @@ classdef Calibration < handle
         function set.dark_mask_var_thresh(obj, val)
            
             obj.dark_mask_var_thresh = val;
+            obj.dark_mask = [];
+            obj.dark_mask_cut = [];
+            
+        end
+        
+        function set.dark_mask_var_min(obj, val)
+           
+            obj.dark_mask_var_min = val;
             obj.dark_mask = [];
             obj.dark_mask_cut = [];
             
@@ -1028,6 +1037,7 @@ classdef Calibration < handle
             % variance values
             v = obj.dark_var(:);
             M(v>obj.dark_mask_var_thresh) = true; % replace old method with simple cut value
+            M(v<obj.dark_mask_var_min) = true; % dead pixels have very low variance
             
             % find the pixels with unusual variance values (old method)
 %             [mu,sig] = util.stat.sigma_clipping(v, 'dist', 'weibul', 'iterations', 5);
