@@ -39,8 +39,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     properties % switches/controls
         
         % observational constraints
-        alt_limit = 25; % minimal angle above horizon for being observable (degrees)
-        min_duration = 0.5; % minimal time until reaching meridian or horizon (hours)
+        min_altitude = 25; % minimal angle above horizon for being observable (degrees)
+        min_duration = 1; % minimal time until reaching meridian or horizon (hours)
         
         debug_bit = 0;
         
@@ -48,6 +48,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     
     properties % inputs/outputs
         
+        keyword = ''; % for dynamically allocated fields like 'moon' or 'ecliptic'
         RA_deg; % numeric value in degrees
         Dec_deg; % numeric value in degrees
         
@@ -151,6 +152,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         function reset(obj) % remove all coordinate data, update to current time
             
+            obj.keyword = '';
             obj.RA_deg = [];
             obj.Dec_deg = [];
             obj.moon = [];
@@ -396,7 +398,25 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             obj.time = datetime('now', 'timezone', 'UTC');
             
+            obj.updateKeywordField; 
+            
             obj.updateSecondaryCoords;
+            
+        end
+        
+        function updateKeywordField(obj)
+            
+            import util.text.cs;
+            
+            if ~isempty(obj.keyword)
+                if cs(obj.keyword, 'moon')
+                    obj.updateMoon; 
+                    obj.RA = obj.moon.RA/15;
+                    obj.Dec = obj.moon.Dec;
+                elseif cs(obj.keyword, 'ecliptic', 'galactic') % can add additional default field keywords
+                    obj.gotoDefaultField(obj.keyword); 
+                end
+            end
             
         end
         
@@ -521,53 +541,53 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 DEC = [];
             end
             
+            obj.keyword = '';
+            
             if ischar(RA) && isempty(DEC)
                 name = RA; 
                 if cs(name, 'ecliptic', 'kbos')
-                    obj.gotoDefaultField('ecliptic'); 
-                    RA = obj.RA;
-                    DEC = obj.Dec;
+                    obj.keyword = 'ecliptic'; % dynamically allocate this field after setting the time
                 elseif cs(name, 'galactic')
-                    obj.gotoDefaultField('galactic'); 
-                    RA = obj.RA;
-                    DEC = obj.Dec;
+                    obj.keyword = 'galactic'; % dynamically allocate this field after setting the time
                 elseif cs(name, 'moon')
-                    RA = 0;
-                    DEC = 0;
-                elseif ~isempty(which('celestial.coo.coo_resolver', 'function'))
+                    obj.keyword = 'moon'; % dynamically allocate this field after setting the time
+                elseif ~isempty(which('celestial.coo.coo_resolver', 'function')) % use Eran's name resolver
+                    
                     [RA, DEC] = celestial.coo.coo_resolver(name, 'OutUnits', 'deg', 'NameServer', @VO.name.server_simbad);
-                    RA = RA/15;
+                    
+                    obj.RA = RA/15;
+                    obj.Dec = DEC;
+                    
                 else
                     error('no name resolver has been found... try adding MAAT to the path.');
                 end 
-                
+            else % just get RA/Dec directly
+                obj.RA = RA;
+                obj.Dec = DEC;
             end
-            
-            obj.RA = RA;
-            obj.Dec = DEC;
             
             if nargin>3 && ~isempty(time)
                 
-                if isa(time, 'datetime')
-                    obj.time = time;
-                    obj.updateSecondaryCoords;
-                elseif ischar(time) && util.text.cs(time, 'now', 'update')
-                    obj.update;
-                elseif ischar(time)
-                    obj.time = util.text.str2time(time);
-                    obj.updateSecondaryCoords;
-                elseif isnumeric(time) % juldate??
-                    obj.time = datetime(time, 'ConvertFrom', 'juliandate', 'TimeZone', 'UTC');
-                    obj.updateSecondaryCoords;
-                end
+                obj.time = obj.parseTime(time); 
+%                 obj.updateSecondaryCoords;
+%                 
+%                 if isa(time, 'datetime')
+%                     obj.time = time;
+%                     obj.updateSecondaryCoords;
+%                 elseif ischar(time) && util.text.cs(time, 'now', 'update')
+%                     obj.update;
+%                 elseif ischar(time)
+%                     obj.time = util.text.str2time(time);
+%                     obj.updateSecondaryCoords;
+%                 elseif isnumeric(time) % juldate??
+%                     obj.time = datetime(time, 'ConvertFrom', 'juliandate', 'TimeZone', 'UTC');
+%                     obj.updateSecondaryCoords;
+%                 end
                 
             end
             
-            if cs(name, 'moon')
-                obj.RA = obj.moon.RA/15;
-                obj.Dec = obj.moon.Dec;
-            end
-            
+            obj.updateKeywordField; % dynamically allocate this field after setting the time
+            obj.updateSecondaryCoords; % make sure all other coordinate systems and sun/moon are updated
             
         end
         
@@ -598,7 +618,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         % For objects below the alt_limit at the stored time, returns NaN. 
         
             if nargin<2 || isempty(alt_limit)
-                alt_limit = obj.alt_limit;
+                alt_limit = obj.min_altitude;
             end
             
             if nargin<3 || isempty(resolution_minutes)
@@ -611,7 +631,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             end
             
             if obj.HA_deg<0
-                val = round(abs(obj.HA_deg/15*60)/resolution_minutes)*resolution_minutes; 
+                val = round(abs(obj.HA_deg/15*60)/resolution_minutes)*resolution_minutes; % in principle we need to convert sidereal minutes to diurnal minutes but they're approximately the same... 
             else
                 
                 e = head.Ephemeris(obj); % copy the object! 
@@ -672,7 +692,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         %                       side) that we want to avoid. Default 5 degrees. 
         
             input = util.text.InputVars;
-            input.input_var('alt_limit', obj.alt_limit); 
+            input.input_var('alt_limit', obj.min_altitude); 
             input.input_var('south', -20, 'south_limit');
             input.input_var('side', 'both', 'hemisphere');
             input.input_var('meridian', 5, 'meridian_distance', 'meridien_distance'); 
@@ -722,7 +742,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         %               to be viable/observable. Default is 25 degrees.
         %   -duration: minimal duration (in hours) that a target must be
         %              observable, until meridian or horizon, to be valid. 
-        %              Default is 0.5 hours. 
+        %              Default is 1 hour. 
         %   -side: can only choose viable targets on the given side, that is
         %          "East", "West", or "both" (default, same as empty). 
         %          Note that this overwrides the "wind_speed" input. 
@@ -741,7 +761,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             if nargin==1, help('head.Ephemeris.better_than'); return; end
         
             input = util.text.InputVars;
-            input.input_var('alt_limit', obj.alt_limit); 
+            input.input_var('alt_limit', obj.min_altitude); 
             input.input_var('duration', obj.min_duration); 
             input.input_var('side', []); 
             input.input_var('wind_speed', []); 
@@ -941,8 +961,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 obj.updateSecondaryCoords;
             end
             
-            
-            
         end
         
         function val = numberDefaultFields(obj, type) % check how many default fields are available for this type
@@ -1089,6 +1107,69 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     end
     
     methods (Static=true) % conversion tools and some additional calculations I stole from Eran's code
+        
+        function time = parseTime(val) % convert time from any allowed format into a datetime object
+        % Usage: time = parseTime(obj, val)
+        % Convert any of the following formats into a datetime object:
+        % 1) string: YYYY-MM-DDThh:mm:ss.sss, hh:mm:ss.sss, hh:mm or hh
+        % 2) numeric value: hour+fraction of hour, for tonight (e.g., 22.5).
+        %                   Make sure to give hours in 24-hour format! 
+        %                   Hours before noon UTC will be the next day. 
+        % 3) datetime object: please give it with TimeZone=UTC. 
+        % 
+        % NOTE: All times must be in UTC obviously.
+        
+            import util.text.cs;
+            
+            if nargin==0, help('head.Ephem.parseText'); return; end
+        
+            if isempty(val)
+                time = [];
+            elseif isnumeric(val) % got a numeric value, assume it is in hours
+                if val>=12
+                    time = datetime('today', 'TimeZone', 'UTC') + hours(val); 
+                else
+                    time = datetime('today', 'TimeZone', 'UTC') + days(1) + hours(val); % this is too early to observe today, push the observation to tomorrow
+                end
+            elseif ischar(val) % got string, must parse it for date and time
+                
+                if cs(val, 'now')
+                    time = datetime('now', 'TimeZone', 'UTC'); 
+                    return;
+                end
+                
+                idx = strfind(val, 'T'); 
+                
+                if isempty(idx) % no date is given, use today's date
+                    time = [];
+                else % get the specific date
+                    time = datetime(val(1:idx-1), 'TimeZone', 'UTC'); % get the date
+                    val = val(idx+1:end); % get the hours from the rest of the string
+                end
+                
+                c = strsplit(val, ':'); 
+                
+                h = str2double(c{1}); % just get the hours from the first number
+                if length(c)>1, h = h + str2double(c{2})/60; end % we also got minutes
+                if length(c)>2, h = h + str2double(c{3})/3600; end % we also got seconds
+                
+                if isempty(time) % automatically choose the time based on the hour of day
+                    if h>=12
+                        time = datetime('today', 'TimeZone', 'UTC'); 
+                    else
+                        time = datetime('today', 'TimeZone', 'UTC') + days(1);  
+                    end
+                end
+                    
+                time = time + hours(h); % add the hours to the required date. 
+                
+            elseif isa(val, 'datetime')
+                time = val;
+            else
+                error('Wrong type of input, class(val)= %s. Use string, numeric, or datetime values. ', class(val)); 
+            end
+            
+        end
         
         function str = deg2hour(number) % convert the degrees into hours then into HH:MM:SS string
         % Usage: str = deg2hour(number)
