@@ -30,12 +30,17 @@ classdef BufferWheel < file.AstroData
 %    (NOTE: these shortcuts can ONLY be used for READING data from buffers). 
 %
 % SWITCHES & CONTROLS:
-%   -product_type: string telling which kind of output (raw? cutouts?
-%    fluxes? dark/flat? etc.). Will print this in the filename. 
+%   -product_type_overwrite: string telling which kind of output. 
+%                            Will print this in the filename. 
+%                            Can choose Full, CutoutsStack, Image, Dark or 
+%                            Flat. If left empty the "product_type" will be
+%                            filled automatically. 
+%   -product_type_append: add some qualification like "Sim" or "ROI" to the
+%                         "product_type" given or filled automatically.
 %   -base_dir: set to [] to use getenv('DATA_TEMP') or getenv('DATA') 
 %   -date_dir: set to [] to use this night's date dir. 
 %   -target_dir: set to [] to use "head.OBJECT" as target_dir. 
-%    NOTE:  "full_path" is: base_dir/date_dir/target_dir. 
+%                NOTE:  "full_path" is: base_dir/date_dir/target_dir. 
 %   -dir_extension: overrides the automatic extension to the dir name. 
 %   -use_dir_type: automatically adds "product_type" to the dir name. Default 0. 
 %   -use_overwrite: silently delete existing files (default is true).
@@ -89,7 +94,8 @@ classdef BufferWheel < file.AstroData
     properties % switches
         
         index = 1; % which "buf" is now active for reading/saving 
-        product_type = 'Raw'; % can be Raw, ROI, Cutouts (including stacks), Dark (always raw), Dlat (always raw). Can append additional strings like "Sim" or "Cal" or "Proc"
+        product_type_overwrite = ''; % can be Full (full frame multiple images), Image, CutoutsStack, Dark (always Full), Flat (always Full). 
+        product_type_append = ''; % Can append additional strings like "Sim" or "ROI"
         dir_extension = ''; % overrides any automatic directory extensions... 
         use_dir_types = 0; % automatically add a dir_extension equal to "type"
         use_year_folder = 1; % add a YYYY folder before YYYY-MM-DD folder
@@ -102,6 +108,8 @@ classdef BufferWheel < file.AstroData
         use_async = 1; % write files in a different thread (mex only)
         use_mex = 1; % use mex interface to write files (use 0 as backup if mex fails or if you want other file types)
         chunk = 64; % chunk size (for deflate only)
+        
+        use_save_single_uint16 = 1; % if given a single image (uint16) save that instead of the stack (single precision)
         
         file_type = 'hdf5'; % support is added for "fits", "mat", and "tiff" in use_mex==0
                 
@@ -151,7 +159,8 @@ classdef BufferWheel < file.AstroData
         dark_dir_name = 'dark';
         flat_dir_name = 'flat'; 
         
-        default_product_type; 
+        default_product_type_overwrite;        
+        default_product_type_append;
         default_dir_extension;
         default_use_dir_types;
         default_project = 'WFAST';
@@ -535,6 +544,34 @@ classdef BufferWheel < file.AstroData
             
         end
         
+        function val = product_type(obj)
+            
+            if isempty(obj.product_type_overwrite)
+                
+                if size(obj.images,3)>1
+                    val = 'Full';
+                elseif ~isempty(obj.images) && size(obj.images,3)==1
+                    val = 'Image';
+                elseif ~isempty(obj.stack) && ~isempty(obj.cutouts)
+                    val = 'CutoutsStack';
+                elseif ~isempty(obj.stack)
+                    val = 'Stack';
+                elseif ~isempty(obj.cutouts)
+                    val = 'Cutouts';
+                else
+                    val = ''; % we really don't know what is stored in these files... 
+                end
+                
+            else
+                val = obj.product_type_overwrite;
+            end
+            
+            if ~isempty(obj.product_type_append)
+                val = [val obj.product_type_append];
+            end
+                
+        end
+        
         function val = makeFilename(obj) % apply filename convention 
            
             import util.text.cs;
@@ -570,7 +607,7 @@ classdef BufferWheel < file.AstroData
                 ext = 'mat';
             end
             
-            % EXAMPLE FILENAME: WFAST_ZYLA_20190410-155223-035_clear_0_Raw.h5
+            % EXAMPLE FILENAME: WFAST_ZYLA_20190410-155223-035_clear_0_Full.h5
             val = sprintf('%s_%s_%s_%s_%d_%s.%s', project, camera, time_str, filter_name, field_id, obj.product_type, ext);
             
         end
@@ -991,14 +1028,20 @@ classdef BufferWheel < file.AstroData
 %                     'psfs', buf.psfs, 'sampling_psf', buf.sampling_psf, 'fluxes', buf.fluxes, 'header', obj.head_struct_cell,...
 %                     'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit);
                 
-                % right now mex write is only for HDF5 files    
-                if obj.use_save_raw_images
-                    file.mex.write(this_filename, buf.mex_flag_write, buf, 'header', obj.head_struct_cell,...
-                    'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit);
-                else
+                % right now mex write is only for HDF5 files
+                if obj.use_save_single_uint16 && ~isempty(obj.images) && size(obj.images,3)==1
                     file.mex.write(this_filename, buf.mex_flag_write, buf, 'header', obj.head_struct_cell,...
                     'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit,...
-                    'images', []); % last line overwrites the "images" in the buf and sets it to empty... 
+                    'stack', []); % last line overwrites the "stack" in the buf and sets it to empty, saving only the one uint16 image in "images"
+                else
+                    if obj.use_save_raw_images
+                        file.mex.write(this_filename, buf.mex_flag_write, buf, 'header', obj.head_struct_cell,...
+                        'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit);
+                    else
+                        file.mex.write(this_filename, buf.mex_flag_write, buf, 'header', obj.head_struct_cell,...
+                        'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit,...
+                        'images', []); % last line overwrites the "images" in the buf and sets it to empty... 
+                    end
                 end
                 
             else % use the old, non-mex writing method
