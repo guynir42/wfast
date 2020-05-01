@@ -1894,16 +1894,16 @@ classdef Acquisition < file.AstroData
             
             obj.cat.inputPositions(obj.positions);
             
-            obj.positions = obj.cat.positions; % if used some filter on the stars we found
-            obj.ref_positions = obj.cat.positions;
-            obj.clip.positions = obj.cat.positions;
-            
             if ~isempty(obj.cat.data) && obj.cat.success % successfully filled the catalog
 
-                coor_deg = obj.cat.mextractor_sim.WCS.WCS.CRVAL;
-                
+                obj.positions = obj.cat.positions; % if used some filter on the stars we found
+                obj.ref_positions = obj.cat.positions;
+                obj.clip.positions = obj.cat.positions;
+
+%                 coor_deg = obj.cat.mextractor_sim.WCS.WCS.CRVAL;
+                                
                 if obj.debug_bit, fprintf('Successfully solved astrometry! Coordinates: %s %s\n', ...
-                        head.Ephemeris.deg2hour(coor_deg(1)), head.Ephemeris.deg2sex(coor_deg(2))); end % need to pull the coordinates in a more serious way
+                        head.Ephemeris.deg2hour(obj.cat.central_RA), head.Ephemeris.deg2sex(obj.cat.centra_Dec)); end % need to pull the coordinates in a more serious way
                 
                 obj.cat.num_stars = obj.num_stars;
 

@@ -1449,10 +1449,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function syncToTarget(obj) % this is still not working! 
+        function sync(obj) % this is still not working! 
             
-%             obj.hndl.SyncToTarget;
-            obj.hndl.SyncToCoordinates;
+            obj.hndl.SyncToCoordinates(obj.hndl.TargetRightAscension, obj.hndl.TargetDeclination);
             
         end
         

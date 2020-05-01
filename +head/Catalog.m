@@ -783,8 +783,17 @@ classdef Catalog < handle
             version = obj.version;
             
             if obj.success
+                
                 if obj.debug_bit, disp(['Saving catalog file to ' filename]); end
+                
+                dir = fileparts(filename);
+                
+                if ~exist(dir, 'dir')
+                    mkdir(dir);
+                end
+                
                 save(filename, 'CatTable', 'header', 'version', '-v7.3');
+                
             else
                 if obj.debug_bit, disp('Cannot save catalog without a good astrometry match'); end
             end
