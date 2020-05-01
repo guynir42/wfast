@@ -80,6 +80,8 @@ classdef AutoFocus < handle
     
     properties(Hidden=true)
        
+        phot_struct;
+        
         version = 1.01;
         
     end
@@ -208,9 +210,6 @@ classdef AutoFocus < handle
             
             if obj.use_min_position
                 
-                [~,idx] = nanmin(nanmean(obj.widths, 1));
-                obj.found_pos = obj.pos(idx);
-                
                 [mn, idx] = nanmin(obj.widths, [], 2); % find the minimal value for each star
                 
                 obj.min_positions = util.vec.tocolumn(obj.pos(idx)); 
@@ -322,7 +321,10 @@ classdef AutoFocus < handle
         
         function findPosOnly(obj)
             
-            obj.found_pos = mean(obj.min_positions, 'omitnan');
+            [~,idx] = nanmin(nanmean(obj.widths, 1));
+            obj.found_pos = obj.pos(idx);
+                
+%             obj.found_pos = mean(obj.min_positions, 'omitnan');
         
         end
         

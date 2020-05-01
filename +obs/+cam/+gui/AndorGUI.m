@@ -102,11 +102,12 @@ classdef AndorGUI < handle
             obj.panel_controls.addButton('input_batch_size', 'batch_size', 'input', 'frames= ', '', 'small', 0.5);
             obj.panel_controls.addButton('input_exp_time', 'expT', 'input', 'T= ', 's', '', 0.5);
             obj.panel_controls.addButton('input_frame_rate', 'frame_rate', 'input', 'f= ', 'Hz', '', 0.5);
-            obj.panel_controls.addButton('button_frame_rate_measured', 'frame_rate_measured', 'info', 'f= ', 'Hz', 'small', 1);
+            obj.panel_controls.addButton('button_frame_rate_measured', 'frame_rate_measured', 'info', 'f= ', 'Hz', '', 1);
             obj.panel_controls.addButton('button_zoom', 'use_roi', 'toggle', 'ZOOM', 'UNZOOM', 'small', 0.3);
             obj.panel_controls.addButton('input_im_size', 'im_size', 'input', ' ', '', 'edit', 0.7);
             obj.panel_controls.addButton('button_pick_center', '', 'custom', 'center', '', 'small', 0.3);
             obj.panel_controls.addButton('input_center_region', 'center_region', 'input', 'center= ', '', 'edit', 0.7);
+            obj.panel_controls.addButton('button_autofocus', 'autofocus', 'push', 'Auto focus'); 
             obj.panel_controls.make;
             obj.panel_controls.button_pick_center.Callback = @obj.callback_pick_center;
             
@@ -123,6 +124,8 @@ classdef AndorGUI < handle
             obj.panel_controls.input_im_size.Tooltip = 'Set the height and width of the image (enables zoom mode)';
             obj.panel_controls.button_pick_center.Tooltip = 'Pick the center point of the ROI region by clicking the full frame image';
             obj.panel_controls.input_center_region.Tooltip = 'Manually pick the center of the ROI region';
+            obj.panel_controls.button_autofocus.Tooltip = 'Start a focusing run. ';
+            
             
             %%%%%%%%%%% panel contrast %%%%%%%%%%%%%%%
             

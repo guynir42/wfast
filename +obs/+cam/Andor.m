@@ -172,7 +172,7 @@ classdef Andor < file.AstroData
     end
     
     properties(Hidden=true)
-       
+        
         mex_flag = [0 0 0 0]; % for starting and stopping the camera...
         
         max_height; % lazy loaded once each run from camera hardware
@@ -831,8 +831,8 @@ classdef Andor < file.AstroData
                 end
 
                 % find stars, the quick version!
-                obj.single;                
-                T = util.img.quick_find_stars(util.stat.sum_single(obj.images), 'threshold', 30, 'saturation', 5e6, 'unflagged', 1); 
+                obj.single('frame rate', obj.af.frame_rate, 'exp time', obj.af.expT, 'batch size', obj.af.batch_size); % need to first update with observational parameters (using varargin!)
+                T = util.img.quick_find_stars(single(util.stat.sum_single(obj.images)), 'threshold', 30, 'saturation', 5e6, 'unflagged', 1); % sum single must turn uint16 to single! 
                 
                 % the focus positions to scan
                 p = obj.af.getPosScanValues(obj.focuser.pos);
@@ -867,10 +867,10 @@ classdef Andor < file.AstroData
                     
                     C = single(nansum(C,3)); % can I replace this with sum_single?
                     
-                    phot_struct = util.img.photometry2(C, 'aperture', obj.focus_aperture, 'use_aperture', 1, ...
+                    obj.af.phot_struct = util.img.photometry2(C, 'aperture', obj.focus_aperture, 'use_aperture', 1, ...
                         'gauss_sigma', 5, 'use_gaussian', 1, 'index', 3, 'threads', 4);
                     
-                    fluxes = phot_struct.apertures_photometry.flux - phot_struct.apertures_photometry.area.*phot_struct.apertures_photometry.background;
+                    fluxes = obj.af.phot_struct.apertures_photometry.flux - obj.af.phot_struct.apertures_photometry.area.*obj.af.phot_struct.apertures_photometry.background;
 %                     widths = phot_struct.apertures_photometry.width;
                     widths = util.img.fwhm(C, 'method', 'filters')/2.355; 
                     widths(widths>10 | widths<0.1) = NaN;

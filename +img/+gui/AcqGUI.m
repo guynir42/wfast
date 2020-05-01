@@ -203,7 +203,7 @@ classdef AcqGUI < handle
             obj.panel_controls.addButton('button_fast_mode', 'setupFastMode', 'push', 'Fast mode', '', '', 0.5, '', '', 'Setup high-cadence observations with T=30ms, f=25Hz, 100 images per batch/file');
             obj.panel_controls.addButton('button_single', 'single', 'push', 'Take single exposure', '', '', [], '', '', 'Take a single image and show it on screen. Does not save the image to file');
             obj.panel_controls.addButton('button_live', 'startLiveView', 'push', 'Start live view', '', '', [], '', '', 'Open the camera GUI and start the live-view video mode. Does not save any images to file');
-            obj.panel_controls.addButton('button_auto_focus', 'runFocus', 'push', 'Auto-focus', '', '', 0.7, '', '', 'Start a focus-run. Does not save any images to file');
+            obj.panel_controls.addButton('button_auto_focus', 'cam.autofocus', 'push', 'Auto-focus', '', '', 0.7, '', '', 'Start a focus-run. Does not save any images to file');
             obj.panel_controls.addButton('button_manual_focus', '', 'custom', 'manual', '', '', 0.3, '', '', 'open the focus GUI for manual focusing');
             obj.panel_controls.addButton('button_preview', '', 'custom', 'Preview run', '', '', [], '', '', 'Start a preview run, checking full acquisition pipeline. Does not save any images to file');
             
