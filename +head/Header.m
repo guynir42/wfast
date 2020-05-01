@@ -460,13 +460,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         
         function val = get.ALT(obj)
             
-            val = obj.ephem.ALT;
+            val = obj.ephem.ALT_deg;
             
         end
         
         function val = get.AZ(obj)
             
-            val = obj.ephem.AZ;
+            val = obj.ephem.AZ_deg;
             
         end
         

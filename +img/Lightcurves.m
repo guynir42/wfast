@@ -105,6 +105,7 @@ classdef Lightcurves < handle
         use_background_median = 1;
         
         % processing steps for fluxes_rem:
+        minimal_length = 10; % minimal number of frames to run any analysis more comlicated than b/g removal
         use_skip_flagged = 0; % skip samples that have a bad photometry flag (for forced, this may be overkill)
         use_remove_outliers = 1; % remove outliers with "N sigmas" above the noise, calculated by polyfit
         outlier_sigma = 5; % this is NOT used by polyfit, only for making fluxes_sub
@@ -154,7 +155,7 @@ classdef Lightcurves < handle
         
     end
     
-    properties(Dependent=true)
+    properties(Dependent=true, Transient=true)
         
         timestamps;
         juldates;
@@ -174,7 +175,7 @@ classdef Lightcurves < handle
         
         fluxes_sub; % remove the measured background
         fluxes_rem; % remove outliers using a few methods
-        fluxes_cal; % 
+        fluxes_cal; % full calibration using airmass, PSF width, Sys-Rem, etc
         
         fit_results;
         
@@ -210,8 +211,6 @@ classdef Lightcurves < handle
         widths_full;
         bad_pixels_full;
         flags_full;
-        
-        fit_results_; % save this from the polyfit (lazy load)
         
         show_what_list = {'fluxes', 'areas', 'backgrounds', 'variances', 'centroids', 'offsets', 'widths', 'bad_pixels', 'power spectra', 'statistics', 'binning'};
         show_flux_type_list = {'raw', 'sub', 'rem', 'cal'};
@@ -255,6 +254,8 @@ classdef Lightcurves < handle
         
         power_spectra_; 
         psd_freq_;
+        
+        fit_results_; % save this from the polyfit (lazy load)
         
         total_RE_;
         local_RE_;
@@ -504,6 +505,8 @@ classdef Lightcurves < handle
            
             if isempty(obj.fluxes)
                 val = [];
+            elseif size(obj.fluxes_sub, 1)<obj.minimal_length
+                val = obj.fluxes_sub;
             else
                 
                 if isempty(obj.fluxes_rem_)
@@ -561,9 +564,11 @@ classdef Lightcurves < handle
         end
         
         function val = get.fluxes_cal(obj)
-            
+            dbstack
             if isempty(obj.fluxes)
                 val = [];
+            elseif size(obj.fluxes_sub, 1)<obj.minimal_length
+                val = obj.fluxes_sub;
             else
             
                 if isempty(obj.fluxes_cal_)
@@ -918,21 +923,33 @@ classdef Lightcurves < handle
 
         function val = get.RE_fit_results(obj)
             
-            if isempty(obj.RE_fit_results_)
-                obj.findOutliers;
+            if size(obj.fluxes_sub,1)<obj.minimal_length
+                val = [];
+            else
+
+                if isempty(obj.RE_fit_results_)
+                    obj.findOutliers;
+                end
+
+                val = obj.RE_fit_results_;
+
             end
             
-            val = obj.RE_fit_results_;
-                
         end
         
         function val = get.bad_star_indices(obj)
-            
-            if isempty(obj.bad_star_indices_)
-                obj.findOutliers;
+
+            if size(obj.fluxes_sub,1)<obj.minimal_length
+                val = [];
+            else
+
+                if isempty(obj.bad_star_indices_)
+                    obj.findOutliers;
+                end
+
+                val = obj.bad_star_indices_;
+
             end
-            
-            val = obj.bad_star_indices_;
             
         end
         

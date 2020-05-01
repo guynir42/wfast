@@ -359,7 +359,7 @@ classdef Reader < file.AstroData
             obj.brake_bit = 1; % when set to 1 the reader stops the run at the end of the batch...
             
 %             obj.dir = util.sys.WorkingDirectory;
-            obj.head = head.Parameters;
+            obj.head = head.Header;
             
             obj.setupDataNames
             

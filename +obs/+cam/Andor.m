@@ -210,7 +210,7 @@ classdef Andor < file.AstroData
         
         focus_pos_tip_tilt; 
         
-        focus_cut_size = 25;
+%         focus_cut_size = 25;
         focus_aperture = 9; 
         focus_annulus = [12 0]; 
         focus_gaussian = 5;
@@ -832,7 +832,7 @@ classdef Andor < file.AstroData
 
                 % find stars, the quick version!
                 obj.single('frame rate', obj.af.frame_rate, 'exp time', obj.af.expT, 'batch size', obj.af.batch_size); % need to first update with observational parameters (using varargin!)
-                T = util.img.quick_find_stars(single(util.stat.sum_single(obj.images)), 'threshold', 30, 'saturation', 5e6, 'unflagged', 1); % sum single must turn uint16 to single! 
+                T = util.img.quick_find_stars(single(util.stat.sum_single(obj.images)), 'threshold', 30, 'saturation', 5e4*obj.af.batch_size, 'unflagged', 1); % sum single must turn uint16 to single! 
                 
                 % the focus positions to scan
                 p = obj.af.getPosScanValues(obj.focuser.pos);
@@ -863,7 +863,7 @@ classdef Andor < file.AstroData
                     obj.batch;
                     
                     % do we want to quick find stars on each iteration...?
-                    C = util.img.mexCutout(obj.images, T.pos, obj.focus_cut_size, NaN)-100; 
+                    C = util.img.mexCutout(obj.images, T.pos, obj.af.cut_size, NaN)-100; 
                     
                     C = single(nansum(C,3)); % can I replace this with sum_single?
                     
@@ -1380,15 +1380,14 @@ classdef Andor < file.AstroData
             import util.text.cs;
             
             if cs(obj.mode, 'science')
+                obj.buffers.product_type_overwrite = '';
                 if obj.use_roi
-                    obj.buffers.product_type = 'ROI';
-                else
-                    obj.buffers.product_type = 'Raw';
+                    obj.buffers.product_append = 'ROI';
                 end
             elseif cs(obj.mode, 'dark')
-                obj.buffers.product_type = 'Dark';
+                obj.buffers.product_type_overwrite = 'Dark';
             elseif cs(obj.mode, 'flat')
-                obj.buffers.product_type = 'Flat';
+                obj.buffers.product_type_overwrite = 'Flat';
             end
             
         end

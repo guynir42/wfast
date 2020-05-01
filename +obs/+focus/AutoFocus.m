@@ -52,7 +52,11 @@ classdef AutoFocus < handle
         use_quadrants = 1;
         num_stars_per_quadrant = 5;
         
-        num_repeats = 5;
+        cut_size = 25;
+        aperture = 9; 
+        annulus = [12 0]; 
+        gaussian = 5;
+        num_repeats = 5; % can we get rid of this?
         
         use_model_psf = 0;
         

@@ -214,48 +214,54 @@ function file_handle = save(obj, filename, varargin)
     % for text files (or struct), do another round for sub-objects...
     if cs(input.format, 'text', 'txt', 'struct', 'cell') && input.recursive
         try
+            
             for ii = 1:length(props)
                 
                 name = props{ii};
-                value = obj.(name);
                 p = findprop(obj, name);
-               
-                if isobject(value) && p.Transient==0 && ~isa(value, 'table') && ~isa(value, 'datetime') && ~isa(value, 'containers.Map') && length(value)<2 && isempty(checkList(value, input.handle_list))
-                    
-                    if input.debug_bit, disp(['prop: "' name '" now saved as object...       **********************']); end
-                    
-                    file_handle = util.oop.save(value, file_handle, input, 'name', name, 'location', this_location);
                 
-                elseif isa(value, 'datetime') || isa(value, 'containers.Map') || isa(value, 'table')
-                    continue;
-                elseif isobject(value) && p.Transient==0 && numel(value)>1
+                if p.Transient==0 % first don't even ask for the value of transient properties (save time lazy loading things...)
                     
-                    for jj = 1:numel(value)
-                        
-                        if ~isa(value(jj), 'datetime') && ~isa(value(jj), 'containers.Map') && isempty(checkList(value(jj), input.handle_list))
-                        
-                            if input.debug_bit, disp(['prop: "' name '(' num2str(jj) ')" now saved as object...']); end
-                        
-                            file_handle = util.oop.save(value(jj), file_handle, input.output_vars{:}, 'name', [name '(' num2str(jj) ')']);
-                            
+                    value = obj.(name); % if it isn't transient, check the value
+
+                    if isobject(value) && ~isa(value, 'table') && ~isa(value, 'datetime') && ~isa(value, 'containers.Map') && length(value)<2 && isempty(checkList(value, input.handle_list))
+
+                        if input.debug_bit, disp(['prop: "' name '" now saved as object...       **********************']); end
+
+                        file_handle = util.oop.save(value, file_handle, input, 'name', name, 'location', this_location);
+
+                    elseif isa(value, 'datetime') || isa(value, 'containers.Map') || isa(value, 'table')
+                        continue;
+                    elseif isobject(value) && numel(value)>1
+
+                        for jj = 1:numel(value)
+
+                            if ~isa(value(jj), 'datetime') && ~isa(value(jj), 'containers.Map') && isempty(checkList(value(jj), input.handle_list))
+
+                                if input.debug_bit, disp(['prop: "' name '(' num2str(jj) ')" now saved as object...']); end
+
+                                file_handle = util.oop.save(value(jj), file_handle, input.output_vars{:}, 'name', [name '(' num2str(jj) ')']);
+
+                            end
+
                         end
-                                                
-                    end
-                    
-                elseif iscell(value)
-                    
-                    for jj = 1:length(value)
-                        
-                        if isobject(value{jj}) && p.Transient==0 && ~isa(value{jj}, 'datetime') && length(value)<2 && isempty(checkList(value{jj}, input.handle_list))
-                        
-                            if input.debug_bit, disp(['prop: "' name '{' num2str(jj) '}" now saved as object...']); end
-                        
-                            file_handle = util.oop.save(value{jj}, file_handle, input.output_vars{:}, 'name', [name '{' num2str(jj) '}']);
-                            
+
+                    elseif iscell(value)
+
+                        for jj = 1:length(value)
+
+                            if isobject(value{jj}) && p.Transient==0 && ~isa(value{jj}, 'datetime') && length(value)<2 && isempty(checkList(value{jj}, input.handle_list))
+
+                                if input.debug_bit, disp(['prop: "' name '{' num2str(jj) '}" now saved as object...']); end
+
+                                file_handle = util.oop.save(value{jj}, file_handle, input.output_vars{:}, 'name', [name '{' num2str(jj) '}']);
+
+                            end
+
                         end
-                        
+
                     end
-                    
+
                 end
                 
             end

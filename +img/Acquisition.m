@@ -181,7 +181,7 @@ classdef Acquisition < file.AstroData
     end
     
     properties(Hidden=true)
-       
+        
         brake_bit = 1; % when this is set to 1 (using the GUI, for example), the run stops. 
         is_running = 0; % when this is 1, cannot start a new run or anything
         is_running_single = 0; % when this is 1, cannot start a new run or anything
@@ -301,7 +301,7 @@ classdef Acquisition < file.AstroData
                 obj.af = obs.focus.AutoFocus;
                 
                 obj.buf = file.BufferWheel;
-                obj.buf.product_type = 'Cutouts';
+%                 obj.buf.product_type = 'Cutouts';
                 obj.buf.use_save_raw_images = 0; % do not save the full frame images! 
                 
                 obj.runtime_buffer = util.vec.CircularBuffer;
@@ -1373,9 +1373,7 @@ classdef Acquisition < file.AstroData
                     end
 
                     obj.batch;
-
-                    obj.prog.showif(obj.batch_counter);
-
+                    
                 end
 
             catch ME
@@ -1538,7 +1536,7 @@ classdef Acquisition < file.AstroData
                     % what if batch_size is bigger than 100??
                 end
                 
-                obj.src.startup('use_save', 0, 'use_reset', input.use_reset, obj.pass_source{:});
+                obj.src.startup('use_save', 0, 'use_reset', input.use_reset, 'use_async', 1, obj.pass_source{:});
 %                 obj.src.startup('use_save', 0, 'async', 1, obj.pass_source{:});
 
                 if obj.use_progress
@@ -1656,6 +1654,7 @@ classdef Acquisition < file.AstroData
             t_stack = toc(t_stack);
             
             if obj.use_cutouts
+                
                 t_cut = tic;
                 obj.calcCutouts;
                 t_cut = toc(t_cut);
@@ -1674,8 +1673,9 @@ classdef Acquisition < file.AstroData
             t_save = tic;
             
             if obj.use_save
+                
                 obj.buf.input(obj);
-                obj.buf.clearImages; % do we need this if we have set use_save_raw_images=0 in the buffers?
+%                 obj.buf.clearImages; % do we need this if we have set use_save_raw_images=0 in the buffers?
                 obj.buf.save;
                 obj.buf.nextBuffer;
                 % check triggering then call the camera save mode
@@ -1847,7 +1847,7 @@ classdef Acquisition < file.AstroData
             
             S = obj.stack_proc;
 
-            if obj.use_remove_saturated
+            if obj.use_remove_saturated % can we get rid of this and instead use the saturation avoidance in quick_find_stars?
                 mu = median(squeeze(util.stat.corner_mean(util.img.jigsaw(obj.stack_proc))));
                 sig = median(squeeze(util.stat.corner_std(util.img.jigsaw(obj.stack_proc))));
                 S = util.img.remove_saturated(S, 'saturation', 4.5e4*obj.num_sum, 'threshold', mu+5*sig, 'dilate', 4); % note the saturation value is X100 because we are looking at the stack
