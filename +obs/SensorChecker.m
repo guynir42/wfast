@@ -66,7 +66,7 @@ classdef SensorChecker < handle
     properties % switches/controls
         
         use_wise_data = 1;
-        use_wise_unsafe_flag = 0;
+        use_wise_safe_flag = 0;
         
         show_day_frac = 0.2; % what fraction of a day to plot back on GUI
         
@@ -663,22 +663,40 @@ classdef SensorChecker < handle
             end
             
             % check the wise general safety flag
-            if obj.use_wise_data && obj.use_wise_unsafe_flag
-                [rc,rv] = system('curl --connect-timeout 2 --silent -X PUT --header "Content-Type: application/x-www-form-urlencoded" --header "Accept: application/json" --data "Action=wise-issafe&Parameters=" http://132.66.65.9:11111/api/v1/safetymonitor/0/action');
-                if(rc==0) % check the call succeeded
-                    value = jsondecode(rv);
-                    if strcmp(value.Value, 'False')
-                        obj.sensors_ok = 0;
-                        obj.report = 'Wise-unsafe! '; 
-                        [rc,rv] = system('curl --connect-timeout 2 --silent -X PUT --header "Content-Type: application/x-www-form-urlencoded" --header "Accept: application/json" --data "Action=wise-unsafereasons&Parameters=" http://132.66.65.9:11111/api/v1/safetymonitor/0/action');
-                        if(rc==0)
-                            value = jsondecode(rv);
-                            obj.report = [obj.report value.Value]; 
-                        end
-                    end
+            if obj.use_wise_data && obj.use_wise_safe_flag
+                [value,reason] = obj.getWiseSafeFlag;
+                
+                if strcmp(value, 'False') % this means it is nor safe! 
+                    obj.sensors_ok = 0;
+                    obj.report = ['Wise-unsafe! ' reason];
                 end
+                
             end
             
+        end
+
+        function [value, reason] = getWiseSafeFlag(obj)
+            
+            [rc,rv] = system('curl --connect-timeout 2 --silent -X PUT --header "Content-Type: application/x-www-form-urlencoded" --header "Accept: application/json" --data "Action=wise-issafe&Parameters=" http://132.66.65.9:11111/api/v1/safetymonitor/0/action');
+            if(rc==0) % check the call succeeded
+                
+                value = jsondecode(rv);
+                value = value.Value;
+                
+                % try to get the reason as well
+                [rc,rv] = system('curl --connect-timeout 2 --silent -X PUT --header "Content-Type: application/x-www-form-urlencoded" --header "Accept: application/json" --data "Action=wise-unsafereasons&Parameters=" http://132.66.65.9:11111/api/v1/safetymonitor/0/action');
+                
+                if(rc==0)
+                    reason = jsondecode(rv);
+                    reason = reason.Value;
+                else
+                    reason = '';
+                end
+
+            else
+                value = ''; 
+            end
+
         end
         
     end

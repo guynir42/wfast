@@ -233,11 +233,12 @@ classdef ASAGUI < handle
             obj.panel_slew.number = 1;
             obj.panel_slew.addButton('button_slew', 'slew', 'push', 'Slew', '', '', 0.2, '', '', 'Immediately start moving telescope to given target');
             obj.panel_slew.addButton('button_stop', 'stop', 'push', 'STOP', '', '', 0.6, '', '', 'Stop current slew and reset guiding rates');
-            obj.panel_slew.addButton('button_sync', 'syncToTarget', 'push', 'Sync', '', '', 0.2, '', '', 'Sync current telescope position to current object');
+            obj.panel_slew.addButton('button_sync', '', 'custom', 'Sync', '', '', 0.2, '', '', 'Sync current telescope pointing data to target object');
             obj.panel_slew.margin = [0.005 0.1];
             obj.panel_slew.make;
             
             obj.panel_slew.button_slew.Callback = @obj.callback_slew;
+            obj.panel_slew.button_sync.Callback = @obj.callback_sync;
             
             obj.fig.fig.WindowButtonUpFcn = @obj.callback_button_up;
             obj.fig.fig.CloseRequestFcn = @obj.callback_close_fig;
@@ -448,6 +449,21 @@ classdef ASAGUI < handle
             
             obj.update;
             
+        end
+        
+        function callback_sync(obj, ~, ~)
+            
+            str = sprintf('Are you sure you want to sync on these coordinates: \n%s%s', obj.owner.objRA, obj.owner.objDEC);
+            
+            res = questdlg(str, 'Flip needed!', 'Sync', 'Abort', 'Sync');
+            if isempty(res) || strcmp(res, 'Abort')
+                return;
+            end
+            
+            obj.owner.sync;
+            
+            obj.update;
+        
         end
         
     end
