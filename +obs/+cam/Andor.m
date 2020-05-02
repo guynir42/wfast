@@ -832,7 +832,7 @@ classdef Andor < file.AstroData
 
                 % find stars, the quick version!
                 obj.single('frame rate', obj.af.frame_rate, 'exp time', obj.af.expT, 'batch size', obj.af.batch_size); % need to first update with observational parameters (using varargin!)
-                T = util.img.quick_find_stars(single(util.stat.sum_single(obj.images)), 'threshold', 30, 'saturation', 5e4*obj.af.batch_size, 'unflagged', 1); % sum single must turn uint16 to single! 
+                T = util.img.quick_find_stars(single(util.stat.sum_single(obj.images)), 'threshold', 15, 'saturation', 5e4*obj.af.batch_size, 'unflagged', 1); % sum single must turn uint16 to single! 
                 
                 % the focus positions to scan
                 p = obj.af.getPosScanValues(obj.focuser.pos);
@@ -870,9 +870,11 @@ classdef Andor < file.AstroData
                     obj.af.phot_struct = util.img.photometry2(C, 'aperture', obj.focus_aperture, 'use_aperture', 1, ...
                         'gauss_sigma', 5, 'use_gaussian', 1, 'index', 3, 'threads', 4);
                     
-                    fluxes = obj.af.phot_struct.apertures_photometry.flux - obj.af.phot_struct.apertures_photometry.area.*obj.af.phot_struct.apertures_photometry.background;
+                    A = obj.af.phot_struct.apertures_photometry.area;
+                    B = obj.af.phot_struct.apertures_photometry.background;
+                    fluxes = obj.af.phot_struct.apertures_photometry.flux - A.*B;
 %                     widths = phot_struct.apertures_photometry.width;
-                    widths = util.img.fwhm(C, 'method', 'filters')/2.355; 
+                    widths = util.img.fwhm(C-permute(B, [1,3,4,2]), 'method', 'filters', 'min_size', 0.25)/2.355; 
                     widths(widths>10 | widths<0.1) = NaN;
                     
                     obj.af.input(ii, p(ii), widths, fluxes, T.pos); 

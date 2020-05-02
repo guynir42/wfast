@@ -172,7 +172,7 @@ classdef BufferGUI < handle
                 obj.button_mex_write.String = 'no mex';
             end  
             
-            if obj.buffers(1).use_write_pars
+            if obj.buffers(1).use_write_header
                 obj.button_pars_write.Value = 0;
                 obj.button_pars_write.String = 'write pars';
             else                

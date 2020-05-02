@@ -45,30 +45,30 @@ classdef AutoFocus < handle
         
         expT = 0.03;
         frame_rate = NaN;
-        batch_size = 1;
+        batch_size = 5;
         
         use_loop_back = 0;
         
-        use_quadrants = 1;
+        use_quadrants = 0;
         num_stars_per_quadrant = 5;
         
         cut_size = 25;
         aperture = 9; 
         annulus = [12 0]; 
         gaussian = 5;
-        num_repeats = 5; % can we get rid of this?
+        num_repeats = 1; % can we get rid of this?
         
         use_model_psf = 0;
         
         use_min_position = 1;
         
-        use_fit_tip_tilt = 1;
+        use_fit_tip_tilt = 0;
         
         step = 0.01;
         range = 0.15;
         
         angle = -60; % between tip axis and pixel y axis (degrees)
-        spider_diameter = 150; % in cm
+        spider_diameter = 80; % in cm
         pixel_size = 12; % in microns
         num_pixels = 2000; % across the sensor (roughly) to be deprecated
         

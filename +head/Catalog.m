@@ -346,7 +346,7 @@ classdef Catalog < handle
 %                     obj.catalog_matched = catsHTM.sources_match('GAIADR2', obj.mextractor_sim, 'ColRA', {'Im_RA'}, 'ColDec', {'Im_Dec'}, 'MagColumn', 'Mag_BP', 'MagLimit', 20);
                     obj.catalog_matched = catsHTM.sources_match('GAIADR2', obj.mextractor_sim, 'ColRA', {'Im_RA'}, 'ColDec', {'Im_Dec'});
 
-                    obj.wcs_object = ClassWCS.populate(S);
+                    obj.wcs_object = ClassWCS.populate(obj.mextractor_sim);
 
                     obj.makeCatalog; % turn the MAAT objects into a table
 
@@ -375,6 +375,8 @@ classdef Catalog < handle
             if obj.success==1
                 
                 obj.wcs_object = obj.mextractor_sim.WCS;
+                obj.wcs_object.WCS.PV = obj.wcs_object.WCS.tpv; % copy this array to fix a bug in Eran's code
+                
                 obj.head.WCS.input(obj.wcs_object); % translate MAAT/WCS into my WorldCoordinates object
             
                 [obj.central_RA, obj.central_Dec] = obj.wcs_object.xy2coo([obj.head.NAXIS1/2, obj.head.NAXIS2/2], 'OutUnits', 'deg'); % center of the field

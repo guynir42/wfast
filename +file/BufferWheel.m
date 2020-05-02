@@ -548,9 +548,9 @@ classdef BufferWheel < file.AstroData
             
             if isempty(obj.product_type_overwrite)
                 
-                if size(obj.images,3)>1
+                if obj.use_save_raw_images && size(obj.images,3)>1
                     val = 'Full';
-                elseif ~isempty(obj.images) && size(obj.images,3)==1
+                elseif obj.use_save_single_uint16 && ~isempty(obj.images) && size(obj.images,3)==1
                     val = 'Image';
                 elseif ~isempty(obj.stack) && ~isempty(obj.cutouts)
                     val = 'CutoutsStack';

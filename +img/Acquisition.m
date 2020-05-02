@@ -1903,7 +1903,7 @@ classdef Acquisition < file.AstroData
 %                 coor_deg = obj.cat.mextractor_sim.WCS.WCS.CRVAL;
                                 
                 if obj.debug_bit, fprintf('Successfully solved astrometry! Coordinates: %s %s\n', ...
-                        head.Ephemeris.deg2hour(obj.cat.central_RA), head.Ephemeris.deg2sex(obj.cat.centra_Dec)); end % need to pull the coordinates in a more serious way
+                        head.Ephemeris.deg2hour(obj.cat.central_RA), head.Ephemeris.deg2sex(obj.cat.central_Dec)); end % need to pull the coordinates in a more serious way
                 
                 obj.cat.num_stars = obj.num_stars;
 

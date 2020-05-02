@@ -564,7 +564,7 @@ classdef Lightcurves < handle
         end
         
         function val = get.fluxes_cal(obj)
-            dbstack
+
             if isempty(obj.fluxes)
                 val = [];
             elseif size(obj.fluxes_sub, 1)<obj.minimal_length
@@ -806,17 +806,21 @@ classdef Lightcurves < handle
         
         function val = get.fit_results(obj)
             
-            if isempty(obj.fit_results_)
-                obj.fit_results_ = util.fit.polyfit(obj.timestamps, abs(obj.fluxes_sub), 'order', 5, 'sigma', 3, 'double', 1); % must use double precision for the sizes and length of these fluxes!
-            end
+            if size(obj.fluxes_sub, 1)<obj.minimal_length
+                val = [];
+            else
+                if isempty(obj.fit_results_)
+                    obj.fit_results_ = util.fit.polyfit(obj.timestamps, abs(obj.fluxes_sub), 'order', 5, 'sigma', 3, 'double', 1); % must use double precision for the sizes and length of these fluxes!
+                end
             
-            val = obj.fit_results_;
+                val = obj.fit_results_;
+            end
             
         end
         
         function val = get.power_spectra(obj)
             
-            if isempty(obj.fluxes_sub)
+            if isempty(obj.fluxes_sub) || size(obj.fluxes_sub, 1)<obj.minimal_length
                 val = [];
                 return; 
             end
@@ -832,7 +836,7 @@ classdef Lightcurves < handle
         
         function val = get.psd_freq(obj)
             
-            if isempty(obj.fluxes_sub)
+            if isempty(obj.fluxes_sub) || size(obj.fluxes_sub, 1)<obj.minimal_length
                 val = [];
                 return; 
             end
@@ -848,7 +852,7 @@ classdef Lightcurves < handle
         
         function val = get.local_RE(obj)
             
-            if isempty(obj.local_RE_)
+            if isempty(obj.local_RE_) || size(obj.fluxes_sub, 1)<obj.minimal_length
                 obj.calculateRelativeError;
             end
             
@@ -858,7 +862,7 @@ classdef Lightcurves < handle
         
         function val = get.total_RE(obj)
             
-            if isempty(obj.total_RE_)
+            if isempty(obj.total_RE_) || size(obj.fluxes_sub, 1)<obj.minimal_length
                 obj.calculateRelativeError;
             end
             
@@ -868,7 +872,7 @@ classdef Lightcurves < handle
         
         function val = get.bin_widths_seconds(obj)
             
-            if isempty(obj.bin_widths_seconds_)
+            if isempty(obj.bin_widths_seconds_) || size(obj.fluxes_sub, 1)<obj.minimal_length
                 obj.calculateRelativeError;
             end
             
