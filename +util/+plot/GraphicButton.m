@@ -30,6 +30,8 @@ classdef GraphicButton < handle
                 
         control@matlab.ui.control.UIControl;
         
+        use_generic_input = 0;
+        
     end
     
     properties(Dependent=true)
@@ -139,7 +141,7 @@ classdef GraphicButton < handle
                 obj.control = uicontrol(parent, 'Style', 'pushbutton', 'Units', 'Normalized', 'Position', position);
                 obj.Callback = @obj.callback_auto;
                 
-            elseif cs(type, 'input', 'input text', 'input custom')
+            elseif cs(type, 'input', 'input text', 'input custom', 'input generic')
                 
                 if isempty(str1)
                     str1 = [var_name '= '];
@@ -149,9 +151,14 @@ classdef GraphicButton < handle
                 
                 if cs(type, 'input text', 'input custom', 7)
                     obj.Callback = @obj.callback_input_text;
+                elseif cs(type, 'input generic', 7)
+                    obj.use_generic_input = 1; % can accept any input value type using parse_value
+                    obj.Callback = @obj.callback_input_text;
                 else
                     obj.Callback = @obj.callback_input;
                 end
+                
+                
                 
             elseif cs(type, 'info')
                 
@@ -419,10 +426,14 @@ classdef GraphicButton < handle
                 
                 obj.FontSize = obj.owner.(obj.self_name).([font_size 'font_size']);
                 
-            elseif cs(obj.type, 'input', 'input text')
+            elseif cs(obj.type, 'input', 'input text', 'input generic')
                 
                 val = obj.getVariable;
             
+                if obj.use_generic_input
+                    val = util.text.print_value(val); 
+                end
+                
                 if cs(obj.type, 'input text', 7)
                     obj.String = [obj.str1 val obj.str2];
                 else
@@ -652,7 +663,11 @@ classdef GraphicButton < handle
             substr = split(str, '=');
             value = strip(substr{end});
             
-            if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable '= ' value]); end
+            if obj.use_generic_input
+                value = util.text.parse_value(value); 
+            end
+            
+            if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable '= ' util.text.print_value(value)]); end
             
             if isprop(obj.owner.(obj.self_name), 'latest_error')
                 obj.owner.(obj.self_name).latest_error = '';

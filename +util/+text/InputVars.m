@@ -39,6 +39,12 @@ classdef InputVars < dynamicprops
 % These two calls are equivalent when "use_ordered_numeric" is true.  
 % 
 
+    properties(Hidden=true, Transient=true)
+        
+        graphic_user_interface; 
+        
+    end
+
     properties
         
         alias_dictionary; % keep track of the names of each of the parameters
@@ -265,6 +271,15 @@ classdef InputVars < dynamicprops
             
         end
         
+        function makeGUI(obj)
+            
+            if isempty(obj.graphic_user_interface)
+                obj.graphic_user_interface = util.text.gui.InputGUI(obj);
+            end
+            
+            obj.graphic_user_interface.make;
+            
+        end
         
     end
     
