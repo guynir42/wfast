@@ -613,6 +613,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
+        function val = telHemisphere(obj)
+           
+            if isempty(obj.pier_side)
+                val = [];
+            elseif strcmp(obj.pier_side, 'pierEast')
+                val = 'West';
+            elseif strcmp(obj.pier_side, 'pierWest')
+                val = 'East';
+            end
+            
+        end
+        
         function val = obj_pier_side(obj)
             
             if isempty(obj.objRA_deg) || isempty(obj.objDEC_deg)
@@ -627,6 +639,22 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
+        function val = objHemisphere(obj)
+            
+            side = obj.obj_pier_side;
+            
+            if isempty(side)
+                val = '';
+            elseif strcmp(side, 'pierEast')
+                val = 'West'; 
+            elseif strcmp(side, 'pierWest')
+                val = 'East';
+            else
+                val = 'unobservable'; 
+            end
+            
+        end
+        
         function val = tel_time_to_limit(obj)
             
             val = NaN; % need to implement this! 
@@ -635,7 +663,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function val = obj_time_to_limit(obj)
             
-            val = NaN; % need to implement this! 
+            val = obj.object.calcObsTimeMinutes;
             
         end
         
@@ -1169,6 +1197,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             try 
             
+                obj.object.update;
+                
                 if obj.use_guiding && ~isempty(obj.tracking) && obj.tracking % && obj.cam_pc.status
                     
                     direction = 1;

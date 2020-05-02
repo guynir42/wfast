@@ -122,7 +122,7 @@ classdef ManagerGUI < handle
             obj.panel_telescope.addButton('button_LST', 'LST', 'info', 'LST: ', '', 'edit', 0.5);
             obj.panel_telescope.addButton('button_ALT', 'ALT', 'info', 'ALT: ', ' deg', 'edit', 0.5);
             obj.panel_telescope.addButton('button_tracking', 'tracking', 'toggle', 'tracking off', 'tracking on', 'edit', 0.5, obj.color_on, 'red');
-            obj.panel_telescope.addButton('button_side', 'mount.pier_side', 'info', ' ', '', 'edit', 0.5); 
+            obj.panel_telescope.addButton('button_side', 'mount.telHemisphere', 'info', ' ', '', 'edit', 0.5); 
             obj.panel_telescope.addButton('button_placeholder', '', 'custom', ''); 
             obj.panel_telescope.addButton('button_slew', 'mount.slew', 'push', 'Slew'); 
             obj.panel_telescope.margin = [0.02 0.01];
@@ -147,7 +147,7 @@ classdef ManagerGUI < handle
             obj.panel_object.addButton('button_dec', 'mount.objDEC', 'input text', 'DE= ', '', 'edit', 0.5, '', '', 'Target declination');
             obj.panel_object.addButton('button_prev_objects', '', 'custom', '', '', '', [], '', '', 'List the last objects that were used to for slew');
             obj.panel_object.addButton('button_alt', 'mount.objALT', 'info', 'ALT= ', '', 'edit', 0.5, '', '', 'Target altitute above horizong (degrees)');
-            obj.panel_object.addButton('button_pierside', 'mount.obj_pier_side', 'info', ' ', '', 'edit', 0.5, '', '', 'Side of the telescope when pointing to object');
+            obj.panel_object.addButton('button_pierside', 'mount.objHemisphere', 'info', ' ', '', 'edit', 0.5, '', '', 'Side of the sky where the object is right now');
             obj.panel_object.margin = [0.02 0.01];
             obj.panel_object.make;
             

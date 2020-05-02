@@ -398,7 +398,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             obj.time = datetime('now', 'timezone', 'UTC');
             
-            obj.updateKeywordField; 
+%             obj.updateKeywordField; 
             
             obj.updateSecondaryCoords;
             
@@ -880,7 +880,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     methods % produce and load default fields
         
         function gotoDefaultField(obj, type, varargin) % jump to one of the default fields by type and number
-        % Usage: gotoDefaultField(obj, type, number=[])
+        % Usage: gotoDefaultField(obj, type, number=[], varargin)
         % Go to one of the default fields, from the given type. 
         % Choose one of the types: KBOs, ...
         % If the number is given, will go to that specific field. 
@@ -915,8 +915,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             end
             
             if cs(type, 'kbos', 'kuiper belt objects', 'ecliptic')
+                obj.keyword = 'ecliptic';
                 s = obj.default_fields(strcmp({obj.default_fields.type}, 'ecliptic')); % get all the structs that fit this type of field
             elseif cs(type, 'galactic')
+                obj.keyword = 'galactic';
                 s = obj.default_fields(strcmp({obj.default_fields.type}, 'galactic')); % get all the structs that fit this type of field
             % add other default field types...
             else

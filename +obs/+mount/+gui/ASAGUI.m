@@ -109,9 +109,10 @@ classdef ASAGUI < handle
             obj.panel_pointing.addButton('button_ra', 'telRA', 'info', 'RA= ', '', '', [], '', '', 'Current pointing Right Ascention');
             obj.panel_pointing.addButton('button_dec', 'telDEC', 'info', 'Dec= ', '', '', [], '', '', 'Current pointing Declination');
             obj.panel_pointing.addButton('button_ha', 'telHA', 'info', 'HA= ', '', '', [], '', '', 'Current pointing Hour Angle');
-            obj.panel_pointing.addButton('button_alt', 'telALT', 'info', 'ALT= ', '', '', [], '', '', 'Current pointing Altitude');
-            obj.panel_pointing.addButton('button_time', 'tel_time_to_limit', 'info', '', ' min. to limit', '', [], '', '', 'Current time to reach limit');
-            obj.panel_pointing.addButton('button_pierside', 'pier_side', 'info', '', '', '', [], '', '', 'Current telescope side of pier');
+            obj.panel_pointing.addButton('button_alt', 'telALT', 'info', 'ALT= ', '', '', [], '', '', 'Current pointing altitude');
+            obj.panel_pointing.addButton('button_alt', 'telAZ', 'info', 'AZ= ', '', '', [], '', '', 'Current pointing azimuth');            
+%             obj.panel_pointing.addButton('button_time', 'tel_time_to_limit', 'info', '', ' min. to limit', '', [], '', '', 'Current time to reach limit');
+            obj.panel_pointing.addButton('button_pierside', 'telHemisphere', 'info', 'pointing ', '', '', [], '', '', 'Current telescope pointing side');
             obj.panel_pointing.margin = [0.005 0.2];
             obj.panel_pointing.make;
             
@@ -145,8 +146,9 @@ classdef ASAGUI < handle
             obj.panel_object.addButton('input_dec', 'objDEC', 'input', 'Dec= ', '', '', 0.5, '', '', 'Input object Declination or use name resolver');
             obj.panel_object.addButton('button_ha', 'objHA', 'info', 'HA= ', '', '', 0.5, '', '', 'Calculated object Hour Angle'); 
             obj.panel_object.addButton('button_alt', 'objALT', 'info', 'ALT= ', '', '', 0.5, '', '', 'Calculated object Altitude'); 
-            obj.panel_object.addButton('button_time', 'obj_time_to_limit', 'info', '', ' min. to limit', '', 0.5, '', '', 'Calculated time object has until reaching limit'); 
-            obj.panel_object.addButton('button_pierside', 'obj_pier_side', 'info', '', '', '', 0.5); 
+            obj.panel_object.addButton('button_time', 'obj_time_to_limit', 'info', '', ' min', '', 0.35, 'small', '', 'Calculated time object has until reaching limit'); 
+            obj.panel_object.addButton('button_airmass', 'object.AIRMASS', 'info', 'a.m.= ', '', '', 0.4, 'small', '', 'Calculated airmass for target'); 
+            obj.panel_object.addButton('button_pierside', 'objHemisphere', 'info', '', '', '', 0.25, '', '', 'Side of the sky where target is right now'); 
             obj.panel_object.addButton('button_history_text', '', 'custom', 'Prev.Objects:', '', '', 0.7);
             obj.panel_object.addButton('button_reset_prev', 'resetPrevObjects', 'push', 'reset', '', '', 0.3, '', '', 'Reset the history list of previous object'); 
             obj.panel_object.addButton('button_prev_objects', '', 'custom', '', '', '', [], '', '', 'List the last objects that were used to for slew');
@@ -273,9 +275,9 @@ classdef ASAGUI < handle
             end
             
             if strcmp(obj.owner.obj_pier_side, 'pierEast')
-                obj.panel_object.button_pierside.Tooltip = 'Object is on West side. To view it, telescope must be on East side';
+                obj.panel_object.button_pierside.Tooltip = 'Object is on West side. ';
             elseif strcmp(obj.owner.obj_pier_side, 'pierWest')
-                obj.panel_object.button_pierside.Tooltip = 'Object is on East side. To view it, telescope must be on West side';
+                obj.panel_object.button_pierside.Tooltip = 'Object is on East side. ';
             elseif strcmp(obj.owner.obj_pier_side, 'pierUnknown')
                 obj.panel_object.button_pierside.Tooltip = 'Object is below horizon (or other error)';
             else
@@ -339,8 +341,13 @@ classdef ASAGUI < handle
             
             if obj.debug_bit>1, disp('Callback: moving NW'); end
             
-            obj.owner.hndl.MoveAxis(0,obj.owner.move_rate);
-            obj.owner.hndl.MoveAxis(1,obj.owner.move_rate);
+            if strcmp(obj.owner.pier_side, 'pierEast')
+                obj.owner.hndl.MoveAxis(0,obj.owner.move_rate);
+                obj.owner.hndl.MoveAxis(1,obj.owner.move_rate);
+            elseif strcmp(obj.owner.pier_side, 'pierWest')
+                obj.owner.hndl.MoveAxis(0,obj.owner.move_rate);
+                obj.owner.hndl.MoveAxis(1,-obj.owner.move_rate);
+            end
             
         end
         
@@ -348,8 +355,11 @@ classdef ASAGUI < handle
             
             if obj.debug_bit>1, disp('Callback: moving NW'); end
             
-%             obj.owner.hndl.MoveAxis(0,obj.owner.move_rate);
-            obj.owner.hndl.MoveAxis(1,obj.owner.move_rate);
+            if strcmp(obj.owner.pier_side, 'pierEast')
+                obj.owner.hndl.MoveAxis(1,obj.owner.move_rate);
+            elseif strcmp(obj.owner.pier_side, 'pierWest')
+                obj.owner.hndl.MoveAxis(1,-obj.owner.move_rate);
+            end
             
         end
         
@@ -357,8 +367,13 @@ classdef ASAGUI < handle
             
             if obj.debug_bit>1, disp('Callback: moving NW'); end
             
-            obj.owner.hndl.MoveAxis(0,-obj.owner.move_rate);
-            obj.owner.hndl.MoveAxis(1,obj.owner.move_rate);
+            if strcmp(obj.owner.pier_side, 'pierEast')
+                obj.owner.hndl.MoveAxis(0,-obj.owner.move_rate);
+                obj.owner.hndl.MoveAxis(1,obj.owner.move_rate);
+            elseif strcmp(obj.owner.pier_side, 'pierWest')
+                obj.owner.hndl.MoveAxis(0,-obj.owner.move_rate);
+                obj.owner.hndl.MoveAxis(1,-obj.owner.move_rate);
+            end
             
         end
         
@@ -384,6 +399,14 @@ classdef ASAGUI < handle
             
             if obj.debug_bit>1, disp('Callback: moving NW'); end
             
+            if strcmp(obj.owner.pier_side, 'pierEast')
+                obj.owner.hndl.MoveAxis(0,obj.owner.move_rate);
+                obj.owner.hndl.MoveAxis(1,-obj.owner.move_rate);
+            elseif strcmp(obj.owner.pier_side, 'pierWest')
+                obj.owner.hndl.MoveAxis(0,obj.owner.move_rate);
+                obj.owner.hndl.MoveAxis(1,obj.owner.move_rate);
+            end
+            
             obj.owner.hndl.MoveAxis(0,obj.owner.move_rate);
             obj.owner.hndl.MoveAxis(1,-obj.owner.move_rate);
             
@@ -393,8 +416,11 @@ classdef ASAGUI < handle
             
             if obj.debug_bit>1, disp('Callback: moving NW'); end
             
-%             obj.owner.hndl.MoveAxis(0,obj.owner.move_rate);
-            obj.owner.hndl.MoveAxis(1,-obj.owner.move_rate);
+            if strcmp(obj.owner.pier_side, 'pierEast')
+                obj.owner.hndl.MoveAxis(1,-obj.owner.move_rate);
+            elseif strcmp(obj.owner.pier_side, 'pierWest')
+                obj.owner.hndl.MoveAxis(1,obj.owner.move_rate);
+            end
             
         end
         
@@ -402,8 +428,13 @@ classdef ASAGUI < handle
             
             if obj.debug_bit>1, disp('Callback: moving NW'); end
             
-            obj.owner.hndl.MoveAxis(0,-obj.owner.move_rate);
-            obj.owner.hndl.MoveAxis(1,-obj.owner.move_rate);
+            if strcmp(obj.owner.pier_side, 'pierEast')
+                obj.owner.hndl.MoveAxis(0,-obj.owner.move_rate);
+                obj.owner.hndl.MoveAxis(1,-obj.owner.move_rate);
+            elseif strcmp(obj.owner.pier_side, 'pierWest')
+                obj.owner.hndl.MoveAxis(0,-obj.owner.move_rate);
+                obj.owner.hndl.MoveAxis(1,obj.owner.move_rate);
+            end
             
         end
         
