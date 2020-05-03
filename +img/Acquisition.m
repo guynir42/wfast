@@ -46,6 +46,8 @@ classdef Acquisition < file.AstroData
         
         log@util.sys.Logger;
         
+        obs_log; % struct with observation time and number of files and other metadata for each target
+        
     end
     
     properties % inputs/outputs
@@ -112,7 +114,7 @@ classdef Acquisition < file.AstroData
         
         use_sync = 1; % if false, do not send or receive messages from PcSync object
         use_ignore_manager = 0; % if true, will not use any data from Manager (via sync object)
-        use_sync_stop = 1; % if false, will not respect stop commands from Manager (via sync object)
+        use_sync_stop = 0; % if false, will not respect stop commands from Manager (via sync object)
         use_autoguide = 1; % if true, send back adjustments on drifts to telescope
         
         use_autodeflate = 1;
@@ -588,7 +590,11 @@ classdef Acquisition < file.AstroData
             val = sprintf('%s\n--------------------------------------', val);
             
             if ~isempty(obj.head) && ~isempty(obj.head.SCALE)
-                val = sprintf('%s\n seeing= %4.2f"', val, obj.average_width.*obj.head.SCALE.*2.355);
+                if obj.use_model_psf
+                    val = sprintf('%s\n seeing= %s"', val, util.text.print_vec(round(obj.head.SCALE.*sort([obj.average_width.*2.355 obj.model_psf.fwhm]),2), '-'));
+                else
+                    val = sprintf('%s\n seeing= %4.2f"', val, obj.head.SCALE.*obj.average_width.*2.355);
+                end
             end
             
             val = sprintf('%s\n PSF widths= %4.2f / %4.2f pix', val, obj.minor_axis, obj.major_axis);
@@ -792,11 +798,11 @@ classdef Acquisition < file.AstroData
         
         function val = get.average_width(obj)
             
-            if obj.use_model_psf
-                val = (obj.model_psf.maj_axis+obj.model_psf.min_axis)/2;
-            else
+%             if obj.use_model_psf
+%                 val = (obj.model_psf.maj_axis+obj.model_psf.min_axis)/2;
+%             else
                 val = obj.phot_stack.average_width;
-            end
+%             end
             
         end
         
@@ -804,6 +810,8 @@ classdef Acquisition < file.AstroData
             
             if isempty(obj.prev_average_width) || ~isreal(obj.prev_average_width) || obj.prev_average_width<=0
                 val = 1.6;
+            elseif obj.prev_average_width>2
+                val = 2;
             else
                 val = obj.prev_average_width;
             end
@@ -1307,7 +1315,7 @@ classdef Acquisition < file.AstroData
                 
                 s = obj.sync.incoming;
                 
-                list = head.Parameters.makeSyncList; 
+                list = head.Header.makeSyncList; 
                 
                 if ~isempty(s) && isstruct(s)
                     
@@ -1328,6 +1336,107 @@ classdef Acquisition < file.AstroData
             catch ME
                 warning(ME.getReport)
             end
+            
+        end
+        
+        function s = makeObsLog(obj, date) % scan the folders in "data_temp" to get up-to-date info on number of files and runtime for each target
+            
+            if nargin<2 || isempty(date)
+                date = obj.buf.date_dir; 
+            end
+            
+            s = struct;
+            s.date = date;
+            
+            d = util.sys.WorkingDirectory(obj.buf.base_dir);
+            if exist(fullfile(d.pwd, date), 'dir')
+                d.cd(date);
+            elseif exist(fullfile(getenv('DATA_EXTRAS'), date), 'dir')
+                d.cd(fullfile(getenv('DATA_EXTRAS'), date))
+            else
+                s = struct('date', date); 
+                return;
+            end
+            
+            list = d.dir; 
+            
+            for ii = 1:length(list)
+                
+                idx = regexp(list{ii}, '_run\d+$');
+                if isempty(idx)
+                    name = list{ii}; 
+                else
+                    name = list{ii}(1:idx-1); 
+                end
+                
+                if ~isfield(s, name)
+                    s.(name) = struct.empty;
+                end
+                
+                new_struct = struct('name', name, 'start', '', 'end', '', 'runtime', [], 'num_files', []); 
+                new_struct = obj.getObsLogFromFolder(fullfile(d.pwd, list{ii}), new_struct);
+                s.(name) = vertcat(s.(name), new_struct); 
+                
+            end
+            
+        end
+        
+        function log_struct = getObsLogFromFolder(obj, folder, log_struct)
+            
+            import util.text.parse_value;
+            
+            d = util.sys.WorkingDirectory(folder);
+            
+            files = d.match('*.h5*'); 
+            readme = d.match('Z_README.txt');
+            
+            if ~isempty(readme)
+                
+                fid = fopen(readme{1}); 
+                on_cleanup = onCleanup(@() fclose(fid)); 
+                
+                for ii = 1:1e4
+                    
+                    tline = fgetl(fid); 
+                    
+                    if ~ischar(tline)
+                        break;
+                    end
+                    
+                    [~, idx] = regexp(tline, 'RUNSTART:'); 
+                    
+                    if ~isempty(idx) && isempty(log_struct.start)
+                        log_struct.start = strtrim(tline(idx+1:end)); 
+                    end
+                    
+                    [~, idx] = regexp(tline, 'ENDTIME:');
+                    
+                    if ~isempty(idx) && isempty(log_struct.end)
+                        log_struct.end = strtrim(tline(idx+1:end)); 
+                    end
+                    
+                    [~, idx] = regexp(tline, 'END_STAMP:'); 
+                    
+                    if ~isempty(idx) && isempty(log_struct.runtime)
+                        log_struct.runtime = parse_value(tline(idx+1:end)); 
+                    end
+                    
+                end % for ii (file lines)
+                
+            elseif ~isempty(files) % can't find the readme, use the last HDF5 file instead
+                
+                try 
+                    log_struct.start = h5readatt(files{end}, '/head', 'RUNSTART');
+                    log_struct.end = h5readatt(files{end}, '/head', 'ENDTIME'); 
+                    log_struct.runtime = h5readatt(files{end}, '/head', 'END_STAMP'); 
+                catch 
+                    log_struct.start = h5readatt(files{end}, '/header', 'RUNSTART');
+                    log_struct.end = h5readatt(files{end}, '/header', 'ENDTIME'); 
+                    log_struct.runtime = h5readatt(files{end}, '/header', 'END_STAMP'); 
+                end
+            end
+            
+            log_struct.num_files = length(files); 
             
         end
         
@@ -1514,10 +1623,16 @@ classdef Acquisition < file.AstroData
                         filename = obj.buf.getReadmeFilename;
                         util.oop.save(obj, filename, 'name', 'acquisition'); 
                         
-%                         if obj.cat.success
-%                             filename = fullfile(obj.buf.directory, 'catalog.mat');
-%                             obj.cat.saveMAT(filename);
-%                         end
+                        if obj.cat.success && obj.use_save
+                            
+                            try
+                                filename = fullfile(obj.buf.directory, 'catalog.mat');
+                                obj.cat.saveMAT(filename);
+                            catch ME
+                                warning(ME.getReport);
+                            end
+
+                        end
                         
                     catch ME
                         warning(ME.getReport);
@@ -1854,7 +1969,7 @@ classdef Acquisition < file.AstroData
             end
             
             if obj.use_remove_bad_pixels
-                S = util.img.maskBadPixels(S); 
+                S = util.img.maskBadPixels(S, NaN); 
             end
             
             if obj.use_arbitrary_pos
@@ -1863,7 +1978,8 @@ classdef Acquisition < file.AstroData
             elseif obj.use_mextractor
                 obj.findStarsMAAT;
             elseif obj.use_quick_find_stars
-                T = util.img.quick_find_stars(S, 'psf', obj.getWidthEstimate, 'number', obj.num_stars, 'sigma', obj.detect_thresh, ...
+                % replaced the psf width with 1, because getWidthEstimate was returning unreasonable results... 
+                T = util.img.quick_find_stars(S, 'psf', 1, 'number', obj.num_stars, 'sigma', obj.detect_thresh, ...
                     'dilate', obj.cut_size-5, 'saturation', obj.saturation_value.*obj.num_sum, 'edges', obj.avoid_edges, 'unflagged', 1); 
                 if isempty(T)
                     error('Could not find any stars using quick_find_stars!');
@@ -1909,14 +2025,14 @@ classdef Acquisition < file.AstroData
 
                 obj.positions = obj.cat.positions; % usually we will already have positions so this should do nothing (unless this analysis is on full frame rate images)
                 
-                if obj.use_save
-                    try
-                        filename = fullfile(obj.buf.directory, 'catalog.mat');
-                        obj.cat.saveMAT(filename);
-                    catch ME
-                        warning(ME.getReport);
-                    end
-                end
+%                 if obj.use_save
+%                     try
+%                         filename = fullfile(obj.buf.directory, 'catalog.mat');
+%                         obj.cat.saveMAT(filename);
+%                     catch ME
+%                         warning(ME.getReport);
+%                     end
+%                 end
 
             else
                 if obj.debug_bit, fprintf('Could not fit astrometric solution...\n'); end

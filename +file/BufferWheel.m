@@ -98,7 +98,7 @@ classdef BufferWheel < file.AstroData
         product_type_append = ''; % Can append additional strings like "Sim" or "ROI"
         dir_extension = ''; % overrides any automatic directory extensions... 
         use_dir_types = 0; % automatically add a dir_extension equal to "type"
-        use_year_folder = 1; % add a YYYY folder before YYYY-MM-DD folder
+        use_year_folder = 0; % add a YYYY folder before YYYY-MM-DD folder
         
         % write parameters
         use_save_raw_images = 1; % if set to 0, will not save to disk the full frame raw images! 

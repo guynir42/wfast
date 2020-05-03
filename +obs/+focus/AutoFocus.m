@@ -68,7 +68,7 @@ classdef AutoFocus < handle
         range = 0.15;
         
         angle = -60; % between tip axis and pixel y axis (degrees)
-        spider_diameter = 80; % in cm
+        spider_diameter = 92.4; % in cm
         pixel_size = 12; % in microns
         num_pixels = 2000; % across the sensor (roughly) to be deprecated
         

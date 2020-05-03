@@ -492,8 +492,8 @@ classdef Deflator < file.AstroData
             obj.makeGUI;
             
             d = util.sys.WorkingDirectory(getenv('DATA_TEMP')); 
-            list = d.dir('',1);
-            d.cd(list{end});
+%             list = d.dir('',1);
+%             d.cd(list{end});
             list = d.dir('',1);
             
             for ii = 1:length(list)

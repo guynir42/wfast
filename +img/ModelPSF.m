@@ -163,6 +163,7 @@ classdef ModelPSF < handle
                     end
                     
                 end
+                
             end
             
             obj.calcStack;
@@ -176,12 +177,12 @@ classdef ModelPSF < handle
             obj.stack = nansum(nansum(obj.cutouts_shifted,3),4);
             
             if obj.use_gaussian
-                obj.stack = obj.stack.*util.img.gaussian2(obj.gauss_sigma, 'size', [size(obj.cutouts,1),size(obj.cutouts,2)]); 
+                obj.stack = obj.stack.*util.img.gaussian2(obj.gauss_sigma, 'size', size(obj.cutouts)); 
             end
             
-            obj.mask = util.img.ellipse('radius', obj.radius, 'size', [size(obj.cutouts,1), size(obj.cutouts,2)]);
+            obj.mask = util.img.ellipse('radius', obj.radius, 'size', size(obj.cutouts));
             
-            c = size(obj.cutouts); c = c(1:2);
+            c = util.vec.imsize(obj.cutouts); 
             [X, Y] = meshgrid((1:c(2))-floor(c(2)/2)-1, (1:c(1))-floor(c(1)/2)-1); 
             
             I = obj.stack.*obj.mask;
@@ -201,7 +202,7 @@ classdef ModelPSF < handle
             obj.min_axis = min(sqrt(diag(E)));
             
 %             obj.fwhm = sqrt(mean([obj.m2x,obj.m2y])).*2.355;
-            obj.fwhm = util.img.fwhm(I);
+            obj.fwhm = util.img.fwhm(I, 'method', 'filters');
             
         end
         

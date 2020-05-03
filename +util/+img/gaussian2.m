@@ -41,8 +41,10 @@ function I = gaussian2(varargin)
         input.S = ceil((max(input.sigma_x, input.sigma_y)*10));
         input.S = input.S+mod(input.S+1,2);
     end
-                
-    [x,y] = meshgrid(-floor((input.S)/2):floor((input.S-1)/2));
+    
+    input.S = util.vec.imsize(input.S); 
+    
+    [x,y] = meshgrid(-floor((input.S(2))/2):floor((input.S(2)-1)/2), -floor((input.S(1))/2):floor((input.S(1)-1)/2));
     
     if isempty(input.rot_frac)
         x2 = x;

@@ -65,7 +65,10 @@ function I = ellipse(varargin)
         r = input.hole;
     end
     
-    [x,y] = meshgrid(-floor((S)/2):floor((S-1)/2));
+    input.S = util.vec.imsize(input.S); 
+    
+%     [x,y] = meshgrid(-floor((S)/2):floor((S-1)/2));
+    [x,y] = meshgrid(-floor((input.S(2))/2):floor((input.S(2)-1)/2), -floor((input.S(1))/2):floor((input.S(1)-1)/2));
     
     % rotate the coordinates
     if isempty(input.rot_frac)

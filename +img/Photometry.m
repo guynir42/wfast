@@ -71,9 +71,9 @@ classdef Photometry < handle
         use_best_widths = 0; % if this is true, keep the widths from gaussian even if using aperture/forced 
         
         corner_size = 0.15; % fraction of the cut_size or pixel value (must be smaller than cut_size!)
-        aperture = 9; % for now lets keep it short by using just the big aperture
-        annulus = 12;
-        annulus_outer = 15; % empty means take the rest of the cutout
+        aperture = 5; % for now lets keep it short by using just the big aperture
+        annulus = 7;
+        annulus_outer = 9; % empty means take the rest of the cutout
         gauss_sigma = 2;
         gauss_thresh = 1e-6;
         
@@ -202,6 +202,22 @@ classdef Photometry < handle
                 if obj.debug_bit, fprintf('Photometry constructor v%4.2f\n', obj.version); end
                 util.oop.save_defaults(obj);
             end
+            
+        end
+        
+        function useBalorDefaults(obj)
+            
+            obj.aperture = 5; 
+            obj.annulus = 7;
+            obj.annulus_outer = 9; 
+            
+        end
+        
+        function useZylaDefaults(obj)
+            
+            obj.aperture = 9; 
+            obj.annulus = 12;
+            obj.annulus_outer = 15; 
             
         end
         
