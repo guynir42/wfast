@@ -160,6 +160,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             obj.constraints.input_var('latest', [], 'latest time'); % observation must not begin after this time
             obj.constraints.input_var('side', [], 'hemisphere'); % observation must be taken on this size (empty is same as "both")
             obj.constraints.input_var('airmass', Inf); % observation must have airmass below this value
+            obj.constraints.input_var('moon', 20, 'moon_distance'); % target must be far away from the moon (degrees)
             
         end
         
@@ -764,6 +765,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             if obj.ALT_deg<input.altitude, return; end % altitude is below defined limit
             
             if isempty(obj.AIRMASS) || isnan(obj.AIRMASS) || obj.AIRMASS>input.airmass, return; end % airmass is undefined or above limit
+            
+            if obj.moon.Dist<obj.constraints.moon, return; end
             
             if obj.calcObsTimeMinutes(input.altitude)<input.duration*60, return; end % there is not enough time left to observe this target
             
