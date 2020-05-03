@@ -31,8 +31,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     properties % objects
         
         time@datetime; % time of the observation (could be past or future, usually sets to current time)
+        
         moon; % structure with some details on the moon position etc
         sun; % structure with some details on the sun position etc
+        
+        constraints@util.text.InputVars; 
         
     end
     
@@ -142,7 +145,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                     
                 end
                 
+                obj.makeConstraints;
+                
             end
+            
+        end
+        
+        function makeConstraints(obj)
+            
+            obj.constraints = util.text.InputVars;
+            obj.constraints.input_var('altitude', 25, 'alt limit'); % minimal angle above horizon for being observable (degrees)
+            obj.constraints.input_var('duration', 1, 'min duration', 'min time'); % minimal time until reaching meridian or horizon (hours)
+            obj.constraints.input_var('earliest', [], 'start time'); % observation must start after this time
+            obj.constraints.input_var('latest', [], 'latest time'); % observation must not begin after this time
+            obj.constraints.input_var('side', [], 'hemisphere'); % observation must be taken on this size (empty is same as "both")
+            obj.constraints.input_var('airmass', Inf); % observation must have airmass below this value
             
         end
         
@@ -728,6 +745,34 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
+        function val = observable(obj, varargin)
+            
+            % start with the existing constraints for this target and update with varargin
+            input = util.oop.full_copy(obj.constraints); 
+            input.scan_vars(varargin{:}); 
+            
+            val = 0; 
+            
+            if ~isempty(input.earliest) && obj.time<obj.parseTime(input.earliest),return; end % current time is too early
+            
+            if ~isempty(input.latest) && obj.time>obj.parseTime(input.latest),return; end % current time is too late
+            
+            if obj.HA_deg<0 && util.text.cs(input.side, 'West'), return; end % target is on East side when only West is accepted
+            
+            if obj.HA_deg>0 && util.text.cs(input.side, 'East'), return; end % target is on West side when only East is accepted
+            
+            if obj.ALT_deg<input.altitude, return; end % altitude is below defined limit
+            
+            if isempty(obj.AIRMASS) || isnan(obj.AIRMASS) || obj.AIRMASS>input.airmass, return; end % airmass is undefined or above limit
+            
+            if obj.calcObsTimeMinutes(input.altitude)<input.duration*60, return; end % there is not enough time left to observe this target
+            
+            % any other constraints? 
+            
+            val = 1; % if we passed all the tests
+            
+        end
+        
         function val = better_than(obj, other, varargin) % find if this object has better observable conditions than that one
         % Usage: val = better_than(obj, other, varargin)
         % Check which target is better to observe right now. 
@@ -760,72 +805,25 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
             if nargin==1, help('head.Ephemeris.better_than'); return; end
         
-            input = util.text.InputVars;
-            input.input_var('alt_limit', obj.min_altitude); 
-            input.input_var('duration', obj.min_duration); 
-            input.input_var('side', []); 
-            input.input_var('wind_speed', []); 
+            % start with the existing constraints for this target and update with varargin
+            input = util.oop.full_copy(obj.constraints); 
             input.scan_vars(varargin{:}); 
-        
+            
             if isempty(other) || ~isa(other, 'head.Ephemeris') || obj==other
                 error('Must supply another Ephemeris object to this function!'); 
             end
             
-            if isempty(other.AIRMASS) || other.ALT_deg<input.alt_limit || other.calcObsTimeMinutes(input.alt_limit)<input.duration*60
+            if other.observable(varargin{:})==0
                 val = 1;
                 return; 
             end
             
-            if isempty(obj.AIRMASS) || obj.ALT_deg<input.alt_limit || obj.calcObsTimeMinutes(input.alt_limit)<input.duration*60
+            if obj.observable(varargin{:})==0
                 val = 0;
                 return;
             end
             
             val = obj.AIRMASS<=other.AIRMASS; % if this object has lower airmass, it is better
-            
-            %%%%%%%%% additional checks besides airmass / alt_limit %%%%%%%%%%
-            
-            % check if the wind is too high, prefer Eastern targets
-            if ~isempty(input.wind_speed)
-                if input.wind_speed>20 % only prefer Eastern targets when the wind is strong
-                    if obj.HA_deg<0 && other.HA_deg>=0 % this is Eastern while other is Western
-                        val = 1;
-                    elseif obj.HA_deg>=0 && other.HA_deg<0 % this is Western while other is Eastern
-                        val = 0;
-                    else
-                        % pass: if both targets are on the same side, do not use wind as a deciding factor
-                    end
-                end
-            end
-            
-            % if given a side to prefer (to prevent meridian flips)
-            if ~isempty(input.side) && ~cs(input.side, 'both')
-                
-                if cs(input.side, 'east')
-                    
-                    if obj.HA_deg<0 && other.HA_deg>=0 % this is Eastern while other is Western
-                        val = 1;
-                    elseif obj.HA_deg>=0 && other.HA_deg<0 % this is Western while other is Eastern
-                        val = 0;
-                    else
-                        % pass: if both targets are on the same side, do not use wind as a deciding factor
-                    end
-                    
-                elseif cs(input.side, 'west')
-                    
-                    if obj.HA_deg>=0 && other.HA_deg<0 % this is Western while other is Eastern
-                        val = 1;
-                    elseif obj.HA_deg<0 && other.HA_deg>=0 % this is Eastern while other is Western
-                        val = 0;
-                    else
-                        % pass: if both targets are on the same side, do not use wind as a deciding factor
-                    end
-                    
-                else
-                    error('Unknown side "%s". Choose "East" or "West" or "both". ', input.side); 
-                end
-                
-            end
             
         end
         
@@ -925,7 +923,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 error('Unknown default field type "%s". Try "ecliptic"... ', type); 
             end
             
-            
             if isempty(input.number) % automatically choose the best field
                 
                 input.number = 1; % assume it is 1 and adjust it if a better field is found
@@ -936,7 +933,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 obj.updateSecondaryCoords;
                 
                 e = head.Ephemeris; % make a test object 
-                e.time = obj.time;
+                e.time = obj.time; % make sure the objects are defined on the same time
+                e.constraints = util.oop.full_copy(obj.constraints); % and with the same constraints
                 
                 for ii = 2:length(s)
                     
@@ -945,7 +943,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                     e.star_density = s(ii).stars;
                     e.updateSecondaryCoords;
                     
-                    if better_than(e, obj, varargin{:}) % found a better field, update to that one
+                    if e.better_than(obj, varargin{:}) % found a better field, update to that one
                         input.number = ii;
                         obj.RA_deg = s(ii).RA;
                         obj.Dec_deg = s(ii).Dec;
