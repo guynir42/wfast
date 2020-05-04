@@ -152,8 +152,8 @@ function file_handle = save(obj, filename, varargin)
     end
     
     % if given a vector of objects, call "save" recursively on each one... 
-    if length(obj)>1
-        for ii = 1:length(obj)
+    if builtin('length', obj)>1
+        for ii = 1:builtin('length', obj)
             try 
             util.oop.save(obj(ii), file_handle, input.output_vars{:}, 'name', [input.name '(' num2str(ii) ')']);
             catch ME
@@ -180,10 +180,14 @@ function file_handle = save(obj, filename, varargin)
 %     group_handle_cleanup = onCleanup(@() H5G.close(group_handle));
     
 %     props = util.oop.list_props(obj); % get the property list, including dynamic properties... 
-    if input.hidden
+    if isa(obj, 'containers.Map') % because matlab built in types have to be so complicated we can't save them like regular objects! 
+        props = {'keys', 'values'}; 
+    elseif input.hidden
         warning off MATLAB:structOnObject;
         st = struct(obj);
         props = fieldnames(st);
+    elseif isstruct(obj)
+        props = fieldnames(obj); 
     else
         props = properties(obj); % just get the good old fashioned, visible (non-hidden non-private) member names
     end
@@ -193,13 +197,20 @@ function file_handle = save(obj, filename, varargin)
 %         name = props{ii};
         name = props{ii};
         try
-            p = findprop(obj, name);
-            if p.Transient 
-                if input.debug_bit, disp(['prop: "' name '" is transient. Skipping...']); end
-            elseif input.dependent==0 && p.Dependent
-                if input.debug_bit, disp(['prop: "' name '" is dependent. Skipping...']); end
-            else
+            
+            if isstruct(obj) || isa(obj, 'containers.Map')
                 group_handle = saveProperty(group_handle, name, obj.(name), input);
+            else
+                
+                p = findprop(obj, name);
+                if p.Transient 
+                    if input.debug_bit, disp(['prop: "' name '" is transient. Skipping...']); end
+                elseif input.dependent==0 && p.Dependent
+                    if input.debug_bit, disp(['prop: "' name '" is dependent. Skipping...']); end
+                else
+                    group_handle = saveProperty(group_handle, name, obj.(name), input);
+                end
+                
             end
             
         catch ME
@@ -218,25 +229,31 @@ function file_handle = save(obj, filename, varargin)
             for ii = 1:length(props)
                 
                 name = props{ii};
-                p = findprop(obj, name);
                 
-                if p.Transient==0 % first don't even ask for the value of transient properties (save time lazy loading things...)
+                if isobject(obj) && ~isa(obj, 'containers.Map')
+                    p = findprop(obj, name);
+                    t = p.Transient; 
+                else
+                    t = 0; % structs and containers.Map objects don't have transient properties... 
+                end
+                
+                if  t==0 % first don't even ask for the value of transient properties (save time lazy loading things...)
                     
                     value = obj.(name); % if it isn't transient, check the value
 
-                    if isobject(value) && ~isa(value, 'table') && ~isa(value, 'datetime') && ~isa(value, 'containers.Map') && length(value)<2 && isempty(checkList(value, input.handle_list))
+                    if (isobject(value) || isstruct(value)) && ~isa(value, 'table') && ~isa(value, 'datetime') && builtin('length', value)<2 && isempty(checkList(value, input.handle_list)) % && ~isa(value, 'containers.Map')
 
                         if input.debug_bit, disp(['prop: "' name '" now saved as object...       **********************']); end
 
                         file_handle = util.oop.save(value, file_handle, input, 'name', name, 'location', this_location);
 
-                    elseif isa(value, 'datetime') || isa(value, 'containers.Map') || isa(value, 'table')
+                    elseif isa(value, 'datetime') || isa(value, 'table') % || isa(value, 'containers.Map')
                         continue;
                     elseif isobject(value) && numel(value)>1
 
                         for jj = 1:numel(value)
 
-                            if ~isa(value(jj), 'datetime') && ~isa(value(jj), 'containers.Map') && isempty(checkList(value(jj), input.handle_list))
+                            if ~isa(value(jj), 'datetime') && isempty(checkList(value(jj), input.handle_list)) % && ~isa(value(jj), 'containers.Map') 
 
                                 if input.debug_bit, disp(['prop: "' name '(' num2str(jj) ')" now saved as object...']); end
 
@@ -245,7 +262,12 @@ function file_handle = save(obj, filename, varargin)
                             end
 
                         end
-
+                        
+%                     elseif isa(value, 'containers.Map')
+%                         new_val = struct;
+%                         new_val.keys = value.keys;
+%                         new_val.values = value.values;
+%                         file_handle = util.oop.save(new_val, file_handle, input.output_vars{:}, 'name', name);
                     elseif iscell(value)
 
                         for jj = 1:length(value)
@@ -326,7 +348,7 @@ function file_handle = saveProperty(file_handle, name, value, input)
         if isempty(value)
             if input.debug_bit, disp(['prop: "' name '" is empty. Writing as attribute...']); end
             saveString(file_handle, name, '{}', input);
-        elseif isvector(value) && (length(value)<=input.att_length ||  util.text.cs(input.format, 'hdf5', 'h5', 'h5z', 'struct', 'cell'))
+        elseif isvector(value) && (length(value)<=input.att_length || util.text.cs(input.format, 'hdf5', 'h5', 'h5z', 'struct', 'cell'))
             if input.debug_bit, disp(['prop: "' name '" is a short 1D cell array. Writing as individual attributes...']); end
             file_handle = saveCell(file_handle, name, value, input);
         else
@@ -392,7 +414,7 @@ function file_handle = saveProperty(file_handle, name, value, input)
             
         end
         
-    elseif isobject(value)
+    elseif isobject(value) || isstruct(value)
         
         if input.debug_bit, disp(['prop: "' name '" is an object... placing link.']); end
         file_handle = saveObject(file_handle, name, value, input);
@@ -563,11 +585,6 @@ function file_handle = saveMatrix(file_handle, name, value, input)
             H5D.write(dataset_id, 'H5ML_DEFAULT', 'H5S_ALL', 'H5S_ALL', 'H5P_DEFAULT', value);
         end
         
-        % these are replaced by onCleanup objects...
-%         H5D.close(dataset_id);        
-%         H5P.close(dataset_create_properties);
-%         H5P.close(link_create_properties);
-        
     elseif cs(input.format, 'text', 'txt')
         fprintf(file_handle, '%25s: [%s %s]\n', name, util.text.print_vec(size(value), 'x'), class(value));
     elseif cs(input.format, 'struct', 'cell')
@@ -579,12 +596,18 @@ end
 
 function file_handle = saveCell(file_handle, name, value, input)
     
-    for ii = 1:length(value)
-        try
-            file_handle = saveProperty(file_handle, [name '{' num2str(ii) '}'], value{ii}, input);
-        catch ME
-            error(['Error when saving ' name '{' num2str(ii) '}. ', getReport(ME)]);
+    if util.text.cs(input.format, 'cell', 'struct')
+        file_handle{end}.(name) = value; 
+    else
+    
+        for ii = 1:length(value)
+            try
+                file_handle = saveProperty(file_handle, [name '{' num2str(ii) '}'], value{ii}, input);
+            catch ME
+                error(['Error when saving ' name '{' num2str(ii) '}. ', getReport(ME)]);
+            end
         end
+        
     end
     
 end
@@ -658,6 +681,8 @@ function file_handle = saveObject(file_handle, name, value, input)
             str = sprintf('[%s %s]', util.text.print_vec(size_vec, 'x'), class(value));
         elseif isa(value, 'datetime')
             str = sprintf('%s', util.text.time2str(value));
+%         elseif isa(value, 'containers.Map')
+            
         elseif ~isempty(link_address)
             str = sprintf('[%s %s] (link: %s)', util.text.print_vec(size_vec, 'x'), class(value), link_address); % link back to existing location
         else   
