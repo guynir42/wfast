@@ -74,7 +74,7 @@ void MyAttribute::input(const char *name, const mxArray *value){
 	else if(mxIsScalar(value)) input(name, mxGetScalar(value)); 
 	else if(mxIsNumeric(value)) input(name, mxGetPr(value), mxGetN(value));
 	// other data types are not supported.
-	else if(mxGetN(value)>1 && mxGetM(value)>1) mexErrMsgIdAndTxt( "MATLAB:file:mex:mexWrite:attributeMatrix", "Attribute cannot accept matices...");
+	else if(mxGetN(value)>1 && mxGetM(value)>1) mexErrMsgIdAndTxt( "MATLAB:file:mex:mexWrite:attributeMatrix", "Attribute cannot accept matrices...");
 	else if(mxIsObject(value)) mexErrMsgIdAndTxt( "MATLAB:file:mex:mexWrite:attributeObject", "Attribute cannot accept objects...");
 	else if(mxIsStruct(value)) mexErrMsgIdAndTxt( "MATLAB:file:mex:mexWrite:attributeStruct", "Attribute cannot accept structs...");
 	

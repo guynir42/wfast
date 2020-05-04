@@ -218,7 +218,31 @@ void SaveData::readHeaderCellArray(const mxArray *cell){
 			
 			const mxArray *value=mxGetFieldByNumber(s,0,j);
 			const char *name=mxGetFieldNameByNumber(s,j);
-			parameter_attributes_2D_vector[i].push_back(MyAttribute(name, value));
+			
+			if(mxIsCell(value)){
+				
+				for(int k=0;k<mxGetNumberOfElements(value); k++){
+			
+					char name_ext[256]; 
+					snprintf(name_ext, 256, "%s{%d}", name, k);
+					parameter_attributes_2D_vector[i].push_back(MyAttribute(name_ext, mxGetCell(value, k))); // this does not support imbedded structs or cells!
+				}
+				
+			}
+			else if(mxIsStruct(value)){
+				
+				for(int k=0;k<mxGetNumberOfFields(value); k++){
+					
+					const mxArray *sub_value=mxGetFieldByNumber(value,0,k);
+					const char *sub_name=mxGetFieldNameByNumber(value,k);
+					char name_ext[256]; 
+					snprintf(name_ext, 256, "%s.%s", name, sub_name, k);
+					parameter_attributes_2D_vector[i].push_back(MyAttribute(name_ext, sub_value)); // this does not support imbedded structs or cells!
+				}
+				
+			}
+			else
+				parameter_attributes_2D_vector[i].push_back(MyAttribute(name, value));
 			
 		}
 		
