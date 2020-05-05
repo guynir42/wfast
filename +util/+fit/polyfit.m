@@ -96,7 +96,7 @@ function results = polyfit(x,y,varargin)
             results(ii).coeffs(1) = ydata(1); 
             
             for jj = 2:input.order+1
-                results(ii).coeffs(jj) = 0; % set all higher orders of the polynomial to zero
+                results(ii).coeffs(jj,1) = 0; % set all higher orders of the polynomial to zero
             end
             
             results(ii).model = print_model(input.order, results(ii).coeffs);

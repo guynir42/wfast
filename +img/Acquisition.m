@@ -84,9 +84,9 @@ classdef Acquisition < file.AstroData
         use_refine_bg = 0;
         
         % these swithces determine how stars are picked when run begins
-        detect_thresh = 10; % minimal S/N of the stack stars for selecting cutouts
+        detect_thresh = 15; % minimal S/N of the stack stars for selecting cutouts
         use_remove_bad_pixels = true;
-        use_remove_saturated = false; % remove all stars with any pixels above saturation value
+        use_remove_saturated = true; % remove all stars with any pixels above saturation value
         saturation_value = 50000; % consider any pixels above this to be saturated
         min_star_temp; % set a lower limit on temperature of stars for findStarsMAAT;
         num_phot_cutouts; % limit the number of cutouts given to photomery (in the fast cadence) to save runtime and RAM in lightcurves

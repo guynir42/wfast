@@ -71,9 +71,9 @@ classdef Photometry < handle
         use_best_widths = 0; % if this is true, keep the widths from gaussian even if using aperture/forced 
         
         corner_size = 0.15; % fraction of the cut_size or pixel value (must be smaller than cut_size!)
-        aperture = 5; % for now lets keep it short by using just the big aperture
-        annulus = 7;
-        annulus_outer = 9; % empty means take the rest of the cutout
+        aperture = 6; % for now lets keep it short by using just the big aperture
+        annulus = 7.5;
+        annulus_outer = 10; % empty means take the rest of the cutout
         gauss_sigma = 2;
         gauss_thresh = 1e-6;
         
@@ -207,9 +207,9 @@ classdef Photometry < handle
         
         function useBalorDefaults(obj)
             
-            obj.aperture = 5; 
-            obj.annulus = 7;
-            obj.annulus_outer = 9; 
+            obj.aperture = 6; 
+            obj.annulus = 7.5;
+            obj.annulus_outer = 10; 
             
         end
         

@@ -405,6 +405,7 @@ classdef Andor < file.AstroData
             end
             
             obj.af = obs.focus.AutoFocus; 
+            obj.af.cam = obj;
  
         end
         
@@ -415,10 +416,12 @@ classdef Andor < file.AstroData
 %             obj.focuser.pos = 4.658; % updated at 03/6/19
 %             obj.focuser.pos = 4.8; % updated at 30/12/19
             
-            obj.focuser.pos = 1.5; % updated at 02/03/20 with the Balor installed
-            
-            obj.focuser.tip = 0;
-            obj.focuser.tilt = 0;
+%             obj.focuser.pos = 1.5; % updated at 02/03/20 with the Balor installed
+
+            % updated at 05/05/20 after fixing the autofocus code
+            obj.focuser.pos = 1.8;
+            obj.focuser.tip = 2;
+            obj.focuser.tilt = 0.9;
             
         end
         
@@ -842,8 +845,6 @@ classdef Andor < file.AstroData
                 end
 
                 obj.af.reset;
-                obj.af.use_quadrants = 0;
-                
                 obj.focuser.pos = p(1);
                 
                 % before we start the loop
@@ -853,6 +854,12 @@ classdef Andor < file.AstroData
 
                 % make sure finishup is called in the end
                 on_cleanup = onCleanup(@obj.finishup);
+                
+                if isempty(obj.af.gui) || ~obj.af.gui.check
+                    obj.af.makeGUI;
+                end
+                
+                figure(obj.af.gui.fig.fig); 
                 
                 for ii = 1:obj.num_batches
                     
@@ -886,7 +893,13 @@ classdef Andor < file.AstroData
                 end
                 
                 obj.af.calculate;
-                % obj.af.fitSurface;
+                obj.af.fitSurface;
+                obj.af.findPosTipTilt;
+                obj.af.plot;
+                if ~isempty(obj.af.gui) && obj.af.gui.check
+                    obj.af.gui.update;
+                end
+                
                 fprintf('FOCUSER RESULTS: pos= %f | tip= %f | tilt= %f\n', obj.af.found_pos, obj.af.found_tip, obj.af.found_tilt);
                 
                 if ~isnan(obj.af.found_pos)
@@ -909,6 +922,9 @@ classdef Andor < file.AstroData
 %                 end
 
                 obj.af.plot;
+                if ~isempty(obj.focuser.gui) && obj.gui.check
+                    obj.focuser.gui.update
+                end
 
             catch ME
                 

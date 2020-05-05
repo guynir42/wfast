@@ -109,9 +109,9 @@ function obj = load(filename, varargin)
         
     end
     
-    if isempty(obj)
-        rethrow(ME); 
-    end
+%     if isempty(obj)
+%         rethrow(ME); 
+%     end
     
 end
 
@@ -165,7 +165,7 @@ function obj = loadHDF5(filename, input)
         if ~isempty(idx)
             class_name = loadAttHDF5(gid, 'object_classname');            
             if input.debug_bit, disp(['Constructing a ' class_name ' object...']); end
-            obj = feval(class_name);
+            obj = feval(class_name); % constructing (instantiating) a new object that we can load stuff into
 
             if isa(obj, 'handle')
                 input.handle_list{end+1} = {input.location, obj};
@@ -178,16 +178,29 @@ function obj = loadHDF5(filename, input)
 
         for ii = 1:length(att_names) % load all attributes saved in the file
 
+            this_name = att_names{ii}; 
+            
+            % try to remove trailing cell indices or vector indices
+            if regexp(this_name, '\{\d+\}$')
+                idx = regexp(this_name, '\{\d+\}$');
+                this_name = this_name(1:idx-1);
+            elseif regexp(this_name, '\(\d+\)$')
+                idx = regexp(this_name, '\(\d+\)$');
+                this_name = this_name(1:idx-1);
+            end
+            
             % check if attribute can even be loaded into object...
-            if strcmp(att_names{ii}, 'object_classname') 
+            if strcmp(this_name, 'object_classname') 
                 continue; % already used this one to construct the object         
-            elseif isprop(obj, att_names{ii})
-                if input.debug_bit, disp(['loading attribute ' att_names{ii} ' as part of object...']); end                
-            elseif isa(obj, 'dynamicprops')
-                if input.debug_bit, disp(['loading attribute ' att_names{ii} ' and adding it to dynamic object...']); end
-                addprop(obj, att_names{ii});
+            elseif isprop(obj,this_name) % no problem, we have this property
+                if input.debug_bit, disp(['loading attribute ' this_name ' as part of object...']); end                
+            elseif isa(obj, 'dynamicprops') % we don't have this property but we can add it! 
+                if input.debug_bit, disp(['loading attribute ' this_name ' and adding it to dynamic object...']); end
+                addprop(obj, this_name);
+            elseif isstruct(obj) 
+                % don't need to do anything, new values can be added to the struct at any time
             else 
-                if input.debug_bit, disp(['attribute ' att_names{ii} ' is not part of object...']); end
+                if input.debug_bit, disp(['attribute ' this_name ' is not part of object...']); end
                 continue;
             end
 
@@ -195,7 +208,8 @@ function obj = loadHDF5(filename, input)
                 
                 value = loadAttHDF5(gid, att_names{ii});
 
-                if ~isempty(value) && ischar(value) && contains(value, class(obj.(att_names{ii}))) && contains(value, '(link: /')
+                if ~isempty(value) && ischar(value) && contains(value, class(get_obj_attribute(obj, att_names{ii}))) && contains(value, '(link: /') % load a sub-object or struct
+                    
                     if ~input.recursive
                         continue;
                     end
@@ -229,21 +243,32 @@ function obj = loadHDF5(filename, input)
                         if input.debug_bit, disp(['already loaded object "' att_names{ii} '"... in handle list at ' sublocation]); end
                     end
                     
-                    obj.(att_names{ii}) = loaded_obj;
+%                     obj.(att_names{ii}) = loaded_obj;
+                    obj = assign_value(obj, att_names{ii}, loaded_obj); 
+
                     clear('loaded_obj');
 
                 else % load a regular attribute...
-                    mp = findprop(obj, att_names{ii});
-                    if isa(obj.(att_names{ii}), 'datetime') && ischar(value)
-                        obj.(att_names{ii}) = util.text.str2time(value); 
-                    elseif ~isobject(obj.(att_names{ii})) % skip over loading objects
+                    
+%                     mp = findprop(obj, att_names{ii});
+                    
+                    if isstruct(obj)
+%                         obj.(att_names{ii}) = value;
+                        obj = assign_value(obj, att_names{ii}, value); 
+                    elseif isa(get_obj_attribute(obj, att_names{ii}), 'datetime') && ischar(value) % need to convert the string value to a datetime object
+%                         obj.(att_names{ii}) = util.text.str2time(value); 
+                        obj = assign_value(obj, att_names{ii}, util.text.str2time(value)); 
+                    elseif ~isobject(get_obj_attribute(obj, att_names{ii})) && ~isstruct(get_obj_attribute(obj, att_names{ii})) % skip over loading objects/structs
                         try
-                            if isempty(value)
-                                obj.(att_names{ii}) = feval([class(obj.(att_names{ii})) '.empty']);
-                            elseif ischar(value) && isa(obj.(att_names{ii}), 'datetime')
-                                obj.(att_names{ii}) = util.text.str2time(value);
-                            else
-                                obj.(att_names{ii}) = value;
+                            if isempty(value) % if value is empty but obj has a class/struct property, just make an empty one
+%                                 obj.(att_names{ii}) = feval([class(obj.(att_names{ii})) '.empty']);
+                                obj = assign_value(obj, att_names{ii}, feval([class(get_obj_attribute(obj, att_names{ii})) '.empty'])); 
+                            elseif ischar(value) && isa(get_obj_attribute(obj, att_names{ii}), 'datetime') % if value is string but obj has a datetime object
+%                                 obj.(att_names{ii}) = util.text.str2time(value);
+                                obj = assign_value(obj, att_names{ii}, util.text.str2time(value)); 
+                            else % just regular properties should be assigned 
+%                                 obj.(att_names{ii}) = value;
+                                obj = assign_value(obj, att_names{ii}, value); 
                             end
                         end
                     end
@@ -273,7 +298,7 @@ function obj = loadHDF5(filename, input)
                 obj.(data_names{ii}) = loadDataHDF5(gid, data_names{ii});
             end
             
-        end % for 1:lengtH(data_names)
+        end % for 1:length(data_names)
         
     end
     
@@ -421,7 +446,7 @@ function obj = readPropertyFromList(obj, line, input)
     if isa(obj.(propname), 'datetime')
         if input.debug_bit, disp(['Property ' propname ' is "datetime". Reading using util.text.str2time...']); end
         value = util.text.str2time(str);            
-    elseif isobject(obj.(propname)) && (isempty(str) || strcmp(str, '[]'))
+    elseif ( isobject(obj.(propname)) ||isstruct(obj.(propname)) ) && (isempty(str) || strcmp(str, '[]'))
         if input.debug_bit, disp(['Property ' propname ' is an empty object of type ' class(obj.(propname)) '...']); end
         value = feval([class(obj.(propname)) '.empty']);
     elseif isempty(str)
@@ -493,5 +518,79 @@ function loaded_obj = checkList(list, location)
 
 end
 
+function val = get_obj_attribute(obj, att_name)
+
+    if regexp(att_name, '\{\d+\}')
+        
+        [idx1, idx2] = regexp(att_name, '\{\d+\}');
+        S(1).type = '.';
+        S(1).subs = att_name(1:idx1-1); 
+        
+        number = str2double(att_name(idx1+1:idx2-1));
+        S(2).type = '{}';
+        S(2).subs = {number}; 
+        
+        if number<=numel(obj.(att_name(1:idx1-1))) && number>0 % we need this check to prevent errors with zero-index cell arrays (e.g., from a bug in C code)
+            val = subsref(obj, S);
+        else
+            val = []; 
+        end
+
+    elseif regexp(att_name, '\(\d+\)')
+
+        [idx1, idx2] = regexp(att_name, '\(\d+\)');
+        S(1).type = '.';
+        S(1).subs = att_name(1:idx1-1); 
+        
+        number = str2double(att_name(idx1+1:idx2-1));
+        S(2).type = '()';
+        S(2).subs = {number}; 
+        
+        if number>0 % we need this check to prevent errors with zero-index cell arrays (e.g., from a bug in C code)
+            val = subsref(obj, S);
+        else
+            val = []; 
+        end
+        
+    else
+        val = obj.(att_name); 
+    end
+
+end
+
+function obj = assign_value(obj, att_name, value)
+
+    if regexp(att_name, '\{\d+\}')
+        
+        [idx1, idx2] = regexp(att_name, '\{\d+\}');
+        S(1).type = '.';
+        S(1).subs = att_name(1:idx1-1); 
+        
+        number = str2double(att_name(idx1+1:idx2-1));
+        S(2).type = '{}';
+        S(2).subs = {number}; 
+        
+        if number>0 % we need this check to prevent errors with zero-index cell arrays (e.g., from a bug in C code)
+            obj = subsasgn(obj, S, value); 
+        end
+
+    elseif regexp(att_name, '\(\d+\)') % do we need this option?
+     
+        [idx1, idx2] = regexp(att_name, '\(\d+\)');
+        S(1).type = '.';
+        S(1).subs = att_name(1:idx1-1); 
+        
+        number = str2double(att_name(idx1+1:idx2-1));
+        S(2).type = '()';
+        S(2).subs = {number}; 
+        
+        if number>0 % we need this check to prevent errors with zero-index cell arrays (e.g., from a bug in C code)
+            obj = subsasgn(obj, S, value); 
+        end
+        
+    else % just good old fashioned assignment! 
+        obj.(att_name) = value; 
+    end
+end
 
 

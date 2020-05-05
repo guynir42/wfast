@@ -2,8 +2,9 @@ classdef AutoFocus < handle
 
     properties(Transient=true)
         
-        fig; % for displaying the focus curve
-        ax; 
+        gui@obs.focus.gui.AutoGUI;
+        aux_figure;
+        cam; % optional link back to camera object
         
     end
     
@@ -19,21 +20,19 @@ classdef AutoFocus < handle
         xy_pos; % position of sampling points
         xy_pos_reduced; % positions of good points
         
-        quadrant_indices;
-        
         % need to update these at some point
         x_max = 2160;
         y_max = 2560;
         
         pos_range_vector;
         
-        fit_results = {};
+        fit_results = [];
         min_positions; % minimum of curves for each star
         min_weights; % the weight to give each star result
         min_positions_reduced; % replace NaNs with zeros
         min_weights_reduced; % average weights not including NaNs and negative values (and NaNs in min_positions)
-
-        surface_coeffs;
+        
+        surface_coeffs; % results of 2D fit to surface (const, x coeff, y coeff)
         
         found_pos; % put your focuser to this position
         found_tip; % put your focuser to this tip value
@@ -49,28 +48,23 @@ classdef AutoFocus < handle
         
         use_loop_back = 0;
         
-        use_quadrants = 0;
-        num_stars_per_quadrant = 5;
-        
         cut_size = 25;
         aperture = 9; 
         annulus = [12 0]; 
         gaussian = 5;
-        num_repeats = 1; % can we get rid of this?
+        index_flux = 1; % the power index we set for the input flux when calculating the weight for each point
         
-        use_model_psf = 0;
+        use_fit_curves = 0; % use fit to 2nd order polynomial instead of the minimal position
+        use_fit_tip_tilt = 0; % tell the camera/acquisition object to use the tip/tilt results
         
-        use_min_position = 1;
-        
-        use_fit_tip_tilt = 0;
-        
-        step = 0.01;
-        range = 0.15;
+        step = 0.01; % step size for scanning the focus positions (mm)
+        range = 0.15; % range on either side of the best focus position (mm)
         
         angle = -60; % between tip axis and pixel y axis (degrees)
         spider_diameter = 92.4; % in cm
         pixel_size = 12; % in microns
-        num_pixels = 2000; % across the sensor (roughly) to be deprecated
+        
+        num_plots = 12;
         
         debug_bit = 1;
         
@@ -84,9 +78,9 @@ classdef AutoFocus < handle
     
     properties(Hidden=true)
        
-        phot_struct;
+        phot_struct; % save the results of the photometry made to get the widths/flux of each star
         
-        version = 1.01;
+        version = 1.02;
         
     end
     
@@ -117,8 +111,6 @@ classdef AutoFocus < handle
             obj.xy_pos = [];
             obj.xy_pos_reduced = [];
             
-            obj.quadrant_indices = {};
-            
             obj.fit_results = {};
             obj.min_positions = [];
             obj.min_positions_reduced = [];
@@ -140,6 +132,17 @@ classdef AutoFocus < handle
     
     methods % getters
         
+        function val = bad_indices(obj)
+            
+            val = isnan(obj.min_weights) | obj.min_weights<=0 | isnan(obj.min_positions);
+            
+            if obj.use_fit_curves && ~isempty(obj.fit_results)
+                coeffs = [obj.fit_results.coeffs];
+                val = val | coeffs(3,:)'<0; % add fits for parabolas without a minimum
+            end
+            
+        end
+        
     end
     
     methods % setters
@@ -147,16 +150,6 @@ classdef AutoFocus < handle
     end
     
     methods % calculations
-        
-%         function startup(obj, focuser_pos, xy_positions, num_stars)
-%             
-%             obj.pos = focuser_pos + (-obj.range:obj.step:obj.range);
-%             obj.widths = NaN(num_stars, length(obj.pos));
-%             obj.weights = NaN(num_stars, length(obj.pos));
-%             obj.min_positions = NaN(num_stars,1);
-%             obj.xy_pos = xy_positions;
-%             
-%         end
         
         function val = getPosScanValues(obj, current_pos)
             
@@ -177,74 +170,62 @@ classdef AutoFocus < handle
             end
             
             obj.pos(idx) = position;
-            
-            if obj.use_quadrants 
                 
-                if ~isempty(obj.quadrant_indices)
-
-                    for ii = 1:length(obj.quadrant_indices)
-
-                        these_widths = widths(obj.quadrant_indices{ii});
-                        these_fluxes = fluxes(obj.quadrant_indices{ii});
-
-                        new_widths(ii) = nansum(these_widths.*these_fluxes)./nansum(these_fluxes); % flux weighted average
-                        new_fluxes(ii) = nansum(these_fluxes); 
-
-                    end
-
-                    widths = new_widths;
-                    fluxes = new_fluxes;
-
-                end
-                
-            else
-                
-                widths = nanmean(widths, 1); 
-                weights = nanmean(fluxes, 1); 
-                weights = weights./nanmean(weights); 
-                
-            end
+            widths = nanmean(widths, 1); 
+            weights = nanmean(fluxes.^obj.index_flux, 1); 
+            weights = weights./nanmean(weights); 
             
             obj.widths(:,idx) = util.vec.tocolumn(widths);
             obj.weights(:,idx) = util.vec.tocolumn(weights);
+            
+            obj.fit_results = [];
             
         end
         
         function calculate(obj)
             
-            if obj.use_min_position
+            if isempty(obj.pos) || isempty(obj.widths)
+                return;
+            end
+            
+            if obj.use_fit_curves
+
+                if isempty(obj.fit_results)
+                    obj.fit_results = util.fit.polyfit(obj.pos', obj.widths', 'errors', 1./obj.weights, 'order', 2); 
+                end
+                
+                coeffs = [obj.fit_results.coeffs];
+                a = coeffs(3,:); 
+                b = coeffs(2,:); 
+                c = coeffs(1,:); 
+
+                x_min = -b./2./a; % minimal position for each parabola
+                y_min = c-b.^2./a./4; % depth of each parabola
+
+                obj.min_positions = util.vec.tocolumn(x_min); 
+                obj.min_weights = nanmedian(obj.weights,2)./util.vec.tocolumn(y_min); % the average flux is one measure of the goodness of that star but also the smallness of the minimal width! 
+
+            else
                 
                 [mn, idx] = nanmin(obj.widths, [], 2); % find the minimal value for each star
                 
                 obj.min_positions = util.vec.tocolumn(obj.pos(idx)); 
                 
-                obj.min_weights = nanmedian(obj.weights,2)./mn; % the average flux is one measure of the goodness of that star but also the smallness of the minimal widths! 
-                
-                bad_indices = isnan(obj.min_positions) | isnan(obj.min_weights) | obj.min_weights<=0;
-                
-                obj.min_positions_reduced = obj.min_positions(~bad_indices); 
-                obj.min_weights_reduced = obj.min_weights(~bad_indices); 
-                obj.xy_pos_reduced = obj.xy_pos(~bad_indices,:); 
-                
-            else
-                
-                obj.fitCurves;
+                obj.min_weights = nanmedian(obj.weights,2)./mn; % the average flux is one measure of the goodness of that star but also the smallness of the minimal width! 
                 
             end
             
+            obj.min_weights = obj.min_weights./nanmean(obj.min_weights); % normalize the weights
             
-            obj.fitSurface;
-                
-            if obj.use_fit_tip_tilt
-                obj.findPosTipTilt;
-            else
-                obj.findPosOnly;
-            end
+            % get positions and weights after removing the bad measurements
+            obj.min_positions_reduced = obj.min_positions(~obj.bad_indices);
+            obj.min_weights_reduced = obj.min_weights(~obj.bad_indices); 
+            obj.xy_pos_reduced = obj.xy_pos(~obj.bad_indices,:); 
             
         end
         
-        function fitCurves(obj) %  not sure if we want to keep using a polynomial fit anymore
-            
+        function fitCurves(obj) % to be deprecated
+
             obj.fit_results = {};
             
             for ii = 1:size(obj.widths, 1) % number of stars
@@ -286,7 +267,7 @@ classdef AutoFocus < handle
             
         end
         
-        function val = checkFit(obj, x, y, fr) %  not sure if we want to keep using a polynomial fit anymore
+        function val = checkFit(obj, x, y, fr) %  to be deprecated
             
             if fr.p1<0 % no minimum
                 val = 0;
@@ -314,8 +295,9 @@ classdef AutoFocus < handle
             B = obj.min_positions_reduced; % measured best position for each location
             w = obj.min_weights_reduced;  % total flux of each position 
             
-            % rotate to the direction of the actuators... 
-            xy_rot = obj.xy_pos_reduced*[cosd(obj.angle), -sind(obj.angle); sind(obj.angle), cosd(obj.angle)]; 
+            % rotate to the direction of the actuators...
+            xy = obj.xy_pos_reduced - nanmean(obj.xy_pos_reduced, 1); 
+            xy_rot = xy*[cosd(obj.angle), -sind(obj.angle); sind(obj.angle), cosd(obj.angle)]; 
             
             A = [ones(m,1) xy_rot(:,1) xy_rot(:,2)]; % design matrix! 
 
@@ -323,7 +305,7 @@ classdef AutoFocus < handle
                         
         end
         
-        function findPosOnly(obj)
+        function findPosOnly(obj) % to be deprecated
             
             [~,idx] = nanmin(nanmean(obj.widths, 1));
             obj.found_pos = obj.pos(idx);
@@ -334,98 +316,146 @@ classdef AutoFocus < handle
         
         function findPosTipTilt(obj)
             
-            obj.found_pos = obj.surface_coeffs(1);
-            obj.found_pos = mean(obj.min_positions, 'omitnan');
-            if obj.debug_bit, fprintf('BEST POS: mean= %f | surface piston term= %f\n', nanmean(obj.min_positions), obj.surface_coeffs(1)); end
+%             obj.found_pos = obj.surface_coeffs(1);
+            obj.found_pos = nansum(obj.min_positions.*obj.min_weights)./nansum(obj.min_weights);
+%             if obj.debug_bit, fprintf('BEST POS: mean= %f | surface piston term= %f\n', nanmean(obj.min_positions), obj.surface_coeffs(1)); end
             
             obj.found_tip = obj.surface_coeffs(2).*obj.spider_diameter.*1e4./obj.pixel_size; % in this case tip is X slope
             obj.found_tilt = obj.surface_coeffs(3).*obj.spider_diameter.*1e4./obj.pixel_size; % in this case tip is Y slope
             
-            if obj.debug_bit, fprintf('BEST TIP= %f | BEST tilt= %f\n', obj.found_tip, obj.found_tilt); end
+%             if obj.debug_bit, fprintf('BEST TIP= %f | BEST tilt= %f\n', obj.found_tip, obj.found_tilt); end
             
         end
+        
+        function str = printout(obj)
             
+            str = sprintf('pos= %f | tip= %f | tilt= %f', obj.found_pos, obj.found_tip, obj.found_tilt);
+            
+            if ~isempty(obj.surface_coeffs)
+                str = sprintf('%s | coeffs= %s', str, util.text.print_vec(obj.surface_coeffs, '  ')); 
+            end
+            
+        end
+        
     end
     
     methods % plotting tools / GUI
         
         function plot(obj, varargin)
             
-            if isempty(obj.fig) || ~isvalid(obj.fig)
-                obj.fig = figure;
+            if isempty(obj.pos) || isempty(obj.widths)
+                return;
             end
             
-            if isempty(obj.ax) || ~isvalid(obj.ax)
-                obj.ax = axes('Parent', obj.fig);
+            input = util.text.InputVars;
+            input.input_var('font_size', 20); 
+            input.input_var('ax', [], 'axes', 'axis'); 
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.ax)
+                if ~isempty(obj.gui) && obj.gui.check
+                    input.ax = obj.gui.axes_image;
+                else
+                    input.ax = gca;
+                end
             end
             
-            cla(obj.ax);
-            hold(obj.ax, 'on');
+            cla(input.ax);
+            hold(input.ax, 'on');
             
-            N = min(size(obj.widths,1), 10); 
+            N = min(size(obj.widths,1), obj.num_plots); 
+
+            mn = util.stat.min2(obj.widths(1:N,:));
+            mx = util.stat.max2(obj.widths(1:N,:));
             
             for ii = 1:N
-                
-                try
-                    h(ii) = plot(obj.ax, obj.pos, obj.widths(ii,:));
+
+                input.ax.ColorOrderIndex = ii;
+
+                h = plot(input.ax, obj.pos, obj.widths(ii,:), '-', 'LineWidth', 1.5); % show the raw data
+%                 h.DisplayName = sprintf('pos= %4.3f | weight= %5.2f', obj.min_positions(ii), obj.min_weights(ii)); 
+
+                if ~isempty(obj.min_positions)
+                    plot(input.ax, obj.min_positions(ii), mn-0.05, 'v', 'MarkerSize', sqrt(abs(obj.min_weights(ii)))*5, 'Color', h.Color); 
+                end
+
+                if obj.use_fit_curves && ~isempty(obj.fit_results)
+                    plot(input.ax, obj.pos, obj.fit_results(ii).ym, ':', 'Color', h.Color, 'LineWidth', 1); % show the 2nd order polynomial fit
                 end
                 
-%                 try
-%                     if length(obj.fit_results)>=ii
-%                         plot(obj.ax, obj.pos, feval(obj.fit_results{ii}, obj.pos), ':', 'Color', h(ii).Color);
-%                     end
-%                 end
-                
             end
             
-            if obj.use_min_position
-                plot(obj.ax, obj.pos, real(nanmean(obj.widths)), 'LineWidth', 3, 'Color', 'k');
+            
+            plot(input.ax, obj.pos, nanmean(obj.widths,1), 'LineWidth', 3, 'Color', 'k');
+%             plot(input.ax, obj.pos, nanmean(obj.widths), 'LineWidth', 3, 'Color', 'k', 'DisplayName', 'average');
+            
+%             hl = legend(input.ax, 'Location', 'North', 'NumColumns', 3); 
+%             hl.FontSize = 12;
+            
+            if ~isempty(obj.found_pos)
+                plot(input.ax, obj.found_pos, input.ax.YLim, '--g'); 
             end
+
+            hold(input.ax, 'off');
             
-            hold(obj.ax, 'off');
-            
-            xlabel(obj.ax, 'focuser position (mm)');
-            ylabel(obj.ax, 'width (second moment)');
+            xlabel(input.ax, 'focuser position (mm)');
+            ylabel(input.ax, 'width (second moment)');
             
             if ~isempty(obj.pos_range_vector)
-                obj.ax.XLim = [min(obj.pos_range_vector), max(obj.pos_range_vector)];
+                input.ax.XLim = [min(obj.pos_range_vector), max(obj.pos_range_vector)];
             end
             
-            if obj.use_model_psf
-                
-            elseif obj.use_quadrants % size(obj.widths,2)==5
-                legend(h, {'center', 'top left', 'top right', 'bottom left', 'bottom right'}, 'Parent', obj.fig);
-            end
+            box(input.ax, 'on'); 
             
-            box(obj.ax, 'on'); 
+            input.ax.YLim = [mn-0.1 mx+0.1];
+            
+            input.ax.FontSize = input.font_size;
             
         end
         
         function show(obj, varargin)
            
-            if isempty(obj.fig) || ~isvalid(obj.fig)
-                obj.fig = figure;
+            obj.fitSurface;
+            
+            if isempty(obj.aux_figure) || ~isvalid(obj.aux_figure)
+                obj.aux_figure = figure;
+            else
+                clf(obj.aux_figure); 
+                figure(obj.aux_figure);
             end 
             
-            if isempty(obj.ax) || ~isvalid(obj.ax)
-                obj.ax = axes('Parent', obj.fig);
+            ax = axes('Parent', obj.aux_figure);
+            
+            [X,Y] = meshgrid(-obj.x_max/2:obj.x_max/2, -obj.y_max/2:obj.y_max/2);
+            
+            % rotate to the direction of the actuators...
+            xy = obj.xy_pos_reduced - nanmean(obj.xy_pos_reduced, 1); 
+            xy_rot = xy*[cosd(obj.angle), -sind(obj.angle); sind(obj.angle), cosd(obj.angle)]; 
+            
+            util.plot.show(obj.surface_coeffs(1) + obj.surface_coeffs(2).*X + obj.surface_coeffs(3).*Y, 'ax', ax, 'fancy', 'off', ...
+                'xvalues', min(xy_rot(:,1)):max(xy_rot(:,1)), 'yvalues', min(xy_rot(:,2)):max(xy_rot(:,2))); 
+%                 'xvalues', -obj.x_max/2:obj.x_max/2, 'yvalues', -obj.y_max/2:obj.y_max/2);
+            
+            hold(ax, 'on');
+            
+            
+            scatter(ax, xy_rot(:,1), xy_rot(:,2), obj.min_weights_reduced*10, obj.min_positions_reduced, 'filled');
+
+            axis(ax, 'image');
+            colorbar(ax); 
+            
+            hold(ax, 'off');
+
+        end
+        
+        function makeGUI(obj)
+            
+            if isempty(obj.gui)
+                obj.gui = obs.focus.gui.AutoGUI(obj); 
             end
             
-            [X,Y] = meshgrid(1:obj.x_max, 1:obj.y_max);
+            obj.gui.make;
             
-            util.plot.show(obj.surface_coeffs(1) + obj.surface_coeffs(2).*X + obj.surface_coeffs(3).*Y, 'ax', obj.ax);
-            
-            hold(obj.ax, 'on');
-            
-            scatter(obj.ax, obj.xy_pos_reduced(:,1), obj.xy_pos_reduced(:,2), obj.min_weights_reduced*10, obj.min_positions_reduced, 'filled');
-
-%             axis(obj.ax, 'image');
-%             colorbar(obj.ax); 
-%             obj.ax.XLim = [1,obj.x_max];
-%             obj.ax.YLim = [1,obj.y_max];
-            
-            hold(obj.ax, 'off');
-
         end
         
     end

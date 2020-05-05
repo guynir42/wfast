@@ -444,7 +444,7 @@ classdef AcqGUI < handle
 
             try
                 obj.owner.use_save = 0;
-                obj.owner.run('reset', 1);
+                obj.owner.run('reset', 1, 'num_batches', 30);
             catch ME
                 obj.latest_error = util.text.eraseTags(ME.getReport());
                 obj.update;
