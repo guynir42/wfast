@@ -224,7 +224,7 @@ void SaveData::readHeaderCellArray(const mxArray *cell){
 				for(int k=0;k<mxGetNumberOfElements(value); k++){
 			
 					char name_ext[256]; 
-					snprintf(name_ext, 256, "%s{%d}", name, k);
+					snprintf(name_ext, 256, "%s{%d}", name, k+1);
 					parameter_attributes_2D_vector[i].push_back(MyAttribute(name_ext, mxGetCell(value, k))); // this does not support imbedded structs or cells!
 				}
 				
