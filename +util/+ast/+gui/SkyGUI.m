@@ -97,13 +97,13 @@ classdef SkyGUI < handle
             
             obj.menu_options.button_reset.Callback = @obj.callback_reset;
             
-            N = 10; % number of buttons on left side
+            N = 12; % number of buttons on left side
             
             %%%%%%%%%%% panel controls %%%%%%%%%%%%%%%
             
             % Add buttons using obj.addButton(button_name, var_name='', type='', str1='', str2='', font_size='', split=1, color_on=[], color_off=[], tooltip)
             
-            num_buttons = 6;
+            num_buttons = 8;
             obj.panel_controls = GraphicPanel(obj.owner, [0 (N-num_buttons)/N 0.2 num_buttons/N], 'controls', 1); % last input is for vertical (default)
             obj.panel_controls.addButton('button_min_mag', 'show_brightest_magnitude', 'input', 'M_min= ', '', '', 0.5, '', '', 'Minimal magnitude (brightest) to show'); 
             obj.panel_controls.addButton('button_max_mag', 'show_faintest_magnitude', 'input', 'M_max= ', '', '', 0.5, '', '', 'Maximal magnitude (faintest) to show'); 
@@ -111,8 +111,12 @@ classdef SkyGUI < handle
             obj.panel_controls.addButton('button_south', 'show_south_limit', 'input', 'south limit= ', ' deg', '', 1, '', '', 'How far south in declination to draw the map'); 
             obj.panel_controls.addButton('button_log', 'show_log', 'toggle', 'linear scale', 'log scale', '', 0.5, '', '', 'Show the map in linear/log scale');
             obj.panel_controls.addButton('button_cosine', 'use_cosine', 'toggle', 'cosine', 'cosine', '', 0.5, 'blue', '', '');
-            obj.panel_controls.addButton('button_ecliptic', 'show_ecliptic', 'toggle', 'ecliptic', 'ecliptic', '', 0.5, 'blue', '', 'Show the ecliptic coordinates grid overlay');
-            obj.panel_controls.addButton('button_ecliptic', 'show_galactic', 'toggle', 'galactic', 'galactic', '', 0.5, 'blue', '', 'Show the galactic coordinates grid overlay');            
+            obj.panel_controls.addButton('button_ecliptic', 'show_ecliptic', 'toggle', 'ecliptic', 'ecliptic', '', 0.5, 'red', '', 'Show the ecliptic coordinates grid overlay');
+            obj.panel_controls.addButton('button_ecliptic', 'show_galactic', 'toggle', 'galactic', 'galactic', '', 0.5, 'green', '', 'Show the galactic coordinates grid overlay');
+            obj.panel_controls.addButton('button_zenith', 'show_zenith', 'toggle', 'zenith', 'zenith', '', 0.5, 'blue', '', 'Show the zenith point for the given LST');
+            obj.panel_controls.addButton('input_lst', 'LST', 'input', 'LST= ', ' h', '', 0.5, '', '', 'The local sidereal time for calculating zenith and horizon'); 
+            obj.panel_controls.addButton('button_horizon', 'show_horizon', 'toggle', 'horizon', 'horizon', '', 0.5, 'yellow', '', 'Show the horizon altitude for the given LST');
+            obj.panel_controls.addButton('input_alt_limit', 'alt_limit', 'input', 'alt lim.= ', ' deg', '', 0.5, '', '', 'The minimal altitude for observations, shown on the horizon overlay'); 
             obj.panel_controls.addButton('button_ra_units', 'show_ra_units', 'custom', '', '', '', 0.5, '', '', 'Choose "degrees" or "hours" for the RA coordinate axis');
             obj.panel_controls.addButton('button_grid', 'show_grid', 'toggle', 'grid', 'grid', '', 0.5, 'blue', '', 'Show the time zone overlay');
             obj.panel_controls.number = num_buttons;

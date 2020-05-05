@@ -56,6 +56,8 @@ classdef SkyMap < handle
         ecliptic_lat; % the ecliptic latitude of each bin in RA/Dec
         galactic_long; % the galactic longitude of each bin in RA/Dec
         galactic_lat; % the galactic latitude of each bin in RA/Dec
+        horizon_alt; % the horizontal coordinates altitude in degrees for each RA/Dec bin (calculated at LST=00:00:00)
+        horizon_az; % the horizontal coordinates azimuth in degrees for each RA/Dec bin (calculated at LST=00:00:00)
         
         col_cell = {}; % information from the HTM catalog
         col_units = {}; % information from the HTM catalog
@@ -75,6 +77,9 @@ classdef SkyMap < handle
         size_max = 1000; % micro arcsec
         angle_step = 0.5; % degrees
         
+        LST = 0; % given in hours, used to estimate zenith, horizon, and altitude limit
+        alt_limit = 25; % given in degrees, for plotting the overlay
+        
         use_partial_load = 0; % load only the required columns from each HDF5 file
         use_mex_binning = 0; % use mex function to make the histogram counts instead of 2 loops and histcounts2
         
@@ -86,8 +91,13 @@ classdef SkyMap < handle
         show_south_limit; % most negative (southern) declination to show on the map
         
         show_log = true; % show the star numbers mapped to color using logarithmic scale
+        
         show_ecliptic = false; % plot an overlay with ecliptic latitude
         show_galactic = false; % plot an overlay with galactic latitude
+        
+        show_zenith = false; % show the plot overlay with the zenith position at the given LST
+        show_horizon = false; % show the plot overlay with the horizon and alt_limit at the given LST
+        
         show_ra_units = 'hours'; % choose to show the RA on the plot in "hours" or "degrees"
         show_grid = false; % show an RA/Dec grid on top of the map
         
@@ -418,12 +428,17 @@ classdef SkyMap < handle
         function calcCoordinates(obj) % go over each bin in RA/Dec and calculate its galactic/ecliptic coordinates (takes more than an hour) 
             
             e = head.Ephemeris;
+            e.time=datetime('4000-03-21 12:00:00'); % this just sets the LST to be close to 00:00:00
+            e.longitude = 0; 
             
             obj.ecliptic_long = zeros(length(obj.DE_axis)-1, length(obj.RA_axis)-1);
             obj.ecliptic_lat = zeros(length(obj.DE_axis)-1, length(obj.RA_axis)-1);
             
             obj.galactic_long = zeros(length(obj.DE_axis)-1, length(obj.RA_axis)-1);
             obj.galactic_lat = zeros(length(obj.DE_axis)-1, length(obj.RA_axis)-1);
+
+            obj.horizon_alt = zeros(length(obj.DE_axis)-1, length(obj.RA_axis)-1);
+            obj.horizon_az = zeros(length(obj.DE_axis)-1, length(obj.RA_axis)-1);
 
             obj.prog.start(length(obj.RA_axis)-1);
             
@@ -439,6 +454,9 @@ classdef SkyMap < handle
                     
                     obj.galactic_long(jj,ii) = e.GAL_Long;
                     obj.galactic_lat(jj,ii) = e.GAL_Lat;
+                    
+                    obj.horizon_alt(jj,ii) = e.Alt_deg;
+                    obj.horizon_az(jj,ii) = e.Az_deg; 
                     
                 end
                 
@@ -584,12 +602,16 @@ classdef SkyMap < handle
             input.input_var('max_mag', obj.show_faintest_magnitude, 'faintest_magnitude'); 
             input.input_var('biggest_size', obj.show_biggest_size, 'biggest_star', 'largest_size', 'largest_star'); 
             input.input_var('south_limit', obj.show_south_limit, 'de_limit', 'dec_limit'); 
+            input.input_var('alt_limit', obj.alt_limit, 'altitude_limit'); 
+            input.input_var('lst', obj.LST, 'locat sidereal time'); 
             input.input_var('log', obj.show_log, 'use_log'); 
             input.input_var('ecliptic', obj.show_ecliptic, 'use_ecliptic'); 
             input.input_var('galactic', obj.show_galactic, 'use_galactic'); 
+            input.input_var('zenith', obj.show_zenith, 'show_zenith'); 
+            input.input_var('horizon', obj.show_horizon, 'show_horizon'); 
             input.input_var('units', obj.show_ra_units, 'ra_units');
             input.input_var('grid', obj.show_grid, 'use_grid'); 
-            input.input_var('font_size', 26); 
+            input.input_var('font_size', 24); 
             input.scan_vars(varargin{:}); 
             
             if isempty(obj.data)
@@ -616,7 +638,7 @@ classdef SkyMap < handle
             M = M(idx_de:end,:); 
             
             if obj.use_cosine 
-                M = M./cosd(y)'; 
+                M = M./cosd(y(idx_de:end))'; 
                 M(isinf(M)) = NaN;
             end
             
@@ -671,14 +693,37 @@ classdef SkyMap < handle
             
             if input.ecliptic
                 % need to handle south limit!
-                [C1,h1] = contour(input.ax, x, y, obj.ecliptic_lat(idx_de:end,:), [-50 -20 -10 0 10 20 50], 'Color', 'red'); 
-                clabel(C1,h1, 'FontSize', 16, 'Color', 'red');
+                [C1,h1] = contour(input.ax, x, y, obj.ecliptic_lat(idx_de:end,:), [-50 -20 -5 5 20 50], 'Color', 'red'); 
+                clabel(C1,h1, 'FontSize', input.font_size-10, 'Color', 'red');
             end
             
             if input.galactic
                 % need to handle south limit!
                 [C2,h2] = contour(input.ax, x, y, obj.galactic_lat(idx_de:end,:), [-50 -20 0 20 50], 'Color', 'green'); 
-                clabel(C2,h2, 'FontSize', 16, 'Color', 'green');
+                clabel(C2,h2, 'FontSize', input.font_size-10, 'Color', 'green');
+            end
+            
+            if input.zenith
+                lst = input.lst;
+                
+                if util.text.cs(input.units, 'degrees')
+                    lst = lst*15;
+                end
+                
+                plot(input.ax, lst.*[1 1], input.ax.YLim, '--b'); 
+                
+            end
+            
+            if input.horizon
+                
+                alt = obj.horizon_alt(idx_de:end,:);
+                
+                [~, dist] = min(abs(input.lst*15-obj.RA_axis)); 
+                alt = circshift(alt, dist, 2); 
+                
+                [C3,h3] = contour(input.ax, x, y, alt, [0 input.alt_limit], 'Color', 'yellow'); 
+                clabel(C3,h3, 'FontSize', input.font_size-10, 'Color', 'yellow');
+                
             end
             
             input.ax.NextPlot = 'replace';
