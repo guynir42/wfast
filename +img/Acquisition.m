@@ -1724,6 +1724,8 @@ classdef Acquisition < file.AstroData
                 return;
             end
             
+            obj.head.update;
+            
             t0 = tic;
             
             obj.prev_stack = obj.stack_proc; % keep one stack from last batch

@@ -227,6 +227,28 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
     
     methods % reset methods
         
+        function reset(obj)
+            
+            obj.STARTTIME = '';
+            obj.ENDTIME = '';
+            obj.END_STAMP = []; 
+            
+            obj.SEEING = [];
+            obj.TEMP_DET = [];
+            obj.TEMP_OUT = [];
+            obj.WIND_DIR = [];
+            obj.WIND_SPEED = [];
+            obj.HUMID_IN = [];
+            obj.HUMID_OUT = [];
+            obj.PRESSURE = [];
+            obj.LIGHT = [];
+            obj.TELRA = [];
+            obj.TELDEC = [];
+            obj.TELRA_DEG = [];
+            obj.TELDEC_DEG = [];
+            
+        end
+        
         function clearStars(obj) % remove all stars from the stars vector
            
             obj.stars = head.Star.empty;
@@ -1034,6 +1056,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         function update(obj, varargin) % update the ephem object and any other internal calculations
            
             obj.ephem.update;
+            obj.STARTTIME = util.text.time2str(obj.ephem.time); 
             
         end
         

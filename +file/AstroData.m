@@ -140,12 +140,6 @@ classdef AstroData < dynamicprops
             
         end
         
-        function reset(obj) % the same as clear at this point
-            
-            obj.clear;
-            
-        end
-        
         function clear(obj) % set to empty all the data products, and get ready for a new batch
             
             obj.images = [];

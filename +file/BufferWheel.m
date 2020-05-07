@@ -242,8 +242,6 @@ classdef BufferWheel < file.AstroData
                 return;
             end
             
-            reset@file.AstroData(obj);
-            
             for ii = 1:length(obj.buf)
                 obj.clearBuf(ii);
             end
@@ -257,6 +255,8 @@ classdef BufferWheel < file.AstroData
             obj.unlockMexFlag;
             
             obj.head_struct_cell = {};
+            
+            obj.clear;
             
         end
                 
@@ -1003,8 +1003,8 @@ classdef BufferWheel < file.AstroData
             obj.vec2times(buf); % transform camera output posix time vectors into formatted time strings for saving
             
             if ~isempty(obj.head) % update the header object when batch started/ended
-                obj.head.t_start = buf.t_start;
-                obj.head.t_end = buf.t_end;
+                obj.head.STARTTIME = buf.t_start;
+                obj.head.ENDTIME = buf.t_end;
             end
             
             obj.buf(buf.buf_number).latest_filename = this_filename; % keep track of the latest filename writen to disk

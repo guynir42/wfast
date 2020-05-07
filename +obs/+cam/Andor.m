@@ -473,9 +473,15 @@ classdef Andor < file.AstroData
             
             obj.batch_counter = 0;
             
+            obj.head.reset;
+            
+            obj.clear;
+            
         end
         
         function clear(obj) % removes outputs and intermediary data
+            
+            clear@file.AstroData(obj); 
             
             % maybe clear the buffers??
             % clearing the buffers will probably crash the camera mex code
@@ -1035,7 +1041,7 @@ classdef Andor < file.AstroData
                 obj.setExpTimeHW(obj.expT); 
                 obj.setFrameRateHW(obj.frame_rate);
 
-                obj.setShutterModeHW('rolling'); % maybe add this as an optional argument?
+                obj.setShutterModeHW('global'); % maybe add this as an optional argument?
                 
                 if isempty(obj.frame_rate) || isnan(obj.frame_rate) % in this mode the camera takes an image as soon as it gets a command to "software trigger"
 %                     [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'TriggerMode','Software'); obs.cam.sdk.AT_CheckWarning(rc);
@@ -1163,6 +1169,8 @@ classdef Andor < file.AstroData
 
                 end
 
+                obj.head.END_STAMP = obj.t_end_stamp;
+                
                 if obj.use_save
                     filename = obj.buffers.getReadmeFilename('Z');
                     util.oop.save(obj, filename, 'name', 'camera');  
@@ -1386,6 +1394,7 @@ classdef Andor < file.AstroData
             obj.head.instrument = obj.getCameraNameHW;
             
             obj.head.update; % get the current time etc
+            obj.head.RUNSTART = util.text.time2str(obj.head.ephem.time); 
             
             obj.head.type = obj.mode;
             obj.head.is_dark = util.text.cs(obj.mode, 'dark');
