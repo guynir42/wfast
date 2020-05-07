@@ -493,7 +493,7 @@ classdef GraphicButton < handle
         
         function callback_push(obj, ~, ~)
             
-            if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable]); end
+            if obj.owner.(obj.self_name).debug_bit>1, disp(['callback: ' obj.variable]); end
             
             if isempty(obj.variable)
                 % pass
@@ -549,7 +549,7 @@ classdef GraphicButton < handle
         
         function callback_toggle(obj, ~, ~)
             
-            if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable]); end
+            if obj.owner.(obj.self_name).debug_bit>1, disp(['callback: ' obj.variable]); end
 
             if isprop(obj.owner.(obj.self_name), 'latest_error')
                 obj.owner.(obj.self_name).latest_error = '';
@@ -580,7 +580,7 @@ classdef GraphicButton < handle
         
         function callback_auto(obj, ~, ~)
             
-            if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable]); end
+            if obj.owner.(obj.self_name).debug_bit>1, disp(['callback: ' obj.variable]); end
             
             if isprop(obj.owner.(obj.self_name), 'latest_error')
                 obj.owner.(obj.self_name).latest_error = '';
@@ -621,7 +621,7 @@ classdef GraphicButton < handle
             
             value = value{1};
             
-            if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable '= ' num2str(value)]); end
+            if obj.owner.(obj.self_name).debug_bit>1, disp(['callback: ' obj.variable '= ' num2str(value)]); end
             
             if isprop(obj.owner.(obj.self_name), 'latest_error')
                 obj.owner.(obj.self_name).latest_error = '';
@@ -667,7 +667,7 @@ classdef GraphicButton < handle
                 value = util.text.parse_value(value); 
             end
             
-            if obj.owner.(obj.self_name).debug_bit, disp(['callback: ' obj.variable '= ' util.text.print_value(value)]); end
+            if obj.owner.(obj.self_name).debug_bit>1, disp(['callback: ' obj.variable '= ' util.text.print_value(value)]); end
             
             if isprop(obj.owner.(obj.self_name), 'latest_error')
                 obj.owner.(obj.self_name).latest_error = '';
@@ -704,7 +704,7 @@ classdef GraphicButton < handle
         
         function callback_info(obj, ~, ~)
             
-            if obj.owner.(obj.self_name).debug_bit, disp('callback: update'); end
+            if obj.owner.(obj.self_name).debug_bit>1, disp('callback: update'); end
 
             obj.owner.(obj.self_name).update;            
             

@@ -938,6 +938,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function addTargetList(obj, str) % add an object to the list of recent targets
             
+            if nargin<2 || isempty(str)
+                str = [obj.objName ' {' obj.objRA ', ' obj.objDEC '}'];
+            end
+            
             if isempty(obj.prev_objects) || all(~strcmp(str, obj.prev_objects)) % check this string is not on the list already... 
                 obj.prev_objects = [str obj.prev_objects]; % add new items up front
                 if length(obj.prev_objects)>obj.num_prev_objects % clip the end of the list if needed
@@ -1613,17 +1617,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             obj.cam_pc.outgoing.TELRA_DEG = obj.telRA_deg;
             obj.cam_pc.outgoing.TELDEC_DEG = obj.telDEC_deg;
             
-            if isempty(obj.tracking) || obj.tracking==0 || (~isempty(obj.objRA_deg) && abs(obj.objRA_deg-obj.telRA_deg)>1) % if mount stops tracking or is 4 time-minutes away from target RA, stop the camera (e.g., when reaching limit)
-                
-                if ~isempty(obj.cam_pc) && isfield(obj.cam_pc.outgoing, 'stop_camera') && obj.cam_pc.outgoing.stop_camera==0
-                    obj.cam_pc.outgoing.stop_camera = 1;
-                    obj.log.input('Telescope not tracking, stopping camera');
-                    disp(obj.log.report); 
-                end
-                
-            else
+%             if isempty(obj.tracking) || obj.tracking==0 || (~isempty(obj.objRA_deg) && abs(obj.objRA_deg-obj.telRA_deg)>1) % if mount stops tracking or is 4 time-minutes away from target RA, stop the camera (e.g., when reaching limit)
+%                 
+%                 if ~isempty(obj.cam_pc) && isfield(obj.cam_pc.outgoing, 'stop_camera') && obj.cam_pc.outgoing.stop_camera==0
+%                     obj.cam_pc.outgoing.stop_camera = 1;
+%                     obj.log.input('Telescope not tracking, stopping camera');
+%                     disp(obj.log.report); 
+%                 end
+%                 
+%             else
 %                 obj.cam_pc.outgoing.stop_camera = 0;
-            end
+%             end
             
         end
         

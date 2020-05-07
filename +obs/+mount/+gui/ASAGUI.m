@@ -268,7 +268,7 @@ classdef ASAGUI < handle
                 obj.owner.plot_rate(obj.plot_axes);
             end
             
-            if obj.owner.objALT<15
+            if obj.owner.objALT<20
                 obj.panel_object.button_alt.BackgroundColor = 'red';
             else
                 obj.panel_object.button_alt.BackgroundColor = util.plot.GraphicButton.defaultColor;
@@ -464,7 +464,7 @@ classdef ASAGUI < handle
             delete(obj.fig.fig);
             
         end
-                
+        
         function callback_slew(obj, ~, ~)
             
             if obj.debug_bit, disp('Callback: slew'); end

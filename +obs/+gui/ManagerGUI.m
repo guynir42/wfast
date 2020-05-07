@@ -51,7 +51,9 @@ classdef ManagerGUI < handle
     
     properties (Hidden=true)
               
-        version = 1.01;
+        key_status_shift = 0; 
+        
+        version = 1.02;
         
     end
             
@@ -93,6 +95,8 @@ classdef ManagerGUI < handle
             obj.fig.height = 25;
             obj.fig.width = 36;
             
+            set(obj.fig.fig, 'WindowKeyPressFcn', @obj.callback_key_press);
+            set(obj.fig.fig, 'KeyReleaseFcn', @obj.callback_key_released);
             
             N_left = 20;
             pos = N_left;
@@ -104,27 +108,27 @@ classdef ManagerGUI < handle
             
             obj.panel_devices = GraphicPanel(obj.owner, [0.0 pos/N_left 0.2 N/N_left], 'device status');
             obj.panel_devices.number = N;
-            obj.panel_devices.addButton('button_dome', 'dome', 'push', 'dome', '', 'small', 1/3);
-            obj.panel_devices.addButton('button_mount', 'mount', 'push', 'mount', '', 'small', 1/3);
-            obj.panel_devices.addButton('button_weather', 'weather', 'push', 'BoltWood', '', 'small', 1/3);
-            obj.panel_devices.addButton('button_wind', 'wind', 'push', 'WindETH', '', 'small', 1/3);
+            obj.panel_devices.addButton('button_dome', 'dome', 'push', 'dome', '', '', 1/3);
+            obj.panel_devices.addButton('button_mount', 'mount', 'push', 'mount', '', '', 1/3);
+            obj.panel_devices.addButton('button_weather', 'weather', 'push', 'BoltWood', '', '', 1/3);
+            obj.panel_devices.addButton('button_wind', 'wind', 'push', 'WindETH', '', '', 1/3);
             obj.panel_devices.margin = [0.01 0.005];
             obj.panel_devices.make;
             
             %%%%%%%%%%% panel telescope %%%%%%%%%%%%%%%
             
-            N = 5;
+            N = 4;
             pos = pos - N;
             obj.panel_telescope = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'telescope');
             obj.panel_telescope.number = N;
-            obj.panel_telescope.addButton('button_RA', 'RA', 'info', 'RA: ', '', 'edit', 0.5);
-            obj.panel_telescope.addButton('button_DE', 'DEC', 'info', 'DE: ', '', 'edit', 0.5);            
-            obj.panel_telescope.addButton('button_LST', 'LST', 'info', 'LST: ', '', 'edit', 0.5);
-            obj.panel_telescope.addButton('button_ALT', 'ALT', 'info', 'ALT: ', ' deg', 'edit', 0.5);
-            obj.panel_telescope.addButton('button_tracking', 'tracking', 'toggle', 'tracking off', 'tracking on', 'edit', 0.5, obj.color_on, 'red');
-            obj.panel_telescope.addButton('button_side', 'mount.telHemisphere', 'info', ' ', '', 'edit', 0.5); 
-            obj.panel_telescope.addButton('button_placeholder', '', 'custom', ''); 
-            obj.panel_telescope.addButton('button_slew', 'mount.slew', 'push', 'Slew'); 
+            obj.panel_telescope.addButton('button_RA', 'RA', 'info', 'RA: ', '', '', 0.5);
+            obj.panel_telescope.addButton('button_DE', 'DEC', 'info', 'DE: ', '', '', 0.5);            
+            obj.panel_telescope.addButton('button_LST', 'LST', 'info', 'LST: ', '', '', 0.5);
+            obj.panel_telescope.addButton('button_ALT', 'ALT', 'info', 'ALT: ', ' deg', '', 0.5);
+            obj.panel_telescope.addButton('button_tracking', 'tracking', 'toggle', 'tracking off', 'tracking on', '', 0.5, obj.color_on, 'red');
+            obj.panel_telescope.addButton('button_side', 'mount.telHemisphere', 'info', 'pointing ', '', '', 0.5); 
+%             obj.panel_telescope.addButton('button_placeholder', '', 'custom', ''); 
+%             obj.panel_telescope.addButton('button_slew', 'mount.slew', 'push', 'Slew'); 
             obj.panel_telescope.margin = [0.02 0.01];
             obj.panel_telescope.make;
             
@@ -133,11 +137,12 @@ classdef ManagerGUI < handle
             obj.panel_telescope.button_LST.Tooltip = 'Local Sidereal Time';
             obj.panel_telescope.button_ALT.Tooltip = 'Current altitidue of mount';
             obj.panel_telescope.button_tracking.Tooltip = 'Turn telescope tracking on and off';
+            obj.panel_telescope.button_side.Tooltip = 'The side to which the telescope is currently pointing';
             
             
             %%%%%%%%%%% panel object %%%%%%%%%%%%%%%
             
-            N = 4;
+            N = 5;
             pos = pos - N;
             obj.panel_object = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'object');            
             obj.panel_object.number = N;
@@ -146,8 +151,9 @@ classdef ManagerGUI < handle
             obj.panel_object.addButton('button_ra', 'mount.objRA', 'input text', 'RA= ', '', 'edit', 0.5, '', '', 'Target right ascention');
             obj.panel_object.addButton('button_dec', 'mount.objDEC', 'input text', 'DE= ', '', 'edit', 0.5, '', '', 'Target declination');
             obj.panel_object.addButton('button_prev_objects', '', 'custom', '', '', '', [], '', '', 'List the last objects that were used to for slew');
-            obj.panel_object.addButton('button_alt', 'mount.objALT', 'info', 'ALT= ', '', 'edit', 0.5, '', '', 'Target altitute above horizong (degrees)');
-            obj.panel_object.addButton('button_pierside', 'mount.objHemisphere', 'info', ' ', '', 'edit', 0.5, '', '', 'Side of the sky where the object is right now');
+            obj.panel_object.addButton('button_ALT', 'mount.objALT', 'info', 'ALT= ', '', 'edit', 0.5, '', '', 'Target altitute above horizong (degrees)');
+            obj.panel_object.addButton('button_pierside', 'mount.objHemisphere', 'info', 'obj: ', '', 'edit', 0.5, '', '', 'Side of the sky where the object is right now');
+            obj.panel_object.addButton('button_slew', '', 'custom', 'Slew', '', '', 1, '', '', 'Slew the telescope to the given object'); 
             obj.panel_object.margin = [0.02 0.01];
             obj.panel_object.make;
             
@@ -164,16 +170,17 @@ classdef ManagerGUI < handle
             obj.panel_dome.addButton('button_close_dome', 'closeDome', 'push', 'Close Dome');
             obj.panel_dome.addButton('button_shutter_east', '', 'custom', 'East shutter: ', '', 'edit', 0.5);
             obj.panel_dome.addButton('button_shutter_west', '', 'custom', 'West shutter: ', '', 'edit', 0.5);
-            obj.panel_dome.addButton('button_close_east', 'dome.closeEast', 'push', 'Close East', '', 'edit', 0.5);
-            obj.panel_dome.addButton('button_close_west', 'dome.closeWest', 'push', 'Close West', '', 'edit', 0.5);
-            obj.panel_dome.addButton('button_open_east', 'dome.openEast', 'push', 'Open East', '', 'edit', 0.5);
-            obj.panel_dome.addButton('button_open_west', 'dome.openWest', 'push', 'Open West', '', 'edit', 0.5);
+            obj.panel_dome.addButton('button_close_east', 'dome.closeEast', 'push', 'Close East', '', '', 0.5);
+            obj.panel_dome.addButton('button_close_west', 'dome.closeWest', 'custom', 'Close West', '', '', 0.5);
+            obj.panel_dome.addButton('button_open_east', 'dome.openEast', 'push', 'Open East', '', '', 0.5);
+            obj.panel_dome.addButton('button_open_west', 'dome.openWest', 'push', 'Open West', '', '', 0.5);
             obj.panel_dome.margin = [0.02 0.01];
             obj.panel_dome.make;
             
             obj.panel_dome.button_close_dome.Tooltip = 'Immediately close both shutters';
             obj.panel_dome.button_shutter_west.Tooltip = 'Position of West shutter';
             obj.panel_dome.button_shutter_east.Tooltip = 'Position of East shutter';
+            obj.panel_dome.button_close_west.Callback = @obj.callback_close_west; 
             
             %%%%%%%%%%% panel controls %%%%%%%%%%%%%%%
             
@@ -181,8 +188,10 @@ classdef ManagerGUI < handle
             pos = pos - N;
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'controls');
             obj.panel_controls.number = N;
-            obj.panel_controls.addButton('button_autoshutdown', 'use_shutdown', 'toggle', 'auto shut down disabled', 'auto shutdown enabled', ...
-                '', 1, obj.color_on, 'red'); 
+            obj.panel_controls.addButton('button_autoshutdown', 'use_shutdown', 'toggle', 'auto shutdown disabled', 'auto shutdown enabled', ...
+                '', 0.7, obj.color_on, 'red'); 
+            obj.panel_controls.addButton('button_twilight', 'checker.use_twilight_mode', 'toggle', 'twilight off', 'twilight on', ...
+                '', 0.3, 'red', obj.color_on);             
             obj.panel_controls.addButton('button_autostartup', 'use_startup', 'toggle', 'auto start up disabled', 'auto start up enabled', ...
                 '', 1, obj.color_on, 'red'); 
             obj.panel_controls.addButton('button_weather_check', 'callback_t2', 'push', 'Weather check');
@@ -190,6 +199,9 @@ classdef ManagerGUI < handle
             obj.panel_controls.make;
             
             obj.panel_controls.button_autoshutdown.Tooltip = 'Allow manager to close dome and stop tracking if weather is bad or if there is a device failure';
+            obj.panel_controls.button_twilight.Tooltip = 'Let the dome stay open during twilight';
+            obj.panel_controls.button_autostartup.Tooltip = 'Allow manager to open and start observing autonomously. (not implemented yet';
+            obj.panel_controls.button_weather_check.Tooltip = 'Run t2 to check weather and devices'; 
             
             %%%%%%%%%%% panel report %%%%%%%%%%%%%%%%%
             
@@ -343,32 +355,34 @@ classdef ManagerGUI < handle
             end
             
             % update telescope buttons
-            if ~isempty(obj.owner.mount) && ~isempty(obj.owner.mount.telRA_deg) && ~isempty(obj.owner.mount.hndl.SideOfPier)
-                if obj.owner.mount.telRA_deg<obj.owner.mount.LST_deg && strcmp(obj.owner.mount.hndl.SideOfPier, 'pierWest')
-                    obj.panel_telescope.button_RA.BackgroundColor = 'red';
-                else
-                    obj.panel_telescope.button_RA.BackgroundColor = util.plot.GraphicButton.defaultColor;
-                end
-            end
-            
             if obj.owner.mount.telALT<20
                 obj.panel_telescope.button_ALT.control.ForegroundColor = 'red';
             else
                 obj.panel_telescope.button_ALT.control.ForegroundColor = 'black';
             end
             
-            % update object buttons
+            % update object buttons            
+            if obj.owner.mount.objALT<20
+                obj.panel_object.button_ALT.control.ForegroundColor = 'red';
+            else
+                obj.panel_object.button_ALT.control.ForegroundColor = 'black';
+            end
+            
             if isempty(obj.owner.mount.prev_objects)
                 obj.panel_object.button_prev_objects.control.String = {' '};
             else
                 obj.panel_object.button_prev_objects.control.String = obj.owner.mount.prev_objects;
             end
             
-            if strcmp(obj.owner.mount.pier_side, obj.owner.mount.obj_pier_side)
-                obj.panel_object.button_pierside.BackgroundColor = util.plot.GraphicButton.defaultColor;
-            elseif ~strcmp(obj.owner.mount.obj_pier_side, 'pierUnknown')
-                obj.panel_object.button_pierside.BackgroundColor = 'red';
-                obj.panel_object.button_pierside.Tooltip = [obj.panel_object.button_pierside.Tooltip ' (need to flip!)']; 
+            if strcmp(obj.owner.mount.obj_pier_side, 'pierUnknown')
+                obj.panel_object.button_pierside.ForegroundColor = 'red';
+                obj.panel_object.button_pierside.Tooltip = 'Side of sky where object is right now (it is unobservable!)'; 
+            elseif strcmp(obj.owner.mount.pier_side, obj.owner.mount.obj_pier_side)
+                obj.panel_object.button_pierside.ForegroundColor = util.plot.GraphicButton.defaultColor;
+                obj.panel_object.button_pierside.Tooltip = 'Side of sky where object is right now'; 
+            else
+                obj.panel_object.button_pierside.ForegroundColor = 'red';
+                obj.panel_object.button_pierside.Tooltip = 'Side of sky where object is right now (need to flip!)'; 
             end
             
             if obj.owner.dome.status==0
@@ -423,6 +437,33 @@ classdef ManagerGUI < handle
                 
     methods % callbacks
         
+        function callback_key_press(obj, hndl, event)
+            
+            if any(contains(event.Modifier,'shift'))
+                
+                obj.key_status_shift = 1;
+                
+                obj.panel_dome.button_close_west.String = 'Close West Full'; 
+                obj.panel_dome.button_open_west.String = 'Open West Full'; 
+                
+                obj.panel_dome.button_close_east.String = 'Close East Full';                 
+                obj.panel_dome.button_open_east.String = 'Open East Full'; 
+                                
+            end
+            
+        end
+        
+        function callback_key_released(obj, hndl, event)
+            
+            obj.key_status_shift = 0;
+            obj.panel_dome.button_close_west.String = 'Close West'; 
+            obj.panel_dome.button_open_west.String = 'Open West'; 
+
+            obj.panel_dome.button_close_east.String = 'Close East';                 
+            obj.panel_dome.button_open_east.String = 'Open East'; 
+            
+        end
+        
         function callback_prev_objects(obj, hndl, ~)
             
             if obj.debug_bit>1, disp('Callback: prev_objects'); end
@@ -440,9 +481,65 @@ classdef ManagerGUI < handle
             
         end
         
+        function callback_close_west(obj, ~, ~)
+            
+            if obj.debug_bit>1, disp('callback: close west'); end
+            
+            if obj.key_status_shift
+                obj.dome.closeWestFull;
+            else
+                obj.dome.closeWest;
+            end
+            
+            obj.update;
+            
+        end
+        
+        function callback_open_west(obj, ~, ~)
+
+            if obj.debug_bit>1, disp('callback: open west'); end
+
+            if obj.key_status_shift
+                obj.dome.openWestFull;
+            else
+                obj.dome.openWest;
+            end
+            
+            obj.update;
+            
+        end
+        
+        function callback_close_east(obj, ~, ~)
+
+            if obj.debug_bit>1, disp('callback: close east'); end
+
+            if obj.key_status_shift
+                obj.dome.closeEastFull;
+            else
+                obj.dome.closeEast;
+            end
+            
+            obj.update;
+            
+        end
+        
+        function callback_open_east(obj, ~, ~)
+
+            if obj.debug_bit>1, disp('callback: open east'); end
+
+            if obj.key_status_shift
+                obj.dome.openEastFull;
+            else
+                obj.dome.openEast;
+            end
+            
+            obj.update;
+            
+        end
+        
         function callback_interval_t1(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: interval_t1'); end
+            if obj.debug_bit>1, disp('callback: interval_t1'); end
             
             rep = util.text.inputdlg('Choose an interval for timer 1', obj.owner.period1);
             
@@ -454,13 +551,14 @@ classdef ManagerGUI < handle
                     obj.owner.setup_t1;
                 end
             end
+            
             obj.update;
             
         end
         
         function callback_interval_t2(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: interval_t2'); end
+            if obj.debug_bit>1, disp('callback: interval_t2'); end
             
             rep = util.text.inputdlg('Choose an interval for timer 2', obj.owner.period2);
             
@@ -479,7 +577,7 @@ classdef ManagerGUI < handle
         
         function callback_interval_t3(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: interval_t3'); end
+            if obj.debug_bit>1, disp('callback: interval_t3'); end
             
             rep = util.text.inputdlg('Choose an interval for timer 3', obj.owner.period3);
             
@@ -496,9 +594,26 @@ classdef ManagerGUI < handle
             
         end
         
+        function callback_slew(obj, ~, ~)
+            
+            if obj.debug_bit>1, disp('Callback: slew'); end
+            
+            if obj.owner.mount.check_need_flip
+                res = questdlg('Need to flip for this target. Are you sure?', 'Flip needed!', 'Slew', 'Abort', 'Slew');
+                if isempty(res) || strcmp(res, 'Abort')
+                    return;
+                end
+            end
+            
+            obj.owner.mount.slew;
+            
+            obj.update;
+            
+        end
+        
         function callback_close(obj, ~, ~) % this is unused! 
            
-            if obj.debug_bit, disp('callback: close'); end
+            if obj.debug_bit>1, disp('callback: close'); end
             
             delete(obj.fig.fig);
             

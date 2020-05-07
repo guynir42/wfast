@@ -54,6 +54,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     
     properties % switches/controls
         
+        use_maintenance_mode = 0; % this disables the function in t3 that re-enables "use_shutdown" every 30 minutes (use with care!!!)
         use_shutdown = 1; % when this is enabled, observatory shuts down on bad weather/device failure
         use_startup = 0; % when this is enabled, observatory opens up and starts working by itself! 
         
@@ -636,10 +637,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end 
         
-        function callback_t3(obj, ~, ~) % make sure t2 is running (are there any other checks?)
+        function callback_t3(obj, ~, ~) % make sure t2 is running and re-enables "use_shutdown"
             
             try
 
+                if obj.use_maintenance_mode==0
+                    obj.use_shutdown = 1;
+                    obj.checker.use_twilight_mode = 0; 
+                end
+                
                 % make sure t2 is running! 
                 if isempty(obj.t2) || ~isvalid(obj.t2) || strcmp(obj.t2.Running, 'off')
                     obj.setup_t2;
@@ -799,17 +805,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.cam_pc.outgoing.LIGHT = obj.average_light; 
             obj.cam_pc.outgoing.PRESSURE = obj.average_pressure; 
             
-            if obj.dome.is_closed
-                
-                if ~isfield(obj.cam_pc.outgoing, 'stop_camera') || obj.cam_pc.outgoing.stop_camera==0
-                    obj.log.input('Dome closed, sending camera stop command');
-                    disp(obj.log.report);
-                end
-                
-                obj.cam_pc.outgoing.stop_camera = 1;
-            else
+%             if obj.dome.is_closed
+%                 
+%                 if ~isfield(obj.cam_pc.outgoing, 'stop_camera') || obj.cam_pc.outgoing.stop_camera==0
+%                     obj.log.input('Dome closed, sending camera stop command');
+%                     disp(obj.log.report);
+%                 end
+%                 
+%                 obj.cam_pc.outgoing.stop_camera = 1;
+%             else
 %                 obj.cam_pc.outgoing.stop_camera = 0;
-            end
+%             end
             
             
             % add additional parameters and some commands like "start run"

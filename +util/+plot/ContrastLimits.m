@@ -331,7 +331,7 @@ classdef ContrastLimits < handle
         
         function autodyn(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: autodyn'); end
+            if obj.debug_bit>1, disp('callback: autodyn'); end
             
             im = findobj(obj.ax, 'type', 'Image');
             if isempty(im)
@@ -359,7 +359,7 @@ classdef ContrastLimits < handle
         
         function reset(obj, ~, ~)
                         
-            if obj.debug_bit, disp('callback: reset'); end
+            if obj.debug_bit>1, disp('callback: reset'); end
             
             obj.clim = [];
             
@@ -371,7 +371,7 @@ classdef ContrastLimits < handle
         
         function callback_sliders(obj, ~, ~)
                         
-            if obj.debug_bit, disp('callback: sliders'); end
+            if obj.debug_bit>1, disp('callback: sliders'); end
             
             obj.clim = [obj.slider_low.Value obj.slider_high.Value];
             
