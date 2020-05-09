@@ -36,6 +36,8 @@ classdef PcSync < handle
         remote_port_tx = 4013;
         role = '';
         
+        use_checksum_warnings = 0;
+        
         debug_bit = 1;
         
     end
@@ -281,9 +283,24 @@ classdef PcSync < handle
                 
                 obj.hndl_rx.BytesAvailableFcn = @obj.read_data_rx;
                 obj.hndl_tx.BytesAvailableFcn = @obj.read_data_tx;
-                obj.outgoing.time = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
-
-                obj.status = 0;
+                
+                t = datetime('now', 'TimeZone', 'UTC');
+                obj.outgoing.time = util.text.time2str(t);
+ 
+                if isfield(obj.incoming, 'time')
+                    t_in = util.text.str2time(obj.incoming.time);
+                else
+                    t_in = [];
+                end
+                
+                if isempty(t_in) || t>t_in+minutes(5) 
+%                     fprintf('%s: Setting PcSync connection status as 0! latest incoming time is %s\n', t, t_in); 
+                    obj.status = 0;
+                else
+                    obj.status = 1; % we also set status=1 in read_data()
+                end
+                
+                
 %                 flushinput(obj.hndl_tx);
                 obj.send(obj.outgoing);
                 

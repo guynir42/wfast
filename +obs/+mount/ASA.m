@@ -786,7 +786,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function set.rate_RA(obj, val)
             
             if ~isempty(obj.hndl) && obj.status
-                obj.hndl.RightAscensionRate = val;
+                obj.hndl.RightAscensionRate = val; % arcsec per second
             end
             
         end
@@ -794,7 +794,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function set.rate_DE(obj, val)
             
             if ~isempty(obj.hndl) && obj.status
-                obj.hndl.DeclinationRate = val;
+                obj.hndl.DeclinationRate = val; % arcsec per second
             end
             
         end
@@ -1227,6 +1227,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                             
                             obj.correct_history.input([dRA, dDE]); 
                             
+                            % rates in arcsec per second
                             if obj.use_integral_guiding
                                 obj.rate_RA = direction*obj.correct_history.mean(1); 
                                 obj.rate_DE = direction*obj.correct_history.mean(2); 

@@ -766,7 +766,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             if isempty(obj.AIRMASS) || isnan(obj.AIRMASS) || obj.AIRMASS>input.airmass, return; end % airmass is undefined or above limit
             
-            if obj.moon.Dist<obj.constraints.moon, return; end
+            if obj.moon.Dist<input.moon, return; end
             
             if obj.calcObsTimeMinutes(input.altitude)<input.duration*60, return; end % there is not enough time left to observe this target
             

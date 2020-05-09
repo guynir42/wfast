@@ -8,6 +8,7 @@ classdef ManagerGUI < handle
              
         buttons = {};
         menus = {};
+        panels = {};
         
         font_size = 12;
         big_font_size = 16;
@@ -15,6 +16,10 @@ classdef ManagerGUI < handle
         small_font_size = 8;
         
         color_on = [0 0.3 1];
+        
+        color_bg = 0.5*[1 1 1];
+        
+        color_buttons = 0.7*[1 1 1]; 
         
         debug_bit = 1;
         
@@ -86,6 +91,7 @@ classdef ManagerGUI < handle
 
             obj.buttons = {};
             obj.menus = {};
+            obj.panels = {}; 
             
             obj.fig = util.plot.FigHandler('Observatory Manager');
             obj.fig.clear;
@@ -159,6 +165,7 @@ classdef ManagerGUI < handle
             
             obj.panel_object.button_prev_objects.control.Style = 'popupmenu';
             obj.panel_object.button_prev_objects.Callback = @obj.callback_prev_objects;
+            obj.panel_object.button_slew.Callback = @obj.callback_slew;
             
             
             %%%%%%%%%%% panel dome %%%%%%%%%%%%%%%
@@ -170,10 +177,10 @@ classdef ManagerGUI < handle
             obj.panel_dome.addButton('button_close_dome', 'closeDome', 'push', 'Close Dome');
             obj.panel_dome.addButton('button_shutter_east', '', 'custom', 'East shutter: ', '', 'edit', 0.5);
             obj.panel_dome.addButton('button_shutter_west', '', 'custom', 'West shutter: ', '', 'edit', 0.5);
-            obj.panel_dome.addButton('button_close_east', 'dome.closeEast', 'push', 'Close East', '', '', 0.5);
-            obj.panel_dome.addButton('button_close_west', 'dome.closeWest', 'custom', 'Close West', '', '', 0.5);
-            obj.panel_dome.addButton('button_open_east', 'dome.openEast', 'push', 'Open East', '', '', 0.5);
-            obj.panel_dome.addButton('button_open_west', 'dome.openWest', 'push', 'Open West', '', '', 0.5);
+            obj.panel_dome.addButton('button_close_east', '', 'custom', 'Close East', '', '', 0.5);
+            obj.panel_dome.addButton('button_close_west', '', 'custom', 'Close West', '', '', 0.5);
+            obj.panel_dome.addButton('button_open_east', '', 'custom', 'Open East', '', '', 0.5);
+            obj.panel_dome.addButton('button_open_west', '', 'custom', 'Open West', '', '', 0.5);
             obj.panel_dome.margin = [0.02 0.01];
             obj.panel_dome.make;
             
@@ -181,6 +188,9 @@ classdef ManagerGUI < handle
             obj.panel_dome.button_shutter_west.Tooltip = 'Position of West shutter';
             obj.panel_dome.button_shutter_east.Tooltip = 'Position of East shutter';
             obj.panel_dome.button_close_west.Callback = @obj.callback_close_west; 
+            obj.panel_dome.button_open_west.Callback = @obj.callback_open_west; 
+            obj.panel_dome.button_close_east.Callback = @obj.callback_close_east; 
+            obj.panel_dome.button_open_east.Callback = @obj.callback_open_east; 
             
             %%%%%%%%%%% panel controls %%%%%%%%%%%%%%%
             
@@ -292,6 +302,16 @@ classdef ManagerGUI < handle
             obj.menu_objects.addButton('button_dome', '&Dome', 'push', 'dome', 'dome GUI', 'Open the dome GUI');
             obj.menu_objects.addButton('button_mount', '&Mount', 'push', 'mount', 'mount GUI', 'Open the dome GUI');
 
+            for ii = 1:length(obj.panels)
+                obj.panels{ii}.panel.BackgroundColor = obj.color_bg; 
+            end
+            
+            for ii = 1:length(obj.buttons)
+                obj.buttons{ii}.control.BackgroundColor = obj.color_buttons;
+            end
+            
+            obj.panel_image.BackgroundColor = obj.color_bg;
+            
             obj.update;
             
         end
@@ -378,7 +398,7 @@ classdef ManagerGUI < handle
                 obj.panel_object.button_pierside.ForegroundColor = 'red';
                 obj.panel_object.button_pierside.Tooltip = 'Side of sky where object is right now (it is unobservable!)'; 
             elseif strcmp(obj.owner.mount.pier_side, obj.owner.mount.obj_pier_side)
-                obj.panel_object.button_pierside.ForegroundColor = util.plot.GraphicButton.defaultColor;
+                obj.panel_object.button_pierside.ForegroundColor = 'black';
                 obj.panel_object.button_pierside.Tooltip = 'Side of sky where object is right now'; 
             else
                 obj.panel_object.button_pierside.ForegroundColor = 'red';
@@ -406,10 +426,24 @@ classdef ManagerGUI < handle
                 end
                 
             end
-                        
+            
+            if obj.key_status_shift
+                obj.panel_dome.button_close_west.String = 'Close West Full'; 
+                obj.panel_dome.button_open_west.String = 'Open West Full'; 
+                
+                obj.panel_dome.button_close_east.String = 'Close East Full';                 
+                obj.panel_dome.button_open_east.String = 'Open East Full'; 
+            else
+                obj.panel_dome.button_close_west.String = 'Close West'; 
+                obj.panel_dome.button_open_west.String = 'Open West'; 
+
+                obj.panel_dome.button_close_east.String = 'Close East';                 
+                obj.panel_dome.button_open_east.String = 'Open East'; 
+            end
+            
             obj.updateStopButton;
 
-            obj.owner.checker.plotWeather('ax', obj.axes_image);
+            obj.owner.checker.plotWeather('ax', obj.axes_image, 'color', obj.color_bg);
                         
         end
         
@@ -420,7 +454,7 @@ classdef ManagerGUI < handle
             elseif obj.owner.dome.brake_bit==0
                 obj.panel_stop.button_stop.BackgroundColor = 'red';
             else
-                obj.panel_stop.button_stop.BackgroundColor = util.plot.GraphicButton.defaultColor;
+                obj.panel_stop.button_stop.BackgroundColor = obj.color_buttons;
             end 
             
             drawnow;
@@ -486,9 +520,10 @@ classdef ManagerGUI < handle
             if obj.debug_bit>1, disp('callback: close west'); end
             
             if obj.key_status_shift
-                obj.dome.closeWestFull;
+                obj.owner.dome.closeWestFull;
+                obj.key_status_shift = 0;
             else
-                obj.dome.closeWest;
+                obj.owner.dome.closeWest;
             end
             
             obj.update;
@@ -500,9 +535,10 @@ classdef ManagerGUI < handle
             if obj.debug_bit>1, disp('callback: open west'); end
 
             if obj.key_status_shift
-                obj.dome.openWestFull;
+                obj.owner.dome.openWestFull;
+                obj.key_status_shift = 0;
             else
-                obj.dome.openWest;
+                obj.owner.dome.openWest;
             end
             
             obj.update;
@@ -514,9 +550,10 @@ classdef ManagerGUI < handle
             if obj.debug_bit>1, disp('callback: close east'); end
 
             if obj.key_status_shift
-                obj.dome.closeEastFull;
+                obj.owner.dome.closeEastFull;
+                obj.key_status_shift = 0;
             else
-                obj.dome.closeEast;
+                obj.owner.dome.closeEast;
             end
             
             obj.update;
@@ -528,9 +565,10 @@ classdef ManagerGUI < handle
             if obj.debug_bit>1, disp('callback: open east'); end
 
             if obj.key_status_shift
-                obj.dome.openEastFull;
+                obj.owner.dome.openEastFull;
+                obj.key_status_shift = 0;
             else
-                obj.dome.openEast;
+                obj.owner.dome.openEast;
             end
             
             obj.update;

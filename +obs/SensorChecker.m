@@ -56,6 +56,7 @@ classdef SensorChecker < handle
         
         wise_data_raw;
         wise_data_struct;
+        wise_report = '';
         
         status = 1;
         sensors_ok = 1;
@@ -609,6 +610,14 @@ classdef SensorChecker < handle
                 
             end
             
+            [value,reason] = obj.getWiseSafeFlag;
+
+            if strcmp(value, 'True')
+                obj.wise_report = 'OK'; 
+            else
+                obj.wise_report = sprintf('Unsafe: %s', reason); 
+            end
+
         end
            
         function val = checkValueOK(obj, type) % check one data type if it is within bounds
@@ -683,15 +692,13 @@ classdef SensorChecker < handle
                 
             end
             
-            % check the wise general safety flag
-            if obj.use_wise_data && obj.use_wise_safe_flag
-                [value,reason] = obj.getWiseSafeFlag;
-                
-                if strcmp(value, 'False') % this means it is nor safe! 
+            if obj.use_wise_safe_flag
+
+                if ~strcmp(obj.wise_report, 'OK') % this means it is nor safe! 
                     obj.sensors_ok = 0;
-                    obj.report = ['Wise-unsafe! ' reason];
+                    obj.report = ['Wise: ' obj.wise_report];
                 end
-                
+
             end
             
         end
@@ -731,6 +738,8 @@ classdef SensorChecker < handle
             input = util.text.InputVars;
             input.input_var('ax', [], 'axes', 'axis');
             input.input_var('day_frac', obj.show_day_frac);
+            input.input_var('color', [1 1 1]); 
+            input.input_var('font_size', 16); 
             input.scan_vars(varargin{:});
             
             if isempty(input.ax)
@@ -819,9 +828,16 @@ classdef SensorChecker < handle
             end
             
             input.ax.YLim = [ax_min, ax_max];
+            input.ax.Color = input.color;
+            input.ax.FontSize = input.font_size;
             
             hl = legend(input.ax, 'Location', 'SouthEastOutside');
             hl.FontSize = 12;
+            
+            if obj.use_wise_data
+                report = obj.wise_report(1:min(length(obj.wise_report), 100)); 
+                text(input.ax, input.ax.XLim(1), input.ax.YLim(2)-5, ['Wise: ', report], 'HorizontalAlignment', 'Left', 'FontSize', input.font_size); 
+            end
             
         end
         

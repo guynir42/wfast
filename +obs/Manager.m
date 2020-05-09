@@ -50,6 +50,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         cam_pc@obs.comm.PcSync; % communications object to camera PC
         
+        obs_log; % get this from cam_pc
+        
     end
     
     properties % switches/controls
@@ -821,6 +823,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             % add additional parameters and some commands like "start run"
             
             obj.cam_pc.update;
+            
+            if ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'obs_log')
+                obj.obs_log = obj.cam_pc.incoming.obs_log; 
+            end
             
         end
         

@@ -42,7 +42,7 @@ classdef GraphicPanel < dynamicprops
             if nargin>=5 && ~isempty(self_name)
                 obj.self_name = self_name;
             end
-                        
+            
         end
         
         function addButton(obj, button_name, var_name, type, str1, str2, font_size, split, color_on, color_off, tooltip)
@@ -144,6 +144,12 @@ classdef GraphicPanel < dynamicprops
                     obj.buttons(end+1) = obj.(button.button_name);
                     
                 end
+                
+            end
+            
+            if isprop(obj.owner.(obj.self_name), 'panels') % may later change this string into a property if we find GUIs that call this list in another name! 
+                
+                obj.owner.(obj.self_name).panels{end+1} = obj;
                 
             end
             
