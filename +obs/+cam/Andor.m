@@ -814,12 +814,20 @@ classdef Andor < file.AstroData
                 error('must be connected to camera and focuser!');
             end
             
+            obj.af.cam = obj;
+            
             old_pos = obj.focuser.pos;
                 
             obj.log.input('Starting focus run'); 
             
             try 
             
+                if isempty(obj.af.gui) || ~obj.af.gui.check
+                    obj.af.makeGUI;
+                end
+                
+                figure(obj.af.gui.fig.fig); 
+                
                 % update the object with the camera parameters
                 obj.af.x_max = obj.ROI(4);
                 obj.af.y_max = obj.ROI(3);
@@ -839,10 +847,6 @@ classdef Andor < file.AstroData
                     return;
                 end
 
-                % find stars, the quick version!
-                obj.single('frame rate', obj.af.frame_rate, 'exp time', obj.af.expT, 'batch size', obj.af.batch_size); % need to first update with observational parameters (using varargin!)
-                T = util.img.quick_find_stars(single(util.stat.sum_single(obj.images)), 'threshold', 15, 'saturation', 5e4*obj.af.batch_size, 'unflagged', 1); % sum single must turn uint16 to single! 
-                
                 % the focus positions to scan
                 p = obj.af.getPosScanValues(obj.focuser.pos);
 
@@ -851,6 +855,11 @@ classdef Andor < file.AstroData
                 end
 
                 obj.af.reset;
+                
+                % find stars, the quick version!
+                obj.single('frame rate', obj.af.frame_rate, 'exp time', obj.af.expT, 'batch size', obj.af.batch_size); % need to first update with observational parameters (using varargin!)
+                T = util.img.quick_find_stars(single(util.stat.sum_single(obj.images)), 'threshold', 15, 'saturation', 5e4*obj.af.batch_size, 'unflagged', 1); % sum single must turn uint16 to single! 
+                
                 obj.focuser.pos = p(1);
                 
                 % before we start the loop
@@ -860,12 +869,6 @@ classdef Andor < file.AstroData
 
                 % make sure finishup is called in the end
                 on_cleanup = onCleanup(@obj.finishup);
-                
-                if isempty(obj.af.gui) || ~obj.af.gui.check
-                    obj.af.makeGUI;
-                end
-                
-                figure(obj.af.gui.fig.fig); 
                 
                 for ii = 1:obj.num_batches
                     
@@ -902,6 +905,7 @@ classdef Andor < file.AstroData
                 obj.af.fitSurface;
                 obj.af.findPosTipTilt;
                 obj.af.plot;
+                
                 if ~isempty(obj.af.gui) && obj.af.gui.check
                     obj.af.gui.update;
                 end
@@ -1036,13 +1040,14 @@ classdef Andor < file.AstroData
                     obj.setupTimeBuffer;
                 end
                 
+%                 obj.setShutterModeHW('global'); % maybe add this as an optional argument?
+                obj.setShutterModeHW('rolling'); % maybe add this as an optional argument?
+                
                 % make sure hardware is updated... 
                 obj.setROI_HW(obj.zoom2roi(obj.im_size, obj.center_region)); % if use_roi=0 these parameters just give full-frame
                 obj.setExpTimeHW(obj.expT); 
                 obj.setFrameRateHW(obj.frame_rate);
 
-                obj.setShutterModeHW('global'); % maybe add this as an optional argument?
-                
                 if isempty(obj.frame_rate) || isnan(obj.frame_rate) % in this mode the camera takes an image as soon as it gets a command to "software trigger"
 %                     [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'TriggerMode','Software'); obs.cam.sdk.AT_CheckWarning(rc);
                     obs.cam.mex_new.set(obj.hndl, 'trigger mode', 'Software'); 
@@ -1842,7 +1847,7 @@ classdef Andor < file.AstroData
                 obs.cam.mex_new.set(obj.hndl, 'shutter mode', 'Global'); % maybe use Global - 100% Duty Cycle? 
             elseif util.text.cs(val, 'rolling')
 %                 [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'ElectronicShutteringMode','Rolling'); obs.cam.sdk.AT_CheckWarning(rc);
-                obs.cam.mex_new.get(obj.hndl, 'shutter mode', 'Rolling'); % maybe use Rolling - 100% Duty Cycle?
+                obs.cam.mex_new.set(obj.hndl, 'shutter mode', 'Rolling'); % maybe use Rolling - 100% Duty Cycle?
             else
                 error('Unknown shutter mode: "%s". Use "global" or "rolling"', val);
             end

@@ -44,6 +44,8 @@ classdef Acquisition < file.AstroData
         
         sync@obs.comm.PcSync;
         
+        timer;
+        
         log@util.sys.Logger;
         
         obs_log; % struct with observation time and number of files and other metadata for each target
@@ -323,6 +325,7 @@ classdef Acquisition < file.AstroData
                 
                 obj.sync = obs.comm.PcSync('server'); % no connect command is given, since this is still blocking indefinitely...
 %                 obj.sync.name = 'Cam-PC';
+                obj.setup_timer;
                 
                 obj.setupDefaults;
                 
@@ -1004,6 +1007,28 @@ classdef Acquisition < file.AstroData
             
         end
         
+        function setupTestMode(obj)
+            
+            obj.use_arbitrary_pos = 1;
+            obj.use_astrometry = 0;
+            obj.use_adjust_cutouts = 0;
+            obj.use_autodeflate = 0;
+            obj.use_check_positions = 0;
+            obj.use_sync_stop = 0;
+                        
+        end
+        
+        function cancelTestMode(obj)
+            
+            obj.use_arbitrary_pos = 0;
+            obj.use_astrometry = 1;
+            obj.use_adjust_cutouts = 1;
+            obj.use_autodeflate = 1;
+            obj.use_check_positions = 1;
+            obj.use_sync_stop = 1;
+            
+        end
+        
     end
     
     methods % utilities
@@ -1307,7 +1332,7 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function getSyncData(obj)
+        function updateSyncData(obj)
             
             try 
                 
@@ -1329,12 +1354,68 @@ classdef Acquisition < file.AstroData
                     
                 end
                 
-                if obj.use_sync && obj.use_sync_stop && isfield(s, 'stop_camera') && s.stop_camera
-                    obj.brake_bit = 1; % allow for manager to send stop command to camera... 
+                % we have two ways to update the log: fast and slow
+                if obj.brake_bit % slow mode, just go over all files and check the data
+                    obj.obs_log = obj.makeObsLog;
+                else 
+                    if isempty(obj.obs_log) || ~strcmp(obj.obs_log.date, obj.buf.date_dir) % only do the slow update if there is no obs_log saved or if it is outdated
+                        obj.obs_log = obj.makeObsLog;
+                    else
+                        
+                        
+                        
+                        
+                        s = obj.obs_log.(obj.run_name); % get the structs for this run name
+                        s(end).runtime = obj.t_end_stamp;
+                        s(end).end_time = obj.t_end;
+                        s(end).num_files = obj.batch_counter;
+                    end
+                    
+                end
+                
+                obj.sync.outgoing.obs_log = obj.obs_log; 
+                
+                if obj.use_sync 
+                    
+                    if obj.use_sync_stop && isfield(s, 'stop_camera') && s.stop_camera
+                        obj.brake_bit = 1; % allow for manager to send stop command to camera... 
+                    end
+                    
+                    % add code here to start observations by command from dome-PC
+                    
                 end
                 
             catch ME
                 warning(ME.getReport)
+            end
+            
+        end
+        
+        function setup_timer(obj)
+            
+            if ~isempty(obj.timer) && isa(obj.timer, 'timer') && isvalid(obj.timer)
+                if strcmp(obj.timer.Running, 'on')
+                    stop(obj.timer);
+                    delete(obj.timer);
+                    obj.timer = [];
+                end
+            end
+            
+            delete(timerfind('name', 'acquisition-timer'));
+            
+            obj.timer = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-timer', ...
+                'Period', 30, 'StartDelay', 1, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer);
+            
+            start(obj.timer);
+            
+        end
+        
+        function callback_timer(obj, ~, ~)
+            
+            if obj.brake_bit
+                obj.updateSyncData; % this also updates the obs_log
+            else
+                % don't do anything, this is triggered in obj.update()
             end
             
         end
@@ -1385,6 +1466,15 @@ classdef Acquisition < file.AstroData
             
             import util.text.parse_value;
             
+            if nargin<3 || isempty(log_struct)
+                log_struct = struct;
+                log_struct.name = '';
+                log_struct.start = '';
+                log_struct.end = '';
+                log_struct.num_files = '';
+                log_struct.runtime = [];
+            end
+            
             d = util.sys.WorkingDirectory(folder);
             
             files = d.match('*.h5*'); 
@@ -1434,6 +1524,7 @@ classdef Acquisition < file.AstroData
                     log_struct.end = h5readatt(files{end}, '/header', 'ENDTIME'); 
                     log_struct.runtime = h5readatt(files{end}, '/header', 'END_STAMP'); 
                 end
+                
             end
             
             log_struct.num_files = length(files); 
@@ -1507,7 +1598,7 @@ classdef Acquisition < file.AstroData
             end
             
             if ~isempty(obj.sync) && obj.use_sync && obj.use_ignore_manager==0
-                obj.getSyncData;
+                obj.updateSyncData;
             end
             
             obj.head.update;
@@ -1578,6 +1669,21 @@ classdef Acquisition < file.AstroData
 
                 end
                 
+                % update the obs_log with the new run
+                if obj.use_save && obj.use_reset
+                    if ~isempty(obj.obs_log)
+                        obj.obs_log = obj.makeObsLog;
+                    end
+                    
+                    start = util.text.time2str(datetime('now', 'TimeZone', 'UTC')); 
+                    
+                    if ~isfield(obj.obs_log, obj.run_name) % this run name has not been created yet
+                        obj.obs_log.(obj.run_name) = struct('name', obj.run_name, 'start', start, 'end', '', 'runtime', 0, 'num_files', 0); % make a new struct for this name
+                    else % there are previous runs with this name, need to 
+                        obj.obs_log.(obj.run_name) = vertcat(obj.obs_log.(obj.run_name), struct('name', obj.run_name, 'start', start, 'end', '', 'runtime', 0, 'num_files', 0)); 
+                    end
+                end
+                
                 if obj.use_save && obj.use_autodeflate
                     obj.deflator.setup_timer;
                 end
@@ -1623,7 +1729,7 @@ classdef Acquisition < file.AstroData
                         filename = obj.buf.getReadmeFilename;
                         util.oop.save(obj, filename, 'name', 'acquisition'); 
                         
-                        if obj.cat.success && obj.use_save
+                        if ~isempty(obj.cat.success) && obj.cat.success && obj.use_save
                             
                             try
                                 filename = fullfile(obj.buf.directory, 'catalog.mat');
@@ -1855,11 +1961,12 @@ classdef Acquisition < file.AstroData
             
             try 
                 
+                obj.clear;
                 
                 obj.src.single; 
                 
                 obj.prev_stack = obj.stack_proc; % keep one stack from last batch
-                obj.clear;
+                
                 obj.copyFrom(obj.src); % get the data into this object
 
                 % if src is using ROI, must update the calibration object to do the same
@@ -2012,7 +2119,7 @@ classdef Acquisition < file.AstroData
             
             obj.cat.inputPositions(obj.positions);
             
-            if ~isempty(obj.cat.data) && obj.cat.success % successfully filled the catalog
+            if ~isempty(obj.cat.data) && ~isempty(obj.cat.success) && obj.cat.success % successfully filled the catalog
 
                 obj.positions = obj.cat.positions; % if used some filter on the stars we found
                 obj.ref_positions = obj.cat.positions;

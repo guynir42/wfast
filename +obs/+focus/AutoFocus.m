@@ -64,6 +64,7 @@ classdef AutoFocus < handle
         spider_diameter = 92.4; % in cm
         pixel_size = 12; % in microns
         
+        use_show_arcsec = 1; % show width in FWHM arcseconds instead of gaussian sigma in pixels
         num_plots = 12;
         
         debug_bit = 1;
@@ -365,14 +366,20 @@ classdef AutoFocus < handle
             
             N = min(size(obj.widths,1), obj.num_plots); 
 
-            mn = util.stat.min2(obj.widths(1:N,:));
-            mx = util.stat.max2(obj.widths(1:N,:));
+            W = obj.widths;
+            
+            if obj.use_show_arcsec && ~isempty(obj.cam) && ~isempty(obj.cam.head) && ~isempty(obj.cam.head.SCALE)
+                W = W.*2.355.*obj.cam.head.SCALE; 
+            end
+            
+            mn = util.stat.min2(W(1:N,:));
+            mx = util.stat.max2(W(1:N,:));
             
             for ii = 1:N
 
                 input.ax.ColorOrderIndex = ii;
 
-                h = plot(input.ax, obj.pos, obj.widths(ii,:), '-', 'LineWidth', 1.5); % show the raw data
+                h = plot(input.ax, obj.pos, W(ii,:), '-', 'LineWidth', 1.5); % show the raw data
 %                 h.DisplayName = sprintf('pos= %4.3f | weight= %5.2f', obj.min_positions(ii), obj.min_weights(ii)); 
 
                 if ~isempty(obj.min_positions)
@@ -386,11 +393,7 @@ classdef AutoFocus < handle
             end
             
             
-            plot(input.ax, obj.pos, nanmean(obj.widths,1), 'LineWidth', 3, 'Color', 'k');
-%             plot(input.ax, obj.pos, nanmean(obj.widths), 'LineWidth', 3, 'Color', 'k', 'DisplayName', 'average');
-            
-%             hl = legend(input.ax, 'Location', 'North', 'NumColumns', 3); 
-%             hl.FontSize = 12;
+            plot(input.ax, obj.pos, nanmean(W,1), 'LineWidth', 3, 'Color', 'k');
             
             if ~isempty(obj.found_pos)
                 plot(input.ax, obj.found_pos, input.ax.YLim, '--g'); 
@@ -399,7 +402,13 @@ classdef AutoFocus < handle
             hold(input.ax, 'off');
             
             xlabel(input.ax, 'focuser position (mm)');
-            ylabel(input.ax, 'width (second moment)');
+            ylabel(input.ax, 'width, second moment [pixels]');
+            
+            
+            if obj.use_show_arcsec && ~isempty(obj.cam) && ~isempty(obj.cam.head) && ~isempty(obj.cam.head.SCALE)
+                ylabel(input.ax, 'FWHM [arcsec]')
+            end
+            
             
             if ~isempty(obj.pos_range_vector)
                 input.ax.XLim = [min(obj.pos_range_vector), max(obj.pos_range_vector)];
