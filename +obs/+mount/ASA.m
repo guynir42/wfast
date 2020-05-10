@@ -391,11 +391,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function val = get.objName(obj)
             
-            if isempty(obj.cam_pc) || isempty(obj.cam_pc.outgoing) || ~isfield(obj.cam_pc.outgoing, 'OBJECT')
-                val = '';
-            else
-                val = obj.cam_pc.outgoing.OBJECT;
-            end
+%             if isempty(obj.cam_pc) || isempty(obj.cam_pc.outgoing) || ~isfield(obj.cam_pc.outgoing, 'OBJECT')
+%                 val = '';
+%             else
+%                 val = obj.cam_pc.outgoing.OBJECT;
+%             end
+            val = obj.object.name;
+
             
         end
         
@@ -672,6 +674,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
     methods % setters
         
         function set.objName(obj, val)
+            
+            obj.object.name = val; 
             
             if ~isempty(obj.cam_pc)
                 obj.cam_pc.outgoing.OBJECT = val;

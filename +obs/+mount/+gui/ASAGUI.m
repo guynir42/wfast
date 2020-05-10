@@ -10,8 +10,8 @@ classdef ASAGUI < handle
         
         font_size = 12;
         big_font_size = 16;
-        edit_font_size = 11;
-        small_font_size = 10;
+        edit_font_size = 12;
+        small_font_size = 8;
         
         color_on = [0 0.3 1];
         
@@ -138,19 +138,28 @@ classdef ASAGUI < handle
             
             num_buttons = 6;
             pos = pos - 4;
-            obj.panel_object = GraphicPanel(obj.owner, [0 pos/N 0.3 4/N], 'object', 1); % last input is for vertical 
+            obj.panel_object = GraphicPanel(obj.owner, [0 pos/N 0.4 4/N], 'object', 1); % last input is for vertical 
             obj.panel_object.number = num_buttons;
             obj.panel_object.addButton('input_name', 'objName', 'input text', 'obj= ', '', '', 0.7, '', '', 'Input the name of object/field');
             obj.panel_object.addButton('button_resolve', 'inputTarget', 'push', 'resolve', '', '', 0.3, '', '', 'Use object name to auto fill RA/Dec');
+            
             obj.panel_object.addButton('input_ra', 'objRA', 'input', 'RA= ', '', '', 0.5, '', '', 'Input object Right Ascention or use name resolver');
             obj.panel_object.addButton('input_dec', 'objDEC', 'input', 'Dec= ', '', '', 0.5, '', '', 'Input object Declination or use name resolver');
-            obj.panel_object.addButton('button_ha', 'objHA', 'info', 'HA= ', '', '', 0.5, '', '', 'Calculated object Hour Angle'); 
-            obj.panel_object.addButton('button_alt', 'objALT', 'info', 'ALT= ', '', '', 0.5, '', '', 'Calculated object Altitude'); 
-            obj.panel_object.addButton('button_time', 'obj_time_to_limit', 'info', '', ' min', '', 0.35, 'small', '', 'Calculated time object has until reaching limit'); 
+            
+            obj.panel_object.addButton('button_ha', 'objHA', 'info', 'HA= ', '', '', 0.4, '', '', 'Calculated object Hour Angle'); 
+            obj.panel_object.addButton('button_alt', 'objALT', 'info', 'ALT= ', '', '', 0.4, '', '', 'Calculated object Altitude'); 
+            obj.panel_object.addButton('button_pierside', 'objHemisphere', 'info', '', '', '', 0.2, '', '', 'Side of the sky where target is right now'); 
+
+            obj.panel_object.addButton('button_time', 'obj_time_to_limit', 'info', 'lim.= ', ' min', '', 0.4, 'small', '', 'Calculated time object has until reaching limit'); 
             obj.panel_object.addButton('button_airmass', 'object.AIRMASS', 'info', 'a.m.= ', '', '', 0.4, 'small', '', 'Calculated airmass for target'); 
-            obj.panel_object.addButton('button_pierside', 'objHemisphere', 'info', '', '', '', 0.25, '', '', 'Side of the sky where target is right now'); 
-            obj.panel_object.addButton('button_history_text', '', 'custom', 'Prev.Objects:', '', '', 0.7);
-            obj.panel_object.addButton('button_reset_prev', 'resetPrevObjects', 'push', 'reset', '', '', 0.3, '', '', 'Reset the history list of previous object'); 
+            obj.panel_object.addButton('button_object', 'object', 'push', 'GUI', '', '', 0.2, '', '', 'Open the object GUI'); 
+            
+            obj.panel_object.addButton('button_moon', 'object.moon.Dist', 'info', 'moon= ', '', '', 0.4, '', '', 'Moon distance from object (degrees'); 
+            obj.panel_object.addButton('button_ecl', 'object.ECL_LAT', 'info', 'ecl= ', '', '', 0.4, '', '', 'Object ecliptic latitude'); 
+            obj.panel_object.addButton('button_constraints', 'object.constraints', 'push', 'const.', '', '', 0.2, '', '', 'Open the object constraints GUI'); 
+            
+%             obj.panel_object.addButton('button_history_text', '', 'custom', 'Prev.Objects:', '', '', 0.7);
+%             obj.panel_object.addButton('button_reset_prev', 'resetPrevObjects', 'push', 'reset', '', '', 0.3, '', '', 'Reset the history list of previous object'); 
             obj.panel_object.addButton('button_prev_objects', '', 'custom', '', '', '', [], '', '', 'List the last objects that were used to for slew');
             obj.panel_object.margin = [0.02 0.02];
             obj.panel_object.make;
@@ -161,12 +170,12 @@ classdef ASAGUI < handle
             %%%%%%%%%%% panel manual %%%%%%%%%%%%%%%
             
             num_buttons = 4;
-            obj.panel_manual = GraphicPanel(obj.owner, [0.3 pos/N 0.3 num_buttons/N], 'manual move', 1); % last input is for vertical 
+            obj.panel_manual = GraphicPanel(obj.owner, [0.4 pos/N 0.2 num_buttons/N], 'manual move', 1); % last input is for vertical 
             obj.panel_manual.addButton('button_NW', '', 'custom', 'NW', '', '', 1/3, '', '', 'Move the telescope to the North West');
             obj.panel_manual.addButton('button_N', '', 'custom', 'N', '', '', 1/3, '', '', 'Move the telescope to the North');
             obj.panel_manual.addButton('button_NE', '', 'custom', 'NE', '', '', 1/3, '', '', 'Move the telescope to the North East');
             obj.panel_manual.addButton('button_W', '', 'custom', 'W', '', '', 1/3, '', '', 'Move the telescope to the West');
-            obj.panel_manual.addButton('input_rate', 'move_rate', 'input', ' ', 'deg/s', '', 1/3, '', '', 'Control the manual slew rate (deg/sec)');
+            obj.panel_manual.addButton('input_rate', 'move_rate', 'input', ' ', 'deg/s', 'small', 1/3, '', '', 'Control the manual slew rate (deg/sec)');
             obj.panel_manual.addButton('button_E', '', 'custom', 'E', '', '', 1/3, '', '', 'Move the telescope to the East');
             obj.panel_manual.addButton('button_SW', '', 'custom', 'SW', '', '', 1/3, '', '', 'Move the telescope to the South West');
             obj.panel_manual.addButton('button_S', '', 'custom', 'S', '', '', 1/3, '', '', 'Move the telescope to the South');

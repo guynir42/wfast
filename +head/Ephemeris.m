@@ -28,9 +28,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
 %
 % 
     
+    properties(Transient=true)
+        
+        gui; 
+        
+    end
+
     properties % objects
         
-        time@datetime; % time of the observation (could be past or future, usually sets to current time)
+        time; % time of the observation (could be past or future, usually sets to current time)
         
         moon; % structure with some details on the moon position etc
         sun; % structure with some details on the sun position etc
@@ -41,23 +47,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     
     properties % switches/controls
         
-        % observational constraints
-        min_altitude = 25; % minimal angle above horizon for being observable (degrees)
-        min_duration = 1; % minimal time until reaching meridian or horizon (hours)
-        
-        debug_bit = 0;
+        debug_bit = 1;
         
     end
     
     properties % inputs/outputs
         
-        keyword = ''; % for dynamically allocated fields like 'moon' or 'ecliptic'
+        name = ''; % for dynamically allocated fields like 'moon' or 'ecliptic'
         RA_deg; % numeric value in degrees
         Dec_deg; % numeric value in degrees
         
     end
     
     properties(Dependent=true)
+        
+        time_str; 
         
         RA; % sexagesimal hour string
         Dec; % sexagesimal degree string
@@ -130,10 +134,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         function obj = Ephemeris(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'head.Ephemeris')
-                if obj.debug_bit, fprintf('Ephemeris copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Ephemeris copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('Ephemeris constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Ephemeris constructor v%4.2f\n', obj.version); end
                 
                 obj.update;
                 
@@ -155,11 +159,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             obj.constraints = util.text.InputVars;
             obj.constraints.input_var('altitude', 25, 'alt limit'); % minimal angle above horizon for being observable (degrees)
-            obj.constraints.input_var('duration', 1, 'min duration', 'min time'); % minimal time until reaching meridian or horizon (hours)
+            obj.constraints.input_var('continuous', 1, 'continuous_time', 'cont_time', 'min_time', 'minimal_time', 'minimal_duration', 'min duration'); % minimal time until reaching meridian or horizon (hours)
+            obj.constraints.input_var('duration', Inf, 'max_duration', 'maximal_duration', 'max_time', 'maximum_time'); % how much time do we want to observe this target at most (hours)
             obj.constraints.input_var('earliest', [], 'start time'); % observation must start after this time
             obj.constraints.input_var('latest', [], 'latest time'); % observation must not begin after this time
             obj.constraints.input_var('side', [], 'hemisphere'); % observation must be taken on this size (empty is same as "both")
             obj.constraints.input_var('airmass', Inf); % observation must have airmass below this value
+            obj.constraints.input_var('south_limit', -20, 'declination_limit'); % lowest declination we are ready to accept
             obj.constraints.input_var('moon', 20, 'moon_distance'); % target must be far away from the moon (degrees)
             
         end
@@ -170,7 +176,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         function reset(obj) % remove all coordinate data, update to current time
             
-            obj.keyword = '';
+            obj.name = '';
             obj.RA_deg = [];
             obj.Dec_deg = [];
             obj.moon = [];
@@ -191,6 +197,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     end
     
     methods % getters
+        
+        function val = get.time_str(obj)
+            
+            val = char(obj.time); 
+            
+        end
         
         function val = get.RA(obj)
             
@@ -408,6 +420,24 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
+        function set.time(obj, val)
+            
+            if isa(val, 'datetime')
+                obj.time = val;
+            else 
+                obj.time = obj.parseTime(val); 
+            end
+            
+            obj.time.Format = 'uuuu-MM-dd HH:mm:ss';
+            
+        end
+        
+        function set.time_str(obj, val)
+            
+            obj.time = val; % will get parsed inside the the setter for "time"
+            
+        end
+        
     end
     
     methods % update moon/sun and coordinates
@@ -415,8 +445,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         function update(obj) % set to current time and update everything else
             
             obj.time = datetime('now', 'timezone', 'UTC');
-            
-%             obj.updateKeywordField; 
             
             obj.updateSecondaryCoords;
             
@@ -426,13 +454,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             import util.text.cs;
             
-            if ~isempty(obj.keyword)
-                if cs(obj.keyword, 'moon')
+            if ~isempty(obj.name)
+                if cs(obj.name, 'moon')
                     obj.updateMoon; 
                     obj.RA = obj.moon.RA/15;
                     obj.Dec = obj.moon.Dec;
-                elseif cs(obj.keyword, 'ecliptic', 'galactic') % can add additional default field keywords
-                    obj.gotoDefaultField(obj.keyword); 
+                elseif cs(obj.name, 'ecliptic', 'galactic') % can add additional default field keywords
+                    obj.gotoDefaultField(obj.name); 
                 end
             end
             
@@ -533,13 +561,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     
     methods % calculations
         
-        function input(obj, RA, DEC, time) % give RA/DEC or RA=<star name>, DEC=[] (optional 3rd argument is time, can use "now")
-        % Usage: input(obj, RA, DEC, <time>) 
+        function input(obj, RA, DEC, time, name) % give RA/DEC or RA=<star name>, DEC=[] (optional 3rd argument is time, can use "now")
+        % Usage: input(obj, RA, DEC, [time], [name]) 
         % Give the coordinates in one of two ways:
         % (1) give the RA and Dec directly. This can be in numeric or string
         %     format. In both formats RA is given in HOURS!
         % (2) give the name of the object and leave DEC empty. 
-        %     Will use Eran's name resolver via SIMBAD. 
+        %     Will use Eran's name resolver via SIMBAD, or find a keyword
+        %     field like "ecliptic" or "moon". 
         %
         % An optional third parameter is the time of observation. This can 
         % be one of several options: 
@@ -548,6 +577,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         % (3) string in YYYY-MM-DDThh:mm:ss.sss format. 
         % (4) numeric value, interpreted as julian date. 
         % 
+        % An optional fourth parameter adds the name of the object for 
+        % reference, in case coordinates are given explicitely and a name
+        % is needed just to keep track of the field identity. 
+        %
         % In either case, the secondary coordinates are updated to the new
         % RA/Dec and time. 
             
@@ -559,53 +592,79 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 DEC = [];
             end
             
-            obj.keyword = '';
+            obj.name = '';
+            
+            if nargin>3 && ~isempty(time) % first see if we need to update the time
+                obj.time = obj.parseTime(time); 
+            end
             
             if ischar(RA) && isempty(DEC)
-                name = RA; 
-                if cs(name, 'ecliptic', 'kbos')
-                    obj.keyword = 'ecliptic'; % dynamically allocate this field after setting the time
-                elseif cs(name, 'galactic')
-                    obj.keyword = 'galactic'; % dynamically allocate this field after setting the time
-                elseif cs(name, 'moon')
-                    obj.keyword = 'moon'; % dynamically allocate this field after setting the time
-                elseif ~isempty(which('celestial.coo.coo_resolver', 'function')) % use Eran's name resolver
-                    
-                    [RA, DEC] = celestial.coo.coo_resolver(name, 'OutUnits', 'deg', 'NameServer', @VO.name.server_simbad);
-                    
-                    obj.RA = RA/15;
-                    obj.Dec = DEC;
-                    
-                else
-                    error('no name resolver has been found... try adding MAAT to the path.');
-                end 
+                obj.name = RA; 
+                obj.resolve; % use SIMBAD or one of the default fields
             else % just get RA/Dec directly
                 obj.RA = RA;
                 obj.Dec = DEC;
             end
             
-            if nargin>3 && ~isempty(time)
-                
-                obj.time = obj.parseTime(time); 
-%                 obj.updateSecondaryCoords;
-%                 
-%                 if isa(time, 'datetime')
-%                     obj.time = time;
-%                     obj.updateSecondaryCoords;
-%                 elseif ischar(time) && util.text.cs(time, 'now', 'update')
-%                     obj.update;
-%                 elseif ischar(time)
-%                     obj.time = util.text.str2time(time);
-%                     obj.updateSecondaryCoords;
-%                 elseif isnumeric(time) % juldate??
-%                     obj.time = datetime(time, 'ConvertFrom', 'juliandate', 'TimeZone', 'UTC');
-%                     obj.updateSecondaryCoords;
-%                 end
-                
+            if isempty(obj.name) && nargin>4
+                obj.name = name;
             end
             
-            obj.updateKeywordField; % dynamically allocate this field after setting the time
-            obj.updateSecondaryCoords; % make sure all other coordinate systems and sun/moon are updated
+%             obj.updateKeywordField; % dynamically allocate this field after setting the time
+%             obj.updateSecondaryCoords; % make sure all other coordinate systems and sun/moon are updated
+            
+        end
+        
+        function resolve(obj, name, varargin) % use the given name to find the object RA/Dec
+        % Usage: resolve(obj, [name])
+        % Resolve the name given (default is obj.name) to find the RA/Dec.
+        % If name is one of the following keywords: "ecliptic", "galactic",
+        % then the field is chosen using internal functions. 
+        % (typically the best observable field is chosen based on the given
+        % constraints of the object). 
+        % If the name is "moon", the object is set to the current moon
+        % position (at the time the object is set to). 
+        %
+        % OPTIONAL ARGUMENTS are passed directly to override observational
+        % constraints when picking automatic fields. 
+        
+            import util.text.cs;
+        
+            if nargin<2 || isempty(name)
+                name = obj.name;
+            end
+            
+            if cs(name, 'ecliptic', 'kbos')
+                obj.name = 'ecliptic'; % dynamically allocate this field after setting the time
+                obj.gotoDefaultField(obj.name, varargin{:}); 
+            elseif cs(name, 'galactic')
+                obj.name = 'galactic'; % dynamically allocate this field after setting the time
+                obj.gotoDefaultField(obj.name, varargin{:});
+            elseif cs(name, 'moon')
+                obj.name = 'moon'; % dynamically allocate this field after setting the time
+                obj.updateMoon;
+                obj.RA = obj.moon.RA;
+                obj.Dec = obj.moon.Dec;
+            else
+                if ~isempty(which('celestial.coo.coo_resolver', 'function')) % use Eran's name resolver
+
+                    obj.name = name;
+
+                    [RA, DEC] = celestial.coo.coo_resolver(name, 'OutUnits', 'deg', 'NameServer', @VO.name.server_simbad);
+
+                    if ~isnan(RA) && ~isnan(DEC)
+                        obj.RA = RA/15;
+                        obj.Dec = DEC;
+                    end
+
+                else
+                    error('no name resolver has been found... try adding MAAT to the path.');
+                end
+            end
+            
+            obj.updateSecondaryCoords;
+            
+            % if none of these succeed, the RA/Dec remains empty! 
             
         end
         
@@ -636,7 +695,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         % For objects below the alt_limit at the stored time, returns NaN. 
         
             if nargin<2 || isempty(alt_limit)
-                alt_limit = obj.min_altitude;
+                alt_limit = obj.constraints.altitude;
             end
             
             if nargin<3 || isempty(resolution_minutes)
@@ -679,11 +738,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         % 
         % reference: https://en.wikipedia.org/wiki/Haversine_formula
             
-            if isempty(obj.moon) || isempty(obj.RA_deg) || isempty(obj.DEC_deg)
+            if isempty(obj.moon) || isempty(obj.RA_deg) || isempty(obj.Dec_deg)
                 val = [];
             else
                 
-                havTheta = sind((obj.DEC_deg-obj.moon.Dec)/2).^2 + cosd(obj.DEC_deg).*cosd(obj.moon.Dec).*sind((obj.RA_deg-obj.moon.RA)/2).^2;
+                havTheta = sind((obj.Dec_deg-obj.moon.Dec)/2).^2 + cosd(obj.Dec_deg).*cosd(obj.moon.Dec).*sind((obj.RA_deg-obj.moon.RA)/2).^2;
                 
                 havTheta(havTheta>1) = 1;
                 havTheta(havTheta<-1) = -1;
@@ -700,23 +759,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         % Will choose random values until one of them is above the alt limit, 
         % and above the south limit in declination (default is -20). 
         % 
-        % OPTIONAL ARGUMENTS:
-        %   -alt_limit: choose the minimal altitude that is considered 
-        %               observable at the given time. Default 25 degrees. 
-        %   -south_limit: choose how far south in declination you wish to 
-        %                 use as valid target. Default -20 degrees. 
-        %   -side: choose "east" or "west" or "both". 
-        %   -meridian_distance: number of degrees from meridian (on either 
-        %                       side) that we want to avoid. Default 5 degrees. 
+        % OPTIONAL ARGUMENTS are simply the observational constraints. Use 
+        % either the constraints defined in the object or override any of 
+        % them by entering keyword-value pairs. 
         
-            input = util.text.InputVars;
-            input.input_var('alt_limit', obj.min_altitude); 
-            input.input_var('south', -20, 'south_limit');
-            input.input_var('side', 'both', 'hemisphere');
-            input.input_var('meridian', 5, 'meridian_distance', 'meridien_distance'); 
+            input = util.oop.full_copy(obj.constraints); % read the default constraints before altering them
             input.scan_vars(varargin{:}); 
             
-            if util.text.cs(input.side, 'both')
+            if isempty(input.side) || util.text.cs(input.side, 'both')
                 min_RA = 6; 
                 range_RA = 12;
             elseif util.text.cs(input.side, 'east')
@@ -733,9 +783,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 
                 obj.RA = obj.LST_deg/15 + rand.*range_RA-min_RA; % random between min_RA and min_RA+range_RA (hours)
                 
-                obj.Dec = rand.*(90-input.south)+input.south; % between south_limit and 90
+                obj.Dec = rand.*(90-input.south_limit)+input.south_limit; % between south_limit and 90
                 
-                if obj.Alt_deg > input.alt_limit && abs(obj.HA_deg)>input.meridian
+%                 if obj.Alt_deg > input.alt_limit && abs(obj.HA_deg)>input.meridian
+                if obj.observable(varargin{:}) 
                     obj.updateSecondaryCoords;
                     return;
                 end
@@ -768,7 +819,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             if obj.moon.Dist<input.moon, return; end
             
-            if obj.calcObsTimeMinutes(input.altitude)<input.duration*60, return; end % there is not enough time left to observe this target
+            if obj.calcObsTimeMinutes(input.altitude)<input.continuous*60, return; end % there is not enough time left to observe this target
             
             % any other constraints? 
             
@@ -916,10 +967,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             end
             
             if cs(type, 'kbos', 'kuiper belt objects', 'ecliptic')
-                obj.keyword = 'ecliptic';
+                obj.name = 'ecliptic';
                 s = obj.default_fields(strcmp({obj.default_fields.type}, 'ecliptic')); % get all the structs that fit this type of field
             elseif cs(type, 'galactic')
-                obj.keyword = 'galactic';
+                obj.name = 'galactic';
                 s = obj.default_fields(strcmp({obj.default_fields.type}, 'galactic')); % get all the structs that fit this type of field
             % add other default field types...
             else
@@ -954,6 +1005,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                         obj.updateSecondaryCoords; 
                     end
                     
+                end
+                
+                if ~obj.observable(varargin{:}) % make sure the chosen field is observable under the given conditions
+                    obj.RA = []; % unobservable field, return object with empty coordinates
+                    obj.Dec = []; % unobservable field, return object with empty coordinates
                 end
                 
             else
@@ -1107,6 +1163,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     
     methods % plotting tools / GUI
         
+        function makeGUI(obj)
+            
+            if isempty(obj.gui)
+                obj.gui = head.gui.EphemGUI(obj)
+            end
+            
+            obj.gui.make;
+            
+        end
+        
     end
     
     methods (Static=true) % conversion tools and some additional calculations I stole from Eran's code
@@ -1127,7 +1193,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             if nargin==0, help('head.Ephem.parseText'); return; end
         
             if isempty(val)
-                time = [];
+                time = NaT;
             elseif isnumeric(val) % got a numeric value, assume it is in hours
                 if val>=12
                     time = datetime('today', 'TimeZone', 'UTC') + hours(val); 
@@ -1142,12 +1208,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 end
                 
                 idx = strfind(val, 'T'); 
+                c = strsplit(strip(val)); 
                 
-                if isempty(idx) % no date is given, use today's date
+                if length(c)==1 && isempty(idx) % no date is given, use today's date
                     time = [];
-                else % get the specific date
+                elseif ~isempty(idx) % split using the 'T' separator
                     time = datetime(val(1:idx-1), 'TimeZone', 'UTC'); % get the date
                     val = val(idx+1:end); % get the hours from the rest of the string
+                elseif length(c)==2 % we can split on white space
+                    time = datetime(c{1}, 'TimeZone', 'UTC'); % get the day
+                    val = c{2}; % get the time
                 end
                 
                 c = strsplit(val, ':'); 

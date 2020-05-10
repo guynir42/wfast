@@ -69,13 +69,13 @@ classdef InputGUI < handle
             obj.buttons = {};
             obj.menus = {};
             
-            obj.fig = util.plot.FigHandler('...');
+            obj.fig = util.plot.FigHandler('input parameters');
             obj.fig.clear;
             obj.fig.bottom = 5;
             obj.fig.height = 10;
             obj.fig.width = 6;
             movegui(obj.fig.fig, 'center');
-            
+            obj.fig.left = obj.fig.left + 12;
             
             %%%%%%%%%%%%%%%%%%%%%%% MENUS %%%%%%%%%%%%%%%%%%%%%%%%%%%
             

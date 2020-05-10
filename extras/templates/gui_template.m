@@ -8,6 +8,7 @@ classdef objGUI < handle
              
         buttons = {};
         menus = {};
+        panels = {};
         
         latest_error = '';
         latest_warning = '';
@@ -78,6 +79,7 @@ classdef objGUI < handle
             
             obj.buttons = {};
             obj.menus = {};
+            obj.panels = {}; 
             
             obj.fig = util.plot.FigHandler('...');
             obj.fig.clear;
