@@ -1008,6 +1008,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             try 
                 
                 if obj.telALT<obj.limit_alt
+                    fprintf('Alt limit crossed!'); 
                     return;
                 end
 
@@ -1082,10 +1083,27 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     error('Prechecks failed, aborting slew');
                 end
                 
-                if obj.check_need_flip
+                % translate the object coordinates to current epoch
+                ra_hours_Jnow = obj.object.RA_deg_now./15; % convert to hours! 
+                dec_deg_Jnow = obj.object.Dec_deg_now;
+                
+                if obj.check_need_flip % do pre-slews to manage to do the flip without getting stuck! 
                     
                     if obj.telDE_deg<30 || obj.telDE_deg>60
+                        
                         obj.slewWithoutPrechecks(obj.hndl.RightAscension, 45); % do a preslew to dec +70 so we can make the flip! 
+                        
+                        try 
+                            if strcmp(obj.obj_pier_side, 'pierEast') % object is on the WEST SIDE!
+                                obj.slewWithoutPrechecks(mod(obj.object.LST_deg/15+4,24), 45); % do a second preslew to the same Dec with RA that is easier to flip from
+                            elseif strcmp(obj.obj_pier_side, 'pierWest') % object is on the EAST SIDE!
+                                obj.slewWithoutPrechecks(mod(obj.object.LST_deg/15-4,24), 45); % do a second preslew to the same Dec with RA that is easier to flip from
+                            end
+                        catch ME
+                            disp('Could not complete the second pre-slew:'); 
+                            warning(ME.getReport); 
+                        end
+                        
                     end
                     
                     
@@ -1101,9 +1119,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                         rethrow(ME);
                     end
                 end
-                
-                ra_hours_Jnow = obj.object.RA_deg_now./15; % convert to hours! 
-                dec_deg_Jnow = obj.object.Dec_deg_now;
                 
                 obj.slewWithoutPrechecks(ra_hours_Jnow, dec_deg_Jnow);
                 
