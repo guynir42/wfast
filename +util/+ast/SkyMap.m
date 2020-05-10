@@ -40,6 +40,8 @@ classdef SkyMap < handle
         dir@util.sys.WorkingDirectory; % to point to the GAIA location and get all the hdf5 files
         prog@util.sys.ProgressBar; 
         
+        ephem@head.Ephemeris; % this is useful for all kinds of calculations... 
+        
     end
     
     properties % inputs/outputs
@@ -149,6 +151,7 @@ classdef SkyMap < handle
                     obj.dir.cd(fullfile(getenv('DATA'), 'GAIA', 'DR2')); 
                 end
                 
+                ephem = head.Ephemeris;
                 obj.prog = util.sys.ProgressBar;
                 
                 obj.reset;
@@ -258,6 +261,17 @@ classdef SkyMap < handle
             else
                 error('Unknown RA units "%s". Use "degrees" or "hours"...', val);
             end
+            
+        end
+        
+        function set.LST(obj, val)
+            
+            if isempty(val)
+                obj.ephem.update;
+                val = obj.ephem.LST_deg/15;
+            end
+            
+            obj.LST = val;
             
         end
         

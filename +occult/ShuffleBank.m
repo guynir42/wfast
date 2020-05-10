@@ -1,9 +1,25 @@
 classdef ShuffleBank < handle
+% Produce and contain a set of kernels for matched-filtering. 
+% The kernels are produced by randomly choosing parameters in range, and 
+% then checking if the new kernel from these parameters is distinct from 
+% the existing kernels. If it is different enough, it is added. 
+% Production ends when there are no new additions for X trials (popcorn method). 
+%
+% The parameter range is determined by "R_range", "r_range", "b_range" and 
+% "v_range" (assuming t=0 for all kernels). 
+% 
+% Use makeKernels() to produce the bank (this takes several hours) or load
+% an existing object. 
+%
+% Use input(fluxes) to filter the input fluxes with all kernels in the bank, 
+% and read out the results from "fluxes_filtered". 
+% (This just uses util.vec.convolution() to do the filtering). 
+
 
     properties(Transient=true, Hidden=true)
         
-        gen@occult.CurveGenerator;
-        prog@util.sys.ProgressBar;
+        gen@occult.CurveGenerator; % use this to produce the kernels
+        prog@util.sys.ProgressBar; % track the time it takes for long calculations
         
     end
     
@@ -20,12 +36,12 @@ classdef ShuffleBank < handle
         pars; % a struct vector, one struct per lightcurve, with R,r,b,v values
         
         % input/output data
-        fluxes; 
-        fluxes_filtered;
-        stds;
-        timestamps;
+        fluxes; % the fluxes that were given to input(). Can be 1D or 2D 
+        fluxes_filtered; % the output fluxes after convolution with all kernels (should be 3D)
+        stds; % calculated standard deviation for each filtered flux (dim 1 is scalar)
+        timestamps; % timestamps for the fluxes
         
-        snrs_tested; 
+        snrs_tested; % test results from runTest()
         
     end
     
@@ -66,10 +82,10 @@ classdef ShuffleBank < handle
         function obj = ShuffleBank(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'occult.ShuffleBank')
-                if obj.debug_bit, fprintf('ShuffleBank copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('ShuffleBank copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('ShuffleBank constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('ShuffleBank constructor v%4.2f\n', obj.version); end
             
                 obj.gen = occult.CurveGenerator;
                 obj.prog = util.sys.ProgressBar;

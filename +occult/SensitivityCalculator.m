@@ -1,5 +1,18 @@
 classdef SensitivityCalculator < handle
-
+% Loads a score.mat file with the detection S/N for each parameter combination, 
+% and integrate over the parameters to calculate the detection sensitivity 
+% or rates for different occulter parameters. 
+% 
+% After loading the source matrix, use coneSearch() to figure out the angular
+% sizes of stars in a field. This size distribution is used to estimate the
+% sensitivity to occultations. 
+% 
+% Run calculateCoverage(distance_au, threshold=5) to get the fraction of sky
+% that is covered with respect to each occulter radius. 
+% This can be multiplied with the surface density of each size category to
+% get the number of detections over the course of the survey. 
+% The inverse of this is the sensitivity. 
+    
     properties(Transient=true)
         
     end
@@ -21,6 +34,7 @@ classdef SensitivityCalculator < handle
         v;
         delta;
         
+        % these parameters are for the stars in the given field
         bol_mag;
         bol_temp;
         
@@ -29,10 +43,10 @@ classdef SensitivityCalculator < handle
     properties % switches/controls
         
         lambda = 550; % nanometer
-        stars = 5000;
-        years = 3;
-        days = 300;
-        hours = 6;
+        stars = 5000; % number of stars in the field
+        years = 3; % survey length
+        days = 300; % number of observation nights per year
+        hours = 6; % number of observation hours per night
         
         debug_bit = 1;
         
@@ -55,10 +69,10 @@ classdef SensitivityCalculator < handle
         function obj = SensitivityCalculator(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'occult.SensitivityCalculator')
-                if obj.debug_bit, fprintf('SensitivityCalculator copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('SensitivityCalculator copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('SensitivityCalculator constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('SensitivityCalculator constructor v%4.2f\n', obj.version); end
             
             end
             
@@ -235,9 +249,9 @@ classdef SensitivityCalculator < handle
         function [h_line, h_area] = plot_expected(obj, varargin)
             
             input = util.text.InputVars;
-            input.input_var('N', 1e12, 'Ntot', 'number objects');
-            input.input_var('r0', 1, 'r_min', 'minimal_radius', 'min radius'); 
-            input.input_var('q', 3); 
+            input.input_var('N', 1e12, 'Ntot', 'number objects'); % total number of object
+            input.input_var('r0', 1, 'r_min', 'minimal_radius', 'min radius'); % start of the occulter size distribution
+            input.input_var('q', 3); % power law index
             input.input_var('line_width', 3); 
             input.input_var('line_style', '-'); 
             input.input_var('color', 0.5.*[1 1 1]); 

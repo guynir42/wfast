@@ -1,4 +1,24 @@
 classdef FilterBank < handle
+% Contains a set of filter kernels, each corresponding to one set of 
+% occultation parameters, that can be used for matched-filtering or for 
+% parameter estimation. 
+% The parameters are sorted in 4 dimensions: R, r, b and v (set t=0). 
+% The range and step for these parameters are defined in "R_list", "r_list", 
+% "b_list" and "v_list". 
+% Additional parameters are t=0, W, T and f that are shared by all kernels. 
+%
+% The "bank" property actually contains all the lightcurves. 
+% This is a 5D matrix where the 1st dimension is the time axis, and the 
+% rest are for each of the occultation parameters. 
+%
+% This object can calculate the analytical S/N for each kernel using the 
+% findAnalyticalSNR(), checkNeighbors() and checkMonteCarlo(). 
+% 
+% This class is also used to calculate S/N from the trig.Finder object's 
+% simulations, injecting each kernel into real data and storing the trigger
+% result in "snr_sim_full". 
+% Plotting these results is done using showSNR(). 
+
 
     properties(Transient=true)
         
@@ -6,8 +26,8 @@ classdef FilterBank < handle
     
     properties % objects
         
-        gen@occult.CurveGenerator;
-        prog@util.sys.ProgressBar;
+        gen@occult.CurveGenerator; % this produces the kernel bank
+        prog@util.sys.ProgressBar; % track the time it takes to calculate things
         
     end
     
@@ -46,7 +66,7 @@ classdef FilterBank < handle
     
     properties % switches/controls
         
-        threshold = 0.95;
+        threshold = 0.95; % minimal overlap to be considered close enough to another kernel
         
         debug_bit = 1;
         
@@ -63,18 +83,18 @@ classdef FilterBank < handle
         function obj = FilterBank(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'occult.FilterBank')
-                if obj.debug_bit, fprintf('FilterBank copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('FilterBank copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             
             elseif ~isempty(varargin) && isa(varargin{1}, 'occult.CurveGenerator')
-                if obj.debug_bit, fprintf('FilterBank generator-based constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('FilterBank generator-based constructor v%4.2f\n', obj.version); end
                 
                 obj.gen = varargin{1};
             
                 obj.prog = util.sys.ProgressBar;
                 
             else
-                if obj.debug_bit, fprintf('FilterBank constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('FilterBank constructor v%4.2f\n', obj.version); end
                 
                 obj.gen = occult.CurveGenerator;
                 
