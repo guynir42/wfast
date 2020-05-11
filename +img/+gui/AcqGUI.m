@@ -11,6 +11,7 @@ classdef AcqGUI < handle
         
         latest_error = '';
         latest_warning = '';
+        latest_message = ''; 
         
         font_size = 13;
         big_font_size = 16;
@@ -372,14 +373,23 @@ classdef AcqGUI < handle
 
             obj.latest_warning = lastwarn;
 
-            if isempty(obj.latest_error) && isempty(obj.latest_warning)
-                obj.panel_info.button_message.String = 'OK';
-            elseif ~isempty(obj.latest_error)
-                obj.panel_info.button_message.String = regexprep(obj.latest_error, '\n*|\s{2,}', '... ');
-            elseif ~isempty(obj.latest_warning)
-                obj.panel_info.button_message.String = ['Warning: ' regexprep(obj.latest_warning, '\n*|\s{2,}', '... ')];
+            display_string = ''; 
+            
+            if isempty(display_string) && ~isempty(obj.latest_error)
+                display_string = regexprep(obj.latest_error, '\n*|\s{2,}', '... ');
             end
             
+            % I wanted to stop showing these warnings, for now...
+%             if isempty(display_string) && ~isempty(obj.latest_warning)
+%                 display_string = ['Warning: ' regexprep(obj.latest_warning, '\n*|\s{2,}', '... ')];
+%             end
+            
+            if isempty(display_string) && ~isempty(obj.latest_message)
+                display_string = obj.latest_message; 
+            end
+            
+            obj.panel_info.button_message.String = display_string;    
+        
             drawnow;
             
         end
@@ -415,6 +425,7 @@ classdef AcqGUI < handle
                 
                 obj.latest_error = '';
                 obj.latest_warning = '';
+                obj.latest_message = '';
                 lastwarn('');
                                 
                 try

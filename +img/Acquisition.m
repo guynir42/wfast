@@ -613,6 +613,9 @@ classdef Acquisition < file.AstroData
             val = sprintf('%s\n mean flux= %.1f', val, obj.average_flux);
             val = sprintf('%s\n mean background= %.1f', val, obj.average_background);
             
+            val = sprintf('%s\n AIRMASS= %5.3f', val, obj.head.AIRMASS); 
+            val = sprintf('%s\n MOON DIST= %d', val, obj.head.ephem.moon_dist); 
+            
             if isprop(obj.cam, 'focuser') && ~isempty(obj.cam.focus_pos_tip_tilt)
                 val = sprintf('%s\n focus: %5.3f (%5.3f / %5.3f)', ...
                     val, obj.cam.focus_pos_tip_tilt(1), obj.cam.focus_pos_tip_tilt(2), obj.cam.focus_pos_tip_tilt(3));
@@ -1362,7 +1365,9 @@ classdef Acquisition < file.AstroData
                         obj.obs_log = obj.makeObsLog;
                     else
                         
-                        
+                        if ~isfield(obj.obs_log, obj.run_name)
+                            obj.obs_log.(obj.run_name) = struct('name', obj.run_name, 'start', '', 'end', '', 'runtime', [], 'num_files', []);
+                        end
                         
                         
                         s = obj.obs_log.(obj.run_name); % get the structs for this run name
@@ -1557,7 +1562,7 @@ classdef Acquisition < file.AstroData
             try 
                 
                 cleanup = onCleanup(@obj.finishup);
-
+                
                 if check==0, return; end
             
                 if obj.start_index
@@ -1642,7 +1647,15 @@ classdef Acquisition < file.AstroData
 %                 end
                 
                 if ~isempty(obj.gui) && obj.gui.check
+                    
+                    if input.use_reset
+                        obj.gui.latest_message = sprintf('Starting new run "%s" with %d batches. Save is %d', obj.run_name, obj.num_batches, obj.use_save);
+                    else
+                        obj.gui.latest_message = sprintf('Continuing new run "%s" with %d batches. Save is %d', obj.run_name, obj.num_batches, obj.use_save);
+                    end
+                    
                     obj.gui.update;
+                    
                 end
                 
                 if input.log_level
@@ -1670,7 +1683,7 @@ classdef Acquisition < file.AstroData
                 end
                 
                 % update the obs_log with the new run
-                if obj.use_save && obj.use_reset
+                if obj.use_save && input.use_reset
                     if ~isempty(obj.obs_log)
                         obj.obs_log = obj.makeObsLog;
                     end
@@ -1690,9 +1703,19 @@ classdef Acquisition < file.AstroData
                 
                 if isempty(obj.positions)
                     
-                    if obj.debug_bit, disp('Positions field empty. Calling single then findStars'); end
+                    str = 'Positions field empty. Calling single then findStars';
+                    
+                    if ~isempty(obj.gui)
+                        pause(1); 
+                        obj.gui.latest_message = str;
+                        obj.gui.update; 
+                    end
+                    
+                    if obj.debug_bit, disp(str); end
+                    
                     obj.single;
                     obj.findStars;
+                    
                     if obj.use_astrometry
                         obj.runAstrometry
                     end
@@ -2111,7 +2134,12 @@ classdef Acquisition < file.AstroData
         
         function runAstrometry(obj)
             
-            disp('runAstrometry'); 
+            if obj.debug_bit, disp('runAstrometry'); end
+            
+            if ~isempty(obj.gui)
+                obj.gui.latest_message = 'running astrometry...';
+                obj.gui.update;
+            end
             
             obj.cat.detection_threshold = obj.detect_thresh;
             obj.cat.detection_stack_number = obj.num_sum;
@@ -2120,41 +2148,36 @@ classdef Acquisition < file.AstroData
             obj.cat.inputPositions(obj.positions);
             
             if ~isempty(obj.cat.data) && ~isempty(obj.cat.success) && obj.cat.success % successfully filled the catalog
-
+                
                 obj.positions = obj.cat.positions; % if used some filter on the stars we found
                 obj.ref_positions = obj.cat.positions;
                 obj.clip.positions = obj.cat.positions;
-
-%                 coor_deg = obj.cat.mextractor_sim.WCS.WCS.CRVAL;
-                                
-                if obj.debug_bit, fprintf('Successfully solved astrometry! Coordinates: %s %s\n', ...
-                        head.Ephemeris.deg2hour(obj.cat.central_RA), head.Ephemeris.deg2sex(obj.cat.central_Dec)); end % need to pull the coordinates in a more serious way
+                
+                str = sprintf('Successfully solved astrometry! Coordinates: %s %s', ...
+                    head.Ephemeris.deg2hour(obj.cat.central_RA), head.Ephemeris.deg2sex(obj.cat.central_Dec)); % need to pull the coordinates in a more serious way
                 
                 obj.cat.num_stars = obj.num_stars;
-
+                
                 obj.positions = obj.cat.positions; % usually we will already have positions so this should do nothing (unless this analysis is on full frame rate images)
                 
-%                 if obj.use_save
-%                     try
-%                         filename = fullfile(obj.buf.directory, 'catalog.mat');
-%                         obj.cat.saveMAT(filename);
-%                     catch ME
-%                         warning(ME.getReport);
-%                     end
-%                 end
-
             else
-                if obj.debug_bit, fprintf('Could not fit astrometric solution...\n'); end
+                str = sprintf('Could not fit astrometric solution...');
             end
-
-           obj.head.LIMMAG_DETECTION = obj.cat.detection_limit; 
             
-           [obj.object_idx, dist] = obj.cat.findNearestObject;
-           
-           if dist>5/3600
-               obj.object_idx = []; % if the closest star found is more than 5" from the required position, it is not really a good match! 
-           end
-           
+            if ~isempty(obj.gui)
+                obj.gui.latest_message = str;
+                obj.gui.update;
+            end
+            
+            if obj.debug_bit, disp(str); end
+            obj.head.LIMMAG_DETECTION = obj.cat.detection_limit;
+            
+            [obj.object_idx, dist] = obj.cat.findNearestObject;
+            
+            if dist>5/3600
+                obj.object_idx = []; % if the closest star found is more than 5" from the required position, it is not really a good match!
+            end
+            
         end
         
         function findStarsMAAT(obj)
