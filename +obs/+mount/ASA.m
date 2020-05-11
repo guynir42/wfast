@@ -1598,16 +1598,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 obj.resetRate;
                 
-                if ~isempty(obj.cam_pc)
-
-                    if isfield(obj.cam_pc.outgoing, 'stop_camera') && obj.cam_pc.outgoing.stop_camera==0
-                        obj.log.input('Telescope stopped, sending camera stop command');
-                        disp(obj.log.report);
-                    end
-
-                    obj.cam_pc.outgoing.stop_camera = 1;
-                    
-                end
+%                 if ~isempty(obj.cam_pc)
+% 
+%                     if isfield(obj.cam_pc.outgoing, 'stop_camera') && obj.cam_pc.outgoing.stop_camera==0
+%                         obj.log.input('Telescope stopped, sending camera stop command');
+%                         disp(obj.log.report);
+%                     end
+% 
+%                     obj.cam_pc.outgoing.stop_camera = 1;
+%                     
+%                 end
                 
             catch ME
                 obj.log.error(ME.getReport);

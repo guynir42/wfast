@@ -80,6 +80,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         Az_deg; % azimut 
         
         AIRMASS; 
+        moon_dist; % rounded value from moon struct
         
         ECL_long; % ecliptic longitude
         ECL_lat; % ecliptic latitude
@@ -339,6 +340,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 val = SecZ - 0.0018167.*(SecZ - 1) - 0.002875.*(SecZ - 1).*(SecZ - 1)...
                     - 0.0008083.*(SecZ - 1).*(SecZ - 1).*(SecZ - 1); % Hardie's polynomial formula
 
+            end
+            
+        end
+        
+        function val = get.moon_dist(obj)
+            
+            if isempty(obj.moon)
+                val = [];
+            else
+                val = round(obj.moon.Dist); 
             end
             
         end

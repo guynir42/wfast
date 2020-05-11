@@ -805,7 +805,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.cam_pc.outgoing.WIND_SPEED = obj.average_wind_speed;
             obj.cam_pc.outgoing.HUMID_OUT = obj.average_humidity;
             obj.cam_pc.outgoing.LIGHT = obj.average_light; 
-            obj.cam_pc.outgoing.PRESSURE = obj.average_pressure; 
+            obj.cam_pc.outgoing.PRESSURE = obj.average_pressure;             
             
 %             if obj.dome.is_closed
 %                 

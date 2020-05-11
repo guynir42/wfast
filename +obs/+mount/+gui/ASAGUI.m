@@ -154,7 +154,7 @@ classdef ASAGUI < handle
             obj.panel_object.addButton('button_airmass', 'object.AIRMASS', 'info', 'a.m.= ', '', '', 0.4, 'small', '', 'Calculated airmass for target'); 
             obj.panel_object.addButton('button_object', 'object', 'push', 'GUI', '', '', 0.2, '', '', 'Open the object GUI'); 
             
-            obj.panel_object.addButton('button_moon', 'object.moon.Dist', 'info', 'moon= ', '', '', 0.4, '', '', 'Moon distance from object (degrees'); 
+            obj.panel_object.addButton('button_moon', 'object.moon_dist', 'info', 'moon= ', '', '', 0.4, '', '', 'Moon distance from object (degrees'); 
             obj.panel_object.addButton('button_ecl', 'object.ECL_LAT', 'info', 'ecl= ', '', '', 0.4, '', '', 'Object ecliptic latitude'); 
             obj.panel_object.addButton('button_constraints', 'object.constraints', 'push', 'const.', '', '', 0.2, '', '', 'Open the object constraints GUI'); 
             

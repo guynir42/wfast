@@ -339,12 +339,12 @@ classdef ManagerGUI < handle
                 obj.menus{ii}.update;
             end
             
-            default_color = [1 1 1].*0.94;
+%             default_color = [1 1 1].*0.94;
             
             % highlight malfunctioning devices! 
             if ~isempty(obj.owner.dome) && obj.owner.dome.status
                 obj.panel_devices.button_dome.String = 'dome ok';
-                obj.panel_devices.button_dome.BackgroundColor = default_color;
+                obj.panel_devices.button_dome.BackgroundColor = obj.color_buttons;
             else
                 obj.panel_devices.button_dome.String = 'dome error';
                 obj.panel_devices.button_dome.BackgroundColor = 'red';
@@ -352,7 +352,7 @@ classdef ManagerGUI < handle
             
             if ~isempty(obj.owner.mount) && obj.owner.mount.status
                 obj.panel_devices.button_mount.String = 'mount ok';
-                obj.panel_devices.button_mount.BackgroundColor = default_color;
+                obj.panel_devices.button_mount.BackgroundColor = obj.color_buttons;
             else
                 obj.panel_devices.button_mount.String = 'mount error';
                 obj.panel_devices.button_mount.BackgroundColor = 'red';
@@ -360,7 +360,7 @@ classdef ManagerGUI < handle
             
             if ~isempty(obj.owner.weather) && obj.owner.weather.status
                 obj.panel_devices.button_weather.String = 'BoltWood ok';
-                obj.panel_devices.button_weather.BackgroundColor = default_color;
+                obj.panel_devices.button_weather.BackgroundColor = obj.color_buttons;
             else
                 obj.panel_devices.button_weather.String = 'BoltWood error';
                 obj.panel_devices.button_weather.BackgroundColor = 'red';
@@ -368,7 +368,7 @@ classdef ManagerGUI < handle
             
             if ~isempty(obj.owner.wind) && obj.owner.wind.status
                 obj.panel_devices.button_wind.String = 'WindETH ok';
-                obj.panel_devices.button_wind.BackgroundColor = default_color;
+                obj.panel_devices.button_wind.BackgroundColor = obj.color_buttons;
             else
                 obj.panel_devices.button_wind.String = 'WindETH error';
                 obj.panel_devices.button_wind.BackgroundColor = 'red';

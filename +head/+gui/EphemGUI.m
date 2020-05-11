@@ -125,7 +125,7 @@ classdef EphemGUI < handle
             obj.panel_outputs.addButton('button_ecl', 'ECL_LAT', 'info', 'ecl= ', '', '', 0.5, '', '', 'ecliptic latitude'); 
             obj.panel_outputs.addButton('button_gal', 'GAL_LAT', 'info', 'gal= ', '', '', 0.5, '', '', 'galactic latitude'); 
             
-            obj.panel_outputs.addButton('button_moon_dist', 'moon.Dist', 'info', 'moon dist.= ', '', '', 0.5, '', '', 'moon angular distance (degrees)');
+            obj.panel_outputs.addButton('button_moon_dist', 'moon_dist', 'info', 'moon dist.= ', '', '', 0.5, '', '', 'moon angular distance (degrees)');
             obj.panel_outputs.addButton('button_moon_ill', 'moon.IllF', 'info', 'moon ill.= ', '', '', 0.5, '', '', 'moon illumination fraction'); 
             
             obj.panel_outputs.addButton('button_airmass', 'AIRMASS', 'info', 'A.M.= ', '', '', 0.5, '', '', 'airmass'); 

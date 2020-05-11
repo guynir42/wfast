@@ -705,6 +705,8 @@ classdef SensorChecker < handle
 
         function [value, reason] = getWiseSafeFlag(obj)
             
+            reason = '';
+            
             [rc,rv] = system('curl --connect-timeout 2 --silent -X PUT --header "Content-Type: application/x-www-form-urlencoded" --header "Accept: application/json" --data "Action=wise-issafe&Parameters=" http://132.66.65.9:11111/api/v1/safetymonitor/0/action');
             if(rc==0) % check the call succeeded
                 
@@ -717,12 +719,8 @@ classdef SensorChecker < handle
                 if(rc==0)
                     reason = jsondecode(rv);
                     reason = reason.Value;
-                else
-                    reason = '';
                 end
 
-            else
-                value = ''; 
             end
 
         end
@@ -831,8 +829,9 @@ classdef SensorChecker < handle
             input.ax.Color = input.color;
             input.ax.FontSize = input.font_size;
             
-            hl = legend(input.ax, 'Location', 'SouthEastOutside');
+            hl = legend(input.ax, 'Location', 'NorthEastOutside');
             hl.FontSize = 12;
+            hl.NumColumns = 2;
             
             if obj.use_wise_data
                 report = obj.wise_report(1:min(length(obj.wise_report), 100)); 
