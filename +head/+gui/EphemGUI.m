@@ -96,10 +96,12 @@ classdef EphemGUI < handle
             num_buttons = 5;
             pos = pos-num_buttons;
             obj.panel_inputs = GraphicPanel(obj.owner, [0 pos/N 1 num_buttons/N], 'inputs', 1); % last input is for vertical (default)
+            obj.panel_inputs.addButton('input_name', 'name', 'input_text', 'name= ', '', '', 0.8, '', '', 'enter a name for the object'); 
+            obj.panel_inputs.addButton('button_clear_name', '', 'custom', 'clear', '', '', 0.2, '', '', 'clear the name and keyword of the object'); 
             obj.panel_inputs.addButton('button_constraints', 'constraints', 'push', 'constraints', '', '', 0.5, '', '', 'choose constraints for automatically choosing fields'); 
             obj.panel_inputs.addButton('button_field_picker', '', 'custom', 'pick field', '', '', 0.5, '', '', 'choose a field from a list of default field types'); 
-            obj.panel_inputs.addButton('input_name', 'name', 'input_text', 'name= ', '', '', 0.8, '', '', 'enter a name for the object'); 
-            obj.panel_inputs.addButton('button_resolve', 'resolve', 'push', 'resolve', '', '', 0.2, '', '', 'resolve the current name using default fields or using SIMBAD'); 
+            obj.panel_inputs.addButton('input_keyword', 'keyword', 'input_text', 'keyword= ', '', '', 0.8, '', '', 'enter a keyword to use in the name resolver'); 
+            obj.panel_inputs.addButton('button_resolve', 'resolve', 'push', 'resolve', '', '', 0.2, '', '', 'resolve the current name using default fields or using SIMBAD/JPL horizons'); 
             obj.panel_inputs.addButton('input_time', 'time_str', 'input_text', 'time= ', '', '', 0.8, '', '', 'input the time for this object (full date or time of day in hours)'); 
             obj.panel_inputs.addButton('button_update', 'update', 'push', 'now', '', '', 0.2, '', '', 'update object time to current time'); 
             obj.panel_inputs.addButton('input_ra', 'RA', 'input_text', 'RA= ', '', '', 0.5, '', '', 'input the right ascention of the object (hours)'); 
@@ -108,6 +110,7 @@ classdef EphemGUI < handle
             
             obj.panel_inputs.make;
             
+            obj.panel_inputs.button_clear_name.Callback = @obj.callback_clear_name;
             obj.panel_inputs.button_field_picker.Callback = @obj.callback_field_picker;
             
             %%%%%%%%%%%%%%%%%%%% panel outputs %%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -167,6 +170,17 @@ classdef EphemGUI < handle
     end
                 
     methods % callbacks
+        
+        function callback_clear_name(obj, ~, ~)
+            
+            if obj.debug_bit>1, disp('callback: clear name'); end
+            
+            obj.owner.name = '';
+            obj.owner.keyword = '';
+            
+            obj.update;
+            
+        end
         
         function callback_field_picker(obj, ~, ~)
             

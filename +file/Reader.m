@@ -254,20 +254,20 @@ classdef Reader < file.AstroData
             
             if ~isempty(varargin) && isa(varargin{1}, 'file.Reader') % copy-constructor
                 obj = util.oop.full_copy(varargin{1});
-                if obj.debug_bit, fprintf('file.Reader copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('file.Reader copy-constructor v%4.2f\n', obj.version); end
             else
                 
                 util.oop.save_defaults(obj);
                                                 
                 if isempty(varargin) % default constructor
-                    if obj.debug_bit, fprintf('file.Reader constructor v%4.2f\n', obj.version); end
+                    if obj.debug_bit>1, fprintf('file.Reader constructor v%4.2f\n', obj.version); end
                     obj.dir = util.sys.WorkingDirectory(getenv('DATA')); % try to start at the DATA directory (if fails, silently uses CWD). 
                 elseif isa(varargin{1}, 'util.sys.WorkingDirectory') % directory constructor
                     obj.dir = util.oop.full_copy(varargin{1});
-                    if obj.debug_bit, fprintf('file.Reader directory constructor v%4.2f\n', obj.version); end
+                    if obj.debug_bit>1, fprintf('file.Reader directory constructor v%4.2f\n', obj.version); end
                 elseif ischar(varargin{1})
                     obj.dir = util.sys.WorkingDirectory(varargin{1});
-                    if obj.debug_bit, fprintf('file.Reader directory constructor v%4.2f\n', obj.version); end
+                    if obj.debug_bit>1, fprintf('file.Reader directory constructor v%4.2f\n', obj.version); end
                 else
                     error(['input to file.Reader constructor is of class "' class(varargin{1}) '". Try giving it a Reader or WorkingDirectory...']);
                 end

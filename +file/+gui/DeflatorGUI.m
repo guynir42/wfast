@@ -49,7 +49,7 @@ classdef DeflatorGUI < handle
             
             % later add other options like copy constructor
             
-            if obj.debug_bit, fprintf('DeflatorGUI constructor v%4.2f\n', obj.version); end
+            if obj.debug_bit>1, fprintf('DeflatorGUI constructor v%4.2f\n', obj.version); end
             
             assert(isa(parent, 'file.Deflator'), 'Input a file.Deflator to constructor of DeflatorGUI!');
             
@@ -300,7 +300,7 @@ classdef DeflatorGUI < handle
         
         function callback_run_stop(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: run/stop'); end
+            if obj.debug_bit>1, disp('callback: run/stop'); end
             
             if obj.def.brake_bit
                 
@@ -319,7 +319,7 @@ classdef DeflatorGUI < handle
         
         function callback_close(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: close'); end
+            if obj.debug_bit>1, disp('callback: close'); end
             
             delete(obj.fig.fig);
             

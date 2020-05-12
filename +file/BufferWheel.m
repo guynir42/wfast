@@ -202,7 +202,7 @@ classdef BufferWheel < file.AstroData
                 header = head.Header.empty;
             end
             
-            if obj.debug_bit
+            if obj.debug_bit>1
                 fprintf('BufferWheel constructor v%4.2f with %d buffers. ', obj.version, num_buffers);
                 if isempty(header) 
                     fprintf('Creating new header object\n');

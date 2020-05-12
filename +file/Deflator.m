@@ -119,7 +119,7 @@ classdef Deflator < file.AstroData
         function obj = Deflator(other)
             
             if nargin==0 || isempty(other)
-                if obj.debug_bit, fprintf('Deflator constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Deflator constructor v%4.2f\n', obj.version); end
                 
                 obj.setupDirs;
                 obj.setupBuffers;

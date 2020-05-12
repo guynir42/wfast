@@ -53,7 +53,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     
     properties % inputs/outputs
         
-        name = ''; % for dynamically allocated fields like 'moon' or 'ecliptic'
+        name = ''; % the generic title for the object (copied into header's OBJECT field, and possibly to folder names)
+        keyword = ''; % for dynamically allocated fields like 'moon' or 'ecliptic'
         RA_deg; % numeric value in degrees
         Dec_deg; % numeric value in degrees
         
@@ -216,6 +217,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     end
     
     methods % getters
+        
+        function val = get.name(obj)
+            
+            if isempty(obj.name) && ~isempty(obj.keyword)
+                val = obj.keyword;
+            else
+                val = obj.name;
+            end
+            
+        end
         
         function val = get.time_str(obj)
             
@@ -622,21 +633,23 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             end
             
             obj.name = '';
+            obj.keyword = '';
             
             if nargin>3 && ~isempty(time) % first see if we need to update the time
                 obj.time = obj.parseTime(time); 
             end
             
             if ischar(RA) && isempty(DEC)
-                obj.name = RA; 
+                obj.keyword = RA; 
                 obj.resolve; % use SIMBAD or one of the default fields
             else % just get RA/Dec directly
                 obj.RA = RA;
                 obj.Dec = DEC;
             end
             
-            if isempty(obj.name) && nargin>4
-                obj.name = name;
+            if nargin>4 && ~isempty(name)
+                obj.name = name; % if no explicit name is given, assume it is the same as "keyword"
+            
             end
             
 %             obj.updateKeywordField; % dynamically allocate this field after setting the time
@@ -644,9 +657,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
-        function resolve(obj, name, varargin) % use the given name to find the object RA/Dec
+        function resolve(obj, keyword, varargin) % use the keyword to find the object RA/Dec
         % Usage: resolve(obj, [name])
-        % Resolve the name given (default is obj.name) to find the RA/Dec.
+        % Resolve the name given (default is obj.keyword) to find the RA/Dec.
         % If name is one of the following keywords: "ecliptic", "galactic",
         % then the field is chosen using internal functions. 
         % (typically the best observable field is chosen based on the given
@@ -659,37 +672,46 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
             import util.text.cs;
         
-            if nargin<2 || isempty(name)
-                name = obj.name;
+            if nargin<2 || isempty(keyword)
+                keyword = obj.keyword;
             end
             
-            if cs(name, 'ecliptic', 'kbos')
-                obj.name = 'ecliptic'; % dynamically allocate this field after setting the time
+            if cs(keyword, 'ecliptic', 'kbos')
+                obj.keyword = 'ecliptic'; % dynamically allocate this field after setting the time
                 obj.gotoDefaultField(obj.name, varargin{:}); 
-            elseif cs(name, 'galactic')
-                obj.name = 'galactic'; % dynamically allocate this field after setting the time
+            elseif cs(keyword, 'galactic')
+                obj.keyword = 'galactic'; % dynamically allocate this field after setting the time
                 obj.gotoDefaultField(obj.name, varargin{:});
-            elseif cs(name, 'moon')
-                obj.name = 'moon'; % dynamically allocate this field after setting the time
+            elseif cs(keyword, 'moon')
+                obj.keyword = 'moon'; % dynamically allocate this field after setting the time
                 obj.updateMoon;
                 obj.RA = obj.moon.RA;
                 obj.Dec = obj.moon.Dec;
             else
                 
-                obj.name = name;
+                obj.keyword = keyword;
                 
                 if ~isempty(which('celestial.coo.convert2equatorial', 'function')) % use Eran's IMPROVED name resolver
                     
-                    [RA, DEC] = celestial.coo.convert2equatorial(name, [], 'JD', obj.JD, ...
+                    [RA, DEC] = celestial.coo.convert2equatorial(keyword, [], 'JD', obj.JD, ...
                         'ObsCoo', [obj.longitude, obj.latitude, 800], 'OutputUnits', 'deg', 'NameServer', 'simbad');
 
                     if isnan(RA) || isnan(DEC) % failed to resolve
                         
-                        [RA, DEC] = celestial.coo.convert2equatorial(name, [], 'JD', obj.JD, ...
+                        try
+                        [RA, DEC] = celestial.coo.convert2equatorial(keyword, [], 'JD', obj.JD, ...
                             'ObsCoo', [obj.longitude, obj.latitude, 800], 'OutputUnits', 'deg', 'NameServer', 'jpl');
+                        catch ME
+                            if strcmp(ME.identifier, 'MATLAB:structRefFromNonStruct')
+                                fprintf('Could not resolve name "%s" with convert2equatorial()!\n', keyword);
+                                return; 
+                            else
+                                rethrow(ME); 
+                            end
+                        end
                         
                         if isnan(RA) || isnan(DEC) % failed to resolve using JPL also
-                            fprintf('Could not resolve name "%s" with convert2equatorial()!\n', name);
+                            fprintf('Could not resolve name "%s" with convert2equatorial()!\n', keyword);
                         end
                         
                     end
@@ -699,10 +721,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                     
                 elseif ~isempty(which('celestial.coo.coo_resolver', 'function')) % use Eran's name resolver
 
-                    [RA, DEC] = celestial.coo.coo_resolver(name, 'OutUnits', 'deg', 'NameServer', @VO.name.server_simbad);
+                    [RA, DEC] = celestial.coo.coo_resolver(keyword, 'OutUnits', 'deg', 'NameServer', @VO.name.server_simbad);
 
                     if isnan(RA) || isnan(DEC)
-                        fprintf('Could not resolve name "%s" with coo_resolver()!\n', name); 
+                        fprintf('Could not resolve name "%s" with coo_resolver()!\n', keyword); 
                         return;
                     end
 

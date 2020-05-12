@@ -54,7 +54,7 @@ classdef ReaderGUI < handle
             % later add other options like copy constructor
             if isa(owner, 'file.Reader')
                 
-                if obj.debug_bit, fprintf('ReaderGUI constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('ReaderGUI constructor v%4.2f\n', obj.version); end
                 
                 obj.owner = owner;
                 
@@ -239,7 +239,7 @@ classdef ReaderGUI < handle
         
         function callback_stop(obj, ~, ~)
             
-            if obj.debug_bit, disp(['callback: stop. brake_bit= ' num2str(obj.owner.brake_bit)]); end
+            if obj.debug_bit>1, disp(['callback: stop. brake_bit= ' num2str(obj.owner.brake_bit)]); end
             
             if obj.owner.brake_bit
                 obj.owner.brake_bit = 0;
@@ -254,7 +254,7 @@ classdef ReaderGUI < handle
         
         function callback_close(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: close'); end
+            if obj.debug_bit>1, disp('callback: close'); end
             
             delete(obj.fig.fig);
             

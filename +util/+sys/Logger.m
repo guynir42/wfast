@@ -87,7 +87,7 @@ classdef Logger < handle
         function obj = Logger(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'util.sys.Logger')
-                if obj.debug_bit
+                if obj.debug_bit>1
                     fprintf('Logger copy-constructor v%4.2f\n', obj.version);
                 end
                 obj = util.oop.full_copy(varargin{1});

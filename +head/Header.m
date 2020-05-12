@@ -41,7 +41,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
     
     properties 
         
-        OBJECT = 'star1'; % the name of the target field or object
+%         OBJECT = 'star1'; % the name of the target field or object
         TYPE; % type of observation... choose science/dark/flat etc... 
         
         COMMENT = ''; % general comment
@@ -123,6 +123,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
     properties(Dependent=true)
         
         % ephemeris: time & coordinates
+        OBJECT; 
         
         % measured from observations (the data for these is in the WCS object)
         OBSRA; % center of field RA as measured by fitting to GAIA, in sexagesimal hour string
@@ -190,7 +191,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
     methods % constructor
        
         function obj = Header(other)
-            
             
             if nargin>0 && isa(other, 'head.Parameters')
                 
@@ -383,6 +383,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         end
         
         % ephemeris
+        function val = get.OBJECT(obj)
+            
+            if ~isempty(obj.ephem)
+                val = '';
+            else
+                obj.ephem.name;
+            end
+            
+        end
+        
         function val = get.JD(obj)
             
             val = obj.ephem.JD;
@@ -781,6 +791,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         end
 
         % ephemeris
+        function set.OBJECT(obj, val)
+            
+            obj.ephem.name = val;
+            
+        end
+        
         function set.RA(obj, val)
             
             if iscell(val) && isscalar(val)

@@ -6,7 +6,7 @@ classdef BufferGUI < handle
         
         fig_handler;
         
-        debug_bit = 0;
+        debug_bit = 1;
         
     end
     
@@ -20,10 +20,10 @@ classdef BufferGUI < handle
         
         function obj = BufferGUI(other)
             if nargin>0 && isa(other, 'file.gui.BufferGUI')                
-                if obj.debug_bit, fprintf('BufferGUI copy-constructor (nothing to do really...) v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('BufferGUI copy-constructor (nothing to do really...) v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(other);
             elseif nargin>0 && isa(other, 'file.BufferWheel')
-                if obj.debug_bit, fprintf('BufferGUI BufferWheel constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('BufferGUI BufferWheel constructor v%4.2f\n', obj.version); end
                 obj.buffers = other;
             else
                 if obj.debug_bit, fprintf('BufferGUI constructor v%4.2f\n', obj.version); end
@@ -193,7 +193,7 @@ classdef BufferGUI < handle
             
             val = ~hndl.Value;
             
-            if obj.debug_bit, disp(['callback: async write: ' num2str(val)]); end
+            if obj.debug_bit>1, disp(['callback: async write: ' num2str(val)]); end
             
             for ii = 1:length(obj.buffers)
                 obj.buffers(ii).use_async = val;
@@ -207,7 +207,7 @@ classdef BufferGUI < handle
                        
             val = ~hndl.Value;
             
-            if obj.debug_bit, disp(['callback: mex write: ' num2str(val)]); end
+            if obj.debug_bit>1, disp(['callback: mex write: ' num2str(val)]); end
             
             for ii = 1:length(obj.buffers)
                 obj.buffers(ii).use_mex = val;
@@ -221,7 +221,7 @@ classdef BufferGUI < handle
                        
             val = ~hndl.Value;
             
-            if obj.debug_bit, disp(['callback: pars write: ' num2str(val)]); end
+            if obj.debug_bit>1, disp(['callback: pars write: ' num2str(val)]); end
             
             for ii = 1:length(obj.buffers)
                 obj.buffers(ii).use_write_pars = val;
@@ -233,7 +233,7 @@ classdef BufferGUI < handle
         
         function callback_file_type(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: file_type'); end
+            if obj.debug_bit>1, disp('callback: file_type'); end
             
             for ii = 1:length(obj.buffers)
 %                 obj.buffers(ii).cycle_file_type;
@@ -256,7 +256,7 @@ classdef BufferGUI < handle
                 error(['cannot set a deflate value of ' val ' choose a number between 0 and 9...']);
             end
             
-            if obj.debug_bit, disp(['callback: deflate: ' num2str(val)]); end
+            if obj.debug_bit>1, disp(['callback: deflate: ' num2str(val)]); end
             
             for ii = 1:length(obj.buffers)
                 obj.buffers(ii).use_deflate = val;
@@ -270,7 +270,7 @@ classdef BufferGUI < handle
                                     
             val = hndl.String;
             
-            if obj.debug_bit, disp(['callback: product type: ' val]); end
+            if obj.debug_bit>1, disp(['callback: product type: ' val]); end
             
             for ii = 1:length(obj.buffers)
                 obj.buffers(ii).product_type = val;
@@ -289,7 +289,7 @@ classdef BufferGUI < handle
                 val = 0; % default value!
             end
                         
-            if obj.debug_bit, disp(['callback: debug_bit: ' num2str(val)]); end
+            if obj.debug_bit>1, disp(['callback: debug_bit: ' num2str(val)]); end
             
             for ii = 1:length(obj.buffers)
                 obj.buffers(ii).debug_bit = val;
@@ -421,7 +421,7 @@ classdef BufferGUI < handle
         
         function callback_close(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: close!'); end
+            if obj.debug_bit>1, disp('callback: close!'); end
             
             delete(obj.fig_handler.fig);
             
