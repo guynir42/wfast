@@ -150,40 +150,36 @@ classdef Email < handle
             input.input_var('text', 'This is a default message'); 
             input.input_var('header', true); 
             input.input_var('footer', true); 
-            input.input_var('html', true); 
+            input.input_var('html', false); 
             input.scan_vars(varargin{:}); 
             
             style = ' align="left" valign="top" style="font-family: Courier, monospace;font-size:16px; white-space:pre;"';
             
             str = '';
-            
             if input.html
                 str = [str '<html><head></head><body>'];
             end
             
             if input.header
-                new_str = sprintf('A message from the W-FAST mailbot, sent at %s.', datetime);
-                if input.html, new_str = ['<div style="font-style:italic;">' new_str '</div>']; end
+                new_str = sprintf('>>>>>>>>>>>>>> A message from the W-FAST mailbot, sent at %s.', datetime);
+                if input.html, new_str = ['<p style="font-style:italic;font-size:14px;">' new_str '</p>']; end
                 str = sprintf('%s\n %s\n\n', str, new_str);
             end
             
-            if input.html
-                str = [str '<code style="font-family: monospace;font-size=12px;white-space:pre;">' input.text '</code>']; 
-            else
-                str = [str input.text]; 
-            end
+            str = [str input.text]; 
             
             if input.footer
                 if input.html
-                    str = sprintf('%s\n\n <div style="font-style:italic;">"%s"</div>', str, obj.getQuote); 
+                    str = sprintf('%s\n\n <p align=left> %s </p>', str, '>>>>>>>>>>>>>>  end of message '); 
+                    str = sprintf('%s\n\n <p align=center style="font-style:italic;">"%s"</p>', str, obj.getQuote); 
                 else
                     str = sprintf('%s\n\n "%s"', str, obj.getQuote); 
                 end
             end
            
             if input.html
-                str = [str '</body></html>'];                
-%                 str = strrep(str, char(10), [char(10) '<br>']); 
+                str = [str '</body></html>'];           
+%                 str = strrep(str, char(10), [char(10) '<br>']);
             end
             
         end

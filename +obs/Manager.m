@@ -717,14 +717,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             fprintf('%s: sending morning report by Email!\n', t); 
             
-            str = sprintf('This is a morning report for the night of %s. \n\n', d); 
-            str = sprintf('%s  Dome status is: %s\n\n', str, obj.observatory_state);
+            str = '';
+            
+            str = sprintf('%s\n<p style="font-size:14px">', str); 
+            str = sprintf('%s\nThis is a morning report for the night of %s.', str, d);
+            str = sprintf('%s\n</p>', str); 
+            
+            str = sprintf('%s\n<p style="font-size:18px;font-weight:bold;">', str); 
+            str = sprintf('%s\n Dome status is: %s ', str, obj.observatory_state);
+            str = sprintf('%s\n</p>', str); 
             
             if ~isempty(obj.obs_log) && strcmp(obj.obs_log.date, d)
                 
                 list = fields(obj.obs_log); 
                 
-                obs_str = sprintf('      Runs overview for tonight: \n  ----------------------------------------');
+                obs_str = sprintf('Runs overview for tonight: \n <table style="width:60%%">');
                 
                 for ii = 1:length(list) % each target has a few runs inside a struct array with this name
                     
@@ -741,41 +748,36 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                         
                     end
                     
-                    obs_str = sprintf('%s\n%10s (%d) | files: %4d | runtime: %7.1f ', obs_str, list{ii}, length(s), files, time); 
+%                     obs_str = sprintf('%s\n%10s (%d) | files: %4d | runtime: %7.1f ', obs_str, list{ii}, length(s), files, time); 
+                    obs_str = sprintf('%s\n <tr> <td> %s (%d) </td><td> files: %4d </td><td> runtime: %7.1f </td></tr>', obs_str, list{ii}, length(s), files, time); 
                     
                 end
                 
                 
+                
             else
-                obs_str = sprintf('  Could not find any information on observations run tonight...\n\n'); 
+                obs_str = sprintf('Could not find any information on observations run tonight...'); 
             end
             
-            str = sprintf('%s \n\n%s', str, obs_str); % add the observation report to the string
+            str = sprintf('%s\n<p> %s \n</p>\n', str, obs_str); % add the observation report to the string
             
             if isfield(obj.cam_pc.incoming, 'drives') && ~isempty(obj.cam_pc.incoming.drives)
             
-                drive_str = sprintf('  Hard drive space overview:\n\n'); 
+                drive_str = sprintf('Hard drive space overview:\n'); 
                 
                 s = obj.cam_pc.incoming.drives;
                 f = fields(s); 
                 
-                for ii = 1:length(f)
-                    drive_str = sprintf('%s|     %s:\\     ', drive_str, f{ii}); 
-                end
-                
-                drive_str = sprintf('%s|\n', drive_str); 
+                drive_str = [drive_str '<table style="width:60%;font-family:Courier;font-size:12px"><tr>'];
                 
                 for ii = 1:length(f)
-                    drive_str = sprintf('%s+-------------', drive_str); 
+                    drive_str = sprintf('%s <td> %s:\\ </td> ', drive_str, f{ii}); 
                 end
-                
-                drive_str = sprintf('%s+\n', drive_str); 
-                
+                drive_str = [drive_str '</tr><tr>'];
                 for ii = 1:length(f)
-                    drive_str = sprintf('%s|% 8d Gb  ', drive_str, round(s.(f{ii}))); 
+                    drive_str = sprintf('%s <td> %d Gb </td> ', drive_str, round(s.(f{ii}))); 
                 end
-                
-                drive_str = sprintf('%s|\n', drive_str); 
+                drive_str = [drive_str '</tr><br>'];
                 
                 gb_limit = 3000; % set this to warn when HDDs are running low...  
                 
@@ -787,11 +789,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     drive_str = sprintf('%s\nWARNING: Drive F is has less than %d Gb left!', drive_str, gb_limit);
                 end
                 
-                str = sprintf('%s \n\n%s', str, drive_str); 
+                str = sprintf('%s\n <p style="font-familiy:Courier;font-size:12px"> %s </p>\n', str, drive_str); 
             
             end
             
-            obj.email.sendToList('subject', '[WFAST] Morning report', 'text', str, 'header', 1, 'footer', 1); 
+            obj.email.sendToList('subject', sprintf('[WFAST] Morning report %d',randi(1000)+10), 'text', str, ...
+                'header', 1, 'footer', 1, 'html', 1); 
             
             obj.latest_email_report_date = d; % make sure we don't resend this email today (after a successful send!)
             
