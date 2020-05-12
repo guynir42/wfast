@@ -69,7 +69,7 @@ classdef ManagerGUI < handle
             % later add other options like copy constructor
             if isa(owner, 'obs.Manager')
                 
-                if obj.debug_bit, fprintf('ManagerGUI constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('ManagerGUI constructor v%4.2f\n', obj.version); end
                 
                 obj.owner = owner;
                 

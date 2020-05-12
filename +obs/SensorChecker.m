@@ -99,12 +99,12 @@ classdef SensorChecker < handle
         function obj = SensorChecker(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'obs.SensorChecker')
-                if obj.debug_bit, fprintf('SensorChecker copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('SensorChecker copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             
             elseif ~isempty(varargin) && isa(varargin{1}, 'obs.Manager')
                 
-                if obj.debug_bit, fprintf('SensorChecker constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('SensorChecker constructor v%4.2f\n', obj.version); end
             
                 obj.owner = varargin{1};
                 
@@ -705,6 +705,7 @@ classdef SensorChecker < handle
 
         function [value, reason] = getWiseSafeFlag(obj)
             
+            value = [];
             reason = '';
             
             [rc,rv] = system('curl --connect-timeout 2 --silent -X PUT --header "Content-Type: application/x-www-form-urlencoded" --header "Accept: application/json" --data "Action=wise-issafe&Parameters=" http://132.66.65.9:11111/api/v1/safetymonitor/0/action');

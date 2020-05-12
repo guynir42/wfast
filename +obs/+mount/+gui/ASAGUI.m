@@ -51,7 +51,7 @@ classdef ASAGUI < handle
             % later add other options like copy constructor
             if isa(owner, 'obs.mount.ASA')
                 
-                if obj.debug_bit, fprintf('ASAGUI constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('ASAGUI constructor v%4.2f\n', obj.version); end
                 
                 obj.owner = owner;
             else
@@ -476,7 +476,7 @@ classdef ASAGUI < handle
         
         function callback_slew(obj, ~, ~)
             
-            if obj.debug_bit, disp('Callback: slew'); end
+            if obj.debug_bit>1, disp('Callback: slew'); end
             
             if obj.owner.check_need_flip
                 res = questdlg('Need to flip for this target. Are you sure?', 'Flip needed!', 'Slew', 'Abort', 'Slew');

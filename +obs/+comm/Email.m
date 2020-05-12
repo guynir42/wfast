@@ -31,17 +31,16 @@ classdef Email < handle
     properties(Hidden=true)
         
         quotes = {'Hasta la vista, baby!', ...
-                  'I''m sorry Dave, I just can''t do that', ...
-                  'You''re in a Johnny Cab... The door opened, you got in...', ...
+                  'I''m sorry Dave, I just can''t do that.', ...
                   'I could be reworked, but I''ll never be top of the line again.', ...
                   'Resistance is futile.',...
-                  'I am the proud owner of a central nervous system', ...
+                  'I am the proud owner of a central nervous system!', ...
                   'Excuse me, I have to go. Somewhere there is a crime happening.',...
                   'I suggest a new strategy, R2. Let the wookiee win!',...
                   'I can''t lie to you about your chances... but you have my sympathies.'...
                   'You hear that, Mr. Anderson?... That is the sound of inevitability...', ...
-                  'My code name is Project 2501',...
-                  'It can also be argued that DNA is nothing more than a program designed to preserve itself',...
+                  'My code name is Project 2501.',...
+                  'It can also be argued that DNA is nothing more than a program designed to preserve itself...',...
                   'Life? Don''t talk to me about life.'
                   }; 
               
@@ -55,15 +54,16 @@ classdef Email < handle
         function obj = Email(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'obs.comm.Email')
-                if obj.debug_bit, fprintf('Email copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Email copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('Email constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Email constructor v%4.2f\n', obj.version); end
                 
             end
             
             obj.setup_preferences;
             obj.readMailingList; 
+            
         end
         
         function setup_preferences(obj) % setup some stuff to get the email client to work
@@ -81,7 +81,9 @@ classdef Email < handle
             props = java.lang.System.getProperties; 
             props.setProperty('mail.smtp.auth','true');
             props.setProperty( 'mail.smtp.starttls.enable', 'true' );
-
+            props.setProperty('mail.smtp.port','587');
+            props.setProperty('java.lang.String.content_type','text/html');
+            
         end
         
     end
@@ -128,6 +130,8 @@ classdef Email < handle
             input.input_var('files', {}); 
             input.scan_vars(varargin{:}); 
             
+            obj.readMailingList;
+            
             str = obj.compose(varargin{:}); 
             
             for ii = 1:length(obj.mailing_list)
@@ -146,20 +150,42 @@ classdef Email < handle
             input.input_var('text', 'This is a default message'); 
             input.input_var('header', true); 
             input.input_var('footer', true); 
+            input.input_var('html', true); 
             input.scan_vars(varargin{:}); 
             
-            if input.header
-                str = sprintf('This is a friendly email from the W-FAST mailbot, send at %s.\n\n', datetime);
-            else
-                str = ''; 
+            style = ' align="left" valign="top" style="font-family: Courier, monospace;font-size:16px; white-space:pre;"';
+            
+            str = '';
+            
+            if input.html
+                str = [str '<html><head></head><body>'];
             end
             
-            str = [str input.text]; 
+            if input.header
+                new_str = sprintf('A message from the W-FAST mailbot, sent at %s.', datetime);
+                if input.html, new_str = ['<div style="font-style:italic;">' new_str '</div>']; end
+                str = sprintf('%s\n %s\n\n', str, new_str);
+            end
+            
+            if input.html
+                str = [str '<code style="font-family: monospace;font-size=12px;white-space:pre;">' input.text '</code>']; 
+            else
+                str = [str input.text]; 
+            end
             
             if input.footer
-                str = sprintf('\n\n "%s"', obj.getQuote); 
+                if input.html
+                    str = sprintf('%s\n\n <div style="font-style:italic;">"%s"</div>', str, obj.getQuote); 
+                else
+                    str = sprintf('%s\n\n "%s"', str, obj.getQuote); 
+                end
             end
-             
+           
+            if input.html
+                str = [str '</body></html>'];                
+%                 str = strrep(str, char(10), [char(10) '<br>']); 
+            end
+            
         end
         
         function send(obj, address, subject, message, files)
@@ -180,7 +206,7 @@ classdef Email < handle
                 files = {}; 
             end
             
-            sendmail(address, subject, message); 
+            util.sys.sendmail(address, subject, message); 
             
         end
         

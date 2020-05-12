@@ -48,6 +48,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         humidity; % humidity/temperature dog
         temperature; % additional temperature meters
         
+        email@obs.comm.Email; 
+        
         cam_pc@obs.comm.PcSync; % communications object to camera PC
         
         obs_log; % get this from cam_pc
@@ -103,6 +105,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     
     properties(Hidden=true)
        
+        latest_email_report_date = ''; % keep track of the last time we sent this, so we don't send multiple emails each day
+        
         version = 1.02;
         
     end
@@ -153,6 +157,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.connectSensorChecker; % create checker object that collects sensor data
             
             obj.constructPcSync;
+            obj.constructEmail;
             
             % start the 3 layers of timers
             obj.setup_t3; % check t2 is alive (half hour period)
@@ -287,6 +292,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 warning(ME.getReport);
                 disp('Cannot create a PcSync tcp/ip object')
             end
+            
+        end
+        
+        function constructEmail(obj)
+            
+            obj.email = obs.comm.Email;
             
         end
         
@@ -652,6 +663,19 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 if isempty(obj.t2) || ~isvalid(obj.t2) || strcmp(obj.t2.Running, 'off')
                     obj.setup_t2;
                 end
+                
+                % morning report! 
+                t = datetime('now', 'TimeZone', 'UTC');
+                
+                if t.Hour>4 % this is in UTC, so we can translate it to 6 or 6 local time
+
+                    d = datestr(t - days(1), 'yyyy-mm-dd');
+
+                    if isempty(obj.latest_email_report_date) || ~strcmp(obj.latest_email_report_date, d)
+                        obj.morning_report;
+                    end
+
+                end
 
             catch ME
                 obj.log.error(ME.getReport);
@@ -683,6 +707,93 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         function stop_t3(obj, ~, ~) % stop timer t3
             
             stop(obj.t3);
+            
+        end
+        
+        function morning_report(obj)
+            
+            t = datetime('yesterday', 'TimeZone', 'UTC');
+            d = datestr(t, 'yyyy-mm-dd');
+            
+            fprintf('%s: sending morning report by Email!\n', t); 
+            
+            str = sprintf('This is a morning report for the night of %s. \n\n', d); 
+            str = sprintf('%s  Dome status is: %s\n\n', str, obj.observatory_state);
+            
+            if ~isempty(obj.obs_log) && strcmp(obj.obs_log.date, d)
+                
+                list = fields(obj.obs_log); 
+                
+                obs_str = sprintf('      Runs overview for tonight: \n  ----------------------------------------');
+                
+                for ii = 1:length(list) % each target has a few runs inside a struct array with this name
+                    
+                    if strcmp(list{ii}, 'date'), continue; end
+                    
+                    s = obj.obs_log.(list{ii}); % struct with some info on the run
+                    files = 0;
+                    time = 0; 
+                    
+                    for jj = 1:length(s) % go over the different structs for each run 
+                        
+                        files = files + s(jj).num_files;
+                        time = time + s(jj).runtime;
+                        
+                    end
+                    
+                    obs_str = sprintf('%s\n%10s (%d) | files: %4d | runtime: %7.1f ', obs_str, list{ii}, length(s), files, time); 
+                    
+                end
+                
+                
+            else
+                obs_str = sprintf('  Could not find any information on observations run tonight...\n\n'); 
+            end
+            
+            str = sprintf('%s \n\n%s', str, obs_str); % add the observation report to the string
+            
+            if isfield(obj.cam_pc.incoming, 'drives') && ~isempty(obj.cam_pc.incoming.drives)
+            
+                drive_str = sprintf('  Hard drive space overview:\n\n'); 
+                
+                s = obj.cam_pc.incoming.drives;
+                f = fields(s); 
+                
+                for ii = 1:length(f)
+                    drive_str = sprintf('%s|     %s:\\     ', drive_str, f{ii}); 
+                end
+                
+                drive_str = sprintf('%s|\n', drive_str); 
+                
+                for ii = 1:length(f)
+                    drive_str = sprintf('%s+-------------', drive_str); 
+                end
+                
+                drive_str = sprintf('%s+\n', drive_str); 
+                
+                for ii = 1:length(f)
+                    drive_str = sprintf('%s|% 8d Gb  ', drive_str, round(s.(f{ii}))); 
+                end
+                
+                drive_str = sprintf('%s|\n', drive_str); 
+                
+                gb_limit = 3000; % set this to warn when HDDs are running low...  
+                
+                if isfield(s, 'E') && ~isempty(s.E) && s.E<gb_limit
+                    drive_str = sprintf('%s\nWARNING: Drive E is has less than %d Gb left!', drive_str, gb_limit);
+                end
+                
+                if isfield(s, 'F') && ~isempty(s.F) && s.F<gb_limit
+                    drive_str = sprintf('%s\nWARNING: Drive F is has less than %d Gb left!', drive_str, gb_limit);
+                end
+                
+                str = sprintf('%s \n\n%s', str, drive_str); 
+            
+            end
+            
+            obj.email.sendToList('subject', '[WFAST] Morning report', 'text', str, 'header', 1, 'footer', 1); 
+            
+            obj.latest_email_report_date = d; % make sure we don't resend this email today (after a successful send!)
             
         end
         

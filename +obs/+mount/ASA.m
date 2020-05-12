@@ -159,10 +159,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function obj = ASA(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'obs.mount.ASA')
-                if obj.debug_bit, fprintf('ASA copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('ASA copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('ASA constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('ASA constructor v%4.2f\n', obj.version); end
             
             end
             
