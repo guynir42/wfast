@@ -6,6 +6,7 @@ int SaveData::debug_bit=0;
 int SaveData::deflate=0;
 size_t SaveData::chunk_size=64;
 int SaveData::async_write=0;
+int SaveData::photometric_write=1;
 
 
 SaveData::SaveData(const char *filename){
@@ -36,7 +37,7 @@ void SaveData::parseVararginPairs(int N, const mxArray *vars[]){
 	for(int i=2; i<N;i+=2){
 		
 		if(mxIsChar(vars[i])==0 && mxIsStruct(vars[i])==0) mexErrMsgIdAndTxt( "MATLAB:file:mex:mexWrite:inputNotStringOrStruct", "Keyword must be a string or a struct.");
-		if(mxIsStruct(vars[i])){ readStruct(vars[i]); i--; continue; } // skip this element and see if there are any more inputs to parse... 
+		if(mxIsStruct(vars[i])){ buf_struct=(mxArray*) vars[i]; i--; continue; } // skip this element and see if there are any more inputs to parse... 
 		
 		const char *keyword=mxArrayToString(vars[i]);
 		
@@ -88,8 +89,10 @@ void SaveData::parseVararginPairs(int N, const mxArray *vars[]){
 		else if(cs(keyword, "deflate")) deflate=(int) mxGetScalar(value);
 		else if(cs(keyword, "chunk")) chunk_size=(int) mxGetScalar(value);
 		else if(cs(keyword, "async_write")) async_write=(int) mxGetScalar(value);
-		
+		else if(cs(keyword, "photometric_write")) photometric_write=(int) mxGetScalar(value); 
 	}
+	
+	if(buf_struct) readStruct(buf_struct); // make sure to read data from the struct only after reading optional arguments (e.g., photometric_write)
 
 }
 
@@ -121,18 +124,20 @@ void SaveData::readStruct(const mxArray *buf){
 	names.push_back("psfs");
 	names.push_back("sampling_psf");
 	
-	names.push_back("fluxes");
-	names.push_back("errors"); 
-	names.push_back("areas"); 
-	names.push_back("backgrounds");
-	names.push_back("variances"); 
-	names.push_back("offsets_x"); 
-	names.push_back("offsets_y"); 
-	names.push_back("centroids_x"); 
-	names.push_back("centroids_y");
-	names.push_back("widths");
-	names.push_back("bad_pixels"); 
-	names.push_back("flags"); 
+	if(photometric_write){
+		names.push_back("fluxes");
+		names.push_back("errors"); 
+		names.push_back("areas"); 
+		names.push_back("backgrounds");
+		names.push_back("variances"); 
+		names.push_back("offsets_x"); 
+		names.push_back("offsets_y"); 
+		names.push_back("centroids_x"); 
+		names.push_back("centroids_y");
+		names.push_back("widths");
+		names.push_back("bad_pixels"); 
+		names.push_back("flags"); 
+	}
 	
 	// add more names to the list if new data fields are added
 	
@@ -170,19 +175,20 @@ void SaveData::readStruct(const mxArray *buf){
 			else if(cs(keyword, "psfs", 4)) psfs.input("psfs", value, 0);		
 			else if(cs(keyword, "sampling_psf",4)) psfs.attributes.push_back(MyAttribute("psf_sampling", value));
 			
-			else if(cs(keyword, "fluxes")) fluxes.input("fluxes", value, 0);
-			else if(cs(keyword, "errors")) errors.input("errors", value, 0);
-			else if(cs(keyword, "areas")) areas.input("areas", value, 0);
-			else if(cs(keyword, "backgrounds")) backgrounds.input("backgrounds", value, 0);
-			else if(cs(keyword, "variances")) variances.input("variances", value, 0);
-			else if(cs(keyword, "offsets_x")) offsets_x.input("offsets_x", value, 0);
-			else if(cs(keyword, "offsets_y")) offsets_y.input("offsets_y", value, 0);
-			else if(cs(keyword, "centroids_x")) centroids_x.input("centroids_x", value, 0);
-			else if(cs(keyword, "centroids_y")) centroids_y.input("centroids_y", value, 0);
-			else if(cs(keyword, "widths")) widths.input("widths", value, 0);
-			else if(cs(keyword, "bad_pixels")) bad_pixels.input("bad_pixels", value, 0);
-			else if(cs(keyword, "flags")) flags.input("flags", value, 0);
-			
+			else if(photometric_write){
+				if(cs(keyword, "fluxes")) fluxes.input("fluxes", value, 0);
+				else if(cs(keyword, "errors")) errors.input("errors", value, 0);
+				else if(cs(keyword, "areas")) areas.input("areas", value, 0);
+				else if(cs(keyword, "backgrounds")) backgrounds.input("backgrounds", value, 0);
+				else if(cs(keyword, "variances")) variances.input("variances", value, 0);
+				else if(cs(keyword, "offsets_x")) offsets_x.input("offsets_x", value, 0);
+				else if(cs(keyword, "offsets_y")) offsets_y.input("offsets_y", value, 0);
+				else if(cs(keyword, "centroids_x")) centroids_x.input("centroids_x", value, 0);
+				else if(cs(keyword, "centroids_y")) centroids_y.input("centroids_y", value, 0);
+				else if(cs(keyword, "widths")) widths.input("widths", value, 0);
+				else if(cs(keyword, "bad_pixels")) bad_pixels.input("bad_pixels", value, 0);
+				else if(cs(keyword, "flags")) flags.input("flags", value, 0);
+			}
 			
 			// add more names to the list if new data fields are added
 		}

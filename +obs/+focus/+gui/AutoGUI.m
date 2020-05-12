@@ -158,9 +158,11 @@ classdef AutoGUI < handle
             %%%%%%%%%%% panel run %%%%%%%%%%%%%%%%%%%%%
             
             obj.panel_run = GraphicPanel(obj.owner, [width, 0.0, 1-width, 0.1], 'run'); 
-            obj.panel_run.addButton('button_autofocus', 'cam.autofocus', 'push', 'Autofocus', '', '', 0.8, '', '', 'run autofocus routine using the camera'); 
+            obj.panel_run.addButton('button_autofocus', '', 'custom', 'Start autofocus run', '', '', 0.8, '', '', 'run autofocus routine using the camera'); 
             obj.panel_run.addButton('button_focuser', 'cam.focuser', 'push', 'manual', '', '', 0.2, '', '', 'open the focuser GUI to set the focus/tip/tilt manually'); 
             obj.panel_run.make;
+            
+            obj.panel_run.button_autofocus.Callback = @obj.callback_autofocus;
             
             %%%%%%%%%%% panel image %%%%%%%%%%%%%%%%%%
             
@@ -211,6 +213,12 @@ classdef AutoGUI < handle
                 obj.menus{ii}.update;
             end
            
+            if obj.owner.cam.is_running_focus
+                obj.panel_run.button_autofocus.String = 'STOP';
+            else
+                obj.panel_run.button_autofocus.String = 'Start autofocus run';
+            end
+            
             obj.owner.calculate;
             obj.owner.plot;
             
@@ -226,9 +234,23 @@ classdef AutoGUI < handle
                 
     methods % callbacks
         
+        function callback_autofocus(obj, ~, ~)
+            
+            if obj.debug_bit>1, disp('callback: start/stop'); end
+            
+            if obj.owner.cam.is_running_focus
+                obj.owner.cam.brake_bit = 1;
+            else
+                obj.owner.cam.autofocus;
+            end
+            
+            obj.update;
+            
+        end
+        
         function callback_close(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: close'); end
+            if obj.debug_bit>1, disp('callback: close'); end
             
             delete(obj.fig.fig);
             

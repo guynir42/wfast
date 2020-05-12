@@ -56,6 +56,7 @@ classdef AcqGUI < handle
         button_gb_left; 
         
         button_show_what;
+        button_gray;
 %         button_src_status;
         button_flip;
         button_show_switch;
@@ -152,6 +153,8 @@ classdef AcqGUI < handle
             
             obj.menu_options.addButton('menu_photometry', '&Photometry', 'menu');
             obj.menu_options.menu_photometry.addButton('button_use_simple', '&Simple photometry', 'toggle', 'use_simple_photometry', 'just sum the cutouts, not using Photometry/Lightcurve objects');
+            obj.menu_options.menu_photometry.addButton('button_use_store_photometry', 'S&tore photometry', 'toggle', 'use_store_photometry', 'keep a copy of the photometric products in the Lightcurve object');
+            obj.menu_options.menu_photometry.addButton('button_use_save_photometry', 'Sa&ve photometry', 'toggle', 'use_save_photometry', 'save the flux and other photometric products in the HDF5 files');
             obj.menu_options.menu_photometry.addButton('button_model_psf', '&PSF model', 'toggle', 'use_model_psf', 'stack the cutouts and fit it to a PSF model');
             obj.menu_options.menu_photometry.addButton('button_num_cutouts', '&Num cutouts', 'input', 'num_phot_cutouts', 'How many stars/cutouts to input to photomery and store in lightcurves');
             
@@ -202,7 +205,7 @@ classdef AcqGUI < handle
             obj.panel_controls.addButton('chooser_units', '', 'custom', '', '', 'small', 0.4); 
             obj.panel_controls.addButton('button_slow_mode', 'setupSlowMode', 'push', 'Slow mode', '', '', 0.5, '', '', 'Setup low-cadence observations with T=3s, single image files, 500 stars max');
             obj.panel_controls.addButton('button_fast_mode', 'setupFastMode', 'push', 'Fast mode', '', '', 0.5, '', '', 'Setup high-cadence observations with T=30ms, f=25Hz, 100 images per batch/file');
-            obj.panel_controls.addButton('button_single', 'single', 'push', 'Take single exposure', '', '', [], '', '', 'Take a single image and show it on screen. Does not save the image to file');
+            obj.panel_controls.addButton('button_single', 'single', 'push', 'Take single batch', '', '', [], '', '', 'Take a single image and show it on screen. Does not save the image to file');
             obj.panel_controls.addButton('button_live', 'startLiveView', 'push', 'Start live view', '', '', [], '', '', 'Open the camera GUI and start the live-view video mode. Does not save any images to file');
             obj.panel_controls.addButton('button_auto_focus', 'cam.autofocus', 'push', 'Auto-focus', '', '', 0.7, '', '', 'Start a focus-run. Does not save any images to file');
             obj.panel_controls.addButton('button_manual_focus', '', 'custom', 'manual', '', '', 0.3, '', '', 'open the focus GUI for manual focusing');
@@ -270,6 +273,9 @@ classdef AcqGUI < handle
             obj.button_show_what = GraphicButton(obj.panel_image, [0 0.00 0.15 0.05], obj.owner, 'show_what', 'picker', 'full', '', 'small');
             obj.button_show_what.Callback = @obj.callback_show_what;
             obj.button_show_what.String = obj.owner.show_what_list;
+            
+            obj.button_gray = GraphicButton(obj.panel_image, [0.15 0.00 0.1 0.05], obj.owner, 'use_show_gray', 'toggle', 'color', 'gray', 'small'); 
+            obj.button_gray.Tooltip = 'show the images in color or in gray-scale'; 
             
             obj.button_flip = GraphicButton(obj.panel_image, [0.9 0.00 0.1 0.05], obj.owner, 'use_flip', 'toggle', 'no flip', 'flip', 'small');
             obj.button_show_switch = GraphicButton(obj.panel_image, [0.8 0.00 0.1 0.05], obj.owner, 'use_show', 'toggle', 'no show', 'show', 'small');
@@ -389,7 +395,11 @@ classdef AcqGUI < handle
             end
             
             obj.panel_info.button_message.String = display_string;    
-        
+            
+            if obj.owner.use_show
+                obj.owner.show;
+            end
+
             drawnow;
             
         end

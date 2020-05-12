@@ -216,6 +216,7 @@ classdef Andor < file.AstroData
         focus_gaussian = 5;
         
         is_running = 0;
+        is_running_focus = 0;
         brake_bit = 1; % when 1 the camera is stopped. Is set to 0 on "startup". 
         
         version = 1.01;
@@ -822,6 +823,8 @@ classdef Andor < file.AstroData
             
             try 
             
+                obj.is_running_focus = 1; % tell focus GUI to display an indicator that focus is running... 
+                
                 if isempty(obj.af.gui) || ~obj.af.gui.check
                     obj.af.makeGUI;
                 end
@@ -858,7 +861,12 @@ classdef Andor < file.AstroData
                 
                 % find stars, the quick version!
                 obj.single('frame rate', obj.af.frame_rate, 'exp time', obj.af.expT, 'batch size', obj.af.batch_size); % need to first update with observational parameters (using varargin!)
-                T = util.img.quick_find_stars(single(util.stat.sum_single(obj.images)), 'threshold', 15, 'saturation', 5e4*obj.af.batch_size, 'unflagged', 1); % sum single must turn uint16 to single! 
+                T = util.img.quick_find_stars(single(util.stat.sum_single(obj.images)), 'threshold', 15,...
+                    'saturation', 5e4*obj.af.batch_size, 'unflagged', 1, 'num_stars', obj.af.num_stars);
+                
+                if isempty(T)
+                    error('Could not find any stars for doing focus!'); 
+                end
                 
                 obj.focuser.pos = p(1);
                 
@@ -931,13 +939,17 @@ classdef Andor < file.AstroData
 %                     obj.cam.focuser.tilt = obj.cam.focuser.tilt + obj.af.found_tilt;
 %                 end
 
+                obj.is_running_focus = 0; 
+                
                 obj.af.plot;
+                
                 if ~isempty(obj.focuser.gui) && obj.gui.check
                     obj.focuser.gui.update
                 end
 
             catch ME
                 
+                obj.is_running_focus = 0; 
                 obj.focuser.pos = old_pos;
                 obj.log.error(ME.getReport);
                 rethrow(ME);
@@ -1198,6 +1210,7 @@ classdef Andor < file.AstroData
                 obj.unstash_parameters; % return all parameters to values they were in before this run
                 
                 obj.is_running = 0;
+                obj.is_running_focus = 0; 
                 
                 if ~isempty(obj.gui)
                     obj.gui.update;
@@ -1208,6 +1221,7 @@ classdef Andor < file.AstroData
                 obj.is_running = 0;
                 rethrow(ME);
             end
+            
         end
         
         function batch(obj)

@@ -45,6 +45,7 @@ classdef AutoFocus < handle
         expT = 0.03;
         frame_rate = NaN;
         batch_size = 5;
+        num_stars = []; 
         
         use_loop_back = 0;
         
@@ -415,6 +416,10 @@ classdef AutoFocus < handle
             end
             
             box(input.ax, 'on'); 
+            
+            if obj.cam.is_running_focus
+                util.plot.inner_title('Focus is running!', 'ax', input.ax, 'FontSize', 26, 'Position', 'North'); 
+            end
             
             input.ax.YLim = [mn-0.1 mx+0.1];
             

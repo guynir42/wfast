@@ -103,6 +103,8 @@ classdef Acquisition < file.AstroData
         use_lock_adjust = 0; % make all cutouts move together based on the average drift
         
         use_simple_photometry = 0; % use only sums on the cutouts instead of Photometry object for full cutouts
+        use_store_photometry = 1; % store the photometric products in the Lightcurve object for entire run
+        use_save_photometry = 1; % save the flux and other products in the HDF5 files along with the images
         
         use_model_psf = 1;
         
@@ -131,6 +133,7 @@ classdef Acquisition < file.AstroData
         display_num_rect_bg = 30;
         
         use_flip = 0; % flip view by 180 degrees (for meridien flip)
+        use_show_gray = 0; % display in gray instead of default colormap
         
         use_audio = 1;
         use_progress = 1;
@@ -257,7 +260,9 @@ classdef Acquisition < file.AstroData
         
         show_what_list = {'images', 'stack', 'stack_proc'};
         
-        version = 1.06;
+        drive_space_gb = []; 
+        
+        version = 1.07;
         
     end
     
@@ -385,23 +390,21 @@ classdef Acquisition < file.AstroData
                 end
                 
             end
-
-            obj.sync.outgoing.RA_rate_delta = 0;
-            obj.sync.outgoing.DE_rate_delta = 0;
-            
-            obj.clear;
             
             obj.num_stars_found = [];
             obj.prev_fluxes = [];
             obj.batch_counter = 0;
             obj.start_index = 1;
             obj.positions = [];
+            obj.positions_bg = [];
             
             obj.failed_batch_counter = 0;
             
             obj.sync.outgoing.RA_rate_delta = 0;
             obj.sync.outgoing.DE_rate_delta = 0;
 
+            obj.clear;
+            
         end
         
         function clear(obj)
@@ -417,6 +420,18 @@ classdef Acquisition < file.AstroData
                 end
                 
             end
+            
+            clear@file.AstroData(obj); % clear everything in this object that is included in file.AstroData (including positions!)
+            
+            obj.prev_stack = obj.stack_proc; % keep one stack from last batch
+            
+            % clear some of the additional data products
+            obj.stack_proc = [];
+            obj.stack_cutouts = [];
+            obj.stack_cutouts_bg = [];
+            obj.cutouts_proc = [];
+            obj.cutouts_bg = [];
+            obj.cutouts_bg_proc = [];
             
         end
         
@@ -1378,7 +1393,9 @@ classdef Acquisition < file.AstroData
                     
                 end
                 
-                obj.sync.outgoing.obs_log = obj.obs_log; 
+                obj.sync.outgoing.obs_log = obj.obs_log; % update the Manager on how much observing time is invested in each target
+                obj.drive_space_gb = obj.getDriveSpace; % calculate how much space is left in each drive (in Gb) 
+                obj.sync.outgoing.drives = obj.drive_space_gb;
                 
                 if obj.use_sync 
                     
@@ -1536,6 +1553,21 @@ classdef Acquisition < file.AstroData
             
         end
         
+        function s = getDriveSpace(obj)
+            
+            s = struct;
+            
+            for ii = double('A'):double('Z')
+                
+                name = [char(ii) ':\'];
+                if exist(name, 'dir')
+                    s.(char(ii)) = util.sys.disk_space(name); 
+                end
+                
+            end
+            
+        end
+        
     end
     
     methods % commands/calculations
@@ -1638,6 +1670,8 @@ classdef Acquisition < file.AstroData
                 
                 obj.stash_parameters(input);
             
+                obj.buf.use_save_photometry = obj.use_save_photometry; 
+                
                 if isempty(obj.num_batches)
                     error('Must input a number of batches!');
                 end
@@ -1670,7 +1704,7 @@ classdef Acquisition < file.AstroData
                     error('Run scheduled to take %4.2f hours with these parameter... aborting!', obj.getTimeLeft/3600); 
                 end
                 
-                if obj.use_save && obj.getGbLeft>util.sys.disk_space(obj.buf.directory)*10 % only throw an error if the required disk space is way too big! 
+                if obj.use_save && obj.getGbLeft>util.sys.disk_space(obj.buf.directory)*1.0 % only throw an error if the required disk space is bigger than storage! 
                     error('Run scheduled requires an estimated %5.2f Gb of storage. Only %5.2f Gb available on drive!', obj.getGbLeft, util.sys.disk_space(obj.buf.directory));
                 end
                 
@@ -1752,7 +1786,7 @@ classdef Acquisition < file.AstroData
                         filename = obj.buf.getReadmeFilename;
                         util.oop.save(obj, filename, 'name', 'acquisition'); 
                         
-                        if ~isempty(obj.cat.success) && obj.cat.success && obj.use_save
+                        if ~isempty(obj.cat.success) && obj.cat.success 
                             
                             try
                                 filename = fullfile(obj.buf.directory, 'catalog.mat');
@@ -1859,6 +1893,7 @@ classdef Acquisition < file.AstroData
             
             obj.prev_stack = obj.stack_proc; % keep one stack from last batch
             obj.clear;
+            obj.positions = obj.clip.positions; % recover the positions from the copy saved in the Clipper
             
             t_batch = tic;
             obj.src.batch; % produce the data (from camera, file, or simulator)
@@ -1944,9 +1979,9 @@ classdef Acquisition < file.AstroData
             
             t_show = tic;
             
-            if obj.use_show
-                obj.show;
-            end
+%             if obj.use_show
+%                 obj.show;
+%             end
             
             drawnow;
             
@@ -1984,11 +2019,9 @@ classdef Acquisition < file.AstroData
             
             try 
                 
-                obj.clear;
+                obj.reset;
                 
                 obj.src.single; 
-                
-                obj.prev_stack = obj.stack_proc; % keep one stack from last batch
                 
                 obj.copyFrom(obj.src); % get the data into this object
 
@@ -2004,6 +2037,11 @@ classdef Acquisition < file.AstroData
                 end
 
                 obj.calcStack;
+                
+                if ~isempty(obj.gui)
+                    obj.show; 
+                    obj.gui.update; 
+                end
                 
                 check = 1;
                 obj.is_running_single = 0;
@@ -2048,6 +2086,8 @@ classdef Acquisition < file.AstroData
                 obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.clip.positions); % run photometry on the stack to verify flux and adjust positions
                 if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
 
+                obj.prev_average_width = obj.average_width; % keep track of the average width
+                
                 if obj.use_check_positions && obj.use_arbitrary_pos==0
                     obj.checkRealign;
                 end
@@ -2080,11 +2120,14 @@ classdef Acquisition < file.AstroData
                      
                 end
 
-                if obj.use_model_psf
+                if obj.use_model_psf && ~isempty(obj.stack_cutouts)
+                    
                     obj.model_psf.input(obj.stack_cutouts, obj.phot_stack.offsets_x, obj.phot_stack.offsets_y);
+                    
+%                     obj.prev_average_width = obj.average_width;
+                    
                 end
 
-                obj.prev_average_width = obj.average_width;
                 
             end
             
@@ -2354,7 +2397,9 @@ classdef Acquisition < file.AstroData
                 obj.bad_pixels = obj.phot.bad_pixels;
                 obj.flags = obj.phot.flags;
                 
-                obj.lightcurves.getData(obj.phot);
+                if obj.use_store_photometry
+                    obj.lightcurves.getData(obj.phot);
+                end
                 
             end
             
@@ -2862,8 +2907,16 @@ classdef Acquisition < file.AstroData
                 end
 
                 util.plot.setImage(I, input.ax);
-
-                obj.clip.showRectangles('num', obj.display_num_rect_stars, 'color', 'black', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 1, 'text', 0);
+                
+                if obj.use_show_gray
+                    colormap(input.ax, 'gray');
+                    rect_color = 'white';
+                else
+                    colormap(input.ax, 'default');
+                    rect_color = 'black'; 
+                end
+                
+                obj.clip.showRectangles('num', obj.display_num_rect_stars, 'color', rect_color, 'ax', input.ax, 'flip', obj.use_flip, 'delete', 1, 'text', 0);
                 obj.clip_bg.showRectangles('num', obj.display_num_rect_bg, 'color', 'red', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 0, 'text', 0);
 
             catch ME

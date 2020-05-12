@@ -42,6 +42,8 @@ class SaveData {
 	char filename[STRLN];	
 	static double *mex_flag; // flag[0]: started writing, flag[1]: finished writing, flag[2]: error
 	
+	mxArray *buf_struct=0;
+	
 	MyMatrix images;
 	MyMatrix timestamps; // 1D vector of times	
 	MyMatrix cutouts;
@@ -75,6 +77,7 @@ class SaveData {
 	static int deflate;
 	static size_t chunk_size;	
 	static int async_write;
+	static int photometric_write;
 		
 	static bool cs(const char *keyword, const char *compare_str, int num_letters=3);
 	static bool cs(const char *keyword, const char *str1, const char *str2, int num_letters=3);
