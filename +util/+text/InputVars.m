@@ -50,6 +50,7 @@ classdef InputVars < dynamicprops
         alias_dictionary; % keep track of the names of each of the parameters
         logical_dictionary; % keep track which parameter is logical (use parse_bool to scan inputs)
         number_dictionary; % keep track of the minimal number of letters required for util.text.cs to match
+        comment_dictionary; % keep a comment for some of the keywords
         
         use_ordered_numeric = 0; % if true, will accept numeric variables in order without keywords
         list_added_properties = {}; % a list of keywords, in the order added when defining the object
@@ -64,6 +65,7 @@ classdef InputVars < dynamicprops
             obj.alias_dictionary = containers.Map;
             obj.logical_dictionary = containers.Map;
             obj.number_dictionary = containers.Map;
+            obj.comment_dictionary = containers.Map;
             
         end
         
@@ -124,6 +126,14 @@ classdef InputVars < dynamicprops
                 obj.alias_dictionary(name) = varargin;
                 
             end
+            
+            obj.comment_dictionary(name) = ''; 
+                
+        end
+        
+        function add_comment(obj, name, comment)
+            
+            obj.comment_dictionary(name) = comment; 
             
         end
         
@@ -231,7 +241,9 @@ classdef InputVars < dynamicprops
                 
                 fprintf('%15s', keys{ii});
                 if isprop(obj, keys{ii})
-                    if isnumeric(obj.(keys{ii})) 
+                    if isempty(obj.(keys{ii}))
+                        fprintf(' = []'); 
+                    elseif isnumeric(obj.(keys{ii})) 
                         fprintf(' = %f', obj.(keys{ii}));
                     elseif ischar(obj.(keys{ii}))
                         fprintf(' = "%s"', obj.(keys{ii}));
@@ -246,6 +258,10 @@ classdef InputVars < dynamicprops
                 
                 if ~isempty(obj.number_dictionary(keys{ii}))
                     fprintf(' (match number= %d)', obj.number_dictionary(keys{ii}));
+                end
+                
+                if ~isempty(obj.comment_dictionary(keys{ii}))
+                    fprintf('     %% %s', obj.comment_dictionary(keys{ii}));
                 end
                 
                 fprintf('\n');

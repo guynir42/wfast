@@ -45,7 +45,7 @@ classdef InputGUI < handle
             % later add other options like copy constructor
             if isa(owner, 'util.text.InputVars')
                 
-                if obj.debug_bit, fprintf('InputGUI constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('InputGUI constructor v%4.2f\n', obj.version); end
                 
                 obj.owner = owner;
                 
@@ -94,8 +94,8 @@ classdef InputGUI < handle
             
             for ii = 1:N
                 
-                obj.panel_inputs.addButton(['button_' list{ii}], '', 'custom', list{ii}, '', '', 0.4);
-                obj.panel_inputs.addButton(['input_' list{ii}], list{ii}, 'input generic', ' ', '', '', 0.6);
+                obj.panel_inputs.addButton(['button_' list{ii}], '', 'custom', list{ii}, '', '', 0.4, '', '', obj.owner.comment_dictionary(list{ii}));
+                obj.panel_inputs.addButton(['input_' list{ii}], list{ii}, 'input generic', ' ', '', '', 0.6, '', '', obj.owner.comment_dictionary(list{ii}));
                 
             end
             
@@ -153,7 +153,7 @@ classdef InputGUI < handle
         
         function callback_close(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: close'); end
+            if obj.debug_bit>1, disp('callback: close'); end
             
             delete(obj.fig.fig);
             

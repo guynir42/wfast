@@ -159,15 +159,33 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         function makeConstraints(obj)
             
             obj.constraints = util.text.InputVars;
-            obj.constraints.input_var('altitude', 25, 'alt limit'); % minimal angle above horizon for being observable (degrees)
-            obj.constraints.input_var('continuous', 1, 'continuous_time', 'cont_time', 'min_time', 'minimal_time', 'minimal_duration', 'min duration'); % minimal time until reaching meridian or horizon (hours)
-            obj.constraints.input_var('duration', Inf, 'max_duration', 'maximal_duration', 'max_time', 'maximum_time'); % how much time do we want to observe this target at most (hours)
-            obj.constraints.input_var('earliest', [], 'start time'); % observation must start after this time
-            obj.constraints.input_var('latest', [], 'latest time'); % observation must not begin after this time
-            obj.constraints.input_var('side', [], 'hemisphere'); % observation must be taken on this size (empty is same as "both")
-            obj.constraints.input_var('airmass', Inf); % observation must have airmass below this value
-            obj.constraints.input_var('south_limit', -20, 'declination_limit'); % lowest declination we are ready to accept
-            obj.constraints.input_var('moon', 20, 'moon_distance'); % target must be far away from the moon (degrees)
+            
+            obj.constraints.input_var('altitude', 25, 'alt limit'); 
+            obj.constraints.add_comment('altitude', 'minimal angle above horizon for being observable (degrees)'); 
+            
+            obj.constraints.input_var('continuous', 1, 'continuous_time', 'cont_time', 'min_time', 'minimal_time', 'minimal_duration', 'min duration');
+            obj.constraints.add_comment('continuous', 'minimal time until reaching meridian or horizon (hours)'); 
+            
+            obj.constraints.input_var('duration', Inf, 'max_duration', 'maximal_duration', 'max_time', 'maximum_time'); 
+            obj.constraints.add_comment('duration', 'how much time do we want to observe this target at most (hours)'); 
+            
+            obj.constraints.input_var('earliest', [], 'start time'); 
+            obj.constraints.add_comment('earliest', 'observation must start after this time (UTC)'); 
+            
+            obj.constraints.input_var('latest', [], 'latest time'); 
+            obj.constraints.add_comment('latest', 'observation must not begin after this time (UTC)'); 
+            
+            obj.constraints.input_var('side', [], 'hemisphere'); 
+            obj.constraints.add_comment('side', 'observation must be taken on this size (empty is same as "both")'); 
+            
+            obj.constraints.input_var('airmass', Inf); 
+            obj.constraints.add_comment('airmass', 'observation must have airmass below this value'); 
+            
+            obj.constraints.input_var('south_limit', -20, 'declination_limit'); 
+            obj.constraints.add_comment('south_limit', 'lowest declination we are ready to accept'); 
+            
+            obj.constraints.input_var('moon', 20, 'moon_distance'); 
+            obj.constraints.add_comment('moon', 'target must be this far away from the moon (degrees)'); 
             
         end
         
@@ -657,17 +675,40 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 obj.RA = obj.moon.RA;
                 obj.Dec = obj.moon.Dec;
             else
-                if ~isempty(which('celestial.coo.coo_resolver', 'function')) % use Eran's name resolver
+                
+                obj.name = name;
+                
+                if ~isempty(which('celestial.coo.convert2equatorial', 'function')) % use Eran's IMPROVED name resolver
+                    
+                    [RA, DEC] = celestial.coo.convert2equatorial(name, [], 'JD', obj.JD, ...
+                        'ObsCoo', [obj.longitude, obj.latitude, 800], 'OutputUnits', 'deg', 'NameServer', 'simbad');
 
-                    obj.name = name;
+                    if isnan(RA) || isnan(DEC) % failed to resolve
+                        
+                        [RA, DEC] = celestial.coo.convert2equatorial(name, [], 'JD', obj.JD, ...
+                            'ObsCoo', [obj.longitude, obj.latitude, 800], 'OutputUnits', 'deg', 'NameServer', 'jpl');
+                        
+                        if isnan(RA) || isnan(DEC) % failed to resolve using JPL also
+                            fprintf('Could not resolve name "%s" with convert2equatorial()!\n', name);
+                        end
+                        
+                    end
+                    
+                    obj.RA = RA/15;
+                    obj.Dec = DEC;
+                    
+                elseif ~isempty(which('celestial.coo.coo_resolver', 'function')) % use Eran's name resolver
 
                     [RA, DEC] = celestial.coo.coo_resolver(name, 'OutUnits', 'deg', 'NameServer', @VO.name.server_simbad);
 
-                    if ~isnan(RA) && ~isnan(DEC)
-                        obj.RA = RA/15;
-                        obj.Dec = DEC;
+                    if isnan(RA) || isnan(DEC)
+                        fprintf('Could not resolve name "%s" with coo_resolver()!\n', name); 
+                        return;
                     end
 
+                    obj.RA = RA/15;
+                    obj.Dec = DEC;
+                    
                 else
                     error('no name resolver has been found... try adding MAAT to the path.');
                 end

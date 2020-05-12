@@ -49,7 +49,7 @@ classdef AudioControl < handle
        
         function obj = AudioControl
            
-            if obj.debug_bit, fprintf('AudioControl constructor v%4.2f\n', obj.version); end
+            if obj.debug_bit>1, fprintf('AudioControl constructor v%4.2f\n', obj.version); end
             
             try 
                 

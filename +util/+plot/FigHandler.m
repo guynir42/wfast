@@ -53,13 +53,13 @@ classdef FigHandler < handle
                 
             elseif ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.Figure')
                
-                if obj.debug_bit, fprintf('FigHandler figure handle constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('FigHandler figure handle constructor v%4.2f\n', obj.version); end
                 
                 obj.fig = varargin{1};
                 
             elseif ~isempty(varargin) && ischar(varargin{1})
 
-                if obj.debug_bit, fprintf('FigHandler string constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('FigHandler string constructor v%4.2f\n', obj.version); end
                 
                 obj.fig = matlab.ui.Figure.empty;
                 obj.findFigure(varargin{1}, varargin{2:end});

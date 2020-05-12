@@ -56,13 +56,13 @@ classdef WorldCoordinates < handle
         function obj = WorldCoordinates(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'head.WorldCoordinates')
-                if obj.debug_bit, fprintf('WorldCoordinates copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('WorldCoordinates copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             elseif ~isempty(varargin) && isstruct(varargin{1}) && isfield(varargin{1}, 'CRVAL') % can add more checks
-                if obj.debug_bit, fprintf('WorldCoordinates struct based constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('WorldCoordinates struct based constructor v%4.2f\n', obj.version); end
                 obj.input(varargin{1});
             elseif ~isempty(varargin) && (isa(varargin{1}, 'SIM') || isa(varargin{1},'ClassWCS'))
-                if obj.debug_bit, fprintf('WorldCoordinates object based constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('WorldCoordinates object based constructor v%4.2f\n', obj.version); end
                 obj.input(varargin{1});
             else
                 if obj.debug_bit, fprintf('WorldCoordinates constructor v%4.2f\n', obj.version); end

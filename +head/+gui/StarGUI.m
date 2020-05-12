@@ -43,7 +43,7 @@ classdef StarGUI < handle
             % later add other options like copy constructor
             if isa(owner, 'head.Star')
                 
-                if obj.debug_bit, fprintf('StarGUI constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('StarGUI constructor v%4.2f\n', obj.version); end
                 
                 obj.owner = owner;
                                 
@@ -243,7 +243,7 @@ classdef StarGUI < handle
         
         function callback_close(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: close'); end
+            if obj.debug_bit>1, disp('callback: close'); end
             
             obj.owner.head.gui.update;
             

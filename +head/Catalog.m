@@ -81,7 +81,6 @@ classdef Catalog < handle
     
     properties % switches/controls
         
-                
         threshold = 5; % used by mextractor to find stars - to be deprecated
         
         input_rotation = -60;
@@ -130,7 +129,7 @@ classdef Catalog < handle
         function obj = Catalog(varargin) % can give the constructor a Header object as input
             
             if ~isempty(varargin) && isa(varargin{1}, 'head.Catalog')
-                if obj.debug_bit, fprintf('Catalog copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Catalog copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             elseif ~isempty(varargin) && isa(varargin{1}, 'head.Header')
                 if obj.debug_bit>1, fprintf('Catalog (head) constructor v%4.2f\n', obj.version); end
@@ -277,8 +276,8 @@ classdef Catalog < handle
             % we don't know how to run astrometry without a SIM object... 
             S = SIM;
             S.Cat = [P NaN(size(P,1), 3)]; 
-            S.Col.X=1; S.Col.Y=2; S.Col.Mag=3; S.Col.Im_RA=4; S.Col.Im_Dec=5;
-            S.ColCell = {'X', 'Y', 'Mag', 'Im_RA', 'Im_Dec'}; % make a false catalog 
+            S.Col.X=1; S.Col.Y=2; S.Col.Mag_G=3; S.Col.ALPHAWIN_J2000=4; S.Col.DELTAWIN_J2000=5;
+            S.ColCell = {'X', 'Y', 'Mag_G', 'ALPHAWIN_J2000', 'DELTAWIN_J2000'}; % make a false catalog 
             
             addpath(fullfile(getenv('DATA'), 'GAIA/DR2')); % make sure astrometry can find GAIA
 
@@ -309,7 +308,7 @@ classdef Catalog < handle
                         [R,S2] = astrometry(S, 'RA', head.Ephemeris.deg2hour(list_RA(jj)), 'Dec', head.Ephemeris.deg2sex(list_DE(ii)), 'Scale', obj.head.SCALE, ...
                             'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', [5000 5000], 'ApplyPM', false, 'Flip', obj.flip, ...
                             'MinRot', obj.input_rotation-obj.input_rot_range, 'MaxRot', obj.input_rotation+obj.input_rot_range, ...
-                            'CatColMag', 'Mag', 'ImSize', [obj.head.NAXIS1, obj.head.NAXIS2]);
+                            'CatColMag', 'Mag_G', 'ImSize', [obj.head.NAXIS1, obj.head.NAXIS2]);
 
                         warning('on', 'MATLAB:polyfit:PolyNotUnique')
                         warning('on', 'MATLAB:lscov:RankDefDesignMat');
@@ -332,7 +331,7 @@ classdef Catalog < handle
                         
                     end
 
-                    obj.mextractor_sim = update_coordinates(S2, 'ColNameRA', 'Im_RA', 'ColNameDec', 'Im_Dec'); 
+                    obj.mextractor_sim = update_coordinates(S2, 'ColNameRA', 'ALPHAWIN_J2000', 'ColNameDec', 'DELTAWIN_J2000'); 
 
                     % test if the astrometric solution even makes sense... 
                     if any(abs(cell2mat(obj.mextractor_sim.WCS.WCS.tpv.KeyVal))>5)
@@ -344,7 +343,7 @@ classdef Catalog < handle
                     % what should we do with R? check a correct match maybe? 
                     
 %                     obj.catalog_matched = catsHTM.sources_match('GAIADR2', obj.mextractor_sim, 'ColRA', {'Im_RA'}, 'ColDec', {'Im_Dec'}, 'MagColumn', 'Mag_BP', 'MagLimit', 20);
-                    obj.catalog_matched = catsHTM.sources_match('GAIADR2', obj.mextractor_sim, 'ColRA', {'Im_RA'}, 'ColDec', {'Im_Dec'});
+                    obj.catalog_matched = catsHTM.sources_match('GAIADR2', obj.mextractor_sim, 'ColRA', {'ALPHAWIN_J2000'}, 'ColDec', {'DELTAWIN_J2000'});
 
                     obj.wcs_object = ClassWCS.populate(obj.mextractor_sim);
 
@@ -394,7 +393,14 @@ classdef Catalog < handle
             S = obj.mextractor_sim;
             SS = obj.catalog_matched;
             
-            T = array2table([SS.Cat, S.Cat], 'VariableNames', [SS.ColCell, S.ColCell]);
+            T = array2table(SS.Cat, 'VariableNames', SS.ColCell);
+            T2 = array2table(S.Cat, 'VariableNames', S.ColCell); 
+            
+            for ii = 1:size(T2,2)
+                if ~any(strcmp(T2.Properties.VariableNames{ii}, T.Properties.VariableNames))
+                    T = [T, T2(:,ii)];
+                end
+            end
 
 %             T.Properties.VariableNames; % change variable names??
 
@@ -402,8 +408,8 @@ classdef Catalog < handle
             T.Dec = T.Dec.*180/pi;
             T.Dist = T.Dist.*180/pi*3600;
             
-            T.Im_RA = T.Im_RA.*180/pi;
-            T.Im_Dec = T.Im_Dec.*180/pi;
+            T.ALPHAWIN_J2000 = T.ALPHAWIN_J2000.*180/pi;
+            T.DELTAWIN_J2000 = T.DELTAWIN_J2000.*180/pi;
             
             % need to improve this some how...
 %             T.Properties.VariableUnits = {'deg', 'deg', 'year', '"', '"', '"', '"', '"', '"', '"', '"', '', '', '', ...
@@ -417,7 +423,7 @@ classdef Catalog < handle
             if obj.use_matched_only
                 obj.data = T(~isnan(T.Mag_BP),:); 
                 [~, idx] = unique(T{:,1:2}, 'rows');
-                T = T(idx,:); % sort the table... 
+                T = T(idx,:); % sort the table... need to fix this up
             else                
                 obj.data = T;
             end

@@ -1,6 +1,8 @@
 function [M_out, idx_end] = insert_matrix(M_old, M_new, idx, fill_value, double_up, make_copy)
 % Usage: [M_out, idx_end] = insert_matrix(M_old, M_new, idx, fill_value=0, double_up=0, make_copy=1)
 %
+% This is a wrapper around the mex function injectMatrix!
+%
 % Insert matrix "M_new" into matrix "M_old" at position "idx" (upper left corner). 
 % If "M_old" is too small it will expand based on the following rules:
 % 1) The empty elements will be filled by "fill_value" (default 0). 

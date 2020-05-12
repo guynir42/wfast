@@ -52,13 +52,9 @@ classdef objGUI < handle
             % later add other options like copy constructor
             if isa(owner, 'package.OBJ')
                 
-                if obj.debug_bit, fprintf('objGUI constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('objGUI constructor v%4.2f\n', obj.version); end
                 
                 obj.owner = owner;
-                
-            elseif isa(owner, '...')
-                
-                
                 
             else
                 error('Input an ... to constructor of ...!');
@@ -196,7 +192,7 @@ classdef objGUI < handle
         
         function callback_close(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: close'); end
+            if obj.debug_bit>1, disp('callback: close'); end
             
             delete(obj.fig.fig);
             

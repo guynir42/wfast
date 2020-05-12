@@ -427,7 +427,7 @@ classdef MenuItem < dynamicprops
         
         function callback_toggle(obj, ~, ~)
             
-            if obj.debug_bit, fprintf('Callback from menu: toggle %s\n', obj.Text); end
+            if obj.debug_bit>1, fprintf('Callback from menu: toggle %s\n', obj.Text); end
             
             current_value = obj.getVariable;
             
@@ -443,7 +443,7 @@ classdef MenuItem < dynamicprops
         
         function callback_push(obj, ~, ~)
             
-            if obj.debug_bit, fprintf('Callback from menu: push %s\n', obj.Text); end
+            if obj.debug_bit>1, fprintf('Callback from menu: push %s\n', obj.Text); end
             
             % add option for sub-object commands (e.g., variable=some_object.func)
             c = strsplit(obj.variable, '.'); 
@@ -468,7 +468,7 @@ classdef MenuItem < dynamicprops
         
         function callback_input(obj, ~, ~)
             
-            if obj.debug_bit, fprintf('Callback from menu: input %s\n', obj.Text); end
+            if obj.debug_bit>1, fprintf('Callback from menu: input %s\n', obj.Text); end
             
             val = util.text.inputdlg(['Input new value of ' obj.variable], obj.getVariable);
             
@@ -485,7 +485,7 @@ classdef MenuItem < dynamicprops
         
         function callback_input_text(obj, ~, ~)
             
-            if obj.debug_bit, fprintf('Callback from menu: input %s\n', obj.Text); end
+            if obj.debug_bit>1, fprintf('Callback from menu: input %s\n', obj.Text); end
             
             val = util.text.inputdlg(['Input new value of ' obj.variable], obj.getVariable);
             

@@ -182,7 +182,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         CAMS_VER; % camera firmware version
         TELS_VER; % telescope firmware version
         
-        debug_bit = 0; 
+        debug_bit = 1; 
         version = 4.00;
           
     end
@@ -194,19 +194,19 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             
             if nargin>0 && isa(other, 'head.Parameters')
                 
-                if obj.debug_bit, fprintf('Header conversion-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Header conversion-constructor v%4.2f\n', obj.version); end
                 
                 obj = cast(util.oop.full_copy(other));
                 
             elseif nargin>0 && isa(other, 'head.Header')
                 
-                if obj.debug_bit, fprintf('Header copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Header copy-constructor v%4.2f\n', obj.version); end
                 
                 obj = util.oop.full_copy(other);
                     
             else
             
-                if obj.debug_bit, fprintf('Header constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Header constructor v%4.2f\n', obj.version); end
                 
                 obj.filter_obj = head.Filter(obj.FILTER);
                 obj.ephem = head.Ephemeris;

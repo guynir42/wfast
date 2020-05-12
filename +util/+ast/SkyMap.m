@@ -138,10 +138,10 @@ classdef SkyMap < handle
         function obj = SkyMap(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'util.ast.SkyMap')
-                if obj.debug_bit, fprintf('SkyMap copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('SkyMap copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('SkyMap constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('SkyMap constructor v%4.2f\n', obj.version); end
             
                 obj.bc = util.ast.BolometricCorrections;
                 obj.dir = util.sys.WorkingDirectory;

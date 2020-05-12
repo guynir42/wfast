@@ -44,7 +44,7 @@ classdef HeaderGUI < handle
             % later add other options like copy constructor
             if isa(owner, 'head.Header')
                 
-                if obj.debug_bit, fprintf('HeaderGUI constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('HeaderGUI constructor v%4.2f\n', obj.version); end
                 
                 obj.owner = owner;
                                 
@@ -189,7 +189,7 @@ classdef HeaderGUI < handle
         
         function callback_target_name(obj, hndl, ~)
             
-            if obj.debug_bit, disp(['hndl.String= ' hndl.String]); end
+            if obj.debug_bit>1, disp(['hndl.String= ' hndl.String]); end
                         
             obj.owner.target_name = strip(hndl.String);
             
@@ -199,7 +199,7 @@ classdef HeaderGUI < handle
         
         function callback_filter_name(obj, hndl, ~)
             
-            if obj.debug_bit, disp(['hndl.String= ' hndl.String]); end
+            if obj.debug_bit>1, disp(['hndl.String= ' hndl.String]); end
                         
             obj.owner.filter_name = strip(hndl.String);
             
@@ -210,7 +210,7 @@ classdef HeaderGUI < handle
         function callback_makeStarGUI(obj, hndl, ~)
            
             value = hndl.UserData;
-            if obj.debug_bit, disp(['callback: makeStarGUI... value= ' num2str(value)]); end
+            if obj.debug_bit>1, disp(['callback: makeStarGUI... value= ' num2str(value)]); end
             
             obj.owner.stars(value).makeGUI;
             obj.owner.stars(value).gui.owner = obj.owner.stars(value); % make the GUI open up on the right star
@@ -242,7 +242,7 @@ classdef HeaderGUI < handle
         
         function callback_close(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: close'); end
+            if obj.debug_bit>1, disp('callback: close'); end
             
             delete(obj.fig.fig);
             
