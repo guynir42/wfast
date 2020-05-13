@@ -68,7 +68,7 @@ classdef GenGUI < handle
             % later add other options like copy constructor
             if isa(owner, 'occult.CurveGenerator')
                 
-                if obj.debug_bit, fprintf('GenGUI constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('GenGUI constructor v%4.2f\n', obj.version); end
                 
                 obj.owner = owner;
                 
@@ -517,7 +517,7 @@ classdef GenGUI < handle
         
         function callback_play_r(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: play r'); end
+            if obj.debug_bit>1, disp('callback: play r'); end
             
             if obj.brake_bit==0
                 
@@ -561,7 +561,7 @@ classdef GenGUI < handle
         
         function callback_play_r2(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: play r2'); end
+            if obj.debug_bit>1, disp('callback: play r2'); end
             
             if obj.brake_bit==0
                 
@@ -605,7 +605,7 @@ classdef GenGUI < handle
         
         function callback_play_d(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: play d'); end
+            if obj.debug_bit>1, disp('callback: play d'); end
             
             if obj.brake_bit==0
                 
@@ -649,7 +649,7 @@ classdef GenGUI < handle
         
         function callback_play_th(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: play th'); end
+            if obj.debug_bit>1, disp('callback: play th'); end
             
             if obj.brake_bit==0
                 
@@ -693,7 +693,7 @@ classdef GenGUI < handle
         
         function callback_play_R(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: play R'); end
+            if obj.debug_bit>1, disp('callback: play R'); end
             
             if obj.brake_bit==0
                 
@@ -737,7 +737,7 @@ classdef GenGUI < handle
         
         function callback_play_b(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: play b'); end
+            if obj.debug_bit>1, disp('callback: play b'); end
             
             if obj.brake_bit==0
                 
@@ -781,7 +781,7 @@ classdef GenGUI < handle
         
         function callback_play_v(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: play v'); end
+            if obj.debug_bit>1, disp('callback: play v'); end
             
             if obj.brake_bit==0
                 
@@ -825,7 +825,7 @@ classdef GenGUI < handle
         
         function callback_play_t(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: play t'); end
+            if obj.debug_bit>1, disp('callback: play t'); end
             
             if obj.brake_bit==0
                 
@@ -869,7 +869,7 @@ classdef GenGUI < handle
         
         function callback_slide_r(obj, hndl, ~)
             
-            if obj.debug_bit, disp('callback: slide r'); end
+            if obj.debug_bit>1, disp('callback: slide r'); end
             
             obj.owner.r = hndl.Value;
             
@@ -879,7 +879,7 @@ classdef GenGUI < handle
         
         function callback_slide_r2(obj, hndl, ~)
             
-            if obj.debug_bit, disp('callback: slide r2'); end
+            if obj.debug_bit>1, disp('callback: slide r2'); end
             
             obj.owner.r2 = hndl.Value;
             
@@ -889,7 +889,7 @@ classdef GenGUI < handle
         
         function callback_slide_d(obj, hndl, ~)
             
-            if obj.debug_bit, disp('callback: slide d'); end
+            if obj.debug_bit>1, disp('callback: slide d'); end
             
             obj.owner.d = hndl.Value;
             
@@ -899,7 +899,7 @@ classdef GenGUI < handle
         
         function callback_slide_th(obj, hndl, ~)
             
-            if obj.debug_bit, disp('callback: slide th'); end
+            if obj.debug_bit>1, disp('callback: slide th'); end
             
             obj.owner.th = hndl.Value;
             
@@ -909,7 +909,7 @@ classdef GenGUI < handle
         
         function callback_slide_R(obj, hndl, ~)
             
-            if obj.debug_bit, disp('callback: slide R'); end
+            if obj.debug_bit>1, disp('callback: slide R'); end
             
             obj.owner.R = hndl.Value;
             
@@ -919,7 +919,7 @@ classdef GenGUI < handle
         
         function callback_slide_b(obj, hndl, ~)
             
-            if obj.debug_bit, disp('callback: slide b'); end
+            if obj.debug_bit>1, disp('callback: slide b'); end
             
             obj.owner.b = hndl.Value;
             
@@ -929,7 +929,7 @@ classdef GenGUI < handle
         
         function callback_slide_v(obj, hndl, ~)
             
-            if obj.debug_bit, disp('callback: slide v'); end
+            if obj.debug_bit>1, disp('callback: slide v'); end
             
             obj.owner.v = hndl.Value;
             
@@ -939,7 +939,7 @@ classdef GenGUI < handle
         
         function callback_slide_t(obj, hndl, ~)
             
-            if obj.debug_bit, disp('callback: slide t'); end
+            if obj.debug_bit>1, disp('callback: slide t'); end
             
             obj.owner.t = hndl.Value;
             
@@ -949,7 +949,7 @@ classdef GenGUI < handle
         
         function callback_show_what(obj, hndl, ~)
            
-            if obj.debug_bit, disp('Callback: show what'); end
+            if obj.debug_bit>1, disp('Callback: show what'); end
             
             obj.show_what = hndl.String{hndl.Value};
             
@@ -959,7 +959,7 @@ classdef GenGUI < handle
         
         function callback_limits(obj, ~, ~)
             
-            if obj.debug_bit, disp('Callback: limits'); end
+            if obj.debug_bit>1, disp('Callback: limits'); end
             
             obj.use_uniform_limits = ~obj.use_uniform_limits;
             
@@ -969,7 +969,7 @@ classdef GenGUI < handle
         
         function callback_randomize(obj, ~, ~)
             
-            if obj.debug_bit, disp('Callback: generate noise'); end
+            if obj.debug_bit>1, disp('Callback: generate noise'); end
             
             obj.owner.generateNoise;
             
@@ -981,7 +981,7 @@ classdef GenGUI < handle
         
         function callback_stop(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: stop'); end
+            if obj.debug_bit>1, disp('callback: stop'); end
             
             obj.brake_bit = 1;
             drawnow;

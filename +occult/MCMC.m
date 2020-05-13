@@ -61,10 +61,10 @@ classdef MCMC < handle
         function obj = MCMC(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'occult.,MCMC')
-                if obj.debug_bit, fprintf('MCMC copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('MCMC copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('MCMC constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('MCMC constructor v%4.2f\n', obj.version); end
             
                 obj.gen = occult.CurveGenerator;
                 obj.prog = util.sys.ProgressBar;

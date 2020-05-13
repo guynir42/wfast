@@ -129,7 +129,7 @@ classdef Parameters < handle
         function obj = Parameters(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'occult.Parameters')
-                if obj.debug_bit, fprintf('Parameters copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Parameters copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else 
                 

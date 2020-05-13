@@ -107,7 +107,7 @@ classdef LightCurve < handle
                 obj.pars = occult.Parameters;
             end
             
-            if obj.debug_bit, fprintf('LightCurve %sconstructor, %s%s%sv%4.2f\n', copy_str, pars_str, flux_str, time_str, obj.version); end
+            if obj.debug_bit>1, fprintf('LightCurve %sconstructor, %s%s%sv%4.2f\n', copy_str, pars_str, flux_str, time_str, obj.version); end
             
         end
         
