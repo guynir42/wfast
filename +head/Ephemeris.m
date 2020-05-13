@@ -1,5 +1,5 @@
 classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
-% This class keeps track of a specific time and sky coordinate. 
+% This class keeps track of a specific time and sky coordinates. 
 % Typically each observation would have a specific Ephemeris. 
 % It uses these three data (RA,DEC and time) to calculate all sorts of 
 % additional information such as LST, altitude, moon/sun positions, 
@@ -7,10 +7,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
 %
 % It can accept new targets using the input() function, that can get either
 % a pair of arguments (RA/DEC) or a name of a star which is resolved using
-% Eran's interface to SIMBAD. In this case give an empty DEC. Also, you can
-% sepcify the time of the observation as the third argument, or leave the 
-% time that the object was set to before. Use "now" to update to current time. 
-% IMPORTANT: the RA must be input as hours, in numeric value or sexagesimal. 
+% Eran's interface to SIMBAD, or an asteroid designation via JPL horizons. 
+% In this case give an empty DEC. Also, you can sepcify the time of the 
+% observation as the third argument, or leave the time that the object was 
+% set to before. Use "now" to update to current time. 
+% IMPORTANT: RA must be input as hours, in numeric value or sexagesimal. 
 %
 % If you use other ways to update the time/coordinates of the object, make 
 % sure to call update() or updateSecondaryCoords() to get the Jnow, ecliptic, 
@@ -21,6 +22,31 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
 % in time to check observational conditions then. Use calcObsTimeMinutes()
 % to figure out how many minutes can the field be observed until reaching
 % either the meridien or the altitude limit (default is 25 degrees). 
+%
+% Another way to automatically get coordinates is to use keywords. To use 
+% this functionality, call resolve(keyword) or just input(keyword) like 
+% described when inputting star names. The keyword can be one of the 
+% following: ecliptic, galactic, moon. 
+% The object will choose the best field (lowest airmass) from a list of 
+% default fields (or dynamically allocated fields). To check if a field is
+% observable, use the observable(varargin) function. To compare two fields 
+% and get the best (and observable) field, use better_than(other, varargin). 
+% In either case, the varargin can be used to override the internal set of
+% constraints that decide if an object is observable. These defaults can be
+% managed using the "constraints" object which is a util.text.InputVars, so
+% it can parse varargin pairs and also can launch a GUI if needed. 
+% The default constraints can be set for each individual target/object, or
+% to be defined globally when comparing two objects (e.g., better_than(...)). 
+% This is especially useful when choosing a field using the scheduler. 
+% For a list of possible observational constraints see the makeConstraints()
+% function and the comments added to each variable. 
+% NOTE: the "name" parameter is used to create folder names etc., while the
+%       "keyword" parameter is used to find dynamic fields. If only one is 
+%       given to the object then it would be used as both name and keyword. 
+%       Only when you specifically want them to be different you should give
+%       a separate value for each field. E.g., asteroid 52678 would have a 
+%       keyword "52678" for resolving with JPL, but could have a different 
+%       name like "Ast_52768" to make the folder name more descriptive. 
 %
 % It also has a few static functions that convert strings to decimal degrees, 
 % using hour2deg for RA-type hour string, and sex2deg for DEC type sexagesimal 
@@ -53,14 +79,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     
     properties % inputs/outputs
         
-        name = ''; % the generic title for the object (copied into header's OBJECT field, and possibly to folder names)
-        keyword = ''; % for dynamically allocated fields like 'moon' or 'ecliptic'
+        
         RA_deg; % numeric value in degrees
         Dec_deg; % numeric value in degrees
         
     end
     
     properties(Dependent=true)
+        
+        name; % the generic title for the object (copied into header's OBJECT field, and possibly to folder names)
+        keyword; % for dynamically allocated fields like 'moon' or 'ecliptic'
         
         time_str; 
         
@@ -92,6 +120,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     end
     
     properties(Hidden=true)
+        
+        % these internal state parameters are used to match name to keyword when one of them isn't given
+        name_ = ''; 
+        keyword_ = '';
         
         RA_deg_now; % in current epoch (rather than in J2000) 
         Dec_deg_now; % in current epoch (rather than in J2000) 
@@ -220,9 +252,23 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         function val = get.name(obj)
             
-            if isempty(obj.name) && ~isempty(obj.keyword)
+            if isempty(obj.name_) && isempty(obj.keyword_)
+                val = '';
+            elseif ~isempty(obj.name_)
+                val = obj.name_;
+            elseif ~isempty(obj.keyword_)
                 val = obj.keyword;
-            else
+            end
+            
+        end
+        
+        function val = get.keyword(obj)
+            
+            if isempty(obj.name_) && isempty(obj.keyword_)
+                val = '';
+            elseif ~isempty(obj.keyword_)
+                val = obj.keyword_;
+            elseif ~isempty(obj.name_)
                 val = obj.name;
             end
             
@@ -422,6 +468,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     end
     
     methods % setters
+        
+        function set.name(obj, val)
+            
+            obj.name_ = val;
+            
+        end
+        
+        function set.keyword_(obj, val)
+            
+            obj.keyword_ = val;
+            
+        end
         
         function set.RA(obj, val) % expect RA to be given in hours, not degrees! 
 
