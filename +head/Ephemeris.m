@@ -160,7 +160,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         default_fields; % save a few default places to goto when no explicite targets are given
         star_density; % an estimate for the number of stars (right now this is only available for default fields)
         
-        version = 1.04;
+        version = 2.00;
         
     end
     
@@ -214,6 +214,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             obj.constraints.input_var('airmass', Inf); 
             obj.constraints.add_comment('airmass', 'observation must have airmass below this value'); 
+            
+            obj.constraints.input_var('threshold', 0.2, 'threshold_airmass', 'thresh_airmass'); 
+            obj.constraints.add_comment('threshold', 'do not prefer a new target if now_observing=1 and other object has airmass very close to current airmass'); 
             
             obj.constraints.input_var('south_limit', -20, 'declination_limit'); 
             obj.constraints.add_comment('south_limit', 'lowest declination we are ready to accept'); 
@@ -1031,13 +1034,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 return;
             end
             
-            % thresh_airmass
             if obj.now_observing && other.now_observing
                 error('Cannot have two different Ephemeris objects with "now_observing" set to true!'); 
             elseif obj.now_observing % this object is now being observed, make it harder to switch
-                val = obj.AIRMASS<=other.AIRMASS + obj.thresh_airmass; 
+                val = obj.AIRMASS<=other.AIRMASS + obj.constraints.threshold; 
             elseif other.now_observing % other object is now begin observed, make it easier to switch
-                val = obj.AIRMASS<=other.AIRMASS - obj.thresh_airmass; 
+                val = obj.AIRMASS<=other.AIRMASS - obj.constraints.threshold; 
             else
                 val = obj.AIRMASS<=other.AIRMASS; % if this object has lower airmass, it is better
             end

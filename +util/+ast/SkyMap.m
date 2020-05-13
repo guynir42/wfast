@@ -620,6 +620,7 @@ classdef SkyMap < handle
             input.input_var('lst', obj.LST, 'locat sidereal time'); 
             input.input_var('log', obj.show_log, 'use_log'); 
             input.input_var('ecliptic', obj.show_ecliptic, 'use_ecliptic'); 
+            input.input_var('vector_ecliptic', [-50 -20 -5 5 20 50]); 
             input.input_var('galactic', obj.show_galactic, 'use_galactic'); 
             input.input_var('zenith', obj.show_zenith, 'show_zenith'); 
             input.input_var('horizon', obj.show_horizon, 'show_horizon'); 
@@ -707,7 +708,7 @@ classdef SkyMap < handle
             
             if input.ecliptic
                 % need to handle south limit!
-                [C1,h1] = contour(input.ax, x, y, obj.ecliptic_lat(idx_de:end,:), [-50 -20 -5 5 20 50], 'Color', 'red'); 
+                [C1,h1] = contour(input.ax, x, y, obj.ecliptic_lat(idx_de:end,:), input.vector_ecliptic, 'Color', 'red'); % [-50 -20 -5 5 20 50]
                 clabel(C1,h1, 'FontSize', input.font_size-10, 'Color', 'red');
             end
             
