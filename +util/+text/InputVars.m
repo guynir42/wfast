@@ -48,6 +48,7 @@ classdef InputVars < dynamicprops
     properties
         
         alias_dictionary; % keep track of the names of each of the parameters
+        default_dictionary; % keep track of the original values (defaults) 
         logical_dictionary; % keep track which parameter is logical (use parse_bool to scan inputs)
         number_dictionary; % keep track of the minimal number of letters required for util.text.cs to match
         comment_dictionary; % keep a comment for some of the keywords
@@ -63,6 +64,7 @@ classdef InputVars < dynamicprops
         function obj = InputVars(varargin)
             
             obj.alias_dictionary = containers.Map;
+            obj.default_dictionary = containers.Map;
             obj.logical_dictionary = containers.Map;
             obj.number_dictionary = containers.Map;
             obj.comment_dictionary = containers.Map;
@@ -100,15 +102,20 @@ classdef InputVars < dynamicprops
             addprop(obj, name);
             obj.list_added_properties{end+1} = name;
             
-            if nargin>2
-                obj.(name) = default_value;
-                if isa(default_value, 'logical')
-                    obj.logical_dictionary(name) = 1;
-                else
-                    obj.logical_dictionary(name) = 0;
-                end
+            if nargin<3 || isempty(default_value)
+                default_value = [];
             end
             
+            obj.(name) = default_value;
+            
+            obj.default_dictionary(name) = default_value;
+            
+            if isa(default_value, 'logical')
+                obj.logical_dictionary(name) = 1;
+            else
+                obj.logical_dictionary(name) = 0;
+            end
+
             if nargin<4 || isempty(varargin)
                 obj.alias_dictionary(name) = {};
                 obj.number_dictionary(name) = []; % no restriction on the number of letters required for a match
@@ -287,6 +294,18 @@ classdef InputVars < dynamicprops
             
         end
         
+        function return_to_defaults(obj) % this replaces "reset" but allows us to use that parameter name
+        
+            keys = obj.default_dictionary.keys;
+            
+            for ii = 1:length(keys)
+                
+                obj.(keys{ii}) = obj.default_dictionary(keys{ii}); 
+                
+            end
+            
+        end
+            
         function makeGUI(obj)
             
             if isempty(obj.graphic_user_interface)

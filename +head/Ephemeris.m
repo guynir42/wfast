@@ -73,13 +73,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     
     properties % switches/controls
         
+        thresh_airmass = 0.2; % do not prefer a new target if currently observing and new target has airmass very close to current airmass
         debug_bit = 1;
         
     end
     
     properties % inputs/outputs
         
-        
+        now_observing = 0; % when this is true, ignore the "continuous" constraint
         RA_deg; % numeric value in degrees
         Dec_deg; % numeric value in degrees
         
@@ -241,6 +242,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             obj.ecliptic_beta = [];
             obj.galactic_longitude = [];
             obj.galactic_latitude = [];
+            
+            obj.constraints.return_to_defaults;
             
             obj.update;
             
@@ -475,7 +478,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
-        function set.keyword_(obj, val)
+        function set.keyword(obj, val)
             
             obj.keyword_ = val;
             
@@ -772,6 +775,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                             fprintf('Could not resolve name "%s" with convert2equatorial()!\n', keyword);
                         end
                         
+                    else
+                        % add some marker to prevent repeated calls to name resolver for stars (lazy load the RA/Dec for stars?)
                     end
                     
                     obj.RA = RA/15;
@@ -933,9 +938,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             % start with the existing constraints for this target and update with varargin
             input = util.oop.full_copy(obj.constraints); 
+            input.input_var('time', [], 'current_time'); % time at which to compare these targets
             input.scan_vars(varargin{:}); 
             
-            val = 0; 
+            if ~isempty(input.time)
+                obj.time = input.time; % this also parses strings or "now" into datetime objects
+            end
+            
+            val = 0; % assume it is not observable, see if it survives all the checks
+            
+            if isempty(obj.RA) || isempty(obj.Dec), return; end
             
             if ~isempty(input.earliest) && obj.time<obj.parseTime(input.earliest),return; end % current time is too early
             
@@ -951,7 +963,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             if obj.moon.Dist<input.moon, return; end
             
-            if obj.calcObsTimeMinutes(input.altitude)<input.continuous*60, return; end % there is not enough time left to observe this target
+            if obj.now_observing==0 && obj.calcObsTimeMinutes(input.altitude)<input.continuous*60, return; end % there is not enough time left to observe this target
             
             % any other constraints? 
             
@@ -993,10 +1005,20 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
             % start with the existing constraints for this target and update with varargin
             input = util.oop.full_copy(obj.constraints); 
+            input.input_var('time', [], 'current_time'); % time at which to compare these targets
             input.scan_vars(varargin{:}); 
             
             if isempty(other) || ~isa(other, 'head.Ephemeris') || obj==other
                 error('Must supply another Ephemeris object to this function!'); 
+            end
+            
+            if obj==other
+                val = 0; % do not switch this object to itself... 
+                return;
+            end
+            
+            if ~isempty(input.time)
+                obj.time = input.time;
             end
             
             if other.observable(varargin{:})==0
@@ -1009,7 +1031,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 return;
             end
             
-            val = obj.AIRMASS<=other.AIRMASS; % if this object has lower airmass, it is better
+            % thresh_airmass
+            if obj.now_observing && other.now_observing
+                error('Cannot have two different Ephemeris objects with "now_observing" set to true!'); 
+            elseif obj.now_observing % this object is now being observed, make it harder to switch
+                val = obj.AIRMASS<=other.AIRMASS + obj.thresh_airmass; 
+            elseif other.now_observing % other object is now begin observed, make it easier to switch
+                val = obj.AIRMASS<=other.AIRMASS - obj.thresh_airmass; 
+            else
+                val = obj.AIRMASS<=other.AIRMASS; % if this object has lower airmass, it is better
+            end
             
         end
         
