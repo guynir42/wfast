@@ -1,14 +1,15 @@
 classdef Calibrator < handle
-
-    properties(Transient=true)
-        
-        gui; 
-        
-    end
-    
-    properties % objects
-        
-    end
+% Take raw fluxes and fit them with a linear function, removing outliers. 
+% This linear function is subtracted from the flux, and the mean of the 
+% subtracted, outlier exluded lightcurve is also removed from the original 
+% flux, to produce a zero-centered straight lightcurve. 
+% Any existing outliers (that might be occultations) are preserved and are 
+% not supposed to be fitted by the linear function. 
+%
+% Use input(fluxes) to produce various fluxes with different processing. 
+% Take the "fluxes_detrended" and "stds_detrended" as a good estimate for
+% the cleaned up fluxes. 
+%
     
     properties % inputs/outputs
         
@@ -61,10 +62,10 @@ classdef Calibrator < handle
         function obj = Calibrator(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'trig.Calibrator')
-                if obj.debug_bit, fprintf('Calibrator copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Calibrator copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('Calibrator constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Calibrator constructor v%4.2f\n', obj.version); end
             
             end
             
@@ -141,7 +142,7 @@ classdef Calibrator < handle
             
             obj.cleanup_fluxes;
             
-            obj.global_calibration;
+            obj.global_calibration; % do we need this?? 
             
         end
         

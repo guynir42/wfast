@@ -1,8 +1,36 @@
 classdef Event < handle
+% Container for candidate occultation events, keeping track of the raw data, 
+% header type info, and event parameters (such as which star triggered). 
+% These objects are produced by the trig.Finder object, and can be used to 
+% display the lightcurve of the event with other metadata that help figure
+% out if the event was real or not. 
+%
+% Each event has a "keep" property that is set to zero if the event is for
+% some reason disqualified. We keep all these "bad" events to learn from them
+% and make sure we are not missing anything. 
+% There are many reasons to disqualify an event, e.g., correlations between 
+% the flux and some other measurement like centroid position. 
+% When an event is disqualified, the reason is logged in the "notes" variable, 
+% and the corresponding switch is set e.g., "is_offset".
+%
+% Other useful data are the photometric products like flux, background,  
+% offsets, etc. These can be used to find correlations or in general to 
+% inspect the conditions during the event. 
+% Imaging data, in the form of cutouts and stack images are also saved to 
+% give the user a chance to look for cosmic rays and satellite streaks. 
+% Imaging data is usually discarded for bad events, but can be recovered by
+% loading it from file. This is possible as metadata like filename and star
+% index are saved with the event. 
+% 
+% Event objects can be displayed using the show() and related methods. 
+% This attempts to plot as many useful data as we can, to make it easier for
+% a human to vet the candidates. To load all event displays one after the 
+% other, use the Finder GUI. 
+%
 
     properties(Transient=true)
         
-        dates; 
+        dates; % translate timestamps to datetime objects with absolute timing
         
     end
     
@@ -22,9 +50,12 @@ classdef Event < handle
     
     properties(Dependent=true)
         
+        % these are built up from the data on the two batches
         cutouts;
         positions;
         stack;
+        
+        % metadata for finding the event in the raw data
         batch_index;
         filename;
         
@@ -55,11 +86,11 @@ classdef Event < handle
         peak_timestamp; % timestamp for time_index
         best_kernel; % full kernel that goes with kern_index
 
-        duration;
-        star_snr;
-        magnitude;
-        RA;
-        Dec;
+        duration; % how much time the event lasted (in seconds)
+        star_snr; % the raw flux S/N of the star with the event
+        magnitude; % magnitude of the event (from GAIA BP filter I guess)
+        RA; % GAIA right ascention
+        Dec; % GAIA declination
         
         which_batch = 'first'; % can be "first" or "second", depending on where is the peak in the 2-batch window
         
@@ -70,8 +101,8 @@ classdef Event < handle
         previous_std; % average rms of previous batches
         is_positive; % is the filter-response positive (typically for occultations)
         
-        was_psd_corrected;
-        was_var_buffered;
+        was_psd_corrected; % keep track of whether we used PSD correction
+        was_var_buffered; % keep track of whether we use a variance buffer
         
         notes = ''; % why this event was not kept
         keep = 1; % only keep the "real" events that are not duplicates
@@ -80,10 +111,11 @@ classdef Event < handle
     
     properties % switches/controls
         
-        corr_flux = 'raw'; 
-        max_corr;
-        max_num_nans;
-        max_offsets; 
+        % these are filled by the values defined in the Finder
+        corr_flux = 'raw'; % which flux should be used to calculate correlations (default is the raw flux)
+        max_corr; % maximum allowed correlation before disqualifying an event
+        max_num_nans; % how many NaN values in the event flux can disqualify it
+        max_offsets; % largest centroid offsets before disqualifying an event
         
         debug_bit = 1;
         

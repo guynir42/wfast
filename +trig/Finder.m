@@ -1,50 +1,114 @@
 classdef Finder < handle
-
+% Class for finding short time-scale occultations in lightcurves. 
+% The Finder gets as input the photometric products like flux and PSF width
+% and tries to find anything that looks like a KBO occultation. 
+% It keeps one batch of data and concatenates the new batch, effectively 
+% working on 200 frames at a time, with one batch as overlap. 
+% 
+% The Finder applies some pre-processing to the data before using a matched
+% filter with occultation templates to find events. 
+% We keep a running average of the power spectrum, using Welch's method, 
+% to estimate the power in different frequencies, and correct for that before
+% using the lightcurves. 
+% Alternatively, the lightcurves can be more simply calibrated by removing
+% a linear fit to each lightcurve (fit is made by excluding outliers). 
+% These processes are achieved by using the PSDCorrector, or by using the 
+% Calibrator for the simple, linear fit correction. 
+% Use the "use_psd_correction" switch to control which calibration is used. 
+%
+% The corrected lightcurves are match-filtered using a bank of occultation
+% templates in occult.ShuffleBank. Read the doc for that class for a more
+% detailed explanation on how the templates are chosen.
+% Peaks in the filtered fluxes above some threshold are used to find event
+% candidates. The threshold is relative to the average noise value in the 
+% data, which is calculated on the previous 10 batches or so. 
+% Note that the noise is calculated on the filtered data, not derived from 
+% the original fluxes. Since correlations exist in the data, these two RMS
+% figures are not always equal. 
+%
+% Candidates are saved in Event objects, which hold a copy of the cutouts, 
+% stack image, and all relevant photometric measurements (e.g., background)
+% around the event time. These are used to check the validity of each event. 
+% Other metadata is saved along with the Event object, like the filename, 
+% batch number, star index, etc. This is useful for later going back to look
+% at the full dataset. 
+%
+% Event candidates are often disqualified by looking at correlations between
+% the flux and other measurements like the centroid positions. 
+% The assumption is that a true event will not happen to coincide with drift
+% or blurring of the PSF, or other external variations. 
+% 
+% Finally, the Finder GUI can be used to change search parameters but also 
+% to go over the list of Event objects found. The Event show() method is used
+% to display as much relevant information to allow vetting events by eye. 
+% 
+% To use the Finder, call the input() method, which accepts multiple inputs
+% including the photometric products but also metadata about the current
+% batch of measurements. 
+% There are two ways to input data to the finder:
+% (a) Specify each data product directly, either as varargin pairs, 
+%     or as numeric arguments one after the other in order. 
+% (b) Give a \code{img.Lightcurve} object that already contains all these
+%     products, and specify an \code{index} and \code{length} parameters
+%     that tell which frames from the lightcurve object should be copied over. 
+% 
+% Events objects are stored in a vector called "all_events", most of which 
+% would be marked as not real by the automatic vetting procedure. To get
+% a list of only the good events, look at "kept_events". 
+% 
+% A simulation mode is available, that injects occultation templates from a
+% occult.FilterBank into real data and checks the detection S/N for these
+% real noise + simulated occultation lightcurves. 
+% This is done by setting use_sim=1. 
+% 
+% There are many other options to tweak when searching for events, for more
+% details see the properties block for "switches/controls" below. 
+%
+    
     properties(Transient=true)
         
         gui@trig.gui.FinderGUI;
-        hist_fig;
-        bank@occult.ShuffleBank;
+        hist_fig; % figure used when opening a S/N histogram
+        bank@occult.ShuffleBank; % randomly picked filter kernels used for matched-filtering (loaded from file when needed)
         
     end
     
     properties % objects
         
-        head@head.Header;
-        cat@head.Catalog;
+        head@head.Header; % link back to parent object, keep a lot of useful metadata
+        cat@head.Catalog; % link back to catalog object, hopefully containing data on the star properties
         
-        cal@trig.Calibrator;
-        psd@trig.PSDCorrector;
+        cal@trig.Calibrator; % fits fluxes to linear functions (excluding outliers) and removes the fitted flux
+        psd@trig.PSDCorrector; % calculates the Power Spectra Density using Welch's method, then dereddens the flux
         
-        all_events@trig.Event;
-        new_events@trig.Event;
-        last_events@trig.Event;
+        all_events@trig.Event; % a list of all the events found in this run (use reset() to delete them)
+        new_events@trig.Event; % a list of the events detected in the most recent batch
+        last_events@trig.Event; % a list of events from the previous batch
         
-        var_buf@util.vec.CircularBuffer;
+        var_buf@util.vec.CircularBuffer; % keep track of the variance in recent batches in a FIFO buffer, getting the updated, averaged variance
         
         phot_pars; % a struct with some housekeeping about how the photometry was done
         
-        prog@util.sys.ProgressBar;
+        prog@util.sys.ProgressBar; % keep track of time when doing long loops like generating a FilterBank for simulations
         
-        sim_bank@occult.FilterBank;
-        sim_events = {};
+        sim_bank@occult.FilterBank; % simulated occultation templates in predefined intervals for checking detection S/N of injected events
+        sim_events = {}; % I think this is no longer used...
         
     end
     
     properties % inputs/outputs
         
-%         f; % debug only
-
         fluxes_both; % built from prev_fluxes and fluxes
         timestamps_both; % built from prev_timestamps and timestamps
-        star_snrs; % S/N of each star's flux (without any corrections)
+        star_snrs; % S/N of each star's flux (without any corrections) used to choose stars to search on
         
-        fluxes_corrected;
-        stds_corrected
+        fluxes_corrected; % after applying PSD correction or linear function removal
+        stds_corrected % RMS of the above fluxes
         
-        black_list_stars;
-        black_list_batches;
-         
+        black_list_stars; % a slowly growing list of stars that display too many events, so that all their events are marked as false
+        black_list_batches; % a slowly growing list of batches that display too many events, so that all their events are marked as false
+        
+        % these are inputs for the current batch
         timestamps;
         cutouts;
         positions;
@@ -63,6 +127,7 @@ classdef Finder < handle
         bad_pixels;
         flags;
         
+        % these are kept from the previous batch, to make sure there is overlap
         prev_timestamps;
         prev_cutouts;
         prev_positions;
@@ -81,9 +146,9 @@ classdef Finder < handle
         prev_bad_pixels;
         prev_flags;
         
-        dt; 
+        dt; % an estimate of the time step (cadence) of the incoming lightcurves
         
-        snr_values;
+        snr_values; % best S/N of the filtered fluxes, saved for each batch (use this to determine the ideal threshold)
         
         star_snr_histogram; % contains the number of star-hours for each star when it was at a given S/N 
         hist_snr_edges; % a vector with the bin edges for the snr axis of the star_hours histogram 
@@ -93,12 +158,12 @@ classdef Finder < handle
     
     properties % switches/controls
         
-        lightcurve_type_index = 'end'; % for multiple photometry products choose the one that most suits you for event detection
+        lightcurve_type_index = 'end'; % for multiple photometry products choose the one that most suits you for event detection (typically 'last' is the biggest aperture from the forced photometry options)
         
         use_psd_correction = 1; % use welch on a flux buffer to correct red noise
-        use_var_buf = 1; % normalize variance of each filtered flux
+        use_var_buf = 1; % normalize variance of each filtered flux to the average of previous batches (averaging size is set by length of "var_buf")
         
-        min_star_snr = 5; % stars with lower S/N are not even tested for events
+        min_star_snr = 5; % stars with lower S/N are not even tested for events (here S/N is calculated on the raw fluxes)
         snr_bin_width = 0.5; % for the star-hour histogram
         snr_bin_max = 100; % biggest value we expect to see in the star-hour histogram
         
@@ -113,22 +178,22 @@ classdef Finder < handle
         max_events = 5; % how many events can we have triggered on the same 2-batch window?
         max_stars = 5; % how many stars can we afford to have triggered at the same time? 
         max_frames = 50; % maximum length of trigger area (very long events are disqualified)
-        max_num_nans = 1;
-        max_corr = 0.75;
-        max_offsets = 5; 
+        max_num_nans = 1; % events with this many NaN data points (or more) are disqualified
+        max_corr = 0.75; % correlation coeff of flux with e.g., background with value above this, around the event time, disqualify the event
+        max_offsets = 5; % events with offsets above this number are disqualified
         
         which_flux_correlate = 'raw'; %can choose "raw" or "detrended" for which flux type to use when correlating against x/y width etc. 
         
-        num_hits_black_list = 4;
+        num_hits_black_list = 4; % how many repeated events can we allow before including star or batch in black list
         
-        use_conserve_memory = 1;
+        use_conserve_memory = 1; % throw away large image data for disqualified events (reduces size of MAT files, and these data can be restored from file)
         
-        use_sim = 0; % run simulation on incoming data... 
+        use_sim = 0; % run simulation on incoming data (injection tests)
         
         frame_rate = 25; % if timestamps are not given explicitely
         
-        display_event_idx = [];
-        use_display_kept_events = 0;
+        display_event_idx = []; % GUI parameter, which event is to be shown now
+        use_display_kept_events = 0; % GUI parameter, to show only kept events or all events (default)
         
         debug_bit = 1;
         
@@ -161,10 +226,10 @@ classdef Finder < handle
         function obj = Finder(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'trig.Finder')
-                if obj.debug_bit, fprintf('Finder copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Finder copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('Finder constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Finder constructor v%4.2f\n', obj.version); end
             
                 obj.cal = trig.Calibrator;
                 
@@ -452,7 +517,9 @@ classdef Finder < handle
             import util.text.cs;
             
             input = util.text.InputVars;
-            input.use_ordered_numeric = 1;
+            input.use_ordered_numeric = 1; % can just give the numeric values in the correct order, without naming each one
+            
+            % these inputs are used for explicitely giving the photometric products
             input.input_var('fluxes', []);
             input.input_var('errors', []);
             input.input_var('areas', []);
@@ -463,21 +530,36 @@ classdef Finder < handle
             input.input_var('widths', []);
             input.input_var('bad_pixels', []);
             input.input_var('flags', []); 
+            
+            % these are parameters of the photometry
             input.input_var('aperture', [], 'radius');
             input.input_var('gauss_sigma', [], 'sigma', 'gaussian_sigma');
+            
+            % these are additional data used for visualizing the events
             input.input_var('timestamps', []); 
             input.input_var('cutouts', []);
             input.input_var('positions', []);
             input.input_var('stack', []);
+            
+            % meta data used to find the event in the original data
             input.input_var('batch_index', [], 'batch_idx', 'batch_number');
             input.input_var('filename', '');
+            
+            % these are used to match time stamps with absolute time
             input.input_var('t_end', [], 8);
             input.input_var('t_end_stamp', [], 8);
+            
+            % these are parameters of the photometry
             input.input_var('used_background_sub', []); 
             input.input_var('phot_pars', [], 'pars_struct');
+            
+            % alternative input method, just give an img.Lightcurves object
+            % and the start index and batch length you want, so Finder will
+            % just pull the data from the object. 
             input.input_var('lightcurves', []);
             input.input_var('index', []);
             input.input_var('length', 100);
+            
             input.scan_vars(varargin{:});
             
             if isempty(obj.bank)
@@ -487,10 +569,10 @@ classdef Finder < handle
             if obj.use_sim
                 
                 if isempty(obj.sim_bank)
-                    obj.sim_bank = occult.FilterBank;
+                    obj.sim_bank = occult.FilterBank; % simulations require we produce a FilterBank to make injection events
                 end
                 
-                if isempty(obj.sim_bank.bank)
+                if isempty(obj.sim_bank.bank) % simulations require we produce a FilterBank to make injection events
                     obj.sim_bank.makeBank;
                 end
                 
@@ -498,7 +580,7 @@ classdef Finder < handle
                     
                     if obj.debug_bit, fprintf('Cross filtering all kernels in ShuffleBank (%d) with all templates in FilterBank (%d)...\n', size(obj.bank.kernels,2), obj.sim_bank.num_pars); end
                     
-                    obj.sim_bank.filtered_bank = util.vec.convolution(obj.bank.kernels, permute(obj.sim_bank.bank-1, [1,6,2,3,4,5])); 
+                    obj.sim_bank.filtered_bank = util.vec.convolution(obj.bank.kernels, permute(obj.sim_bank.bank-1, [1,6,2,3,4,5])); % making pre-filtered template kernels, these are simply added to filtered data
                     
                 end
                 
@@ -535,7 +617,7 @@ classdef Finder < handle
             
             list = {'fluxes', 'errors', 'areas', 'backgrounds', 'variances', 'offsets_x', 'offsets_y', 'widths', 'bad_pixels', 'flags'};
             
-            for ii = 1:length(list)
+            for ii = 1:length(list) % get the photometric products on the above list (make sure to use the right index/indices of the 3rd dim, for different apertures)
                 
                 data = input.(list{ii}); 
                 if isempty(obj.lightcurve_type_index) || cs(obj.lightcurve_type_index, ':', 'all')
@@ -581,7 +663,7 @@ classdef Finder < handle
                                 
                 obj.star_snrs = nanmean(obj.fluxes_both)./nanstd(obj.fluxes_both); 
                               
-                if obj.use_psd_correction
+                if obj.use_psd_correction % use fancy new code with Welch's method to de-redden the fluxes
                    
                     t = tic;
                     
@@ -595,7 +677,7 @@ classdef Finder < handle
 
                     if obj.debug_bit>2, fprintf('PSD correction time: %f seconds.\n', toc(t)); end
 
-                else
+                else % instead of PSD correction just remove a linear fit to each flux
 
                     t = tic;
                     obj.cal.input(obj.fluxes_both, vertcat(obj.prev_errors, obj.errors), obj.timestamps_both); % add errors_both later if we need to 
@@ -607,15 +689,15 @@ classdef Finder < handle
                 end
                 
                 t = tic;
-                obj.bank.input(obj.fluxes_corrected, obj.stds_corrected, obj.timestamps_both); % use the filter bank on the fluxes
+                obj.bank.input(obj.fluxes_corrected, obj.stds_corrected, obj.timestamps_both); % use the filter bank to match-filter the corrected fluxes
                 
                 if nnz(~isnan(obj.bank.fluxes_filtered))==0
-                    error('Filtered fluxes in ShuffleBank are all NaN!');
+                    error('Filtered fluxes in ShuffleBank are all NaN!'); % this happens if some NaNs get into the FFT
                 end
                 
                 if obj.debug_bit>2, fprintf('Filtering time: %f seconds.\n', toc(t)); end
                 
-                if obj.use_sim
+                if obj.use_sim % inject events on top of the "noise" data
                     
                     obj.sim_bank.filtered_index = 0; % start by running events without any added occultations
                     
@@ -636,11 +718,11 @@ classdef Finder < handle
 %                             end
                         end
                         
-                        if obj.sim_bank.filtered_index>0
+                        if obj.sim_bank.filtered_index>0 % run this only on simulated events
                             if ~isempty(obj.new_events)
                                 [mx1, idx] = max([obj.new_events.snr]); % find the best event (if there are more than one)
                                 mx2 = obj.new_events(idx).star_snr;
-                                snr_vec(obj.sim_bank.filtered_index) = mx1/mx2; % save the normalized S/N
+                                snr_vec(obj.sim_bank.filtered_index) = mx1/mx2; % normalize the S/N by the star S/N
                             end
                         end
                         
@@ -650,19 +732,15 @@ classdef Finder < handle
                     
                     obj.sim_bank.snr_sim_full(end+1,:) = snr_vec;
                     
-                else
+                else % when not using sim mode! 
                     
                     obj.findEvents; % just find real events! 
                     obj.last_events = obj.new_events;
                     obj.all_events = [obj.all_events obj.new_events];
                     
-%                     if obj.num_kept
-%                         error('Found a real event!'); % debugging only!
-%                     end
-                    
                 end
                 
-            end
+            end % done finding events on fluxes+prev_fluxes
             
             % store these for next time
             obj.prev_fluxes = obj.fluxes;
@@ -684,7 +762,6 @@ classdef Finder < handle
             
             if ~isempty(obj.bank.fluxes_filtered)
                 obj.var_buf.input(nanvar(obj.bank.fluxes_filtered)); % variance tracking: keep a running buffer of the variance of previous filter results
-%                 obj.f = vertcat(obj.f, obj.bank.fluxes_filtered(:,138,1)); % debugging only!
             end
             
         end
@@ -858,7 +935,7 @@ classdef Finder < handle
                 obj.hist_snr_edges = obj.min_star_snr:obj.snr_bin_width:obj.snr_bin_max; 
                 obj.hist_star_edges = 1:length(obj.star_snrs); 
                 
-                h = histcounts2(obj.hist_star_edges, obj.star_snrs, obj.hist_star_edges, obj.hist_snr_edges); % put one in the bin with the right S/N and star index
+                h = histcounts2(obj.hist_star_edges, obj.star_snrs, obj.hist_star_edges, obj.hist_snr_edges); % put one for each star in the bin with the right S/N and star index
                 
                 h = h.*batch_duration_seconds./3600; % the duration of the second batch, subtracting the duration of all events in that part
                 

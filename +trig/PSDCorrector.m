@@ -1,5 +1,38 @@
 classdef PSDCorrector < handle
-
+% Use Welch's method on a buffer of previous fluxes to get an estimate for 
+% the Power Spectral Desnity (PSD) of the flux of each star. 
+% You will need to keep quite a few samples of previous fluxes to get a good
+% estimate of the PSD. This is controlled by "N_buf" and "B_min". 
+% The former determines the maximum buffer size, and the latter determines
+% the minimal buffer size that allows using the PSD. 
+% In the first few batches the PSD is not used, until reaching "N_min". 
+% Then after we reach "N_buf" samples in the buffer, the PSD correction is
+% at full power, and remains so until the end of the run. Any new flux data
+% that comes into this object is stored in a FIFO buffer. 
+%
+% Use input(flux) to give the newest batch of fluxes to this object. Make 
+% sure to define "num_frames_to_add" as the number of flux points in a single
+% batch, so it only inputs one batch at a time to the PSD calculation, not
+% the overlapping two-batch we usually work with. The two-batch is indeed 
+% given to input() but only so it can be calibrated (de-reddened) using the
+% PSD we have already calculated on previous batches. 
+%
+% Use the "fluxes_deredened" for fluxes corrected by the sqrt of the PSD. 
+% Use the "fluxes_blued" for fluxes with double correction (extra red removal) 
+% which is useful for accounting also for the filter that should be divided 
+% by sqrt of the PSD. Thus the "blued" fluxes can be match-filtered directly. 
+% See Barak's paper: https://ui.adsabs.harvard.edu/abs/2019arXiv190805644Z/abstract
+%
+% NOTE: we use a linear fit (excluding outliers) to calibrate the fluxes
+% before putting them into the PSD. If the flux buffer is too short for 
+% getting a good PSD estimate (at the beginning of the run) then we return
+% the fluxes with only this simple calibration. If the PSD is applied, it is
+% applied to the calibrated fluxes. 
+% 
+% The PSD itself is stored in "psd" and can be plotted for inspection. 
+% 
+    
+    
     properties(Transient=true)
         
     end
@@ -54,10 +87,10 @@ classdef PSDCorrector < handle
         function obj = PSDCorrector(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'trig.PSDCorrector')
-                if obj.debug_bit, fprintf('PSDCorrector copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('PSDCorrector copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('PSDCorrector constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('PSDCorrector constructor v%4.2f\n', obj.version); end
             
             end
             
