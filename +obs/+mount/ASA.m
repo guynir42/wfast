@@ -6,7 +6,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 %
 % To give a target use inputTarget(star_name) or inputTarget(RA,DEC). 
 % Make sure the target parmeters are correctly translated to the object 
-% coordinates objRA and objDEC. Also make sure the objALT is high enough. 
+% coordinates objRA and objDec. Also make sure the objALT is high enough. 
 % To make the telescope go to target just use "slew" without arguments. 
 % 
 % NOTE: All parameters of the mount / target are given in hours/degrees as
@@ -98,10 +98,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         % they are kept in the Ephemeris class
         objName;
         objRA_deg; 
-        objDEC_deg;
+        objDec_deg;
         
         objRA; % string in HH:MM:SS format
-        objDEC; % string in DD:MM:SS format
+        objDec; % string in DD:MM:SS format
         
         % these are read-only values for inspection
         objHA; % string in HH:MM:SS format
@@ -111,10 +111,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         % these are read out directly from the mount        
         % these are read-only values for inspection
         telRA_deg; 
-        telDEC_deg;
+        telDec_deg;
         
         telRA; % string in HH:MM:SS format
-        telDEC; % string in DD:MM:SS format
+        telDec; % string in DD:MM:SS format
         
         telHA; % string in HH:MM:SS format
         telALT; % degrees
@@ -396,6 +396,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 %             else
 %                 val = obj.cam_pc.outgoing.OBJECT;
 %             end
+
             val = obj.object.name;
 
             
@@ -407,7 +408,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function val = get.objDEC_deg(obj)
+        function val = get.objDec_deg(obj)
             
             val = obj.object.Dec_deg;
             
@@ -425,7 +426,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function val = get.objDEC(obj)
+        function val = get.objDec(obj)
             
             val = obj.object.DE;
             
@@ -465,17 +466,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function val = get.telDEC_deg(obj)
-            
-            try
-                val = obj.hndl.Declination;
-            catch
-                val = [];
-            end
-            
-        end
-        
-        function val = get.telDE_deg(obj)
+        function val = get.telDec_deg(obj)
             
             try
                 val = obj.hndl.Declination;
@@ -491,15 +482,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function val = get.telDEC(obj)
+        function val = get.telDec(obj)
             
-            val = head.Ephemeris.deg2sex(obj.telDEC_deg);
+            val = head.Ephemeris.deg2sex(obj.telDec_deg);
             
         end
         
         function val = get.telDE(obj)
             
-            val = head.Ephemeris.deg2sex(obj.telDEC_deg);
+            val = head.Ephemeris.deg2sex(obj.telDec_deg);
             
         end
         
@@ -629,11 +620,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function val = obj_pier_side(obj)
             
-            if isempty(obj.objRA_deg) || isempty(obj.objDEC_deg)
+            if isempty(obj.objRA_deg) || isempty(obj.objDec_deg)
                 val = '';
             else
                 try
-                    val = obj.hndl.DestinationSideOfPier(obj.objRA_deg/15, obj.objDEC_deg);
+                    val = obj.hndl.DestinationSideOfPier(obj.objRA_deg/15, obj.objDec_deg);
                 catch 
                     val = '';
                 end
@@ -687,7 +678,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             obj.object.RA = val; % note this is given in HOURS!
             obj.object.update;
-            obj.objName = '';
+            obj.object.name = '';
+            obj.object.keyword = '';
             
             try
                 obj.hndl.TargetRightAscension = obj.object.RA_deg/15; % also update the telescope's target field...
@@ -702,7 +694,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             obj.object.RA_deg = val;
             obj.object.update;
-            obj.objName = '';
+            obj.object.name = '';
+            obj.object.keyword = '';
             
             try
                 obj.hndl.TargetRightAscension = obj.object.RA_deg/15; % also update the telescope's target field...
@@ -713,7 +706,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function set.objDEC(obj, val)
+        function set.objDec(obj, val)
             
             obj.object.Dec = val;
             obj.object.update;
@@ -725,7 +718,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function set.objDEC_deg(obj, val)
+        function set.objDec_deg(obj, val)
             
             obj.object.Dec_deg = val;
             obj.object.update;
@@ -934,7 +927,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             if nargout==0
                 obj.objRA = RA;
-                obj.objDEC = Dec;
+                obj.objDec = Dec;
                 obj.objName = name;
             end
             
@@ -943,7 +936,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function addTargetList(obj, str) % add an object to the list of recent targets
             
             if nargin<2 || isempty(str)
-                str = [obj.objName ' {' obj.objRA ', ' obj.objDEC '}'];
+                str = [obj.objName ' {' obj.objRA ', ' obj.objDec '}'];
             end
             
             if isempty(obj.prev_objects) || all(~strcmp(str, obj.prev_objects)) % check this string is not on the list already... 
@@ -1031,6 +1024,35 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
+        function val = check_after_slew(obj)
+            
+            val = 1; 
+            
+            % the RA/Dec condition for a successfull slew is 10 arcmin,
+            % because there is some bug in turning coordinates from J2000
+            % to Jnow (not sure if the problem is in the mount software or
+            % in Eran's coco function. 
+            if abs(obj.telRA_deg-obj.objRA_deg)*3600>600
+                val = 0; 
+                return;
+            end
+            
+            if abs(obj.telDec_deg-obj.objDec_deg)*3600>600
+                val = 0;
+                return;
+            end
+            
+            pause(1); 
+            
+            v = obj.getVibrationStrength; 
+            
+            if sqrt(v)*3600>10
+                val = 0;
+                return;
+            end
+            
+        end
+        
         function val = check_need_flip(obj) % check if target is on the other side of the pier
             
             if strcmp(obj.obj_pier_side, 'pierUnknown')
@@ -1093,7 +1115,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 if obj.check_need_flip % do pre-slews to manage to do the flip without getting stuck! 
                     
-                    if obj.telDE_deg<30 || obj.telDE_deg>60
+                    if obj.telDec_deg<30 || obj.telDec_deg>60
                         
                         obj.slewWithoutPrechecks(obj.hndl.RightAscension, 45); % do a preslew to dec +70 so we can make the flip! 
                         
@@ -1117,7 +1139,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 if input.history
                     try % keep a history of all targets
-                        str = [obj.objName ' {' obj.objRA ', ' obj.objDEC '}'];
+                        str = [obj.objName ' {' obj.objRA ', ' obj.objDec '}'];
                         obj.addTargetList(str);
                     catch ME
                         rethrow(ME);
@@ -1126,7 +1148,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 obj.slewWithoutPrechecks(ra_hours_Jnow, dec_deg_Jnow);
                 
-                if obj.use_motor_toggle
+                if obj.use_motor_toggle % this does not work! 
                     
                     obj.hndl.MotorOff; 
                     
@@ -1139,6 +1161,40 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 end
                 
                 obj.tracking = 1;
+                                
+                pause(3); 
+                
+                % check that we've reached the right position and not vibrating 
+                if ~obj.check_after_slew
+                    
+                    obj.log.input('Slew post-check failed, trying to slew again...');
+                    disp(obj.log.report); 
+                    
+                    obj.slewWithoutPrechecks(ra_hours_Jnow, dec_deg_Jnow);
+                    
+                    obj.tracking = 1;
+                
+                    pause(1); 
+                    
+                    if ~obj.check_after_slew % if this fails, slew aside a little and come back
+                        
+                        obj.log.input('Slew post-check failed again, trying to slew to different coordinate and return...'); 
+                        disp(obj.log.report); 
+
+                        obj.slewWithoutPrechecks(ra_hours_Jnow+0.1, dec_deg_Jnow+1);
+                        
+                        pause(3); 
+                        
+                        obj.slewWithoutPrechecks(ra_hours_Jnow, dec_deg_Jnow);
+                        
+                        if ~obj.check_after_slew
+                            obj.log.error('Slewing post-checks failed after all attempts to re-slew. '); 
+                            error(obj.log.report); 
+                        end
+                        
+                    end
+                    
+                end
                 
                 if ~isempty(obj.cam_pc)
                     obj.cam_pc.outgoing.stop_camera = 0; % need to tell cam-pc to start working! 
@@ -1191,6 +1247,32 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 
             end
 
+        end
+        
+        function [total_var, RA_var, DE_var] = getVibrationStrength(obj, varargin) % variance in RA/DE in units of degrees (run this only when tracking...)
+            
+            input = util.text.InputVars;
+            input.input_var('N', 50, 'number', 'iterations'); 
+            input.input_var('delay', 0.01, 'pause'); 
+            input.scan_vars(varargin{:}); 
+            
+            RA = nan(input.N, 1); 
+            DE = nan(input.N, 1); 
+            
+            for ii = 1:input.N
+                
+                RA(ii) = obj.telRA_deg; 
+                DE(ii) = obj.telDec_deg;
+                
+                pause(input.delay); 
+                
+            end
+            
+            RA_var = nanvar(RA); 
+            DE_var = nanvar(DE); 
+            
+            total_var = RA_var + DE_var;
+            
         end
         
         function setup_timer(obj, ~, ~) % start the timer that checks Arduino and updates GUI
@@ -1629,13 +1711,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function updateCamera(obj) % send details on object coordinates to cam_pc
             
             obj.cam_pc.outgoing.RA = obj.objRA;
-            obj.cam_pc.outgoing.DEC = obj.objDEC;            
+            obj.cam_pc.outgoing.DEC = obj.objDec;            
             obj.cam_pc.outgoing.RA_DEG = obj.objRA_deg;
-            obj.cam_pc.outgoing.DEC_DEG = obj.objDEC_deg;
+            obj.cam_pc.outgoing.DEC_DEG = obj.objDec_deg;
             obj.cam_pc.outgoing.TELRA = obj.telRA;
-            obj.cam_pc.outgoing.TELDEC = obj.telDEC;
+            obj.cam_pc.outgoing.TELDEC = obj.telDec;
             obj.cam_pc.outgoing.TELRA_DEG = obj.telRA_deg;
-            obj.cam_pc.outgoing.TELDEC_DEG = obj.telDEC_deg;
+            obj.cam_pc.outgoing.TELDEC_DEG = obj.telDec_deg;
             
 %             if isempty(obj.tracking) || obj.tracking==0 || (~isempty(obj.objRA_deg) && abs(obj.objRA_deg-obj.telRA_deg)>1) % if mount stops tracking or is 4 time-minutes away from target RA, stop the camera (e.g., when reaching limit)
 %                 
@@ -1745,7 +1827,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         DE_target_deg;
         DE_target;
-        telDE_deg;
         telDE;
         
     end

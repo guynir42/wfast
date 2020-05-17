@@ -727,7 +727,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             str = sprintf('%s\n Dome status is: %s ', str, obj.observatory_state);
             str = sprintf('%s\n</p>', str); 
             
-            if ~isempty(obj.obs_log) && strcmp(obj.obs_log.date, d)
+            if ~isempty(obj.obs_log) && isfield(obj.obs_log, 'date') && strcmp(obj.obs_log.date, d) && length(fields(obj.obs_log))>1
                 
                 list = fields(obj.obs_log); 
                 
@@ -793,7 +793,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             end
             
-            obj.email.sendToList('subject', sprintf('[WFAST] Morning report %d',randi(1000)+10), 'text', str, ...
+            obj.email.sendToList('subject', sprintf('[WFAST] Morning report %s', d), 'text', str, ...
                 'header', 1, 'footer', 1, 'html', 1); 
             
             obj.latest_email_report_date = d; % make sure we don't resend this email today (after a successful send!)

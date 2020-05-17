@@ -107,7 +107,7 @@ classdef ASAGUI < handle
             obj.panel_pointing = GraphicPanel(obj.owner, [0 pos/N 1 1/N], 'pointing', 0); % last input is for horizontal
             obj.panel_pointing.number = num_buttons;
             obj.panel_pointing.addButton('button_ra', 'telRA', 'info', 'RA= ', '', '', [], '', '', 'Current pointing Right Ascention');
-            obj.panel_pointing.addButton('button_dec', 'telDEC', 'info', 'Dec= ', '', '', [], '', '', 'Current pointing Declination');
+            obj.panel_pointing.addButton('button_dec', 'telDec', 'info', 'Dec= ', '', '', [], '', '', 'Current pointing Declination');
             obj.panel_pointing.addButton('button_ha', 'telHA', 'info', 'HA= ', '', '', [], '', '', 'Current pointing Hour Angle');
             obj.panel_pointing.addButton('button_alt', 'telALT', 'info', 'ALT= ', '', '', [], '', '', 'Current pointing altitude');
             obj.panel_pointing.addButton('button_alt', 'telAZ', 'info', 'AZ= ', '', '', [], '', '', 'Current pointing azimuth');            
@@ -144,7 +144,7 @@ classdef ASAGUI < handle
             obj.panel_object.addButton('button_resolve', 'inputTarget', 'push', 'resolve', '', '', 0.3, '', '', 'Use object name to auto fill RA/Dec');
             
             obj.panel_object.addButton('input_ra', 'objRA', 'input', 'RA= ', '', '', 0.5, '', '', 'Input object Right Ascention or use name resolver');
-            obj.panel_object.addButton('input_dec', 'objDEC', 'input', 'Dec= ', '', '', 0.5, '', '', 'Input object Declination or use name resolver');
+            obj.panel_object.addButton('input_dec', 'objDec', 'input', 'Dec= ', '', '', 0.5, '', '', 'Input object Declination or use name resolver');
             
             obj.panel_object.addButton('button_ha', 'objHA', 'info', 'HA= ', '', '', 0.4, '', '', 'Calculated object Hour Angle'); 
             obj.panel_object.addButton('button_alt', 'objALT', 'info', 'ALT= ', '', '', 0.4, '', '', 'Calculated object Altitude'); 
@@ -166,6 +166,8 @@ classdef ASAGUI < handle
             
             obj.panel_object.button_prev_objects.control.Style = 'popupmenu';
             obj.panel_object.button_prev_objects.Callback = @obj.callback_prev_objects;
+            
+            obj.panel_object.panel.BackgroundColor = 0.5.*[1 1 1];
             
             %%%%%%%%%%% panel manual %%%%%%%%%%%%%%%
             
@@ -493,7 +495,7 @@ classdef ASAGUI < handle
         
         function callback_sync(obj, ~, ~)
             
-            str = sprintf('Are you sure you want to sync on these coordinates: \n%s%s', obj.owner.objRA, obj.owner.objDEC);
+            str = sprintf('Are you sure you want to sync on these coordinates: \n%s%s', obj.owner.objRA, obj.owner.objDec);
             
             res = questdlg(str, 'Flip needed!', 'Sync', 'Abort', 'Sync');
             if isempty(res) || strcmp(res, 'Abort')
