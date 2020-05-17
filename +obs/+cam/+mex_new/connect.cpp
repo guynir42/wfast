@@ -33,8 +33,11 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	rc = AT_Open(0, hndl);
 	if(rc) mexErrMsgIdAndTxt( "MATLAB:obs:cam:mex:connect:open", "Got error code %d when using AT_Open!", rc);
 	
-	// printf("hndl= %ld\n", *hndl);
+	printf("hndl= %ld\n", *hndl);
 	
+	rc=AT_Command(*hndl, L"AcquisitionStop");
+	if(rc) mexErrMsgIdAndTxt( "MATLAB:obs:cam:mex:connect:stopAcquistionFailed", "Got error code %d when trying to stop acquisition!", rc);
+
 	rc=AT_SetBool(*hndl, L"SensorCooling", (bool) 1); 
 	if(rc) mexErrMsgIdAndTxt( "MATLAB:obs:cam:mex:connect:setSensorCooling", "Got error code %d when setting sensor cooling!", rc);
 

@@ -82,6 +82,8 @@ classdef Acquisition < file.AstroData
         total_runtime;
         runtime_units = 'minutes';
         
+        use_focus_on_start = 1; % when true, will do a focus run every time the command to start a new run is given from PcSync
+        
         use_background = 1;
         use_refine_bg = 0;
         
@@ -192,6 +194,9 @@ classdef Acquisition < file.AstroData
         brake_bit = 1; % when this is set to 1 (using the GUI, for example), the run stops. 
         is_running = 0; % when this is 1, cannot start a new run or anything
         is_running_single = 0; % when this is 1, cannot start a new run or anything
+        
+        latest_command_str = '';
+        latest_command_time = '';
         
         failed_batch_counter = 0;
         
@@ -1393,6 +1398,7 @@ classdef Acquisition < file.AstroData
                     
                 end
                 
+                
                 obj.sync.outgoing.obs_log = obj.obs_log; % update the Manager on how much observing time is invested in each target
                 obj.drive_space_gb = obj.getDriveSpace; % calculate how much space is left in each drive (in Gb) 
                 obj.sync.outgoing.drives = obj.drive_space_gb;
@@ -1404,12 +1410,67 @@ classdef Acquisition < file.AstroData
                     end
                     
                     % add code here to start observations by command from dome-PC
+
+                    if isfield(obj.sync.incoming, 'command_str')
+                        obj.parseCommands;
+                    end
                     
+                    obj.sync.update;
+                
                 end
                 
             catch ME
                 warning(ME.getReport)
             end
+            
+        end
+        
+        function parseCommands(obj)
+            
+            import util.text.cs;
+            
+            try 
+
+                obj.sync.outgoing.echo_str = obj.sync.incoming.command_str;
+                obj.sync.outgoing.echo_time = obj.sync.incoming.command_time;
+                
+                if ~isempty(obj.sync.incoming.command_str) && ...  
+                        ~strcmp(obj.latest_command_time,obj.sync.incoming.command_time)
+                    
+                    if cs(obj.sync.incoming.command_str, 'start')
+
+                        if obj.use_focus_on_start
+                            disp('Now running focus by order of dome-PC'); 
+                            pause(2); 
+                            obj.sync.outgoing.report = 'Starting focus run!';
+                        end
+                        
+                        disp('Now starting new run by order of dome-PC'); 
+                        
+                        obj.sync.outgoing.report = 'Starting run...';
+                        
+                    elseif cs(obj.sync.incoming.command_str, 'stop') 
+                        
+                        obj.brake_bit = 1;
+                        
+                        obj.sync.outgoing.report = 'camera ready.';
+
+                    else
+                        error('Unknown command: %s! Use "start" or "stop", etc...', obj.sync.incoming.command_str); 
+                    end
+
+                    obj.sync.outgoing.report = 'camera ready.'; 
+                
+                    obj.latest_command_str = obj.sync.incoming.command_str;
+                    obj.latest_command_time = obj.sync.incoming.command_time;
+
+                end
+                
+            catch ME
+                obj.sync.outgoing.report = sprintf('error! \n%s', ME.getReport); 
+                rethrow(ME); 
+            end
+
             
         end
         

@@ -325,7 +325,8 @@ classdef Andor < file.AstroData
                 cd(current_dir);
                 
 %                 [rc] = obs.cam.sdk.AT_SetBool(obj.hndl, 'SensorCooling', 1); obs.cam.sdk.AT_CheckWarning(rc);        
-                obs.cam.mex_new.set(obj.hndl, 'cooling', 1); 
+                
+%                 obs.cam.mex_new.set(obj.hndl, 'cooling', 1); 
               
 %                 rc = obs.cam.sdk.AT_SetBool(obj.hndl, 'SpuriousNoiseFilter', 0); obs.cam.sdk.AT_CheckWarning(rc);
 %                 rc = obs.cam.sdk.AT_SetBool(obj.hndl, 'StaticBlemishCorrection', 0); obs.cam.sdk.AT_CheckWarning(rc);
@@ -1380,7 +1381,7 @@ classdef Andor < file.AstroData
             end
             
 %             [rc, cooling] = obs.cam.sdk.AT_GetBool(obj.hndl, 'SensorCooling'); obs.cam.sdk.AT_CheckWarning(rc);
-            cooling = obs.cam.mex_new.get(obj.hndl, 'cooling'); 
+%             cooling = obs.cam.mex_new.get(obj.hndl, 'cooling'); 
             if ~cooling, error('Camera sensor cooling is off!'); end
             
             % add other checks for consistency in parameters... 

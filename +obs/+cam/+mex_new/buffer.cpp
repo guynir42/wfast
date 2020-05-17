@@ -33,6 +33,8 @@ class BufferQueue {
 	BufferQueue();
 	~BufferQueue();
 	
+	void printout();
+	
 	void allocate(AT_H camera_handle, int num_images=10);
 	void release(); 
 	void queue(); 
@@ -40,7 +42,6 @@ class BufferQueue {
 	mxArray *BufferQueue::getImageMatrix();
 	
 } buffer; // create a global member in memory, which is deleted when "clear mex" is called or when compiling
-
 
 void mexFunction( int nlhs, mxArray *plhs[],
                   int nrhs, const mxArray *prhs[] ){
@@ -65,7 +66,10 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	// optional 3rd argument is a scalar parameter
 	double par=NAN;
 	if(nrhs>2 && mxIsEmpty(prhs[2])==0) par=mxGetScalar(prhs[2]); 
-		
+	
+	if(cs(key, "printout")){
+		buffer.printout(); 
+	}
 	if(cs(key, "allocate")){
 		
 		if(isnan(par)) buffer.allocate(hndl); // use the default number of images
@@ -96,6 +100,12 @@ BufferQueue::BufferQueue(){
 BufferQueue::~BufferQueue(){
 
 	release();
+
+}
+
+void BufferQueue::printout(){
+
+	printf("hndl= %ld\n", (long int) hndl); 
 
 }
 

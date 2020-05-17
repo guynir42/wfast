@@ -295,6 +295,8 @@ classdef Reader < file.AstroData
             obj.dataset_names.cutouts = [obj.dataset_names.cutouts, obj.dataset_names.cutouts_proc];
             
             obj.dataset_names.positions = {'positions'};
+            obj.attribute_names.object_idx = {'obj_idx', 'object_idx', 'obj_index', 'object_index'}; 
+
             obj.dataset_names.coordinates = {'coordinates'};
             obj.dataset_names.magnitudes = {'magnitudes'};
             obj.dataset_names.temperatures = {'temperatures'};
@@ -307,7 +309,6 @@ classdef Reader < file.AstroData
             
             obj.dataset_names.psfs = {'psfs'};
             obj.attribute_names.psf_sampling = {'psf_sampling', 'psf_binning'};
-            obj.attribute_names.obj_idx = {'obj_idx', 'object_idx', 'obj_index', 'object_index'}; 
 
             obj.dataset_names.fluxes = {'fluxes', 'flux', 'lightcurves'};
             obj.dataset_names.errors = {'errors', 'error'};
@@ -868,7 +869,7 @@ classdef Reader < file.AstroData
                         loaded_positions = h5read(filename, sa('/', data_name)); % read the entire "positions" dataset, if it exists
                         obj.positions = loaded_positions(:,:,end); % to handle cases where we accidentally saved coordinates and positions together... 
                         
-                        obj.getAttribute(filename, data_name, att_names, 'obj_idx');
+                        obj.getAttribute(filename, data_name, att_names, 'object_idx');
                         
                     elseif any(strcmp(data_name, obj.dataset_names.coordinates)) && all(data_size) % data_names.coordinates may be a cell array of different optional names
                         

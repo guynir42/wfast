@@ -273,10 +273,10 @@ classdef Lightcurves < handle
         function obj = Lightcurves(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'Lightcurves')
-                if obj.debug_bit, fprintf('Lightcurves copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Lightcurves copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('Lightcurves constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Lightcurves constructor v%4.2f\n', obj.version); end
             
             end
             
@@ -1516,6 +1516,8 @@ classdef Lightcurves < handle
             obj.widths_full = obj.widths_full(indices,:,:);
             obj.bad_pixels_full = obj.bad_pixels_full(indices,:,:);
             obj.flags_full = obj.flags_full(indices,:,:);
+            
+            obj.frame_index = size(obj.fluxes_full,1)+1; 
             
             obj.clearIntermidiate;
             obj.clearFits;
