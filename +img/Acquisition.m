@@ -35,8 +35,6 @@ classdef Acquisition < file.AstroData
         
         model_psf@img.ModelPSF;
         
-        af@obs.focus.AutoFocus;
-        
         % output to file
         buf@file.BufferWheel;
         
@@ -312,8 +310,6 @@ classdef Acquisition < file.AstroData
                 obj.lightcurves.use_psf_correction =0;
                 
                 obj.model_psf = img.ModelPSF;
-                
-                obj.af = obs.focus.AutoFocus;
                 
                 obj.buf = file.BufferWheel;
 %                 obj.buf.product_type = 'Cutouts';
@@ -1295,10 +1291,6 @@ classdef Acquisition < file.AstroData
                 else
                     warning(['unknown source class: ' class(source)]);
                 end
-            end
-            
-            if isa(obj.src, 'obs.cam.Andor')
-                obj.src.af = obj.af;
             end
             
             obj.update;
@@ -2651,324 +2643,26 @@ classdef Acquisition < file.AstroData
         
         function runFocus(obj, varargin)
             
-            if obj.is_running || obj.is_running_single
-                disp('Already running, set is_running and is_running_single to zero...');
-                return;
-            else
-                obj.is_running = 1;
-            end
-            
-            obj.log.input('Running autofocus');
+            obj.log.input('Running autofocus loop.'); 
             
             try
-               
-                obj.af.reset;
-                obj.af.use_quadrants = 1;
+            
+                for ii = 1:4
                 
-                if ~isempty(obj.gui) && obj.gui.check
-                    obj.gui.update;
+                    obj.cam.autofocus; 
+                    
+                    min_pos = obj.cam.af.pos(2); 
+                    max_pos = obj.cam.af.pos(end-1); 
+                    
+                    if obj.cam.af.found_width<1 && obj.cam.found_pos>=min_pos && obj.cam.found_pos<=max_pos
+                        break; % if focus is good enough and not at the edges of the range, we don't need to repeat it
+                    end
+                
                 end
                 
-                old_pos = [];
-                
-                if isempty(obj.cam) || isempty(obj.cam.focuser)
-                    error('must be connected to camera and focuser!');
-                end
-
-                input = obj.makeInputVars('reset', 0, 'batch_size', obj.af.batch_size, 'expT', obj.af.expT, 'frame_rate', obj.af.frame_rate, ...
-                    'use_model_psf', obj.af.use_model_psf, 'use audio', 0, 'use_save', 0, 'run name', 'focus', 'prog', 0, ...
-                    'pass_source', {'async', 0}, varargin{:});
-
-                obj.reset;
-                
-                check = obj.single;
-                if check==0, return; end
-                
-                obj.findStarsFocus;
-                
-                old_pos = obj.cam.focuser.pos; % keep this in case of error/failure
-                
-                obj.cam.focuser.pos = obj.cam.focuser.pos - obj.af.range; % starting point for scan... 
-            
-                p = obj.af.getPosScanValues(old_pos);
-            
-                if obj.af.use_loop_back
-                    p = [p flip(p)];
-                end
-                
-                input.num_batches = length(p);
-            
-                obj.stash_parameters(input);
-                obj.brake_bit = 0;
-                cleanup = onCleanup(@obj.finishupFocus);
-%                 obj.startup(input);
-%                 obj.src.startup('use_save', 0, 'use_async', 0, obj.pass_source{:});
-                
-                for ii = 1:length(p) % loop over all focus-positions in range
-                    
-                    if obj.brake_bit
-                        return;
-                    end
-
-                    try 
-                        
-                        obj.cam.focuser.pos = p(ii);
-                        
-                        pause(0.1);
-                    
-                    catch ME
-                        warning(ME.getReport);
-                    end
-                    
-                    for jj = 1:obj.af.num_repeats
-                        
-                        check = obj.single;
-                        if check==0, return; end
-                    
-                        if obj.use_model_psf
-                            widths(jj,:) = [obj.model_psf.maj_axis obj.model_psf.min_axis];
-                            weights(jj,:) = [1 1]; % both minor and major axis would have the same weight
-                        else
-                            widths(jj,:) = obj.phot_stack.widths; % get the width directly from the 
-                            weights(jj,:) = obj.phot_stack.fluxes; % use the flux as the average for weighing the different measurements
-                        end
-                        
-                    end
-                    
-                    obj.af.input(ii, obj.cam.focuser.pos, nanmedian(widths,1), nanmedian(weights,1), obj.positions); % give the average over multiple batches to the AF code
-                    
-                    obj.batch_counter = obj.batch_counter + 1;
-                    
-%                     if obj.use_model_psf
-%                         obj.af.input(ii, obj.cam.focuser.pos, [obj.model_psf.maj_axis obj.model_psf.min_axis], [1 1], obj.positions);
-%                     else
-%                         obj.af.input(ii, obj.cam.focuser.pos, obj.phot_stack.widths, obj.phot_stack.fluxes, obj.positions);
-%                     end
-                    
-                    if obj.use_progress
-                        obj.prog.showif(obj.batch_counter);
-                    end
-                    
-                    if ~isempty(obj.gui) && obj.gui.check
-                        obj.show;
-                        obj.gui.update;
-                    end
-                    
-                    obj.af.plot;
-
-                    drawnow;
-
-                end
-            
-                obj.af.calculate;
-                obj.brake_bit = 1;
-                
-                fprintf('FOCUSER RESULTS: pos= %f | tip= %f | tilt= %f\n', obj.af.found_pos, obj.af.found_tip, obj.af.found_tilt);
-            
             catch ME
-                
-                disp(['Focus has failed, returning focuser to previous position= ' num2str(old_pos)]); 
-                
-                try 
-                    obj.cam.focuser.pos = old_pos; 
-                end
-                
-                obj.unstash_parameters;
-                obj.is_running = 0;
-                obj.clip.reset; % don't save these star positions! 
-                obj.positions = [];
+                obj.log.error(ME.getReport);
                 rethrow(ME);
-                
-            end
-            
-%             obj.cam.focuser.pos = obj.af.pos(1); % go back to lower position, then go back up (like the tank cannon)
-            
-            if ~isnan(obj.af.found_pos)
-                obj.cam.focuser.pos = obj.af.found_pos;
-            else
-                disp('The location of new position is NaN. Choosing original position');
-                obj.cam.focuser.pos = old_pos;
-            end
-            
-            if isprop(obj.cam.focuser, 'tip') && ~isempty(obj.af.found_tip)
-                obj.cam.focuser.tip = obj.cam.focuser.tip + obj.af.found_tip;
-            end
-            
-            if isprop(obj.cam.focuser, 'tilt') && ~isempty(obj.af.found_tilt)
-                obj.cam.focuser.tilt = obj.cam.focuser.tilt + obj.af.found_tilt;
-            end
-            
-            obj.af.plot;
-            
-            obj.clip.reset; % don't save these star positions! 
-            obj.positions = [];
-            
-            obj.reset; 
-            
-        end
-        
-        function findStarsFocus(obj, varargin)
-            
-%             disp('findStarsFocus');
-            
-            I = obj.stack_proc;
-            S = size(I);
-            C = obj.cut_size;
-            
-            [M,V] = util.img.im_stats(I);
-            
-            T_all = table;
-            
-            idx_top = 1:round(S(1)/3); 
-            idx_middle = round(S(1)/3+1):round(S(1)*2/3);
-            idx_bottom = round(S(1)*2/3+1):S(1);
-            
-            idx_left = 1:round(S(2)/3); 
-            idx_center = round(S(2)/3+1):round(S(2)*2/3);
-            idx_right = round(S(2)*2/3+1):S(2);
-
-            % unmask the central region
-            unmask{1} = false(S);
-            unmask{1}(idx_middle, idx_center) = true;
-            
-            % unmask the top left corner
-            unmask{2} = false(S);
-            unmask{2}(idx_top, idx_left) = true;
-            
-            % unmask the top right corner
-            unmask{3} = false(S);
-            unmask{3}(idx_top, idx_right) = true;
-            
-            % unmask the bottom left corner
-            unmask{4} = false(S);
-            unmask{4}(idx_bottom, idx_left) = true;
-
-            % unmask the bottom right
-            unmask{5} = false(S);
-            unmask{5}(idx_bottom, idx_right) = true;
-            
-%             markers = round(S'.*[1/3 2/3]); % divide the sensor to 1/3rds 
-% 
-%             unmask{1} = false(S);
-%             unmask{1}(markers(1,1):markers(1,2), markers(2,1):markers(2,2)) = 1; % only the central part is unmasked
-%             
-%             unmask{2} = false(S);
-%             unmask{2}(C:markers(1,1), C:markers(2,1)) = 1; % upper left corner
-%             
-%             unmask{3} = false(S);
-%             unmask{3}(markers(1,2):end-C+1, C:markers(2,1)) = 1; % lower left corner
-%             
-%             unmask{4} = false(S);
-%             unmask{4}(C:markers(1,1), markers(2,2):end-C+1) = 1; % upper right corner
-%             
-%             unmask{5} = false(S);
-%             unmask{5}(markers(1,2):end-C+1, markers(2,2):end-C+1) = 1; % lower right corner
-            
-            for ii = 1:5
-            
-                I_masked = I;
-                I_masked(~unmask{ii}) = M;
-                
-                T = util.img.quick_find_stars(I_masked, 'mean', M, 'std', sqrt(V), 'number', obj.af.num_stars_per_quadrant, ...
-                    'saturation', 4e4, 'flag', true, varargin{:});
-                
-                obj.af.quadrant_indices{end+1} = height(T_all)+(1:height(T)); 
-                
-                if ~isempty(T)
-                    T_all = vertcat(T_all, T);
-                end
-                
-            end
-            
-            obj.clip.positions = T_all.pos;
-            obj.positions = double(T_all.pos);
-            
-            obj.ref_positions = obj.positions;
-            obj.ref_stack = obj.stack_proc;
-            
-            if obj.gui.check
-                obj.show;
-            end
-            
-        end
-        
-        function finishupFocus(obj)
-            
-            if obj.debug_bit, disp(['Finished run "' obj.run_name '" with ' num2str(obj.batch_counter) ' batches.']); end
-            
-            obj.brake_bit = 1;
-            
-            obj.unstash_parameters;
-            
-            obj.is_running = 0;
-            
-            if ~isempty(obj.gui) && obj.gui.check
-                obj.gui.update;
-            end
-            
-        end
-        
-        function findStarsFocusOld(obj) % find stars in order in five locations around the sensor
-            
-            I = obj.stack_proc;
-            S = size(I);
-            C = obj.cut_size;
-            
-            I = util.img.maskBadPixels(I);
-            
-            if obj.use_remove_saturated
-                mu = median(squeeze(util.stat.corner_mean(util.img.jigsaw(I))));
-                sig = median(squeeze(util.stat.corner_std(util.img.jigsaw(I))));
-                I = util.img.remove_saturated(I, 'saturation', 4.5e4, 'threshold', mu+5*sig, 'dilate', 4);
-            end
-            
-            I = conv2(I, util.img.gaussian2(2), 'same'); % smoothing filter
-            
-            markers = round(S'.*[1/3 2/3]); % divide the sensor to 1/3rds 
-            
-            mask{1} = false(S);
-            mask{1}(markers(1,1):markers(1,2), markers(2,1):markers(2,2)) = 1; % only the central part is unmasked
-            
-            mask{2} = false(S);
-            mask{2}(C:markers(1,1), C:markers(2,1)) = 1; % upper left corner
-            
-            mask{3} = false(S);
-            mask{3}(markers(1,2):end-C+1, C:markers(2,1)) = 1; % lower left corner
-            
-            mask{4} = false(S);
-            mask{4}(C:markers(1,1), markers(2,2):end-C+1) = 1; % upper right corner
-            
-            mask{5} = false(S);
-            mask{5}(markers(1,2):end-C+1, markers(2,2):end-C+1) = 1; % lower right corner
-            
-            pos = zeros(obj.num_stars, 2);
-            
-            for ii = 1:obj.num_stars
-                
-                for jj = 1:100
-                
-                    [mx,idx] = util.stat.max2(I.*mask{mod(ii-1,5)+1}); % find the maximum in each masked area
-                    
-                    if any(idx-floor(C/2)<1), break; end
-                    
-                    I(idx(1)-floor(C/2):idx(1)+floor(C/2)+1, idx(2)-floor(C/2):idx(2)+floor(C/2)+1) = NaN; % remove found stars
-                
-                    if mx<obj.saturation_value*obj.num_sum % found a good star
-                        pos(ii,:) = flip(idx); % x then y!
-                        break; % pick this star and keep going
-                    else % continue to look for stars in this quadrant
-                        if obj.debug_bit, disp(['Star is saturated max= ' num2str(mx)]); end
-                    end
-                    
-                end
-                
-            end
-            
-            obj.clip.positions = pos;
-            obj.positions = double(pos);
-            
-            if obj.gui.check
-                obj.show;
             end
             
         end
