@@ -175,6 +175,9 @@ void OutputPin::parse(char *arg){
     else if(Parser::parseBool(str2)==1) _inverse=1;
     else _inverse=!_inverse;
   }
+  
+  else if(Parser::partialMatch(str1, "printout")) printout(); 
+  
   else{
     snprintf(_out_buf, Parser::MAXN, "bad command: %s", str1);
   }

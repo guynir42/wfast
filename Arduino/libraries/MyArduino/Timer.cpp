@@ -626,7 +626,7 @@ void Timer::parse(char *arg){
     snprintf(_out_buf, Parser::MAXN, "timer COUNT: %s s", buf); 
     
   }
-  else if(Parser::partialMatch(str1, "expire")){ 
+  else if(Parser::partialMatch(str1, "expire") || Parser::partialMatch(str1, "expiration")){ 
     
     setMode(EXPIRE); 
     parseTiming(str2);
@@ -635,7 +635,7 @@ void Timer::parse(char *arg){
     snprintf(_out_buf, Parser::MAXN, "timer EXPIRE: %s s", buf); 
     
   }
-  else if(Parser::partialMatch(str1, "alternate")){ 
+  else if(Parser::partialMatch(str1, "alternate") || Parser::partialMatch(str1, "alternator")){ 
     
     setMode(ALTER);
     parseTiming(str2);
