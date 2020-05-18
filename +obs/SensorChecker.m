@@ -771,20 +771,21 @@ classdef SensorChecker < handle
                 
                 idx = obj.(name).index;
                 unit = obj.(name).units;
+                adj = ''; % adjustment made to make plotting easier
                 
                 if cs(name, 'light') % scale to the axes
                     v = v/16;
-                    unit = [unit '/16'];
+                    adj = '/16';
                 end
                 
                 if cs(name, 'clouds') % get the values on the same scale
-                    v = v + 60; 
-                    unit = ['+60 ' unit];
+                    v = v + 60;
+                    adj = '+60';
                 end
                 
                 if cs(name, 'pressure') % scale the pressure by 20
                     v = v - 975;
-                    unit = ['-975 ' unit];
+                    adj = '-975';
                 end
                 
                 if ~isfield(obj.(name), 'func') || isempty(obj.(name).func)
@@ -794,14 +795,20 @@ classdef SensorChecker < handle
                 end
                 
                 if obj.use_only_plot_mean
-                    h = plot(input.ax, t, combined_data, '-', 'LineWidth', 2, 'DisplayName', sprintf('mean %s [%s]', strrep(name, '_', ' '), unit), 'Color', colors{ii}); 
+                    h = plot(input.ax, t, combined_data, '-', 'LineWidth', 2, 'DisplayName', sprintf('mean %s [%s %s]', strrep(name, '_', ' '), adj, unit), 'Color', colors{ii}); 
                     input.ax.NextPlot = 'add';
                 else
+
+                    plot(input.ax, t, combined_data, '-', 'LineWidth', 2, 'HandleVisibility', 'off', 'Color', colors{ii}); 
+                
+                    input.ax.NextPlot = 'add';
 
                     h = plot(input.ax, t, v, '-');
 
                     for jj = 1:length(h) 
-                        h(jj).DisplayName = sprintf('%s [%s]: %s', strrep(name, '_', ' '), unit, obj.(name).sensors{jj}); 
+                        h(jj).DisplayName = sprintf('%s [%s %s]: %s', strrep(name, '_', ' '), adj, unit, obj.(name).sensors{jj}); 
+                        h(jj).UserData = sprintf('%s (%s): %6.1f %s', obj.(name).sensors{jj}, strrep(name, '_', ' '), obj.(name).now(jj), unit); 
+                        h(jj).ButtonDownFcn = @obj.callback_plot; 
                         h(jj).Marker = markers{mod(idx(jj)-1, Nmark)+1};
                         h(jj).MarkerSize = 8;
                         h(jj).LineWidth = 0.5;
@@ -809,10 +816,6 @@ classdef SensorChecker < handle
                         h(jj).Color = colors{ii}; 
                     end
 
-                    input.ax.NextPlot = 'add';
-
-                    plot(input.ax, t, combined_data, '-', 'LineWidth', 2, 'HandleVisibility', 'off', 'Color', h(1).Color); 
-                
                 end
                 
                 if max(v(:))>ax_max, ax_max = max(v(:))*1.1; end
@@ -856,6 +859,16 @@ classdef SensorChecker < handle
             end
             
             t = datetime(t, 'ConvertFrom', 'juliandate');
+            
+        end
+        
+        function callback_plot(obj, hndl, ~)
+            
+            if ~isempty(obj.owner.gui) && obj.owner.gui.check
+                obj.owner.gui.button_clicker.String = hndl.UserData;
+            else
+                disp(hndl.UserData); 
+            end
             
         end
         
