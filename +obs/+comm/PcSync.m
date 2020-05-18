@@ -72,10 +72,10 @@ classdef PcSync < handle
             import util.text.cs;
             
             if ~isempty(varargin) && isa(varargin{1}, 'obs.comm.PcSync')
-                if obj.debug_bit, fprintf('PcSync copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('PcSync copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('PcSync constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('PcSync constructor v%4.2f\n', obj.version); end
             
                 if isscalar(varargin) && ischar(varargin{1})
                     

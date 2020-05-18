@@ -56,10 +56,10 @@ classdef Accelerometer < handle
         function obj = Accelerometer(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'obs.sens.Accelerometer')
-                if obj.debug_bit, fprintf('Accelerometer copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Accelerometer copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('Accelerometer constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Accelerometer constructor v%4.2f\n', obj.version); end
                                 
                 obj.connect(varargin{:});
                 obj.data = util.vec.CircularBuffer(100);

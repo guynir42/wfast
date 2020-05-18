@@ -82,7 +82,7 @@ classdef Boltwood < handle
             
             if isempty(varargin)
             
-                if obj.debug_bit, fprintf('Boltwood default constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Boltwood default constructor v%4.2f\n', obj.version); end
                 
                 obj.data = util.vec.CircularBuffer;
                 obj.connect; % Open Boltwood weather application. Also open connection to application if not already opened.

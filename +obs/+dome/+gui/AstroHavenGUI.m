@@ -43,7 +43,7 @@ classdef AstroHavenGUI < handle
             % later add other options like copy constructor
             if isa(owner, 'obs.dome.AstroHaven')
                 
-                if obj.debug_bit, fprintf('AstroHavenGUI constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('AstroHavenGUI constructor v%4.2f\n', obj.version); end
                 
                 obj.owner = owner;
                 
@@ -181,7 +181,7 @@ classdef AstroHavenGUI < handle
         
         function callback_close(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: close'); end
+            if obj.debug_bit>1, disp('callback: close'); end
             
             delete(obj.fig.fig);
             

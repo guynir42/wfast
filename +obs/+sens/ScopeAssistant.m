@@ -74,10 +74,10 @@ classdef ScopeAssistant < handle
         function obj = ScopeAssistant(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'obs.sens.ScopeAssistant')
-                if obj.debug_bit, fprintf('ScopeAssistant copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('ScopeAssistant copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('ScopeAssistant constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('ScopeAssistant constructor v%4.2f\n', obj.version); end
                 
                 obj.data = util.vec.CircularBuffer(100);
                 obj.reco = obs.comm.Reconnect;

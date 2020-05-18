@@ -45,10 +45,10 @@ classdef Reconnect < handle
         function obj = Reconnect(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'obs.comm.Reconnect')
-                if obj.debug_bit, fprintf('Reconnect copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Reconnect copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('Reconnect constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Reconnect constructor v%4.2f\n', obj.version); end
             
             end
             
