@@ -13,6 +13,7 @@ classdef ModelPSF < handle
         offsets_x;
         offsets_y;
         cutouts;
+        
         cutouts_shifted;
         stack; 
         mask;

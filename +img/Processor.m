@@ -17,6 +17,8 @@ classdef Processor < file.AstroData
         phot@img.Photometry;
         lightcurves@img.Lightcurves;
         
+        func; 
+        
         % ... add streak detection maybe?
         
     end
