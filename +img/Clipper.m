@@ -109,13 +109,13 @@ classdef Clipper < handle
            
             if nargin>0 && ~isempty(other) && isa(other, 'img.Clipper')
                
-                if other.debug_bit, fprintf('img.Clipper copy-constructor v%4.2f\n', obj.version); end
+                if other.debug_bit>1, fprintf('img.Clipper copy-constructor v%4.2f\n', obj.version); end
                 
                 obj = util.oop.full_copy(other);
                                 
             else
                 
-                if obj.debug_bit, fprintf('img.Clipper constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('img.Clipper constructor v%4.2f\n', obj.version); end
                 
                 util.oop.save_defaults(obj);
                 obj.avoid_edges = obj.cut_size;

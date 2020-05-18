@@ -56,14 +56,10 @@ classdef AndorGUI < handle
             % later add other options like copy constructor
             if isa(owner, 'obs.cam.Andor')
                 
-                if obj.debug_bit, fprintf('AndorGUI constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('AndorGUI constructor v%4.2f\n', obj.version); end
                 
                 obj.owner = owner;
-                
-            elseif isa(owner, 'Andor camera')
-                
-                
-                
+                                
             else
                 error('Input an obs.cam.Andor to constructor of AndorGUI!');
             end
@@ -286,7 +282,7 @@ classdef AndorGUI < handle
         
         function callback_pick_center(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: pick_center'); end
+            if obj.debug_bit>1, disp('callback: pick_center'); end
             
             h = findobj(obj.axes_image, 'type','image');
             
@@ -314,7 +310,7 @@ classdef AndorGUI < handle
         
         function callback_start_stop(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: start/stop'); end
+            if obj.debug_bit>1, disp('callback: start/stop'); end
             
             if obj.owner.brake_bit
                 obj.owner.live;
@@ -328,7 +324,7 @@ classdef AndorGUI < handle
         
         function callback_close(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: close'); end
+            if obj.debug_bit>1, disp('callback: close'); end
             
             delete(obj.fig.fig);
             

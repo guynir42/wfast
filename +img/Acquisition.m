@@ -275,11 +275,11 @@ classdef Acquisition < file.AstroData
         function obj = Acquisition(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'Acquisition')
-                if obj.debug_bit, fprintf('Acquisition copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Acquisition copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
                 
-                if obj.debug_bit, fprintf('Acquisition constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Acquisition constructor v%4.2f\n', obj.version); end
                 
                 obj.log = util.sys.Logger('Acquisition', obj);
                 obj.log.heartbeat(600);

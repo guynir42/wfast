@@ -67,7 +67,7 @@ classdef FocusSpider < handle
         
         function obj = FocusSpider
             
-            if obj.debug_bit, fprintf('FocusSpider constructor v%4.2f\n', obj.version); end
+            if obj.debug_bit>1, fprintf('FocusSpider constructor v%4.2f\n', obj.version); end
             
             obj.connect;
             

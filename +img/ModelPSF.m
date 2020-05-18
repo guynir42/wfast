@@ -57,10 +57,10 @@ classdef ModelPSF < handle
         function obj = ModelPSF(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'img.ModelPSF')
-                if obj.debug_bit, fprintf('ModelPSF copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('ModelPSF copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('ModelPSF constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('ModelPSF constructor v%4.2f\n', obj.version); end
             
             end
             

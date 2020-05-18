@@ -272,7 +272,7 @@ classdef CalGUI < handle
         
         function callback_close(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: close'); end
+            if obj.debug_bit>1, disp('callback: close'); end
             
             delete(obj.fig.fig);
             
@@ -282,7 +282,7 @@ classdef CalGUI < handle
         
         function callback_stop(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: stop'); end
+            if obj.debug_bit>1, disp('callback: stop'); end
             
             if ~isempty(obj.cal.mode) && obj.cal.brake_bit==0
                 obj.cal.brake_bit = 1;

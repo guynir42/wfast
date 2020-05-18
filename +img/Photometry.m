@@ -196,10 +196,10 @@ classdef Photometry < handle
         function obj = Photometry(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'img.Photometry')
-                if obj.debug_bit, fprintf('Photometry copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Photometry copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('Photometry constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Photometry constructor v%4.2f\n', obj.version); end
                 util.oop.save_defaults(obj);
             end
             

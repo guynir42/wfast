@@ -61,7 +61,7 @@ classdef ClipperGUI < handle
            
             assert(isa(clip_obj, 'img.Clipper'), 'must input a Clipper object to construct a ClipperGUI');
             
-            if obj.debug_bit, fprintf('ClipperGUI constructor v%4.2f\n', obj.version); end
+            if obj.debug_bit>1, fprintf('ClipperGUI constructor v%4.2f\n', obj.version); end
             
             obj.clip = clip_obj;
                         
@@ -306,7 +306,7 @@ classdef ClipperGUI < handle
                 numbers = obj.clip.default_cut_size;
             end
             
-            if obj.debug_bit, disp(['callback: cut_size= ' num2str(numbers)]); end
+            if obj.debug_bit>1, disp(['callback: cut_size= ' num2str(numbers)]); end
             
             obj.clip.cut_size = numbers;
             
@@ -316,7 +316,7 @@ classdef ClipperGUI < handle
         
         function callback_mex_cut(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: mex_cut'); end
+            if obj.debug_bit>1, disp('callback: mex_cut'); end
             
             obj.clip.use_mex = ~obj.clip.use_mex;
             
@@ -328,7 +328,7 @@ classdef ClipperGUI < handle
 
         function callback_use_lock_adjust(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: use_lock_adjust'); end
+            if obj.debug_bit>1, disp('callback: use_lock_adjust'); end
             
             obj.clip.use_lock_adjust = ~obj.clip.use_lock_adjust;
             
@@ -338,7 +338,7 @@ classdef ClipperGUI < handle
         
         function callback_use_moments(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: use_moments'); end
+            if obj.debug_bit>1, disp('callback: use_moments'); end
             
             obj.clip.use_moments = ~obj.clip.use_moments;
             
@@ -358,7 +358,7 @@ classdef ClipperGUI < handle
                 numbers = 1;
             end
             
-            if obj.debug_bit, disp(['callback: num_stars= ' num2str(numbers)]); end
+            if obj.debug_bit>1, disp(['callback: num_stars= ' num2str(numbers)]); end
             
             obj.clip.num_stars = numbers;
             
@@ -376,7 +376,7 @@ classdef ClipperGUI < handle
                 numbers = obj.clip.default_filter_size;
             end
             
-            if obj.debug_bit, disp(['callback: filter_size= ' num2str(numbers)]); end
+            if obj.debug_bit>1, disp(['callback: filter_size= ' num2str(numbers)]); end
             
             obj.clip.filter_size = numbers;
             
@@ -394,7 +394,7 @@ classdef ClipperGUI < handle
                 numbers = obj.clip.default_filter_sigma;
             end
             
-            if obj.debug_bit, disp(['callback: filter_sigma= ' num2str(numbers)]); end
+            if obj.debug_bit>1, disp(['callback: filter_sigma= ' num2str(numbers)]); end
             
             obj.clip.filter_sigma = numbers;
             
@@ -412,7 +412,7 @@ classdef ClipperGUI < handle
                 numbers = ceil(obj.clip.cut_size/2);
             end
             
-            if obj.debug_bit, disp(['callback: avoid_edges= ' num2str(numbers)]); end
+            if obj.debug_bit>1, disp(['callback: avoid_edges= ' num2str(numbers)]); end
             
             obj.clip.avoid_edges = numbers;
             
@@ -424,7 +424,7 @@ classdef ClipperGUI < handle
 
         function callback_close(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: close'); end
+            if obj.debug_bit>1, disp('callback: close'); end
             
             delete(obj.fig.fig);
             

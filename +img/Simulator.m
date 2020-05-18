@@ -51,10 +51,10 @@ classdef Simulator < file.AstroData
         function obj = Simulator(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'img.Simulator')
-                if obj.debug_bit, fprintf('Simulator copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Simulator copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('Simulator constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Simulator constructor v%4.2f\n', obj.version); end
             
             end
             

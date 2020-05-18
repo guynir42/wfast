@@ -44,7 +44,7 @@ classdef PhotGUI < handle
             % later add other options like copy constructor
             if isa(owner, 'img.Photometry')
                 
-                if obj.debug_bit, fprintf('PhotGUI  constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('PhotGUI  constructor v%4.2f\n', obj.version); end
                 
                 obj.owner = owner;
                 
@@ -175,7 +175,7 @@ classdef PhotGUI < handle
         
         function callback_close(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: close'); end
+            if obj.debug_bit>1, disp('callback: close'); end
             
             delete(obj.fig.fig);
             

@@ -197,13 +197,13 @@ classdef Calibration < handle
             
             if nargin>0 && ~isempty(other) && isa(other, 'img.Calibration') % copy-constructor
                 
-                if obj.debug_bit, fprintf('Calibration copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Calibration copy-constructor v%4.2f\n', obj.version); end
                 
                 obj = util.oop.full_copy(other);
                 
             else
                 
-                if obj.debug_bit, fprintf('Calibration constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Calibration constructor v%4.2f\n', obj.version); end
                 
                 if isempty(obj.camera_name) || strcmpi(obj.camera_name, 'zyla')
                     obj.dark_mask_var_thresh = obj.dark_mask_var_thresh_zyla;

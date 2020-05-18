@@ -165,10 +165,10 @@ classdef Analysis < file.AstroData
         function obj = Analysis(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'img.Analysis')
-                if obj.debug_bit, fprintf('Analysis copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Analysis copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('Analysis constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Analysis constructor v%4.2f\n', obj.version); end
             
                 obj.reader = file.Reader;
                 obj.cal = img.Calibration;

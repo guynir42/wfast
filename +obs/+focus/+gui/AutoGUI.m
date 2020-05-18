@@ -56,7 +56,7 @@ classdef AutoGUI < handle
             % later add other options like copy constructor
             if isa(owner, 'obs.focus.AutoFocus')
                 
-                if obj.debug_bit, fprintf('AutoGUI constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('AutoGUI constructor v%4.2f\n', obj.version); end
                 
                 obj.owner = owner;
                 

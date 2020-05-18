@@ -81,7 +81,7 @@ classdef AcqGUI < handle
             % later add other options like copy constructor
             if isa(owner, 'img.Acquisition')
                 
-                if obj.debug_bit, fprintf('AcqGUI constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('AcqGUI constructor v%4.2f\n', obj.version); end
                 
                 obj.owner = owner;
                 
@@ -416,7 +416,7 @@ classdef AcqGUI < handle
         
         function callback_units_picker(obj, hndl, ~)
             
-            if obj.debug_bit, disp('callback: units picker'); end
+            if obj.debug_bit>1, disp('callback: units picker'); end
             
             total_seconds = obj.owner.total_runtime.*obj.owner.convertRuntimeToSeconds;
             
@@ -431,7 +431,7 @@ classdef AcqGUI < handle
         function callback_run(obj, ~, ~)
             
             if obj.owner.brake_bit
-                if obj.debug_bit, disp('callback: run'); end
+                if obj.debug_bit>1, disp('callback: run'); end
                 
                 obj.latest_error = '';
                 obj.latest_warning = '';
@@ -448,7 +448,7 @@ classdef AcqGUI < handle
                 end
                 
             else
-                if obj.debug_bit, disp('callback: stop'); end            
+                if obj.debug_bit>1, disp('callback: stop'); end            
                 obj.owner.brake_bit = 1;
                 obj.update;
             end
@@ -457,7 +457,7 @@ classdef AcqGUI < handle
         
         function callback_preview(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: preview'); end
+            if obj.debug_bit>1, disp('callback: preview'); end
 
             obj.latest_error = '';
             obj.latest_warning = '';
@@ -476,7 +476,7 @@ classdef AcqGUI < handle
         
         function callback_continue(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: continue'); end
+            if obj.debug_bit>1, disp('callback: continue'); end
 
             obj.latest_error = '';
             obj.latest_warning = '';
@@ -495,7 +495,7 @@ classdef AcqGUI < handle
         
         function callback_num_files(obj, ~, ~)
             
-            if obj.debug_bit, disp('callback: num_files'); end
+            if obj.debug_bit>1, disp('callback: num_files'); end
             
             if ~isinf(obj.owner.num_files)
                 obj.owner.num_batches = obj.owner.num_files;
@@ -507,7 +507,7 @@ classdef AcqGUI < handle
         
         function callback_show_what(obj, hndl, ~)
             
-            if obj.debug_bit, disp('callback: show_what'); end
+            if obj.debug_bit>1, disp('callback: show_what'); end
             
 %             obj.owner.show_what_index = hndl.Value;
 %             obj.owner.show_what = obj.owner.show_what_list{obj.owner.show_what_index};
@@ -523,7 +523,7 @@ classdef AcqGUI < handle
         
         function callback_focuser(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: focuser'); end
+            if obj.debug_bit>1, disp('callback: focuser'); end
         
             obj.owner.cam.focuser.makeGUI;
             
@@ -533,7 +533,7 @@ classdef AcqGUI < handle
         
         function callback_close(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: close'); end
+            if obj.debug_bit>1, disp('callback: close'); end
             
             delete(obj.fig.fig);
             

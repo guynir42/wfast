@@ -37,6 +37,7 @@ classdef AutoFocus < handle
         found_pos; % put your focuser to this position
         found_tip; % put your focuser to this tip value
         found_tilt; % put your focuser to this tilt value
+        found_width; % the best PSF width (gaussian sigma) found by the minimum of the mean V-curve of all stars
         
     end
     
@@ -91,10 +92,10 @@ classdef AutoFocus < handle
         function obj = AutoFocus(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'obs.focus.AutoFocus')
-                if obj.debug_bit, fprintf('AutoFocus copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('AutoFocus copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('AutoFocus constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('AutoFocus constructor v%4.2f\n', obj.version); end
             
             end
             
@@ -309,8 +310,9 @@ classdef AutoFocus < handle
         
         function findPosOnly(obj) % to be deprecated
             
-            [~,idx] = nanmin(nanmean(obj.widths, 1));
+            [mn,idx] = nanmin(nanmean(obj.widths, 1));
             obj.found_pos = obj.pos(idx);
+            obj.found_width = mn;
                 
 %             obj.found_pos = mean(obj.min_positions, 'omitnan');
         
@@ -320,6 +322,8 @@ classdef AutoFocus < handle
             
 %             obj.found_pos = obj.surface_coeffs(1);
             obj.found_pos = nansum(obj.min_positions.*obj.min_weights)./nansum(obj.min_weights);
+            obj.found_width = nanmin(nanmean(obj.widths,1)); 
+            
 %             if obj.debug_bit, fprintf('BEST POS: mean= %f | surface piston term= %f\n', nanmean(obj.min_positions), obj.surface_coeffs(1)); end
             
             obj.found_tip = obj.surface_coeffs(2).*obj.spider_diameter.*1e4./obj.pixel_size; % in this case tip is X slope

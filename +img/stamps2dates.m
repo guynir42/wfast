@@ -11,7 +11,7 @@ function datestrings = stamps2dates(varargin)
 % -end_string: The date string of the file end time. 
 % -end_stamp: The time stamp when "end_string" was set. 
 % -output: Can specify which format to get the output, 
-%          *date string (default) formatted as FITS date strings.
+%          *string (default) formatted as FITS date strings.
 %          *datetime objects (MATLAB class). 
 %          *seconds, starting from 0 at the beginning of the list. 
 

@@ -64,7 +64,7 @@ classdef AnalysisGUI < handle
             % later add other options like copy constructor
             if isa(owner, 'img.Analysis')
                 
-                if obj.debug_bit, fprintf('AnalysisGUI constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('AnalysisGUI constructor v%4.2f\n', obj.version); end
                 
                 obj.owner = owner;
                 
@@ -322,10 +322,10 @@ classdef AnalysisGUI < handle
         function callback_run(obj, ~, ~)
             
             if obj.owner.brake_bit
-                if obj.debug_bit, disp('callback: run'); end            
+                if obj.debug_bit>1, disp('callback: run'); end            
                 obj.owner.run;
             else
-                if obj.debug_bit, disp('callback: stop'); end            
+                if obj.debug_bit>1, disp('callback: stop'); end            
                 obj.owner.brake_bit = 1;
             end
             
@@ -456,7 +456,7 @@ classdef AnalysisGUI < handle
         
         function callback_close(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: close'); end
+            if obj.debug_bit>1, disp('callback: close'); end
             
             delete(obj.fig.fig);
             

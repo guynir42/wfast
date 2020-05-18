@@ -59,7 +59,7 @@ classdef LightGUI < handle
             % later add other options like copy constructor
             if isa(owner, 'img.Lightcurves')
                 
-                if obj.debug_bit, fprintf('LightGUI constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('LightGUI constructor v%4.2f\n', obj.version); end
                 
                 obj.owner = owner;
                 
@@ -258,7 +258,7 @@ classdef LightGUI < handle
         
         function callback_show_what(obj, hndl, ~)
             
-            if obj.debug_bit, disp('callback: show_what'); end
+            if obj.debug_bit>1, disp('callback: show_what'); end
             
             obj.owner.show_what = hndl.String{hndl.Value};
 
@@ -268,7 +268,7 @@ classdef LightGUI < handle
         
         function callback_flux_type(obj, hndl, ~)
             
-            if obj.debug_bit, disp('callback: flux_type'); end
+            if obj.debug_bit>1, disp('callback: flux_type'); end
             
             obj.owner.show_flux_type = hndl.String{hndl.Value};
 
@@ -276,10 +276,9 @@ classdef LightGUI < handle
             
         end
         
-        
         function callback_close(obj, ~, ~)
            
-            if obj.debug_bit, disp('callback: close'); end
+            if obj.debug_bit>1, disp('callback: close'); end
             
             delete(obj.fig.fig);
             

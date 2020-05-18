@@ -76,10 +76,10 @@ classdef Background < handle
         function obj = Background(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'img.Background')
-                if obj.debug_bit, fprintf('Background copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Background copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('Background constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Background constructor v%4.2f\n', obj.version); end
             
             end
             

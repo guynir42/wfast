@@ -252,10 +252,10 @@ classdef Andor < file.AstroData
         function obj = Andor(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'obs.cam.Andor')
-                if obj.debug_bit, fprintf('Andor camera copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Andor camera copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('Andor camera constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Andor camera constructor v%4.2f\n', obj.version); end
                 
                 obj.log = util.sys.Logger('Andor_camera'); % start the logger before anything else
                 

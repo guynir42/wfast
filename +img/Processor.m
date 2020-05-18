@@ -48,10 +48,10 @@ classdef Processor < file.AstroData
         function obj = Processor(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'img.Processor')
-                if obj.debug_bit, fprintf('Processor copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Processor copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('Processor constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Processor constructor v%4.2f\n', obj.version); end
             
             end
             

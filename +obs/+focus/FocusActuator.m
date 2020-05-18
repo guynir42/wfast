@@ -56,7 +56,7 @@ classdef FocusActuator < handle
             
             obj.controller_serial = serial_str;
             
-            if obj.debug_bit, fprintf('FocusActuator constructor v%4.2f |  axis: %s | S/N: %s\n', obj.version, obj.axis, obj.controller_serial); end
+            if obj.debug_bit>1, fprintf('FocusActuator constructor v%4.2f |  axis: %s | S/N: %s\n', obj.version, obj.axis, obj.controller_serial); end
                         
             addpath('C:\Users\Public\PI\PI_MATLAB_Driver_GCS2');
 
