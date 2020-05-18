@@ -74,6 +74,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         period2 = 300; % time for equipment/weather check and log file
         period3 = 1800; % time for verifying shorter timers are working (and other tests?)
         
+        autostart_min_weather_samples = 4;
+        autostart_min_weather_minutes = 20;
+        
         brake_bit = 1; % also set the brake bit for mount/dome
         debug_bit = 1;
         
@@ -107,7 +110,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
        
         latest_email_report_date = ''; % keep track of the last time we sent this, so we don't send multiple emails each day
         
-        version = 1.02;
+        sensor_ok_history; % a vector of datetime objects, for each time we have measured good weather (this gets reset upon a single bad weather measurement)
+        latest_email_autostart_date = '';
+        
+        
+        version = 1.03;
         
     end
     
@@ -719,13 +726,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             str = '';
             
-            str = sprintf('%s\n<p style="font-size:14px">', str); 
-            str = sprintf('%s\nThis is a morning report for the night of %s.', str, d);
-            str = sprintf('%s\n</p>', str); 
+            str = sprintf('%s\n%s', str, obj.email.html(sprintf('This is a morning report for the night of %s.', d), 'p', 'font-size:14px')); 
             
-            str = sprintf('%s\n<p style="font-size:18px;font-weight:bold;">', str); 
-            str = sprintf('%s\n Dome status is: %s ', str, obj.observatory_state);
-            str = sprintf('%s\n</p>', str); 
+%             str = sprintf('%s\n<p style="font-size:14px">', str); 
+%             str = sprintf('%s\nThis is a morning report for the night of %s.', str, d);
+%             str = sprintf('%s\n</p>', str); 
+            
+            str = sprintf('%s\n%s', str, obj.email.html(sprintf('Dome status is: %s ', obj.observatory_state), 'p', 'font-size:18px; font-weight:bold')); 
+
+%             str = sprintf('%s\n<p style="font-size:18px;font-weight:bold;">', str); 
+%             str = sprintf('%s\n Dome status is: %s ', str, obj.observatory_state);
+%             str = sprintf('%s\n</p>', str); 
             
             if ~isempty(obj.obs_log) && isfield(obj.obs_log, 'date') && strcmp(obj.obs_log.date, d) && length(fields(obj.obs_log))>1
                 
@@ -759,8 +770,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obs_str = sprintf('Could not find any information on observations run tonight...'); 
             end
             
-            str = sprintf('%s\n<p> %s \n</p>\n', str, obs_str); % add the observation report to the string
+%             str = sprintf('%s\n<p> %s \n</p>\n', str, obs_str); % add the observation report to the string
             
+            str = [str obj.email.html(obs_str)]; 
+
             if isfield(obj.cam_pc.incoming, 'drives') && ~isempty(obj.cam_pc.incoming.drives)
             
                 drive_str = sprintf('Hard drive space overview:\n'); 
@@ -768,18 +781,25 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 s = obj.cam_pc.incoming.drives;
                 f = fields(s); 
                 
-                drive_str = [drive_str '<table style="width:60%;font-family:Courier;font-size:12px"><tr>'];
-                
-                for ii = 1:length(f)
-                    drive_str = sprintf('%s <td> %s:\\ </td> ', drive_str, f{ii}); 
-                end
-                drive_str = [drive_str '</tr><tr>'];
-                for ii = 1:length(f)
-                    drive_str = sprintf('%s <td> %d Gb </td> ', drive_str, round(s.(f{ii}))); 
-                end
-                drive_str = [drive_str '</tr><br>'];
-                
                 gb_limit = 3000; % set this to warn when HDDs are running low...  
+                
+                drive_str = sprintf('%s\n<table style="width:60%%;font-family:Courier;font-size:12px">\n <tr>', drive_str);
+                
+                for ii = 1:length(f)
+                    drive_str = sprintf('%s\n      <td style="font-family:Courier"> %s:\\ </td> ', drive_str, f{ii}); 
+                end
+                
+                drive_str = sprintf('%s\n  </tr><tr>\n', drive_str);
+                
+                for ii = 1:length(f)
+                    if ( strcmp(f{ii}, 'E') || strcmp(f{ii}, 'F') ) && ~isempty(s.(f{ii})) && s.(f{ii})<gb_limit
+                        drive_str = sprintf('%s\n    <td style="background-color:red"> %d Gb </td> ', drive_str, round(s.(f{ii}))); 
+                    else
+                        drive_str = sprintf('%s\n    <td style="background-color:none"> %d Gb </td> ', drive_str, round(s.(f{ii}))); 
+                    end
+                end
+                
+                drive_str = sprintf('%s\n</tr><br>', drive_str);
                 
                 if isfield(s, 'E') && ~isempty(s.E) && s.E<gb_limit
                     drive_str = sprintf('%s\nWARNING: Drive E is has less than %d Gb left!', drive_str, gb_limit);
@@ -789,12 +809,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     drive_str = sprintf('%s\nWARNING: Drive F is has less than %d Gb left!', drive_str, gb_limit);
                 end
                 
-                str = sprintf('%s\n <p style="font-familiy:Courier;font-size:12px"> %s </p>\n', str, drive_str); 
-            
+%                 str = sprintf('%s\n <p style="font-familiy:Courier;font-size:12px"> %s </p>\n', str, drive_str); 
+                str = [str obj.email.html(drive_str, 'p', 'font-family:Courier; font-size:12px;')]; 
+                
             end
             
-            obj.email.sendToList('subject', sprintf('[WFAST] Morning report %s', d), 'text', str, ...
-                'header', 1, 'footer', 1, 'html', 1); 
+%             obj.email.sendToList('subject', sprintf('[WFAST] Morning report %s %d', d, randi(1000)), 'text', str, 'header', 1, 'footer', 1, 'html', 1); 
+            obj.email.sendToList('subject', sprintf('[WFAST] Morning report %s', d), 'text', str, 'header', 1, 'footer', 1, 'html', 1); 
             
             obj.latest_email_report_date = d; % make sure we don't resend this email today (after a successful send!)
             
@@ -844,12 +865,43 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
             end
             
+            if obj.is_shutdown
+                obj.latest_email_autostart_date = ''; % once shut down, we need once again to send an email if we are ready to open
+            end
+            
+            if obj.use_startup
+                
+                if obj.sensors_ok
+                    
+                    t = datetime('now', 'TimeZone', 'UTC');
+                    
+                    if obj.checkPrevWeather
+                        
+                        if isempty(obj.latest_email_autostart_date) 
+                            obj.email.sendToList('subject', ['Ready to open dome ' util.text.time2str(t)], ...
+                                'text', sprintf('Weather data looks good for at least %d minutes. Consider opening for observations. ', ...
+                                round(minutes(t-obj.sensor_ok_history(end)))));
+                            
+                            obj.latest_email_autostart_date = t;
+                            
+                        end
+                        
+                    end
+                    
+                    obj.sensor_ok_history = vertcat(datetime('now', 'TimeZone', 'UTC')); 
+                    
+                else
+                    obj.sensor_ok_history = [];
+                end
+                
+            end
+            
             if ~isempty(obj.gui) && obj.gui.check
                 obj.gui.update;
             end
             
         end
-        
+                
         function updateDevices(obj) % run "update" for each device and see if the status is still good
         
             obj.devices_ok = 1;
@@ -889,9 +941,66 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
+        function val = checkPrevWeather(obj)
+           
+            new_hist = datetime('now', 'TimeZone', 'UTC');
+
+            % collect to a new history all the times that are
+            % spaced more than 4 minutes from the last accepted entry
+            for ii = length(obj.sensor_ok_history):-1:1
+                if new_hist(end)-obj.sensor_ok_history(ii)>4*60 % measurements less than 4 minutes apart are ignored
+                    new_hist(end+1) = obj.sensor_ok_history(ii); 
+                end
+            end
+
+            % new_hist should now contain only well spaced times when weather was ok
+            if numel(new_hist)>=obj.autostart_min_weather_samples && ...
+                minutes(new_hist(end)-new_hist(1))<obj.autostart_min_weather_minutes
+                
+                val = 1;
+                
+            else
+                val = 0; 
+            end
+            
+        end
+        
         function updateCameraComputer(obj) % send updates through the PcSync object to the camera-PC
             
             try 
+                
+                if ~isfield(obj.cam_pc.incoming, 'time') 
+                    % do something like try to reconnect
+                    obj.cam_pc.connect;
+                end
+                
+                t_in = util.text.str2time(obj.cam_pc.incoming.time);
+                t_now = datetime('now', 'TimeZone', 'UTC'); 
+                
+                if minutes(t_now-t_in)>10
+                    % do something like try to reconnect
+                    disp('input from "cam_pc" is out of date by more than 10 minutes!'); 
+                    obj.cam_pc.connect;
+                end
+                
+                % check that commands are being echoed back
+                if isfield(obj.cam_pc.outgoing, 'command_str') && isfield(obj.cam_pc.outgoing, 'command_time')
+                    
+                    % if command is successfully echoed, no need to stop sending it
+                    if isfield(obj.cam_pc.incoming, 'echo_str') && isfield(obj.cam_pc.incoming, 'echo_time')
+                        
+                        if strcmp(obj.cam_pc.outgoing.command_str, obj.cam_pc.incoming.echo_str) && ...
+                            strcmp(obj.cam_pc.outgoing.command_time, obj.cam_pc.incoming.echo_time)
+                            
+                            obj.cam_pc.outgoing.command_str = ''; 
+                            obj.cam_pc.outgoing.command_time = ''; 
+                            % on the receiving side, empty command is ignored
+                            
+                        end
+                        
+                    end
+                    
+                end
                 
                 if ~obj.cam_pc.is_connected || ~obj.cam_pc.status
 %                     obj.cam_pc.connect;
@@ -910,7 +1019,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     obj.mount.cam_pc = obj.cam_pc; % share the handle to this object
                 end
                 
-                obj.mount.updateCamera;
+                obj.mount.updateCamera; % does mount have any useful data to share with camera? 
                 
             end
             
@@ -938,9 +1047,28 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             obj.cam_pc.update;
             
+            % get the observation log from the camera, including how long each target was observed
             if ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'obs_log')
                 obj.obs_log = obj.cam_pc.incoming.obs_log; 
             end
+            
+        end
+        
+        function commandCamPC(obj, str, cam_mode, exp_time)
+            
+            if nargin<3 || isempty(cam_mode)
+                cam_mode = '';
+            end
+            
+            if nargin<4 || isempty(exp_time)
+                exp_time = [];
+            end
+            
+            obj.cam_pc.outgoing.command_str = str;
+            obj.cam_pc.outgoing.command_time = util.text.time2str(datetime('now', 'TimeZone', 'UTC')); 
+            obj.cam_pc.outgoing.cam_mode = cam_mode;
+            obj.cam_pc.outgoing.exp_time = exp_time;
+            obj.cam_pc.update; 
             
         end
         

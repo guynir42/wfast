@@ -206,6 +206,20 @@ classdef Email < handle
             
         end
         
+        function val = html(obj, text, type, style)
+            
+            if nargin<3 || isempty(type)
+                type = 'p';
+            end
+            
+            if nargin<4 || isempty(style)
+                style = '';
+            end
+            
+            val = sprintf('<%s style="%s">\n %s \n</%s>', type, style, text, type); 
+            
+        end
+        
         function val = getQuote(obj, number)
             
             if nargin<2 || isempty(number)
