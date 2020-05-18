@@ -45,6 +45,7 @@ classdef Acquisition < file.AstroData
         sync@obs.comm.PcSync;
         
         timer;
+        backup_timer;
         
         log@util.sys.Logger;
         
@@ -1361,6 +1362,11 @@ classdef Acquisition < file.AstroData
                 
                 obj.sync.update;
                 
+                if isempty(obj.sync.incoming) || numel(fieldnames(obj.sync.incoming))==0
+                    obj.sync.connect;
+                    pause(1); 
+                end
+                
                 s = obj.sync.incoming;
                 
                 list = head.Header.makeSyncList; 
@@ -1389,11 +1395,11 @@ classdef Acquisition < file.AstroData
                             obj.obs_log.(obj.run_name) = struct('name', obj.run_name, 'start', '', 'end', '', 'runtime', [], 'num_files', []);
                         end
                         
-                        
                         s = obj.obs_log.(obj.run_name); % get the structs for this run name
                         s(end).runtime = obj.t_end_stamp;
                         s(end).end_time = obj.t_end;
                         s(end).num_files = obj.batch_counter;
+                        
                     end
                     
                 end
@@ -1445,7 +1451,27 @@ classdef Acquisition < file.AstroData
                             obj.sync.outgoing.report = 'Starting focus run!';
                         end
                         
-                        disp('Now starting new run by order of dome-PC'); 
+                        cam_mode = '';
+                        if ~isfield(obj.sync.incoming, 'cam_mode')
+                            cam_mode = obj.sync.incoming.cam_mode;
+                        end
+                        
+                        exp_time = [];
+                        if ~isfield(obj.sync.incoming, 'exp_time')
+                            exp_time = obj.sync.incoming.exp_time;
+                        end
+                        
+                        fprintf('Now starting new run by order of dome-PC (mode: %s | expT= %f\n', cam_mode, exp_time); 
+                        
+                        if isempty(cam_mode) || cs(cam_mode, 'fast') % should we default to fast mode
+                            obj.setupFastMode;
+                        elseif cs(cam_mode, 'slow')
+                            obj.setupSlowMode;
+                        end
+                        
+                        if ~isempty(exp_time)
+                            obj.expT = exp_time;
+                        end
                         
                         obj.sync.outgoing.report = 'Starting run...';
                         
@@ -1501,6 +1527,32 @@ classdef Acquisition < file.AstroData
                 % don't do anything, this is triggered in obj.update()
             end
             
+        end
+        
+        function setup_backup_timer(obj)
+            
+            if ~isempty(obj.backup_timer) && isa(obj.backup_timer, 'timer') && isvalid(obj.backup_timer)
+                if strcmp(obj.backup_timer.Running, 'on')
+                    stop(obj.backup_timer);
+                    delete(obj.backup_timer);
+                    obj.backup_timer = [];
+                end
+            end
+            
+            delete(timerfind('name', 'acquisition-backup-timer'));
+            
+            obj.backup_timer = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-backup-timer', ...
+                'Period', 180, 'StartDelay', 1, 'TimerFcn', @obj.callback_backup_timer, 'ErrorFcn', @obj.setup_backup_timer);
+            
+            start(obj.timer);
+            
+            
+        end
+        
+        function callback_backup_timer(obj, ~, ~)
+            if ~strcmp(obj.timer.Running, 'on')
+                obj.setup_timer;
+            end
         end
         
         function s = makeObsLog(obj, date) % scan the folders in "data_temp" to get up-to-date info on number of files and runtime for each target
