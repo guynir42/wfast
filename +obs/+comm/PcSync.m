@@ -6,6 +6,8 @@ classdef PcSync < handle
         hndl_rx;
         hndl_tx;
         
+        time_latest_transmission; % date time of last time we send something (will get cleared as soon as we get a checksum back)
+        
     end
     
     properties % objects
@@ -25,6 +27,9 @@ classdef PcSync < handle
         raw_data_sent;
         checksum; % for sent data
         
+        pending_connection = 0;
+        pending_send = 0;
+        
         status = 0;
         
     end
@@ -36,6 +41,7 @@ classdef PcSync < handle
         remote_port_tx = 4013;
         role = '';
         
+        use_reply_hash = 1;
         use_checksum_warnings = 0;
         
         debug_bit = 1;
@@ -61,7 +67,7 @@ classdef PcSync < handle
         default_client_remote_port_rx = 4013;
         default_client_remote_port_tx = 4012;
         
-        version = 1.02;
+        version = 1.03;
         
     end
     
@@ -169,6 +175,8 @@ classdef PcSync < handle
                         fprintf('Connecting to TCP/IP as server. There is no timeout! To break out hit Ctrl+C\n');
                     end
 
+                    obj.pending_connection = 1;
+                    
                     obj.disconnect;
 
                     if strcmpi(obj.role, 'server')
@@ -178,12 +186,14 @@ classdef PcSync < handle
                         obj.hndl_tx = obj.connectSocket('tx');
                         obj.hndl_rx = obj.connectSocket('rx');
                     end
-
+                    
                     pause(0.1);
 
                     obj.update;
 
                     obj.reco.inputSuccess;
+                    
+                    obj.pending_connection = 0;
                     
                 catch ME
                     obj.log.error(ME.getReport);
@@ -232,6 +242,8 @@ classdef PcSync < handle
                 delete(obj.hndl_rx);
                 obj.hndl_rx = [];
             end
+            
+            obj.incoming = []; 
 
         end
         
@@ -293,17 +305,21 @@ classdef PcSync < handle
                     t_in = [];
                 end
                 
-                if isempty(t_in) || t>t_in+minutes(5) 
-%                     fprintf('%s: Setting PcSync connection status as 0! latest incoming time is %s\n', t, t_in); 
-                    obj.status = 0;
-                else
-                    obj.status = 1; % we also set status=1 in read_data()
+                t = datetime('now', 'TimeZone', 'UTC'); 
+
+                if ~isempty(obj.time_latest_transmission) && minutes(t-obj.time_latest_transmission)>5 % more than five minutes waiting for a response checksum! 
+                    if obj.debug_bit, fprintf('Did not receive any response checksum for over 5 minutes! Setting status=0. \n'); end
+                    obj.status = 0; 
                 end
                 
-                
+                obj.time_latest_transmission = t;
 %                 flushinput(obj.hndl_tx);
                 obj.send(obj.outgoing);
                 
+                obj.pending_connection = 0;
+                
+            else
+                obj.status = 0;
             end
             
         end
@@ -326,7 +342,7 @@ classdef PcSync < handle
             
             data_temp = obj.(data_name);
             
-            for ii = 1:10
+            for ii = 1:100
 
                 if hndl.BytesAvailable>0
                     
@@ -396,20 +412,30 @@ classdef PcSync < handle
             if isempty(variable)
                 if obj.debug_bit>1, disp('Received an empty variable'); end
             elseif strcmp(rx_or_tx, 'tx') && ischar(variable)
+                
                 if ~strcmp(obj.checksum, variable)
+                    
                     if obj.use_checksum_warnings
                         fprintf('Time: %s | message length= %d | pipe: %s\n', util.text.time2str(datetime('now', 'TimeZone', 'UTC')), length(data_temp), rx_or_tx); 
                         warning('Checksum for latest transmission was %s, received confirmation checksum: %s', obj.checksum, variable)
                     end
+                    
                 end
+                
+                obj.time_latest_transmission = []; % successfully recieved something back! 
                 obj.status = 1;
+                
             elseif strcmp(rx_or_tx, 'rx') && isstruct(variable)
                 if obj.debug_bit>1, disp(['Successfully deserialized message with ' num2str(length(obj.raw_data_rx_temp)-1) ' bytes! Converted into a struct... ']); end
                 obj.raw_data_received = data_temp;
                 obj.(data_name) = uint8([]);
                 obj.incoming = variable;
                 obj.status = 1;
-                obj.reply_hash;
+                
+                if obj.use_reply_hash
+                    obj.reply_hash;
+                end
+                
             else
                 warning('Wrong type of data received in %s pipe, class(variable)= %s', rx_or_tx, class(variable)); % this shouldn't happen! 
             end

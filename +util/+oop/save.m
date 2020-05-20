@@ -366,7 +366,7 @@ function file_handle = saveProperty(file_handle, name, value, input)
             
         end
         
-    elseif isnumeric(value)
+    elseif isnumeric(value) || islogical(value)
         
         if isempty(value)
             
@@ -491,6 +491,9 @@ function file_handle = saveNumericAtt(file_handle, name, value, input)
             type_id = H5T.copy('H5T_NATIVE_USHORT');
         elseif isa(value, 'single')
             type_id = H5T.copy('H5T_NATIVE_FLOAT');
+        elseif islogical(value)
+            type_id = H5T.copy('H5T_NATIVE_USHORT');
+            value = uint16(value); 
         else
             error('Unsupported numeric attribute type "%s". Use "double" or "single" or "uint16"', class(value));
         end

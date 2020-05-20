@@ -84,8 +84,8 @@ classdef FinderGUI < handle
             obj.fig = util.plot.FigHandler('event finder');
             obj.fig.clear;
             obj.fig.bottom = 5;
-            obj.fig.height = 16;
-            obj.fig.width = 25;
+            obj.fig.height = 24;
+            obj.fig.width = 45;
             movegui(obj.fig.fig, 'center');
             
             N_left = 16; % number of buttons on left side

@@ -300,18 +300,20 @@ classdef Acquisition < file.AstroData
                 obj.flux_buf = util.vec.CircularBuffer;
                 
                 obj.phot = img.Photometry;
-                obj.phot.num_threads = 6;
+                obj.phot.num_threads = 8;
                 obj.lightcurves = img.Lightcurves;
                 
                 % we don't want to start doing serious calibration on the
                 % lightcurves object during acquisition! 
                 obj.lightcurves.use_remove_outliers = 0;
                 obj.lightcurves.use_zero_point = 0;
-                obj.lightcurves.use_psf_correction =0;
+                obj.lightcurves.use_airmass_correction = 0;
+                obj.lightcurves.use_psf_correction = 0;
+                obj.lightcurves.use_sysrem = 0;
                 
                 obj.model_psf = img.ModelPSF;
                 
-                obj.buf = file.BufferWheel;
+                obj.buf = file.BufferWheel(10);
 %                 obj.buf.product_type = 'Cutouts';
                 obj.buf.use_save_raw_images = 0; % do not save the full frame images! 
                 
@@ -1354,9 +1356,13 @@ classdef Acquisition < file.AstroData
                 
                 obj.sync.update;
                 
-                if isempty(obj.sync.incoming) || numel(fieldnames(obj.sync.incoming))==0
+                % check if the PcSync is good
+%                 if isempty(obj.sync.incoming) || numel(fieldnames(obj.sync.incoming))==0 || ...
+%                     ~isfield(obj.sync.incoming, 'time') || minutes(datetime('now', 'TimeZone', 'UTC')-util.text.str2time(obj.sync.incoming.time))>10 % what if dome timers are off? need to change this to more reliable PcSync test
+
+                if obj.sync.status==0 && obj.sync.pending_connection==0
                     obj.sync.connect;
-                    pause(1); 
+                    pause(1);
                 end
                 
                 s = obj.sync.incoming;
@@ -1391,11 +1397,11 @@ classdef Acquisition < file.AstroData
                         s(end).runtime = obj.t_end_stamp;
                         s(end).end_time = obj.t_end;
                         s(end).num_files = obj.batch_counter;
+                        obj.obs_log.(obj.run_name) = s; % structs are not handles! 
                         
                     end
                     
                 end
-                
                 
                 obj.sync.outgoing.obs_log = obj.obs_log; % update the Manager on how much observing time is invested in each target
                 obj.drive_space_gb = obj.getDriveSpace; % calculate how much space is left in each drive (in Gb) 
@@ -1505,7 +1511,7 @@ classdef Acquisition < file.AstroData
             delete(timerfind('name', 'acquisition-timer'));
             
             obj.timer = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-timer', ...
-                'Period', 30, 'StartDelay', 1, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer);
+                'Period', 30, 'StartDelay', 30, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer, 'BusyMode', 'drop');
             
             start(obj.timer);
             
