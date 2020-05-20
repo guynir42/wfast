@@ -99,7 +99,7 @@ classdef SchedGUI < handle
             
             
             
-            N = 13; % number of buttons on left side
+            N = 14; % number of buttons on left side
             
             %%%%%%%%%%%%%%%%%%% LEFT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -122,12 +122,13 @@ classdef SchedGUI < handle
             
             % Add buttons using obj.addButton(button_name, var_name='', type='', str1='', str2='', font_size='', split=1, color_on=[], color_off=[], tooltip)
             
-            num_buttons = 1;
+            num_buttons = 2;
             pos = pos-num_buttons;
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N 0.2 num_buttons/N], 'controls', 1); % last input is for vertical (default)
             obj.panel_controls.number = num_buttons;
             obj.panel_controls.addButton('button_stay', 'use_stay_on_side', 'toggle', 'any side', 'stay on side', 'edit', 0.5, obj.color_on, '', 'choose if the telescope should stay on the same side all night'); 
             obj.panel_controls.addButton('input_wind', 'max_wind', 'input', 'max wind= ', 'km/h', 'edit', 0.5, '', '', 'maximum wind speed to observe towards the west'); 
+            obj.panel_controls.addButton('button_constraints', 'ephem.constraints', 'push', 'constraints', '', '', 0.5, '', '', 'choose the default constraints to apply BEFORE reading the target list'); 
             
             obj.panel_controls.make;
             
@@ -149,7 +150,7 @@ classdef SchedGUI < handle
             obj.panel_sim = GraphicPanel(obj.owner, [0 pos/N 0.2 num_buttons/N], 'simulations', 1); % last input is for vertical (default)
             obj.panel_sim.number = num_buttons;
             obj.panel_sim.addButton('input_step', 'sim_time_step', 'input', 'step= ', 'min', '', 0.5, '', '', 'time interval for checking out new targets'); 
-            obj.panel_sim.addButton('input_side', 'sim_starting_side', 'input', 'start= ', '', '', 0.5, '', '', 'side on which the telescope begins the simulation'); 
+            obj.panel_sim.addButton('input_side', 'sim_starting_side', 'input_text', 'start= ', '', '', 0.5, '', '', 'side on which the telescope begins the simulation'); 
             % add wind start/end time here if you want...
             obj.panel_sim.addButton('input_pause', 'sim_plot_pause', 'input', 'pause= ', 's', '', 0.5, '', '', 'additional pause time between simulation steps, for slowing down the plotting'); 
             obj.panel_sim.addButton('button_placeholder', '', 'custom', '', '', '', 0.5, '', '', ''); 
@@ -274,13 +275,12 @@ classdef SchedGUI < handle
             
             if obj.debug_bit>1, disp('callback: browse'); end
             
-            [filename, path] = uigetfile('*.txt', 'Choose a new target list', 'target_list.txt'); 
+            [filename, path] = uigetfile('*.txt', 'Choose a new target list', fullfile(getenv('DATA'), 'WFAST/target_lists/target_list.txt')); 
             
             if ischar(filename)
                 obj.owner.filename = fullfile(path, filename);
+                obj.owner.readFile;
             end
-            
-            obj.readFile;
             
             obj.update;
             

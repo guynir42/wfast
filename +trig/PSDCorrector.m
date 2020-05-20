@@ -47,8 +47,9 @@ classdef PSDCorrector < handle
         fluxes_calibrated; % removing a linear fit to the data
         stds_calibrated; % from the fit, not including outliers! 
         
-        flux_buffer; 
-        psd; 
+        flux_buffer; % keep a FIFO buffer of fluxes from previos batches to run welch on 
+        psd; % Power Spectra Density for each star (1st dim is freq, 2nd dim is star index)
+        freq; % the frequency axis for the PSD
         
         fluxes_deredened;
         stds_deredened;
@@ -60,6 +61,8 @@ classdef PSDCorrector < handle
     end
     
     properties % switches/controls
+        
+        frame_rate = 25; 
         
         num_frames_to_add = 100; % how many frames from the input flux should be added to the PSD (in case we get multiple, overlapping batches)
         
@@ -163,7 +166,7 @@ classdef PSDCorrector < handle
                 S(1) = S(1)*2; % add padding twice the size of the data
                 f = util.img.pad2size(f, S); % zero pad the fluxes! 
 
-                obj.psd = pwelch(obj.flux_buffer, size(obj.fluxes_input, 1), [], S(1), 'twosided');
+                [obj.psd, obj.freq] = pwelch(obj.flux_buffer, size(obj.fluxes_input, 1), [], S(1), 'twosided', obj.frame_rate);
 
                 ff = fft(f);
 

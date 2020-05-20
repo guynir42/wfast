@@ -64,6 +64,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         time; % time of the observation (could be past or future, usually sets to current time)
         
+        start_time = []; % if observation began, when did it start (datetime object)
+        end_time = []; % if observation has ended, when it ended (datetime object)
+        
         moon; % structure with some details on the moon position etc
         sun; % structure with some details on the sun position etc
         
@@ -73,7 +76,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     
     properties % switches/controls
         
-        thresh_airmass = 0.2; % do not prefer a new target if currently observing and new target has airmass very close to current airmass
         debug_bit = 1;
         
     end
@@ -81,6 +83,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
     properties % inputs/outputs
         
         now_observing = 0; % when this is true, ignore the "continuous" constraint
+        prev_runtime_minutes = 0;
+        
         RA_deg; % numeric value in degrees
         Dec_deg; % numeric value in degrees
         
@@ -209,6 +213,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             obj.constraints.input_var('latest', [], 'latest time'); 
             obj.constraints.add_comment('latest', 'observation must not begin after this time (UTC)'); 
             
+            obj.constraints.input_var('fudge_time', 5); 
+            obj.constraints.add_comment('fudge_time', 'if object is this close to fulfilling any of the time constraints (continuous, duration, earliest, latest) it can still qualify'); 
+            
             obj.constraints.input_var('side', [], 'hemisphere'); 
             obj.constraints.add_comment('side', 'observation must be taken on this size (empty is same as "both")'); 
             
@@ -247,6 +254,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             obj.galactic_latitude = [];
             
             obj.constraints.return_to_defaults;
+
+            obj.clear;
+            
+        end
+        
+        function clear(obj)
+            
+            obj.start_time = [];
+            obj.end_time = [];
+            obj.prev_runtime_minutes = 0;
             
             obj.update;
             
@@ -471,6 +488,28 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
+        function val = getRuntimeMinutes(obj) % runtime of the currently running observation
+            
+            if obj.now_observing==0 || isempty(obj.time) || isempty(obj.start_time) || isnat(obj.start_time)
+                val = [];
+            else
+                val = minutes(obj.time-obj.start_time);
+            end
+            
+        end
+        
+        function val = getTotalRuntimeMinutes(obj) % runtime of all observations since the last call to clear()
+            
+            t = obj.getRuntimeMinutes;
+            
+            if isempty(t)
+                val = obj.prev_runtime_minutes;
+            else
+                val = obj.prev_runtime_minutes + t;
+            end
+            
+        end
+        
     end
     
     methods % setters
@@ -482,6 +521,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         end
         
         function set.keyword(obj, val)
+            
+            if isnumeric(val)
+                val = num2str(val);
+            elseif islogical(val)
+                val = num2str(val);
+            end
             
             obj.keyword_ = val;
             
@@ -526,11 +571,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         function set.time(obj, val)
             
-            if isa(val, 'datetime')
-                obj.time = val;
-            else 
-                obj.time = obj.parseTime(val); 
-            end
+            obj.time = obj.parseTime(val); 
             
             obj.time.Format = 'uuuu-MM-dd HH:mm:ss';
             
@@ -538,7 +579,38 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         function set.time_str(obj, val)
             
-            obj.time = val; % will get parsed inside the the setter for "time"
+            obj.time = val; % will get parsed inside the setter for "time"
+            
+        end
+        
+        function set.start_time(obj, val)
+            
+            obj.start_time = obj.parseTime(val); 
+            
+        end
+        
+        function set.end_time(obj, val)
+            
+            obj.end_time = obj.parseTime(val); 
+            
+        end
+        
+        function start_observing(obj)
+            
+            obj.now_observing = 1;
+            obj.start_time = obj.time;
+            
+        end
+        
+        function finish_observing(obj)
+            
+            t = obj.getRuntimeMinutes;
+            if ~isempty(t)
+                obj.prev_runtime_minutes = obj.prev_runtime_minutes + t; 
+            end
+            
+            obj.now_observing = 0;
+            obj.end_time = obj.time;
             
         end
         
@@ -952,9 +1024,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             if isempty(obj.RA) || isempty(obj.Dec), return; end
             
-            if ~isempty(input.earliest) && obj.time<obj.parseTime(input.earliest),return; end % current time is too early
+            if ~isempty(input.earliest) && obj.time<obj.parseTime(input.earliest), return; end % current time is too early
             
-            if ~isempty(input.latest) && obj.time>obj.parseTime(input.latest),return; end % current time is too late
+            if ~isempty(input.latest) && obj.time>obj.parseTime(input.latest), return; end % current time is too late
             
             if obj.HA_deg<0 && util.text.cs(input.side, 'West'), return; end % target is on East side when only West is accepted
             

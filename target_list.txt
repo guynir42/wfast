@@ -1,4 +1,0 @@
-ecliptic, priority=1
-sirius, priority = 1
-asteroid_52768, 10:32:56-28:12:44.5, priority=5, dur=2, decay=1, 
-arcturus

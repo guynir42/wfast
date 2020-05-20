@@ -49,9 +49,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         PROJECT = 'WFAST'; % project can be Kraar or WFAST
         INST = 'Zyla_5.5'; % The camera model used. In new headers this must be updated by hardware to Balor
         
-        STARTTIME; % start time of current batch of images (in YYYY-MM-DDThh:mm:ss.sss format)
-        ENDTIME; % end time of current batch of images (in YYYY-MM-DDThh:mm:ss.sss format)
-        RUNSTART;  % start time of the observation run (in YYYY-MM-DDThh:mm:ss.sss format)
+        STARTTIME; % start time of current batch of images (in YYYY-MM-DDThh:mm:ss.sss format) in UTC!
+        ENDTIME; % end time of current batch of images (in YYYY-MM-DDThh:mm:ss.sss format) in UTC!
+        RUNSTART;  % start time of the observation run (in YYYY-MM-DDThh:mm:ss.sss format) in UTC!
         
         END_STAMP; % the camera timestamp correspinding to ENDTIME
         
@@ -817,6 +817,20 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             
         end
         
+        function set.STARTTIME(obj, val)
+            
+            obj.STARTTIME = val;
+            obj.ephem.start_time = val;
+            
+        end
+        
+        function set.ENDTIME(obj, val)
+            
+            obj.ENDTIME = val;
+            obj.ephem.end_time = val;
+            
+        end
+        
         function addStar(obj, varargin)
                         
             obj.stars(end+1) = head.Star('pars', obj, varargin{:});
@@ -842,7 +856,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             obj.TARGET = util.text.strPlusPlus(obj.TARGET);
             
         end
-            
+        
     end
     
     methods % save/load 

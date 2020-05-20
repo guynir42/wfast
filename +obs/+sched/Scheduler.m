@@ -119,9 +119,6 @@ classdef Scheduler < handle
                 load(fullfile(getenv('DATA'), '/WFAST/saved/sky_map')); 
                 
                 obj.map = sky_map;
-                obj.map.show_galactic = 0;
-                obj.map.show_ra_units = 'hours';
-                obj.map.show_log = 1;
                 
                 obj.ephem = obj.map.ephem; 
                 
@@ -217,7 +214,7 @@ classdef Scheduler < handle
             
             obj.reset;
             
-            obj.targets = obs.sched.Target.readFile(filename);
+            obj.targets = obs.sched.Target.readFile(filename, obj.ephem.constraints);
             
         end
         
@@ -252,9 +249,67 @@ classdef Scheduler < handle
             
             % add to arguments the chosen side if "stay_on_side" is true, or because of wind
             % ...
+            if obj.use_stay_on_side
+                arguments = [arguments 'side', obj.current_side];
+                %... what about wind conditions?
+            end
             
-            new_target = best_target(obj.targets, 'time', time, arguments{:});
+            for ii = 1:length(obj.targets)
+                obj.targets(ii).ephem.time = time;
+                if obj.targets(ii).use_resolver
+                    obj.targets(ii).ephem.resolve([], arguments{:}); % also updates secondaries
+                else
+                    obj.targets(ii).ephem.updateSecondaryCoords
+                end
+            end
             
+            new_target = obs.sched.Target.empty;
+            
+            % see if any of the targets is now observing and is still inside the "continuous" constraint
+            for ii = 1:length(obj.targets)
+                
+                e = obj.targets(ii).ephem; % shorthand
+                
+                if e.now_observing
+                    
+                    if e.getRuntimeMinutes + e.constraints.fudge_time < e.constraints.continuous*60
+                        new_target = obj.targets(ii); % this target must be observed for some time before a new target can be observed... 
+                        break;
+                    end
+                    
+                end
+                
+            end
+            % if we didn't find any target that is still constrained by "continuous", look for the best available target
+            
+               
+            if isempty(new_target) % this happens if there is no target currently under "continuous condition
+                
+                target_list = obj.targets; % make a copy of the list, that can get shorter because of various external constraints
+                
+                dur_flag = true(length(target_list),1); % indices of the targets that meet the duration prerequisite
+
+                for ii = 1:length(target_list)
+                    e = target_list(ii).ephem; % shorthand
+                    
+                    if e.getTotalRuntimeMinutes + e.constraints.fudge_time > e.constraints.duration*60
+                        dur_flag(ii) = false; % flag as false targets that have been observed more than "duration"
+                    end
+                    
+                end
+
+                target_list_duration = target_list(dur_flag); % narrow down to a subset of legal targets...
+            
+                new_target = best_target(target_list_duration, 'time', time, arguments{:}); % try to find a good target under the "duration" constraint
+
+                % this happens if we didn't find any targets that haven't been observed "duration" hours
+                if isempty(new_target) 
+                    new_target = best_target(target_list(~dur_flag), 'time', time, arguments{:}); % run only the targets that have longer than duration
+                end
+                
+            end
+            
+            %%%%%% now we have made the selection of the best target, lets see what we can do with it %%%%%%% 
             if isempty(new_target) % no targets are currently observable! 
                 
                 obj.report = sprintf('%s: No available targets. Going to idle mode...', time); 
@@ -311,6 +366,16 @@ classdef Scheduler < handle
                 obj.current_Dec = obj.current.ephem.Dec_deg;
                 obj.current_side = obj.current.side; 
                 
+                % add the obs_history from the Target object to the Scheduler list
+                s = obj.current.obs_history(end); 
+                s.index = obj.current.index;
+                s.name = obj.current.name;
+                if isempty(obj.obs_history)
+                   obj.obs_history = s;
+                else
+                    obj.obs_history(end+1) = s;
+                end
+            
             end
             
             % silently ignore this command if the current target is empty (idle mode)
@@ -331,17 +396,8 @@ classdef Scheduler < handle
             
             obj.current.finish_observation(time);
             
-            s = obj.current.obs_history(end); 
-            s.index = obj.current.index;
-            s.name = obj.current.name;
-            
-            if isempty(obj.obs_history)
-               obj.obs_history = s;
-            else
-                obj.obs_history(end+1) = s;
-            end
-            
-            
+            obj.obs_history(end).end_time = obj.current.obs_history(end).end_time;
+            obj.obs_history(end).runtime = obj.current.obs_history(end).runtime;
             
         end
         
@@ -452,15 +508,15 @@ classdef Scheduler < handle
             
             obj.brake_bit = 1;
             
-            if ~isempty(obj.gui)
-                obj.gui.update;
-            end
-            
             % need to call anything else to wrap up?
             
             obj.report = sprintf('Sunrise at %s. Finished observations...', sim_time);
             if obj.debug_bit>1, disp(obj.report); end
-
+            
+            if ~isempty(obj.gui)
+                obj.gui.update;
+            end
+            
         end
         
     end
@@ -484,10 +540,10 @@ classdef Scheduler < handle
                 end
                 
             end
-            
-            obj.map.LST = obj.ephem.LST_deg/15;
-            
-            obj.map.show('vector', [-5 5]); 
+                        
+            obj.map.show('ax', input.ax, 'vector', [-5 5], 'alt_limit', obj.ephem.constraints.altitude, ...
+                'LST', obj.ephem.LST_deg/15, 'log', 1, 'ecliptic', 1, 'galactic', 0, 'zenith', 1, 'horizon', 1, ...
+                'grid', 0, 'units', 'hours', 'font size', input.font_size); 
             
             title(input.ax, ''); 
             input.ax.FontSize = input.font_size;
@@ -527,7 +583,7 @@ classdef Scheduler < handle
             % at some point we will have to figure out a way to put multiple printouts for the same field, beyond East/West...             
             shift_down = 0;
             if strcmp(s.side, 'East')
-                shift_down = 5;
+                shift_down = 7;
             end
             
             if ~isempty(s.start_time) && ~isempty(s.end_time)

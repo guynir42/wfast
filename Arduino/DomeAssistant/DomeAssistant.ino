@@ -9,7 +9,7 @@
 
 const int buf_size=10; // buffer the last few measurements
 
-BME280 bme280;
+BME280 bme280; // the sensor SDA and SCL should be connected to the ATMega2560 pins 20 and 21
 GroundPin bmeGND(19);
 VoltagePin bmeVCC(18); 
 
@@ -27,7 +27,7 @@ OutputPin relay7(6);
 OutputPin relay8(5); 
 
 // remote control
-VoltagePin remoteVCC(53); // the end of that row is ground for this device
+VoltagePin remoteVCC(53); // the end of that row is use as ground for the remote
 InputPin remoteD0(51); 
 InputPin remoteD1(49); 
 InputPin remoteD2(47); 

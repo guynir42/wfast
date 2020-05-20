@@ -41,7 +41,6 @@ classdef (CaseInsensitiveProperties) Target < handle
     
     properties % inputs/outputs
         
-        total_obs_time_seconds = 0;
         obs_history = []; % struct array with a single struct for each separate run on this target, containing RA_deg, Dec_deg, and start_time and end_times
         start_time = ''; % keep the start time of the current observation (in HH:MM format). 
         start_side = '';
@@ -134,8 +133,8 @@ classdef (CaseInsensitiveProperties) Target < handle
         
         function clear(obj) % return the target to the state before it was observed at all
             
-            obj.ephem.now_observing = 0; 
-            obj.total_obs_time_seconds = 0;
+            obj.ephem.clear;
+            
             obj.obs_history = []; 
             obj.start_time = ''; 
             obj.start_RA_deg = [];
@@ -170,7 +169,7 @@ classdef (CaseInsensitiveProperties) Target < handle
             if isempty(obj.decay_rate)
                 val = obj.priority;
             else
-                val = obj.priority - obj.total_obs_time_seconds/3600*obj.decay_rate; 
+                val = obj.priority - obj.ephem.getTotalRuntimeMinutes/60*obj.decay_rate; 
             end
             
         end
@@ -189,7 +188,7 @@ classdef (CaseInsensitiveProperties) Target < handle
         
         function val = get.side(obj)
             
-            if isempty(obj.ephem.HA_deg)
+            if isempty(obj.ephem.HA_deg) || isnan(obj.ephem.HA_deg)
                 val = '';
             elseif obj.ephem.HA_deg<0
                 val = 'East';
@@ -421,19 +420,19 @@ classdef (CaseInsensitiveProperties) Target < handle
             input.input_var('time', []); % time at which to compare these targets
             input.scan_vars(varargin{:}); 
             
-            if ~isempty(input.time) % get all targets up to date to a specific time (can use "now") make sure dynamic fields are updated! 
-                
-                for ii = 1:length(obj_vec)
-                    
-                    obj_vec(ii).ephem.time = head.Ephemeris.parseTime(input.time); 
-                    
-                    if obj_vec(ii).use_resolver
-                        obj_vec(ii).ephem.resolve; % also updates secondaries
-                    end
-                    
-                end
-                
-            end
+%             if ~isempty(input.time) % get all targets up to date to a specific time (can use "now") make sure dynamic fields are updated! 
+%                 
+%                 for ii = 1:length(obj_vec)
+%                     
+%                     obj_vec(ii).ephem.time = head.Ephemeris.parseTime(input.time); 
+%                     
+%                     if obj_vec(ii).use_resolver
+%                         obj_vec(ii).ephem.resolve; % also updates secondaries
+%                     end
+%                     
+%                 end
+%                 
+%             end
             
             best = obs.sched.Target.empty; % no target is chosen yet
             
@@ -465,13 +464,25 @@ classdef (CaseInsensitiveProperties) Target < handle
             end
             
             if isempty(obj.start_time) % if this object is not currently observing!
+                
                 obj.start_time = time;
                 obj.start_side = obj.side;
                 obj.start_RA_deg = obj.ephem.RA_deg;
                 obj.start_Dec_deg = obj.ephem.Dec_deg;
+                
+                obj.ephem.time = time;  
+                obj.ephem.start_observing;
+                
+                s = struct('RA_deg', obj.start_RA_deg, 'Dec_deg', obj.start_Dec_deg, ...
+                    'side', obj.start_side, 'start_time', obj.start_time, 'end_time', '', 'runtime', 0); 
+
+                if isempty(obj.obs_history)
+                    obj.obs_history = s;
+                else
+                    obj.obs_history(end+1) = s;
+                end
+
             end
-            
-            obj.ephem.now_observing = 1; 
             
             % if the object is already observing we will simply ignore this command! 
             
@@ -487,18 +498,11 @@ classdef (CaseInsensitiveProperties) Target < handle
                 error('Can not finish an observation that has not been started yet! Use start_observation()'); 
             end
             
-            dt = obj.compare_times_hours(obj.start_time, time); 
+            obj.obs_history(end).end_time = time; 
+            obj.obs_history(end).runtime = obj.compare_times_hours(obj.start_time, time); 
             
-            s = struct('RA_deg', obj.start_RA_deg, 'Dec_deg', obj.start_Dec_deg, ...
-                'side', obj.start_side, 'start_time', obj.start_time, 'end_time', time, 'runtime', dt); 
-            
-            if isempty(obj.obs_history)
-                obj.obs_history = s;
-            else
-                obj.obs_history(end+1) = s;
-            end
-            
-            obj.ephem.now_observing = 0; 
+            obj.ephem.time = time;
+            obj.ephem.finish_observing;
             
             obj.start_time = ''; % when finished we no longer need to keep this info (it is stored in obs_history)
             
@@ -508,7 +512,7 @@ classdef (CaseInsensitiveProperties) Target < handle
     
     methods (Static=true)
         
-        function obj_vec = readFile(filename) % read the text file line by line and parse() each line to a new Target object, returning a vector
+        function obj_vec = readFile(filename, constraints) % read the text file line by line and parse() each line to a new Target object, returning a vector
         % Usage: obj_vec = readFile(filename='target_list.txt')
         
             if nargin<1 || isempty(filename)
@@ -519,6 +523,14 @@ classdef (CaseInsensitiveProperties) Target < handle
                 error('Could not find the file "%s". ', filename);
             end
 
+            if nargin<2 || isempty(constraints)
+                constraints = [];
+            else
+                if ~isa(constraints, 'util.text.InputVars')
+                    error('Second argument (constraints) to readFile must be a util.text.InputVars setup using a head.Ephemeris object! Instead got a %s', class(constraints)); 
+                end
+            end
+            
             fid = fopen(filename);
             on_cleanup = onCleanup(@() fclose(fid)); % make sure this is called no matter how the function exits
             
@@ -533,6 +545,11 @@ classdef (CaseInsensitiveProperties) Target < handle
                 end
                 
                 new_obj = obs.sched.Target; 
+                
+                if ~isempty(constraints)
+                    new_obj.ephem.constraints = util.oop.full_copy(constraints);
+                end
+                
                 new_obj.parse(tline); 
                 
                 obj_vec = [obj_vec; new_obj]; 
