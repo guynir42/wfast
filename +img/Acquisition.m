@@ -43,7 +43,7 @@ classdef Acquisition < file.AstroData
         sync@obs.comm.PcSync;
         
         timer;
-        backup_timer;
+        slow_timer;
         
         log@util.sys.Logger;
         
@@ -1360,10 +1360,10 @@ classdef Acquisition < file.AstroData
 %                 if isempty(obj.sync.incoming) || numel(fieldnames(obj.sync.incoming))==0 || ...
 %                     ~isfield(obj.sync.incoming, 'time') || minutes(datetime('now', 'TimeZone', 'UTC')-util.text.str2time(obj.sync.incoming.time))>10 % what if dome timers are off? need to change this to more reliable PcSync test
 
-                if obj.sync.status==0 && obj.sync.pending_connection==0
-                    obj.sync.connect;
-                    pause(1);
-                end
+%                 if obj.sync.status==0 && obj.sync.pending_connection==0
+%                     obj.sync.connect;
+%                     pause(1);
+%                 end
                 
                 s = obj.sync.incoming;
                 
@@ -1527,30 +1527,40 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function setup_backup_timer(obj)
+        function setup_slow_timer(obj)
             
-            if ~isempty(obj.backup_timer) && isa(obj.backup_timer, 'timer') && isvalid(obj.backup_timer)
-                if strcmp(obj.backup_timer.Running, 'on')
-                    stop(obj.backup_timer);
-                    delete(obj.backup_timer);
-                    obj.backup_timer = [];
+            if ~isempty(obj.slow_timer) && isa(obj.slow_timer, 'timer') && isvalid(obj.slow_timer)
+                if strcmp(obj.slow_timer.Running, 'on')
+                    stop(obj.slow_timer);
+                    delete(obj.slow_timer);
+                    obj.slow_timer = [];
                 end
             end
             
             delete(timerfind('name', 'acquisition-backup-timer'));
             
-            obj.backup_timer = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-backup-timer', ...
-                'Period', 180, 'StartDelay', 1, 'TimerFcn', @obj.callback_backup_timer, 'ErrorFcn', @obj.setup_backup_timer);
+            obj.slow_timer = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-slow-timer', ...
+                'Period', 300, 'StartDelay', 1, 'TimerFcn', @obj.callback_slow_timer, 'ErrorFcn', @obj.setup_slow_timer);
             
-            start(obj.timer);
+            start(obj.slow_timer);
             
             
         end
         
-        function callback_backup_timer(obj, ~, ~)
+        function callback_slow_timer(obj, ~, ~)
+            
             if ~strcmp(obj.timer.Running, 'on')
                 obj.setup_timer;
             end
+            
+            obj.sync.update;
+            pause(0.05); 
+            
+            if obj.sync.status==0 
+                obj.sync.connect;
+                pause(1);
+            end
+            
         end
         
         function s = makeObsLog(obj, date) % scan the folders in "data_temp" to get up-to-date info on number of files and runtime for each target

@@ -307,8 +307,8 @@ classdef PcSync < handle
                 
                 t = datetime('now', 'TimeZone', 'UTC'); 
 
-                if ~isempty(obj.time_latest_transmission) && minutes(t-obj.time_latest_transmission)>5 % more than five minutes waiting for a response checksum! 
-                    if obj.debug_bit, fprintf('Did not receive any response checksum for over 5 minutes! Setting status=0. \n'); end
+                if ~isempty(obj.time_latest_transmission) && minutes(t-obj.time_latest_transmission)>10 % more than five minutes waiting for a response checksum! 
+                    if obj.debug_bit, fprintf('Did not receive any response checksum for over 10 minutes! Setting status=0. \n'); end
                     obj.status = 0; 
                 end
                 

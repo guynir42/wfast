@@ -1236,9 +1236,10 @@ classdef Andor < file.AstroData
             obj.batch_counter = obj.batch_counter + 1;
             
             if obj.use_show && ~isempty(obj.gui) && obj.gui.check
-                obj.show(obj.pass_show{:});
+%                 obj.show(obj.pass_show{:});
+                obj.show;
             end
-
+            
             obj.frame_rate_camera = size(obj.images,3)./(obj.t_end_stamp - obj.timestamps(1)); % how many frames in what time (not including dead time and read time)
             
             if ~isempty(obj.buffers.t_start)
@@ -1381,7 +1382,7 @@ classdef Andor < file.AstroData
             end
             
 %             [rc, cooling] = obs.cam.sdk.AT_GetBool(obj.hndl, 'SensorCooling'); obs.cam.sdk.AT_CheckWarning(rc);
-%             cooling = obs.cam.mex_new.get(obj.hndl, 'cooling'); 
+            cooling = obs.cam.mex_new.get(obj.hndl, 'cooling'); 
             if ~cooling, error('Camera sensor cooling is off!'); end
             
             % add other checks for consistency in parameters... 
