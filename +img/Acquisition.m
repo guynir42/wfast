@@ -2012,6 +2012,10 @@ classdef Acquisition < file.AstroData
             
             t0 = tic;
             
+            if ~isempty(obj.gui) && obj.gui.check
+                obj.gui.update; 
+            end
+            
             obj.prev_stack = obj.stack_proc; % keep one stack from last batch
             obj.clear;
             obj.positions = obj.clip.positions; % recover the positions from the copy saved in the Clipper
@@ -2022,9 +2026,6 @@ classdef Acquisition < file.AstroData
             
             if obj.debug_bit>1, fprintf('Starting batch %d. Loaded %d images from "%s" source.\n', obj.batch_counter+1, size(obj.images,3), class(obj.src)); end
             
-            if ~isempty(obj.gui) && obj.gui.check
-                obj.gui.update; 
-            end
             
             drawnow; % make sure commands to the GUI and other callbacks are noticed... 
             

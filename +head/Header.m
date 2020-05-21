@@ -385,10 +385,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         % ephemeris
         function val = get.OBJECT(obj)
             
-            if ~isempty(obj.ephem)
+            if isempty(obj.ephem)
                 val = '';
             else
-                obj.ephem.name;
+                val = obj.ephem.name;
             end
             
         end
