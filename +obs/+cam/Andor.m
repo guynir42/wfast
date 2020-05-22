@@ -1430,7 +1430,7 @@ classdef Andor < file.AstroData
             if cs(obj.mode, 'science')
                 obj.buffers.product_type_overwrite = '';
                 if obj.use_roi
-                    obj.buffers.product_append = 'ROI';
+                    obj.buffers.product_type_append = 'ROI';
                 end
             elseif cs(obj.mode, 'dark')
                 obj.buffers.product_type_overwrite = 'Dark';

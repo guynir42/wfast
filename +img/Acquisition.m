@@ -333,8 +333,11 @@ classdef Acquisition < file.AstroData
                 obj.deflator = file.Deflator;
                 
                 obj.sync = obs.comm.PcSync('server'); % no connect command is given, since this is still blocking indefinitely...
+                obj.sync.reco.delay_time_minutes = 10; % this prevents the slow_timer from repeatedly trying to reconnect 
+                
 %                 obj.sync.name = 'Cam-PC';
                 obj.setup_timer;
+                obj.setup_slow_timer;
                 
                 obj.setupDefaults;
                 
@@ -1029,6 +1032,18 @@ classdef Acquisition < file.AstroData
             
         end
         
+        function set.use_show_gray(obj, val)
+            
+            obj.use_show_gray = val;
+            
+            if obj.use_show_gray
+                colormap(obj.gui.axes_image, 'gray');
+            else
+                colormap(obj.gui.axes_image, 'default');
+            end
+            
+        end
+        
         function setupTestMode(obj)
             
             obj.use_arbitrary_pos = 1;
@@ -1540,7 +1555,7 @@ classdef Acquisition < file.AstroData
             delete(timerfind('name', 'acquisition-backup-timer'));
             
             obj.slow_timer = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-slow-timer', ...
-                'Period', 300, 'StartDelay', 1, 'TimerFcn', @obj.callback_slow_timer, 'ErrorFcn', @obj.setup_slow_timer);
+                'Period', 300, 'StartDelay', 300, 'TimerFcn', @obj.callback_slow_timer, 'ErrorFcn', @obj.setup_slow_timer);
             
             start(obj.slow_timer);
             
@@ -1557,7 +1572,8 @@ classdef Acquisition < file.AstroData
             pause(0.05); 
             
             if obj.sync.status==0 
-                obj.sync.connect;
+                obj.sync.connect;                
+                obj.sync.reco.lock;
                 pause(1);
             end
             
@@ -1888,6 +1904,12 @@ classdef Acquisition < file.AstroData
                 obj.head.RUNSTART = util.text.time2str(obj.head.ephem.time);
                 obj.head.NAXIS4 = obj.num_stars_found;
                 
+                if obj.src.use_roi
+                    obj.buf.product_type_append = 'ROI';
+                else
+                    obj.buf.product_type_append = strrep(obj.buf.product_type_append, 'ROI', '');
+                end
+                
                 if obj.use_save
                     try
                         
@@ -2024,9 +2046,6 @@ classdef Acquisition < file.AstroData
             obj.src.batch; % produce the data (from camera, file, or simulator)
             t_batch = toc(t_batch); 
             
-            if obj.debug_bit>1, fprintf('Starting batch %d. Loaded %d images from "%s" source.\n', obj.batch_counter+1, size(obj.images,3), class(obj.src)); end
-            
-            
             drawnow; % make sure commands to the GUI and other callbacks are noticed... 
             
             obj.update;
@@ -2034,6 +2053,8 @@ classdef Acquisition < file.AstroData
             t_copy = tic;
             obj.copyFrom(obj.src); % get the data into this object
             t_copy = toc(t_copy);
+            
+            if obj.debug_bit>1, fprintf('Starting batch %d. Loaded %d images from "%s" source.\n', obj.batch_counter+1, size(obj.images,3), class(obj.src)); end
             
             obj.head.END_STAMP = obj.t_end_stamp;
                         
@@ -2671,7 +2692,7 @@ classdef Acquisition < file.AstroData
                     min_pos = obj.cam.af.pos(2); 
                     max_pos = obj.cam.af.pos(end-1); 
                     
-                    if obj.cam.af.found_width<1 && obj.cam.found_pos>=min_pos && obj.cam.found_pos<=max_pos
+                    if obj.cam.af.found_width<1 && obj.cam.af.found_pos>=min_pos && obj.cam.af.found_pos<=max_pos
                         break; % if focus is good enough and not at the edges of the range, we don't need to repeat it
                     end
                 
@@ -2703,7 +2724,7 @@ classdef Acquisition < file.AstroData
             import util.text.cs;
             
             try
-            
+                
                 input = util.text.InputVars;
                 input.input_var('ax', [], 'axes', 'axis');
                 input.scan_vars(varargin{:});
@@ -2715,7 +2736,7 @@ classdef Acquisition < file.AstroData
                         input.ax = gca;
                     end
                 end
-
+                
                 if cs(obj.show_what, 'images')
                     I = obj.images(:,:,end);
                 elseif cs(obj.show_what, 'stack')
@@ -2733,16 +2754,16 @@ classdef Acquisition < file.AstroData
                 util.plot.setImage(I, input.ax);
                 
                 if obj.use_show_gray
-                    colormap(input.ax, 'gray');
+%                     colormap(input.ax, 'gray'); % changing colormaps is very slow!
                     rect_color = 'white';
                 else
-                    colormap(input.ax, 'default');
+%                     colormap(input.ax, 'default'); % changing colormaps is very slow!
                     rect_color = 'black'; 
                 end
                 
                 obj.clip.showRectangles('num', obj.display_num_rect_stars, 'color', rect_color, 'ax', input.ax, 'flip', obj.use_flip, 'delete', 1, 'text', 0);
                 obj.clip_bg.showRectangles('num', obj.display_num_rect_bg, 'color', 'red', 'ax', input.ax, 'flip', obj.use_flip, 'delete', 0, 'text', 0);
-
+                
             catch ME
                 warning(ME.getReport);
             end

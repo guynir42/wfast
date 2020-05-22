@@ -207,7 +207,7 @@ classdef AcqGUI < handle
             obj.panel_controls.addButton('button_fast_mode', 'setupFastMode', 'push', 'Fast mode', '', '', 0.5, '', '', 'Setup high-cadence observations with T=30ms, f=25Hz, 100 images per batch/file');
             obj.panel_controls.addButton('button_single', 'single', 'push', 'Take single batch', '', '', [], '', '', 'Take a single image and show it on screen. Does not save the image to file');
             obj.panel_controls.addButton('button_live', 'startLiveView', 'push', 'Start live view', '', '', [], '', '', 'Open the camera GUI and start the live-view video mode. Does not save any images to file');
-            obj.panel_controls.addButton('button_auto_focus', 'cam.autofocus', 'push', 'Auto-focus', '', '', 0.7, '', '', 'Start a focus-run. Does not save any images to file');
+            obj.panel_controls.addButton('button_auto_focus', 'runFocus', 'push', 'Auto-focus', '', '', 0.7, '', '', 'Start a focus-run. Does not save any images to file');
             obj.panel_controls.addButton('button_manual_focus', '', 'custom', 'manual', '', '', 0.3, '', '', 'open the focus GUI for manual focusing');
             obj.panel_controls.addButton('button_preview', '', 'custom', 'Preview run', '', '', [], '', '', 'Start a preview run, checking full acquisition pipeline. Does not save any images to file');
             
@@ -304,6 +304,12 @@ classdef AcqGUI < handle
             
             obj.panel_contrast.ax = obj.axes_image;
             
+            if obj.owner.use_show_gray
+                colormap(obj.axes_image, 'gray');
+            else
+                colormap(obj.axes_image, 'default');
+            end
+            
             if ~isempty(obj.owner.images)
                 obj.owner.show;
             end
@@ -315,7 +321,7 @@ classdef AcqGUI < handle
             if ~obj.check
                 return;
             end
-           
+            
             for ii = 1:length(obj.buttons)
                 obj.buttons{ii}.update;
             end
@@ -396,7 +402,7 @@ classdef AcqGUI < handle
             
             obj.panel_info.button_message.String = display_string;    
             
-            if obj.owner.use_show
+            if obj.owner.use_show && ~isempty(obj.owner.images)
                 obj.owner.show;
             end
 
