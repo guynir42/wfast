@@ -94,6 +94,22 @@ void SaveData::parseVararginPairs(int N, const mxArray *vars[]){
 	
 	if(buf_struct) readStruct(buf_struct); // make sure to read data from the struct only after reading optional arguments (e.g., photometric_write)
 
+	for(int i=2; i<N;i+=2){ // change this later to a switch for not saving images or stacks
+		
+		if(mxIsChar(vars[i])==0 && mxIsStruct(vars[i])==0) mexErrMsgIdAndTxt( "MATLAB:file:mex:mexWrite:inputNotStringOrStruct", "Keyword must be a string or a struct.");
+		if(mxIsStruct(vars[i])){ buf_struct=(mxArray*) vars[i]; i--; continue; } // skip this element and see if there are any more inputs to parse... 
+		
+		const char *keyword=mxArrayToString(vars[i]);
+		
+		// if we decide this pair is worth parsing, use keyword and value variables:
+		const mxArray *value=mxCreateDoubleScalar(1); // the positive approach
+		if(i+1<N) value=vars[i+1];	
+		// if(mxIsEmpty(value)) continue; // just skip empty inputs
+		
+		// the third parameters tells MyMatrix if we want to deflate it (ignored if we are not using deflate at all)
+		if(cs(keyword, "images")) images.input("images", value, 1); 
+	}
+	
 }
 
 void SaveData::readStruct(const mxArray *buf){

@@ -107,7 +107,7 @@ classdef Acquisition < file.AstroData
         use_store_photometry = 1; % store the photometric products in the Lightcurve object for entire run
         use_save_photometry = 1; % save the flux and other products in the HDF5 files along with the images
         
-        use_model_psf = 1;
+        use_model_psf = 0;
         
         use_check_positions = 1;
         lost_stars_fraction = 0.3;
@@ -366,7 +366,7 @@ classdef Acquisition < file.AstroData
 %             obj.num_batches = 500;
             obj.batch_size = 100;
             
-            obj.num_stars = 2500;
+            obj.num_stars = 2000;
             obj.cut_size = 15;
             obj.avoid_edges = 50;
             
@@ -622,9 +622,10 @@ classdef Acquisition < file.AstroData
                 end
             end
             
-            val = sprintf('%s\n PSF widths= %4.2f / %4.2f pix', val, obj.minor_axis, obj.major_axis);
-            
-            val = sprintf('%s\n PSF angle= %4.2f deg', val, obj.model_psf.angle);
+            if obj.use_model_psf
+                val = sprintf('%s\n PSF widths= %4.2f / %4.2f pix', val, obj.minor_axis, obj.major_axis);
+                val = sprintf('%s\n PSF angle= %4.2f deg', val, obj.model_psf.angle);
+            end
             
             val = sprintf('%s\n LIMMAG_D= %4.2f', val, obj.head.LIMMAG_DET); 
             
@@ -1369,67 +1370,59 @@ classdef Acquisition < file.AstroData
             
             try 
                 
-                obj.sync.update;
-                
-                % check if the PcSync is good
-%                 if isempty(obj.sync.incoming) || numel(fieldnames(obj.sync.incoming))==0 || ...
-%                     ~isfield(obj.sync.incoming, 'time') || minutes(datetime('now', 'TimeZone', 'UTC')-util.text.str2time(obj.sync.incoming.time))>10 % what if dome timers are off? need to change this to more reliable PcSync test
+                if obj.use_sync 
 
-%                 if obj.sync.status==0 && obj.sync.pending_connection==0
-%                     obj.sync.connect;
-%                     pause(1);
-%                 end
-                
-                s = obj.sync.incoming;
-                
-                list = head.Header.makeSyncList; 
-                
-                if ~isempty(s) && isstruct(s)
-                    
-                    for ii = 1:length(list)
-                        if isfield(s, list{ii})
-                            try
-                                obj.head.(list{ii}) = s.(list{ii});
+                    obj.sync.update;
+
+                    s = obj.sync.incoming;
+
+                    list = head.Header.makeSyncList; 
+
+                    if ~isempty(s) && isstruct(s)
+
+                        for ii = 1:length(list)
+                            if isfield(s, list{ii})
+                                try
+                                    obj.head.(list{ii}) = s.(list{ii});
+                                end
                             end
                         end
+
                     end
-                    
-                end
-                
-                % we have two ways to update the log: fast and slow
-                if obj.brake_bit % slow mode, just go over all files and check the data
-                    obj.obs_log = obj.makeObsLog;
-                else 
-                    if isempty(obj.obs_log) || ~strcmp(obj.obs_log.date, obj.buf.date_dir) % only do the slow update if there is no obs_log saved or if it is outdated
+
+                    % we have two ways to update the log: fast and slow
+                    if obj.brake_bit % slow mode, just go over all files and check the data
+
                         obj.obs_log = obj.makeObsLog;
-                    else
-                        
-                        if ~isfield(obj.obs_log, obj.run_name)
-                            obj.obs_log.(obj.run_name) = struct('name', obj.run_name, 'start', '', 'end', '', 'runtime', [], 'num_files', []);
+
+                    else % fast mode (while taking images, only update the latest obs_log, don't go scanning files)
+
+                        if isempty(obj.obs_log) || ~isfield(obj.obs_log, 'date') || ~strcmp(obj.obs_log.date, obj.buf.date_dir) % only do the slow update if there is no obs_log saved or if it is outdated
+                            obj.obs_log = obj.makeObsLog;
+                        else
+
+                            if ~isfield(obj.obs_log, obj.run_name)
+                                obj.obs_log.(obj.run_name) = struct('name', obj.run_name, 'start', '', 'end', '', 'runtime', [], 'num_files', []);
+                            end
+
+                            s = obj.obs_log.(obj.run_name); % get the structs for this run name
+                            s(end).runtime = obj.t_end_stamp;
+                            s(end).end_time = obj.t_end;
+                            s(end).num_files = obj.batch_counter;
+                            obj.obs_log.(obj.run_name) = s; % structs are not handles! 
+
                         end
-                        
-                        s = obj.obs_log.(obj.run_name); % get the structs for this run name
-                        s(end).runtime = obj.t_end_stamp;
-                        s(end).end_time = obj.t_end;
-                        s(end).num_files = obj.batch_counter;
-                        obj.obs_log.(obj.run_name) = s; % structs are not handles! 
-                        
+
                     end
-                    
-                end
-                
-                obj.sync.outgoing.obs_log = obj.obs_log; % update the Manager on how much observing time is invested in each target
-                obj.drive_space_gb = obj.getDriveSpace; % calculate how much space is left in each drive (in Gb) 
-                obj.sync.outgoing.drives = obj.drive_space_gb;
-                
-                if obj.use_sync 
-                    
+
+                    obj.sync.outgoing.obs_log = obj.obs_log; % update the Manager on how much observing time is invested in each target
+                    obj.drive_space_gb = obj.getDriveSpace; % calculate how much space is left in each drive (in Gb) 
+                    obj.sync.outgoing.drives = obj.drive_space_gb;
+
                     if obj.use_sync_stop && isfield(s, 'stop_camera') && s.stop_camera
                         obj.brake_bit = 1; % allow for manager to send stop command to camera... 
                     end
                     
-                    % add code here to start observations by command from dome-PC
-
                     if isfield(obj.sync.incoming, 'command_str')
                         obj.parseCommands;
                     end
@@ -2126,8 +2119,6 @@ classdef Acquisition < file.AstroData
 %                 obj.show;
 %             end
             
-            drawnow;
-            
             t_show = toc(t_show);
             
             t_gui = tic;
@@ -2135,6 +2126,8 @@ classdef Acquisition < file.AstroData
             if ~isempty(obj.gui) && obj.gui.check
                 obj.gui.update; 
             end
+            
+            drawnow;
             
             t_gui = toc(t_gui);
             
