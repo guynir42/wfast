@@ -110,7 +110,7 @@ classdef BufferWheel < file.AstroData
         use_mex = 1; % use mex interface to write files (use 0 as backup if mex fails or if you want other file types)
         chunk = 64; % chunk size (for deflate only)
         
-        use_save_single_uint16 = 1; % if given a single image (uint16) save that instead of the stack (single precision)
+        use_prefer_images_to_stack = 1; % if given a single image (uint16) save that instead of the stack (single precision)
         
         file_type = 'hdf5'; % support is added for "fits", "mat", and "tiff" in use_mex==0
                 
@@ -551,7 +551,7 @@ classdef BufferWheel < file.AstroData
                 
                 if obj.use_save_raw_images && size(obj.images,3)>1
                     val = 'Full';
-                elseif obj.use_save_single_uint16 && ~isempty(obj.images) && size(obj.images,3)==1
+                elseif obj.use_prefer_images_to_stack && ~isempty(obj.images) && size(obj.images,3)==1
                     val = 'Image';
                 elseif ~isempty(obj.stack) && ~isempty(obj.cutouts)
                     val = 'CutoutsStack';
@@ -1030,20 +1030,26 @@ classdef BufferWheel < file.AstroData
 %                     'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit);
                 
                 % right now mex write is only for HDF5 files
-                if obj.use_save_single_uint16 && ~isempty(obj.images) && size(obj.images,3)==1
-                    file.mex.write(this_filename, buf.mex_flag_write, buf, 'header', obj.head_struct_cell, 'photometric', obj.use_save_photometry, ...
-                    'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit,...
-                    'stack', []); % last line overwrites the "stack" in the buf and sets it to empty, saving only the one uint16 image in "images"
-                else
-                    if obj.use_save_raw_images
-                        file.mex.write(this_filename, buf.mex_flag_write, buf, 'header', obj.head_struct_cell, 'photometric', obj.use_save_photometry, ...
-                        'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit);
-                    else
-                        file.mex.write(this_filename, buf.mex_flag_write, buf, 'header', obj.head_struct_cell, 'photometric', obj.use_save_photometry, ...
-                        'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit,...
-                        'images', []); % last line overwrites the "images" in the buf and sets it to empty... 
-                    end
-                end
+                
+                file.mex.write(this_filename, buf.mex_flag_write, buf, 'header', obj.head_struct_cell, 'photometric', obj.use_save_photometry, ...
+                        'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit, ...
+                        'full_save', obj.use_save_raw_images, 'prefer_images_to_stack', obj.use_prefer_images_to_stack);
+                
+                % now the mex function handles these options: 
+%                 if obj.use_prefer_images_to_stack && ~isempty(obj.images) && size(obj.images,3)==1
+%                     file.mex.write(this_filename, buf.mex_flag_write, buf, 'header', obj.head_struct_cell, 'photometric', obj.use_save_photometry, ...
+%                     'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit,...
+%                     'stack', []); % last line overwrites the "stack" in the buf and sets it to empty, saving only the one uint16 image in "images"
+%                 else
+%                     if obj.use_save_raw_images
+%                         file.mex.write(this_filename, buf.mex_flag_write, buf, 'header', obj.head_struct_cell, 'photometric', obj.use_save_photometry, ...
+%                         'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit);
+%                     else
+%                         file.mex.write(this_filename, buf.mex_flag_write, buf, 'header', obj.head_struct_cell, 'photometric', obj.use_save_photometry, ...
+%                         'chunk', obj.chunk, 'deflate', obj.use_deflate, 'async_write', obj.use_async, 'debug_bit', obj.debug_bit,...
+%                         'images', []); % last line overwrites the "images" in the buf and sets it to empty... 
+%                     end
+%                 end
                 
             else % use the old, non-mex writing method
 

@@ -73,12 +73,16 @@ class SaveData {
 	std::vector< std::string > parameter_addresses_vector; // names of each struct 	
 	std::vector< std::vector<MyAttribute> > parameter_attributes_2D_vector; // a list of parameter objects (converted to structures) 
 	
-	static int debug_bit;
-	static int deflate;
-	static size_t chunk_size;	
-	static int async_write;
-	static int photometric_write;
-		
+	// these are all static so that objects like MyDataset (defined in SaveDataHDF5.h) can access them
+	static int debug_bit; // default=0. Control level of verbosity
+	static int deflate; // default=0. Choose level of deflation/compression (usually 1 is enough)
+	static size_t chunk_size; // default=64. Size of chunk will automatically shrink if it is bigger than image size (assume square chunks in image plane)
+	static int async_write; // default=0. Use threads to write data while continuing work
+	static int photometric_write; // default=1. Use this to save fluxes, backgrounds, widths, etc... 
+	static int full_save; // default=1. Use this to save full-frame data cubes
+	static int prefer_images_to_stack; // default=1. If true, and if stacks and images have only 2 dimensions, then will only save images, not stack. 
+	// since these are static and non-const, we initialize them in the SaveData.cpp source file! 
+	
 	static bool cs(const char *keyword, const char *compare_str, int num_letters=3);
 	static bool cs(const char *keyword, const char *str1, const char *str2, int num_letters=3);
 	static bool cs(const char *keyword, const char *str1, const char *str2, const char *str3, int num_letters=3);

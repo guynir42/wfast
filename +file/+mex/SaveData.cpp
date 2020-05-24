@@ -7,7 +7,8 @@ int SaveData::deflate=0;
 size_t SaveData::chunk_size=64;
 int SaveData::async_write=0;
 int SaveData::photometric_write=1;
-
+int SaveData::full_save=1;
+int SaveData::prefer_images_to_stack=1;
 
 SaveData::SaveData(const char *filename){
 	
@@ -44,7 +45,6 @@ void SaveData::parseVararginPairs(int N, const mxArray *vars[]){
 		// if we decide this pair is worth parsing, use keyword and value variables:
 		const mxArray *value=mxCreateDoubleScalar(1); // the positive approach
 		if(i+1<N) value=vars[i+1];	
-		// if(mxIsEmpty(value)) continue; // just skip empty inputs
 		
 		// the third parameters tells MyMatrix if we want to deflate it (ignored if we are not using deflate at all)
 		if(cs(keyword, "images")) images.input("images", value, 1); 
@@ -90,10 +90,20 @@ void SaveData::parseVararginPairs(int N, const mxArray *vars[]){
 		else if(cs(keyword, "chunk")) chunk_size=(int) mxGetScalar(value);
 		else if(cs(keyword, "async_write")) async_write=(int) mxGetScalar(value);
 		else if(cs(keyword, "photometric_write")) photometric_write=(int) mxGetScalar(value); 
+		else if(cs(keyword, "full_save")) full_save=(int) mxGetScalar(value); 
+		else if(cs(keyword, "prefer_images_to_stack")) prefer_images_to_stack=(int) mxGetScalar(value); 
 	}
 	
 	if(buf_struct) readStruct(buf_struct); // make sure to read data from the struct only after reading optional arguments (e.g., photometric_write)
 
+	if (prefer_images_to_stack && images.ndims==2){ // if images is a 2D (single image, not data cube) we can just save the images and ignore the stack (this overrides the "full_save" option...)
+		stack.clear(); 
+	}
+	else if(full_save==0){ // flag to make sure we do not want to save full frame images! (this can only happen if we are not saving the images in place of the stack...)
+		images.clear(); 
+	}
+	
+	/*
 	for(int i=2; i<N;i+=2){ // change this later to a switch for not saving images or stacks
 		
 		if(mxIsChar(vars[i])==0 && mxIsStruct(vars[i])==0) mexErrMsgIdAndTxt( "MATLAB:file:mex:mexWrite:inputNotStringOrStruct", "Keyword must be a string or a struct.");
@@ -109,6 +119,7 @@ void SaveData::parseVararginPairs(int N, const mxArray *vars[]){
 		// the third parameters tells MyMatrix if we want to deflate it (ignored if we are not using deflate at all)
 		if(cs(keyword, "images")) images.input("images", value, 1); 
 	}
+	*/
 	
 }
 
