@@ -333,8 +333,20 @@ classdef Catalog < handle
 
                     obj.mextractor_sim = update_coordinates(S2, 'ColNameRA', 'ALPHAWIN_J2000', 'ColNameDec', 'DELTAWIN_J2000'); 
 
+                    % the following are pathces to fix compatibility of
+                    % Eran's functions with themselves
+                    obj.mextractor_sim.WCS.CTYPE1 = obj.mextractor_sim.WCS.CTYPE{1};
+                    obj.mextractor_sim.WCS.CTYPE2 = obj.mextractor_sim.WCS.CTYPE{2};
+                    obj.mextractor_sim.WCS.CUNIT1 = obj.mextractor_sim.WCS.CUNIT{1};
+                    obj.mextractor_sim.WCS.CUNIT2 = obj.mextractor_sim.WCS.CUNIT{2};
+                    obj.mextractor_sim.WCS.CRPIX1 = obj.mextractor_sim.WCS.CRPIX(1);
+                    obj.mextractor_sim.WCS.CRPIX2 = obj.mextractor_sim.WCS.CRPIX(2);
+                    obj.mextractor_sim.WCS.CRVAL1 = obj.mextractor_sim.WCS.CRVAL(1);
+                    obj.mextractor_sim.WCS.CRVAL2 = obj.mextractor_sim.WCS.CRVAL(2);
+                    
+                    
                     % test if the astrometric solution even makes sense... 
-                    if any(abs(cell2mat(obj.mextractor_sim.WCS.WCS.tpv.KeyVal))>5)
+                    if any(abs(cell2mat(obj.mextractor_sim.WCS.tpv.KeyVal))>5)
 %                         disp('failed to find a reasonable fit!'); 
 %                         abs(cell2mat(obj.mextractor_sim.WCS.WCS.tpv.KeyVal))
                         obj.success = 0;
@@ -343,7 +355,8 @@ classdef Catalog < handle
                     % what should we do with R? check a correct match maybe? 
                     
 %                     obj.catalog_matched = catsHTM.sources_match('GAIADR2', obj.mextractor_sim, 'ColRA', {'Im_RA'}, 'ColDec', {'Im_Dec'}, 'MagColumn', 'Mag_BP', 'MagLimit', 20);
-                    obj.catalog_matched = catsHTM.sources_match('GAIADR2', obj.mextractor_sim, 'ColRA', {'ALPHAWIN_J2000'}, 'ColDec', {'DELTAWIN_J2000'});
+                    obj.catalog_matched = catsHTM.sources_match('GAIADR2', obj.mextractor_sim, ...
+                        'ColRA', {'ALPHAWIN_J2000'}, 'ColDec', {'DELTAWIN_J2000'});
 
                     obj.wcs_object = ClassWCS.populate(obj.mextractor_sim);
 
@@ -374,11 +387,12 @@ classdef Catalog < handle
             if obj.success==1
                 
                 obj.wcs_object = obj.mextractor_sim.WCS;
-                obj.wcs_object.WCS.PV = obj.wcs_object.WCS.tpv; % copy this array to fix a bug in Eran's code
+                obj.wcs_object.PV = obj.wcs_object.tpv; % copy this array to fix a bug in Eran's code
                 
                 obj.head.WCS.input(obj.wcs_object); % translate MAAT/WCS into my WorldCoordinates object
             
-                [obj.central_RA, obj.central_Dec] = obj.wcs_object.xy2coo([obj.head.NAXIS1/2, obj.head.NAXIS2/2], 'OutUnits', 'deg'); % center of the field
+%                 [obj.central_RA, obj.central_Dec] = obj.wcs_object.xy2coo([obj.head.NAXIS1/2, obj.head.NAXIS2/2], 'OutUnits', 'deg'); % center of the field
+                [obj.central_RA, obj.central_Dec] = obj.mextractor_sim.xy2coo(obj.head.NAXIS1/2, obj.head.NAXIS2/2, 'deg'); % center of the field
                 
                 obj.rotation = obj.head.WCS.rotation; % field rotation from PV parameters
                 
