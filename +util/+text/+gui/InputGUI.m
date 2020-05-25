@@ -25,7 +25,7 @@ classdef InputGUI < handle
     
     properties % gui stuff
         
-        panel_inputs;
+        panel_inputs; 
         
         panel_close;
         button_close;
@@ -90,7 +90,7 @@ classdef InputGUI < handle
             
             N = length(list); 
             
-            obj.panel_inputs = GraphicPanel(obj.owner, [0 1/(1+N) 1 N/(1+N)], '', 1, 'graphic_user_interface');
+            obj.panel_inputs = GraphicPanel(obj.owner, [0 1/(N+2) 1 (N+1)/(N+2)], '', 1, 'graphic_user_interface');
             
             for ii = 1:N
                 
@@ -99,11 +99,13 @@ classdef InputGUI < handle
                 
             end
             
+            obj.panel_inputs.addButton('button_restore_defaults', 'return_to_defaults', 'push', 'restore defaults'); 
+            
             obj.panel_inputs.make;
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
             
-            obj.panel_close = uipanel('Position', [0 0 1 1/(1+N)]);
+            obj.panel_close = uipanel('Position', [0 0 1 1/(N+2)]);
             obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE', '', '', 'graphic_user_interface');
             obj.button_close.Callback = @obj.callback_close;
             

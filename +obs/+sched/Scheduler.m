@@ -38,6 +38,7 @@ classdef Scheduler < handle
         
         ephem@head.Ephemeris; % keep track of time and superposed constraints
         
+        log@util.sys.Logger; 
         
     end
     
@@ -54,7 +55,8 @@ classdef Scheduler < handle
         total_observed_time = 0; % how much was actually observed (should be equal to night time if there are no conflicting constraints or bad weather)
         obs_history = []; % a strcut array for runs we have done, with fields: name, index (from targets), RA_deg, Dec_deg, start_time and end_time
         
-        report = ''; 
+        report = ''; % report what is the next move for the telescope
+        rationale = ''; % save a short description why this target is chosen
         
     end
     
@@ -97,9 +99,12 @@ classdef Scheduler < handle
         prev_target@obs.sched.Target; % keep track of the last thing we observed (do we even need this? maybe just for reference/debugging)
         prev_side = ''; % I think we don't need this! 
         
+        report_log = {}; % save a copy of all reports
+        rationale_log = {}; % save a copy of all rationales
+        
         default_filename;
         
-        version = 1.00;
+        version = 1.02;
         
     end
     
@@ -121,6 +126,8 @@ classdef Scheduler < handle
                 obj.map = sky_map;
                 
                 obj.ephem = obj.map.ephem; 
+                
+                obj.log = util.sys.Logger('Scheduler'); 
                 
             end
             
@@ -159,6 +166,9 @@ classdef Scheduler < handle
             obj.prev_side = ''; 
         
             obj.obs_history = [];
+            
+            obj.report_log = {};
+            obj.rationale_log = {}; 
             
         end
         
@@ -237,6 +247,52 @@ classdef Scheduler < handle
             
         end
         
+        function record_rational(obj, time, target_list, new_target, dur_flag)
+            
+            if nargin<5 || isempty(dur_flag)
+                dur_flag = true(length(target_list),1); 
+            end
+            
+            if isa(time, 'datetime')
+                time = util.text.time2str(time);
+            end
+            
+            obj.rationale = [time ': '];
+
+            for ii = 1:length(target_list)
+
+                new_str = target_list(ii).name;
+
+                if ~dur_flag(ii) 
+                    new_str = sprintf('%s (Duration exceeded)', new_str);
+                elseif ~isempty(target_list(ii).ephem.unobservable_reason) % ephem object already recorded why we can't observe this
+                    new_str = sprintf('%s (%s)', new_str, target_list(ii).ephem.unobservable_reason);
+                else % target is observable, should choose it based on priority and airmass
+                    
+                    if target_list(ii).ephem.now_observing % currently observed target has some advantage even if it has slightly lower airmass
+                        star = '*';
+                    else
+                        star = '';
+                    end
+                    
+                    new_str = sprintf('%s (P= %4.2f, AM= %4.2f%s)', new_str, target_list(ii).getCurrentPriority, target_list(ii).ephem.AIRMASS, star);
+                
+                end
+
+                if isequal(target_list(ii), new_target) % highlight the chosen target
+                    new_str = sprintf('**** %s ****', new_str); 
+                end
+
+                if ii==1
+                    obj.rationale = [obj.rationale new_str]; 
+                else
+                    obj.rationale = [obj.rationale ', ' new_str]; 
+                end
+                
+            end
+            
+        end
+        
         function choose(obj, time)
             
             if nargin<2 || isempty(time)
@@ -274,6 +330,7 @@ classdef Scheduler < handle
                     
                     if e.getRuntimeMinutes + e.constraints.fudge_time < e.constraints.continuous*60
                         new_target = obj.targets(ii); % this target must be observed for some time before a new target can be observed... 
+                        obj.rationale = sprintf('%s: Target %s has been observed for only %d minutes! Continuing observations... ', time, new_target.name, e.getRuntimeMinutes); 
                         break;
                     end
                     
@@ -281,7 +338,6 @@ classdef Scheduler < handle
                 
             end
             % if we didn't find any target that is still constrained by "continuous", look for the best available target
-            
                
             if isempty(new_target) % this happens if there is no target currently under "continuous condition
                 
@@ -299,12 +355,19 @@ classdef Scheduler < handle
                 end
 
                 target_list_duration = target_list(dur_flag); % narrow down to a subset of legal targets...
-            
+                
                 new_target = best_target(target_list_duration, 'time', time, arguments{:}); % try to find a good target under the "duration" constraint
-
-                % this happens if we didn't find any targets that haven't been observed "duration" hours
-                if isempty(new_target) 
+                
+                if ~isempty(new_target) 
+                    obj.record_rational(time, target_list, new_target, dur_flag); % keep a record for each target why it was or wasn't picked
+                else % this happens if we didn't find any targets that haven't been observed "duration" hours
+                    
                     new_target = best_target(target_list(~dur_flag), 'time', time, arguments{:}); % run only the targets that have longer than duration
+                    
+                    if ~isempty(new_target)
+                        obj.record_rational(time, target_list, new_target); % keep a record for each target why it was or wasn't picked
+                    end
+                    
                 end
                 
             end
@@ -312,7 +375,10 @@ classdef Scheduler < handle
             %%%%%% now we have made the selection of the best target, lets see what we can do with it %%%%%%% 
             if isempty(new_target) % no targets are currently observable! 
                 
+                obj.record_rational(time, target_list, new_target); % keep a record for each target why it was or wasn't picked
+                
                 obj.report = sprintf('%s: No available targets. Going to idle mode...', time); 
+                obj.report_log{end+1,1} = obj.report;
                 if obj.debug_bit>1, disp(obj.report); end
                 
                 obj.prev_target = obj.current;
@@ -325,6 +391,7 @@ classdef Scheduler < handle
             % (dynamic fields can have different coords for the same name)
                 
                 obj.report = sprintf('%s: Moving to new object: %50s', time, new_target.summary); 
+                obj.report_log{end+1,1} = obj.report;
                 if obj.debug_bit>1, disp([obj.report ' | ' new_target.details]); end
                 
                 obj.prev_target = obj.current;
@@ -334,12 +401,14 @@ classdef Scheduler < handle
             elseif ~isempty(obj.current_side) && ~isequal(obj.current_side, new_target.side)
                 
                 obj.report = sprintf('%s: Flip to same object:  %50s', time, new_target.summary); 
+                obj.report_log{end+1,1} = obj.report;
                 if obj.debug_bit>1, disp([obj.report ' | ' new_target.details]); end
                 
                 obj.finish_current(time);
                 % stay with current target, do not update prev_target (is this the right thing to do??)
             else
                 obj.report = sprintf('%s: Continue observing:   %50s', time, new_target.summary); 
+                obj.report_log{end+1,1} = obj.report;
                 if obj.debug_bit>1, disp([obj.report ' | ' new_target.details]); end
             end
             
@@ -415,69 +484,106 @@ classdef Scheduler < handle
             
         end
         
+        function write_log(obj)
+            
+            if ~isempty(obj.report)
+                obj.log.input(obj.report);
+            end
+            
+            if ~isempty(obj.rationale)
+                obj.log.input(obj.rationale);
+            end
+            
+        end
+        
     end
     
     methods % simulations
         
-        function run_simulation(obj, start_time, end_time)
+        function run_simulation(obj, use_clear, start_time, end_time)
             
-            if nargin<2 || isempty(start_time)
+            if nargin<2 || isempty(use_clear)
+                use_clear = 0; 
+            end
+            
+            if nargin<3 || isempty(start_time)
                 start_time = datetime('today', 'TimeZone', 'UTC'); 
                 start_time.Hour = 13; % set the time to 16:00 Israel time (in winter??) 
             end
             
-            if nargin<3 || isempty(end_time)
+            if nargin<4 || isempty(end_time)
                 end_time = datetime('today', 'TimeZone', 'UTC'); 
                 end_time = end_time + days(1); % tomorrow morning! 
                 end_time.Hour = 04; % set the time to 7:00 Israel time (in winter??) 
             end
             
-            sim_time = start_time; % this is the virtual clock we will use throughout
-            
-            obj.clear; % start a new night
-            
             obj.brake_bit = 0; % start running
             
-            % move forward in time without calling update() until reaching night time
-            for ii = 1:1e4 % arbitrary timeout
+            if use_clear % only start a new simulation if requested specifically to do so... 
                 
-                if obj.brake_bit
-                    return;
+                sim_time = start_time; % this is the virtual clock we will use throughout
+                obj.clear; % start a new night
+                
+                % move forward in time without calling update() until reaching night time
+                for ii = 1:1e4 % arbitrary timeout
+                
+                    obj.ephem.time = sim_time;
+
+                    if obj.brake_bit
+                        return;
+                    end
+
+                    obj.ephem.updateSun;
+
+                    if obj.ephem.sun.Alt<obj.max_sun_elevation % sunset! 
+                        break; % go to next loop with observations... 
+                    end
+
+                    sim_time = sim_time + minutes(obj.sim_time_step); 
+
                 end
-                
-                obj.ephem.time = sim_time;
-                obj.ephem.updateSun;
-                
-                if obj.ephem.sun.Alt<obj.max_sun_elevation % sunset! 
-                    break; % go to next loop with observations... 
-                end
-                
-                sim_time = sim_time + minutes(obj.sim_time_step); 
-                
+
+                obj.report = sprintf('Sunset at %s. Starting observations...', sim_time); 
+                obj.report_log{end+1,1} = obj.report;
+                if obj.debug_bit>1, disp(obj.report); end
+
+                obj.current_side = obj.sim_starting_side; % simulations will start with telescope on this side
+
+            else
+                sim_time = obj.ephem.time; 
             end
-            
-            obj.report = sprintf('Sunset at %s. Starting observations...', sim_time); 
-            if obj.debug_bit>1, disp(obj.report); end
-            
-            obj.current_side = obj.sim_starting_side; % simulations will start with telescope on this side
             
             % move forward in time while observing targets, until sun comes up
             for ii = 1:1e4 % arbitrary timeout
                 
+                obj.ephem.time = sim_time;
+                
                 if obj.brake_bit
-                    obj.finish_current(sim_time);
-                    return;
+%                     obj.finish_current(sim_time);
+                    break;
                 end
                 
-                obj.ephem.time = sim_time;
                 obj.ephem.updateSun;
                 
                 if obj.ephem.sun.Alt>obj.max_sun_elevation % sunrise! 
+                    
+                    obj.finish_current(sim_time);             
+                    obj.brake_bit = 1;
+
+                    obj.report = sprintf('Sunrise at %s. Finished observations...', sim_time);
+                    obj.report_log{end+1,1} = obj.report;
+                    if obj.debug_bit>1, disp(obj.report); end
+
+                    % need to call anything else to wrap up?
+
                     break; % finish observing for tonight
+                    
                 end
                 
                 obj.choose(sim_time); 
                 
+                obj.rationale_log{end+1,1} = obj.rationale;
+            
                 if isempty(obj.current)
 %                     if obj.debug_bit>1, fprintf('No targets available... remain in idle mode\n'); end
                     % do nothing but wait
@@ -503,15 +609,6 @@ classdef Scheduler < handle
                 pause(obj.sim_plot_pause); % pause to make the simulation go a little slower for plotting/visualization
                 
             end
-            
-            obj.finish_current(sim_time); 
-            
-            obj.brake_bit = 1;
-            
-            % need to call anything else to wrap up?
-            
-            obj.report = sprintf('Sunrise at %s. Finished observations...', sim_time);
-            if obj.debug_bit>1, disp(obj.report); end
             
             if ~isempty(obj.gui)
                 obj.gui.update;
@@ -541,8 +638,8 @@ classdef Scheduler < handle
                 
             end
                         
-            obj.map.show('ax', input.ax, 'vector', [-5 5], 'alt_limit', obj.ephem.constraints.altitude, ...
-                'LST', obj.ephem.LST_deg/15, 'log', 1, 'ecliptic', 1, 'galactic', 0, 'zenith', 1, 'horizon', 1, ...
+            obj.map.show('ax', input.ax, 'vector', [-5 5], 'LST', obj.ephem.LST_deg/15,...
+                'log', 1, 'galactic', 0, 'zenith', 1, 'horizon', 1, ...
                 'grid', 0, 'units', 'hours', 'font size', input.font_size); 
             
             title(input.ax, ''); 
@@ -582,7 +679,7 @@ classdef Scheduler < handle
             
             % at some point we will have to figure out a way to put multiple printouts for the same field, beyond East/West...             
             shift_down = 0;
-            if strcmp(s.side, 'East')
+            if strcmp(s.side, 'West')
                 shift_down = 7;
             end
             

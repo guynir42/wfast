@@ -99,7 +99,7 @@ classdef SchedGUI < handle
             
             
             
-            N = 14; % number of buttons on left side
+            N = 12; % number of buttons on left side
             
             %%%%%%%%%%%%%%%%%%% LEFT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -115,31 +115,32 @@ classdef SchedGUI < handle
             obj.panel_current.addButton('button_dec', 'current_Dec', 'info', 'Dec= ', '', 'edit', 0.5, '', '', 'declination last object to be observed');
             obj.panel_current.addButton('button_side', 'current_side', 'info', 'side= ', '', '', 0.5, '', '', 'side (hemisphere) of last object to be observed');
             obj.panel_current.addButton('button_wind', 'wind_string', 'info', 'wind= ', '', 'edit', 0.5, '', '', 'wind state right now (from Manager or from simulation)');
-            
+            obj.panel_current.margin = [0.02 0.05]; 
             obj.panel_current.make;
             
             %%%%%%%%%%% panel controls %%%%%%%%%%%%%%%
             
             % Add buttons using obj.addButton(button_name, var_name='', type='', str1='', str2='', font_size='', split=1, color_on=[], color_off=[], tooltip)
             
-            num_buttons = 2;
+            num_buttons = 3;
             pos = pos-num_buttons;
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N 0.2 num_buttons/N], 'controls', 1); % last input is for vertical (default)
             obj.panel_controls.number = num_buttons;
             obj.panel_controls.addButton('button_stay', 'use_stay_on_side', 'toggle', 'any side', 'stay on side', 'edit', 0.5, obj.color_on, '', 'choose if the telescope should stay on the same side all night'); 
             obj.panel_controls.addButton('input_wind', 'max_wind', 'input', 'max wind= ', 'km/h', 'edit', 0.5, '', '', 'maximum wind speed to observe towards the west'); 
             obj.panel_controls.addButton('button_constraints', 'ephem.constraints', 'push', 'constraints', '', '', 0.5, '', '', 'choose the default constraints to apply BEFORE reading the target list'); 
-            
+            obj.panel_controls.margin = [0.02 0.05];
             obj.panel_controls.make;
             
             %%%%%%%%%%% panel display %%%%%%%%%%%%%%%
             
-            num_buttons = 1;
+            num_buttons = 3;
             pos = pos-num_buttons;
             obj.panel_display = GraphicPanel(obj.owner, [0 pos/N 0.2 num_buttons/N], 'display', 1); % last input is for vertical (default)
             obj.panel_display.number = num_buttons;
             obj.panel_display.addButton('button_ecliptic', 'map.show_ecliptic', 'toggle', 'ecliptic', 'ecliptic', '', 0.5, 'red', '', 'show the ecliptic altitude overlay'); 
             obj.panel_display.addButton('input_altitude', 'map.alt_limit', 'input', 'alt_lim= ', '', '', 0.5, '', '', 'alt limit for display on the map only!'); 
+            obj.panel_display.margin = [0.02 0.05];
             obj.panel_display.make;
             
             
@@ -153,26 +154,28 @@ classdef SchedGUI < handle
             obj.panel_sim.addButton('input_side', 'sim_starting_side', 'input_text', 'start= ', '', '', 0.5, '', '', 'side on which the telescope begins the simulation'); 
             % add wind start/end time here if you want...
             obj.panel_sim.addButton('input_pause', 'sim_plot_pause', 'input', 'pause= ', 's', '', 0.5, '', '', 'additional pause time between simulation steps, for slowing down the plotting'); 
-            obj.panel_sim.addButton('button_placeholder', '', 'custom', '', '', '', 0.5, '', '', ''); 
+            obj.panel_sim.addButton('button_resume', 'run_simulation', 'push', 'continue', '', '', 0.5, '', '', 'continue the simulation from where it was stopped'); 
             obj.panel_sim.addButton('button_start', '', 'custom', 'Start simulation', '', '', 1, '', '', 'start or stop the simulation'); 
+            obj.panel_sim.margin = [0.02 0.05];
             obj.panel_sim.make;
             
             obj.panel_sim.button_start.Callback = @obj.callback_start_stop;
             
             %%%%%%%%%%% panel contrast %%%%%%%%%%%%%%%
             
-            pos = pos - 5; 
-            obj.panel_contrast = util.plot.ContrastLimits(obj.axes_image, obj.fig.fig, [0 pos/N 0.2 5/N], 1); % last input is for vertical (default)
-            obj.panel_contrast.font_size = obj.font_size;
-            obj.panel_contrast.big_font_size = obj.big_font_size;
-            obj.panel_contrast.small_font_size = obj.small_font_size;
-            obj.panel_contrast.edit_font_size = obj.edit_font_size;
+%             pos = pos - 5; 
+%             obj.panel_contrast = util.plot.ContrastLimits(obj.axes_image, obj.fig.fig, [0 pos/N 0.2 5/N], 1); % last input is for vertical (default)
+%             obj.panel_contrast.font_size = obj.font_size;
+%             obj.panel_contrast.big_font_size = obj.big_font_size;
+%             obj.panel_contrast.small_font_size = obj.small_font_size;
+%             obj.panel_contrast.edit_font_size = obj.edit_font_size;
             
             
             %%%%%%%%%%% panel report %%%%%%%%%%%%%%%%%
             
             obj.panel_report = GraphicPanel(obj.owner, [0.2 (N-1)/N 0.8 1/N], 'report', 1); % last input is for vertical (default)
             obj.panel_report.addButton('button_report', 'report', 'info'); 
+            obj.panel_report.margin = [0.02 0.01];
             obj.panel_report.make;
             
             %%%%%%%%%%% panel filename %%%%%%%%%%%%%%%
@@ -181,6 +184,7 @@ classdef SchedGUI < handle
             obj.panel_filename.addButton('input_filename', 'filename', 'input', '', '', '', 0.6, '', '', 'give the filename to load the target list from'); 
             obj.panel_filename.addButton('button_read', 'readFile', 'push', 'readFile', '', '', 0.2, '', '', 'read the targets from current file'); 
             obj.panel_filename.addButton('button_browse', '', 'custom', 'browse', '', '', 0.2, '', '', 'choose a new file for the target list'); 
+            obj.panel_filename.margin = [0.01 0.02];
             obj.panel_filename.make;
             
             obj.panel_filename.button_browse.Callback = @obj.callback_browse;
@@ -198,7 +202,7 @@ classdef SchedGUI < handle
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
             
             obj.panel_close = uipanel('Position', [0 0 0.2 1/N]);
-            obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE');
+            obj.button_close = GraphicButton(obj.panel_close, [0.05 0.05 0.9 0.9], obj.owner, '', 'custom', 'CLOSE');
             obj.button_close.Callback = @obj.callback_close;
             
             obj.update;
@@ -241,7 +245,7 @@ classdef SchedGUI < handle
             
             obj.owner.show;
             
-            obj.panel_contrast.update;
+%             obj.panel_contrast.update;
             
             drawnow;
             
@@ -262,7 +266,7 @@ classdef SchedGUI < handle
             if obj.debug_bit>1, disp('callback: start/stop'); end
             
             if obj.owner.brake_bit
-                obj.owner.run_simulation;
+                obj.owner.run_simulation(1); % this first argument is used to start a new simulation 
             else
                 obj.owner.brake_bit = 1;
             end

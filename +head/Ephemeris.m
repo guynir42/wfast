@@ -84,6 +84,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         now_observing = 0; % when this is true, ignore the "continuous" constraint
         prev_runtime_minutes = 0;
+        unobservable_reason = ''; % if this target is unobservable, must record the (first) test it failed
         
         RA_deg; % numeric value in degrees
         Dec_deg; % numeric value in degrees
@@ -1020,29 +1021,38 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 obj.time = input.time; % this also parses strings or "now" into datetime objects
             end
             
+            if isempty(input.fudge_time)
+                input.fudge_time = 0;
+            end
+            
             val = 0; % assume it is not observable, see if it survives all the checks
             
-            if isempty(obj.RA) || isempty(obj.Dec), return; end
+            if isempty(obj.RA) || isempty(obj.Dec), obj.unobservable_reason = 'No coordinates'; return; end
             
-            if ~isempty(input.earliest) && obj.time<obj.parseTime(input.earliest), return; end % current time is too early
+            t_start = obj.parseTime(input.earliest);
+            if ~isempty(input.earliest) && obj.time<t_start-minutes(input.fudge_time), obj.unobservable_reason = sprintf('Can''t observe before %2d:%2d', t_start.Hour, t_start.Minute); return; end % current time is too early
             
-            if ~isempty(input.latest) && obj.time>obj.parseTime(input.latest), return; end % current time is too late
+            t_end = obj.parseTime(input.latest);
+            if ~isempty(input.latest) && obj.time>t_end+minutes(input.fudge_time), obj.unobservable_reason = sprintf('Can''t observe after %2d:%2d', t_end.Hour, t_end.Minute); return; end % current time is too late
             
-            if obj.HA_deg<0 && util.text.cs(input.side, 'West'), return; end % target is on East side when only West is accepted
+            if obj.HA_deg<0 && util.text.cs(input.side, 'West'), obj.unobservable_reason = 'Eastern target'; return; end % target is on East side when only West is accepted
             
-            if obj.HA_deg>0 && util.text.cs(input.side, 'East'), return; end % target is on West side when only East is accepted
+            if obj.HA_deg>0 && util.text.cs(input.side, 'East'), obj.unobservable_reason = 'Western target'; return; end % target is on West side when only East is accepted
             
-            if obj.ALT_deg<input.altitude, return; end % altitude is below defined limit
+            if obj.ALT_deg<input.altitude, obj.unobservable_reason = sprintf('Alt= %d<%d', round(obj.ALT_deg), round(input.altitude)); return; end % altitude is below defined limit
             
-            if isempty(obj.AIRMASS) || isnan(obj.AIRMASS) || obj.AIRMASS>input.airmass, return; end % airmass is undefined or above limit
+            if isempty(obj.AIRMASS) || isnan(obj.AIRMASS) || obj.AIRMASS>input.airmass, obj.unobservable_reason = 'Undefined airmass'; return; end % airmass is undefined or above limit
             
-            if obj.moon.Dist<input.moon, return; end
+            if obj.moon.Dist<input.moon, obj.unobservable_reason = sprintf('Moon dist= %d>%d', round(obj.moon.Dist), round(input.moon)); return; end
             
-            if obj.now_observing==0 && obj.calcObsTimeMinutes(input.altitude)<input.continuous*60, return; end % there is not enough time left to observe this target
+            minutes_left = obj.calcObsTimeMinutes(input.altitude);
+            if obj.now_observing==0 && minutes_left<input.continuous*60, obj.unobservable_reason = sprintf('Time left %d<%d minutes', round(minutes_left), round(input.continuous.*60)); return; end % there is not enough time left to observe this target
             
             % any other constraints? 
             
             val = 1; % if we passed all the tests
+            
+            obj.unobservable_reason = '';
             
         end
         
