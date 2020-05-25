@@ -7,6 +7,7 @@ classdef PcSync < handle
         hndl_tx;
         
         time_latest_transmission; % date time of last time we send something (will get cleared as soon as we get a checksum back)
+        time_latest_reply; % date time of last time we got a proper checksum back after sending data! 
         
     end
     
@@ -27,14 +28,13 @@ classdef PcSync < handle
         raw_data_sent;
         checksum; % for sent data
         
-        pending_connection = 0;
-        pending_send = 0;
-        
         status = 0;
         
     end
     
     properties % switches/controls
+        
+        max_replay_delay_minutes = 10; % how long should we wait to get a reply from the other computer
         
         remote_ip = '192.168.1.103';
         remote_port_rx = 4012;
@@ -174,8 +174,6 @@ classdef PcSync < handle
                     if util.text.cs(obj.role, 'server')
                         fprintf('Connecting to TCP/IP as server. There is no timeout! To break out hit Ctrl+C\n');
                     end
-
-                    obj.pending_connection = 1;
                     
                     obj.disconnect;
 
@@ -192,8 +190,6 @@ classdef PcSync < handle
                     obj.update;
 
                     obj.reco.inputSuccess;
-                    
-                    obj.pending_connection = 0;
                     
                 catch ME
                     obj.log.error(ME.getReport);
@@ -305,18 +301,20 @@ classdef PcSync < handle
                     t_in = [];
                 end
                 
-                t = datetime('now', 'TimeZone', 'UTC'); 
-
-                if ~isempty(obj.time_latest_transmission) && minutes(t-obj.time_latest_transmission)>10 % more than five minutes waiting for a response checksum! 
-                    if obj.debug_bit, fprintf('Did not receive any response checksum for over 10 minutes! Setting status=0. \n'); end % will get rid of this printout soon
-                    obj.status = 0; 
+                obj.status = 1; 
+                
+                if ~isempty(obj.time_latest_transmission) 
+                    
+                    if isempty(obj.time_latest_reply) || minutes(obj.time_latest_reply-obj.time_latest_transmission)>obj.max_replay_delay_minutes % more than five minutes waiting for a response checksum! 
+                        if obj.debug_bit>1, fprintf('Did not receive any response checksum for over %d minutes! Setting status=0. \n', obj.max_replay_delay_minutes); end 
+                        obj.status = 0; 
+                    end
+                    
                 end
                 
                 obj.time_latest_transmission = t;
-%                 flushinput(obj.hndl_tx);
+
                 obj.send(obj.outgoing);
-                
-                obj.pending_connection = 0;
                 
             else
                 obj.status = 0;
@@ -420,9 +418,11 @@ classdef PcSync < handle
                         warning('Checksum for latest transmission was %s, received confirmation checksum: %s', obj.checksum, variable)
                     end
                     
+                    obj.time_latest_reply = datetime('now', 'TimeZone', 'UTC'); 
+                    
                 end
                 
-                obj.time_latest_transmission = []; % successfully recieved something back! 
+%                 obj.time_latest_transmission = []; % successfully recieved something back! 
                 obj.status = 1;
                 
             elseif strcmp(rx_or_tx, 'rx') && isstruct(variable)

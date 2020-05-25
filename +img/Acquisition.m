@@ -44,6 +44,7 @@ classdef Acquisition < file.AstroData
         
         timer;
         slow_timer;
+        backup_timer;
         
         log@util.sys.Logger;
         
@@ -338,6 +339,7 @@ classdef Acquisition < file.AstroData
 %                 obj.sync.name = 'Cam-PC';
                 obj.setup_timer;
                 obj.setup_slow_timer;
+                obj.setup_backup_timer;
                 
                 obj.setupDefaults;
                 
@@ -1545,7 +1547,7 @@ classdef Acquisition < file.AstroData
                 end
             end
             
-            delete(timerfind('name', 'acquisition-backup-timer'));
+            delete(timerfind('name', 'acquisition-slow-timer'));
             
             obj.slow_timer = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-slow-timer', ...
                 'Period', 300, 'StartDelay', 300, 'TimerFcn', @obj.callback_slow_timer, 'ErrorFcn', @obj.setup_slow_timer);
@@ -1565,9 +1567,43 @@ classdef Acquisition < file.AstroData
             pause(0.05); 
             
             if obj.sync.status==0 
-                obj.sync.connect;                
-                obj.sync.reco.lock;
-                pause(1);
+                
+                obj.sync.connect;
+                
+                if obj.sync.status
+                    obj.sync.reco.lock;
+                end
+                
+                pause(0.05);
+                
+            end
+            
+        end
+        
+        function setup_backup_timer(obj)
+            
+            if ~isempty(obj.backup_timer) && isa(obj.backup_timer, 'timer') && isvalid(obj.backup_timer)
+                if strcmp(obj.backup_timer.Running, 'on')
+                    stop(obj.backup_timer);
+                    delete(obj.backup_timer);
+                    obj.backup_timer = [];
+                end
+            end
+            
+            delete(timerfind('name', 'acquisition-backup-timer'));
+            
+            obj.backup_timer = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-backup-timer', ...
+                'Period', 1800, 'StartDelay', 1800, 'TimerFcn', @obj.callback_backup_timer, 'ErrorFcn', @obj.setup_backup_timer);
+            
+            start(obj.backup_timer);
+            
+            
+        end
+        
+        function callback_backup_timer(obj, ~, ~)
+            
+            if ~strcmp(obj.slow_timer.Running, 'on')
+                obj.setup_slow_timer;
             end
             
         end
@@ -1848,17 +1884,7 @@ classdef Acquisition < file.AstroData
                 
                 % update the obs_log with the new run
                 if obj.use_save && input.use_reset
-                    if ~isempty(obj.obs_log)
-                        obj.obs_log = obj.makeObsLog;
-                    end
                     
-                    start = util.text.time2str(datetime('now', 'TimeZone', 'UTC')); 
-                    
-                    if ~isfield(obj.obs_log, obj.run_name) % this run name has not been created yet
-                        obj.obs_log.(obj.run_name) = struct('name', obj.run_name, 'start', start, 'end', '', 'runtime', 0, 'num_files', 0); % make a new struct for this name
-                    else % there are previous runs with this name, need to 
-                        obj.obs_log.(obj.run_name) = vertcat(obj.obs_log.(obj.run_name), struct('name', obj.run_name, 'start', start, 'end', '', 'runtime', 0, 'num_files', 0)); 
-                    end
                 end
                 
                 if obj.use_save && obj.use_autodeflate
@@ -1903,8 +1929,27 @@ classdef Acquisition < file.AstroData
                     obj.buf.product_type_append = strrep(obj.buf.product_type_append, 'ROI', '');
                 end
                 
-                if obj.use_save
-                    try
+                if obj.use_save && input.use_reset % only do these things when startin a real run (with saving)
+                    
+                    try % get the observation log updated that a new run has begum
+
+                        if ~isempty(obj.obs_log)
+                            obj.obs_log = obj.makeObsLog;
+                        end
+
+                        start = util.text.time2str(datetime('now', 'TimeZone', 'UTC')); 
+
+                        if ~isfield(obj.obs_log, obj.run_name) % this run name has not been created yet
+                            obj.obs_log.(obj.run_name) = struct('name', obj.run_name, 'start', start, 'end', '', 'runtime', 0, 'num_files', 0); % make a new struct for this name
+                        else % there are previous runs with this name, need to 
+                            obj.obs_log.(obj.run_name) = vertcat(obj.obs_log.(obj.run_name), struct('name', obj.run_name, 'start', start, 'end', '', 'runtime', 0, 'num_files', 0)); 
+                        end
+
+                    catch ME
+                        warning(ME.getReport); 
+                    end
+                    
+                    try % make a folder for the new files
                         
                         basename = obj.buf.makeFullpath; % the name from the object_name, ignoring the override
                         
@@ -1919,25 +1964,34 @@ classdef Acquisition < file.AstroData
                             
                         end
                         
-                        filename = obj.buf.getReadmeFilename;
-                        util.oop.save(obj, filename, 'name', 'acquisition'); 
-                        
-                        if ~isempty(obj.cat.success) && obj.cat.success 
-                            
-                            try
-                                filename = fullfile(obj.buf.directory, 'catalog.mat');
-                                obj.cat.saveMAT(filename);
-                            catch ME
-                                warning(ME.getReport);
-                            end
-
-                        end
-                        
                     catch ME
                         warning(ME.getReport);
                     end
+
+                    if ~isempty(obj.cat.success) && obj.cat.success % save the catalog file 
+
+                        try
+                            filename = fullfile(obj.buf.directory, 'catalog.mat');
+                            obj.cat.saveMAT(filename);
+                        catch ME
+                            warning(ME.getReport);
+                        end
+
+                    end
+
                 end
 
+                if obj.use_save % save the README file for each time the run is started/continued
+                    
+                    try
+                        filename = obj.buf.getReadmeFilename;
+                        util.oop.save(obj, filename, 'name', 'acquisition'); 
+                    catch ME
+                        warning(ME.getReport); 
+                    end
+                    
+                end
+                
                 if obj.use_audio
                     try obj.audio.playTakeForever; catch ME, warning(ME.getReport); end
                 end
