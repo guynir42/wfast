@@ -60,7 +60,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         use_maintenance_mode = 0; % this disables the function in t3 that re-enables "use_shutdown" every 30 minutes (use with care!!!)
         use_shutdown = 1; % when this is enabled, observatory shuts down on bad weather/device failure
-        use_startup = 0; % when this is enabled, observatory opens up and starts working by itself! 
+        use_startup = 1; % when this is enabled, observatory opens up and starts working by itself! (currently it only sends an alert email) 
         
         % use these to override these devices/sensors
         use_dome = 1; % override AstroHaven dome
@@ -293,6 +293,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             try
                 
                 obj.cam_pc = obs.comm.PcSync('client');
+                obj.cam_pc.reco.delay_time_minutes = 10;
                 
             catch ME
                 obj.log.error(ME.getReport);
@@ -674,7 +675,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 % morning report! 
                 t = datetime('now', 'TimeZone', 'UTC');
                 
-                if t.Hour>4 % this is in UTC, so we can translate it to 6 or 6 local time
+                if t.Hour>=4 % this is in UTC, so we can translate it to 6 or 7 local time
 
                     d = datestr(t - days(1), 'yyyy-mm-dd');
 
@@ -717,32 +718,125 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
+    end
+    
+    methods % utilities
+        
+        function date = parseDate(obj, str)
+            
+            if isa(str, 'datetime')
+                date = str;
+            else
+                
+                date = datetime(util.sys.date_dir('now'));
+                
+                date_cell = strsplit(str, {'-', '/', '\'}); 
+                d = str2double(date_cell{end}); % the day of the observation
+                
+                if length(date_cell)>=2
+                    m = str2double(date_cell{end-1});
+                else
+                    m = date.Month;
+                end
+                
+                if length(date_cell)>=3
+                    y = str2double(date_cell{end-2});
+                else
+                    y = date.Year;
+                end
+                
+                if y<2000
+                    y = 2000+y;
+                end
+                
+                date = datetime([y,m,d]); 
+                
+            end
+            
+        end
+        
+        function [name, short_list] = getObserverName(obj, date, num_future_days)
+            
+            if nargin<2 || isempty(date)
+                date = datetime(util.sys.date_dir('now'));
+            elseif ischar(date)
+                date = obj.parseDate(date); 
+            end
+            
+            if nargin<3 || isempty(num_future_days)
+                num_future_days = 5; 
+            end
+            
+            fid = fopen(fullfile(getenv('DATA'), 'WFAST/preferences/observers_schedule.txt')); 
+            on_cleanup = onCleanup(@() fclose(fid)); 
+            
+            name = '---'; 
+            short_list = {}; 
+            
+            for ii = 1:1e4
+                
+                tline = fgetl(fid); 
+                
+                if isnumeric(tline)
+                    break;
+                end
+                
+                c = strsplit(tline, ' '); % split the date and name
+                date_str = strtrim(c{1});
+                this_name = strtrim(c{2}); 
+                
+                this_date = obj.parseDate(date_str); 
+                
+                if isequal(this_date, date)
+                    name = this_name;
+                end
+                
+                if nargout>1 % also want to make a short list
+                    if days(this_date-date)<num_future_days
+                        short_list{end+1,1} = sprintf('%s: %s', this_date, this_name); 
+                    end
+                end
+                
+            end
+            
+        end
+        
+        function makeObserverserList(obj, varargin)
+            % do this later
+        end
+        
         function morning_report(obj)
             
             t = datetime('yesterday', 'TimeZone', 'UTC');
-            d = datestr(t, 'yyyy-mm-dd');
+            date_string = datestr(t, 'yyyy-mm-dd');
             
-            fprintf('%s: sending morning report by Email!\n', t); 
+            if obj.debug_bit, fprintf('%s: sending morning report by Email!\n', t); end
             
             str = '';
             
-            str = sprintf('%s\n%s', str, obj.email.html(sprintf('This is a morning report for the night of %s.', d), 'p', 'font-size:14px')); 
-            
-%             str = sprintf('%s\n<p style="font-size:14px">', str); 
-%             str = sprintf('%s\nThis is a morning report for the night of %s.', str, d);
-%             str = sprintf('%s\n</p>', str); 
+            str = sprintf('%s\n%s', str, obj.email.html(sprintf('This is a morning report for the night of %s.', date_string), 'p', 'font-size:14px')); 
             
             str = sprintf('%s\n%s', str, obj.email.html(sprintf('Dome status is: %s ', obj.observatory_state), 'p', 'font-size:18px; font-weight:bold')); 
 
-%             str = sprintf('%s\n<p style="font-size:18px;font-weight:bold;">', str); 
-%             str = sprintf('%s\n Dome status is: %s ', str, obj.observatory_state);
-%             str = sprintf('%s\n</p>', str); 
+            %%%%%% tonight's observer %%%%%%%
             
-            if ~isempty(obj.obs_log) && isfield(obj.obs_log, 'date') && strcmp(obj.obs_log.date, d) && length(fields(obj.obs_log))>1
+            try 
+                [name, list] = obj.getObserverName;
+            catch ME
+                warning(ME.getReport);
+                name = 'error reading list'; 
+                list = {}; 
+            end
+            
+            str = sprintf('%s\n%s', str, obj.email.html(sprintf('Tonight''s observer is %s. ', name))); 
+            
+            %%%%%%% runs overview %%%%%%%%%
+            
+            if ~isempty(obj.obs_log) && isfield(obj.obs_log, 'date') && strcmp(obj.obs_log.date, date_string) && length(fields(obj.obs_log))>1
                 
                 list = fields(obj.obs_log); 
                 
-                obs_str = sprintf('Runs overview for tonight: \n <table style="width:60%%">');
+                obs_str = sprintf('<table style="width:60%%">');
                 
                 for ii = 1:length(list) % each target has a few runs inside a struct array with this name
                     
@@ -764,16 +858,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     
                 end
                 
-                
-                
             else
                 obs_str = sprintf('Could not find any information on observations run tonight...'); 
             end
-            
-%             str = sprintf('%s\n<p> %s \n</p>\n', str, obs_str); % add the observation report to the string
-            
-            str = [str obj.email.html(obs_str)]; 
+    
+            str = sprintf('%s\n%s\n%s', str, obj.email.html('Runs overview for tonight: ', 'p', 'text-decoration: underline'), obj.email.html(obs_str)); 
 
+            %%%%%%%%%%% drives overview %%%%%%%%%%%%%%%%
+            
             if isfield(obj.cam_pc.incoming, 'drives') && ~isempty(obj.cam_pc.incoming.drives)
             
                 drive_str = sprintf('Hard drive space overview:\n'); 
@@ -814,12 +906,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
             end
             
-%             obj.email.sendToList('subject', sprintf('[WFAST] Morning report %s %d', d, randi(1000)), 'text', str, 'header', 1, 'footer', 1, 'html', 1); 
-            obj.email.sendToList('subject', sprintf('[WFAST] Morning report %s', d), 'text', str, 'header', 1, 'footer', 1, 'html', 1); 
+            %%%%%%%% list of next night's observers %%%%%%%%
+            if ~isempty(list)
+                str = sprintf('%s\n%s', str, obj.email.html(sprintf('Observers for the next few nights are:\n<br> %s. ', strjoin(list, '\n<br>')))); 
+            end
             
-            obj.latest_email_report_date = d; % make sure we don't resend this email today (after a successful send!)
+%             obj.email.sendToList('subject', sprintf('[WFAST] Morning report %s %d', d, randi(1000)), 'text', str, 'header', 1, 'footer', 1, 'html', 1); 
+            obj.email.sendToList('subject', sprintf('[WFAST] Morning report (obs. is %s) %s ', obj.observatory_state, date_string), 'text', str, 'header', 1, 'footer', 1, 'html', 1); 
+            
+            obj.latest_email_report_date = date_string; % make sure we don't resend this email today (after a successful send!)
             
         end
+        
         
     end
     
@@ -865,22 +963,25 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
             end
             
-            if obj.is_shutdown
-                obj.latest_email_autostart_date = ''; % once shut down, we need once again to send an email if we are ready to open
+            if obj.sensors_ok==0 % if at any time weather is bad, reset these counters
+                obj.sensor_ok_history = [];
+                obj.latest_email_autostart_date = [];
             end
             
             if obj.use_startup
                 
-                if obj.sensors_ok
+                if obj.sensors_ok 
                     
                     t = datetime('now', 'TimeZone', 'UTC');
                     
-                    if obj.checkPrevWeather
+                    good_times_minutes = obj.checkPrevWeather;
+                    
+                    if good_times_minutes>0 % check that weather is good for some time now
                         
-                        if isempty(obj.latest_email_autostart_date) 
+                        if isempty(obj.latest_email_autostart_date)
                             obj.email.sendToList('subject', ['Ready to open dome ' util.text.time2str(t)], ...
-                                'text', sprintf('Weather data looks good for at least %d minutes. Consider opening for observations. ', ...
-                                round(minutes(t-obj.sensor_ok_history(end)))));
+                                'text', sprintf('Observer: %s.\n Weather data looks good for at least %d minutes. Consider opening for observations. ', ...
+                                obj.getObserverName, round(good_times_minutes)));
                             
                             obj.latest_email_autostart_date = t;
                             
@@ -888,10 +989,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                         
                     end
                     
-                    obj.sensor_ok_history = vertcat(datetime('now', 'TimeZone', 'UTC')); 
+                    obj.sensor_ok_history = vertcat(obj.sensor_ok_history, t); % add this moment to the list of good weather data
                     
-                else
-                    obj.sensor_ok_history = [];
                 end
                 
             end
@@ -947,17 +1046,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 
             % collect to a new history all the times that are
             % spaced more than 4 minutes from the last accepted entry
-            for ii = length(obj.sensor_ok_history):-1:1
-                if new_hist(end)-obj.sensor_ok_history(ii)>4*60 % measurements less than 4 minutes apart are ignored
-                    new_hist(end+1) = obj.sensor_ok_history(ii); 
+            for ii = length(obj.sensor_ok_history):-1:1 % notice we are moving from latest to earliest!!
+                if minutes(new_hist(end)-obj.sensor_ok_history(ii))>4 % measurements less than 4 minutes apart are ignored
+                    new_hist(end+1,1) = obj.sensor_ok_history(ii); 
                 end
             end
 
-            % new_hist should now contain only well spaced times when weather was ok
+            % new_hist should now contain only well spaced times when
+            % weather was ok (in reversed order!)
             if numel(new_hist)>=obj.autostart_min_weather_samples && ...
-                minutes(new_hist(end)-new_hist(1))<obj.autostart_min_weather_minutes
+                minutes(new_hist(1)-new_hist(end))>=obj.autostart_min_weather_minutes
                 
-                val = 1;
+                val = minutes(new_hist(1)-new_hist(end));
                 
             else
                 val = 0; 
@@ -969,19 +1069,24 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             try 
                 
-                if ~isfield(obj.cam_pc.incoming, 'time') 
-                    % do something like try to reconnect
+                % trust the "status" flag to check if we need to reconnect
+                if ~obj.cam_pc.is_connected || ~obj.cam_pc.status
                     obj.cam_pc.connect;
                 end
                 
-                t_in = util.text.str2time(obj.cam_pc.incoming.time);
-                t_now = datetime('now', 'TimeZone', 'UTC'); 
-                
-                if minutes(t_now-t_in)>10
-                    % do something like try to reconnect
-                    disp('input from "cam_pc" is out of date by more than 10 minutes!'); 
-                    obj.cam_pc.connect;
-                end
+%                 if ~isfield(obj.cam_pc.incoming, 'time') 
+%                     % do something like try to reconnect
+%                     obj.cam_pc.connect;
+%                 end
+%                 
+%                 t_in = util.text.str2time(obj.cam_pc.incoming.time);
+%                 t_now = datetime('now', 'TimeZone', 'UTC'); 
+%                 
+%                 if minutes(t_now-t_in)>10
+%                     % do something like try to reconnect
+%                     disp('input from "cam_pc" is out of date by more than 10 minutes!'); 
+%                     obj.cam_pc.connect;
+%                 end
                 
                 % check that commands are being echoed back
                 if isfield(obj.cam_pc.outgoing, 'command_str') && isfield(obj.cam_pc.outgoing, 'command_time')
@@ -1001,14 +1106,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     end
                     
                 end
-                
-                if ~obj.cam_pc.is_connected || ~obj.cam_pc.status
-%                     obj.cam_pc.connect;
-                end
 
             catch 
-                t = datetime('now', 'TimeZone', 'UTC'); 
-                fprintf('%s: Failed to connect to camera computer\n', t); 
+%                 t = datetime('now', 'TimeZone', 'UTC'); 
+%                 fprintf('%s: Failed to connect to camera computer\n', t); 
                 % do nothing, as we can be waiting for ever for server to connect
             end
             

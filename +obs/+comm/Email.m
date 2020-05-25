@@ -161,7 +161,7 @@ classdef Email < handle
             end
             
             if input.header
-                new_str = sprintf('>>>>>>>>>>>>>> A message from the W-FAST mailbot, sent at %s.', datetime);
+                new_str = sprintf('>>>>>>>>>>>>>> A message from the W-FAST mailbot, sent at %s (local time).', datetime);
                 if input.html, new_str = ['<p style="font-style:italic;font-size:14px;">' new_str '</p>']; end
                 str = sprintf('%s\n %s\n\n', str, new_str);
             end
@@ -173,6 +173,7 @@ classdef Email < handle
                     str = sprintf('%s\n\n <p align=left> %s </p>', str, '>>>>>>>>>>>>>>  end of message '); 
                     str = sprintf('%s\n\n <p align=center style="font-style:italic;">"%s"</p>', str, obj.getQuote); 
                 else
+                    str = sprintf('%s\n\n %s ', str, '>>>>>>>>>>>>>>  end of message '); 
                     str = sprintf('%s\n\n "%s"', str, obj.getQuote); 
                 end
             end
