@@ -122,7 +122,7 @@ classdef Acquisition < file.AstroData
         use_ignore_manager = 0; % if true, will not use any data from Manager (via sync object)
         use_sync_stop = 0; % if false, will not respect stop commands from Manager (via sync object)
         use_autoguide = 1; % if true, send back adjustments on drifts to telescope
-        
+        use_ignore_sync_object_name = 0; % if true, will not update the head.OBJECT field so it can be changed manually
         use_autodeflate = 1;
         
         camera_angle = 60; % degrees between image top and cardinal south/north (when after meridian)
@@ -1380,6 +1380,10 @@ classdef Acquisition < file.AstroData
 
                     list = head.Header.makeSyncList; 
 
+                    if obj.use_ignore_sync_object_name
+                        list = list(~contains(list, 'OBJECT'));
+                    end
+                    
                     if ~isempty(s) && isstruct(s)
 
                         for ii = 1:length(list)
@@ -2734,10 +2738,15 @@ classdef Acquisition < file.AstroData
             
                 for ii = 1:4
                 
+                    if obj.debug_bit, fprintf('Running focus loop attempt %d\n', ii); end
+                    
                     obj.cam.autofocus; 
                     
                     min_pos = obj.cam.af.pos(2); 
                     max_pos = obj.cam.af.pos(end-1); 
+                    
+                    
+                    if obj.debug_bit, fprintf('Resulting focus point is %4.2f at FWHM of %4.2f"\n', obj.cam.af.found_pos, obj.cam.af.found_width.*2.355.*obj.head.SCALE); end
                     
                     if obj.cam.af.found_width<1 && obj.cam.af.found_pos>=min_pos && obj.cam.af.found_pos<=max_pos
                         break; % if focus is good enough and not at the edges of the range, we don't need to repeat it

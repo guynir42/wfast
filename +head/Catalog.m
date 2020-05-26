@@ -392,7 +392,9 @@ classdef Catalog < handle
                 obj.head.WCS.input(obj.wcs_object); % translate MAAT/WCS into my WorldCoordinates object
             
 %                 [obj.central_RA, obj.central_Dec] = obj.wcs_object.xy2coo([obj.head.NAXIS1/2, obj.head.NAXIS2/2], 'OutUnits', 'deg'); % center of the field
-                [obj.central_RA, obj.central_Dec] = obj.mextractor_sim.xy2coo(obj.head.NAXIS1/2, obj.head.NAXIS2/2, 'deg'); % center of the field
+                [obj.central_RA, obj.central_Dec] = obj.mextractor_sim.xy2coo(obj.head.NAXIS1/2, obj.head.NAXIS2/2, 'mat'); % center of the field
+                obj.central_RA = obj.central_RA.*180/pi;
+                obj.central_Dec = obj.central_Dec.*180/pi;
                 
                 obj.rotation = obj.head.WCS.rotation; % field rotation from PV parameters
                 

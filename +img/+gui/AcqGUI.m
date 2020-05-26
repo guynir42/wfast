@@ -163,6 +163,7 @@ classdef AcqGUI < handle
             obj.menu_options.menu_sync.addButton('button_ignore_manager', '&Ignore manager', 'toggle', 'use_ignore_manager', 'when true, Acquisition will ignore all commands from Manager');
             obj.menu_options.menu_sync.addButton('button_stop', 'Sync &stop', 'toggle', 'use_sync_stop', 'when true, will stop camera when given command from Manager, when dome is close, when telescope is not tracking');
             obj.menu_options.menu_sync.addButton('button_guiding', '&Guiding', 'toggle', 'use_autoguide', 'use this to pass position data back to mount');
+            obj.menu_options.menu_sync.addButton('button_object', 'ignore &Object', 'toggle', 'use_ignore_sync_object_name', 'when true, OBJECT in header will not be updated'); 
             
             obj.menu_options.addButton('menu_deflate', '&Deflate', 'menu');
             obj.menu_options.menu_deflate.addButton('button_autodeflate', '&Autodeflate', 'toggle', 'use_autodeflate', 'turn on the deflate automatically in the morning');
