@@ -1838,6 +1838,10 @@ classdef Acquisition < file.AstroData
                 
                 obj.update(input); % update header object to current time and input run name, RA/DE if given to input.
                 
+                if isempty(obj.head.OBJECT)
+                    error('Cannot start a run without a valid OBJECT name in header!'); 
+                end
+                
                 obj.stash_parameters(input);
             
                 obj.buf.use_save_photometry = obj.use_save_photometry; 
@@ -2734,22 +2738,33 @@ classdef Acquisition < file.AstroData
             
             obj.log.input('Running autofocus loop.'); 
             
+            prev_focus_point = NaN;
+            
             try
             
+                if ~isempty(obj.gui) && obj.gui.check
+                    obj.gui.latest_error = '';
+                    obj.gui.latest_warning = '';
+                    lastwarn('');
+                end
+                
                 for ii = 1:4
                 
                     if obj.debug_bit, fprintf('Running focus loop attempt %d\n', ii); end
                     
-                    obj.cam.autofocus; 
+                    obj.cam.autofocus('iteration', ii); 
                     
                     min_pos = obj.cam.af.pos(2); 
                     max_pos = obj.cam.af.pos(end-1); 
-                    
                     
                     if obj.debug_bit, fprintf('Resulting focus point is %4.2f at FWHM of %4.2f"\n', obj.cam.af.found_pos, obj.cam.af.found_width.*2.355.*obj.head.SCALE); end
                     
                     if obj.cam.af.found_width<1 && obj.cam.af.found_pos>=min_pos && obj.cam.af.found_pos<=max_pos
                         break; % if focus is good enough and not at the edges of the range, we don't need to repeat it
+                    end
+                    
+                    if abs(obj.cam.af.found_pos - prev_focus_point)<0.05
+                        break; % if focus returns to the same position each time, we can give up on it
                     end
                 
                 end

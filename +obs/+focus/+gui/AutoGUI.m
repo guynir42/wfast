@@ -114,6 +114,7 @@ classdef AutoGUI < handle
             obj.panel_controls.addButton('button_placeholder', 'use_fit_curves', 'toggle', 'no fit', 'use fit', '', 0.5, obj.color_on, '', 'fit each star width curve to a parabola'); 
             obj.panel_controls.addButton('input_range', 'range', 'input', 'range= ', '', '', 0.5, '', '', 'how far in either direction from the focus point we want to scan'); 
             obj.panel_controls.addButton('input_step', 'step', 'input', 'step= ', '', '', 0.5, '', '', 'step size for sampling the focus positions'); 
+            obj.panel_controls.addButton('input_stars', 'num_stars', 'input', 'num stars= ', '', '', 0.5, '', '', 'maximum number of stars to use for focusing'); 
                         
             obj.panel_controls.number = num_buttons;
             

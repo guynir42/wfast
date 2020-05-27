@@ -39,6 +39,8 @@ classdef AutoFocus < handle
         found_tilt; % put your focuser to this tilt value
         found_width; % the best PSF width (gaussian sigma) found by the minimum of the mean V-curve of all stars
         
+        iteration = [];
+        
     end
     
     properties % switches/controls
@@ -122,6 +124,8 @@ classdef AutoFocus < handle
             obj.found_pos = [];
             obj.found_tip = [];
             obj.found_tilt = [];
+            
+            obj.iteration = [];
             
             obj.clear;
             
@@ -349,10 +353,6 @@ classdef AutoFocus < handle
         
         function plot(obj, varargin)
             
-            if isempty(obj.pos) || isempty(obj.widths)
-                return;
-            end
-            
             input = util.text.InputVars;
             input.input_var('font_size', 20); 
             input.input_var('ax', [], 'axes', 'axis'); 
@@ -368,6 +368,10 @@ classdef AutoFocus < handle
             
             cla(input.ax);
             hold(input.ax, 'on');
+            
+            if isempty(obj.pos) || isempty(obj.widths)
+                return;
+            end
             
             N = min(size(obj.widths,1), obj.num_plots); 
 
@@ -423,6 +427,12 @@ classdef AutoFocus < handle
             
             if obj.cam.is_running_focus
                 util.plot.inner_title('Focus is running!', 'ax', input.ax, 'FontSize', 26, 'Position', 'North'); 
+            end
+            
+            util.plot.inner_title(sprintf('num stars= %d', size(obj.widths,1)), 'ax', input.ax, 'FontSize', 14, 'Position', 'SouthWest'); 
+            
+            if ~isempty(obj.iteration)
+                util.plot.inner_title(sprintf('iteration= %d', obj.iteration), 'ax', input.ax, 'FontSize', 14, 'Position', 'SouthEast'); 
             end
             
             input.ax.YLim = [mn-0.1 mx+0.1];

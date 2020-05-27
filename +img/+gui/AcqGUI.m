@@ -387,9 +387,11 @@ classdef AcqGUI < handle
             obj.latest_warning = lastwarn;
 
             display_string = ''; 
+            is_error = 0;
             
             if isempty(display_string) && ~isempty(obj.latest_error)
                 display_string = regexprep(obj.latest_error, '\n*|\s{2,}', '... ');
+                is_error = 1;
             end
             
             % I wanted to stop showing these warnings, for now...
@@ -401,7 +403,12 @@ classdef AcqGUI < handle
                 display_string = obj.latest_message; 
             end
             
-            obj.panel_info.button_message.String = display_string;    
+            obj.panel_info.button_message.String = display_string;  
+            if is_error 
+                obj.panel_info.button_message.ForegroundColor = 'red'; 
+            else
+                obj.panel_info.button_message.ForegroundColor = 'black'; 
+            end
             
             if obj.owner.use_show && ~isempty(obj.owner.images)
                 obj.owner.show;

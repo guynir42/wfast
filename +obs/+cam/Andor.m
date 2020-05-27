@@ -816,6 +816,10 @@ classdef Andor < file.AstroData
                 error('must be connected to camera and focuser!');
             end
             
+            input = util.text.InputVars;
+            input.input_var('iteration', []); 
+            input.scan_vars(varargin{:}); 
+            
             obj.af.cam = obj;
             
             old_pos = obj.focuser.pos;
@@ -826,11 +830,6 @@ classdef Andor < file.AstroData
             
                 obj.is_running_focus = 1; % tell focus GUI to display an indicator that focus is running... 
                 
-                if isempty(obj.af.gui) || ~obj.af.gui.check
-                    obj.af.makeGUI;
-                end
-                
-                figure(obj.af.gui.fig.fig); 
                 
                 % update the object with the camera parameters
                 obj.af.x_max = obj.ROI(4);
@@ -859,6 +858,22 @@ classdef Andor < file.AstroData
                 end
 
                 obj.af.reset;
+                obj.af.iteration = input.iteration;
+                
+                if isempty(obj.af.gui) || ~obj.af.gui.check
+                    obj.af.makeGUI;
+                end
+                
+                obj.af.gui.update;
+                obj.af.plot;
+                
+                ax = obj.af.gui.axes_image;
+                
+                text(ax, mean(ax.XLim), mean(ax.YLim), 'Finding stars for focus run!', 'FontSize', 36, 'HorizontalAlignment', 'Center'); 
+                
+                drawnow;
+                
+                figure(obj.af.gui.fig.fig); 
                 
                 % find stars, the quick version!
                 obj.single('frame rate', obj.af.frame_rate, 'exp time', obj.af.expT, 'batch size', obj.af.batch_size); % need to first update with observational parameters (using varargin!)
@@ -1211,7 +1226,6 @@ classdef Andor < file.AstroData
                 obj.unstash_parameters; % return all parameters to values they were in before this run
                 
                 obj.is_running = 0;
-                obj.is_running_focus = 0; 
                 
                 if ~isempty(obj.gui)
                     obj.gui.update;
