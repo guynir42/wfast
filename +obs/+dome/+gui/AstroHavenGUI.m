@@ -13,6 +13,8 @@ classdef AstroHavenGUI < handle
         edit_font_size = 11;
         small_font_size = 10;
         
+        color_on = [0 0.3 1];
+        
         debug_bit = 1;
         
     end
@@ -24,6 +26,8 @@ classdef AstroHavenGUI < handle
         panel_shutter_west;
         panel_shutter_east;
         panel_shutter_both;
+        
+        panel_tracking;
         
         panel_stop1;
         panel_stop2;
@@ -71,9 +75,9 @@ classdef AstroHavenGUI < handle
             obj.fig.width = 12;
             movegui(obj.fig.fig, 'center');
             obj.fig.left = 24;
-            obj.fig.bottom = -5;
+            obj.fig.bottom = 5;
             
-            N = 10; % total number of rows
+            N = 11; % total number of rows
             pos = N;
             
             %%%%%%%%%%% panel status %%%%%%%%%%%%%%%%%
@@ -133,6 +137,16 @@ classdef AstroHavenGUI < handle
             obj.panel_shutter_east.margin = [0.1 0.01];
             obj.panel_shutter_east.make;
             
+            
+            %%%%%%%%%%% panel tracking %%%%%%%%%%%%%%%%%%%
+            
+            pos = pos - 1;
+            obj.panel_tracking = GraphicPanel(obj.owner, [0 pos/N 1 1/N], 'Tracking'); 
+            obj.panel_tracking.addButton('button_track', 'use_tracking', 'toggle', 'tracking is off', 'tracking is on', '', 0.5, obj.color_on, '', 'turn dome tracking on or off'); 
+            obj.panel_tracking.addButton('input_rate', 'track_rate', 'input', 'rate= ', '', '', 0.5, '', '', 'how many steps the dome should open/close every half hour'); 
+            obj.panel_tracking.margin = [0.03 0.01];
+            obj.panel_tracking.make;
+                        
             %%%%%%%%%%% panel stop2 %%%%%%%%%%%%%%%%%%%
             
             obj.panel_stop2 = GraphicPanel(obj.owner, [0 0 1 1/N]);

@@ -1280,9 +1280,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             if ~isempty(obj.timer) && isa(obj.timer, 'timer') && isvalid(obj.timer)
                 if strcmp(obj.timer.Running, 'on')
                     stop(obj.timer);
-                    delete(obj.timer);
-                    obj.timer = [];
                 end
+                
+                delete(obj.timer);
+                obj.timer = [];
+                
             end
             
             delete(timerfind('name', 'mount-timer'));

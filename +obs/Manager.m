@@ -363,7 +363,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     return;
                 end
                 
-                if obj.dome.is_closed==0
+                if obj.dome.is_closed==0 || obj.dome.use_tracking 
                     val = 0;
                     return;
                 end
@@ -722,13 +722,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     
     methods % utilities
         
-        function date = parseDate(obj, str)
+        function date = parseDate(obj, str, latest_date)
+            
+            if nargin<3 || isempty(latest_date)
+                latest_date = datetime(util.sys.date_dir('now'));
+            end
             
             if isa(str, 'datetime')
                 date = str;
             else
-                
-                date = datetime(util.sys.date_dir('now'));
                 
                 date_cell = strsplit(str, {'-', '/', '\'}); 
                 d = str2double(date_cell{end}); % the day of the observation
@@ -736,13 +738,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 if length(date_cell)>=2
                     m = str2double(date_cell{end-1});
                 else
-                    m = date.Month;
+                    m = latest_date.Month;
                 end
                 
                 if length(date_cell)>=3
                     y = str2double(date_cell{end-2});
                 else
-                    y = date.Year;
+                    y = latest_date.Year;
                 end
                 
                 if y<2000
@@ -755,12 +757,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function [name, short_list] = getObserverName(obj, date, num_future_days)
+        function [name, short_list] = getObserverName(obj, date_now, num_future_days)
             
-            if nargin<2 || isempty(date)
-                date = datetime(util.sys.date_dir('now'));
-            elseif ischar(date)
-                date = obj.parseDate(date); 
+            if nargin<2 || isempty(date_now)
+                date_now = datetime(util.sys.date_dir('now'));
+            elseif ischar(date_now)
+                date_now = obj.parseDate(date_now); 
             end
             
             if nargin<3 || isempty(num_future_days)
@@ -772,6 +774,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             name = '---'; 
             short_list = {}; 
+            this_date = []; % must read the first date off the list first
             
             for ii = 1:1e4
                 
@@ -785,14 +788,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 date_str = strtrim(c{1});
                 this_name = strtrim(c{2}); 
                 
-                this_date = obj.parseDate(date_str); 
+                this_date = obj.parseDate(date_str, this_date); 
                 
-                if isequal(this_date, date)
+                if isequal(this_date, date_now)
                     name = this_name;
                 end
                 
                 if nargout>1 % also want to make a short list
-                    if days(this_date-date)<num_future_days
+                    if date_now<=this_date && days(this_date-date_now)<num_future_days 
                         short_list{end+1,1} = sprintf('%s: %s', this_date, this_name); 
                     end
                 end
@@ -821,11 +824,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             %%%%%% tonight's observer %%%%%%%
             
             try 
-                [name, list] = obj.getObserverName;
+                [name, obs_list] = obj.getObserverName;
             catch ME
                 warning(ME.getReport);
                 name = 'error reading list'; 
-                list = {}; 
+                obs_list = {}; 
             end
             
             str = sprintf('%s\n%s', str, obj.email.html(sprintf('Tonight''s observer is %s. ', name))); 
@@ -834,15 +837,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             if ~isempty(obj.obs_log) && isfield(obj.obs_log, 'date') && strcmp(obj.obs_log.date, date_string) && length(fields(obj.obs_log))>1
                 
-                list = fields(obj.obs_log); 
+                field_list = fields(obj.obs_log); 
                 
                 obs_str = sprintf('<table style="width:60%%">');
                 
-                for ii = 1:length(list) % each target has a few runs inside a struct array with this name
+                for ii = 1:length(field_list) % each target has a few runs inside a struct array with this name
                     
-                    if strcmp(list{ii}, 'date'), continue; end
+                    if strcmp(field_list{ii}, 'date'), continue; end
                     
-                    s = obj.obs_log.(list{ii}); % struct with some info on the run
+                    s = obj.obs_log.(field_list{ii}); % struct with some info on the run
                     files = 0;
                     time = 0; 
                     
@@ -854,7 +857,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     end
                     
 %                     obs_str = sprintf('%s\n%10s (%d) | files: %4d | runtime: %7.1f ', obs_str, list{ii}, length(s), files, time); 
-                    obs_str = sprintf('%s\n <tr> <td> %s (%d) </td><td> files: %4d </td><td> runtime: %7.1f </td></tr>', obs_str, list{ii}, length(s), files, time); 
+                    obs_str = sprintf('%s\n <tr> <td> %s (%d) </td><td> files: %4d </td><td> runtime: %7.1f </td></tr>', obs_str, field_list{ii}, length(s), files, time); 
                     
                 end
                 
@@ -907,8 +910,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             end
             
             %%%%%%%% list of next night's observers %%%%%%%%
-            if ~isempty(list)
-                str = sprintf('%s\n%s', str, obj.email.html(sprintf('Observers for the next few nights are:\n<br> %s. ', strjoin(list, '\n<br>')))); 
+            if ~isempty(obs_list)
+                str = sprintf('%s\n%s', str, obj.email.html(sprintf('Observers for the next few nights are:\n<br> %s. ', strjoin(obs_list, '\n<br>')))); 
             end
             
 %             obj.email.sendToList('subject', sprintf('[WFAST] Morning report %s %d', d, randi(1000)), 'text', str, 'header', 1, 'footer', 1, 'html', 1); 
@@ -979,9 +982,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     if good_times_minutes>0 % check that weather is good for some time now
                         
                         if isempty(obj.latest_email_autostart_date)
+                            
+                            try
+                                name = obj.getObserverName;
+                            catch ME
+                                name = '---';
+                            end
+                            
                             obj.email.sendToList('subject', ['Ready to open dome ' util.text.time2str(t)], ...
                                 'text', sprintf('Observer: %s.\n Weather data looks good for at least %d minutes. Consider opening for observations. ', ...
-                                obj.getObserverName, round(good_times_minutes)));
+                                name, round(good_times_minutes)));
                             
                             obj.latest_email_autostart_date = t;
                             

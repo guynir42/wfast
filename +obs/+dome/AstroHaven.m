@@ -46,6 +46,8 @@ classdef AstroHaven < handle
         
         log@util.sys.Logger; % write reports to text file
         
+        timer; % for dome tracking
+        
     end
     
     properties % definitions, switches, conrols
@@ -56,6 +58,9 @@ classdef AstroHaven < handle
         port_name = 'COM4'; % change this later
         
         use_accelerometers = 0; % for future installation
+        
+        use_tracking = 0; % when on, the dome timer will slowly open the west shutter and close the east shutter 
+        track_rate = 50; % how many "steps" to open west / close east to take every 30 minutes
         
         max_fail_reply = 3; % how many sent messages to try before failing the command
         max_fail_connect = 3; % how many reconnect attempts before failing to connect
@@ -336,16 +341,45 @@ classdef AstroHaven < handle
             
         end
         
+        function val = get.use_tracking(obj)
+            
+            if obj.use_tracking && ~isempty(obj.timer) && isa(obj.timer, 'timer') && isvalid(obj.timer) && strcmp(obj.timer.Running, 'on')
+                val = 1;
+            else
+                val = 0;
+            end
+            
+        end
+        
+    end
+    
+    methods % setters
+        
+        function set.use_tracking(obj, val)
+            
+            if val
+            
+                if isempty(obj.timer) || ~isa(obj.timer, 'timer') || ~isvalid(obj.timer) || strcmp(obj.timer.Running, 'off')
+                    obj.setup_timer;
+                end
+            
+            end
+            
+            obj.use_tracking = val;
+                
+        end
+        
     end
     
     methods % commands to move or stop shutters
-                
+        
         function emergencyClose(obj) % do everything you can to close dome (including sending the uncancelable 'C' command) 
             
             obj.log.input('Emergency close!');
             
             try 
                 % obj.counter = 0;
+                obj.use_tracking = 0;
                 obj.send('C');
                 obj.closeBoth(100);
                 obj.update;
@@ -371,6 +405,8 @@ classdef AstroHaven < handle
             try
             
                 obj.update;
+                
+                obj.use_tracking = 0;
                 
                 t = tic;
                 
@@ -407,6 +443,8 @@ classdef AstroHaven < handle
             try
             
                 obj.update;
+                
+                obj.use_tracking = 0;
                 
                 t = tic;
                 
@@ -456,6 +494,8 @@ classdef AstroHaven < handle
             
                 obj.update;
                 
+                obj.use_tracking = 0;
+                
                 t = tic;
                 
                 reply = obj.command('a', number); % can add a "max_duration" argument to allow the loop to stop after so long
@@ -490,6 +530,8 @@ classdef AstroHaven < handle
             try
             
                 obj.update;
+                
+                obj.use_tracking = 0;
                 
                 t = tic;
                 
@@ -537,6 +579,8 @@ classdef AstroHaven < handle
             
                 obj.update;
                 
+                obj.use_tracking = 0;
+                
                 t = tic;
                 
                 reply = obj.command('b', number); % can add a "max_duration" argument to allow the loop to stop after so long
@@ -572,6 +616,8 @@ classdef AstroHaven < handle
             
                 obj.update;
                 
+                obj.use_tracking = 0;
+                
                 t = tic;
                 
                 reply = obj.command('B', number); % can add a "max_duration" argument to allow the loop to stop after so long
@@ -600,6 +646,96 @@ classdef AstroHaven < handle
         function closeEastFull(obj) % send command to East shutter until it is fully closed
             
             obj.closeEast(1000);
+            
+        end
+        
+        function stop(obj) % stop the motion of the shutters
+            
+            obj.brake_bit = 1;
+            
+            obj.use_tracking = 0;
+            
+            if ~isempty(obj.gui)
+                obj.gui.update;
+            end
+            
+        end
+        
+        function setup_timer(obj, ~, ~)
+            
+            if ~isempty(obj.timer) && isa(obj.timer, 'timer') && isvalid(obj.timer)
+                
+                if strcmp(obj.timer.Running, 'on')
+                    stop(obj.timer);
+                end
+                
+                delete(obj.timer);
+                obj.timer = [];
+                
+            end
+            
+            delete(timerfind('name', 'dome-timer'));
+            
+            obj.timer = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'dome-timer', ...
+                'Period', 30*60, 'StartDelay', 30*60, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer);
+            
+            start(obj.timer);
+            
+        end
+        
+        function callback_timer(obj, ~, ~)
+            
+            if obj.use_tracking
+                
+                obj.update;
+
+                obj.log.input('Dome is tracking (open West / close East)');
+
+                try 
+                   
+                    % first move the West shutter down 
+                    date_str = util.text.time2str(datetime('now', 'TimeZone', 'UTC')); 
+                    if obj.debug_bit, fprintf('%s: Opening West shutter by %d steps\n', date_str, obj.track_rate); end
+                    
+                    t = tic;
+                
+                    reply = obj.command('a', obj.track_rate); 
+
+                    if isempty(reply)
+                        % what to do if a command didn't succeed? should this be an error?
+                    else
+                        obj.open_time_west = obj.open_time_west + toc(t);
+                    end
+
+                    % now close the East shutter
+                    date_str = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
+                    if obj.debug_bit, fprintf('%s: Closing East shutter by %d steps\n', date_str, obj.track_rate); end
+                    
+                    t = tic;
+
+                    reply = obj.command('B', obj.track_rate); 
+
+                    if isempty(reply)
+                        % what to do if a command didn't succeed? should this be an error?
+                    else
+                        obj.close_time_east = obj.close_time_east + toc(t);
+                    end
+
+                    obj.use_tracking = 1;
+                    
+                    obj.update;
+
+                    if ~isempty(obj.gui)
+                        obj.gui.update;
+                    end
+                    
+                catch ME
+                    obj.use_tracking = 0;
+                    obj.log.error(ME.getReport); 
+                    rethrow(ME); 
+                end
+                
+            end
             
         end
         
@@ -826,16 +962,6 @@ classdef AstroHaven < handle
                     
                 end
                 
-            end
-            
-        end
-        
-        function stop(obj) % stop the motion of the shutters
-            
-            obj.brake_bit = 1;
-            
-            if ~isempty(obj.gui)
-                obj.gui.update;
             end
             
         end
