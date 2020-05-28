@@ -32,6 +32,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         prev_objects = {}; % list of latest objects 
         
+        object_backup; 
+        
     end
     
     properties % objects
@@ -173,10 +175,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             obj.log = util.sys.Logger('ASA_mount', obj);
             
+            obj.object = head.Ephemeris;
+            obj.object_backup = obj.object; % so we don't lose this object accidentally
+            
             try
             
-                obj.object = head.Ephemeris;
-
                 try
                     obj.connect;
                 catch ME
@@ -1109,6 +1112,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     error('Prechecks failed, aborting slew');
                 end
                 
+                on_cleanup = onCleanup(@() obj.after_slew); % make sure these things happen in any way the function is finished (error, return statement, ctrl+C, or normaly done)
+                
+                obj.brake_bit = 0;
+            
                 % translate the object coordinates to current epoch
                 ra_hours_Jnow = obj.object.RA_deg_now./15; % convert to hours! 
                 dec_deg_Jnow = obj.object.Dec_deg_now;
@@ -1117,12 +1124,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     
                     if obj.telDec_deg<30 || obj.telDec_deg>60
                         
+                        if obj.brake_bit, return; end % in case user clicked stop!
+                        
                         obj.slewWithoutPrechecks(obj.hndl.RightAscension, 45); % do a preslew to dec +70 so we can make the flip! 
                         
                         try 
                             if strcmp(obj.obj_pier_side, 'pierEast') % object is on the WEST SIDE!
+                                if obj.brake_bit, return; end % in case user clicked stop!
                                 obj.slewWithoutPrechecks(mod(obj.object.LST_deg/15+4,24), 45); % do a second preslew to the same Dec with RA that is easier to flip from
                             elseif strcmp(obj.obj_pier_side, 'pierWest') % object is on the EAST SIDE!
+                                if obj.brake_bit, return; end % in case user clicked stop!
                                 obj.slewWithoutPrechecks(mod(obj.object.LST_deg/15-4,24), 45); % do a second preslew to the same Dec with RA that is easier to flip from
                             end
                         catch ME
@@ -1131,7 +1142,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                         end
                         
                     end
-                    
                     
                     % other things to do before a flip...?
                     
@@ -1146,27 +1156,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     end
                 end
                 
+                if obj.brake_bit, return; end % in case user clicked stop!
                 obj.slewWithoutPrechecks(ra_hours_Jnow, dec_deg_Jnow);
                 
-                if obj.use_motor_toggle % this does not work! 
-                    
-                    obj.hndl.MotorOff; 
-                    
-                    pause(0.01);
-                    
-                    obj.hndl.MotorOn;
-                    
-                    obj.slewWithoutPrechecks(ra_hours_Jnow, dec_deg_Jnow);
-                    
-                end
+                obj.tracking = 1; % must enable tracking for post-slew checks to work
                 
-                obj.tracking = 1;
-                                
                 pause(3); 
                 
                 % check that we've reached the right position and not vibrating 
                 if ~obj.check_after_slew
                     
+                    if obj.brake_bit, return; end % in case user clicked stop!
                     obj.log.input('Slew post-check failed, trying to slew again...');
                     disp(obj.log.report); 
                     
@@ -1178,6 +1178,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     
                     if ~obj.check_after_slew % if this fails, slew aside a little and come back
                         
+                        if obj.brake_bit, return; end % in case user clicked stop!
                         obj.log.input('Slew post-check failed again, trying to slew to different coordinate and return...'); 
                         disp(obj.log.report); 
 
@@ -1185,6 +1186,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                         
                         pause(3); 
                         
+                        if obj.brake_bit, return; end % in case user clicked stop!
                         obj.slewWithoutPrechecks(ra_hours_Jnow, dec_deg_Jnow);
                         
                         if ~obj.check_after_slew
@@ -1196,6 +1198,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     
                 end
                 
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
+            
+        end
+        
+        function after_slew(obj)
+            
+                obj.tracking = 1;
+                                
                 if ~isempty(obj.cam_pc)
                     obj.cam_pc.outgoing.stop_camera = 0; % need to tell cam-pc to start working! 
                     obj.updateCamera;
@@ -1213,11 +1226,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 obj.resetRate;
                 
                 obj.audio.stop;
-                
-            catch ME
-                obj.log.error(ME.getReport);
-                rethrow(ME);
-            end
             
         end
         
@@ -1231,10 +1239,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 
                 pause(0.01);
 
-                if obj.brake_bit
-                    obj.stop;
-                    break;
-                end
+                if obj.brake_bit, obj.stop; break; end
 
                 if ~obj.check_while_moving
                     obj.emergency_stop;
@@ -1554,6 +1559,20 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 obj.brake_bit = 0;
                 
+                % convert alt/az to ra/dec using Eran's converter 
+                [RA, Dec] = celestial.coo.convert_coo(Az*pi/180, Alt*pi/180, 'azalt', 'J2000', juliandate(datetime('now', 'TimeZone', 'UTC')), [obj.object.longitude, obj.object.latitude]./180.*pi); 
+                
+                obj.object_backup = obj.object; % restore the original object later
+                on_cleanup = onCleanup(@() obj.restore_object);
+                
+                obj.object = head.Ephemeris;
+                obj.object.RA_deg = RA/pi*180;
+                obj.object.Dec_deg = Dec/pi*180;
+                obj.object.update;
+                obj.object.name = 'Engineering slew'; 
+                
+                obj.slew('history', 0); % slew to the coordinates closest to the required Alt/Az, doing all the required checks and intermidiate slews... 
+                
                 obj.hndl.SlewToAltAzAsync(Az, Alt); % note that in ASCOM, SlewToAltAz expects Az and then Alt !!!
                 
                 for ii = 1:100000
@@ -1577,13 +1596,19 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 end
             
                 obj.tracking = 0;
-
+                
             catch ME
                 obj.log.error(ME.getReport);
                 obj.tracking = 0;
                 rethrow(ME);
             end
             
+            
+        end
+        
+        function restore_object(obj)
+            
+            obj.object = obj.object_backup;
             
         end
         
@@ -1594,6 +1619,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         end
         
         function park(obj) % go to parking position 
+            
+            obj.engineeringSlew(30, 180); 
             
             obj.hndl.Park;
             obj.tracking = 0;
