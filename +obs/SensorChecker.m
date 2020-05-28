@@ -62,6 +62,9 @@ classdef SensorChecker < handle
         sensors_ok = 1;
         report = 'OK';
         
+        last_night_total_hours;
+        last_night_good_hours;
+        
     end
     
     properties % switches/controls
@@ -89,7 +92,14 @@ classdef SensorChecker < handle
         % list all the classes that status checker is following
         sensor_classes = {'obs.sens.Simulator', 'obs.sens.Boltwood', 'obs.sens.WindETH', 'obs.sens.VirtualSensor'}; 
         
-        version = 1.02;
+        total_time_hours = 0;
+        good_time_hours = 0;
+        last_measured_time = [];
+        good_state = []; % save the last state of the weather data
+        sun_state = []; % save the last state of the sun to reset the total_time/good_time when sun goes up
+        
+        version = 1.03;
+        % 1.03 (2020/05/28) added history of last night's good weather
         % 1.02 (2019/12/16) added virtual sensors, communications with Wise, and put all data into structures
         
     end
@@ -701,6 +711,41 @@ classdef SensorChecker < handle
 
             end
             
+            %%%%%%% log the amount of "good" hours vs. "total hours" %%%%%%
+            t = datetime('now', 'TimeZone', 'UTC'); 
+            t0 = obj.last_measured_time;
+            
+            if ~isempty(t0) && t>t0
+                
+                if obj.sun_state % last time we measured it, the light was low enough
+                    
+                    obj.total_time_hours = obj.total_time_hours + hours(t-t0); 
+
+                    if obj.good_state % last time we measured the weather was good
+                        obj.good_time_hours = obj.good_time_hours + hours(t-t0); 
+                    end
+
+                end
+                
+            end
+            
+            obj.sun_state = nanmean(obj.light.now)<obj.light.max; % this is true when the light is low enough
+            
+            if obj.sun_state==0 % sun is up, the night is over, time to store the collected data and reset for next time
+                
+                if obj.total_time_hours>0
+                    obj.last_night_total_hours = obj.total_time_hours;
+                    obj.last_night_good_hours = obj.good_time_hours;
+                end
+                
+                obj.total_time_hours = 0;
+                obj.good_time_hours = 0;
+                
+            end
+            
+            obj.good_state = obj.sensors_ok; 
+            obj.last_measured_time = t; 
+            
         end
 
         function [value, reason] = getWiseSafeFlag(obj)
@@ -724,6 +769,18 @@ classdef SensorChecker < handle
 
             end
 
+        end
+        
+        function val = checkDayTime(obj) % return true if it is day time according to the system clock
+            
+            time = datetime('now', 'TimeZone', 'Asia/Jerusalem');
+            
+            if time.Hour>7 && time.Hour<16
+                val = 1;
+            else
+                val = 0;
+            end
+            
         end
         
     end

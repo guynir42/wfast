@@ -113,8 +113,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         sensor_ok_history; % a vector of datetime objects, for each time we have measured good weather (this gets reset upon a single bad weather measurement)
         latest_email_autostart_date = '';
         
-        
-        version = 1.03;
+        version = 1.04;
         
     end
     
@@ -795,7 +794,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
                 
                 if nargout>1 % also want to make a short list
-                    if date_now<=this_date && days(this_date-date_now)<num_future_days 
+                    if date_now<this_date && days(this_date-date_now)<num_future_days 
                         short_list{end+1,1} = sprintf('%s: %s', this_date, this_name); 
                     end
                 end
@@ -959,7 +958,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
             end
             
-            if obj.use_shutdown && obj.checkDayTime % check if the system clock says it is day time
+            if obj.use_shutdown && obj.checker.checkDayTime % check if the system clock says it is day time
                 if obj.is_shutdown==0 % if already shut down, don't need to do it again
                     fprintf('%s: System clock says it is day time... %s \n', datestr(obj.log.time), obj.checker.report); 
                     obj.shutdown;
@@ -1035,18 +1034,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             end
             
             % add maybe checks for boltwood if we think it is critical?
-            
-        end
-        
-        function val = checkDayTime(obj) % return true if it is day time according to the system clock
-            
-            time = datetime('now', 'TimeZone', 'Asia/Jerusalem');
-            
-            if time.Hour>7 && time.Hour<16
-                val = 1;
-            else
-                val = 0;
-            end
             
         end
         
