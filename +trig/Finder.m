@@ -779,7 +779,7 @@ classdef Finder < handle
             
             t = tic; 
             
-            if obj.use_sim && obj.sim_bank.filtered_index>0
+            if obj.use_sim && obj.sim_bank.filtered_index>0 % simulation mode only! 
                 
                 t_sim = tic;
                 
@@ -827,7 +827,7 @@ classdef Finder < handle
             
             batch_duration_seconds = obj.timestamps(end) - obj.timestamps(1) + obj.dt;
             
-            for ii = 1:obj.max_events
+            for ii = 1:obj.max_events % try to find events repeatedly until nothing shows up
                 
                 t_max = tic;
                 
@@ -846,7 +846,7 @@ classdef Finder < handle
                     end
                 end
                 
-                if mx>=obj.threshold
+                if mx>=obj.threshold % at least one part of the filtered lightcurves passed the threshold
                 
                     t_ev = tic;
                     
@@ -912,6 +912,7 @@ classdef Finder < handle
                 
             end
             
+            % finshed looking at all events, now see if the batch is black listed and if not, store star hours
             if isempty(star_index_sim) % only store star hours and add batch black list when not in sim-mode
                 
                 if batch_duration_seconds<0 
@@ -969,6 +970,8 @@ classdef Finder < handle
             
             thresh = obj.getTimeThresh;
             time_range = [];
+            
+            kernel_min_spread = ceil(nnz(abs(obj.bank.kernels(:,kern_index)>=0.02))/2); % minimal time range cannot be smaller than "active" part of kernel (i.e., above 2% deviation)
 
             for jj = 0:N % go backward in time
 
@@ -977,7 +980,7 @@ classdef Finder < handle
                 if idx<1, break; end
 
 %                 if any(abs(ff(idx, :, star_index))>=thresh)
-                if abs(ff(idx, kern_index, star_index))>=thresh || jj<=obj.min_time_spread
+                if abs(ff(idx, kern_index, star_index))>=thresh || jj<=obj.min_time_spread || jj<=kernel_min_spread
                     time_range = [time_range, idx];
                 else
                     break;
@@ -994,7 +997,7 @@ classdef Finder < handle
                 if idx>N, break; end
 
 %                 if any(abs(ff(idx, :, star_index))>=thresh)
-                if abs(ff(idx, kern_index, star_index))>=thresh || jj<=obj.min_time_spread 
+                if abs(ff(idx, kern_index, star_index))>=thresh || jj<=obj.min_time_spread || jj<=kernel_min_spread
                     time_range = [time_range, idx];
                 else
                     break;

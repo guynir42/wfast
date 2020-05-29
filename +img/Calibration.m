@@ -1431,6 +1431,25 @@ classdef Calibration < handle
            
         end
         
+        function saveMat(obj, filename)
+            
+            dark_mean = obj.dark_mean;
+            dark_var = obj.dark_var;
+            dark_mask = obj.dark_mask;
+            date_dark = obj.date_dark;
+            
+            flat_mean = obj.flat_mean;
+            flat_var = obj.flat_var;
+            date_flat = obj.date_flat;
+            
+            cam_name = obj.camera_name;
+            proj_name = obj.project_name;
+            
+            save(filename, 'dark_mean', 'dark_var', 'dark_mask', 'date_dark', ...
+                'flat_mean', 'flat_var', 'date_flat', 'cam_name', 'proj_name', '-v7.3'); 
+            
+        end
+        
         function loadByDate(obj, date, camera, project, force_reload)
             
             if nargin<2 || isempty(date)

@@ -37,7 +37,7 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     input.input_var('mean', []);
     input.input_var('std', []);
     input.input_var('sigma', 5, 'threshold');
-    input.input_var('saturation', 5e6); % saturation by default for 100 images in a stack
+    input.input_var('saturation', 5e4); % saturation by default for a singe image (input larger values for stacks)
     input.input_var('edges', []);
     input.input_var('fraction', 0.8); % fraction of MX_twice or MX_half that must surpass MX to be counted as point-source or extended-source
     input.input_var('unflagged', 0, 'flagged'); % only leave rows which have flag==0
@@ -53,7 +53,7 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     
     if isempty(input.mean) || isempty(input.std)
         
-        [M,V] = util.img.im_stats(I);
+        [M,V] = util.img.im_stats(I, 'tile', 250, 'overlap', 100, 'method', 'median', 'output', 'map');
         
         if isempty(input.mean)
             input.mean = M;
@@ -78,6 +78,7 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     pos = [];
     flux = [];
     flag = [];
+    snr = [];
     table_props = table.empty;
     
     thresholds = input.sigma + [5 3 0];
@@ -142,6 +143,7 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
             pos = vertcat(pos, P);
             flux = vertcat(flux, F);
             flag = vertcat(flag, f);
+            snr = vertcat(snr, MX_f); 
             table_props = vertcat(table_props, T);
 
             I_reduced(BW_dilated) = NaN;
@@ -156,7 +158,7 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     
     I_reduced = I_reduced.*input.std + input.mean; % rescale this back to the original values
     
-    T2 = table(flux, flag);
+    T2 = table(flux, flag, snr);
     
     table_props = horzcat(T2, table_props);
     
@@ -169,7 +171,7 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     if ~isempty(table_props)
 
         table_props.Properties.VariableNames{'WeightedCentroid'} = 'pos';
-        table_props = [table_props(:,'flux') table_props(:,'flag') table_props(:,'pos') table_props(:, 'PixelValues'), table_props(:, 'PixelIdxList')];
+        table_props = [table_props(:,'flux') table_props(:,'flag') table_props(:,'snr') table_props(:,'pos') table_props(:, 'PixelValues'), table_props(:, 'PixelIdxList')];
 
         if height(table_props)>input.number
             table_props = table_props(1:input.number, :);

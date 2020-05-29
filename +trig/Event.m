@@ -458,16 +458,15 @@ classdef Event < handle
             end
             
             t = obj.time_indices; % time indices inside the event area
-            if any(obj.offsets_x_at_star(t)>obj.max_offsets)
-                obj.keep = 0;
-                obj.is_large_offsets = 1;
-                obj.addNote(sprintf('offset x= %f', nanmax(obj.offsets_x_at_star(t))));
-            end
+            R = sqrt(obj.offsets_x_at_star.^2+obj.offsets_y_at_star.^2);
             
-            if any(obj.offsets_y_at_star(t)>obj.max_offsets)
+            if any(R(t)>obj.max_offsets)
                 obj.keep = 0;
                 obj.is_large_offsets = 1;
-                obj.addNote(sprintf('offset y= %f', nanmax(obj.offsets_y_at_star(t))));
+                [mx,idx] = nanmax(R);
+                obj.addNote(sprintf('offsets (x,y,R)= %4.2f, %4.2f, %4.2f', ...
+                    obj.offsets_x_at_star(idx), obj.offsets_y_at_star(idx), mx)); 
+                    
             end
             
             % add any other checks you can think about
@@ -515,16 +514,16 @@ classdef Event < handle
             
             v_temp = vector;
             v_temp(t) = NaN;
-%             Mv = nanmean(v_temp); % get the mean outside the event
-            Mv = nanmean(vector(t)); % get the mean inside the event!
+            Mv = nanmean(v_temp); % get the mean outside the event
+%             Mv = nanmean(vector(t)); % get the mean inside the event!
             Sv = nanstd(v_temp); % get the std outside the event!
             vector = (vector - Mv)./Sv;
             
-            denom = sqrt(nansum(f(t).^2).*nansum(vector(t).^2));
+            denom = sqrt(nansum((f(t)-nanmean(f(t))).^2).*nansum((vector(t)-nanmean(vector(t))).^2));
             if denom==0
                 corr = 0;
             else
-                corr = nansum(f(t).*vector(t))./denom; % ignore the STD normalization and just get the correlation coefficient (the normalized projection)
+                corr = nansum((f(t)-nanmean(f(t))).*(vector(t)-nanmean(vector(t))))./denom; % ignore the STD normalization and just get the correlation coefficient (the normalized projection)
             end
             
             covar = nansum(f(t).*vector(t)); % get the covariance between the two vectors in the event region, normalized by the STD outside the event region

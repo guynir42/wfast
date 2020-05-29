@@ -302,6 +302,22 @@ classdef Analysis < file.AstroData
             
         end
         
+        function val = get_obj_name(obj)
+            
+            if ~isempty(obj.head) && ~isempty(obj.head.OBJECT)
+                val = obj.head.OBJECT;
+            else
+                [~, val] = fileparts(obj.directory); 
+                
+                idx = regexp(val, '_run\d+$');
+                if ~isempty(idx) && idx>1
+                    val = val(1:idx-1);
+                end
+                
+            end
+            
+        end
+        
         function val = get.num_batches(obj)
             
             if isempty(obj.reader) && isempty(obj.num_batches_limit)
@@ -511,7 +527,7 @@ classdef Analysis < file.AstroData
                 mkdir(obj.log_dir); % if we call this function we are ignoring "overwrite analysis folder" mechanism (from start of run() function) and creating a folder if needed!~
             end
             
-            name = obj.head.OBJECT;
+            name = obj.get_obj_name;
             
             obj.lightcurves.saveAsMAT(fullfile(obj.log_dir, ['lightcurves_' name]));
             
@@ -533,7 +549,7 @@ classdef Analysis < file.AstroData
                 mkdir(obj.log_dir); % if we call this function we are ignoring "overwrite analysis folder" mechanism (from start of run() function) and creating a folder if needed!~
             end
             
-            filename = ['summary_' obj.head.OBJECT '.txt'];
+            filename = ['summary_' obj.get_obj_name '.txt'];
             
             fid = fopen(fullfile(obj.log_dir, filename), 'wt');
             
