@@ -301,19 +301,20 @@ classdef PcSync < handle
                     t_in = [];
                 end
                 
-                obj.status = 1; 
-                
                 if ~isempty(obj.time_latest_transmission) 
                     
-                    if isempty(obj.time_latest_reply) || minutes(obj.time_latest_transmission-obj.time_latest_reply)>obj.max_replay_delay_minutes % more than five minutes waiting for a response checksum! 
+                    if isempty(obj.time_latest_reply) || minutes(obj.time_latest_reply-obj.time_latest_transmission)>obj.max_replay_delay_minutes % more than five minutes waiting for a response checksum! 
                         if obj.debug_bit>1, fprintf('Did not receive any response checksum for over %d minutes! Setting status=0. \n', obj.max_replay_delay_minutes); end 
                         obj.status = 0; 
+                    else
+                        obj.status = 1;                
                     end
                     
                 end
                 
                 obj.time_latest_transmission = t;
-
+                obj.time_latest_reply = [];
+                
                 obj.send(obj.outgoing);
                 
             else
@@ -418,7 +419,7 @@ classdef PcSync < handle
                         warning('Checksum for latest transmission was %s, received confirmation checksum: %s', obj.checksum, variable)
                     end
                     
-                    obj.time_latest_reply = datetime('now', 'TimeZone', 'UTC'); 
+                    obj.time_latest_reply = datetime('now', 'TimeZone', 'UTC'); % does this have to be only on successful checksum?
                     
                 end
                 

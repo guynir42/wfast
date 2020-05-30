@@ -391,7 +391,7 @@ classdef AutoFocus < handle
                 h = plot(input.ax, obj.pos, W(ii,:), '-', 'LineWidth', 1.5); % show the raw data
 %                 h.DisplayName = sprintf('pos= %4.3f | weight= %5.2f', obj.min_positions(ii), obj.min_weights(ii)); 
 
-                if ~isempty(obj.min_positions)
+                if ~isempty(obj.min_positions) && ~isnan(obj.min_positions(ii)) && ~isnan(obj.min_weights(ii))
                     plot(input.ax, obj.min_positions(ii), mn-0.05, 'v', 'MarkerSize', sqrt(abs(obj.min_weights(ii)))*5+1, 'Color', h.Color); 
                 end
 

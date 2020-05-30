@@ -337,14 +337,19 @@ classdef AcqGUI < handle
             
             if obj.owner.is_slow_mode
                 obj.panel_controls.button_slow_mode.ForegroundColor = obj.color_on;
+                obj.panel_controls.button_fast_mode.ForegroundColor = 'black';                
+                obj.panel_controls.button_slow_mode.BackgroundColor = obj.panel_controls.button_slow_mode.default_color;
+                obj.panel_controls.button_fast_mode.BackgroundColor = obj.panel_controls.button_fast_mode.default_color;
+            elseif obj.owner.is_fast_mode
+                obj.panel_controls.button_fast_mode.ForegroundColor = obj.color_on;
+                obj.panel_controls.button_slow_mode.ForegroundColor = 'black';
+                obj.panel_controls.button_slow_mode.BackgroundColor = obj.panel_controls.button_slow_mode.default_color;
+                obj.panel_controls.button_fast_mode.BackgroundColor = obj.panel_controls.button_fast_mode.default_color;
             else
                 obj.panel_controls.button_slow_mode.ForegroundColor = 'black';
-            end
-            
-            if obj.owner.is_fast_mode
-                obj.panel_controls.button_fast_mode.ForegroundColor = obj.color_on;
-            else
                 obj.panel_controls.button_fast_mode.ForegroundColor = 'black';
+                obj.panel_controls.button_slow_mode.BackgroundColor = 'red';
+                obj.panel_controls.button_fast_mode.BackgroundColor = 'red';
             end
             
             if obj.owner.brake_bit && (obj.owner.is_running || obj.owner.is_running_single) % started a run but not yet took off the brake bit
