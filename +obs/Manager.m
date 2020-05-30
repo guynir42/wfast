@@ -40,6 +40,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         checker@obs.SensorChecker;
         
+        sched@obs.sched.Scheduler;
+        
         dome; % AstroHaven dome
         mount; % ASA mount
         
@@ -137,6 +139,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function connect(obj) % connect to all hardware and objects
             
+            obj.loadScheduler;
+            
             if obj.use_dome
                 obj.connectDome; % AstroHaven dome
             end
@@ -179,6 +183,22 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             delete(obj.t3);
             delete(obj.t2);
             delete(obj.t1);
+            
+        end
+        
+        function loadScheduler(obj)
+            
+            try
+                
+                if isempty(obj.sched)
+                    obj.sched = obs.sched.Scheduler;
+                end
+                
+                obj.sched.readFile; 
+                
+            catch ME
+                warning(ME.getReport); 
+            end
             
         end
         
@@ -1167,6 +1187,28 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.cam_pc.outgoing.cam_mode = cam_mode;
             obj.cam_pc.outgoing.exp_time = exp_time;
             obj.cam_pc.update; 
+            
+        end
+        
+        function chooseNewTarget(obj, varargin)
+            
+            obj.sched.wind_speed = nanmax(obj.checker.wind_speed.now);
+            
+            new_target = obj.sched.choose('now', varargin{:}); 
+            
+            if isempty(new_target)
+                obj.mount.object.name = '';
+                obj.mount.object.RA = '';
+                obj.mount.object.Dec = '';
+                fprintf('Could not find any targets! \nTry changing the constraints or adding new targets and reloading the scheduler.\n'); 
+            else
+                obj.mount.object.name = new_target.name;
+                obj.mount.object.RA = new_target.RA;
+                obj.mount.object.Dec = new_target.Dec;
+            end
+            
+            % anything else we need to do to update the scheduler that a
+            % target from its list is going to be observed?
             
         end
         

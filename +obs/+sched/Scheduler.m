@@ -55,6 +55,7 @@ classdef Scheduler < handle
         total_observed_time = 0; % how much was actually observed (should be equal to night time if there are no conflicting constraints or bad weather)
         obs_history = []; % a strcut array for runs we have done, with fields: name, index (from targets), RA_deg, Dec_deg, start_time and end_time
         
+        continue_run = 0; % if this is true, the call to "choose" has concluded with us needing to continue the same target
         report = ''; % report what is the next move for the telescope
         rationale = ''; % save a short description why this target is chosen
         
@@ -77,7 +78,8 @@ classdef Scheduler < handle
     
     properties % switches/controls
         
-        filename = 'target_list.txt'; % use the GUI to select a better default file
+        filename = fullfile(getenv('DATA'), 'WFAST/target_lists/target_list.txt');
+%         filename = 'target_list.txt'; % use the GUI to select a better default file
         
         max_sun_elevation = -10; % consider it night time when sun is this far below horizon
         max_wind = 30; % above this wind speed, we must only observe the East side
@@ -293,21 +295,31 @@ classdef Scheduler < handle
             
         end
         
-        function choose(obj, time)
+        function new_target = choose(obj, time, varargin)
             
             if nargin<2 || isempty(time)
                 time = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
             elseif isa(time, 'datetime')
                 time = util.text.time2str(time); 
+            elseif ischar(time)
+                if util.text.cs(time, 'now')
+                    time = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
+                end
             end
             
             arguments = obj.ephem.constraints.output_vars;
             
             % add to arguments the chosen side if "stay_on_side" is true, or because of wind
             % ...
-            if obj.use_stay_on_side
+            
+            if obj.wind_state
+                arguments = [arguments 'side', 'East'];
+            elseif obj.use_stay_on_side
                 arguments = [arguments 'side', obj.current_side];
-                %... what about wind conditions?
+            end
+            
+            if ~isempty(varargin)
+                arguments = [arguments varargin];
             end
             
             for ii = 1:length(obj.targets)
@@ -372,6 +384,8 @@ classdef Scheduler < handle
                 
             end
             
+            obj.continue_run = 0; % by default we do not need to continue the run, and will instead start a new one
+            
             %%%%%% now we have made the selection of the best target, lets see what we can do with it %%%%%%% 
             if isempty(new_target) % no targets are currently observable! 
                 
@@ -381,9 +395,9 @@ classdef Scheduler < handle
                 obj.report_log{end+1,1} = obj.report;
                 if obj.debug_bit>1, disp(obj.report); end
                 
-                obj.prev_target = obj.current;
-                obj.finish_current(time);
-                obj.current = new_target;
+%                 obj.prev_target = obj.current;
+%                 obj.finish_current(time);
+%                 obj.current = new_target;
                 
             elseif ~isequal(obj.current, new_target) || ~obj.compare_coordinates(new_target) 
             % new target is different from the current one, or current target is empty, 
@@ -394,9 +408,9 @@ classdef Scheduler < handle
                 obj.report_log{end+1,1} = obj.report;
                 if obj.debug_bit>1, disp([obj.report ' | ' new_target.details]); end
                 
-                obj.prev_target = obj.current;
-                obj.finish_current(time);
-                obj.current = new_target;
+%                 obj.prev_target = obj.current;
+%                 obj.finish_current(time);
+%                 obj.current = new_target;
                 
             elseif ~isempty(obj.current_side) && ~isequal(obj.current_side, new_target.side)
                 
@@ -404,12 +418,13 @@ classdef Scheduler < handle
                 obj.report_log{end+1,1} = obj.report;
                 if obj.debug_bit>1, disp([obj.report ' | ' new_target.details]); end
                 
-                obj.finish_current(time);
+%                 obj.finish_current(time);
                 % stay with current target, do not update prev_target (is this the right thing to do??)
             else
                 obj.report = sprintf('%s: Continue observing:   %50s', time, new_target.summary); 
                 obj.report_log{end+1,1} = obj.report;
                 if obj.debug_bit>1, disp([obj.report ' | ' new_target.details]); end
+                obj.continue_run = 1; % this is the only case where we do not need to start a new run! 
             end
             
             if ~isempty(obj.gui) && obj.gui.check
@@ -580,7 +595,13 @@ classdef Scheduler < handle
                     
                 end
                 
-                obj.choose(sim_time); 
+                new_target = obj.choose(sim_time); 
+                
+                if obj.continue_run==0 % what happens if we continue the same target after a flip? the prev_target will be same as current! is this the right thing to do??
+                    obj.prev_target = obj.current;
+                    obj.finish_current(sim_time);
+                    obj.current = new_target;
+                end
                 
                 obj.rationale_log{end+1,1} = obj.rationale;
             
@@ -698,6 +719,12 @@ classdef Scheduler < handle
             end
             
             obj.gui.make;
+            
+        end
+        
+        function constraintsGUI(obj)
+            
+            obj.ephem.constraints.makeGUI;
             
         end
         

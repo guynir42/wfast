@@ -697,14 +697,14 @@ classdef SensorChecker < handle
                 if ~obj.checkValueOK(name) || ~obj.checkBoolOK(name)
                     obj.sensors_ok = 0;
                     obj.report = obj.(name).err_str; 
-                    return; 
+                    break; 
                 end
                 
             end
             
-            if obj.use_wise_safe_flag
+            if obj.sensors_ok && obj.use_wise_safe_flag
 
-                if ~strcmp(obj.wise_report, 'OK') % this means it is nor safe! 
+                if ~strcmp(obj.wise_report, 'OK') % this means it is not safe! 
                     obj.sensors_ok = 0;
                     obj.report = ['Wise: ' obj.wise_report];
                 end
@@ -809,7 +809,7 @@ classdef SensorChecker < handle
             
             markers = {'o', '+', '*', 's', 'v', 'x', 'd', 'p', '^', '>', '<', 'h'}; 
             Nmark = length(markers); 
-            lines = {'-', '--', ':', '.-'}; 
+            lines = {'-', '--', ':', '-.'}; 
             colors = {'yellow', 'cyan', 'red', 'magenta', 'black', 'blue', 'green', 'black'}; 
             
             for ii = 1:length(obj.data_types)

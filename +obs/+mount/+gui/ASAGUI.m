@@ -301,7 +301,6 @@ classdef ASAGUI < handle
                 obj.panel_object.button_prev_objects.control.String = obj.owner.prev_objects;
             end
             
-            
             if strcmp(obj.owner.pier_side, obj.owner.obj_pier_side)
                 obj.panel_object.button_pierside.BackgroundColor = util.plot.GraphicButton.defaultColor;
             elseif ~strcmp(obj.owner.obj_pier_side, 'pierUnknown')

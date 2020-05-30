@@ -31,6 +31,8 @@ classdef ManagerGUI < handle
         
         panel_telescope;
         
+        panel_scheduler;
+        
         panel_object;
         
         panel_dome;
@@ -146,6 +148,16 @@ classdef ManagerGUI < handle
             obj.panel_telescope.button_tracking.Tooltip = 'Turn telescope tracking on and off';
             obj.panel_telescope.button_side.Tooltip = 'The side to which the telescope is currently pointing';
             
+            %%%%%%%%%%% panel scheduler %%%%%%%%%%%%%%%
+            
+            N = 1;
+            pos = pos - 1;
+            obj.panel_scheduler = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'scheduler'); 
+            obj.panel_scheduler.addButton('button_gui', 'sched', 'push', 'GUI', '', '', 1/3, '', '', 'open the scheduler GUI for more details'); 
+            obj.panel_scheduler.addButton('button_constraints', 'sched.constraintsGUI', 'push', 'constraints', '', '', 1/3, '', '', 'open the constraints menu for choosing targets from scheduler'); 
+            obj.panel_scheduler.addButton('button_choose', 'chooseNewTarget', 'push', 'choose', '', '', 1/3, '', '', 'choose a target from the scheduler and load it into the "object" field'); 
+            obj.panel_scheduler.margin = [0.02 0.01];
+            obj.panel_scheduler.make;
             
             %%%%%%%%%%% panel object %%%%%%%%%%%%%%%
             
@@ -195,7 +207,7 @@ classdef ManagerGUI < handle
             
             %%%%%%%%%%% panel controls %%%%%%%%%%%%%%%
             
-            N = 9;
+            N = 4;
             pos = pos - N;
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'controls');
             obj.panel_controls.number = N;
@@ -304,6 +316,7 @@ classdef ManagerGUI < handle
             obj.menu_objects = MenuItem(obj, '&Device GUIs', 'menu');
             obj.menu_objects.addButton('button_dome', '&Dome', 'push', 'dome', 'dome GUI', 'Open the dome GUI');
             obj.menu_objects.addButton('button_mount', '&Mount', 'push', 'mount', 'mount GUI', 'Open the dome GUI');
+            obj.menu_objects.addButton('button_scheduler', '&Scheduler', 'push', 'sched', 'scheduler GUI', 'Open the scheduler GUI');
 
             for ii = 1:length(obj.panels)
                 obj.panels{ii}.panel.BackgroundColor = obj.color_bg; 

@@ -85,11 +85,11 @@ classdef SchedGUI < handle
             
             obj.fig = util.plot.FigHandler('Scheduler');
             obj.fig.clear;
-            obj.fig.bottom = 5;
-            obj.fig.height = 16;
-            obj.fig.width = 25;
+            obj.fig.height = 20;
+            obj.fig.width = 36;
             movegui(obj.fig.fig, 'center');
             
+            obj.fig.bottom = 3;
             
             %%%%%%%%%%%%%%%%%%%%%%% MENUS %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -202,7 +202,7 @@ classdef SchedGUI < handle
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
             
             obj.panel_close = uipanel('Position', [0 0 0.2 1/N]);
-            obj.button_close = GraphicButton(obj.panel_close, [0.05 0.05 0.9 0.9], obj.owner, '', 'custom', 'CLOSE');
+            obj.button_close = GraphicButton(obj.panel_close, [0.05 0.05 0.9 0.9], obj.owner, '', 'custom', 'CLOSE GUI');
             obj.button_close.Callback = @obj.callback_close;
             
             obj.update;

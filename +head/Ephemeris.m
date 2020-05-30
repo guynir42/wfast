@@ -241,6 +241,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         function reset(obj) % remove all coordinate data, update to current time
             
             obj.name = '';
+            obj.keyword = '';
             obj.RA_deg = [];
             obj.Dec_deg = [];
             obj.moon = [];
@@ -262,6 +263,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         function clear(obj)
             
+            obj.now_observing = 0;
             obj.start_time = [];
             obj.end_time = [];
             obj.prev_runtime_minutes = 0;

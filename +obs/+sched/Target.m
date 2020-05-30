@@ -495,7 +495,8 @@ classdef (CaseInsensitiveProperties) Target < handle
             end
             
             if isempty(obj.start_time)
-                error('Can not finish an observation that has not been started yet! Use start_observation()'); 
+                return;
+%                 error('Can not finish an observation that has not been started yet! Use start_observation()'); 
             end
             
             obj.obs_history(end).end_time = time; 

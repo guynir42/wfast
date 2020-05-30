@@ -1106,13 +1106,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             obj.log.input(sprintf('Slewing to target. RA= %s | DE= %s | ALT= %4.2f', obj.object.RA, obj.object.Dec, obj.object.ALT_deg));
             
-            try 
+            try % do the actual slews
                 
                 if ~obj.check_before_slew
                     error('Prechecks failed, aborting slew');
                 end
                 
-                on_cleanup = onCleanup(@() obj.after_slew); % make sure these things happen in any way the function is finished (error, return statement, ctrl+C, or normaly done)
+                
+                on_cleanup = onCleanup(@() obj.after_slew(input)); % make sure these things happen in any way the function is finished (error, return statement, ctrl+C, or normaly done)
                 
                 obj.brake_bit = 0;
             
@@ -1147,15 +1148,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     
                 end
                 
-                if input.history
-                    try % keep a history of all targets
-                        str = [obj.objName ' {' obj.objRA ', ' obj.objDec '}'];
-                        obj.addTargetList(str);
-                    catch ME
-                        rethrow(ME);
-                    end
-                end
-                
                 if obj.brake_bit, return; end % in case user clicked stop!
                 obj.slewWithoutPrechecks(ra_hours_Jnow, dec_deg_Jnow);
                 
@@ -1182,7 +1174,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                         obj.log.input('Slew post-check failed again, trying to slew to different coordinate and return...'); 
                         disp(obj.log.report); 
 
-                        obj.slewWithoutPrechecks(ra_hours_Jnow+0.1, dec_deg_Jnow+1);
+                        if obj.HA_deg>0 % target is on West side
+                            obj.slewWithoutPrechecks(ra_hours_Jnow-0.1, dec_deg_Jnow+1);
+                        else % target is on East side
+                            obj.slewWithoutPrechecks(ra_hours_Jnow+0.1, dec_deg_Jnow+1);
+                        end
                         
                         pause(3); 
                         
@@ -1205,14 +1201,23 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function after_slew(obj)
+        function after_slew(obj, input)
             
                 obj.tracking = 1;
                                 
                 if ~isempty(obj.cam_pc)
                     obj.cam_pc.outgoing.stop_camera = 0; % need to tell cam-pc to start working! 
-                    obj.updateCamera;
+                    obj.updateCamera; % make sure camera also knows about the new target
                     obj.cam_pc.update;
+                end
+                
+                if input.history
+                    try % keep a history of all targets
+                        str = [obj.objName ' {' obj.objRA ', ' obj.objDec '}'];
+                        obj.addTargetList(str);
+                    catch ME
+                        rethrow(ME);
+                    end
                 end
                 
                 obj.setup_timer;
@@ -1233,8 +1238,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             obj.brake_bit = 0;
             
-            obj.hndl.SlewToCoordinatesAsync(ra_hours_Jnow, dec_deg_Jnow);
-
+            try
+                obj.hndl.SlewToCoordinatesAsync(ra_hours_Jnow, dec_deg_Jnow);
+            catch ME
+                if strcmp(ME.identifier, 'MATLAB:COM:E2148734208')
+                    fprintf('Hardware error: "%s". Slewing again...\n', ME.identifier);
+                    obj.hndl.SlewToCoordinatesAsync(ra_hours_Jnow, dec_deg_Jnow);
+                end
+            end
+            
+            
             for ii = 1:100000
 
                 pause(0.01);
@@ -1306,7 +1319,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             if isempty(obj) || isempty(obj.hndl)
                 return;
             end
-            
+                       
             try 
             
                 obj.object.update;
@@ -1351,39 +1364,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                         end
                         
                     end
-                    
-%                     if ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'RA_rate_delta') && ~isempty(obj.cam_pc.incoming.RA_rate_delta)
-%                         dRA = obj.cam_pc.incoming.RA_rate_delta;
-%                         if isempty(dRA) || isnan(dRA), dRA = 0; end
-%                         
-%                         if ~isequal(dRA, obj.prev_dRA)
-%                             obj.rate_RA = obj.rate_RA + direction*dRA;
-%                             obj.prev_dRA = dRA;
-%                             fprintf('dRA= %6.4f ', dRA); 
-%                         end
-%                         
-% %                         obj.cam_pc.incoming.RA_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
-%                         
-%                         obj.cam_pc.outgoing.RA_rate = obj.rate_RA;
-%                         
-%                     end
-%                     
-%                     if ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'DE_rate_delta') && ~isempty(obj.cam_pc.incoming.DE_rate_delta)
-%                         dDE = obj.cam_pc.incoming.DE_rate_delta;
-%                         if isempty(dDE) || isnan(dDE), dDE = 0; end
-%                         
-%                         if ~isequal(dDE, obj.prev_dDE)
-%                             obj.rate_DE = obj.rate_DE + direction*dDE;
-%                             obj.prev_dDE = dDE;
-%                             fprintf('| dDE= %6.4f\n', dDE); 
-%                         end
-%                         
-% %                         obj.cam_pc.incoming.DE_rate_delta = 0; % must zero this out, so if we lose connection we don't keep adding these deltas
-%                         obj.cam_pc.outgoing.DE_rate = obj.rate_DE;
-%                         
-%                     end
-                    
-%                     fprintf('dRA= %6.4f | dDe= %6.4f\n', dRA, dDE); 
                     
                 else
                     % what to do here? reconnect or leave that to t1?
@@ -1490,57 +1470,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function adjustPosition(obj, RA_deg, DE_deg) % not working yet
-            
-            error('This doesnt work, dont use it');
-            
-            obj.log.input(sprintf('Adjusting position by RA: %f deg | DE: %f deg', RA_deg, DE_deg));
-            
-            try
-
-                total_time = 1;
-                time_res = 0.1;
-                N = ceil(total_time./time_res);
-                total_time = N.*time_res; % if the division was not integer
-
-                if obj.prechecks==0
-                    obj.stop;
-                    return;
-                end
-
-                obj.brake_bit = 0;
-                on_cleanup = onCleanup(@obj.stop);
-            
-                % convert the total adjustment to the rate in arcsec/sec
-                obj.hndl.RightAscensionRate = DE_deg.*3600/total_time;
-                obj.hndl.DeclinationRate = DE_deg.*3600/total_time;
-            
-                t = tic;
-                
-                for ii = 1:N
-                
-                    if obj.brake_bit || obj.checks==0
-                        obj.emergency_stop;
-                        return;
-                    end
-                    
-                    if toc(t)>total_time
-                        obj.stop;
-                        return;
-                    end
-                    
-                    pause(time_res);
-                    
-                end
-            
-            catch ME
-                obj.stop;
-                obj.log.error(ME.getReport);
-                rethrow(ME);
-            end
-                
-        end
-        
         function engineeringSlew(obj,Alt,Az) % alternative way to slew to Alt/Az
             
             if nargin<2 || isempty(Alt)
@@ -1606,6 +1535,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
+        function park(obj) % go to parking position 
+            
+            obj.engineeringSlew(30, 180); 
+            
+            if obj.brake_bit, obj.stop; return; end
+            
+            obj.hndl.Park;
+            obj.tracking = 0;
+            
+        end
+        
         function restore_object(obj)
             
             obj.object = obj.object_backup;
@@ -1615,15 +1555,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function sync(obj) % this is still not working! 
             
             obj.hndl.SyncToCoordinates(obj.hndl.TargetRightAscension, obj.hndl.TargetDeclination);
-            
-        end
-        
-        function park(obj) % go to parking position 
-            
-            obj.engineeringSlew(30, 180); 
-            
-            obj.hndl.Park;
-            obj.tracking = 0;
             
         end
         
@@ -1664,31 +1595,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             obj.setup_timer; % the timer also updates GUI and arduino
             
-            try % logger hearteat
+            try % logger heartbeat
                 if ~obj.log.check_heartbeat
                     obj.log.heartbeat(300, obj); 
                 end
             catch ME
                 warning(ME.getReport);
             end
-            
-%             try % arduino
-%                
-%                 if obj.use_accelerometer
-%                     
-%                     obj.ard.update;
-%                     
-%                     if isempty(obj.ard) || obj.ard.status==0 || obj.checkArduinoTime==0
-%                         obj.connectArduino;
-%                     end
-%                     
-%                 end
-%                 
-%             catch ME
-%                 warning(ME.getReport);
-%             end
-            
-            % add additional tests?
             
             obj.status = 1;
             
@@ -1747,18 +1660,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             obj.cam_pc.outgoing.TELDEC = obj.telDec;
             obj.cam_pc.outgoing.TELRA_DEG = obj.telRA_deg;
             obj.cam_pc.outgoing.TELDEC_DEG = obj.telDec_deg;
-            
-%             if isempty(obj.tracking) || obj.tracking==0 || (~isempty(obj.objRA_deg) && abs(obj.objRA_deg-obj.telRA_deg)>1) % if mount stops tracking or is 4 time-minutes away from target RA, stop the camera (e.g., when reaching limit)
-%                 
-%                 if ~isempty(obj.cam_pc) && isfield(obj.cam_pc.outgoing, 'stop_camera') && obj.cam_pc.outgoing.stop_camera==0
-%                     obj.cam_pc.outgoing.stop_camera = 1;
-%                     obj.log.input('Telescope not tracking, stopping camera');
-%                     disp(obj.log.report); 
-%                 end
-%                 
-%             else
-%                 obj.cam_pc.outgoing.stop_camera = 0;
-%             end
             
         end
         
