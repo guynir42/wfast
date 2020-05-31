@@ -110,8 +110,8 @@ classdef AutoGUI < handle
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N width num_buttons/N], 'controls', 1); % last input is for vertical (default)
             obj.panel_controls.addButton('input_exp_time', 'expT', 'input', 'expT= ', '', '', 0.5, '', '', 'exposure time (seconds) for each image'); 
             obj.panel_controls.addButton('input_batch_size', 'batch_size', 'input', 'N= ', '', '', 0.5, '', '', 'number of images for each batch / each focus position'); 
-            obj.panel_controls.addButton('button_loop_back', 'use_loop_back', 'toggle', 'no loop', 'loop back', '', 0.5, obj.color_on, '', 'scan the focus positions in both directions'); 
-            obj.panel_controls.addButton('button_placeholder', 'use_fit_curves', 'toggle', 'no fit', 'use fit', '', 0.5, obj.color_on, '', 'fit each star width curve to a parabola'); 
+            obj.panel_controls.addButton('button_loop_back', 'use_loop_back', 'toggle', 'loop back is off', 'loop back is on', '', 0.5, obj.color_on, '', 'scan the focus positions in both directions'); 
+            obj.panel_controls.addButton('button_placeholder', 'use_fit_curves', 'toggle', 'fit is off', 'fit is on', '', 0.5, obj.color_on, '', 'fit each star width curve to a parabola'); 
             obj.panel_controls.addButton('input_range', 'range', 'input', 'range= ', '', '', 0.5, '', '', 'how far in either direction from the focus point we want to scan'); 
             obj.panel_controls.addButton('input_step', 'step', 'input', 'step= ', '', '', 0.5, '', '', 'step size for sampling the focus positions'); 
             obj.panel_controls.addButton('input_stars', 'num_stars', 'input', 'num stars= ', '', '', 0.5, '', '', 'maximum number of stars to use for focusing'); 
@@ -181,7 +181,7 @@ classdef AutoGUI < handle
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
             
             obj.panel_close = uipanel('Position', [0 0 width 1/N]);
-            obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE');
+            obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE GUI');
             obj.button_close.Callback = @obj.callback_close;
             
             obj.update;

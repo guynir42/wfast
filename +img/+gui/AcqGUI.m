@@ -108,7 +108,7 @@ classdef AcqGUI < handle
             
             obj.fig.bottom = 5;
             obj.fig.height = 20;
-            obj.fig.width = 30;
+            obj.fig.width = 36;
             movegui(obj.fig.fig, 'center');
             obj.fig.clear;
             
@@ -207,8 +207,8 @@ classdef AcqGUI < handle
             obj.panel_controls.addButton('button_slow_mode', 'setupSlowMode', 'push', 'Slow mode', '', '', 0.5, '', '', 'Setup low-cadence observations with T=3s, single image files, 500 stars max');
             obj.panel_controls.addButton('button_fast_mode', 'setupFastMode', 'push', 'Fast mode', '', '', 0.5, '', '', 'Setup high-cadence observations with T=30ms, f=25Hz, 100 images per batch/file');
             obj.panel_controls.addButton('button_single', 'single', 'push', 'Take single batch', '', '', [], '', '', 'Take a single image and show it on screen. Does not save the image to file');
-            obj.panel_controls.addButton('button_live', 'startLiveView', 'push', 'Start live view', '', '', [], '', '', 'Open the camera GUI and start the live-view video mode. Does not save any images to file');
-            obj.panel_controls.addButton('button_auto_focus', 'runFocus', 'push', 'Auto-focus', '', '', 0.7, '', '', 'Start a focus-run. Does not save any images to file');
+            obj.panel_controls.addButton('button_live', 'startLiveView', 'push', 'Camera GUI: Live view', '', '', [], '', '', 'Open the camera GUI and start the live-view video mode. Does not save any images to file');
+            obj.panel_controls.addButton('button_auto_focus', 'runFocus', 'push', 'Autofocus iterations', '', '', 0.7, '', '', 'Start am iterative focus-run. Will stop when good focus is reached');
             obj.panel_controls.addButton('button_manual_focus', '', 'custom', 'manual', '', '', 0.3, '', '', 'open the focus GUI for manual focusing');
             obj.panel_controls.addButton('button_preview', '', 'custom', 'Preview run', '', '', [], '', '', 'Start a preview run, checking full acquisition pipeline. Does not save any images to file');
             
@@ -275,11 +275,11 @@ classdef AcqGUI < handle
             obj.button_show_what.Callback = @obj.callback_show_what;
             obj.button_show_what.String = obj.owner.show_what_list;
             
-            obj.button_gray = GraphicButton(obj.panel_image, [0.15 0.00 0.1 0.05], obj.owner, 'use_show_gray', 'toggle', 'color', 'gray', 'small'); 
+            obj.button_gray = GraphicButton(obj.panel_image, [0.15 0.00 0.1 0.05], obj.owner, 'use_show_gray', 'toggle', 'in color', 'in B/W', 'small'); 
             obj.button_gray.Tooltip = 'show the images in color or in gray-scale'; 
             
-            obj.button_flip = GraphicButton(obj.panel_image, [0.9 0.00 0.1 0.05], obj.owner, 'use_flip', 'toggle', 'no flip', 'flip', 'small');
-            obj.button_show_switch = GraphicButton(obj.panel_image, [0.8 0.00 0.1 0.05], obj.owner, 'use_show', 'toggle', 'no show', 'show', 'small');
+            obj.button_flip = GraphicButton(obj.panel_image, [0.9 0.00 0.1 0.05], obj.owner, 'use_flip', 'toggle', 'flip is off', 'flip is on', 'small');
+            obj.button_show_switch = GraphicButton(obj.panel_image, [0.8 0.00 0.1 0.05], obj.owner, 'use_show', 'toggle', 'show is off', 'show is on', 'small');
                         
             obj.button_num_stars = GraphicButton(obj.panel_image, [0.00 0.95 0.1 0.05], obj.owner, 'display_num_rect_stars', 'input', 'rect= ', '', 'small');
             

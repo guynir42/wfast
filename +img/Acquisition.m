@@ -1839,7 +1839,10 @@ classdef Acquisition < file.AstroData
                 obj.update(input); % update header object to current time and input run name, RA/DE if given to input.
                 
                 if isempty(obj.head.OBJECT)
-                    error('Cannot start a run without a valid OBJECT name in header!'); 
+                    obj.gui.latest_error = 'Cannot start a run without a valid OBJECT name in header!';
+                    warning(obj.gui.latest_error); 
+                    obj.log.error(obj.gui.latest_error); 
+                    return;
                 end
                 
                 obj.stash_parameters(input);
@@ -1847,12 +1850,11 @@ classdef Acquisition < file.AstroData
                 obj.buf.use_save_photometry = obj.use_save_photometry; 
                 
                 if isempty(obj.num_batches)
-                    error('Must input a number of batches!');
+                    obj.gui.latest_error = 'Must input a number of batches!';
+                    warning(obj.gui.latest_error);
+                    obj.log.error(obj.gui.latest_error);
+                    return;
                 end
-                
-%                 if ~isempty(obj.total_runtime)
-%                     obj.num_batches = ceil(obj.total_runtime.*obj.convertRuntimeToSeconds.*obj.getFrameRateEstimate./obj.batch_size);
-%                 end
                 
                 if ~isempty(obj.gui) && obj.gui.check
                     
@@ -1871,15 +1873,24 @@ classdef Acquisition < file.AstroData
                 end
                 
                 if ~obj.cal.checkDark
-                    error('Cannot start a new run without loading darks into calibration object!');
+                    obj.gui.latest_error = 'Cannot start a new run without loading darks into calibration object!';
+                    warning(obj.gui.latest_error);
+                    obj.log.error(obj.gui.latest_error);
+                    return;
                 end
                 
                 if obj.getTimeLeft>3600*10
-                    error('Run scheduled to take %4.2f hours with these parameter... aborting!', obj.getTimeLeft/3600); 
+                    obj.gui.latest_error = sprintf('Run scheduled to take %4.2f hours with these parameter... aborting!', obj.getTimeLeft/3600);
+                    warning(obj.gui.latest_error);
+                    obj.log.error(obj.gui.latest_error);
+                    return;
                 end
                 
                 if obj.use_save && obj.getGbLeft>util.sys.disk_space(obj.buf.directory)*1.0 % only throw an error if the required disk space is bigger than storage! 
-                    error('Run scheduled requires an estimated %5.2f Gb of storage. Only %5.2f Gb available on drive!', obj.getGbLeft, util.sys.disk_space(obj.buf.directory));
+                    obj.gui.latest_error = sprintf('Run scheduled requires an estimated %5.2f Gb of storage. Only %5.2f Gb available on drive!', obj.getGbLeft, util.sys.disk_space(obj.buf.directory));
+                    warning(obj.gui.latest_error);
+                    obj.log.error(obj.gui.latest_error);
+                    return;
                 end
                 
                 if input.use_reset % this parameter is not saved in the object because we only use it here... 
@@ -2013,7 +2024,6 @@ classdef Acquisition < file.AstroData
                 end
                 
                 obj.src.startup('use_save', 0, 'use_reset', input.use_reset, 'use_async', 1, obj.pass_source{:});
-%                 obj.src.startup('use_save', 0, 'async', 1, obj.pass_source{:});
 
                 if obj.use_progress
                     obj.prog.start(obj.num_batches); % maybe use continue if not restarting? 
@@ -2683,7 +2693,7 @@ classdef Acquisition < file.AstroData
                 obj.cam.makeGUI;
             end
             
-            obj.cam.live;
+            obj.cam.live('autodyn', 1);
             
         end
         
@@ -2748,7 +2758,9 @@ classdef Acquisition < file.AstroData
                     lastwarn('');
                 end
                 
-                for ii = 1:4
+                success = 0;
+                
+                for ii = 1:6
                 
                     if obj.debug_bit, fprintf('Running focus loop attempt %d\n', ii); end
                     
@@ -2760,13 +2772,26 @@ classdef Acquisition < file.AstroData
                     if obj.debug_bit, fprintf('Resulting focus point is %4.2f at FWHM of %4.2f"\n', obj.cam.af.found_pos, obj.cam.af.found_width.*2.355.*obj.head.SCALE); end
                     
                     if obj.cam.af.found_width<1 && obj.cam.af.found_pos>=min_pos && obj.cam.af.found_pos<=max_pos
+                        success = 1;
                         break; % if focus is good enough and not at the edges of the range, we don't need to repeat it
                     end
                     
                     if abs(obj.cam.af.found_pos - prev_focus_point)<0.05
+                        success = 1;
                         break; % if focus returns to the same position each time, we can give up on it
                     end
                 
+                end
+                
+                % could not find a decent focus:
+                if ~isempty(obj.cam.af.gui) && obj.cam.af.gui.check
+                    if success
+                        util.plot.inner_title(sprintf('Focus success after %d iterations!', ii),...
+                            'ax', obj.cam.af.gui.image_axes, 'FontSize', 26, 'Position', 'North'); 
+                    else
+                        util.plot.inner_title(sprintf('Focus failed after %d iterations!', ii),...
+                            'ax', obj.cam.af.gui.image_axes, 'FontSize', 26, 'Position', 'North'); 
+                    end
                 end
                 
             catch ME

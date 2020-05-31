@@ -77,7 +77,7 @@ classdef Analysis < file.AstroData
         saturation_value = 50000; % consider any pixels above this to be saturated
         
         use_background_stack = 1; % subtract b/g from the full-frame stack
-        use_background_cutouts = 1; % subtract b/g from the cutouts (and stack cutouts!)
+        use_background_cutouts = 0; % subtract b/g from the cutouts (and stack cutouts!)
         use_refine_bg = 0; % need to figure out exactly how to do this
         
         use_check_flux = 1;

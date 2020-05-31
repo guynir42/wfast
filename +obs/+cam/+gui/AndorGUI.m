@@ -178,7 +178,7 @@ classdef AndorGUI < handle
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
                         
             obj.panel_close = uipanel('Position', [0 0/15 0.2 2/15]);
-            obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE');
+            obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE GUI');
             obj.button_close.Callback = @obj.callback_close;
             
             obj.update;

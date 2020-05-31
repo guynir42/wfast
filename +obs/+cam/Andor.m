@@ -830,6 +830,8 @@ classdef Andor < file.AstroData
             
                 obj.is_running_focus = 1; % tell focus GUI to display an indicator that focus is running... 
                 
+                % make sure finishup is called in the end
+                on_cleanup = onCleanup(@obj.finish_focus);
                 
                 % update the object with the camera parameters
                 obj.af.x_max = obj.ROI(4);
@@ -891,9 +893,6 @@ classdef Andor < file.AstroData
                     'reset', 1, 'frame_rate', obj.af.frame_rate, 'exp time', obj.af.expT, ...
                     'save', 0, 'show', 1, 'log_level', 1, 'progress', 0, 'audio', 1, varargin{:});
 
-                % make sure finishup is called in the end
-                on_cleanup = onCleanup(@obj.finishup);
-                
                 for ii = 1:obj.num_batches
                     
                     if obj.brake_bit, break; end
@@ -955,17 +954,7 @@ classdef Andor < file.AstroData
 %                     obj.cam.focuser.tilt = obj.cam.focuser.tilt + obj.af.found_tilt;
 %                 end
 
-                obj.is_running_focus = 0; 
-                
-                obj.af.plot;
-                
-                if ~isempty(obj.focuser.gui) && obj.gui.check
-                    obj.focuser.gui.update
-                end
-
             catch ME
-                
-                obj.is_running_focus = 0; 
                 obj.focuser.pos = old_pos;
                 obj.log.error(ME.getReport);
                 rethrow(ME);
@@ -1011,7 +1000,7 @@ classdef Andor < file.AstroData
                 obj.is_running = 1;
             end
             
-            obj.startup(varargin);
+            input = obj.startup(varargin);
             
             try
                 
@@ -1028,6 +1017,10 @@ classdef Andor < file.AstroData
                     
                     obj.batch;
                     
+                    if ii==1 && input.autodyn && ~isempty(obj.gui) && obj.gui.check
+                        obj.gui.panel_contrast.autodyn;
+                    end
+                    
                 end
                 
             catch ME
@@ -1037,7 +1030,7 @@ classdef Andor < file.AstroData
             
         end
         
-        function startup(obj, varargin)
+        function input = startup(obj, varargin)
             
             try 
                 
@@ -1313,6 +1306,7 @@ classdef Andor < file.AstroData
                 input.input_var('use_save', obj.use_save, 'save', 5); % if you want to save each batch 
                 input.input_var('use_audio', obj.use_audio, 'audio', 5); % turn on/off audio signals
                 input.input_var('use_reset', true, 5); 
+                input.input_var('autodyn', false, 'use_autodyn'); 
                 input.input_var('use_progress', obj.use_progress, 'progress', 5); % display a progress bar on screen
                 input.input_var('log_level', obj.log_level); % choose if and how much logging you want for this run (1 is only start of run). Errors are always logged. 
                 input.input_var('debug_bit', obj.debug_bit, 'debug');
@@ -1567,6 +1561,20 @@ classdef Andor < file.AstroData
             util.vec.mex_change(obj.mex_flag, 2, 1); % C++ interfaces through this flag
 
             obj.brake_bit = 1; % matlab loops are stopped with this value
+            
+        end
+        
+        function finish_focus(obj)
+            
+            obj.finishup;
+            
+            obj.is_running_focus = 0; 
+
+%             obj.af.plot;
+
+            if ~isempty(obj.focuser.gui) && obj.gui.check
+                obj.focuser.gui.update
+            end
             
         end
         
