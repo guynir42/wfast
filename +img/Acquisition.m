@@ -1065,7 +1065,7 @@ classdef Acquisition < file.AstroData
             obj.use_adjust_cutouts = 1;
             obj.use_autodeflate = 1;
             obj.use_check_positions = 1;
-            obj.use_sync_stop = 1;
+%             obj.use_sync_stop = 1;
             
         end
         
@@ -1570,9 +1570,9 @@ classdef Acquisition < file.AstroData
             obj.sync.update;
             pause(0.05); 
             
-            if obj.sync.status==0 
-                
-                obj.sync.connect;
+            if obj.sync.status==0 && obj.brake_bit % do not stop to reconnect during acquisition! 
+                disp('connecting to PcSync'); 
+                obj.connectSync;
                 
                 if obj.sync.status
                     obj.sync.reco.lock;
