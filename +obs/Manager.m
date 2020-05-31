@@ -194,6 +194,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     obj.sched = obs.sched.Scheduler;
                 end
                 
+                if isempty(obj.mount.sched)
+                    obj.mount.sched = obj.sched;
+                end
+                
                 obj.sched.readFile; 
                 
             catch ME
@@ -827,7 +831,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             % do this later
         end
         
-        function morning_report(obj)
+        function morning_report(obj, test_mode)
+            
+            if nargin<2 || isempty(test_mode)
+                test_mode = 0;
+            end
             
             t = datetime('yesterday', 'TimeZone', 'UTC');
             date_string = datestr(t, 'yyyy-mm-dd');
@@ -836,9 +844,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             str = '';
             
-            str = sprintf('%s\n%s', str, obj.email.html(sprintf('This is a morning report for the night of %s.', date_string), 'p', 'font-size:14px')); 
+            str = sprintf('%s\n%s', str, obj.email.html(sprintf('Morning report for night of %s.', date_string), 'p', 'font-size:14px')); 
             
-            str = sprintf('%s\n%s', str, obj.email.html(sprintf('Dome status is: %s ', obj.observatory_state), 'p', 'font-size:18px; font-weight:bold')); 
+            str = sprintf('%s\n%s', str, obj.email.html(sprintf('Observatory is: %s ', obj.observatory_state), 'p', 'font-size:20px; font-weight:bold')); 
 
             %%%%%% tonight's observer %%%%%%%
             
@@ -850,7 +858,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obs_list = {}; 
             end
             
-            str = sprintf('%s\n%s', str, obj.email.html(sprintf('Tonight''s observer is %s. ', name))); 
+            str = sprintf('%s\n%s', str, obj.email.html(sprintf('Observer: %s. ', name))); 
             
             %%%%%%% runs overview %%%%%%%%%
             
@@ -858,7 +866,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 field_list = fields(obj.obs_log); 
                 
-                obs_str = sprintf('<table style="width:60%%">');
+                obs_str = sprintf('<table">');
+                obs_str = sprintf('%s\n  <tr style="font-family:Courier;font-size:18px">', obs_str); 
+                obs_str = sprintf('%s\n     <th style="text-align:left;width:100px"> name  </th>', obs_str);
+                obs_str = sprintf('%s\n     <th style="text-align:left;width:100px"> runs  </th>', obs_str);
+                obs_str = sprintf('%s\n     <th style="text-align:left;width:100px"> files </th>', obs_str);
+                obs_str = sprintf('%s\n     <th style="text-align:left;width:100px"> time  </th> </tr>', obs_str); 
                 
                 for ii = 1:length(field_list) % each target has a few runs inside a struct array with this name
                     
@@ -876,9 +889,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     end
                     
 %                     obs_str = sprintf('%s\n%10s (%d) | files: %4d | runtime: %7.1f ', obs_str, list{ii}, length(s), files, time); 
-                    obs_str = sprintf('%s\n <tr> <td> %s (%d) </td><td> files: %4d </td><td> runtime: %7.1f </td></tr>', obs_str, field_list{ii}, length(s), files, time); 
+                    obs_str = sprintf('%s\n <tr style="font-family:Courier;font-size:18px"> <td> %s </td>', obs_str, field_list{ii});  
+                    obs_str = sprintf('%s\n      <td> %d </td>', obs_str, length(s)); 
+                    obs_str = sprintf('%s\n      <td> %d </td>', obs_str, files); 
+                    obs_str = sprintf('%s\n      <td> %4.2f h </td> </tr>', obs_str, time/3600); 
                     
                 end
+                
+                obs_str = sprintf('%s\n</table>', obs_str); 
                 
             else
                 obs_str = sprintf('Could not find any information on observations run tonight...'); 
@@ -886,6 +904,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     
             str = sprintf('%s\n%s\n%s', str, obj.email.html('Runs overview for tonight: ', 'p', 'text-decoration: underline'), obj.email.html(obs_str)); 
 
+            %%%%%%%%%%% good times vs. total time %%%%%%%%%%%%%
+            
+            if ~isempty(obj.checker.last_night_total_hours) && ~isempty(obj.checker.last_night_good_hours)
+                
+                str = sprintf('%s\n\n <p style="font-size:14px"> Good weather: %4.1f out of %4.1f hours </p>\n', str, obj.checker.last_night_good_hours, obj.checker.last_night_total_hours); 
+                
+            end
+            
             %%%%%%%%%%% drives overview %%%%%%%%%%%%%%%%
             
             if isfield(obj.cam_pc.incoming, 'drives') && ~isempty(obj.cam_pc.incoming.drives)
@@ -897,13 +923,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 gb_limit = 3000; % set this to warn when HDDs are running low...  
                 
-                drive_str = sprintf('%s\n<table style="width:60%%;font-family:Courier;font-size:12px">\n <tr>', drive_str);
+                drive_str = sprintf('%s\n<table style="width:60%%">', drive_str);
+                drive_str = sprintf('%s\n <tr style="font-family:Courier;font-size:12px">', drive_str); 
                 
                 for ii = 1:length(f)
-                    drive_str = sprintf('%s\n      <td style="font-family:Courier"> %s:\\ </td> ', drive_str, f{ii}); 
+                    drive_str = sprintf('%s\n   <td> %s:\\ </td> ', drive_str, f{ii}); 
                 end
                 
-                drive_str = sprintf('%s\n  </tr><tr>\n', drive_str);
+                drive_str = sprintf('%s\n  </tr><tr style="font-family:Courier;font-size:12px">\n', drive_str);
                 
                 for ii = 1:length(f)
                     if ( strcmp(f{ii}, 'E') || strcmp(f{ii}, 'F') ) && ~isempty(s.(f{ii})) && s.(f{ii})<gb_limit
@@ -913,7 +940,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     end
                 end
                 
-                drive_str = sprintf('%s\n</tr><br>', drive_str);
+                drive_str = sprintf('%s\n</tr></table>', drive_str); % add end of row and end of table
                 
                 if isfield(s, 'E') && ~isempty(s.E) && s.E<gb_limit
                     drive_str = sprintf('%s\nWARNING: Drive E is has less than %d Gb left!', drive_str, gb_limit);
@@ -924,7 +951,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
                 
 %                 str = sprintf('%s\n <p style="font-familiy:Courier;font-size:12px"> %s </p>\n', str, drive_str); 
-                str = [str obj.email.html(drive_str, 'p', 'font-family:Courier; font-size:12px;')]; 
+                str = sprintf('%s\n %s', str, obj.email.html(drive_str, 'p', 'font-family:Courier; font-size:14px;')); 
                 
             end
             
@@ -933,10 +960,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 str = sprintf('%s\n%s', str, obj.email.html(sprintf('Observers for the next few nights are:\n<br> %s. ', strjoin(obs_list, '\n<br>')))); 
             end
             
-%             obj.email.sendToList('subject', sprintf('[WFAST] Morning report %s %d', d, randi(1000)), 'text', str, 'header', 1, 'footer', 1, 'html', 1); 
-            obj.email.sendToList('subject', sprintf('[WFAST] Morning report (obs. is %s) %s ', obj.observatory_state, date_string), 'text', str, 'header', 1, 'footer', 1, 'html', 1); 
+            %%%%%%%%%%% SEND THE ACTUAL EMAIL! %%%%%%%%%%%%%%
             
-            obj.latest_email_report_date = date_string; % make sure we don't resend this email today (after a successful send!)
+            if test_mode==0
+                obj.email.sendToList('subject', sprintf('[WFAST] Morning report (obs. is %s) %s ', obj.observatory_state, date_string), 'text', str, 'header', 1, 'footer', 1, 'html', 1); 
+                obj.latest_email_report_date = date_string; % make sure we don't resend this email today (after a successful send!)
+            else
+                disp(str); 
+                obj.email.sendToList('list', {'guyynir@gmail.com'}, 'subject', sprintf('[WFAST] Morning report (obs. is %s) %s test-%d', obj.observatory_state, date_string, randi(1e5)), 'text', str, 'header', 1, 'footer', 1, 'html', 1); 
+            end
             
         end
         
@@ -1084,7 +1116,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function updateCameraComputer(obj) % send updates through the PcSync object to the camera-PC
             
-            try 
+            try % check if PcSync is not connected
                 
                 % trust the "status" flag to check if we need to reconnect
                 if ~obj.cam_pc.is_connected || ~obj.cam_pc.status
@@ -1137,7 +1169,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     obj.mount.cam_pc = obj.cam_pc; % share the handle to this object
                 end
                 
-                obj.mount.updateCamera; % does mount have any useful data to share with camera? 
+%                 obj.mount.updateCamera; % only call this when finished slewing
                 
             end
             

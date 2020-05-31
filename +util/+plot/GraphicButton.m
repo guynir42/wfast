@@ -526,6 +526,18 @@ classdef GraphicButton < handle
                             elseif isprop(obj.owner.(c{1}), c{2}) && ismethod(obj.owner.(c{1}).(c{2}), 'makeGUI')
                                 obj.owner.(c{1}).(c{2}).makeGUI;
                             end
+                        elseif length(c)==3
+                            if ismethod(obj.owner.(c{1}).(c{2}), c{3})
+                                obj.owner.(c{1}).(c{2}).(c{3});
+                            elseif isprop(obj.owner.(c{1}).(c{2}), c{3}) && ismethod(obj.owner.(c{1}).(c{2}).(c{3}), 'makeGUI')
+                                obj.owner.(c{1}).(c{2}).(c{3}).makeGUI;
+                            end
+                        elseif length(c)==4
+                            if ismethod(obj.owner.(c{1}).(c{2}).(c{3}), c{4})
+                                obj.owner.(c{1}).(c{2}).(c{3}).(c{4});
+                            elseif isprop(obj.owner.(c{1}).(c{2}).(c{3}), c{4}) && ismethod(obj.owner.(c{1}).(c{2}).(c{3}).(c{4}), 'makeGUI')
+                                obj.owner.(c{1}).(c{2}).(c{3}).(c{4}).makeGUI;
+                            end
                         end
                         
                         

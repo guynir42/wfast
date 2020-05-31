@@ -126,11 +126,16 @@ classdef Email < handle
         function sendToList(obj, varargin)
             
             input = util.text.InputVars;
+            input.input_var('list', []); % alternative list
             input.input_var('subject', '[WFAST] automated message'); 
             input.input_var('files', {}); 
             input.scan_vars(varargin{:}); 
             
-            obj.readMailingList;
+            if isempty(input.list)
+                obj.readMailingList;
+            else
+                obj.mailing_list = input.list;
+            end
             
             str = obj.compose(varargin{:}); 
             

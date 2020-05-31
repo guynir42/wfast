@@ -187,6 +187,25 @@ classdef FigHandler < handle
             
         end
         
+        function maximize(obj)
+            
+            obj.fig.WindowState = 'maximized';
+            figure(obj.fig); 
+            
+        end
+        
+        function minimize(obj)
+            
+            obj.fig.WindowState = 'minimized';
+            
+        end
+        
+        function center(obj)
+            
+            movegui(obj.fig, 'center');
+            
+        end
+        
     end
     
     methods % getters

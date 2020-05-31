@@ -98,11 +98,7 @@ classdef ManagerGUI < handle
             
             obj.fig = util.plot.FigHandler('Observatory Manager');
             obj.fig.clear;
-            movegui(obj.fig.fig, 'center');
-            
-            obj.fig.bottom = -5;
-            obj.fig.height = 25;
-            obj.fig.width = 36;
+            obj.fig.maximize
             
             set(obj.fig.fig, 'WindowKeyPressFcn', @obj.callback_key_press);
             set(obj.fig.fig, 'KeyReleaseFcn', @obj.callback_key_released);
@@ -134,10 +130,8 @@ classdef ManagerGUI < handle
             obj.panel_telescope.addButton('button_DE', 'DEC', 'info', 'DE: ', '', '', 0.5);            
             obj.panel_telescope.addButton('button_LST', 'LST', 'info', 'LST: ', '', '', 0.5);
             obj.panel_telescope.addButton('button_ALT', 'ALT', 'info', 'ALT: ', ' deg', '', 0.5);
-            obj.panel_telescope.addButton('button_tracking', 'tracking', 'toggle', 'tracking off', 'tracking on', '', 0.5, obj.color_on, 'red');
+            obj.panel_telescope.addButton('button_tracking', 'tracking', 'toggle', 'tracking is off', 'tracking is on', '', 0.5, obj.color_on, 'red');
             obj.panel_telescope.addButton('button_side', 'mount.telHemisphere', 'info', 'pointing ', '', '', 0.5); 
-%             obj.panel_telescope.addButton('button_placeholder', '', 'custom', ''); 
-%             obj.panel_telescope.addButton('button_slew', 'mount.slew', 'push', 'Slew'); 
             obj.panel_telescope.margin = [0.02 0.01];
             obj.panel_telescope.make;
             
@@ -211,11 +205,11 @@ classdef ManagerGUI < handle
             pos = pos - N;
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'controls');
             obj.panel_controls.number = N;
-            obj.panel_controls.addButton('button_autoshutdown', 'use_shutdown', 'toggle', 'auto shutdown disabled', 'auto shutdown enabled', ...
+            obj.panel_controls.addButton('button_autoshutdown', 'use_shutdown', 'toggle', 'auto shutdown is disabled', 'auto shutdown is enabled', ...
                 '', 0.7, obj.color_on, 'red'); 
-            obj.panel_controls.addButton('button_twilight', 'checker.use_twilight_mode', 'toggle', 'twilight off', 'twilight on', ...
-                '', 0.3, 'red', obj.color_on);             
-            obj.panel_controls.addButton('button_autostartup', 'use_startup', 'toggle', 'auto start up disabled', 'auto start up enabled', ...
+            obj.panel_controls.addButton('button_twilight', 'checker.use_twilight_mode', 'toggle', 'twilight is off', 'twilight is on', ...
+                '', 0.3, 'red', obj.color_on);
+            obj.panel_controls.addButton('button_autostartup', 'use_startup', 'toggle', 'auto start up is disabled', 'auto start up is enabled', ...
                 '', 1, obj.color_on, 'red'); 
             obj.panel_controls.addButton('button_weather_check', 'callback_t2', 'push', 'Weather check');
             obj.panel_controls.margin = [0.01 0.01];
@@ -223,7 +217,7 @@ classdef ManagerGUI < handle
             
             obj.panel_controls.button_autoshutdown.Tooltip = 'Allow manager to close dome and stop tracking if weather is bad or if there is a device failure';
             obj.panel_controls.button_twilight.Tooltip = 'Let the dome stay open during twilight';
-            obj.panel_controls.button_autostartup.Tooltip = 'Allow manager to open and start observing autonomously. (not implemented yet';
+            obj.panel_controls.button_autostartup.Tooltip = 'Allow manager to open and start observing autonomously. (not implemented yet)';
             obj.panel_controls.button_weather_check.Tooltip = 'Run t2 to check weather and devices'; 
             
             %%%%%%%%%%% panel report %%%%%%%%%%%%%%%%%

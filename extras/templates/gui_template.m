@@ -82,7 +82,8 @@ classdef objGUI < handle
             obj.fig.bottom = 5;
             obj.fig.height = 16;
             obj.fig.width = 25;
-            movegui(obj.fig.fig, 'center');
+            obj.fig.center;
+%             obj.fig.maximize;
             
             
             %%%%%%%%%%%%%%%%%%%%%%% MENUS %%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -141,7 +142,7 @@ classdef objGUI < handle
             
             N = 1; pos = pos - N;            
             obj.panel_close = uipanel('Position', [0 pos 0.2 N/N_middle]);
-            obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE');
+            obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE GUI');
             obj.button_close.Callback = @obj.callback_close;
             
             obj.update;

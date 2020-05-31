@@ -32,7 +32,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         prev_objects = {}; % list of latest objects 
         
-        object_backup; 
+        object_backup;
         
     end
     
@@ -77,8 +77,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         use_accelerometer = 1; % make constant checks for altitude outside of the mounts own sensors
         use_ultrasonic = 0; % make constant checks that there is nothing in front of the telescope
-        
-        use_motor_toggle = 0; % when slewing is done, turn motor off then on again
         
         move_rate = 1; % manual slew rate in deg/sec
         
@@ -394,12 +392,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function val = get.objName(obj)
             
-%             if isempty(obj.cam_pc) || isempty(obj.cam_pc.outgoing) || ~isfield(obj.cam_pc.outgoing, 'OBJECT')
-%                 val = '';
-%             else
-%                 val = obj.cam_pc.outgoing.OBJECT;
-%             end
-
             val = obj.object.name;
 
             
@@ -671,9 +663,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             obj.object.name = val; 
             
-            if ~isempty(obj.cam_pc)
-                obj.cam_pc.outgoing.OBJECT = val;
-            end
+%             if ~isempty(obj.cam_pc)
+%                 obj.cam_pc.outgoing.OBJECT = val;
+%             end
             
         end
         
@@ -1570,8 +1562,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             obj.object.update;
             
-            try
+            try % check that the mount is still connected
                 obj.hndl.Connected;
+                % maybe add a check to see the altitude is reasonable? 
             catch 
                 obj.status = 0; 
                 return;
@@ -1652,6 +1645,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function updateCamera(obj) % send details on object coordinates to cam_pc
             
+            obj.cam_pc.outgoing.OBJECT = strrep(obj.objName, ' ', '_');
             obj.cam_pc.outgoing.RA = obj.objRA;
             obj.cam_pc.outgoing.DEC = obj.objDec;            
             obj.cam_pc.outgoing.RA_DEG = obj.objRA_deg;

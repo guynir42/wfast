@@ -864,7 +864,7 @@ classdef SensorChecker < handle
 
                     for jj = 1:length(h) 
                         h(jj).DisplayName = sprintf('%s [%s %s]: %s', strrep(name, '_', ' '), adj, unit, obj.(name).sensors{jj}); 
-                        h(jj).UserData = sprintf('%s (%s): %6.1f %s', obj.(name).sensors{jj}, strrep(name, '_', ' '), obj.(name).now(jj), unit); 
+                        h(jj).UserData = sprintf('%s: %s (now= %3.1f %s)', obj.(name).sensors{jj}, strrep(name, '_', ' '), obj.(name).now(jj), unit); 
                         h(jj).ButtonDownFcn = @obj.callback_plot; 
                         h(jj).Marker = markers{mod(idx(jj)-1, Nmark)+1};
                         h(jj).MarkerSize = 8;

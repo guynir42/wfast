@@ -10,7 +10,7 @@ classdef ASAGUI < handle
         
         font_size = 12;
         big_font_size = 16;
-        edit_font_size = 12;
+        edit_font_size = 10;
         small_font_size = 8;
         
         color_on = [0 0.3 1];
@@ -23,9 +23,13 @@ classdef ASAGUI < handle
         
         panel_status;
         panel_pointing;
+        
         panel_motion;
+        panel_scheduler;
         
         panel_rates;
+        button_reset_rates;
+        
         plot_axes;
         
         panel_object;
@@ -35,6 +39,8 @@ classdef ASAGUI < handle
         panel_arduino;
         
         panel_slew;
+        
+        menu_options;
         
     end
     
@@ -68,7 +74,7 @@ classdef ASAGUI < handle
             
             import util.plot.GraphicButton;
             import util.plot.GraphicPanel;
-            import util.plot.ContrastLimits;
+            import util.plot.MenuItem;
             
             obj.buttons = {};
             
@@ -77,9 +83,9 @@ classdef ASAGUI < handle
             obj.fig.bottom = 5;
             obj.fig.height = 16;
             obj.fig.width = 25;
-            movegui(obj.fig.fig, 'center');
+            obj.fig.center;
             
-            N = 9; % number of button lines
+            N = 12; % number of button lines
             
             pos = N;
             
@@ -97,7 +103,7 @@ classdef ASAGUI < handle
             obj.panel_status.addButton('button_placeholder2', '', 'custom');
             obj.panel_status.addButton('button_placeholder3', '', 'custom');
             obj.panel_status.addButton('button_connect', 'connect', 'push', 'Connect', '', '', [], '', '', 'Reload Autoslew software and connect to telescope');
-            obj.panel_status.margin = [0.005 0.2];
+            obj.panel_status.margin = [0.005 0.1];
             obj.panel_status.make;
             
             %%%%%%%%%%% panel pointing %%%%%%%%%%%%%%%
@@ -113,19 +119,18 @@ classdef ASAGUI < handle
             obj.panel_pointing.addButton('button_alt', 'telAZ', 'info', 'AZ= ', '', '', [], '', '', 'Current pointing azimuth');            
 %             obj.panel_pointing.addButton('button_time', 'tel_time_to_limit', 'info', '', ' min. to limit', '', [], '', '', 'Current time to reach limit');
             obj.panel_pointing.addButton('button_pierside', 'telHemisphere', 'info', 'pointing ', '', '', [], '', '', 'Current telescope pointing side');
-            obj.panel_pointing.margin = [0.005 0.2];
+            obj.panel_pointing.margin = [0.005 0.1];
             obj.panel_pointing.make;
             
             %%%%%%%%%%% panel motion %%%%%%%%%%%%%%%
             
-            num_buttons = 3;
-            pos = pos-2; % horizontal panel
-            obj.panel_motion = GraphicPanel(obj.owner, [0 pos/N 0.4 2/N], 'motion', 1); % last input is for vertical
-            obj.panel_motion.addButton('button_motors', '', 'custom', 'Motor', '', '', 0.5, '', '', 'Need to implement motor on/off and feedback from mount!');
-            obj.panel_motion.addButton('button_tracking', 'tracking', 'toggle', '', '', '', 0.5, obj.color_on, 'red', 'telescope tracking');
-            obj.panel_motion.addButton('button_guiding', 'use_guiding', 'toggle', 'guiding off', 'guiding on', '', 0.5, obj.color_on, 'red', 'Apply rate corrections based on inputs from camera');
-            obj.panel_motion.addButton('button_reset_rates', 'resetRate', 'push', 'reset rates', '', '', 0.5, '', '', 'Reset guiding rates');
-            obj.panel_motion.addButton('button_motor_toggle', 'use_motor_toggle', 'toggle', 'no motor toggle', 'motor toggle','', 0.5, obj.color_on, 'red', 'Turn motors off then on when slew is done');
+            num_buttons = 2;
+            pos = pos-num_buttons; % horizontal panel
+            obj.panel_motion = GraphicPanel(obj.owner, [0 pos/N 0.4 num_buttons/N], 'motion', 1); % last input is for vertical
+%             obj.panel_motion.addButton('button_motors', '', 'custom', 'Motor', '', '', 0.5, '', '', 'Need to implement motor on/off and feedback from mount!');
+%             obj.panel_motion.addButton('button_reset_rates', 'resetRate', 'push', 'reset rates', '', '', 0.5, '', '', 'Reset guiding rates');
+            obj.panel_motion.addButton('button_tracking', 'tracking', 'toggle', 'trcking is off', 'tracking is on', '', 0.5, obj.color_on, 'red', 'telescope tracking');
+            obj.panel_motion.addButton('button_guiding', 'use_guiding', 'toggle', 'guiding is off', 'guiding is on', '', 0.5, obj.color_on, 'red', 'Apply rate corrections based on inputs from camera');
             obj.panel_motion.number = num_buttons;
             obj.panel_motion.margin = [0.02 0.02];
             obj.panel_motion.make;
@@ -133,13 +138,20 @@ classdef ASAGUI < handle
             %%%%%%%%%%% panel rates %%%%%%%%%%%%%%%
             
             obj.panel_rates = uipanel('Title', 'rates', 'Position', [0.4 pos/N 0.6 2/N]);
+            obj.button_reset_rates = GraphicButton(obj.panel_rates, [0.0 0.0 0.1 0.3], obj.owner, 'resetRates', 'push', 'reset');
+            obj.button_reset_rates.Tooltip = 'reset the guiding rates';
             
             %%%%%%%%%%% panel object %%%%%%%%%%%%%%%
             
-            num_buttons = 6;
-            pos = pos - 4;
-            obj.panel_object = GraphicPanel(obj.owner, [0 pos/N 0.4 4/N], 'object', 1); % last input is for vertical 
+            num_buttons = 7;
+            pos = pos - num_buttons;
+            obj.panel_object = GraphicPanel(obj.owner, [0 pos/N 0.4 7/N], 'object', 1); % last input is for vertical 
             obj.panel_object.number = num_buttons;
+            
+            obj.panel_object.addButton('button_gui', 'owner.sched', 'push', 'Scheduler', '', '', 1/3, '', '', 'open the scheduler GUI for more details'); 
+            obj.panel_object.addButton('button_constraints', 'owner.sched.constraintsGUI', 'push', 'constraints', '', '', 1/3, '', '', 'open the constraints menu for choosing targets from scheduler'); 
+            obj.panel_object.addButton('button_choose', 'owner.chooseNewTarget', 'push', 'choose', '', '', 1/3, '', '', 'choose a target from the scheduler and load it into the "object" field'); 
+            
             obj.panel_object.addButton('input_name', 'objName', 'input text', 'obj= ', '', '', 0.7, '', '', 'Input the name of object/field');
             obj.panel_object.addButton('button_resolve', 'inputTarget', 'push', 'resolve', '', '', 0.3, '', '', 'Use object name to auto fill RA/Dec');
             
@@ -169,9 +181,9 @@ classdef ASAGUI < handle
             
             obj.panel_object.panel.BackgroundColor = 0.5.*[1 1 1];
             
+            
             %%%%%%%%%%% panel manual %%%%%%%%%%%%%%%
             
-            num_buttons = 4;
             obj.panel_manual = GraphicPanel(obj.owner, [0.4 pos/N 0.2 num_buttons/N], 'manual move', 1); % last input is for vertical 
             obj.panel_manual.addButton('button_NW', '', 'custom', 'NW', '', '', 1/3, '', '', 'Move the telescope to the North West');
             obj.panel_manual.addButton('button_N', '', 'custom', 'N', '', '', 1/3, '', '', 'Move the telescope to the North');
@@ -182,7 +194,7 @@ classdef ASAGUI < handle
             obj.panel_manual.addButton('button_SW', '', 'custom', 'SW', '', '', 1/3, '', '', 'Move the telescope to the South West');
             obj.panel_manual.addButton('button_S', '', 'custom', 'S', '', '', 1/3, '', '', 'Move the telescope to the South');
             obj.panel_manual.addButton('button_SE', '', 'custom', 'SE', '', '', 1/3, '', '', 'Move the telescope to the South East');
-            obj.panel_manual.number = num_buttons;
+            obj.panel_manual.number = 4;
             obj.panel_manual.margin = [0.05 0.05];
             obj.panel_manual.make;
             
@@ -205,17 +217,14 @@ classdef ASAGUI < handle
                         
             %%%%%%%%%%% panel limits %%%%%%%%%%%%%%%
             
-            num_buttons = 1;
-            obj.panel_limits = GraphicPanel(obj.owner, [0.6 (pos+3)/N 0.2 num_buttons/N], 'limits', 1); % last input is for vertical 
-            obj.panel_limits.number = num_buttons;
-            obj.panel_limits.addButton('button_alt', 'limit_alt', 'info', 'alt limit= ', '', 'small', 0.5, '', '', 'Minimal angle above horizon for telescope motion (degrees)');
-            obj.panel_limits.addButton('button_flip', 'limit_flip', 'info', 'flip limit= ', '', 'small', 0.5, '', '', 'Maximum angle beyond meridian after which telescope must flip (degrees)');
-            obj.panel_limits.margin = [0.03 0.08];
-            obj.panel_limits.make;
+%             obj.panel_limits = GraphicPanel(obj.owner, [0.6 (pos+num_buttons-1)/N 0.2 1/N], 'limits', 1); % last input is for vertical 
+%             obj.panel_limits.addButton('button_alt', 'limit_alt', 'info', 'alt limit= ', '', 'small', 0.5, '', '', 'Minimal angle above horizon for telescope motion (degrees)');
+%             obj.panel_limits.addButton('button_flip', 'limit_flip', 'info', 'flip limit= ', '', 'small', 0.5, '', '', 'Maximum angle beyond meridian after which telescope must flip (degrees)');
+%             obj.panel_limits.margin = [0.03 0.08];
+%             obj.panel_limits.make;
             
             %%%%%%%%%%% panel engineering %%%%%%%%%%%%%%%
             
-            num_buttons = 3;
             obj.panel_engineering = GraphicPanel(obj.owner, [0.6 (pos)/N 0.2 num_buttons/N], 'engineering slews', 1); % last input is for vertical 
             obj.panel_engineering.number = num_buttons;
             obj.panel_engineering.addButton('button_park', 'park', 'push', 'Park', '', '', [], '', '', 'Send the telescope to park 1 position'); 
@@ -227,15 +236,14 @@ classdef ASAGUI < handle
             
             %%%%%%%%%%% panel arduino %%%%%%%%%%%%%%%
             
-            num_buttons = 6;
-            obj.panel_arduino = GraphicPanel(obj.owner, [0.8 pos/N 0.2 4/N], 'arduino', 1); % last input is for vertical 
+            obj.panel_arduino = GraphicPanel(obj.owner, [0.8 pos/N 0.2 num_buttons/N], 'arduino', 1); % last input is for vertical 
             obj.panel_arduino.number = num_buttons;
             obj.panel_arduino.addButton('button_status', 'ard.status', 'info', 'Status= ', '', '', 0.5, '', '', 'Status of communication with arduino');
             obj.panel_arduino.addButton('button_connect', 'connectArduino', 'push', 'Connect', '', '', 0.5, '', '', 'Attempt to reconnect with arduino');
             obj.panel_arduino.addButton('button_use_accel', 'use_accelerometer', 'toggle', 'accel. off ', 'use accel.', '', 0.5, obj.color_on, 'red', 'Use arduino accelerometer to stop telescope at low altitude');
-            obj.panel_arduino.addButton('button_angle', 'ard.ALT', 'info', 'ALT= ', '', 'small', 0.5, '', '', 'Current measured Altitude angle (degrees)');
+            obj.panel_arduino.addButton('button_angle', 'ard.ALT', 'info', 'ALT= ', '', 'edit', 0.5, '', '', 'Current measured Altitude angle (degrees)');
             obj.panel_arduino.addButton('button_use_ultra', 'use_ultrasonic', 'toggle', 'ultra. off ', 'use ultra.', '', 0.5, obj.color_on, 'red', 'Use arduino ultrasonic sensor to warn agains obstacles in front of telescope');
-            obj.panel_arduino.addButton('button_distance', 'ard.distance', 'info', 'dist= ', '', 'small', 0.5, '', '', 'Current measured distance to obstructions (cm)');
+            obj.panel_arduino.addButton('button_distance', 'ard.distance', 'info', 'dist= ', '', 'edit', 0.5, '', '', 'Current measured distance to obstructions (cm)');
             obj.panel_arduino.margin = [0.02 0.02];
             obj.panel_arduino.make;
             
@@ -256,6 +264,15 @@ classdef ASAGUI < handle
             obj.fig.fig.WindowButtonUpFcn = @obj.callback_button_up;
             obj.fig.fig.CloseRequestFcn = @obj.callback_close_fig;
             
+            
+            %%%%%%%%%% Menus %%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            obj.menu_options = MenuItem(obj, '&Options', 'menu');
+            obj.menu_options.addButton('menu_limits', '&Limits', 'menu');
+            obj.menu_options.menu_limits.addButton('button_alt_limit', '&Alt limit= %d', 'input', 'limit_alt', 'minimal altitude for stopping the slew (degrees)');
+            obj.menu_options.menu_limits.addButton('button_flip_limit', '&Flip limit= %d', 'input', 'limit_flip', 'how far can we track beyond the meridian (degrees)');
+            
+            
             obj.update;
             
         end
@@ -271,7 +288,7 @@ classdef ASAGUI < handle
             end
             
             if isempty(obj.plot_axes) || ~isvalid(obj.plot_axes)
-                delete(obj.panel_rates.Children);
+                delete(findobj(obj.panel_rates.Children, 'type', 'axes'));
                 obj.plot_axes = axes('Parent', obj.panel_rates);
             end
             
