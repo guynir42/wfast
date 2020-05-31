@@ -1512,7 +1512,7 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function setup_timer(obj)
+        function setup_timer(obj, ~, ~)
             
             if ~isempty(obj.timer) && isa(obj.timer, 'timer') && isvalid(obj.timer)
                 if strcmp(obj.timer.Running, 'on')
@@ -1541,7 +1541,7 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function setup_slow_timer(obj)
+        function setup_slow_timer(obj, ~, ~)
             
             if ~isempty(obj.slow_timer) && isa(obj.slow_timer, 'timer') && isvalid(obj.slow_timer)
                 if strcmp(obj.slow_timer.Running, 'on')
@@ -1572,7 +1572,7 @@ classdef Acquisition < file.AstroData
             
             if obj.sync.status==0 && obj.brake_bit % do not stop to reconnect during acquisition! 
                 disp('connecting to PcSync'); 
-                obj.connectSync;
+%                 obj.connectSync;
                 
                 if obj.sync.status
                     obj.sync.reco.lock;
@@ -1584,7 +1584,7 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function setup_backup_timer(obj)
+        function setup_backup_timer(obj, ~, ~)
             
             if ~isempty(obj.backup_timer) && isa(obj.backup_timer, 'timer') && isvalid(obj.backup_timer)
                 if strcmp(obj.backup_timer.Running, 'on')
@@ -2787,10 +2787,10 @@ classdef Acquisition < file.AstroData
                 if ~isempty(obj.cam.af.gui) && obj.cam.af.gui.check
                     if success
                         util.plot.inner_title(sprintf('Focus success after %d iterations!', ii),...
-                            'ax', obj.cam.af.gui.image_axes, 'FontSize', 26, 'Position', 'North'); 
+                            'ax', obj.cam.af.gui.axes_image, 'FontSize', 26, 'Position', 'North'); 
                     else
                         util.plot.inner_title(sprintf('Focus failed after %d iterations!', ii),...
-                            'ax', obj.cam.af.gui.image_axes, 'FontSize', 26, 'Position', 'North'); 
+                            'ax', obj.cam.af.gui.axes_image, 'FontSize', 26, 'Position', 'North'); 
                     end
                 end
                 

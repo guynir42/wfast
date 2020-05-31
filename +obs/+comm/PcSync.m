@@ -313,7 +313,7 @@ classdef PcSync < handle
                 end
                 
                 obj.time_latest_transmission = t;
-                obj.time_latest_reply = [];
+%                 obj.time_latest_reply = [];
                 
                 obj.send(obj.outgoing);
                 

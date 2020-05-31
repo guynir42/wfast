@@ -339,7 +339,7 @@ classdef AutoFocus < handle
         
         function str = printout(obj)
             
-            str = sprintf('pos= %f | tip= %f | tilt= %f', obj.found_pos, obj.found_tip, obj.found_tilt);
+            str = sprintf('depth= %5.3f | pos= %5.3f | tip= %5.3f | tilt= %5.3f', obj.found_width, obj.found_pos, obj.found_tip, obj.found_tilt);
             
             if ~isempty(obj.surface_coeffs)
                 str = sprintf('%s | coeffs= %s', str, util.text.print_vec(obj.surface_coeffs, '  ')); 
