@@ -419,10 +419,10 @@ classdef PcSync < handle
                         warning('Checksum for latest transmission was %s, received confirmation checksum: %s', obj.checksum, variable)
                     end
                     
-                    obj.time_latest_reply = datetime('now', 'TimeZone', 'UTC'); % does this have to be only on successful checksum?
-                    
                 end
                 
+                obj.time_latest_reply = datetime('now', 'TimeZone', 'UTC'); % does this have to be only on successful checksum?
+                    
 %                 obj.time_latest_transmission = []; % successfully recieved something back! 
                 obj.status = 1;
                 

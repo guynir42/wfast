@@ -1104,7 +1104,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     error('Prechecks failed, aborting slew');
                 end
                 
-                
                 on_cleanup = onCleanup(@() obj.after_slew(input)); % make sure these things happen in any way the function is finished (error, return statement, ctrl+C, or normaly done)
                 
                 obj.brake_bit = 0;
@@ -1166,7 +1165,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                         obj.log.input('Slew post-check failed again, trying to slew to different coordinate and return...'); 
                         disp(obj.log.report); 
 
-                        if obj.HA_deg>0 % target is on West side
+                        if obj.object.HA_deg>0 % target is on West side
                             obj.slewWithoutPrechecks(ra_hours_Jnow-0.1, dec_deg_Jnow+1);
                         else % target is on East side
                             obj.slewWithoutPrechecks(ra_hours_Jnow+0.1, dec_deg_Jnow+1);
@@ -1186,6 +1185,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     
                 end
                 
+                obj.tracking = 1;
+                
             catch ME
                 obj.log.error(ME.getReport);
                 rethrow(ME);
@@ -1195,15 +1196,19 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function after_slew(obj, input)
             
-                obj.tracking = 1;
-                                
+                if nargin<2 || isempty(input)
+                    input = []; 
+                end
+                
+                obj.restore_object; % if we replaced target-object with a temporary object (e.g., for eng. slew), recover it from backup
+                
                 if ~isempty(obj.cam_pc)
                     obj.cam_pc.outgoing.stop_camera = 0; % need to tell cam-pc to start working! 
                     obj.updateCamera; % make sure camera also knows about the new target
                     obj.cam_pc.update;
                 end
                 
-                if input.history
+                if ~isempty(input) && isprop(input, 'history') && input.history
                     try % keep a history of all targets
                         str = [obj.objName ' {' obj.objRA ', ' obj.objDec '}'];
                         obj.addTargetList(str);
@@ -1478,13 +1483,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     error('Input altitude is below limit of %f degress', obj.limit_alt);
                 end
                 
+                on_cleanup = onCleanup(@() obj.after_slew);
+
                 obj.brake_bit = 0;
                 
                 % convert alt/az to ra/dec using Eran's converter 
                 [RA, Dec] = celestial.coo.convert_coo(Az*pi/180, Alt*pi/180, 'azalt', 'J2000', juliandate(datetime('now', 'TimeZone', 'UTC')), [obj.object.longitude, obj.object.latitude]./180.*pi); 
                 
                 obj.object_backup = obj.object; % restore the original object later
-                on_cleanup = onCleanup(@() obj.restore_object);
                 
                 obj.object = head.Ephemeris;
                 obj.object.RA_deg = RA/pi*180;

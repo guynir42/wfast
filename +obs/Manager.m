@@ -568,6 +568,20 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
+        function set.use_shutdown(obj, val)
+            
+            if ~isequal(obj.use_shutdown, val) 
+                
+                if val==0 % if we are disabling this, we may as well get 30 minutes to work before t3 shuts it back up
+                    obj.setup_t3; 
+                end
+                
+                obj.use_shutdown = val;
+                
+            end
+            
+        end
+        
     end
     
     methods % timer related
@@ -1120,6 +1134,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 % trust the "status" flag to check if we need to reconnect
                 if ~obj.cam_pc.is_connected || ~obj.cam_pc.status
+%                     fprintf('%s: now I would be trying to connect...\n', datetime('now', 'TimeZone', 'UTC'));
                     obj.cam_pc.connect;
                 end
                 
