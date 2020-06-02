@@ -104,7 +104,7 @@ classdef Acquisition < file.AstroData
         use_adjust_cutouts = 1; % use adjustments in software (not by moving the mount)
         use_lock_adjust = 0; % make all cutouts move together based on the average drift
         
-        use_simple_photometry = 0; % use only sums on the cutouts instead of Photometry object for full cutouts
+        use_simple_photometry = 1; % use only sums on the cutouts instead of Photometry object for full cutouts (for now we keep this on, to maintain 25 Hz)
         use_store_photometry = 1; % store the photometric products in the Lightcurve object for entire run
         use_save_photometry = 1; % save the flux and other products in the HDF5 files along with the images
         
@@ -602,6 +602,16 @@ classdef Acquisition < file.AstroData
                 val = sprintf('%s\n RA:    %s hours\n Dec: %s deg', val, obj.head.RA, obj.head.Dec);
             
                 val = sprintf('%s\n--------------------------------------', val);
+                
+                val = sprintf('%s\n telRA:    %s hours\n telDec: %s deg', val, obj.head.telRA, obj.head.telDec); 
+                
+                if obj.cat.success
+                    val = sprintf('%s\n realRA:    %s hours\n realDec: %s  deg', val, head.Ephemeris.deg2hour(obj.cat.central_RA), head.Ephemeris.deg2sex(obj.cat.central_Dec)); 
+                else
+                    val = sprintf('%s\n Could not solve astrometry', val); 
+                end
+                
+                val = sprintf('%s\n--------------------------------------', val);
             end
             
             val = sprintf('%s\n exp. time= %4.2f s \n frame rate= %4.2f Hz', val, obj.expT, obj.frame_rate);
@@ -648,7 +658,11 @@ classdef Acquisition < file.AstroData
             
             val = sprintf('%s\n--------------------------------------', val);
             
-            val = sprintf('%s\n sensor temperature= %4.2f', val, obj.sensor_temperature);
+            try
+                val = sprintf('%s\n sensor temperature= %4.2f', val, obj.sensor_temperature);
+            catch ME
+                warning(ME.getReport); 
+            end
             
             if isa(obj.src, 'obs.cam.Andor')
 
@@ -1381,7 +1395,15 @@ classdef Acquisition < file.AstroData
                     list = head.Header.makeSyncList; 
 
                     if obj.use_ignore_sync_object_name
-                        list = list(~contains(list, 'OBJECT'));
+                        list = list(~strcmp(list, 'OBJECT'));
+                    end
+                    
+                    if obj.brake_bit==0 % things we want to NOT update during a run? 
+                        list = list(~strcmpi(list, 'OBJECT'));
+                        list = list(~strcmpi(list, 'RA'));
+                        list = list(~strcmpi(list, 'DEC'));
+                        list = list(~strcmpi(list, 'RA_DEG'));
+                        list = list(~strcmpi(list, 'DEC_DEG'));
                     end
                     
                     if ~isempty(s) && isstruct(s)
@@ -1535,6 +1557,9 @@ classdef Acquisition < file.AstroData
             
             if obj.brake_bit
                 obj.updateSyncData; % this also updates the obs_log
+                if ~isempty(obj.gui) 
+                    obj.gui.update;
+                end
             else
                 % don't do anything, this is triggered in obj.update()
             end
@@ -1571,8 +1596,8 @@ classdef Acquisition < file.AstroData
             pause(0.05); 
             
             if obj.sync.status==0 && obj.brake_bit % do not stop to reconnect during acquisition! 
-                disp('connecting to PcSync'); 
-%                 obj.connectSync;
+%                 disp('connecting to PcSync'); 
+                obj.connectSync;
                 
                 if obj.sync.status
                     obj.sync.reco.lock;
@@ -1804,7 +1829,7 @@ classdef Acquisition < file.AstroData
 
             end
             
-            if ~isempty(obj.sync) && obj.use_sync && obj.use_ignore_manager==0
+            if obj.use_sync && obj.use_ignore_manager==0
                 obj.updateSyncData;
             end
             
@@ -1837,6 +1862,13 @@ classdef Acquisition < file.AstroData
                 input = obj.makeInputVars(varargin{:});
                 
                 obj.update(input); % update header object to current time and input run name, RA/DE if given to input.
+                
+                if obj.use_sync && obj.sync.status==0
+                    obj.gui.latest_error = 'Cannot start a run without a PcSync connection to dome-PC!';
+                    warning(obj.gui.latest_error); 
+                    obj.log.error(obj.gui.latest_error); 
+                    return;
+                end
                 
                 if isempty(obj.head.OBJECT)
                     obj.gui.latest_error = 'Cannot start a run without a valid OBJECT name in header!';
@@ -1905,6 +1937,12 @@ classdef Acquisition < file.AstroData
                 if obj.use_save && input.use_reset
                     
                 end
+                
+                if obj.display_num_rect_stars>100
+                    obj.display_num_rect_stars = 100; % do not plot too many rectangles, as it slows down the display
+                end
+                
+                
                 
                 if obj.use_save && obj.use_autodeflate
                     obj.deflator.setup_timer;
@@ -2785,6 +2823,9 @@ classdef Acquisition < file.AstroData
                 
                 % could not find a decent focus:
                 if ~isempty(obj.cam.af.gui) && obj.cam.af.gui.check
+                    
+                    obj.cam.af.plot;
+                    
                     if success
                         util.plot.inner_title(sprintf('Focus success after %d iterations!', ii),...
                             'ax', obj.cam.af.gui.axes_image, 'FontSize', 26, 'Position', 'North'); 

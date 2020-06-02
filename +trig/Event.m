@@ -117,6 +117,8 @@ classdef Event < handle
         max_num_nans; % how many NaN values in the event flux can disqualify it
         max_offsets; % largest centroid offsets before disqualifying an event
         
+        use_timestamp_repair = 1; % fix timestamp jumps
+        
         debug_bit = 1;
         
     end
@@ -141,6 +143,8 @@ classdef Event < handle
         is_simulated = 0; % we've added this event on purpose
         is_forced = 0; % we've forced the system to trigger on a subtrheshold event
         % ...
+        
+        timestamps_original; % if we repair the timestamps, keep a copy of the original
         
         % additional housekeeping info
         used_background_sub; % did the photometery object use local (e.g., annulus) b/g subtraction?
@@ -364,7 +368,28 @@ classdef Event < handle
             
             obj.which_batch = 'first';
             obj.frame_index = y;
-                        
+            
+            if obj.use_timestamp_repair && nanvar(diff(obj.timestamps))>0.1 % arbitrary cutoff for finding that there's a jump in the timestamps
+                obj.repairTimestamps;
+            end
+            
+        end
+        
+        function repairTimestamps(obj)
+            
+            t = obj.timestamps;
+            
+            dt = prctile(diff(t), 70); % find the common time step (should be 0.04 seconds)
+            
+            t_adj = t'-dt.*(0:length(t)-1); % the timestamps after removing the slope we found
+            t0 = prctile(t_adj, 70); % most of the timestamps can be extrapolated to this point at the first measurement
+            
+            t = t0 + dt.*(0:length(t)-1)'; % adjust the times to be interpolated from the point we found
+            
+            obj.timestamps_original = obj.timestamps;
+            
+            obj.timestamps = t;
+            
         end
         
         function val = is_same(obj, other)
@@ -398,7 +423,7 @@ classdef Event < handle
             end
             
             % check if there are too many NaNs in the offsets
-            Nidx = isnan(obj.offsets_x_at_star(obj.time_indices)) | isnan(obj.offsets_y_at_star(obj.time_indices)); 
+            Nidx = isnan(obj.offsets_x_at_star(obj.time_indices)) | isnan(obj.offsets_y_at_star(obj.time_indices)) | isnan(obj.widths_at_star(obj.time_indices)); 
             if nnz(Nidx)>=obj.max_num_nans % && ~all(Nidx) % if all frames have NaN offsets (i.e., forced photometry), it is ok. If some of them do, it is bad shape
                 obj.keep = 0;
                 obj.is_nan_offsets = 1;
@@ -798,7 +823,9 @@ classdef Event < handle
 %             input.ax.YLim(2) = max(abs(input.ax.YLim));
 %             input.ax.YLim(1) = -max(abs(input.ax.YLim))-2;
             
-            input.ax.XLim = [obj.timestamps(1) obj.timestamps(end)];
+            if obj.timestamps(1)<obj.timestamps(end)
+                input.ax.XLim = [obj.timestamps(1) obj.timestamps(end)];
+            end
 
             input.ax.NextPlot = 'replace';
             

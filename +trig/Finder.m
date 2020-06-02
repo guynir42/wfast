@@ -182,6 +182,8 @@ classdef Finder < handle
         max_corr = 0.75; % correlation coeff of flux with e.g., background with value above this, around the event time, disqualify the event
         max_offsets = 5; % events with offsets above this number are disqualified
         
+        use_timestamp_repair = 1; % use this to fix problems with the timestamps
+        
         which_flux_correlate = 'raw'; %can choose "raw" or "detrended" for which flux type to use when correlating against x/y width etc. 
         
         num_hits_black_list = 4; % how many repeated events can we allow before including star or batch in black list
@@ -1107,6 +1109,8 @@ classdef Finder < handle
                 ev.max_num_nans = obj.max_num_nans;
                 ev.max_corr = obj.max_corr;
                 ev.max_offsets = obj.max_offsets;
+                
+                ev.use_timestamp_repair = obj.use_timestamp_repair;
                 
                 ev.was_psd_corrected = obj.use_psd_correction; 
                 ev.was_var_buffered = obj.use_var_buf;

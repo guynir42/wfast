@@ -92,6 +92,8 @@ classdef Catalog < handle
         use_matched_only = 0; % only keep stars that are matched to a proper GAIA star
         use_psf_width = 1; % only keep stars that have the best response to the correct PSF width - to be depricated
         
+        use_telescope_coords = 1; % if header has TELRA and TELDEC use them instead of RA/DEC
+        
         % Do a positive/negative jump to further and further out from the 
         % given coordinates, until finding a good astrometric match. 
         % This helps fix cases where the telescope had a mild sync error. 
@@ -282,12 +284,19 @@ classdef Catalog < handle
             addpath(fullfile(getenv('DATA'), 'GAIA/DR2')); % make sure astrometry can find GAIA
 
             % scan a few values of RA/DE outside the values suggested by pars object
-            DE = obj.head.DEC_DEG;
+            
+            if obj.use_telescope_coords && ~isempty(obj.head.TELRA_DEG) && ~isempty(obj.head.TELDEC_DEG)
+                RA = obj.head.TELRA_DEG;
+                DE = obj.head.TELDEC_DEG;
+            else
+                RA = obj.head.RA_DEG;
+                DE = obj.head.DEC_DEG;
+            end
+            
             list_DE = (-obj.Dec_scan_range:obj.Dec_scan_step:obj.Dec_scan_range);
             [~,idx] = sort(abs(list_DE));
             list_DE = list_DE(idx) + DE; 
             
-            RA = obj.head.RA_DEG;
             list_RA = (-obj.RA_scan_range:obj.RA_scan_step:obj.RA_scan_range);
             list_RA = list_RA./abs(cosd(DE)); % adjust for high DE targets, where a change of few degrees in RA can be still smaller than the FOV
             [~,idx] = sort(abs(list_RA));
@@ -308,7 +317,7 @@ classdef Catalog < handle
                         [R,S2] = astrometry(S, 'RA', head.Ephemeris.deg2hour(list_RA(jj)), 'Dec', head.Ephemeris.deg2sex(list_DE(ii)), 'Scale', obj.head.SCALE, ...
                             'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', [5000 5000], 'ApplyPM', false, 'Flip', obj.flip, ...
                             'MinRot', obj.input_rotation-obj.input_rot_range, 'MaxRot', obj.input_rotation+obj.input_rot_range, ...
-                            'CatColMag', 'Mag_G', 'ImSize', [obj.head.NAXIS1, obj.head.NAXIS2]);
+                            'CatColMag', 'Mag_G', 'ImSize', [obj.head.NAXIS1, obj.head.NAXIS2], 'Verbose', false);
 
                         warning('on', 'MATLAB:polyfit:PolyNotUnique')
                         warning('on', 'MATLAB:lscov:RankDefDesignMat');
