@@ -32,6 +32,7 @@ classdef Acquisition < file.AstroData
         phot@img.Photometry;
         flux_buf@util.vec.CircularBuffer;
         lightcurves@img.Lightcurves;
+        light_stack@img.Lightcurves;
         
         model_psf@img.ModelPSF;
         
@@ -107,6 +108,7 @@ classdef Acquisition < file.AstroData
         use_simple_photometry = 1; % use only sums on the cutouts instead of Photometry object for full cutouts (for now we keep this on, to maintain 25 Hz)
         use_store_photometry = 1; % store the photometric products in the Lightcurve object for entire run
         use_save_photometry = 1; % save the flux and other products in the HDF5 files along with the images
+        use_save_stack_lcs = 1; % save the Lightcurves object from phot_stack to disk at end of run
         
         use_model_psf = 0;
         
@@ -217,7 +219,7 @@ classdef Acquisition < file.AstroData
         default_cut_size_bg;
         
         slow_mode_expT = 3;
-        slow_mode_frame_rate = 1/3; % try 0.03 if 1/3 doesn't work...
+        slow_mode_frame_rate = 1/3.01; % a little bit lower than 1/3
         slow_mode_batch_size = 1;
         
         fast_mode_expT = 0.03;
@@ -303,6 +305,7 @@ classdef Acquisition < file.AstroData
                 obj.phot = img.Photometry;
                 obj.phot.num_threads = 8;
                 obj.lightcurves = img.Lightcurves;
+                obj.light_stack = img.Lightcurves;
                 
                 % we don't want to start doing serious calibration on the
                 % lightcurves object during acquisition! 
@@ -2095,6 +2098,11 @@ classdef Acquisition < file.AstroData
                 catch ME
                     warning(ME.getReport);
                 end
+                
+                if obj.use_save_stack_lcs
+%                     obj.light_stack.saveAsMat;
+                end
+                
             end
             
             if obj.debug_bit, disp(['Finished run "' obj.run_name '" with ' num2str(obj.batch_counter) ' batches.']); end
@@ -2304,7 +2312,8 @@ classdef Acquisition < file.AstroData
             
             % make the basic stack image
             obj.num_sum = size(obj.images,3);
-            obj.stack = util.stat.sum_single(obj.images); % sum along the 3rd dimension directly into single precision
+%             obj.stack = util.stat.sum_single(obj.images); % sum along the 3rd dimension directly into single precision
+            obj.stack = single(sum(obj.images,3)); % sum along the 3rd dimension directly into single precision
             
             obj.stack_proc = obj.cal.input(obj.stack, 'sum', obj.num_sum); % stack after calibration
             
@@ -2329,8 +2338,10 @@ classdef Acquisition < file.AstroData
                 
                 obj.stack_cutouts = obj.clip.input(obj.stack_proc);  
                 
-                obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.clip.positions); % run photometry on the stack to verify flux and adjust positions
+                obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.clip.positions, 'timestamps', obj.timestamps(1),'juldates', obj.juldates(1)); % run photometry on the stack to verify flux and adjust positions
                 if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
+                
+                obj.light_stack.getData(obj.phot_stack)
 
                 obj.prev_average_width = obj.average_width; % keep track of the average width
                 

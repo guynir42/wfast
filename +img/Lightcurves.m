@@ -197,7 +197,10 @@ classdef Lightcurves < handle
         % filled with NaN, to allow less allocations of the data. 
         % To use the actual data call the same names without "_full". 
         timestamps_full;
+        timestamps_full_original; % if we use repair 
+        
         juldates_full;
+        juldates_full_original;
         
         fluxes_full;
         errors_full;
@@ -289,7 +292,9 @@ classdef Lightcurves < handle
         function reset(obj) % remove the long term storage for the entire run
             
             obj.timestamps_full = [];
+            obj.timestamps_full_original = [];
             obj.juldates_full = [];
+            obj.juldates_full_original = [];
             obj.magnitudes = [];
             
             obj.fluxes_full = [];
@@ -1853,6 +1858,33 @@ classdef Lightcurves < handle
             
             flux_corr = obj.fluxes.*rho./(Av./nanmean(Av));
             
+        end
+        
+        function repairTimestamps(obj)
+            
+            t = obj.timestamps_full;
+            
+            dt = prctile(diff(t), 70); % find the common time step (should be 0.04 seconds)
+            
+            t0 = t(1); 
+            
+            t = t0 + dt.*(0:length(t)-1)'; % adjust the times to be interpolated from the point we found
+            
+            if isempty(obj.timestamps_full_original)
+                obj.timestamps_full_original = obj.timestamps_full;
+            end
+            
+            obj.timestamps_full = t;
+            
+            if isempty(obj.juldates_full_original)
+                obj.juldates_full_original = obj.juldates_full;
+            end
+            
+            obj.juldates_full = obj.juldates_full(1) + (obj.timestamps_full - obj.timestamps_full(1))./24./3600;
+            
+            obj.timestamps_ = [];
+            obj.juldates_ = [];
+                        
         end
         
     end

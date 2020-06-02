@@ -48,7 +48,7 @@ classdef AutoFocus < handle
         expT = 0.03;
         frame_rate = NaN;
         batch_size = 5;
-        num_stars = []; 
+        num_stars = 200; 
         
         use_loop_back = 0;
         

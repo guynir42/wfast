@@ -386,7 +386,9 @@ classdef Event < handle
             
             t = t0 + dt.*(0:length(t)-1)'; % adjust the times to be interpolated from the point we found
             
-            obj.timestamps_original = obj.timestamps;
+            if isempty(timestamps_original)
+                obj.timestamps_original = obj.timestamps;
+            end
             
             obj.timestamps = t;
             

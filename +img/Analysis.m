@@ -1088,7 +1088,8 @@ classdef Analysis < file.AstroData
             elseif ~isempty(obj.images) % we got images, need to produce cutouts, stack and positions outselves
                 
                 obj.num_sum = size(obj.images,3);
-                obj.stack = util.stat.sum_single(obj.images); % sum along the 3rd dimension directly into single precision
+%                 obj.stack = util.stat.sum_single(obj.images); % sum along the 3rd dimension directly into single precision
+                obj.stack = single(sum(obj.images,3));
                 obj.positions = obj.clip.positions;
                 obj.positions_bg = obj.clip_bg.positions;
                 
