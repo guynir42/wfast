@@ -166,7 +166,7 @@ classdef ManagerGUI < handle
             obj.panel_object.addButton('button_prev_objects', '', 'custom', '', '', '', [], '', '', 'List the last objects that were used to for slew');
             obj.panel_object.addButton('button_ALT', 'mount.objALT', 'info', 'ALT= ', '', 'edit', 0.5, '', '', 'Target altitute above horizong (degrees)');
             obj.panel_object.addButton('button_pierside', 'mount.objHemisphere', 'info', 'obj: ', '', 'edit', 0.5, '', '', 'Side of the sky where the object is right now');
-            obj.panel_object.addButton('button_slew', '', 'custom', 'Slew', '', '', 1, '', '', 'Slew the telescope to the given object'); 
+            obj.panel_object.addButton('button_slew', 'mount.slewAskFlip', 'push', 'Slew', '', '', 1, '', '', 'Slew the telescope to the given object'); 
             obj.panel_object.margin = [0.02 0.01];
             obj.panel_object.make;
             

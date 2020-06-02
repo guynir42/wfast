@@ -1045,6 +1045,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             if isempty(obj.AIRMASS) || isnan(obj.AIRMASS) || obj.AIRMASS>input.airmass, obj.unobservable_reason = 'Undefined airmass'; return; end % airmass is undefined or above limit
             
+            % south limit!
+            
             if obj.moon.Dist<input.moon, obj.unobservable_reason = sprintf('Moon dist= %d>%d', round(obj.moon.Dist), round(input.moon)); return; end
             
             minutes_left = obj.calcObsTimeMinutes(input.altitude);

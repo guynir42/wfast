@@ -138,7 +138,7 @@ classdef ASAGUI < handle
             %%%%%%%%%%% panel rates %%%%%%%%%%%%%%%
             
             obj.panel_rates = uipanel('Title', 'rates', 'Position', [0.4 pos/N 0.6 2/N]);
-            obj.button_reset_rates = GraphicButton(obj.panel_rates, [0.0 0.0 0.1 0.3], obj.owner, 'resetRates', 'push', 'reset');
+            obj.button_reset_rates = GraphicButton(obj.panel_rates, [0.0 0.0 0.1 0.3], obj.owner, 'resetRate', 'push', 'reset');
             obj.button_reset_rates.Tooltip = 'reset the guiding rates';
             
             %%%%%%%%%%% panel object %%%%%%%%%%%%%%%
@@ -166,9 +166,9 @@ classdef ASAGUI < handle
             obj.panel_object.addButton('button_airmass', 'object.AIRMASS', 'info', 'a.m.= ', '', '', 0.4, 'small', '', 'Calculated airmass for target'); 
             obj.panel_object.addButton('button_object', 'object', 'push', 'GUI', '', '', 0.2, '', '', 'Open the object GUI'); 
             
-            obj.panel_object.addButton('button_moon', 'object.moon_dist', 'info', 'moon= ', '', '', 0.4, '', '', 'Moon distance from object (degrees'); 
-            obj.panel_object.addButton('button_ecl', 'object.ECL_LAT', 'info', 'ecl= ', '', '', 0.4, '', '', 'Object ecliptic latitude'); 
-            obj.panel_object.addButton('button_constraints', 'object.constraints', 'push', 'const.', '', '', 0.2, '', '', 'Open the object constraints GUI'); 
+            obj.panel_object.addButton('button_moon', 'object.moon_dist', 'info', 'moon= ', '', '', 0.5, '', '', 'Moon distance from object (degrees'); 
+            obj.panel_object.addButton('button_ecl', 'object.ECL_LAT', 'info', 'ecl= ', '', '', 0.5, '', '', 'Object ecliptic latitude'); 
+%             obj.panel_object.addButton('button_constraints', 'object.constraints', 'push', 'const.', '', '', 0.2, '', '', 'Open the object constraints GUI'); 
             
 %             obj.panel_object.addButton('button_history_text', '', 'custom', 'Prev.Objects:', '', '', 0.7);
 %             obj.panel_object.addButton('button_reset_prev', 'resetPrevObjects', 'push', 'reset', '', '', 0.3, '', '', 'Reset the history list of previous object'); 
@@ -227,10 +227,10 @@ classdef ASAGUI < handle
             
             obj.panel_engineering = GraphicPanel(obj.owner, [0.6 (pos)/N 0.2 num_buttons/N], 'engineering slews', 1); % last input is for vertical 
             obj.panel_engineering.number = num_buttons;
-            obj.panel_engineering.addButton('button_park', 'park', 'push', 'Park', '', '', [], '', '', 'Send the telescope to park 1 position'); 
+            obj.panel_engineering.addButton('button_park', 'parkAskFlip', 'push', 'Park', '', '', [], '', '', 'Send the telescope to park 1 position'); 
             obj.panel_engineering.addButton('button_altitude', 'target_altitude', 'input', 'Alt= ', '', '', 0.5, '', '', 'Input the altitude you want to go to in the next engineering slew'); 
             obj.panel_engineering.addButton('button_azimuth', 'target_azimuth', 'input', 'Az= ', '', '', 0.5, '', '', 'Input the azimuth you want to go to in the next engineering slew'); 
-            obj.panel_engineering.addButton('button_slew', 'engineeringSlew', 'push', 'Eng. Slew', '', '', [], '', '', 'Send the telescope to Alt-Azimut specified'); 
+            obj.panel_engineering.addButton('button_slew', 'engineeringSlewAskFlip', 'push', 'Eng. Slew', '', '', [], '', '', 'Send the telescope to Alt-Azimut specified'); 
             obj.panel_engineering.margin = [0.02 0.02];
             obj.panel_engineering.make;
             
@@ -252,7 +252,7 @@ classdef ASAGUI < handle
             pos = pos - 1;
             obj.panel_slew = GraphicPanel(obj.owner, [0 pos/N 1 1/N], '', 1);
             obj.panel_slew.number = 1;
-            obj.panel_slew.addButton('button_slew', 'slew', 'push', 'Slew', '', '', 0.2, '', '', 'Immediately start moving telescope to given target');
+            obj.panel_slew.addButton('button_slew', 'slewAskFlip', 'push', 'Slew', '', '', 0.2, '', '', 'Immediately start moving telescope to given target');
             obj.panel_slew.addButton('button_stop', 'stop', 'push', 'STOP', '', '', 0.6, '', '', 'Stop current slew and reset guiding rates');
             obj.panel_slew.addButton('button_sync', '', 'custom', 'Sync', '', '', 0.2, '', '', 'Sync current telescope pointing data to target object');
             obj.panel_slew.margin = [0.005 0.1];
@@ -492,7 +492,7 @@ classdef ASAGUI < handle
             
         end
         
-        function callback_slew(obj, ~, ~)
+        function callback_slew(obj, ~, ~) % to be deprecated
             
             if obj.debug_bit>1, disp('Callback: slew'); end
             

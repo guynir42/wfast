@@ -1058,7 +1058,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function slew(obj, varargin) % begin slewing after doing pre-checks
+        function success = slew(obj, varargin) % begin slewing after doing pre-checks
         % Usage: slew(obj, varargin)
         % Begin slewing to the current coordinates in "object". 
         % Will preform some prechecks (e.g., altitude of target) and then 
@@ -1081,8 +1081,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             input.input_var('ra', [], 'right ascention'); 
             input.input_var('dec', [], 'declination'); 
             input.input_var('skip', false, 'skip prechecks');
+            input.input_var('ask_flip', false); 
             input.input_var('history', true, 'previous_targets'); 
             input.scan_vars(varargin{:}); 
+            
+            success = 0;
             
             if ~isempty(input.ra)
                 obj.object.RA = input.ra;
@@ -1094,6 +1097,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
             if isempty(obj.object.RA) || isempty(obj.object.Dec) 
                 error('Please provide a target with viable RA/DE');
+            end
+            
+            if input.ask_flip && obj.check_need_flip
+                res = questdlg('Need to flip for this target. Are you sure?', 'Flip needed!', 'Slew', 'Abort', 'Slew');
+                if isempty(res) || strcmp(res, 'Abort')
+                    return; % return with success=0
+                end
             end
             
             obj.log.input(sprintf('Slewing to target. RA= %s | DE= %s | ALT= %4.2f', obj.object.RA, obj.object.Dec, obj.object.ALT_deg));
@@ -1186,11 +1196,103 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 end
                 
                 obj.tracking = 1;
+                success = 1;
                 
             catch ME
                 obj.log.error(ME.getReport);
                 rethrow(ME);
             end
+            
+        end
+        
+        function success = engineeringSlew(obj, varargin) % alternative way to slew to Alt/Az
+            
+            input = util.text.InputVars;
+            input.use_ordered_numeric = 1;
+            input.input_var('altitude', obj.target_altitude);
+            input.input_var('azimuth', obj.target_azimuth); 
+            input.input_var('ask_flip', false); 
+            input.input_var('history', false, 'use_history'); 
+            input.scan_vars(varargin{:}); 
+            
+            tracking_state = obj.tracking; 
+            success = 0;
+            
+            try 
+
+                if input.altitude<obj.limit_alt
+                    error('Input altitude is below limit of %f degress', obj.limit_alt);
+                end
+                
+                on_cleanup = onCleanup(@() obj.after_slew(input));
+
+                obj.brake_bit = 0;
+                
+                % convert alt/az to ra/dec using Eran's converter 
+                [RA, Dec] = celestial.coo.convert_coo(input.azimuth*pi/180, input.altitude*pi/180, 'azalt', 'J2000', ...
+                    juliandate(datetime('now', 'TimeZone', 'UTC')), [obj.object.longitude, obj.object.latitude]./180.*pi); 
+                
+                obj.object_backup = obj.object; % restore the original object later
+                
+                obj.object = head.Ephemeris;
+                obj.object.RA_deg = RA/pi*180;
+                obj.object.Dec_deg = Dec/pi*180;
+                obj.object.update;
+                obj.object.name = 'Engineering slew'; 
+                
+                success = obj.slew('ask_flip', input.ask_flip, 'history', 0); % slew to the coordinates closest to the required Alt/Az, doing all the required checks and intermidiate slews... 
+                
+                if success==0, obj.tracking = tracking_state; return; end
+                
+                obj.hndl.SlewToAltAzAsync(input.azimuth, input.altitude); % note that in ASCOM, SlewToAltAz expects Az and then Alt !!!
+                
+                for ii = 1:100000
+                    
+                    pause(0.01);
+                    
+                    if obj.brake_bit
+                        obj.stop;
+                        break;
+                    end
+                    
+                    if ~obj.check_while_moving
+                        obj.emergency_stop;
+                        break;
+                    end
+                    
+                    if obj.hndl.Slewing==0
+                        break;
+                    end
+                    
+                end
+            
+                obj.tracking = 0;
+                
+            catch ME
+                obj.tracking = tracking_state;
+                obj.log.error(ME.getReport);
+                obj.tracking = 0;
+                rethrow(ME);
+            end
+            
+            
+        end
+        
+        function park(obj, varargin) % go to parking position 
+            
+            input = util.text.InputVars;
+            input.input_var('ask_flip', false); 
+            input.scan_vars(varargin{:}); 
+            
+            success = obj.engineeringSlew('alt', 30, 'az', 180, 'ask_flip', input.ask_flip); 
+            
+            if obj.brake_bit, obj.stop; return; end
+            
+            if success
+                obj.hndl.Park;
+            end
+            
+            obj.tracking = 0;
             
         end
         
@@ -1203,9 +1305,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 obj.restore_object; % if we replaced target-object with a temporary object (e.g., for eng. slew), recover it from backup
                 
                 if ~isempty(obj.cam_pc)
+                    
                     obj.cam_pc.outgoing.stop_camera = 0; % need to tell cam-pc to start working! 
-                    obj.updateCamera; % make sure camera also knows about the new target
+                    
+                    % tell the camera there is a new target object
+                    obj.cam_pc.outgoing.OBJECT = strrep(strtrim(obj.objName), ' ', '_');
+                    obj.cam_pc.outgoing.RA = obj.objRA;
+                    obj.cam_pc.outgoing.DEC = obj.objDec;
+                    
+                    obj.updateCamera; % update camera with telescope pointing
+                    
                     obj.cam_pc.update;
+                    
                 end
                 
                 if ~isempty(input) && isprop(input, 'history') && input.history
@@ -1228,6 +1339,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 obj.resetRate;
                 
                 obj.audio.stop;
+            
+        end
+        
+        function restore_object(obj)
+            
+            obj.object = obj.object_backup;
             
         end
         
@@ -1467,89 +1584,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
-        function engineeringSlew(obj,Alt,Az) % alternative way to slew to Alt/Az
-            
-            if nargin<2 || isempty(Alt)
-                Alt = obj.target_altitude;
-            end
-            
-            if nargin<3 || isempty(Az)
-                Az = obj.target_azimuth;
-            end
-            
-            try 
-
-                if Alt<obj.limit_alt
-                    error('Input altitude is below limit of %f degress', obj.limit_alt);
-                end
-                
-                on_cleanup = onCleanup(@() obj.after_slew);
-
-                obj.brake_bit = 0;
-                
-                % convert alt/az to ra/dec using Eran's converter 
-                [RA, Dec] = celestial.coo.convert_coo(Az*pi/180, Alt*pi/180, 'azalt', 'J2000', juliandate(datetime('now', 'TimeZone', 'UTC')), [obj.object.longitude, obj.object.latitude]./180.*pi); 
-                
-                obj.object_backup = obj.object; % restore the original object later
-                
-                obj.object = head.Ephemeris;
-                obj.object.RA_deg = RA/pi*180;
-                obj.object.Dec_deg = Dec/pi*180;
-                obj.object.update;
-                obj.object.name = 'Engineering slew'; 
-                
-                obj.slew('history', 0); % slew to the coordinates closest to the required Alt/Az, doing all the required checks and intermidiate slews... 
-                
-                obj.hndl.SlewToAltAzAsync(Az, Alt); % note that in ASCOM, SlewToAltAz expects Az and then Alt !!!
-                
-                for ii = 1:100000
-                    
-                    pause(0.01);
-                    
-                    if obj.brake_bit
-                        obj.stop;
-                        break;
-                    end
-                    
-                    if ~obj.check_while_moving
-                        obj.emergency_stop;
-                        break;
-                    end
-                    
-                    if obj.hndl.Slewing==0
-                        break;
-                    end
-                    
-                end
-            
-                obj.tracking = 0;
-                
-            catch ME
-                obj.log.error(ME.getReport);
-                obj.tracking = 0;
-                rethrow(ME);
-            end
-            
-            
-        end
-        
-        function park(obj) % go to parking position 
-            
-            obj.engineeringSlew(30, 180); 
-            
-            if obj.brake_bit, obj.stop; return; end
-            
-            obj.hndl.Park;
-            obj.tracking = 0;
-            
-        end
-        
-        function restore_object(obj)
-            
-            obj.object = obj.object_backup;
-            
-        end
-        
         function sync(obj) % this is still not working! 
             
             obj.hndl.SyncToCoordinates(obj.hndl.TargetRightAscension, obj.hndl.TargetDeclination);
@@ -1651,9 +1685,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function updateCamera(obj) % send details on object coordinates to cam_pc
             
-            obj.cam_pc.outgoing.OBJECT = strrep(obj.objName, ' ', '_');
-            obj.cam_pc.outgoing.RA = obj.objRA;
-            obj.cam_pc.outgoing.DEC = obj.objDec;            
             obj.cam_pc.outgoing.RA_DEG = obj.objRA_deg;
             obj.cam_pc.outgoing.DEC_DEG = obj.objDec_deg;
             obj.cam_pc.outgoing.TELRA = obj.telRA;
@@ -1721,6 +1752,28 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
             val = sprintf('Status= %d, LST= %s, RA= %s, Dec= %s, HA= %s, ALT= %4.2f, %s', ...
                 obj.status, obj.LST, obj.telRA, obj.telDE, obj.telHA, obj.telALT, obj.pier_side); 
+            
+        end
+        
+    end
+    
+    methods(Hidden=true)
+        
+        function slewAskFlip(obj)
+            
+            obj.slew('ask_flip', true); 
+            
+        end
+        
+        function engineeringSlewAskFlip(obj)
+
+            obj.engineeringSlew('ask_flip', true); 
+            
+        end
+        
+        function parkAskFlip(obj)
+            
+            obj.park('ask_flip', true); 
             
         end
         

@@ -515,31 +515,30 @@ classdef GraphicButton < handle
                         c = strsplit(obj.variable, '.'); 
                         
                         if length(c)==1
-                            if ismethod(obj.owner, c{1})
-                                obj.owner.(c{1});
-                            elseif isprop(obj.owner, c{1}) && ismethod(obj.owner.(c{1}), 'makeGUI')
+                            if isprop(obj.owner, c{1}) && ismethod(obj.owner.(c{1}), 'makeGUI')
                                 obj.owner.(c{1}).makeGUI;
+                            else % ismethod(obj.owner, c{1})
+                                obj.owner.(c{1});
                             end
                         elseif length(c)==2
-                            if ismethod(obj.owner.(c{1}), c{2})
-                                obj.owner.(c{1}).(c{2});
-                            elseif isprop(obj.owner.(c{1}), c{2}) && ismethod(obj.owner.(c{1}).(c{2}), 'makeGUI')
+                            if isprop(obj.owner.(c{1}), c{2}) && ismethod(obj.owner.(c{1}).(c{2}), 'makeGUI')
                                 obj.owner.(c{1}).(c{2}).makeGUI;
+                            else % ismethod(obj.owner.(c{1}), c{2})
+                                obj.owner.(c{1}).(c{2});
                             end
                         elseif length(c)==3
-                            if ismethod(obj.owner.(c{1}).(c{2}), c{3})
-                                obj.owner.(c{1}).(c{2}).(c{3});
-                            elseif isprop(obj.owner.(c{1}).(c{2}), c{3}) && ismethod(obj.owner.(c{1}).(c{2}).(c{3}), 'makeGUI')
+                            if isprop(obj.owner.(c{1}).(c{2}), c{3}) && ismethod(obj.owner.(c{1}).(c{2}).(c{3}), 'makeGUI')
                                 obj.owner.(c{1}).(c{2}).(c{3}).makeGUI;
+                            else % ismethod(obj.owner.(c{1}).(c{2}), c{3})
+                                obj.owner.(c{1}).(c{2}).(c{3});
                             end
                         elseif length(c)==4
-                            if ismethod(obj.owner.(c{1}).(c{2}).(c{3}), c{4})
-                                obj.owner.(c{1}).(c{2}).(c{3}).(c{4});
-                            elseif isprop(obj.owner.(c{1}).(c{2}).(c{3}), c{4}) && ismethod(obj.owner.(c{1}).(c{2}).(c{3}).(c{4}), 'makeGUI')
+                            if isprop(obj.owner.(c{1}).(c{2}).(c{3}), c{4}) && ismethod(obj.owner.(c{1}).(c{2}).(c{3}).(c{4}), 'makeGUI')
                                 obj.owner.(c{1}).(c{2}).(c{3}).(c{4}).makeGUI;
+                            else % ismethod(obj.owner.(c{1}).(c{2}).(c{3}), c{4})
+                                obj.owner.(c{1}).(c{2}).(c{3}).(c{4});
                             end
                         end
-                        
                         
                     else % if we are given str2 (input to function) does this even work??
                         obj.owner.(obj.variable).(obj.str2);

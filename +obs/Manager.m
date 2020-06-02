@@ -198,6 +198,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     obj.mount.sched = obj.sched;
                 end
                 
+                obj.mount.object.constraints = obj.sched.ephem.constraint;
+                
                 obj.sched.readFile; 
                 
             catch ME
@@ -1184,7 +1186,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     obj.mount.cam_pc = obj.cam_pc; % share the handle to this object
                 end
                 
-%                 obj.mount.updateCamera; % only call this when finished slewing
+                obj.mount.updateCamera; % only update the telescope pointing
                 
             end
             
