@@ -2092,6 +2092,7 @@ classdef Acquisition < file.AstroData
             obj.src.finishup;
                         
             if obj.use_save
+                
                 try
                     filename = obj.buf.getReadmeFilename('Z');
                     util.oop.save(obj, filename, 'name', 'acquisition'); 
@@ -2100,7 +2101,7 @@ classdef Acquisition < file.AstroData
                 end
                 
                 if obj.use_save_stack_lcs
-%                     obj.light_stack.saveAsMat;
+                    obj.light_stack.saveAsMat(fullfile(obj.buf.directory, 'lightcurves.mat'));
                 end
                 
             end
