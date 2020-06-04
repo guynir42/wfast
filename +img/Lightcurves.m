@@ -2039,7 +2039,9 @@ classdef Lightcurves < handle
             phot_pars = obj.phot_pars;
             
             header = obj.head;
-            cat = obj.cat.data;
+            if ~isempty(obj.cat)
+                cat = obj.cat.data;
+            end
             
             save(filename, 'timestamps', 'fluxes', 'errors', 'areas', 'backgrounds', 'variances',...
                 'offsets_x', 'offsets_y', 'centroids_x', 'centroids_y', 'widths', ...

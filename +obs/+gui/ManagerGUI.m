@@ -132,6 +132,7 @@ classdef ManagerGUI < handle
             obj.panel_telescope.addButton('button_ALT', 'ALT', 'info', 'ALT: ', ' deg', '', 0.5);
             obj.panel_telescope.addButton('button_tracking', 'tracking', 'toggle', 'tracking is off', 'tracking is on', '', 0.5, obj.color_on, 'red');
             obj.panel_telescope.addButton('button_side', 'mount.telHemisphere', 'info', 'pointing ', '', '', 0.5); 
+            obj.panel_telescope.addButton('button_vibrations', '', 'custom', '', '', '', 0.5); 
             obj.panel_telescope.margin = [0.02 0.01];
             obj.panel_telescope.make;
             
@@ -318,6 +319,7 @@ classdef ManagerGUI < handle
             
             for ii = 1:length(obj.buttons)
                 obj.buttons{ii}.control.BackgroundColor = obj.color_buttons;
+                obj.buttons{ii}.default_color = obj.color_buttons;
             end
             
             obj.panel_image.BackgroundColor = obj.color_bg;

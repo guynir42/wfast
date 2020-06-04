@@ -108,7 +108,7 @@ classdef Acquisition < file.AstroData
         use_lock_adjust = 0; % make all cutouts move together based on the average drift
         
         use_simple_photometry = 1; % use only sums on the cutouts instead of Photometry object for full cutouts (for now we keep this on, to maintain 25 Hz)
-        use_store_photometry = 1; % store the photometric products in the Lightcurve object for entire run
+        use_store_photometry = 0; % store the photometric products in the Lightcurve object for entire run
         use_save_photometry = 1; % save the flux and other products in the HDF5 files along with the images
         use_save_stack_lcs = 1; % save the Lightcurves object from phot_stack to disk at end of run
         
@@ -357,6 +357,8 @@ classdef Acquisition < file.AstroData
                 
                 obj.lightcurves.head = obj.head;
                 obj.lightcurves.cat = obj.cat;
+                obj.light_stack.head = obj.head;
+                obj.light_stack.cat = obj.cat;
                 
                 util.oop.save_defaults(obj); % make sure each default_XXX property is updated with the current XXX property value. 
                 
@@ -2163,8 +2165,14 @@ classdef Acquisition < file.AstroData
                     warning(ME.getReport);
                 end
                 
-                if obj.use_save_stack_lcs
-                    obj.light_stack.saveAsMat(fullfile(obj.buf.directory, 'lightcurves.mat'));
+                try
+                
+                    if obj.use_save_stack_lcs
+                        obj.light_stack.saveAsMAT(fullfile(obj.buf.directory, 'lightcurves.mat'));
+                    end
+                
+                catch ME
+                    warning(ME.getReport);
                 end
                 
             end
@@ -2377,7 +2385,27 @@ classdef Acquisition < file.AstroData
             % make the basic stack image
             obj.num_sum = size(obj.images,3);
 %             obj.stack = util.stat.sum_single(obj.images); % sum along the 3rd dimension directly into single precision
-            obj.stack = single(sum(obj.images,3)); % sum along the 3rd dimension directly into single precision
+            try
+                
+                obj.stack = single(sum(obj.images,3)); % sum along the 3rd dimension directly into single precision
+                
+            catch ME
+                if strcmp(ME.identifier, 'MATLAB:nomem')
+                    disp('Ran out of memory while stacking images. Trying again with a split array...');
+                    pause(0.1);
+                    
+                    indices = ceil([size(obj.images,1) size(obj.images,2)]./2); 
+                
+                    obj.stack(1:indices(1), 1:indices(2)) = single(sum(obj.images(1:indices(1), 1:indices(2),:),3)); 
+                    obj.stack(1:indices(1), indices(2)+1:end) = single(sum(obj.images(1:indices(1), indices(2)+1:end,:),3)); 
+                    obj.stack(indices(1)+1:end,1:indices(2)) = single(sum(obj.images(indices(1)+1:end,1:indices(2),:),3)); 
+                    obj.stack(indices(1)+1:end,indices(2)+1:end) = single(sum(obj.images(indices(1)+1:end,indices(2)+1:end,:),3)); 
+                    
+                else
+                    rethrow(ME);
+                end
+            
+            end
             
             obj.stack_proc = obj.cal.input(obj.stack, 'sum', obj.num_sum); % stack after calibration
             
