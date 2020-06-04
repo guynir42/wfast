@@ -51,6 +51,8 @@ classdef Acquisition < file.AstroData
         
         obs_log; % struct with observation time and number of files and other metadata for each target
         
+        forced_targets = []; % structs with target parameters (at least RA/Dec) to add to the positions/cutouts/catalog
+        
     end
     
     properties % inputs/outputs
@@ -416,6 +418,12 @@ classdef Acquisition < file.AstroData
             obj.sync.outgoing.DE_rate_delta = 0;
 
             obj.clear;
+            
+        end
+        
+        function resetForcedTargets(obj)
+            
+            obj.forced_targets = [];
             
         end
         
@@ -1761,6 +1769,61 @@ classdef Acquisition < file.AstroData
                 if exist(name, 'dir')
                     s.(char(ii)) = util.sys.disk_space(name); 
                 end
+                
+            end
+            
+        end
+        
+        function addForcedTarget(obj, varargin)
+            
+            s = struct;
+            
+            for ii = 1:2:length(varargin)
+                
+                key = varargin{ii};
+                
+                if length(varargin)>ii
+                    val = varargin{ii+1};
+                else
+                    val = NaN;
+                end
+                
+                % what about strings??
+%                 if ~isscalar(val)
+%                     val = NaN;
+%                 end
+                
+                s.(key) = val;
+
+            end
+            
+            if ~isfield(s, 'RA') || ~isfield(s, 'Dec')
+                error('Must input a target with RA and Dec'); 
+            end
+            
+            if ischar(s.RA)
+                s.RA = head.Ephemeris.hour2deg(s.RA); 
+            end
+            
+            if ischar(s.Dec)
+                s.Dec = head.Ephemeris.sex2deg(s.Dec);
+            end
+            
+            obj.forced_targets(end+1) = s;
+            
+        end
+        
+        function appendTargets(obj)
+            
+            for ii = 1:length(obj.forced_targets)
+                
+                % first get the X/Y from the RA/Dec
+                
+                % add the RA/Dec and X/Y to the catalog
+                
+                % add the position fields
+                
+                % log the indices of the new positions into the forced_indices field
                 
             end
             
