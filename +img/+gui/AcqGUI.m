@@ -153,7 +153,7 @@ classdef AcqGUI < handle
             
             obj.menu_options.addButton('menu_photometry', '&Photometry', 'menu');
             obj.menu_options.menu_photometry.addButton('button_use_simple', '&Simple photometry', 'toggle', 'use_simple_photometry', 'just sum the cutouts, not using Photometry/Lightcurve objects');
-            obj.menu_options.menu_photometry.addButton('button_use_store_photometry', 'S&tore photometry', 'toggle', 'use_store_photometry', 'keep a copy of the photometric products in the Lightcurve object');
+            obj.menu_options.menu_photometry.addButton('button_use_store_photometry', 'S&tore lightcurves', 'toggle', 'use_store_photometry', 'keep a copy of the photometric products in the Lightcurve object');
             obj.menu_options.menu_photometry.addButton('button_use_save_photometry', 'Sa&ve photometry', 'toggle', 'use_save_photometry', 'save the flux and other photometric products in the HDF5 files');
             obj.menu_options.menu_photometry.addButton('button_use_save_stack_lcs', 'Save stack &LCs', 'toggle', 'use_save_stack_lcs', 'save the flux and other photometric products from the stack cutouts as a mat file');
             obj.menu_options.menu_photometry.addButton('button_model_psf', '&PSF model', 'toggle', 'use_model_psf', 'stack the cutouts and fit it to a PSF model');

@@ -529,12 +529,21 @@ classdef Analysis < file.AstroData
             
             name = obj.get_obj_name;
             
-            obj.lightcurves.saveAsMAT(fullfile(obj.log_dir, ['lightcurves_' name]));
+            try 
+                obj.lightcurves.saveAsMAT(fullfile(obj.log_dir, ['lightcurves_' name]));
+            catch ME
+                warning(ME.getReport);
+            end
             
-            obj.finder.conserveMemory;
-            
-            finder = obj.finder;
-            save(fullfile(obj.log_dir, ['finder_' name]), 'finder', '-v7.3');
+            try
+                obj.finder.conserveMemory;
+
+                finder = obj.finder;
+
+                save(fullfile(obj.log_dir, ['finder_' name]), 'finder', '-v7.3');
+            catch ME
+                warning(ME.getReport);
+            end
             
             % if there is no object-dump file, create one now! 
             if ~exist(obj.log_obj, 'file')
