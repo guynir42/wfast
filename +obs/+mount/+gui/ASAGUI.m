@@ -97,11 +97,11 @@ classdef ASAGUI < handle
             pos = pos-1; % horizontal panel
             obj.panel_status = GraphicPanel(obj.owner, [0 pos/N 1 1/N], 'status', 0); % last input is for horizontal
             obj.panel_status.number = num_buttons;
-            obj.panel_status.addButton('button_status', 'status', 'info', 'status= ', '', '', [], '', '', 'Is mount responsive and connected');
             obj.panel_status.addButton('button_lst', 'LST', 'info', 'LST= ', '', '', [], '', '', 'Local Sidereal Time');
+            obj.panel_status.addButton('button_status', 'status', 'info', 'status= ', '', '', [], '', '', 'Is mount responsive and connected');
             obj.panel_status.addButton('button_placeholder1', '', 'custom');
-            obj.panel_status.addButton('button_placeholder2', '', 'custom');
-            obj.panel_status.addButton('button_placeholder3', '', 'custom');
+            obj.panel_status.addButton('button_vibrations', '', 'custom');
+            obj.panel_status.addButton('button_on_target', '', 'custom');
             obj.panel_status.addButton('button_connect', 'connect', 'push', 'Connect', '', '', [], '', '', 'Reload Autoslew software and connect to telescope');
             obj.panel_status.margin = [0.005 0.1];
             obj.panel_status.make;

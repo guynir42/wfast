@@ -124,10 +124,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         function obj = Manager(varargin)
             
             if ~isempty(varargin) && isa(varargin{1}, 'obs.Manager')
-                if obj.debug_bit, fprintf('Manager copy-constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Manager copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit, fprintf('Manager constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('Manager constructor v%4.2f\n', obj.version); end
                 
                 obj.log = util.sys.Logger('Top_level_manager'); % keep track of commands given and errors received... 
                 
@@ -138,8 +138,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         end
         
         function connect(obj) % connect to all hardware and objects
-            
-            obj.loadScheduler;
             
             if obj.use_dome
                 obj.connectDome; % AstroHaven dome
@@ -152,6 +150,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     warning(ME.getReport); 
                 end
             end
+            
+            obj.loadScheduler;
             
             if obj.use_weather
                 obj.connectBoltwood; 
@@ -192,10 +192,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 if isempty(obj.sched)
                     obj.sched = obs.sched.Scheduler;
-                end
-                
-                if isempty(obj.mount.sched)
-                    obj.mount.sched = obj.sched;
                 end
                 
                 obj.mount.object.constraints = obj.sched.ephem.constraint;
@@ -714,7 +710,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 % morning report! 
                 t = datetime('now', 'TimeZone', 'UTC');
                 
-                if t.Hour>=4 % this is in UTC, so we can translate it to 6 or 7 local time
+                if t.Hour>=4 && t.Hour<5 % this is in UTC, so we can translate it to 6 or 7 local time
 
                     d = datestr(t - days(1), 'yyyy-mm-dd');
 
@@ -899,8 +895,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     
                     for jj = 1:length(s) % go over the different structs for each run 
                         
-                        files = files + s(jj).num_files;
-                        time = time + s(jj).runtime;
+                        if ~isempty(s(jj).num_files)
+                            files = files + s(jj).num_files;
+                        end
+                        
+                        if ~isempty(s(jj).runtime)
+                            time = time + s(jj).runtime;
+                        end
                         
                     end
                     
@@ -1001,6 +1002,19 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 
             obj.log.input(obj.report); % summary of observatory status
 
+            if ~isempty(obj.mount)
+                
+                % these checks will update the mount gui
+                if ~obj.mount.check_on_target
+                    % anything we want to do about this??
+                end
+                
+                if ~obj.mount.check_stability
+                    % anything we want to do about this??
+                end
+                
+            end
+            
             if ~isempty(obj.cam_pc) 
                 
                 if ~isempty(obj.mount.tracking) && obj.mount.tracking && obj.dome.is_closed==0

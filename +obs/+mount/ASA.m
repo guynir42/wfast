@@ -78,7 +78,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         use_accelerometer = 1; % make constant checks for altitude outside of the mounts own sensors
         use_ultrasonic = 0; % make constant checks that there is nothing in front of the telescope
         
-        move_rate = 1; % manual slew rate in deg/sec
+        move_rate = 3; % manual slew rate in deg/sec
         
         step_arcsec = 5; % not used yet
         
@@ -1027,24 +1027,100 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             % because there is some bug in turning coordinates from J2000
             % to Jnow (not sure if the problem is in the mount software or
             % in Eran's coco function. 
-            if abs(obj.telRA_deg-obj.objRA_deg)*3600>600
-                val = 0; 
-                return;
-            end
-            
-            if abs(obj.telDec_deg-obj.objDec_deg)*3600>600
-                val = 0;
-                return;
+                      
+            if ~obj.check_on_target
+                val = 0; return;
             end
             
             pause(1); 
             
-            v = obj.getVibrationStrength; 
-            
-            if sqrt(v)*3600>10
-                val = 0;
-                return;
+            if ~obj.check_stability
+                val = 0; return;
             end
+            
+        end
+        
+        function val = check_on_target(obj, threshold) % check the target is not further than 600 arcsec
+            
+            if nargin<2 || isempty(threshold)
+                threshold = 600; % can change this default later 
+            end
+            
+            val = abs(obj.telRA_deg-obj.objRA_deg)*3600<threshold &&...
+                    abs(obj.telDec_deg-obj.objDec_deg)*3600<threshold;
+            if ~isempty(obj.gui) && obj.gui.check
+                if val
+                    obj.gui.panel_status.button_on_target.String = 'on target';
+                    obj.gui.panel_status.button_on_target.ForegroundColor = 'blue';
+                else
+                    obj.gui.panel_status.button_on_target.String = 'off target!';    
+                    obj.gui.panel_status.button_on_target.ForegroundColor = 'red';
+                end
+            end
+                    
+        end
+        
+        function [val, vib_strength] = check_stability(obj, threshold) % check the mount is not vibrating with amplitude larger than 10 arcsec
+            
+            if nargin<2 || isempty(threshold)
+                threshold = 10; % can change this default later 
+            end
+            
+            vib_strength = obj.getVibrationStrength; 
+            
+            vib_strength = vib_strength.*3600;
+            
+            if sqrt(vib_strength)>threshold
+                val = 0;
+            else
+                val = 1;
+            end
+            
+            if ~isempty(obj.gui) && obj.gui.check
+                if val
+                    obj.gui.panel_status.button_vibrations.String = 'no vibrations';                        
+                    obj.gui.panel_status.button_vibrations.BackgroundColor = obj.gui.panel_status.button_vibrations.default_color;
+                else
+                    obj.gui.panel_status.button_vibrations.String = sprintf('vibrations: %3.1f"', vib_strength); 
+                    obj.gui.panel_status.button_vibrations.BackgroundColor = 'red';
+                end
+            end
+                
+            if ~isempty(obj.owner.gui) && obj.owner.gui.check
+                if val
+                    obj.owner.gui.panel_telescope.button_vibrations.String = 'no vibrations';                        
+                    obj.owner.gui.panel_telescope.button_vibrations.BackgroundColor = obj.owner.gui.panel_telescope.button_vibrations.default_color;
+                else
+                    obj.owner.gui.panel_telescope.button_vibrations.String = sprintf('vibrations: %3.1f"', vib_strength); 
+                    obj.owner.gui.panel_telescope.button_vibrations.BackgroundColor = 'red';
+                end
+            end
+            
+        end
+        
+        function [total_var, RA_var, DE_var] = getVibrationStrength(obj, varargin) % variance in RA/DE in units of degrees (run this only when tracking...)
+            
+            input = util.text.InputVars;
+            input.input_var('N', 50, 'number', 'iterations'); 
+            input.input_var('delay', 0.01, 'pause'); 
+            input.scan_vars(varargin{:}); 
+            
+            RA = nan(input.N, 1); 
+            DE = nan(input.N, 1); 
+            
+            for ii = 1:input.N
+                
+                RA(ii) = obj.telRA_deg; 
+                DE(ii) = obj.telDec_deg;
+                
+                pause(input.delay); 
+                
+            end
+            
+            RA_var = nanvar(RA); 
+            DE_var = nanvar(DE); 
+            
+            total_var = RA_var + DE_var;
             
         end
         
@@ -1128,7 +1204,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                         
                         if obj.brake_bit, return; end % in case user clicked stop!
                         
-                        obj.slewWithoutPrechecks(obj.hndl.RightAscension, 45); % do a preslew to dec +70 so we can make the flip! 
+                        if strcmp(obj.pier_side, 'pierEast') % telescope is pointing West
+                            obj.slewWithoutPrechecks(obj.hndl.RightAscension-0.5, 45); % do a pre-slew to dec +70 so we can make the flip! 
+                        elseif strcmp(obj.pier_side, 'pierWest') % telescope pointing East
+                            obj.slewWithoutPrechecks(obj.hndl.RightAscension+0.5, 45); % do a pre-slew to dec +70 so we can make the flip! 
+                            % we must move the RA a bit to the East, in
+                            % case we are close to meridian, the mount would
+                            % "prefer west" and do a flip on its own. 
+                        end
                         
                         try 
                             if strcmp(obj.obj_pier_side, 'pierEast') % object is on the WEST SIDE!
@@ -1379,32 +1462,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 
             end
 
-        end
-        
-        function [total_var, RA_var, DE_var] = getVibrationStrength(obj, varargin) % variance in RA/DE in units of degrees (run this only when tracking...)
-            
-            input = util.text.InputVars;
-            input.input_var('N', 50, 'number', 'iterations'); 
-            input.input_var('delay', 0.01, 'pause'); 
-            input.scan_vars(varargin{:}); 
-            
-            RA = nan(input.N, 1); 
-            DE = nan(input.N, 1); 
-            
-            for ii = 1:input.N
-                
-                RA(ii) = obj.telRA_deg; 
-                DE(ii) = obj.telDec_deg;
-                
-                pause(input.delay); 
-                
-            end
-            
-            RA_var = nanvar(RA); 
-            DE_var = nanvar(DE); 
-            
-            total_var = RA_var + DE_var;
-            
         end
         
         function setup_timer(obj, ~, ~) % start the timer that checks Arduino and updates GUI
