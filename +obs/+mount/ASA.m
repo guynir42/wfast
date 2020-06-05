@@ -1046,15 +1046,22 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 threshold = 600; % can change this default later 
             end
             
-            val = abs(obj.telRA_deg-obj.objRA_deg)*3600<threshold &&...
+            if isempty(obj.objRA_deg) || isempty(obj.objDec_deg)
+                val = [];
+            else
+                val = abs(obj.telRA_deg-obj.objRA_deg)*3600<threshold &&...
                     abs(obj.telDec_deg-obj.objDec_deg)*3600<threshold;
+            end
+            
             if ~isempty(obj.gui) && obj.gui.check
-                if val
+                if val==1
                     obj.gui.panel_status.button_on_target.String = 'on target';
                     obj.gui.panel_status.button_on_target.ForegroundColor = 'blue';
-                else
+                elseif val==0
                     obj.gui.panel_status.button_on_target.String = 'off target!';    
                     obj.gui.panel_status.button_on_target.ForegroundColor = 'red';
+                elseif isempty(val)
+                    obj.gui.panel_status.button_on_target.String = '';
                 end
             end
                     
