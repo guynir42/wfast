@@ -29,10 +29,13 @@ classdef AstroData < dynamicprops
         
         cutouts; % this is raw cutouts and it is usually what we save on file
         positions; % only for cutouts. a 2xN matrix (X then Y, N is the number of cutouts). 
+        object_idx; % what is the index of the object closest to the coordinates given
+        forced_indices; % if any forced targets are added to the positions field, list their indices in a vector
+        unlocked_indices; % if any targets are set to adjust cutout position independently (not locked to the mean drift), list their indices in a vector
+        
         coordinates; % match each star/cutout position with RA/DEC (in degrees)
         magnitudes; % each star's magnitude (from catalog)
         temperatures; % each star's temperature in K (from catalog)
-        object_idx; % what is the index of the object closest to the coordinates given
         
         cutouts_bg; % samples of the raw images at random locations to calculate the backgrounds
         positions_bg; % only for bg_cutouts. a 2xN matrix (X then Y, N is the number of cutouts). 

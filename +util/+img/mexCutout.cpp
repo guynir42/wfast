@@ -226,7 +226,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		
 			for(int p=0; p<pages; p++) for(int j=push_x; j<cut_size_x; j++){
 				
-				src=&in_array[(rows*cols*p+x1*rows+y1+push_y+j*rows)*num_bytes]; // pointer to the start of the line in the source matrix
+				src=&out_array2[(rows*cols*p+x1*rows+y1+push_y+j*rows)*num_bytes]; // pointer to the start of the line in the source matrix
 				N=(cut_size_y-push_y)*num_bytes; // how many bytes need to be copied...
 				
 				if(replace_value_bytes==0) memset(src, 0, N); // for zero use quick replace (memset)

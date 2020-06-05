@@ -13,13 +13,13 @@ function val = fwhm(I, varargin)
 %
 % Method "filters":
 % Generate a filter bank with gaussians of increasing width, find the one
-% that most 
+% that gives the highest S/N. 
 %
 % OPTIONAL ARGUMENTS:
 %   -oversample: increase the resolution using sinc interpolation in Fourier
 %                space. Default is [] which means no oversampling. 
 %   -method: choose the different methods to calculate FWHM. 
-%            Options: 
+%            Options: "radial", "moments", "filters". 
 %   -number_interp: minimal number of points along slope. If the number of
 %                   pixels in the image is larger than this, we don't need
 %                   to interpolate. Otherwise it will interpolate to this 
@@ -52,7 +52,7 @@ function val = fwhm(I, varargin)
     input.input_var('aperture', []); 
     input.input_var('step_size', 0.05);
     input.input_var('max_size', []); 
-    input.input_var('min_size', 0.5);
+    input.input_var('min_size', 1);
     input.input_var('fft', false, 'use_fft'); 
     input.scan_vars(varargin{:});
     
@@ -103,20 +103,33 @@ function val = fwhm(I, varargin)
     elseif cs(input.method, 'filters')
         
         if isempty(input.max_size)
-            input.max_size = ceil(min(S)/2); 
+            input.max_size = ceil(min(S)/1.5); 
         end
+        
+        I2 = I-util.stat.mean2(I); 
+        
+        I3 = reshape(I2, [size(I,1), size(I,2).*size(I,3).*size(I,4)]); % flatten the array into 2D
+        I3 = reshape(regionfill(I3, isnan(I3)), size(I)); % reshape it back after removing NaNs
+        
+%         I2 = zeros(size(I), 'like', I);
+%                     
+%         for ii = 1:size(I,3)
+%             for jj = 1:size(I,4)
+%                 I2(:,:,ii,jj) = regionfill(I(:,:,ii,jj), isnan(I(:,:,ii,jj)));
+%             end
+%         end
         
         sig = input.min_size:input.step_size:input.max_size;
         mx = nan(size(I,3), size(I,4), size(sig,2)); 
         
         for ii = 1:length(sig)
             
-            g = util.img.gaussian2(sig(ii), 'size', S, 'norm', 2); % gaussian normalized for matched filtering 
+            g = util.img.gaussian2(sig(ii)./2.355, 'size', S, 'norm', 2); % gaussian normalized for matched filtering 
              
             if input.fft
-                If = util.img.conv_f(g, I); 
+                If = util.img.conv_f(g, I3); 
             else
-                If = reshape(filter2(g, reshape(I, [size(I,1), size(I,2).*size(I,3).*size(I,4)])), size(I)); % reshape back to original size
+                If = reshape(filter2(g, reshape(I3, [size(I,1), size(I,2).*size(I,3).*size(I,4)])), size(I)); % reshape back to original size
             end
             
             mx(:,:,ii) = permute(util.stat.max2(If), [3,4,1,2]); % the maximum in each cutout for each sigma
@@ -125,7 +138,7 @@ function val = fwhm(I, varargin)
         
         [~, idx] = nanmax(mx,[], 3); % find the maximum sigma for each ii and jj
         
-        val = 2.355.*sig(idx); 
+        val = sig(idx); 
         
     else
         error('Unknown method "%s". Choose "radial" or "moments" or "filters". ', input.method); 

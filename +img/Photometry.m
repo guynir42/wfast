@@ -68,7 +68,7 @@ classdef Photometry < handle
         use_aperture = 0; % no need to do aperture because forced is much better
         use_forced = 1;
         use_best_offsets = 1; % if this is true, keep the offsets from gaussian even if using aperture/forced 
-        use_best_widths = 0; % if this is true, keep the widths from gaussian even if using aperture/forced 
+        use_best_widths = 0; % if this is true, keep the widths from gaussian even if using aperture/forced (it is not very good, biased to lower values)
         
         corner_size = 0.15; % fraction of the cut_size or pixel value (must be smaller than cut_size!)
         aperture = 6; % for now lets keep it short by using just the big aperture

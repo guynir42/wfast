@@ -140,6 +140,13 @@ classdef InputVars < dynamicprops
         
         function add_comment(obj, name, comment)
             
+            if nargin==2
+                comment = name;
+                name = obj.list_added_properties{end};
+            elseif isempty(name)
+                name = obj.list_added_properties{end};
+            end
+            
             obj.comment_dictionary(name) = comment; 
             
         end

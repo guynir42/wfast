@@ -2,8 +2,8 @@
 % Calculate all sorts of photometric measurements on image cutouts. 
 %
 % By default, this calculates raw photometry (sum of the entire square), 
-% aperture photometry on a few radii, forced photometry (on the largest
-% radius using the average position of all stars), and gaussian PSF
+% aperture photometry on a few radii, forced photometry (using the same radii,
+% centered using the average position of all stars), and gaussian PSF
 % photometry, assuming some gaussian width. 
 % 
 % Input: a matrix of cutouts, must be single precision, 2-4 dimensional. 

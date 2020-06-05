@@ -11,7 +11,6 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
 % -sigma: Threshold for finding stars (after mean subtract and divide by std). Default 3.5.
 % -saturation: Value of brightest pixel must be lower than this or else flag 1 is set. 
 % -edges: Replace edges with NaN before finding stars. If empty will be dilate*2. 
-% -fraction: of MX_twice or MX_half that must surpass MX to be counted as point-source or extended-source
 % -unflagged: if true only leave rows which have flag==0 (Default is false: take all stars!)
 %
 %
@@ -39,7 +38,7 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     input.input_var('sigma', 5, 'threshold');
     input.input_var('saturation', 5e4); % saturation by default for a singe image (input larger values for stacks)
     input.input_var('edges', []);
-    input.input_var('fraction', 0.8); % fraction of MX_twice or MX_half that must surpass MX to be counted as point-source or extended-source
+    input.input_var('fraction', 0.8); % fraction of MX_twice or MX_half that must surpass MX to be counted as point-source or extended-source (no longer used)
     input.input_var('unflagged', 0, 'flagged'); % only leave rows which have flag==0
     input.scan_vars(varargin{:});
     
@@ -138,6 +137,8 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
             f = zeros(size(P,1),1);    
             f(MX_f<MX_half*input.fraction) = 2; % point source 
             f(MX_f<MX_twice*input.fraction) = 3; % extended object
+%             f(MX_f<MX_half-1) = 2; % point source 
+%             f(MX_f<MX_twice-1) = 3; % extended object
             f(MX>input.saturation) = 1; % saturated star 
 
             pos = vertcat(pos, P);
@@ -146,6 +147,14 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
             snr = vertcat(snr, MX_f); 
             table_props = vertcat(table_props, T);
 
+            if input.unflagged
+                table_props(logical(flag), :) = []; % remove all non-zero flag stars
+                pos(logical(flag),:) = []; 
+                flux(logical(flag)) = []; 
+                snr(logical(flag)) = []; 
+                flag(logical(flag)) = []; 
+            end
+            
             I_reduced(BW_dilated) = NaN;
         
             if height(table_props)>input.number
@@ -162,9 +171,9 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     
     table_props = horzcat(T2, table_props);
     
-    if input.unflagged
-        table_props(logical(flag), :) = []; % remove all non-zero flag stars
-    end
+%     if input.unflagged
+%         table_props(logical(flag), :) = []; % remove all non-zero flag stars
+%     end
     
     table_props = sortrows(table_props, 1, 'descend');
     
