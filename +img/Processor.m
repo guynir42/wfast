@@ -274,7 +274,14 @@ classdef Processor < dynamicprops
         
         function run_async(obj)
             
-        end        
+        end
+    
+        function stop(obj)
+            
+            obj.brake_bit = 1;
+            
+        end
+        
     end
     
     methods % utilities
@@ -291,6 +298,20 @@ classdef Processor < dynamicprops
             
         end
         
+        function str = printout(obj)
+            
+            str = sprintf('batch: %d/%d', obj.successful_batches, obj.getNumBatches); 
+            
+            str = sprintf('%s | folder: %s', str, strrep(obj.reader.dir.two_tail, '\', ' \ ')); 
+            
+            str = sprintf('%s | coords: %s%s', str, obj.head.RA, obj.head.Dec); 
+            
+            if ~isempty(obj.head.AIRMASS)
+                str = sprintf('%s | a.m.= %4.2f', str, obj.head.AIRMASS); 
+            end
+            
+        end
+        
     end
     
     methods(Hidden=true) % internal calculations
@@ -298,6 +319,8 @@ classdef Processor < dynamicprops
         function startup(obj, varargin)
             
             if obj.pars.reset % all the things that must happen when a run begins (and not happen when a run continues)
+                
+                obj.displayInfo(sprintf('starting new run with %d batches', obj.getNumBatches));
                 
                 obj.reset;
                 obj.prog.reset(obj.getNumBatches);
@@ -307,6 +330,7 @@ classdef Processor < dynamicprops
                 obj.data.project = obj.find_project;
 
                 if obj.pars.use_auto_load_cal
+                    obj.displayInfo(sprintf('Loading calibration file for date %s', obj.data.date)); 
                     obj.cal.loadByDate(obj.data.date, obj.data.camera, obj.data.project); 
                 end
 
@@ -399,6 +423,7 @@ classdef Processor < dynamicprops
             obj.data.image_proc = obj.cal.input(obj.data.image, 'sum', obj.data.num_sum); 
             
             if isempty(obj.data.positions)
+                
                 obj.findStars;
                 
                 if obj.pars.use_astrometry
@@ -409,7 +434,6 @@ classdef Processor < dynamicprops
             
             obj.data.ref_image = obj.data.image_proc;
             obj.data.ref_positions = obj.data.positions;
-            
             
             [obj.data.cutouts, obj.data.image_cut] = util.img.mexCutout(obj.data.image_proc, obj.data.positions, obj.pars.cut_size, NaN, NaN); % replace and fill up using NaNs (it is safe, the processed image is single precision
             
@@ -440,6 +464,10 @@ classdef Processor < dynamicprops
             
             if obj.pars.use_fits_save
                 % TODO: need to add this...
+            end
+            
+            if ~isempty(obj.gui)
+                obj.gui.update;
             end
             
         end
@@ -634,6 +662,8 @@ classdef Processor < dynamicprops
         
         function solveAstrometry(obj)
             
+            obj.displayInfo('Running astrometry'); 
+            
             if util.text.cs(obj.head.cam_name, 'balor')
                 obj.cat.input_rotation = -60; 
             elseif util.text.cs(obj.head.cam_name, 'zyla')
@@ -659,6 +689,15 @@ classdef Processor < dynamicprops
                 obj.data.found_stars = obj.data.found_stars(~bad_idx, :); 
 
             end
+            
+            if obj.cat.success
+                str = sprintf('Found astrometric solution: %s%s', head.Ephemeris.deg2hour(obj.cat.central_RA), head.Ephemeris.deg2sex(obj.cat.central_Dec)); 
+            else
+                str = 'Cannot find an astrometric solution!'; 
+            end
+
+            obj.displayInfo(str);
+            disp(str); 
 
         end
         
@@ -718,10 +757,24 @@ classdef Processor < dynamicprops
             
         end
         
+        function displayInfo(obj, str)
+            
+            try 
+                
+                if ~isempty(obj.gui) && obj.gui.check
+                    obj.gui.panel_info.button_info.String = str;
+                end
+            
+            catch ME
+                warning(ME.getReport);
+            end
+            
+        end
+        
         function makeGUI(obj)
             
             if isempty(obj.gui)
-                obj.gui = img.gui.AnalysisGUI(obj);
+                obj.gui = img.gui.ProcGUI(obj);
             end
             
             obj.gui.make;

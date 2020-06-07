@@ -45,7 +45,7 @@ classdef InputVars < dynamicprops
         
     end
 
-    properties
+    properties(Hidden=true)
         
         alias_dictionary; % keep track of the names of each of the parameters
         default_dictionary; % keep track of the original values (defaults) 

@@ -650,7 +650,7 @@ classdef GraphicButton < handle
                         obj.setVariable(obj.owner.(['default_' obj.variable]));
     %                     obj.owner.(obj.variable) = obj.owner.(['default_' obj.variable]);
                     else
-                        obj.owner.(obj.variable) = [];
+                        obj.setVariable([]);
                     end
                 else  
                     obj.setVariable(value);

@@ -71,10 +71,9 @@ classdef InputGUI < handle
             
             obj.fig = util.plot.FigHandler('input parameters');
             obj.fig.clear;
-            obj.fig.bottom = 5;
             obj.fig.height = 10;
             obj.fig.width = 6;
-            movegui(obj.fig.fig, 'center');
+%             movegui(obj.fig.fig, 'center');
             obj.fig.left = obj.fig.left + 12;
             
             %%%%%%%%%%%%%%%%%%%%%%% MENUS %%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -109,6 +108,9 @@ classdef InputGUI < handle
             obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE', '', '', 'graphic_user_interface');
             obj.button_close.Callback = @obj.callback_close;
             
+            obj.fig.height = N+2;
+            obj.fig.center;
+            obj.fig.left = 30;
             obj.update;
             
         end
