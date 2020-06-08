@@ -43,6 +43,8 @@ classdef ManagerGUI < handle
         
         panel_weather;
         
+        panel_camera;
+        
         panel_stop;
         
         panel_image;
@@ -183,8 +185,9 @@ classdef ManagerGUI < handle
             obj.panel_dome = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'dome');
             obj.panel_dome.number = N;            
             obj.panel_dome.addButton('button_close_dome', 'closeDome', 'push', 'Close Dome');
-            obj.panel_dome.addButton('button_shutter_east', '', 'custom', 'East shutter: ', '', 'edit', 0.5);
-            obj.panel_dome.addButton('button_shutter_west', '', 'custom', 'West shutter: ', '', 'edit', 0.5);
+            obj.panel_dome.addButton('button_shutter_east', '', 'custom', 'East: ', '', 'edit', 0.275);
+            obj.panel_dome.addButton('button_tracking', 'dome.use_tracking', 'toggle', 'dome not tracking', 'dome is tracking', 'edit', 0.45, obj.color_on, '', 'dome can be set to slowly open West and close East'); 
+            obj.panel_dome.addButton('button_shutter_west', '', 'custom', 'West: ', '', 'edit', 0.275);
             obj.panel_dome.addButton('button_close_east', '', 'custom', 'Close East', '', '', 0.5);
             obj.panel_dome.addButton('button_close_west', '', 'custom', 'Close West', '', '', 0.5);
             obj.panel_dome.addButton('button_open_east', '', 'custom', 'Open East', '', '', 0.5);
@@ -206,18 +209,18 @@ classdef ManagerGUI < handle
             pos = pos - N;
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'controls');
             obj.panel_controls.number = N;
-            obj.panel_controls.addButton('button_autoshutdown', 'use_shutdown', 'toggle', 'auto shutdown is disabled', 'auto shutdown is enabled', ...
-                '', 0.7, obj.color_on, 'red'); 
-            obj.panel_controls.addButton('button_twilight', 'checker.use_twilight_mode', 'toggle', 'twilight is off', 'twilight is on', ...
-                '', 0.3, 'red', obj.color_on);
-            obj.panel_controls.addButton('button_autostartup', 'use_startup', 'toggle', 'auto start up is disabled', 'auto start up is enabled', ...
-                '', 1, obj.color_on, 'red'); 
+            obj.panel_controls.addButton('button_autoshutdown', 'use_shutdown', 'toggle', 'auto shutdown is disabled', 'auto shutdown is enabled', '', 0.7, obj.color_on, 'red'); 
+%             obj.panel_controls.addButton('button_twilight', 'checker.use_twilight_mode', 'toggle', 'twilight is off', 'twilight is on', '', 0.3, 'red', obj.color_on);
+            obj.panel_controls.addButton('button_twilight', '', 'custom', 'twilight is off', 'twilight is on', '', 0.3, 'red', obj.color_on);
+            
+            obj.panel_controls.addButton('button_autostartup', 'use_startup', 'toggle', 'auto start up is disabled', 'auto start up is enabled', '', 1, obj.color_on, 'red'); 
             obj.panel_controls.addButton('button_weather_check', 'callback_t2', 'push', 'Weather check');
             obj.panel_controls.margin = [0.01 0.01];
             obj.panel_controls.make;
             
             obj.panel_controls.button_autoshutdown.Tooltip = 'Allow manager to close dome and stop tracking if weather is bad or if there is a device failure';
             obj.panel_controls.button_twilight.Tooltip = 'Let the dome stay open during twilight';
+            obj.panel_controls.button_twilight.Callback = @obj.callback_twilight_mode;
             obj.panel_controls.button_autostartup.Tooltip = 'Allow manager to open and start observing autonomously. (not implemented yet)';
             obj.panel_controls.button_weather_check.Tooltip = 'Run t2 to check weather and devices'; 
             
@@ -268,13 +271,28 @@ classdef ManagerGUI < handle
             
             obj.button_mean_only = GraphicButton(obj.panel_image, [0.0 0.95 0.1 0.05], obj.owner, 'checker.use_only_plot_mean', 'toggle', 'all', 'mean'); 
             
-            obj.button_clicker = GraphicButton(obj.panel_image, [0.64 0.02 0.3 0.05], obj.owner, '', 'custom', '', ''); 
+            obj.button_clicker = GraphicButton(obj.panel_image, [0.64 0.45 0.28 0.05], obj.owner, '', 'custom', '', ''); 
+            
+            %%%%%%%%%%% panel camera %%%%%%%%%%%%%%%%%
+            
+            obj.panel_camera = GraphicPanel(obj.owner, [0.2 0 0.8 2/N_middle], 'camera');
+            obj.panel_camera.addButton('button_stop', 'commandCameraStop', 'push', 'Stop cam', '', '', 0.1, '', '', 'send a stop command to the camera-PC'); 
+            obj.panel_camera.addButton('input_arguments', '', 'custom', ' ', '', '', 0.6, '', '', 'use this input to give arguments to the camera-PC'); 
+            obj.panel_camera.addButton('button_stop', 'commandCameraStart', 'push', 'Start cam', '', '', 0.1, '', '', 'send a start command to the camera-PC'); 
+            obj.panel_camera.addButton('button_info', 'camera_info', 'info', ' ', '', '', 0.2, '', '', 'some information from the camera-PC'); 
+            
+            obj.panel_camera.margin = [0.01 0.1];
+            obj.panel_camera.make;
+            
+            obj.panel_camera.input_arguments.control.Style = 'edit';
+            obj.panel_camera.input_arguments.Callback = @obj.callback_arguments;
             
             %%%%%%%%%%% panel stop %%%%%%%%%%%%%%%%%%%
             
-            obj.panel_stop = GraphicPanel(obj.owner, [0.2 0 0.8 2/N_middle]);
-            obj.panel_stop.addButton('button_stop', 'stop', 'push', 'STOP');
-            obj.panel_stop.margin = [0.01 0.1];
+%             obj.panel_stop = GraphicPanel(obj.owner, [0.2 0 0.8 2/N_middle]);
+            obj.panel_stop = GraphicPanel(obj.owner, [0.7 0.2 0.28 0.2]);
+            obj.panel_stop.addButton('button_stop', 'stop', 'push', 'STOP MOUNT AND DOME');
+%             obj.panel_stop.margin = [0.01 0.1];
             obj.panel_stop.make;
             
             %%%%%%%%%% Menus %%%%%%%%%%%%%%%%%%%%%%%%%
@@ -417,27 +435,7 @@ classdef ManagerGUI < handle
                 obj.panel_object.button_pierside.Tooltip = 'Side of sky where object is right now (need to flip!)'; 
             end
             
-            if obj.owner.dome.status==0
-                obj.panel_dome.button_shutter_west.String = 'Shut.West: error';
-                obj.panel_dome.button_shutter_east.String = 'Shut.East: error';
-            else
-                if obj.owner.dome.shutter_west_deg==0
-                    obj.panel_dome.button_shutter_west.String = sprintf('Shut.West: open');
-                elseif obj.owner.dome.shutter_west_deg==90
-                    obj.panel_dome.button_shutter_west.String = sprintf('Shut.West: closed');
-                else
-                    obj.panel_dome.button_shutter_west.String = sprintf('Shut.West: %d deg', round(obj.owner.dome.shutter_west_deg));
-                end
-                
-                if obj.owner.dome.shutter_east_deg==0
-                    obj.panel_dome.button_shutter_east.String = sprintf('Shut.East: open');
-                elseif obj.owner.dome.shutter_east_deg==90
-                    obj.panel_dome.button_shutter_east.String = sprintf('Shut.East: closed');
-                else
-                    obj.panel_dome.button_shutter_east.String = sprintf('Shut.East: %d deg', round(obj.owner.dome.shutter_east_deg));
-                end
-                
-            end
+            obj.updateDomeStatusButtons;
             
             if obj.key_status_shift
                 obj.panel_dome.button_close_west.String = 'Close West Full'; 
@@ -453,10 +451,46 @@ classdef ManagerGUI < handle
                 obj.panel_dome.button_open_east.String = 'Open East'; 
             end
             
+            if obj.owner.checker.use_twilight_mode
+                obj.panel_controls.button_twilight.String = 'twilight is on'; 
+                obj.panel_controls.button_twilight.ForegroundColor = obj.panel_controls.button_twilight.color_on;
+            else
+                obj.panel_controls.button_twilight.String = 'twilight is off'; 
+                obj.panel_controls.button_twilight.ForegroundColor = obj.panel_controls.button_twilight.color_off;
+            end
+            
+            obj.panel_camera.input_arguments.String = obj.owner.camera_args;
+            
             obj.updateStopButton;
 
             obj.owner.checker.plotWeather('ax', obj.axes_image, 'color', obj.color_bg);
                         
+        end
+        
+        function updateDomeStatusButtons(obj)
+            
+            if obj.owner.dome.status==0
+                obj.panel_dome.button_shutter_west.String = 'West: error';
+                obj.panel_dome.button_shutter_east.String = 'East: error';
+            else
+                if obj.owner.dome.shutter_west_deg==0
+                    obj.panel_dome.button_shutter_west.String = sprintf('West: open');
+                elseif obj.owner.dome.shutter_west_deg==90
+                    obj.panel_dome.button_shutter_west.String = sprintf('West: closed');
+                else
+                    obj.panel_dome.button_shutter_west.String = sprintf('West: %d deg', round(obj.owner.dome.shutter_west_deg));
+                end
+                
+                if obj.owner.dome.shutter_east_deg==0
+                    obj.panel_dome.button_shutter_east.String = sprintf('East: open');
+                elseif obj.owner.dome.shutter_east_deg==90
+                    obj.panel_dome.button_shutter_east.String = sprintf('East: closed');
+                else
+                    obj.panel_dome.button_shutter_east.String = sprintf('East: %d deg', round(obj.owner.dome.shutter_east_deg));
+                end
+                
+            end
+            
         end
         
         function updateStopButton(obj)
@@ -482,6 +516,22 @@ classdef ManagerGUI < handle
     end
                 
     methods % callbacks
+        
+        function callback_twilight_mode(obj, ~, ~)
+            
+            if obj.debug_bit>1, disp('Callback: twilight mode'); end
+            
+            if obj.owner.checker.use_twilight_mode
+                obj.owner.checker.use_twilight_mode = 0;
+            else
+                obj.owner.setup_t3; % first run this so it doesn't turn off twilight mode very shortly after user enables it
+                obj.owner.checker.use_twilight_mode = 1;
+                obj.owner.callback_t2; % update weather check with new light-level limit
+            end
+            
+            obj.update;
+            
+        end
         
         function callback_key_press(obj, hndl, event)
             
@@ -656,6 +706,20 @@ classdef ManagerGUI < handle
             end
             
             obj.owner.mount.slew;
+            
+            obj.update;
+            
+        end
+        
+        function callback_arguments(obj, hndl, ~)
+            
+            if obj.debug_bit>1, disp('Callback: slew'); end
+            
+            args = hndl.String;
+            
+            if obj.debug_bit>1, disp(args); end
+            
+            obj.owner.camera_args = args;
             
             obj.update;
             

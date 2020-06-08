@@ -26,6 +26,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     
     properties(Transient=true)
         
+        t0; % lightweight timer that only updates a few GUI buttons
         t1; % quick timer (every minute or so) just to update sensors/devices
         t2; % check that everything is connected and that weather is good, print to log file
         t3; % verify that the other two are still running (every half an hour or so)
@@ -72,12 +73,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         use_humidity = 0; % override humidity dog
         use_temperature = 0; % override other temp sensors
         
+        period0 = 2; % time between updates of GUI info buttons
         period1 = 60; % time between updates of all devices/sensors
         period2 = 300; % time for equipment/weather check and log file
         period3 = 1800; % time for verifying shorter timers are working (and other tests?)
         
         autostart_min_weather_samples = 4;
         autostart_min_weather_minutes = 20;
+        
+        camera_args = '';
         
         brake_bit = 1; % also set the brake bit for mount/dome
         debug_bit = 1;
@@ -588,7 +592,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             obj.stop_t3;
             obj.stop_t2;
-            obj.stop_t1;
+            obj.stop_t1; 
+            obj.stop_t0;
             
         end
         
@@ -597,13 +602,70 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.setup_t3;
             obj.setup_t2;
             obj.setup_t1;
+            obj.setup_t0;
             
         end
+        
+        function callback_t0(obj, ~, ~) % update some GUI buttons
+            
+            if ~isempty(obj.gui) && obj.gui.check
+                
+                obj.gui.panel_telescope.button_RA.update;
+                obj.gui.panel_telescope.button_DE.update;
+                obj.gui.panel_telescope.button_LST.update;
+                obj.gui.panel_telescope.button_ALT.update;
+                obj.gui.panel_telescope.button_tracking.update;
+                
+                obj.gui.updateDomeStatusButtons;
+                obj.gui.panel_dome.button_tracking.update;
+                
+                if ~isfield(obj.cam_pc.incoming, 'report')
+                    obj.cam_pc.incoming.report = '';
+                end
+                
+                obj.gui.panel_camera.button_info.update;
+                
+                obj.gui.updateStopButton;
+                
+            end
+            
+        end
+        
+        function setup_t0(obj, ~, ~) % start the timer t0 with period0
+            
+            if ~isempty(obj.t0) && isa(obj.t0, 'timer') && isvalid(obj.t0)
+                if strcmp(obj.t0.Running, 'on')
+                    stop(obj.t0);
+                    delete(obj.t0);
+                    obj.t0 = [];
+                end
+            end
+            
+            delete(timerfind('name', 'Status-check-t0'));
+            
+            obj.t0 = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'Status-check-t0', ...
+                'Period', obj.period0, 'StartDelay', obj.period0, ...
+                'TimerFcn', @obj.callback_t0, 'ErrorFcn', @obj.setup_t0);
+            
+            start(obj.t0);
+            
+        end
+        
+        function stop_t0(obj, ~, ~) % stop the timer t0
+            
+            stop(obj.t0);
+            
+        end 
         
         function callback_t1(obj, ~, ~) % update sensors and GUI
             
             try 
-            
+                
+                % make sure t0 is running! 
+                if isempty(obj.t0) || ~isvalid(obj.t0) || strcmp(obj.t0.Running, 'off')
+                    obj.setup_t0;
+                end
+
                 if isempty(obj.checker)
                     obj.connectSensorChecker;
                 end
@@ -1235,21 +1297,86 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function commandCamPC(obj, str, cam_mode, exp_time)
+        function commandCamPC(obj, str, varargin)
             
-            if nargin<3 || isempty(cam_mode)
-                cam_mode = '';
-            end
+            input = util.text.InputVars;
+            input.input_var('num_batches', []); 
+            input.input_var('cam_mode', 'fast'); 
+            input.input_var('exp_time', []); 
+            input.input_var('use_focus', []); 
+            input.scan_vars(varargin{:}); 
             
-            if nargin<4 || isempty(exp_time)
-                exp_time = [];
-            end
-            
-            obj.cam_pc.outgoing.command_str = str;
+            obj.cam_pc.outgoing.command_str = str; % can be "start" or "stop" or... 
             obj.cam_pc.outgoing.command_time = util.text.time2str(datetime('now', 'TimeZone', 'UTC')); 
-            obj.cam_pc.outgoing.cam_mode = cam_mode;
-            obj.cam_pc.outgoing.exp_time = exp_time;
+            
+            if length(varargin)==1 && ischar(varargin{1}) % input was given as single string (assumed formatted...)
+%                 varargin = util.text.parse_inputs(varargin{1}); 
+                args = varargin{1};
+                
+            else % need to construct a string from the varargin
+
+                args = '';
+
+                for ii = 1:2:length(varargin)
+
+                    key = varargin{ii};
+                    val = '';
+                    if length(varargin)>ii
+                        val = util.text.print_value(varargin{ii+1});
+                    end
+
+                    if isempty(args)
+                        args = sprintf('%s=%s', key, val); 
+                    else
+                        args = sprintf('%s, %s=%s', args, key, val); 
+                    end
+
+                end    
+            end
+            
+            obj.cam_pc.outgoing.command_pars = args;
             obj.cam_pc.update; 
+            
+            obj.log.input(sprintf('Sending camera command: "%s" with arguments "%s"', str, args)); 
+            
+            if obj.debug_bit, disp(obj.log.report); end
+            
+        end
+        
+        function commandCameraStop(obj)
+            
+            obj.commandCamPC('stop'); 
+            
+        end
+        
+        function commandCameraStart(obj)
+            
+            obj.commandCamPC('start', obj.camera_args); 
+            
+            if ~isempty(obj.gui) && obj.gui.check
+                obj.gui.panel_camera.button_info.String = ''; % indicator that the button was clicked
+            end
+            
+        end
+        
+        function str = camera_info(obj)
+            
+            str = {};
+            str{end+1} = obj.cam_pc.incoming.report;
+            
+            if ~isempty(obj.cam_pc.incoming.report) && ~strcmp(obj.cam_pc.incoming.report, 'idle')
+                
+                if isfield(obj.cam_pc.incoming, 'batch_counter') && isfield(obj.cam_pc.incoming, 'total_batches') 
+                    str{end+1} = sprintf('%d / %d', obj.cam_pc.incoming.batch_counter, obj.cam_pc.incoming.total_batches);
+                end
+                
+                if isfield(obj.cam_pc.incoming, 'runtime')
+                    str{end+1} = sprintf('%ds', round(obj.cam_pc.incoming.runtime)); 
+                end
+                
+            end
+            
+            str = strjoin(str, ', '); 
             
         end
         

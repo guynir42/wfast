@@ -78,6 +78,8 @@ classdef SensorChecker < handle
         
         max_data_history_length = 1e4; % when reaching ~30 days of backlog, will drop the first half of the data (it is all saved in text log files)
         
+        wise_timeout = 10;
+        
         debug_bit = 1;
         
     end
@@ -608,7 +610,7 @@ classdef SensorChecker < handle
         function getWiseData(obj) % call the Wise computer and ask for all the weather data
             
             % I got this string from Arie, and had to install cURL for windows but now it works. Note the use of double quotes
-            [rc,rv] = system('curl --connect-timeout 2 --silent -X PUT --header "Content-Type: application/x-www-form-urlencoded" --header "Accept: application/json" --data "Action=raw-weather-data&Parameters=" http://132.66.65.9:11111/api/v1/safetymonitor/0/action');
+            [rc,rv] = system(sprintf('curl --max-time %d --connect-timeout 2 --silent -X PUT --header "Content-Type: application/x-www-form-urlencoded" --header "Accept: application/json" --data "Action=raw-weather-data&Parameters=" http://132.66.65.9:11111/api/v1/safetymonitor/0/action', obj.wise_timeout));
             
             if rc==0
                 
@@ -618,6 +620,8 @@ classdef SensorChecker < handle
                 
                 obj.wise_data_struct = jsondecode(value.Value); 
                 
+            else
+                fprintf('cURL error code %d in getWiseData\n', rc); 
             end
             
             [value,reason] = obj.getWiseSafeFlag;
@@ -729,7 +733,7 @@ classdef SensorChecker < handle
                 
             end
             
-            obj.sun_state = nanmean(obj.light.now)<obj.light.max; % this is true when the light is low enough
+            obj.sun_state = nanmean(obj.light.now)<obj.light.max && obj.use_twilight_mode==0; % this is true when the light is low enough (excluding twilight mode)
             
             if obj.sun_state==0 % sun is up, the night is over, time to store the collected data and reset for next time
                 
@@ -753,20 +757,22 @@ classdef SensorChecker < handle
             value = [];
             reason = '';
             
-            [rc,rv] = system('curl --connect-timeout 2 --silent -X PUT --header "Content-Type: application/x-www-form-urlencoded" --header "Accept: application/json" --data "Action=wise-issafe&Parameters=" http://132.66.65.9:11111/api/v1/safetymonitor/0/action');
+            [rc,rv] = system(sprintf('curl --max-time %d --connect-timeout 2 --silent -X PUT --header "Content-Type: application/x-www-form-urlencoded" --header "Accept: application/json" --data "Action=wise-issafe&Parameters=" http://132.66.65.9:11111/api/v1/safetymonitor/0/action', obj.wise_timeout));
             if(rc==0) % check the call succeeded
                 
                 value = jsondecode(rv);
                 value = value.Value;
                 
                 % try to get the reason as well
-                [rc,rv] = system('curl --connect-timeout 2 --silent -X PUT --header "Content-Type: application/x-www-form-urlencoded" --header "Accept: application/json" --data "Action=wise-unsafereasons&Parameters=" http://132.66.65.9:11111/api/v1/safetymonitor/0/action');
+                [rc,rv] = system(sprintf('curl --max-time %d --connect-timeout 2 --silent -X PUT --header "Content-Type: application/x-www-form-urlencoded" --header "Accept: application/json" --data "Action=wise-unsafereasons&Parameters=" http://132.66.65.9:11111/api/v1/safetymonitor/0/action', obj.wise_timeout));
                 
                 if(rc==0)
                     reason = jsondecode(rv);
                     reason = reason.Value;
                 end
 
+            else
+                fprintf('cURL error code %d in getWiseSafeFlag\n', rc); 
             end
 
         end

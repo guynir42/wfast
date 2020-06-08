@@ -60,7 +60,7 @@ classdef AstroHaven < handle
         use_accelerometers = 0; % for future installation
         
         use_tracking = 0; % when on, the dome timer will slowly open the west shutter and close the east shutter 
-        track_rate = 50; % how many "steps" to open west / close east to take every 30 minutes
+        track_rate = 25; % how many "steps" to open west / close east to take every 30 minutes
         
         max_fail_reply = 3; % how many sent messages to try before failing the command
         max_fail_connect = 3; % how many reconnect attempts before failing to connect

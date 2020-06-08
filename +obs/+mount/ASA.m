@@ -1207,7 +1207,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 if obj.check_need_flip % do pre-slews to manage to do the flip without getting stuck! 
                     
-                    if obj.telDec_deg<30 || obj.telDec_deg>60
+                    if obj.telDec_deg<45 || obj.telDec_deg>45 % used to be limited to <30 or >60 but I think it is always a good idea to do this little dance
                         
                         if obj.brake_bit, return; end % in case user clicked stop!
                         
