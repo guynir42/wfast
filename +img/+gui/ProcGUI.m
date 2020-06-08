@@ -48,6 +48,7 @@ classdef ProcGUI < handle
         button_reset_axes;
         button_display_text;
         input_num_rect;
+        button_expt;
         
         axes_image;
     
@@ -174,6 +175,7 @@ classdef ProcGUI < handle
             obj.panel_objects.addButton('button_photometry', 'phot', 'push', 'Photometry', '', '', 0.5, '', '', 'open the GUI for photometry object'); 
             obj.panel_objects.addButton('button_lightcurves', 'lightcurves', 'push', 'Lightcurves', '', '', 0.5, '', '', 'open the GUI for the lightcurves object'); 
             obj.panel_objects.addButton('button_pars', 'pars', 'push', 'Parameters', '', '', 0.5, '', '', 'open the GUI for parameters'); 
+            obj.panel_objects.addButton('button_head', 'head', 'push', 'Header', '', '', 0.5, '', '', 'open the GUI for the header object'); 
             obj.panel_objects.number = num_buttons;
             obj.panel_objects.margin = [0.02 0.03];
             obj.panel_objects.make;
@@ -215,6 +217,8 @@ classdef ProcGUI < handle
             
             obj.input_num_rect = GraphicButton(obj.panel_image, [0.15 0.0 0.2 0.05], obj.owner, 'pars.display_num_rect_stars', 'input', 'num cutouts= '); 
             obj.input_num_rect.Tooltip = 'number of squares around stars to show'; 
+            
+            obj.button_expt = GraphicButton(obj.panel_image, [0.0 0.95 0.15 0.05], obj.owner, 'head.EXPTIME', 'info', 'T= ', 's'); 
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
             

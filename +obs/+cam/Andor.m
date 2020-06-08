@@ -215,6 +215,8 @@ classdef Andor < file.AstroData
         focus_annulus = [12 0]; 
         focus_gaussian = 5;
         
+        focus_cutouts;
+        
         is_running = 0;
         is_running_focus = 0;
         brake_bit = 1; % when 1 the camera is stopped. Is set to 0 on "startup". 
@@ -810,7 +812,9 @@ classdef Andor < file.AstroData
             
         end
         
-        function autofocus(obj, varargin)
+        function success = autofocus(obj, varargin)
+            
+            success = 0;
             
             if isempty(obj.focuser)
                 error('must be connected to camera and focuser!');
@@ -831,7 +835,7 @@ classdef Andor < file.AstroData
                 obj.is_running_focus = 1; % tell focus GUI to display an indicator that focus is running... 
                 
                 % make sure finishup is called in the end
-                on_cleanup = onCleanup(@obj.finish_focus);
+                on_cleanup = onCleanup(@() obj.finish_focus(old_pos));
                 
                 % update the object with the camera parameters
                 obj.af.x_max = obj.ROI(4);
@@ -879,7 +883,7 @@ classdef Andor < file.AstroData
                 
                 % find stars, the quick version!
                 obj.single('frame rate', obj.af.frame_rate, 'exp time', obj.af.expT, 'batch size', obj.af.batch_size); % need to first update with observational parameters (using varargin!)
-                T = util.img.quick_find_stars(single(util.stat.sum_single(obj.images)), 'threshold', 15,...
+                T = util.img.quick_find_stars(single(util.stat.sum_single(obj.images)), 'threshold', obj.af.threshold,...
                     'saturation', 5e4*obj.af.batch_size, 'unflagged', 1, 'num_stars', obj.af.num_stars);
                 
                 if isempty(T)
@@ -895,32 +899,58 @@ classdef Andor < file.AstroData
 
                 for ii = 1:obj.num_batches
                     
-                    if obj.brake_bit, break; end
+                    if obj.brake_bit, return; end
                     
                     obj.focuser.pos = p(ii); 
                     
+                    t1 = tic;
                     obj.batch;
+                    time_batch = toc(t1);
                     
+                    t2 = tic;
                     % do we want to quick find stars on each iteration...?
-                    C = util.img.mexCutout(obj.images, T.pos, obj.af.cut_size, NaN)-100; 
+                    obj.focus_cutouts = util.img.mexCutout(obj.images, T.pos, obj.af.cut_size, NaN)-100; 
                     
-                    C = single(nansum(C,3)); % can I replace this with sum_single?
+                    time_cut = toc(t2);
                     
-                    obj.af.phot_struct = util.img.photometry2(C, 'aperture', obj.focus_aperture, 'use_aperture', 1, ...
-                        'gauss_sigma', 5, 'use_gaussian', 1, 'index', 3, 'threads', 4);
+                    C = single(nansum(obj.focus_cutouts,3)); 
                     
-                    A = obj.af.phot_struct.apertures_photometry.area;
-                    B = obj.af.phot_struct.apertures_photometry.background;
-                    fluxes = obj.af.phot_struct.apertures_photometry.flux - A.*B;
+                    t3 = tic;
+                    
+                    obj.af.phot_struct = util.img.photometry2(C, 'aperture', obj.focus_aperture, 'use_aperture', 0, ...
+                        'use_forced', 1, 'gauss_sigma', 5, 'use_gaussian', 1, 'index', 3, 'threads', 4);
+                    
+                    
+                    time_phot = toc(t3); 
+                    
+                    A = obj.af.phot_struct.forced_photometry.area;
+                    B = obj.af.phot_struct.forced_photometry.background;
+                    fluxes = obj.af.phot_struct.forced_photometry.flux - A.*B;
 %                     widths = phot_struct.apertures_photometry.width;
-                    widths = util.img.fwhm(C-permute(B, [1,3,4,2]), 'method', 'filters', 'min_size', 0.25)/2.355; 
+
+                    t4 = tic;
+                    widths = util.img.fwhm(C-permute(B, [1,3,4,2]), 'method', 'filters', 'min_size', 0.25, 'max_size', 10, 'step', 0.2)/2.355; 
                     widths(widths>10 | widths<0.1) = NaN;
+                    time_width = toc(t4);
                     
-                    obj.af.input(ii, p(ii), widths, fluxes, T.pos); 
+                    if ii==1
+                        [~,idx] = nanmax(fluxes);
+                        obj.af.star_idx = idx;
+                    end
+                    
+                    time_calculate = toc(t2);
+                    
+                    t5 = tic;
+                    obj.af.input(ii, p(ii), widths, (abs(fluxes)), T.pos, C); 
                     
                     obj.af.plot;
-
+                    obj.af.showCutout;
+                    
                     drawnow;
+                    
+                    time_af = toc(t5);
+                    
+%                     fprintf('ii= %02d | time batch= %fs | time cut= %fs | time phot= %fs | time width= %fs | time af= %fs\n', ii, time_batch, time_cut, time_phot, time_width, time_af);
                     
                 end
                 
@@ -929,11 +959,11 @@ classdef Andor < file.AstroData
                 obj.af.findPosTipTilt;
                 obj.af.plot;
                 
-                if ~isempty(obj.af.gui) && obj.af.gui.check
+                if ~isempty(obj.af.gui)
                     obj.af.gui.update;
                 end
                 
-                fprintf('FOCUSER RESULTS: pos= %f | tip= %f | tilt= %f\n', obj.af.found_pos, obj.af.found_tip, obj.af.found_tilt);
+                fprintf('FOCUSER RESULTS: width= %f | pos= %f | tip= %f | tilt= %f\n', obj.af.found_width, obj.af.found_pos, obj.af.found_tip, obj.af.found_tilt);
                 
                 if ~isnan(obj.af.found_pos)
                     obj.focuser.pos = obj.af.found_pos;
@@ -954,7 +984,10 @@ classdef Andor < file.AstroData
 %                     obj.cam.focuser.tilt = obj.cam.focuser.tilt + obj.af.found_tilt;
 %                 end
 
+                success = 1;
+
             catch ME
+                
                 obj.focuser.pos = old_pos;
                 obj.log.error(ME.getReport);
                 rethrow(ME);
@@ -1564,7 +1597,7 @@ classdef Andor < file.AstroData
             
         end
         
-        function finish_focus(obj)
+        function finish_focus(obj, old_pos)
             
             obj.finishup;
             
@@ -1572,7 +1605,15 @@ classdef Andor < file.AstroData
 
 %             obj.af.plot;
 
-            if ~isempty(obj.focuser.gui) && obj.gui.check
+            if obj.af.success==0
+                obj.focuser.pos = old_pos;
+            end
+
+            if ~isempty(obj.af.gui)
+                obj.af.gui.update
+            end
+            
+            if ~isempty(obj.focuser.gui)
                 obj.focuser.gui.update
             end
             

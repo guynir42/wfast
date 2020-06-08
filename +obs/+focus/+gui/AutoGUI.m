@@ -39,7 +39,13 @@ classdef AutoGUI < handle
         panel_image;
         button_reset_axes;
         button_num_plots;
+        
+        button_idx_plus;
+        button_idx_minus;
+        input_star_idx;
+        
         axes_image;
+        axes_small;
     
     end
     
@@ -115,7 +121,8 @@ classdef AutoGUI < handle
             obj.panel_controls.addButton('input_range', 'range', 'input', 'range= ', '', '', 0.5, '', '', 'how far in either direction from the focus point we want to scan'); 
             obj.panel_controls.addButton('input_step', 'step', 'input', 'step= ', '', '', 0.5, '', '', 'step size for sampling the focus positions'); 
             obj.panel_controls.addButton('input_stars', 'num_stars', 'input', 'num stars= ', '', '', 0.5, '', '', 'maximum number of stars to use for focusing'); 
-                        
+            obj.panel_controls.addButton('input_thresh', 'threshold', 'input', 'thresh= ', '', '', 0.5, '', '', 'minimal S/N for stars to be used for focusing'); 
+            
             obj.panel_controls.number = num_buttons;
             
             obj.panel_controls.make;
@@ -178,6 +185,11 @@ classdef AutoGUI < handle
             obj.button_num_plots = GraphicButton(obj.panel_image, [0.00 0.0 0.15 0.05], obj.owner, 'num_plots', 'input', 'num= ', '');
             obj.button_num_plots.Tooltip = 'how many plots to show at the same time'; 
             
+            obj.button_idx_minus = GraphicButton(obj.panel_image, [0.82 0.55 0.03 0.05], obj.owner, 'decreaseStarIdx', 'push', '-');
+            obj.input_star_idx = GraphicButton(obj.panel_image, [0.85 0.55 0.1 0.05], obj.owner, 'star_idx', 'input', 'idx= ');
+            obj.button_idx_plus = GraphicButton(obj.panel_image, [0.95 0.55 0.03 0.05], obj.owner, 'increaseStarIdx', 'push', '+');
+            
+            
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
             
             obj.panel_close = uipanel('Position', [0 0 width 1/N]);
@@ -195,6 +207,10 @@ classdef AutoGUI < handle
             obj.axes_image = axes('Parent', obj.panel_image);
 
             axis(obj.axes_image, 'normal');
+            
+            obj.axes_small = axes('Parent', obj.panel_image, 'Position', [0.75 0.6 0.3 0.3], 'Units', 'Normalized');
+
+            axis(obj.axes_small, 'square');
             
             obj.update;
             
@@ -220,8 +236,9 @@ classdef AutoGUI < handle
                 obj.panel_run.button_autofocus.String = 'Start autofocus run';
             end
             
-            obj.owner.calculate;
+%             obj.owner.calculate;
             obj.owner.plot;
+            obj.owner.showCutout;
             
         end
                         

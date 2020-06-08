@@ -186,6 +186,8 @@ classdef Processor < dynamicprops
             obj.failed_batch_counter = 0;
             obj.successful_batches = 0;
             
+            obj.clear;
+            
         end
         
         function clear(obj) % call this each batch

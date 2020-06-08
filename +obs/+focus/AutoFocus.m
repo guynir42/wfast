@@ -24,6 +24,8 @@ classdef AutoFocus < handle
         x_max = 2160;
         y_max = 2560;
         
+        cutouts; % dim 1&2 are y&x, dim 3 is frame / pos number, dim 4 is star index
+        
         pos_range_vector;
         
         fit_results = [];
@@ -41,6 +43,10 @@ classdef AutoFocus < handle
         
         iteration = [];
         
+        success = 0; 
+        
+        star_idx = 1;
+        
     end
     
     properties % switches/controls
@@ -49,6 +55,7 @@ classdef AutoFocus < handle
         frame_rate = NaN;
         batch_size = 5;
         num_stars = 200; 
+        threshold = 15; 
         
         use_loop_back = 0;
         
@@ -116,6 +123,8 @@ classdef AutoFocus < handle
             obj.xy_pos = [];
             obj.xy_pos_reduced = [];
             
+            obj.cutouts = [];
+            
             obj.fit_results = {};
             obj.min_positions = [];
             obj.min_positions_reduced = [];
@@ -126,6 +135,9 @@ classdef AutoFocus < handle
             obj.found_tilt = [];
             
             obj.iteration = [];
+            obj.star_idx = 1;
+            
+            obj.success = 0; 
             
             obj.clear;
             
@@ -154,6 +166,33 @@ classdef AutoFocus < handle
     
     methods % setters
         
+        function set.use_fit_curves(obj, val)
+            
+            if ~isequal(obj.use_fit_curves, val)
+                obj.use_fit_curves = val;
+                obj.calculate;
+            end
+            
+        end
+        
+        function increaseStarIdx(obj)
+            
+            obj.star_idx = obj.star_idx + 1;
+            if obj.star_idx>size(obj.cutouts,4)
+                obj.star_idx = 1;
+            end
+            
+        end
+        
+        function decreaseStarIdx(obj)
+            
+            obj.star_idx = obj.star_idx - 1;
+            if obj.star_idx<1
+                obj.star_idx = size(obj.cutouts,4);
+            end
+            
+        end
+        
     end
     
     methods % calculations
@@ -166,7 +205,7 @@ classdef AutoFocus < handle
             
         end
 
-        function input(obj, idx, position, widths, fluxes, xy_pos)
+        function input(obj, idx, position, widths, fluxes, xy_pos, cutouts)
             
             if nargin<5 || isempty(fluxes)
                 fluxes = 1;
@@ -186,6 +225,8 @@ classdef AutoFocus < handle
             obj.weights(:,idx) = util.vec.tocolumn(weights);
             
             obj.fit_results = [];
+            
+            obj.cutouts(:,:,idx,:) = cutouts; % dim 1&2 are y&x, dim 3 is frame / pos number, dim 4 is star index
             
         end
         
@@ -218,7 +259,8 @@ classdef AutoFocus < handle
                 
                 obj.min_positions = util.vec.tocolumn(obj.pos(idx)); 
                 
-                obj.min_weights = nanmedian(obj.weights,2)./mn; % the average flux is one measure of the goodness of that star but also the smallness of the minimal width! 
+%                 obj.min_weights = nanmedian(obj.weights,2)./mn; % the average flux is one measure of the goodness of that star but also the smallness of the minimal width! 
+                obj.min_weights = nanmedian(obj.weights,2);
                 
             end
             
@@ -228,6 +270,8 @@ classdef AutoFocus < handle
             obj.min_positions_reduced = obj.min_positions(~obj.bad_indices);
             obj.min_weights_reduced = obj.min_weights(~obj.bad_indices); 
             obj.xy_pos_reduced = obj.xy_pos(~obj.bad_indices,:); 
+            
+            obj.success = 1;
             
         end
         
@@ -325,9 +369,13 @@ classdef AutoFocus < handle
         function findPosTipTilt(obj)
             
 %             obj.found_pos = obj.surface_coeffs(1);
-            obj.found_pos = nansum(obj.min_positions.*obj.min_weights)./nansum(obj.min_weights);
-            obj.found_width = nanmin(nanmean(obj.widths,1)); 
+
+%             obj.found_pos = nansum(obj.min_positions.*obj.min_weights)./nansum(obj.min_weights);
+%             obj.found_width = nanmin(nanmean(obj.widths,1)); 
             
+            [obj.found_width, idx] = nanmin(util.vec.weighted_average(obj.widths, obj.weights, 1)); 
+            obj.found_pos = obj.pos(idx); 
+
 %             if obj.debug_bit, fprintf('BEST POS: mean= %f | surface piston term= %f\n', nanmean(obj.min_positions), obj.surface_coeffs(1)); end
             
             obj.found_tip = obj.surface_coeffs(2).*obj.spider_diameter.*1e4./obj.pixel_size; % in this case tip is X slope
@@ -390,6 +438,8 @@ classdef AutoFocus < handle
 
                 h = plot(input.ax, obj.pos, W(ii,:), '-', 'LineWidth', 1.5); % show the raw data
 %                 h.DisplayName = sprintf('pos= %4.3f | weight= %5.2f', obj.min_positions(ii), obj.min_weights(ii)); 
+                h.UserData = ii; % keep the index of the star here
+                h.ButtonDownFcn = @obj.callback_pick_star;
 
                 if ~isempty(obj.min_positions) && ~isnan(obj.min_positions(ii)) && ~isnan(obj.min_weights(ii))
                     plot(input.ax, obj.min_positions(ii), mn-0.05, 'v', 'MarkerSize', sqrt(abs(obj.min_weights(ii)))*5+1, 'Color', h.Color); 
@@ -401,8 +451,7 @@ classdef AutoFocus < handle
                 
             end
             
-            
-            plot(input.ax, obj.pos, nanmean(W,1), 'LineWidth', 3, 'Color', 'k');
+            plot(input.ax, obj.pos, util.vec.weighted_average(W,obj.weights, 1), 'LineWidth', 3, 'Color', 'k');
             
             if ~isempty(obj.found_pos)
                 plot(input.ax, obj.found_pos, input.ax.YLim, '--g'); 
@@ -413,11 +462,9 @@ classdef AutoFocus < handle
             xlabel(input.ax, 'focuser position (mm)');
             ylabel(input.ax, 'width, second moment [pixels]');
             
-            
             if obj.use_show_arcsec && ~isempty(obj.cam) && ~isempty(obj.cam.head) && ~isempty(obj.cam.head.SCALE)
                 ylabel(input.ax, 'FWHM [arcsec]')
             end
-            
             
             if ~isempty(obj.pos_range_vector)
                 input.ax.XLim = [min(obj.pos_range_vector), max(obj.pos_range_vector)];
@@ -435,9 +482,39 @@ classdef AutoFocus < handle
                 util.plot.inner_title(sprintf('iteration= %d', obj.iteration), 'ax', input.ax, 'FontSize', 14, 'Position', 'SouthEast'); 
             end
             
-            input.ax.YLim = [mn-0.1 mx+0.1];
+%             input.ax.YLim = [mn-0.1 mx+0.1];
+            
+            M = nanmean(W,1);
+%             S = nanstd(W,[],1); 
+            S = sqrt( util.vec.weighted_average((W-nanmean(W,1)).^2, sum(obj.weights,2), 1) );
+            input.ax.YLim = [0 nanmax(M+3.*S)];
             
             input.ax.FontSize = input.font_size;
+            
+        end
+        
+        function showCutout(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('font_size', 20); 
+            input.input_var('ax', [], 'axes', 'axis'); 
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(obj.cutouts)
+                return;
+            end
+            
+            if isempty(input.ax)
+                if ~isempty(obj.gui) && obj.gui.check
+                    input.ax = obj.gui.axes_small;
+                else
+                    input.ax = gca;
+                end
+            end
+            
+            util.plot.show(nansum(obj.cutouts(:,:,:,obj.star_idx),3), 'ax', input.ax, 'autodyn', 1, 'fancy', 'off'); 
+            
+            util.plot.inner_title(sprintf('weight= %4.2f', nanmean(obj.weights(obj.star_idx,:),2)), 'Position', 'Top', 'Color', 'white', 'ax', input.ax); 
             
         end
         
@@ -483,6 +560,20 @@ classdef AutoFocus < handle
             end
             
             obj.gui.make;
+            
+        end
+        
+        function callback_pick_star(obj, hndl, ~)
+            
+            idx = hndl.UserData;
+            
+            if ~isempty(idx)
+                obj.star_idx = idx;
+            end
+            
+            if ~isempty(obj.gui)
+                obj.gui.update;
+            end
             
         end
         

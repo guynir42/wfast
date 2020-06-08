@@ -197,8 +197,8 @@ classdef WorldCoordinates < handle
                 end
             end
             
-            x2 = x - obj.CRPIX(1);
-            y2 = y - obj.CRPIX(2);
+            x2 = x - obj.CRPIX(2);
+            y2 = y - obj.CRPIX(1);
             
             vec = obj.CD*[x2;y2]; % rotation matrix, also stretches the pixels to units of degrees
             Xout = vec(1); % units of degrees

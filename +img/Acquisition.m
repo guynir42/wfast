@@ -201,6 +201,7 @@ classdef Acquisition < file.AstroData
         
         latest_command_str = '';
         latest_command_time = '';
+        latest_command_pars = '';
         
         failed_batch_counter = 0;
         
@@ -363,6 +364,8 @@ classdef Acquisition < file.AstroData
                 util.oop.save_defaults(obj); % make sure each default_XXX property is updated with the current XXX property value. 
                 
                 obj.stash_parameters;
+                
+                obj.sync.connect;
                 
             end
             
@@ -1397,14 +1400,18 @@ classdef Acquisition < file.AstroData
         
         function updateSyncData(obj)
             
+%             disp('updateSyncData'); 
+            
             try 
                 
-                if obj.use_sync 
+                if obj.use_sync && obj.sync.status
 
+                    drawnow;
+                    
                     obj.sync.update;
 
                     s = obj.sync.incoming;
-
+                    
                     list = head.Header.makeSyncList; 
 
                     if obj.use_ignore_sync_object_name
@@ -1446,11 +1453,11 @@ classdef Acquisition < file.AstroData
                                 obj.obs_log.(obj.run_name) = struct('name', obj.run_name, 'start', '', 'end', '', 'runtime', [], 'num_files', []);
                             end
 
-                            s = obj.obs_log.(obj.run_name); % get the structs for this run name
-                            s(end).runtime = obj.t_end_stamp;
-                            s(end).end_time = obj.t_end;
-                            s(end).num_files = obj.batch_counter;
-                            obj.obs_log.(obj.run_name) = s; % structs are not handles! 
+                            s_obs = obj.obs_log.(obj.run_name); % get the structs for this run name
+                            s_obs(end).runtime = obj.t_end_stamp;
+                            s_obs(end).end_time = obj.t_end;
+                            s_obs(end).num_files = obj.batch_counter;
+                            obj.obs_log.(obj.run_name) = s_obs; % structs are not handles! 
 
                         end
 
@@ -1460,12 +1467,28 @@ classdef Acquisition < file.AstroData
                     obj.drive_space_gb = obj.getDriveSpace; % calculate how much space is left in each drive (in Gb) 
                     obj.sync.outgoing.drives = obj.drive_space_gb;
 
+                    if obj.cat.success
+                        obj.sync.outgoing.obsRA = head.Ephemeris.deg2hour(obj.cat.central_RA); 
+                        obj.sync.outgoing.obsDec = head.Ephemeris.deg2sex(obj.cat.central_Dec); 
+                    end
+                    
+                    if ~isempty(obj.cam) && ~isempty(obj.cam.af) && obj.cam.af.success
+                        obj.sync.outgoing.focus_pos = obj.cam.af.found_pos;
+                        obj.sync.outgoing.focus_width = obj.cam.af.found_width;
+                    end
+                    
+                    obj.sync.outgoing.batch_counter = obj.batch_counter;
+                    obj.sync.outgoing.total_batches = obj.num_batches;
+                    obj.sync.outgoing.runtime = obj.prog.getElapsed; 
+                    
                     if obj.use_sync_stop && isfield(s, 'stop_camera') && s.stop_camera
                         obj.brake_bit = 1; % allow for manager to send stop command to camera... 
                     end
                     
-                    if isfield(obj.sync.incoming, 'command_str')
-                        obj.parseCommands;
+                    obj.parseCommands;
+                    
+                    if obj.brake_bit==0 && obj.batch_counter>1
+                        obj.sync.outgoing.report = 'running';
                     end
                     
                     obj.sync.update;
@@ -1480,63 +1503,88 @@ classdef Acquisition < file.AstroData
         
         function parseCommands(obj)
             
+%             disp('parseCommands'); 
+            
             import util.text.cs;
             
             try 
-
+                
+                if ~isfield(obj.sync.incoming, 'command_str')
+                    return;
+                end
+                
                 obj.sync.outgoing.echo_str = obj.sync.incoming.command_str;
                 obj.sync.outgoing.echo_time = obj.sync.incoming.command_time;
                 
-                if ~isempty(obj.sync.incoming.command_str) && ...  
-                        ~strcmp(obj.latest_command_time,obj.sync.incoming.command_time)
+%                 fprintf('command_str= %s | command_time= %s\n', obj.sync.incoming.command_str, obj.sync.incoming.command_time); 
+                
+                obj.sync.read_data(obj.sync.hndl_rx, 'rx'); 
+                
+                if ~isempty(obj.sync.incoming.command_str) && ~isempty(obj.sync.incoming.command_time)
                     
-                    if cs(obj.sync.incoming.command_str, 'start')
+                    t1 = util.text.str2time(obj.latest_command_time);
+                    t2 = util.text.str2time(obj.sync.incoming.command_time);
+                    
+                    if isempty(obj.latest_command_time)
+                        dt = 0;
+                    else
+                        dt = abs(minutes(t2-t1)); % the time since we got the last command needs to be long enough
+                    end
 
-                        if obj.use_focus_on_start
-                            disp('Now running focus by order of dome-PC'); 
-                            pause(2); 
-                            obj.sync.outgoing.report = 'Starting focus run!';
+                    if strcmp(obj.sync.incoming.command_str, obj.latest_command_str) && dt<1 % cannot take the same command over and over in such a short interval...
+                        return;
+                    end 
+                    
+                    obj.latest_command_str = obj.sync.incoming.command_str;
+                    obj.latest_command_time = obj.sync.incoming.command_time;
+                    obj.latest_command_pars = obj.sync.incoming.command_pars;
+                    
+                    if cs(obj.sync.incoming.command_str, 'start') && ...
+                            obj.brake_bit && obj.is_running==0 && obj.is_running_single==0 &&...
+                            obj.cam.is_running==0 && obj.cam.is_running_focus==0
+
+                        args = util.text.parse_inputs(obj.latest_command_pars);
+                        
+                        input = util.text.InputVars;
+                        input.input_var('focus', obj.use_focus_on_start, 'use_focus');
+                        input.input_var('mode', 'fast', 'cam_mode', 'camera_mode'); 
+                        input.scan_vars(args{:}); 
+                        
+                        if input.focus 
+                            disp('Now running focus by order of dome-PC'); % this message will be removed later on...
+                            obj.sync.outgoing.report = 'Focusing';
+                            obj.runFocus;
                         end
                         
-                        cam_mode = '';
-                        if ~isfield(obj.sync.incoming, 'cam_mode')
-                            cam_mode = obj.sync.incoming.cam_mode;
-                        end
+                        obj.log.input(sprintf('Starting run command from Dome-PC. Args= "%s"', obj.latest_command_pars)); 
+                        disp(obj.log.report); 
                         
-                        exp_time = [];
-                        if ~isfield(obj.sync.incoming, 'exp_time')
-                            exp_time = obj.sync.incoming.exp_time;
-                        end
+                        obj.sync.outgoing.report = 'Starting';
                         
-                        fprintf('Now starting new run by order of dome-PC (mode: %s | expT= %f\n', cam_mode, exp_time); 
-                        
-                        if isempty(cam_mode) || cs(cam_mode, 'fast') % should we default to fast mode
+                        if cs(input.mode, 'fast')
                             obj.setupFastMode;
-                        elseif cs(cam_mode, 'slow')
+                        elseif cs(input.mode, 'slow')
                             obj.setupSlowMode;
                         end
                         
-                        if ~isempty(exp_time)
-                            obj.expT = exp_time;
-                        end
+                        obj.run('reset', 1, args{:}); % the rest of the inputs from dome-pc are parsed in the regular way
                         
-                        obj.sync.outgoing.report = 'Starting run...';
-                        
+                    elseif cs(obj.sync.incoming.command_str, 'start') % only get here if the timing is wrong... 
+                        warning('Got command to start running, but already running...'); 
                     elseif cs(obj.sync.incoming.command_str, 'stop') 
                         
                         obj.brake_bit = 1;
                         
-                        obj.sync.outgoing.report = 'camera ready.';
+                        obj.sync.outgoing.report = 'idle';
 
                     else
                         error('Unknown command: %s! Use "start" or "stop", etc...', obj.sync.incoming.command_str); 
                     end
 
-                    obj.sync.outgoing.report = 'camera ready.'; 
+                    % careful: there is a "return" statement in there
+                    
+                    obj.sync.outgoing.report = 'idle'; % even if we started a new run, it will have to be over before we can set report back to "idle"
                 
-                    obj.latest_command_str = obj.sync.incoming.command_str;
-                    obj.latest_command_time = obj.sync.incoming.command_time;
-
                 end
                 
             catch ME
@@ -1568,13 +1616,15 @@ classdef Acquisition < file.AstroData
         
         function callback_timer(obj, ~, ~)
             
+%             disp('timer')
+            
             if obj.brake_bit
                 obj.updateSyncData; % this also updates the obs_log
                 if ~isempty(obj.gui) 
                     obj.gui.update;
                 end
-            else
-                % don't do anything, this is triggered in obj.update()
+            elseif obj.is_running==0 && obj.is_running_single==0 && obj.cam.is_running==0 && obj.cam.is_running_focus==0
+                obj.sync.outgoing.report = 'idle';
             end
             
         end
@@ -1885,6 +1935,8 @@ classdef Acquisition < file.AstroData
         
         function update(obj, input)
             
+%             disp('update');
+            
             if nargin>=2 && ~isempty(input) && isa(input, 'util.text.InputVars')
                 
                 if ~isempty(input.RA)
@@ -1897,7 +1949,7 @@ classdef Acquisition < file.AstroData
 
             end
             
-            if obj.use_sync && obj.use_ignore_manager==0
+            if obj.use_sync && obj.use_ignore_manager==0 && ~isempty(obj.sync)
                 obj.updateSyncData;
             end
             
@@ -2838,9 +2890,65 @@ classdef Acquisition < file.AstroData
             
         end
         
+        function setBrake(obj)
+            
+            obj.brake_bit = 1;
+            
+        end
+        
     end
     
     methods % optional run commands
+        
+        function success = runFlat(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('number', 20); % how many flat files we want en-total
+            input.input_var('iterations', 4); % how many iterations of focus run we want to do
+            input.scan_vars(varargin{:}); 
+            
+            success = 0;
+            
+            % find out how many flat files we already took
+            
+            on_cleanup = onCleanup(@obj.setBrake);
+            obj.brake_bit = 0;
+            
+            for ii = 1:input.iterations
+
+                if obj.brake_bit
+                    break;
+                end
+                
+                N_flats = 0; 
+
+                if exist(fullfile(getenv('DATA_TEMP'), util.sys.date_dir('now')), 'dir')
+
+                    d = util.sys.WorkingDirectory;
+                    d.cd(fullfile(getenv('DATA_TEMP'), util.sys.date_dir('now')));
+
+                    if d.cd('flat')
+
+                        N_flats = length(d.match('*.h5*')); 
+
+                    end
+
+                end
+
+                N = input.number-N_flats;
+
+                if N>0
+
+                    obj.cam.record('mode', 'flat', 'num_batches', N, 'batch_size', 100, 'frame_rate', 10, 'expT', 0.03); 
+
+                else
+                    success = 1;
+                    break;
+                end
+
+            end
+            
+        end
         
         function runPreview(obj, varargin) % I'm not sure we need this... 
             
@@ -2892,20 +3000,28 @@ classdef Acquisition < file.AstroData
             prev_focus_point = NaN;
             
             try
-            
+
+                obj.brake_bit = 0;
+                
                 if ~isempty(obj.gui) && obj.gui.check
                     obj.gui.latest_error = '';
                     obj.gui.latest_warning = '';
                     lastwarn('');
+                    obj.gui.update;
                 end
                 
                 success = 0;
                 
                 for ii = 1:6
                 
+                    
                     if obj.debug_bit, fprintf('Running focus loop attempt %d\n', ii); end
                     
-                    obj.cam.autofocus('iteration', ii); 
+                    val = obj.cam.autofocus('iteration', ii); 
+                    
+                    if obj.brake_bit || val==0
+                        break;
+                    end
                     
                     min_pos = obj.cam.af.pos(2); 
                     max_pos = obj.cam.af.pos(end-1); 
@@ -2929,13 +3045,17 @@ classdef Acquisition < file.AstroData
                     
                     obj.cam.af.plot;
                     
+                    obj.cam.af.gui.update;
+                    
                     if success
                         util.plot.inner_title(sprintf('Focus success after %d iterations!', ii),...
                             'ax', obj.cam.af.gui.axes_image, 'FontSize', 26, 'Position', 'North'); 
                     else
                         util.plot.inner_title(sprintf('Focus failed after %d iterations!', ii),...
                             'ax', obj.cam.af.gui.axes_image, 'FontSize', 26, 'Position', 'North'); 
+                        pause(0.5); 
                     end
+                    
                 end
                 
             catch ME
@@ -2943,6 +3063,12 @@ classdef Acquisition < file.AstroData
                 rethrow(ME);
             end
             
+            obj.brake_bit = 1;
+            
+            if ~isempty(obj.gui) && obj.gui.check
+                obj.gui.update;
+            end
+
         end
         
     end
