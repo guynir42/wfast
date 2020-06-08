@@ -1047,7 +1047,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             % south limit!
             
-            if obj.moon.Dist<input.moon, obj.unobservable_reason = sprintf('Moon dist= %d>%d', round(obj.moon.Dist), round(input.moon)); return; end
+            if obj.moon.Dist<input.moon, obj.unobservable_reason = sprintf('Moon dist= %d<%d', round(obj.moon.Dist), round(input.moon)); return; end
             
             minutes_left = obj.calcObsTimeMinutes(input.altitude);
             if obj.now_observing==0 && minutes_left<input.continuous*60, obj.unobservable_reason = sprintf('Time left %d<%d minutes', round(minutes_left), round(input.continuous.*60)); return; end % there is not enough time left to observe this target
