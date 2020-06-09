@@ -85,7 +85,9 @@ classdef Catalog < handle
         
         input_rotation = -60;
         input_rot_range = 5; 
-        mag_limit = 16; % what stars to look for in the GAIA catalog
+        mag_limit = 18; % what stars to look for in the GAIA catalog
+        
+        block_size = 2500;
         
         avoid_edges = 50; % how many pixels away from edge of image (need image to know the size!) - to be deprecated! 
         
@@ -315,9 +317,9 @@ classdef Catalog < handle
                         warning('off', 'MATLAB:lscov:RankDefDesignMat');
 
                         [R,S2] = astrometry(S, 'RA', head.Ephemeris.deg2hour(list_RA(jj)), 'Dec', head.Ephemeris.deg2sex(list_DE(ii)), 'Scale', obj.head.SCALE, ...
-                            'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', [5000 5000], 'ApplyPM', false, 'Flip', obj.flip, ...
+                            'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', obj.block_size.*[1 1], 'ApplyPM', false, 'Flip', obj.flip, ...
                             'MinRot', obj.input_rotation-obj.input_rot_range, 'MaxRot', obj.input_rotation+obj.input_rot_range, ...
-                            'CatColMag', 'Mag_G', 'ImSize', [obj.head.NAXIS1, obj.head.NAXIS2], 'Verbose', false);
+                            'CatColMag', 'Mag_G', 'ImSize', [obj.head.NAXIS1, obj.head.NAXIS2], 'Verbose', false, 'RCrad', 3.3/180*pi);
 
                         warning('on', 'MATLAB:polyfit:PolyNotUnique')
                         warning('on', 'MATLAB:lscov:RankDefDesignMat');
@@ -363,11 +365,11 @@ classdef Catalog < handle
                     end
                     % what should we do with R? check a correct match maybe? 
                     
+                    obj.wcs_object = ClassWCS.populate(obj.mextractor_sim);
+
 %                     obj.catalog_matched = catsHTM.sources_match('GAIADR2', obj.mextractor_sim, 'ColRA', {'Im_RA'}, 'ColDec', {'Im_Dec'}, 'MagColumn', 'Mag_BP', 'MagLimit', 20);
                     obj.catalog_matched = catsHTM.sources_match('GAIADR2', obj.mextractor_sim, ...
-                        'ColRA', {'ALPHAWIN_J2000'}, 'ColDec', {'DELTAWIN_J2000'});
-
-                    obj.wcs_object = ClassWCS.populate(obj.mextractor_sim);
+                        'ColRA', {'ALPHAWIN_J2000'}, 'ColDec', {'DELTAWIN_J2000'}, 'SearchRadius', 2);
 
                     obj.makeCatalog; % turn the MAAT objects into a table
 
