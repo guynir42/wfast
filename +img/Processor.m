@@ -738,14 +738,15 @@ classdef Processor < dynamicprops
                 for ii = 1:min(size(P,1), obj.pars.display_num_rect_stars)
                     if obj.pars.use_display_rect_text, text(P(ii,1), P(ii,2), sprintf('clip %d', ii),'FontSize', 16, 'Parent', input.ax); end
 %                     if obj.pars.use_display_rect_text, text(P(ii,1), P(ii,2), sprintf('S/N %4.2f', obj.data.found_stars.snr(ii)),'FontSize', 16, 'Parent', input.ax); end
-                    if isnan(obj.cat.magnitudes(ii))
-                        rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'white'); % white is for no match to GAIA
-                    elseif obj.data.found_stars.flag(ii)==1
-                        rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'red'); % red is for saturated stars
-                    elseif obj.data.found_stars.flag(ii)==2
+                    
+                    if obj.data.found_stars.flag(ii)==2
                         rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'yellow'); % yellow is for point sources
                     elseif obj.data.found_stars.flag(ii)==3
                         rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'green'); % green is for extended sources
+                    elseif obj.data.found_stars.flag(ii)==1
+                        rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'red'); % red is for saturated stars
+                    elseif isnan(obj.cat.magnitudes(ii))
+                        rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'white'); % white is for no match to GAIA
                     else    
                         rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'black'); % black is good stars
                     end

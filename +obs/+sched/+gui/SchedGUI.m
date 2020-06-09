@@ -111,9 +111,9 @@ classdef SchedGUI < handle
             pos = pos-num_buttons;
             obj.panel_current = GraphicPanel(obj.owner, [0 pos/N 0.2 num_buttons/N], 'current state', 1); % last input is for vertical (default)
             obj.panel_current.number = num_buttons;
-            obj.panel_current.addButton('button_ra', 'current_RA', 'info', 'RA= ', '', 'edit', 0.5, '', '', 'right ascention last object to be observed');
-            obj.panel_current.addButton('button_dec', 'current_Dec', 'info', 'Dec= ', '', 'edit', 0.5, '', '', 'declination last object to be observed');
-            obj.panel_current.addButton('button_side', 'current_side', 'info', 'side= ', '', '', 0.5, '', '', 'side (hemisphere) of last object to be observed');
+            obj.panel_current.addButton('button_ra', '', 'custom', 'RA= ', '', 'edit', 0.5, '', '', 'right ascention last object to be observed');
+            obj.panel_current.addButton('button_dec', '', 'custom', 'Dec= ', '', 'edit', 0.5, '', '', 'declination last object to be observed');
+            obj.panel_current.addButton('button_side', '', 'custom', 'side= ', '', '', 0.5, '', '', 'side (hemisphere) of last object to be observed');
             obj.panel_current.addButton('button_wind', 'wind_string', 'info', 'wind= ', '', 'edit', 0.5, '', '', 'wind state right now (from Manager or from simulation)');
             obj.panel_current.margin = [0.02 0.05]; 
             obj.panel_current.make;
@@ -140,6 +140,8 @@ classdef SchedGUI < handle
             obj.panel_display.number = num_buttons;
             obj.panel_display.addButton('button_ecliptic', 'map.show_ecliptic', 'toggle', 'ecliptic', 'ecliptic', '', 0.5, 'red', '', 'show the ecliptic altitude overlay'); 
             obj.panel_display.addButton('input_altitude', 'map.alt_limit', 'input', 'alt_lim= ', '', '', 0.5, '', '', 'alt limit for display on the map only!'); 
+            obj.panel_display.addButton('button_moon', 'map.show_moon', 'toggle', 'moon', 'moon', '', 0.5, 'cyan', '', 'show the moon and moon distance overlay'); 
+            obj.panel_display.addButton('input_dist_mon', 'map.dist_moon', 'input', 'dist= ', '', '', 0.5, '', '', 'moon distance for display on the map only!'); 
             obj.panel_display.margin = [0.02 0.05];
             obj.panel_display.make;
             
@@ -160,16 +162,6 @@ classdef SchedGUI < handle
             obj.panel_sim.make;
             
             obj.panel_sim.button_start.Callback = @obj.callback_start_stop;
-            
-            %%%%%%%%%%% panel contrast %%%%%%%%%%%%%%%
-            
-%             pos = pos - 5; 
-%             obj.panel_contrast = util.plot.ContrastLimits(obj.axes_image, obj.fig.fig, [0 pos/N 0.2 5/N], 1); % last input is for vertical (default)
-%             obj.panel_contrast.font_size = obj.font_size;
-%             obj.panel_contrast.big_font_size = obj.big_font_size;
-%             obj.panel_contrast.small_font_size = obj.small_font_size;
-%             obj.panel_contrast.edit_font_size = obj.edit_font_size;
-            
             
             %%%%%%%%%%% panel report %%%%%%%%%%%%%%%%%
             
@@ -223,10 +215,14 @@ classdef SchedGUI < handle
             
         end
                 
-        function update(obj,~,~)
+        function update(obj, use_sim)
                         
             if ~obj.check
                 return;
+            end
+            
+            if nargin<2 || isempty(use_sim)
+                use_sim = obj.owner.showing_sim;
             end
             
             for ii = 1:length(obj.buttons)
@@ -237,15 +233,31 @@ classdef SchedGUI < handle
                 obj.menus{ii}.update;
             end
             
+            if ~use_sim
+                history = obj.owner.obs_history;
+                side = obj.owner.current_side;
+            else
+                side = obj.owner.current_side_sim;
+                history = obj.owner.obs_history_sim;
+            end
+            
+            if isempty(history)
+                obj.panel_current.button_ra.String = 'RA= ';
+                obj.panel_current.button_dec.String = 'Dec= ';
+            else
+                obj.panel_current.button_ra.String = sprintf('RA= %5.1f', history(end).RA_deg);
+                obj.panel_current.button_dec.String = sprintf('Dec= %5.1f', history(end).Dec_deg); 
+            end
+            
+            obj.panel_current.button_side.String = sprintf('side= %s', side); 
+            
             if obj.owner.brake_bit
                 obj.panel_sim.button_start.String = 'Start simulation';
             else
                 obj.panel_sim.button_start.String = 'Stop simulation';
             end
             
-            obj.owner.show;
-            
-%             obj.panel_contrast.update;
+            obj.owner.show('use_sim', use_sim);
             
             drawnow;
             

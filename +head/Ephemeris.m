@@ -226,10 +226,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             obj.constraints.input_var('threshold', 0.2, 'threshold_airmass', 'thresh_airmass'); 
             obj.constraints.add_comment('threshold', 'do not prefer a new target if now_observing=1 and other object has airmass very close to current airmass'); 
             
-            obj.constraints.input_var('south_limit', -20, 'declination_limit'); 
+            obj.constraints.input_var('south_limit', -30, 'declination_limit'); 
             obj.constraints.add_comment('south_limit', 'lowest declination we are ready to accept'); 
             
-            obj.constraints.input_var('moon', 20, 'moon_distance'); 
+            obj.constraints.input_var('moon', 50, 'moon_distance'); 
             obj.constraints.add_comment('moon', 'target must be this far away from the moon (degrees)'); 
             
         end

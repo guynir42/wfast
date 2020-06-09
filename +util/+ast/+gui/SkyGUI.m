@@ -97,7 +97,7 @@ classdef SkyGUI < handle
             
             obj.menu_options.button_reset.Callback = @obj.callback_reset;
             
-            N = 12; % number of buttons on left side
+            N = 13; % number of buttons on left side
             
             %%%%%%%%%%% panel controls %%%%%%%%%%%%%%%
             
@@ -117,6 +117,8 @@ classdef SkyGUI < handle
             obj.panel_controls.addButton('input_lst', 'LST', 'input', 'LST= ', ' h', '', 0.5, '', '', 'The local sidereal time for calculating zenith and horizon'); 
             obj.panel_controls.addButton('button_horizon', 'show_horizon', 'toggle', 'horizon', 'horizon', '', 0.5, 'yellow', '', 'Show the horizon altitude for the given LST');
             obj.panel_controls.addButton('input_alt_limit', 'alt_limit', 'input', 'alt lim.= ', ' deg', '', 0.5, '', '', 'The minimal altitude for observations, shown on the horizon overlay'); 
+            obj.panel_controls.addButton('button_moon', 'show_moon', 'toggle', 'moon', 'moon', '', 0.5, 'cyan', '', 'Show the moon position and the distance to it');
+            obj.panel_controls.addButton('input_dist_moon', 'dist_moon', 'input', 'distance= ', ' deg', '', 0.5, '', '', 'The minimal mnoon distance for observations'); 
             obj.panel_controls.addButton('button_ra_units', 'show_ra_units', 'custom', '', '', '', 0.5, '', '', 'Choose "degrees" or "hours" for the RA coordinate axis');
             obj.panel_controls.addButton('button_grid', 'show_grid', 'toggle', 'grid', 'grid', '', 0.5, 'blue', '', 'Show the time zone overlay');
             obj.panel_controls.number = num_buttons;

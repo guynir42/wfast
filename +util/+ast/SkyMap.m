@@ -100,6 +100,9 @@ classdef SkyMap < handle
         show_zenith = false; % show the plot overlay with the zenith position at the given LST
         show_horizon = false; % show the plot overlay with the horizon and alt_limit at the given LST
         
+        show_moon = false;
+        dist_moon = 50; % contour around moon for overlay
+        
         show_ra_units = 'hours'; % choose to show the RA on the plot in "hours" or "degrees"
         show_grid = false; % show an RA/Dec grid on top of the map
         
@@ -567,6 +570,21 @@ classdef SkyMap < handle
             
         end
         
+        function val = getMoonDist(obj)
+            
+            obj.ephem.updateMoon;
+            
+            [RA,DE] = meshgrid(obj.RA_axis(1:end-1), obj.DE_axis(1:end-1)); 
+            
+            havTheta = sind((DE-obj.ephem.moon.Dec)/2).^2 + cosd(DE).*cosd(obj.ephem.moon.Dec).*sind((RA-obj.ephem.moon.RA)/2).^2;
+                
+            havTheta(havTheta>1) = 1;
+            havTheta(havTheta<-1) = -1;
+                
+            val = 2.*asind(sqrt(havTheta)); 
+            
+        end
+        
     end
     
     methods % plotting tools / GUI
@@ -617,13 +635,15 @@ classdef SkyMap < handle
             input.input_var('biggest_size', obj.show_biggest_size, 'biggest_star', 'largest_size', 'largest_star'); 
             input.input_var('south_limit', obj.show_south_limit, 'de_limit', 'dec_limit'); 
             input.input_var('alt_limit', obj.alt_limit, 'altitude_limit'); 
-            input.input_var('lst', obj.LST, 'locat sidereal time'); 
+            input.input_var('lst', obj.LST, 'local sidereal time'); 
             input.input_var('log', obj.show_log, 'use_log'); 
             input.input_var('ecliptic', obj.show_ecliptic, 'use_ecliptic'); 
             input.input_var('vector_ecliptic', [-50 -20 -5 5 20 50]); 
             input.input_var('galactic', obj.show_galactic, 'use_galactic'); 
             input.input_var('zenith', obj.show_zenith, 'show_zenith'); 
             input.input_var('horizon', obj.show_horizon, 'show_horizon'); 
+            input.input_var('moon', obj.show_moon, 'show_moon'); 
+            input.input_var('dist_moon', obj.dist_moon); 
             input.input_var('units', obj.show_ra_units, 'ra_units');
             input.input_var('grid', obj.show_grid, 'use_grid'); 
             input.input_var('font_size', 24); 
@@ -738,6 +758,17 @@ classdef SkyMap < handle
                 
                 [C3,h3] = contour(input.ax, x, y, alt, [0 input.alt_limit], 'Color', 'yellow'); 
                 clabel(C3,h3, 'FontSize', input.font_size-10, 'Color', 'yellow');
+                
+            end
+            
+            if input.moon
+                
+                distances = obj.getMoonDist;
+                
+                plot(input.ax, obj.ephem.moon.RA/15, obj.ephem.moon.Dec, 'co', 'MarkerSize', 18, 'MarkerFaceColor', 'c'); % show moon
+                
+                [C4,h4] = contour(input.ax, x, y, distances, [0 input.dist_moon], 'Color', 'cyan'); 
+                clabel(C4,h4, 'FontSize', input.font_size-10, 'Color', 'cyan');
                 
             end
             
