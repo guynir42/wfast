@@ -135,6 +135,17 @@ void measure(char *arg){
   
   Serial.print("H= ");
   Serial.print(average_humidity()); 
+
+  Serial.print(" | relays: "); 
+  Serial.print(relay1.getState()); 
+  Serial.print(relay2.getState()); 
+  Serial.print(relay3.getState()); 
+  Serial.print(relay4.getState()); 
+  Serial.print(relay5.getState()); 
+  Serial.print(relay6.getState()); 
+  Serial.print(relay7.getState()); 
+  Serial.print(relay8.getState()); 
+    
   Serial.println();
 
 }
