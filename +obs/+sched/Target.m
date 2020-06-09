@@ -58,7 +58,6 @@ classdef (CaseInsensitiveProperties) Target < handle
         % scheduling priority and timing
         priority = 1; % higher is more important (fractions are also acceptible). 
         decay_rate = []; % how fast priority decays per hour of observing time.
-        continuous = 0; % must not interrupt this target even if other targets are more favorable (must set "hours_required")
         
         % instructions to mount/camera
         tracking = 1; % most targets need the telescope to be tracking 

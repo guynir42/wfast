@@ -7,13 +7,17 @@ classdef Scheduler < handle
 %
 % The important functions are update() which pushes the object to the current
 % time, the choose() function that checks if a new target should be observed, 
-% which also internally calls finish_current() and sets the "continue_run"
-% flag to 0 (telling the observer that a new slew/focus/run start needs to 
-% be called). Finally, after slewing to a new target, use start_current()
-% to signal to the scheduler that a new run has begun. 
+% which also internally  sets the "continue_run" flag to 0 if the observation
+% is over, telling the observer that a new slew/focus/run start needs to 
+% be called. 
+% Finally, after slewing to a new target, use start_current() to signal to 
+% the scheduler that a new run has begun. 
+%
 % NOTE: each of these functions can be given a time (string or datetime obj)
-%       that is parsed and used instead of current time (the default). This
-%       is useful for simulations. In real life, just don't give this arg. 
+%       that is parsed and used instead of current time (the default). 
+%       You should also provide a second argument set to true to signal the 
+%       scheduler to apply all calculations to the simulation list of targets. 
+%       In real life, just don't give these arguments. 
 %
 % Additional functionality is the ability to plot the target positions and 
 % observation times on a map of the sky (using the graphics from SkyMap). 
@@ -22,6 +26,20 @@ classdef Scheduler < handle
 % Other considerations can be controlled like wind speed, that will put 
 % additional constraints on the target selection. So the simulation can run
 % with different weather conditions, producing different outcomes. 
+%
+% Every time you use choose() the scheduler provides a "report" string which
+% tells you what the next step should be. 
+% There is also a "rationale" string showing all the targets and why that 
+% one was selected. 
+% In "rationale", the parenthesis includes a reason why a target was excluded, 
+% or if it wasn't excluded, it shows the priority and airmass. 
+% A target currently being observed has a star next to the airmass, to show
+% that it has a slight preference to other targets with similar airmass. 
+% The chosen target is highlighted with ***** target ******. 
+%
+% If you need to get a play-by-play of the reports or rationales, look at 
+% the "report_log" or "rationale_log", and their simulation counterparts the
+% "report_log_sim" and "rationale_log_sim". 
     
     properties(Transient=true)
         
