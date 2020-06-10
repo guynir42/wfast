@@ -187,7 +187,11 @@ classdef WorldCoordinates < handle
         end
         
         function RA_Dec = xy2coo(obj, x, y) % find the RA and Dec for the image xy positions
-            
+        % Usage: RA_Dec = xy2coo(obj, x, y)
+        % Find the RA and Dec for the image xy positions
+        
+        if nargin==0, help('head.WorldCoordinates.xy2coo'); return; end
+        
             if nargin<3 || isempty(y)
                 if size(x,2)==2
                     y = x(:,2);

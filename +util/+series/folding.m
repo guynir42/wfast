@@ -27,7 +27,12 @@ function [f_folded, std_folded] = folding(f, num_samples, varargin)
     
     input = util.text.InputVars;
     input.input_var('median', false, 'use_median');
+    input.input_var('oversample', []); 
     input.scan_vars(varargin{:});
+    
+    if input.oversample
+        f = util.series.resample(f, input.oversample); 
+    end
     
     S = size(f); % keep track of the original size of the input
     N = floor(size(f,1)./num_samples).*num_samples; % the number of samples that divide cleanly by num_samples

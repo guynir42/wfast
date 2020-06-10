@@ -237,21 +237,21 @@ classdef Processor < dynamicprops
             
             try
             
-            obj.startup; 
-            
-            for ii = obj.current_batch:obj.getNumBatches
-                
-                if obj.brake_bit, break; end
-                
-                obj.batch;
-                
-                if ii==1, obj.first_batch; end
-                
-                obj.successful_batches = obj.successful_batches + 1;
-                
-                obj.prog.showif(ii); 
-                
-            end
+                obj.startup; 
+
+                for ii = obj.current_batch:obj.getNumBatches
+
+                    if obj.brake_bit, break; end
+
+                    obj.batch;
+
+                    if ii==1, obj.first_batch; end
+
+                    obj.successful_batches = obj.successful_batches + 1;
+
+                    obj.prog.showif(ii); 
+
+                end
             
             catch ME
                 
@@ -576,7 +576,7 @@ classdef Processor < dynamicprops
             obj.data.psf_width = util.vec.weighted_average(s.forced_photometry.width, s.forced_photometry.flux, 2);
             
             T = util.img.quick_find_stars(obj.data.image_proc, 'psf', obj.data.psf_width, 'number', obj.pars.num_stars,...
-               'dilate', obj.pars.cut_size-5, 'saturation', obj.pars.saturation.*obj.data.num_sum, 'unflagged', 0); 
+               'dilate', obj.pars.cut_size-5, 'saturation', obj.pars.saturation.*obj.data.num_sum, 'sigma', obj.pars.threshold, 'unflagged', 0); 
             
             if isempty(T)
                 error('Could not find any stars using quick_find_stars!');
@@ -672,7 +672,7 @@ classdef Processor < dynamicprops
                 obj.cat.input_rotation = -15; 
             end
 
-            obj.cat.input(obj.data.positions); 
+            obj.cat.input(obj.data.found_stars); 
 
             if obj.cat.success==0
                 error('Could not find astrometric solution!'); 

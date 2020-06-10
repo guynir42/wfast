@@ -66,9 +66,13 @@ classdef Catalog < handle
         magnitudes; % GAIA Mag_BP for each star (or NaN for failed matches)
         temperatures; % GAIA Teff for each star (or NaN for failed matches)
         
-        FWHM; % from mextractor - to be deprecated
-        width; % equivalent to 1st moment (=FWHM/2.355) - to be deprecated
-        seeing; % arcsec - to be deprecated
+        flux;
+        snr;
+        bg_mean;
+        bg_std;
+        
+        zero_point;
+        sky_magnitude;
         
         detection_limit; % faintest magnitude we can detect, based on the given stars
         detection_threshold; % what was the detection S/N
@@ -81,13 +85,13 @@ classdef Catalog < handle
     
     properties % switches/controls
         
-        threshold = 5; % used by mextractor to find stars - to be deprecated
-        
+        max_num_stars = 2000;         
         input_rotation = -60;
         input_rot_range = 5; 
         mag_limit = 18; % what stars to look for in the GAIA catalog
         
-        block_size = 2500;
+        block_size = 2500; % pixels
+        search_radius = 3; % arcsec (used in catsHTM.sources_match)
         
         avoid_edges = 50; % how many pixels away from edge of image (need image to know the size!) - to be deprecated! 
         
@@ -123,7 +127,10 @@ classdef Catalog < handle
     end
     
     properties(Hidden=true)
-       
+        
+        mag_snr_fit; % fit result of the Mag_BP vs. log10(snr) using util.fit.polyfit to second order
+        table_props; % table as given by quick_find_stars
+        
         version = 1.01;
         
     end
@@ -234,19 +241,19 @@ classdef Catalog < handle
     
     methods % calculations
         
-        function input(obj, P) % shortcut to inputPositions
+        function input(obj, P, varargin) % shortcut to inputPositions
         % See the help for head.Catalog.inputPositions. 
             
             if nargin==1, help('head.Catalog.inputPositions'); return; end
             
-            obj.inputPositions(P); 
+            obj.inputPositions(P, varargin{:}); 
             
         end
         
-        function inputPositions(obj, P) % give the positions matrix, matches it to GAIA
+        function inputPositions(obj, positions, varargin) % give the positions matrix, matches it to GAIA
         % Usage: inputPositions(obj, P) 
         % Input P must be a two-column matrix with x and y for each star found
-        % but the pipeline (typically, quick_find_stars). 
+        % by the pipeline (typically, quick_find_stars). 
         % Will match the positions to GAIA, and confirm by setting success=1. 
         % If it cannot find a match, it may scan additional RA/Dec values
         % around the coordinates given in the header. 
@@ -254,6 +261,12 @@ classdef Catalog < handle
         % If the full range is scanned and no successfull matches are made
         % it would set success=0 and not fill the data. 
         %
+        % Additional inputs could be the S/N value and the background noise
+        % and background mean for each star position. 
+        % Instead, simply give a table with properties "pos", with optional
+        % "flux" and "BG_STD" and "BG_MEAN", that allow Catalog to calculate
+        % the zero point, the sky brightness, and the limiting magnitude. 
+        % 
         % Upon success it would fill the "data" property with information 
         % from GAIA, and copy some results to "magnitudes", "coordinates", 
         % and "temperatures". 
@@ -261,17 +274,59 @@ classdef Catalog < handle
         
             if nargin==1, help('head.Catalog.inputPositions'); return; end
             
+            input = util.text.InputVars;
+            input.input_var('fluxes', []); 
+            input.input_var('snrs', []); 
+            input.input_var('bg_mean', []); 
+            input.input_var('bg_std', [], 'bg_noise'); 
+            input.input_var('threshold', []); 
+            input.input_var('sum', [], 'num_sum', 'stack_number');
+            input.input_var('exptime', [], 'exposure_time'); 
+            input.scan_vars(varargin{:}); 
+            
             t = tic;
             
             obj.success = 0; % change to 1 after all functions return normally 
             
-            if isempty(P)
+            if isempty(positions)
                 return; % with success==0
             end
             
-            if istable(P) && ismember('pos', P.Properties.VariableNames)
-                P = P.pos; % if given a table from quick_find_stars, just take out the positions only
+            if istable(positions) 
+                
+                obj.table_props = positions; 
+                
+                if ismember('pos', positions.Properties.VariableNames)
+                    positions = positions.pos; % if given a table from quick_find_stars, just take out the positions only
+                else
+                    error('Input table to Catalog does not contain the "pos" property!'); 
+                end
+                
+                if ismember('flux', obj.table_props.Properties.VariableNames)
+                    obj.flux = obj.table_props.flux;
+                end
+                
+                if ismember('snr', obj.table_props.Properties.VariableNames)
+                    obj.snr = obj.table_props.snr;
+                end
+                
+                if ismember('BG_MEAN', obj.table_props.Properties.VariableNames)
+                    obj.bg_mean = obj.table_props.BG_MEAN;
+                end
+                
+                if ismember('BG_STD', obj.table_props.Properties.VariableNames)
+                    obj.bg_std = obj.table_props.BG_STD;
+                end
+                
             end
+            
+            if ~isempty(input.fluxes), obj.flux = input.fluxes; end
+            if ~isempty(input.snrs), obj.snr = input.snrs; end
+            if ~isempty(input.bg_mean), obj.bg_mean = input.bg_mean; end
+            if ~isempty(input.bg_std), obj.bg_std = input.bg_std; end
+            if ~isempty(input.threshold), obj.detection_threshold = input.threshold; end
+            if ~isempty(input.sum), obj.detection_stack_number = input.sum; end
+            if ~isempty(input.exptime), obj.detection_exp_time = input.exptime; end
             
             if isempty(obj.head) || isempty(obj.head.RA_DEG) || isempty(obj.head.DEC_DEG)
                 error('Cannot run astrometry without RA/DEC in header!'); 
@@ -279,7 +334,12 @@ classdef Catalog < handle
             
             % we don't know how to run astrometry without a SIM object... 
             S = SIM;
-            S.Cat = [P NaN(size(P,1), 3)]; 
+            S.Cat = [positions NaN(size(positions,1), 3)]; 
+            
+            if ~isempty(obj.max_num_stars)
+                S.Cat = S.Cat(1:obj.max_num_stars,:); % use only the brighter stars for matching
+            end
+            
             S.Col.X=1; S.Col.Y=2; S.Col.Mag_G=3; S.Col.ALPHAWIN_J2000=4; S.Col.DELTAWIN_J2000=5;
             S.ColCell = {'X', 'Y', 'Mag_G', 'ALPHAWIN_J2000', 'DELTAWIN_J2000'}; % make a false catalog 
             
@@ -341,21 +401,10 @@ classdef Catalog < handle
                         continue; % with success==0
                         
                     end
-
+                    
+                    S2.Cat = [positions NaN(size(positions,1), 3)]; % make sure to re-load all the stars after solving
                     obj.mextractor_sim = update_coordinates(S2, 'ColNameRA', 'ALPHAWIN_J2000', 'ColNameDec', 'DELTAWIN_J2000'); 
 
-                    % the following are pathces to fix compatibility of
-                    % Eran's functions with themselves
-%                     obj.mextractor_sim.WCS.CTYPE1 = obj.mextractor_sim.WCS.CTYPE{1};
-%                     obj.mextractor_sim.WCS.CTYPE2 = obj.mextractor_sim.WCS.CTYPE{2};
-%                     obj.mextractor_sim.WCS.CUNIT1 = obj.mextractor_sim.WCS.CUNIT{1};
-%                     obj.mextractor_sim.WCS.CUNIT2 = obj.mextractor_sim.WCS.CUNIT{2};
-%                     obj.mextractor_sim.WCS.CRPIX1 = obj.mextractor_sim.WCS.CRPIX(1);
-%                     obj.mextractor_sim.WCS.CRPIX2 = obj.mextractor_sim.WCS.CRPIX(2);
-%                     obj.mextractor_sim.WCS.CRVAL1 = obj.mextractor_sim.WCS.CRVAL(1);
-%                     obj.mextractor_sim.WCS.CRVAL2 = obj.mextractor_sim.WCS.CRVAL(2);
-                    
-                    
                     % test if the astrometric solution even makes sense... 
                     if any(abs(cell2mat(obj.mextractor_sim.WCS.tpv.KeyVal))>5)
 %                         disp('failed to find a reasonable fit!'); 
@@ -369,7 +418,7 @@ classdef Catalog < handle
 
 %                     obj.catalog_matched = catsHTM.sources_match('GAIADR2', obj.mextractor_sim, 'ColRA', {'Im_RA'}, 'ColDec', {'Im_Dec'}, 'MagColumn', 'Mag_BP', 'MagLimit', 20);
                     obj.catalog_matched = catsHTM.sources_match('GAIADR2', obj.mextractor_sim, ...
-                        'ColRA', {'ALPHAWIN_J2000'}, 'ColDec', {'DELTAWIN_J2000'}, 'SearchRadius', 2);
+                        'ColRA', {'ALPHAWIN_J2000'}, 'ColDec', {'DELTAWIN_J2000'}, 'SearchRadius', obj.search_radius);
 
                     obj.makeCatalog; % turn the MAAT objects into a table
 
@@ -397,19 +446,13 @@ classdef Catalog < handle
             
             if obj.success==1
                 
-%                 obj.wcs_object = ClassWCS;
-%                 obj.wcs_object.WCS = obj.mextractor_sim.WCS; % why did I do this???
-%                 obj.wcs_object.PV = obj.wcs_object.tpv; % copy this array to fix a bug in Eran's code
-                
                 obj.head.WCS.input(obj.wcs_object); % translate MAAT/WCS into my WorldCoordinates object
             
                 [obj.central_RA, obj.central_Dec] = obj.wcs_object.xy2coo([obj.head.NAXIS1/2, obj.head.NAXIS2/2], 'OutUnits', 'deg'); % center of the field
-%                 [obj.central_RA, obj.central_Dec] = obj.mextractor_sim.xy2coo(obj.head.NAXIS1/2, obj.head.NAXIS2/2, 'mat'); % BAD: this uses an old method for SIM objects rather than the new one for ClassWCS objects!
 
-%                 obj.central_RA = obj.central_RA.*180/pi;
-%                 obj.central_Dec = obj.central_Dec.*180/pi;
-                
                 obj.rotation = obj.head.WCS.rotation; % field rotation from PV parameters
+                
+                obj.calcSky;
                 
             end
             
@@ -462,216 +505,82 @@ classdef Catalog < handle
             obj.coordinates = [obj.data.RA obj.data.Dec];
             obj.temperatures = obj.data.Teff;
             
-            [N,E] = histcounts(obj.magnitudes, 'BinWidth', 0.5);
-            [mx,idx] = max(N);
+            obj.data = [obj.data obj.table_props]; 
             
-            if idx<length(N)
-                for ii = idx+1:length(N) 
-                    if(N(ii)<0.1*mx) % find the first bin with less than 10% of the peak
-                        idx = ii; 
-                        break; 
-                    end 
-                end
-            end
-            
-            obj.detection_limit = E(idx); % the lower edge of that bin is the limiting magnitudes
+%             [N,E] = histcounts(obj.magnitudes, 'BinWidth', 0.5);
+%             [mx,idx] = max(N);
+%             
+%             if idx<length(N)
+%                 for ii = idx+1:length(N) 
+%                     if(N(ii)<0.1*mx) % find the first bin with less than 10% of the peak
+%                         idx = ii; 
+%                         break; 
+%                     end 
+%                 end
+%             end
+%             
+%             obj.detection_limit = E(idx); % the lower edge of that bin is the limiting magnitudes
             
             
 %             obj.detection_limit = nanmax(obj.magnitudes); % must find a better way to estimate this (there's lots of accidental matches with the wrong flux)
             
         end
         
-    end
-    
-    methods(Hidden=true) % old methods scheduled for deletion
-        
-        function inputImage(obj, Im) % old method (used to be called input()), input an image and give it to mextractor. to be deprecated! 
+        function calcSky(obj) % get the zero point, mag limit and sky brightness
             
-            obj.success = 0; % change to 1 after all functions return normally 
             
-            obj.image = Im;
-            
-            obj.runMextractor;
-            obj.runAstrometry;
-            obj.makeCatalog;
-            
-            if ~isempty(obj.head)
+            try % first get the zero point
                 
-                if isempty(obj.head.WCS)
-                    obj.head.WCS = head.WorldCoordinates;
+                if ~isempty(obj.flux)
+                    delta_mag = obj.magnitudes + 2.5*log10(obj.flux); % difference between GAIA mag and the instrumental flux converted to mag
+                    obj.zero_point = util.vec.weighted_average(delta_mag, sqrt(obj.flux)); 
                 end
                 
-                obj.head.WCS.input(obj.wcs_object); % make sure the WCS object is updated too
-                
+            catch ME
+                warning(ME.getReport);
             end
             
-            obj.success = 1;
+            try % now get the limiting magnitude
             
-        end
-        
-        function S = runMextractor(obj, I) % old method to find coordinates from image using mextractor. To be deprecated
-            
-            if obj.debug_bit, disp('Running mextractor on input image...'); end
-            
-            if isempty(which('mextractor'))
-                error('Cannot load the MAAT package. Make sure it is on the path...');
-            end
-            
-            if nargin<2 || isempty(I)
-                I = obj.image;
-            else
-                obj.image = I;
-            end
-            
-            if isempty(I)
-                error('Must supply an image to run mextractor (or fill "image" property).');
-            end
-            
-            I = regionfill(I, isnan(I));
-            
-            S = SIM;
-            S.Im = I;
-            
-            if obj.debug_bit>1
-                S = mextractor(S, 'Verbose', true, 'Thresh', obj.threshold);
-            else
-                evalc('S = mextractor(S, ''Thresh'', obj.threshold)');
-            end
-            
-            if obj.use_psf_width
-                SN = S.Cat(:,find(strcmp(S.ColCell, 'SN')));
-                SN2 = S.Cat(:,find(strcmp(S.ColCell, 'SN_UNF')));
-                S.Cat = S.Cat(SN>SN2-2,:);
-            end
-            
-            [~,HWHM]=S.curve_growth_psf;
-            obj.FWHM = 2.*HWHM; % pixels
-            obj.width = obj.FWHM./2.355;
-            obj.seeing = obj.FWHM.*obj.head.SCALE;
-            
-            obj.mextractor_sim = S;
-            
-        end
-        
-        function SS = runAstrometry(obj, S, RA, Dec, plate_scale) % old method to find coordinates from image using mextractor. To be deprecated
-            
-            if obj.debug_bit, disp('Running astrometry on SIM image...'); end
-            
-            if isempty(which('astrometry'))
-                error('Cannot load the MAAT package. Make sure it is on the path...');
-            end
-            
-            if nargin<2 || isempty(S)
-                S = obj.mextractor_sim;
-            else
-                obj.mextractor_sim = S;
-            end
-            
-            if isempty(S), error('Must supply a SIM object to run astrometry (or fill image_mextractor).'); end
-            
-            if nargin<3 || isempty(RA)
-                RA = obj.RA;
-            end
-            
-            if isempty(RA), error('Must supply a RA input'); end
-
-            if nargin<4 || isempty(Dec)
-                DE = obj.DE;
-            end
-            
-            if isempty(DE), error('Must supply a Dec input'); end
-            
-            if nargin<5 || isempty(plate_scale)
-                plate_scale = obj.plate_scale; % will use default value if no pars object is found
-            end
-            
-            if exist(fullfile(getenv('DATA'), 'GAIA\DR2'), 'dir')
-                addpath(fullfile(getenv('DATA'), 'GAIA\DR2'));
-            elseif exist(fullfile(fileparts(getenv('DATA')), 'DATA_ALL\GAIA\DR2'))
-                addpath(fullfile(fileparts(getenv('DATA')), 'DATA_ALL\GAIA\DR2'));
-            end
-            
-            [~,S] = astrometry(S, 'RA', obj.RA, 'Dec', obj.DE, 'Scale', obj.plate_scale,...
-                'Flip', obj.flip, 'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', [3000 3000], 'ApplyPM', false, ...
-                'MinRot', -20, 'MaxRot', 20);
-            
-            % update RA/Dec in catalog according to WCS
-            obj.mextractor_sim = update_coordinates(S);
-            
-            %  Match sources with GAIA
-            SS = catsHTM.sources_match('GAIADR2',obj.mextractor_sim);
-            
-            obj.catalog_matched = SS;
-            
-            obj.wcs_object = ClassWCS.populate(S);
-            
-        end
-        
-        function findStars(obj, pos_xy, min_radius) % to be depricated! 
-            
-            if obj.debug_bit, disp('Finding stars and matching them to catalog...'); end
-            
-            if nargin<2 || isempty(pos_xy)
-                pos_xy = []; % if not given, just look for stars on your own
-            end
-            
-            if nargin<3 || isempty(min_radius)
-                min_radius = []; % minimal distance in pixels to give a match
-            end
-            
-            if isempty(obj.data)
-                error('Cannot find stars without a catalog. Try using input(..) or load(..)'); 
-            end
-            
-            T = obj.data;
-            
-            obj.positions = pos_xy;
-            
-            if isempty(obj.positions)
-
-                if ~isempty(obj.min_star_temp)
-                    T = T(T{:,'Teff'}>=obj.min_star_temp,:); % select only stars with temperature above minimal level (hotter stars have smaller angular scale)
-                end
-
-                if obj.avoid_edges>0
+                if ~isempty(obj.snr)
                     
-                    x_ok = T.XPEAK_IMAGE>1+obj.avoid_edges & T.XPEAK_IMAGE<size(obj.image,2)-obj.avoid_edges;
-                    y_ok = T.YPEAK_IMAGE>1+obj.avoid_edges & T.YPEAK_IMAGE<size(obj.image,1)-obj.avoid_edges;
-                   
-                    T = T(x_ok & y_ok,:); 
+                    obj.mag_snr_fit = util.fit.polyfit(log10(obj.snr), obj.data.Mag_BP, 'double', 1, 'order', 2); 
+                    
+                    if ~isempty(obj.detection_threshold)
+                        
+                        obj.detection_limit = obj.mag_snr_fit.func(log10(obj.detection_threshold)); 
+                        
+                    end
                     
                 end
                 
-                % add other limitations on the stars chosen! 
-
-                T = sortrows(T, 'Mag_BP'); % sort stars from brightest to faintest
+            catch ME
+                warning(ME.getReport);
+            end
+            
+            try % calculate the sky brightness
                 
-                if ~isempty(obj.num_stars)
-                    idx = 1:min(obj.num_stars, height(T)); 
-                else
-                    idx = 1:height(T);
+                if ~isempty(obj.bg_mean) && ~isempty(obj.zero_point) && ~isempty(obj.head) && ~isempty(obj.head.SCALE)
+                    
+                    B_pix = nanmedian(obj.bg_mean); % background flux per pixel
+                    B_arcsec = B_pix./obj.head.SCALE.^2; % convert to background flux per arcsecong^2
+                    
+                    obj.sky_magnitude = obj.zero_point - 2.5*log10(B_arcsec); 
+                    
                 end
-
-                obj.positions = T{idx,{'XPEAK_IMAGE', 'YPEAK_IMAGE'}};
-                obj.magnitudes = T{idx,'Mag_BP'};
-                obj.coordinates = T{idx,{'RA','Dec'}};
-                obj.temperatures = T{idx, 'Teff'};
-                % any other data worth taking from catalog?
-
-            else
-
-                % NOTE: this option takes a list of positions and ignores
-                % limitations such as mag_limit, min_temp and num_stars
                 
-                idx = obj.findNearestXY(obj.positions, min_radius);
-
-                T{end+1,:} = NaN; % last row is all NaN's, for mis-matched stars
-                idx(isnan(idx)) = height(T);
-
-                obj.magnitudes = T{idx,'Mag_G'};
-                obj.coordinates = T{idx,{'RA','Dec'}};
-                obj.temperatures = T{idx, 'Teff'};
-
+            catch ME
+                warning(ME.getReport);
+            end
+            
+        end
+        
+        function val = getInstMag(obj)
+            
+            if isempty(obj.zero_point) || ~any(ismember(obj.data.Properties.VariableNames, 'flux'))
+                val = [];
+            else
+                val = obj.zero_point - 2.5*log10(obj.data.flux); 
             end
             
         end

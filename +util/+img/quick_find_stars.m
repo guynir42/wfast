@@ -103,14 +103,17 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
             BW_dilated = BW;
         end
 
-        T = regionprops('table', BW, I, 'WeightedCentroid', 'PixelValues', 'PixelIdxList'); 
+        T = regionprops('table', BW, I, 'WeightedCentroid', 'PixelValues', 'PixelIdxList', 'PixelList'); 
 
         if ~isempty(T) && ~iscell(T{:,'PixelValues'}) % this happens when all regions are single-pixel
             T2 = T(:,'WeightedCentroid');
             T2{:,2} = num2cell(T.PixelValues);
             T2{:,3} = num2cell(T.PixelIdxList);
+            T2{:,4} = num2cell(T.PixelList);
             T2.Properties.VariableNames{2} = 'PixelValues';
             T2.Properties.VariableNames{3} = 'PixelIdxList';
+            T2.Properties.VariableNames{4} = 'PixelList';
+            
             T = T2;
         end
         
@@ -171,21 +174,49 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     
     table_props = horzcat(T2, table_props);
     
-%     if input.unflagged
-%         table_props(logical(flag), :) = []; % remove all non-zero flag stars
-%     end
-    
     table_props = sortrows(table_props, 1, 'descend');
     
     if ~isempty(table_props)
 
         table_props.Properties.VariableNames{'WeightedCentroid'} = 'pos';
-        table_props = [table_props(:,'flux') table_props(:,'flag') table_props(:,'snr') table_props(:,'pos') table_props(:, 'PixelValues'), table_props(:, 'PixelIdxList')];
+        table_props = [table_props(:,'flux') table_props(:,'flag') table_props(:,'snr') table_props(:,'pos') table_props(:, 'PixelValues'), table_props(:, 'PixelList'), table_props(:, 'PixelIdxList')];
 
         if height(table_props)>input.number
             table_props = table_props(1:input.number, :);
         end
 
     end
+    
+    peak_xy = NaN(height(table_props), 2); 
+    
+    % add the peak pixel position
+    for ii = 1:height(table_props)
+        
+        [~,idx] = nanmax(table_props.PixelValues{ii}); 
+        peak_xy(ii,:) = table_props.PixelList{ii}(idx,:); 
+        
+    end
+    
+    table_props = [table_props table(peak_xy)]; 
+    table_props.Properties.VariableNames{end} = 'Peak_pos'; 
+    
+    % add the background mean/std to the table
+    if isscalar(input.mean)
+        bg_mean = ones(height(table_props),1).*input.mean;
+    else
+        idx = sub2ind(size(input.std), round(table_props.pos(:,2)), round(table_props.pos(:,1)));
+        bg_mean = input.mean(idx);
+    end
+    
+    if isscalar(input.std)
+        bg_std = ones(height(table_props),1).*input.std;
+    else
+        idx = sub2ind(size(input.std), round(table_props.pos(:,2)), round(table_props.pos(:,1)));
+        bg_std = input.std(idx);
+    end
+    
+    table_props = [table_props table(bg_mean) table(bg_std)];
+    table_props.Properties.VariableNames{end-1} = 'BG_MEAN';
+    table_props.Properties.VariableNames{end} = 'BG_STD';
     
 end
