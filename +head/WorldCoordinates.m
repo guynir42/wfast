@@ -188,7 +188,8 @@ classdef WorldCoordinates < handle
         
         function RA_Dec = xy2coo(obj, x, y) % find the RA and Dec for the image xy positions
         % Usage: RA_Dec = xy2coo(obj, x, y)
-        % Find the RA and Dec for the image xy positions
+        % Find the RA and Dec for the image xy positions, using the TPV 
+        % coefficients in the WCS. 
         
         if nargin==0, help('head.WorldCoordinates.xy2coo'); return; end
         
@@ -201,25 +202,25 @@ classdef WorldCoordinates < handle
                 end
             end
             
-            x2 = x - obj.CRPIX(2);
-            y2 = y - obj.CRPIX(1);
+            x2 = x - obj.CRPIX(1);
+            y2 = y - obj.CRPIX(2);
             
             vec = obj.CD*[x2;y2]; % rotation matrix, also stretches the pixels to units of degrees
-            Xout = vec(1); % units of degrees
-            Yout = vec(2); % units of degrees
+            x3 = vec(1); % units of degrees
+            y3 = vec(2); % units of degrees
             
             if obj.use_tpv
             
                 if ~isempty(strfind(obj.CTYPE1, 'TPV')) && ~isempty(strfind(obj.CTYPE2, 'TPV'))
 
-                    R  = sqrt(Xout.^2 + Yout.^2); % units of degrees
+                    R  = sqrt(x3.^2 + y3.^2); % units of degrees
             
                     [Xpowers, Ypowers] = head.WorldCoordinates.tpv_polydef;
             
                     % these lines assume PV is a 2x40 coefficients matrix with
                     % NaNs or zeros where there is no contribution to that polynomial
-                    Xout = sum(obj.PV(:,1).*Xout.^Xpowers(:,1).*Yout.^Xpowers(:,2).*R.^Xpowers(:,3), 1, 'omitnan');
-                    Yout = sum(obj.PV(:,2).*Xout.^Ypowers(:,1).*Yout.^Ypowers(:,2).*R.^Ypowers(:,3), 1, 'omitnan');
+                    Xout = sum(obj.PV(:,1).*x3.^Xpowers(:,1).*y3.^Xpowers(:,2).*R.^Xpowers(:,3), 1, 'omitnan');
+                    Yout = sum(obj.PV(:,2).*x3.^Ypowers(:,1).*y3.^Ypowers(:,2).*R.^Ypowers(:,3), 1, 'omitnan');
 
                 else
                     error('Unknown CTYPE1 "%s". Use tpv instead...', obj.CTYPE1);
@@ -235,7 +236,13 @@ classdef WorldCoordinates < handle
         end
         
         function XY = coo2xy(obj, RA, Dec) % invertion of xy2coo by calling fminsearch and calculating the point nearest to RA/Dec
-            
+        % Usage: xy = coo2xy(obj, RA, Dec)
+        % Use the GAIA match to transform the given RA/Dec into xy on the 
+        % image plane. 
+        % Specify coordinates as hexagesimal strings or numeric degrees, 
+        % DO NOT GIVE RA AS NUMERIC HOURS, if you give it as numeric value, 
+        % it must be in degrees!
+        
             if ischar(RA)
                 RA = head.Ephemeris.hour2deg(RA);
             end
@@ -247,11 +254,6 @@ classdef WorldCoordinates < handle
             func = @(xy) sum(([RA, Dec] - obj.xy2coo(xy(1), xy(2)) ).^2); % minimization function
             
             XY = fminsearch(func, obj.CRPIX); % initial guess is middle of field 
-                        
-            % This is from Eran's coo2xy but it doesn't account for the corrections in the PV parameters (i.e., it doesn't include the GAIA match!)
-%             DEG = 180/pi;
-            
-%             XY = obj.CRPIX + obj.SCALE_DEG*DEG*celestial.proj.pr_gnomonic(RA/DEG, Dec/DEG, 1, obj.CRVAL./DEG); 
             
         end
         

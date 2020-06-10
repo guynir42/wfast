@@ -377,7 +377,7 @@ classdef Catalog < handle
                         [R,S2] = astrometry(S, 'RA', head.Ephemeris.deg2hour(list_RA(jj)), 'Dec', head.Ephemeris.deg2sex(list_DE(ii)), 'Scale', obj.head.SCALE, ...
                             'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', obj.block_size.*[1 1], 'ApplyPM', false, 'Flip', obj.flip, ...
                             'MinRot', obj.input_rotation-obj.input_rot_range, 'MaxRot', obj.input_rotation+obj.input_rot_range, ...
-                            'CatColMag', 'Mag_G', 'ImSize', [obj.head.NAXIS1, obj.head.NAXIS2], 'Verbose', false, 'RCrad', 3.3/180*pi);
+                            'CatColMag', 'Mag_G', 'ImSize', [obj.head.NAXIS2, obj.head.NAXIS1], 'Verbose', false, 'RCrad', 3.3/180*pi);
 
                         warning('on', 'MATLAB:polyfit:PolyNotUnique')
                         warning('on', 'MATLAB:lscov:RankDefDesignMat');
@@ -446,7 +446,7 @@ classdef Catalog < handle
                 
                 obj.head.WCS.input(obj.wcs_object); % translate MAAT/WCS into my WorldCoordinates object
             
-                [obj.central_RA, obj.central_Dec] = obj.wcs_object.xy2coo([obj.head.NAXIS1/2, obj.head.NAXIS2/2], 'OutUnits', 'deg'); % center of the field
+                [obj.central_RA, obj.central_Dec] = obj.wcs_object.xy2coo([obj.head.NAXIS2/2, obj.head.NAXIS1/2], 'OutUnits', 'deg'); % center of the field
 
                 obj.rotation = obj.head.WCS.rotation; % field rotation from PV parameters
                 
@@ -675,15 +675,37 @@ classdef Catalog < handle
             
         end
         
-        function xy = coords2xy(obj, RA, Dec) % convert sky coordinates to xy on the image
-        % Usage: xy = coords2xy(obj, RA, Dec)
+        function ra_dec = xy2coo(obj, x, y) % convert xy position to sky coordinates
+        % Usage: RA_Dec = xy2coo(obj, x, y)
+        % Find the RA and Dec for the image xy positions, using the TPV 
+        % coefficients in the WCS. 
+        
+            if nargin==0, help('head.Catalog.xy2coo'); return; end
+        
+            if nargin<3 || isempty(y)
+                if size(x,2)==2
+                    y = x(:,2);
+                    x = x(:,1);
+                else
+                    error('Must input x and y!');
+                end
+            end
+            
+            ra_dec = obj.head.WCS.xy2coo(x,y); 
+            
+        end
+        
+        function xy = coo2xy(obj, RA, Dec) % convert sky coordinates to xy on the image
+        % Usage: xy = coo2xy(obj, RA, Dec)
         % Use the GAIA match to transform the given RA/Dec into xy on the 
         % image plane. 
         % Specify coordinates as hexagesimal strings or numeric degrees, 
         % DO NOT GIVE RA AS NUMERIC HOURS!
         % If no coordinates are given, uses the header's RA/Dec. 
         % Outputs a vector with two elements, x and y. 
-        
+            
+            if nargin==0, help('head.Catalog.xy2coo'); return; end
+
             if nargin<2 || isempty(RA)
                 RA = obj.head.RA_DEG;
             end
