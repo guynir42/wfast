@@ -163,9 +163,6 @@ classdef Catalog < handle
             obj.coordinates = [];
             obj.temperatures = [];
 
-            obj.FWHM = [];
-            obj.width = [];
-            obj.seeing = [];
             obj.detection_limit = [];
             obj.detection_threshold = [];
             obj.detection_stack_number = [];
@@ -337,7 +334,8 @@ classdef Catalog < handle
             S.Cat = [positions NaN(size(positions,1), 3)]; 
             
             if ~isempty(obj.max_num_stars)
-                S.Cat = S.Cat(1:obj.max_num_stars,:); % use only the brighter stars for matching
+                N = min(size(S.Cat,1), obj.max_num_stars);
+                S.Cat = S.Cat(1:N,:); % use only the brighter stars for matching
             end
             
             S.Col.X=1; S.Col.Y=2; S.Col.Mag_G=3; S.Col.ALPHAWIN_J2000=4; S.Col.DELTAWIN_J2000=5;

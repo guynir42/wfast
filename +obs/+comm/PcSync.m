@@ -347,8 +347,12 @@ classdef PcSync < handle
                     
                     obj.waitForTransferStatus(hndl);
                     
-                    new_data = uint8(fread(hndl, hndl.BytesAvailable))'; % this may be only a part of the message...
-                                       
+                    if hndl.BytesAvailable>0
+                        new_data = uint8(fread(hndl, hndl.BytesAvailable))'; % this may be only a part of the message...
+                    else
+                        new_data = uint8([]); 
+                    end
+                    
                     data_temp = horzcat(data_temp, new_data); % add the latest data to temp buffer
                     
                     if length(data_temp)<30 % message is too short (no footer attached!)

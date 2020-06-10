@@ -2082,7 +2082,7 @@ classdef Acquisition < file.AstroData
                     if obj.debug_bit, disp(str); end
                     
                     
-                    obj.sync.outgoing.report = 'Finding stars'
+                    obj.sync.outgoing.report = 'Finding stars';
                     obj.sync.update;
                     
                     obj.single;
@@ -2090,7 +2090,7 @@ classdef Acquisition < file.AstroData
                     
                     if obj.use_astrometry
                         
-                        obj.sync.outgoing.report = 'Astrometry'
+                        obj.sync.outgoing.report = 'Astrometry';
                         obj.sync.update;
                         obj.runAstrometry;
                         
