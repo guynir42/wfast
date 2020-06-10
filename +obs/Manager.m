@@ -619,8 +619,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.gui.updateDomeStatusButtons;
                 obj.gui.panel_dome.button_tracking.update;
                 
-                if ~isfield(obj.cam_pc.incoming, 'report')
+                if ~isempty(obj.cam_pc.incoming) && ~isfield(obj.cam_pc.incoming, 'report')
                     obj.cam_pc.incoming.report = '';
+                end
+                
+                if isempty(obj.cam_pc.outgoing.command_str)
+                    obj.gui.panel_camera.button_start.control.Enable = 'on';
+                else
+                    obj.gui.panel_camera.button_start.control.Enable = 'off';
                 end
                 
                 obj.gui.panel_camera.button_info.update;
@@ -1361,22 +1367,28 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function str = camera_info(obj)
             
-            str = {};
-            str{end+1} = obj.cam_pc.incoming.report;
-            
-            if ~isempty(obj.cam_pc.incoming.report) && ~strcmp(obj.cam_pc.incoming.report, 'idle')
+            if isfield(obj.cam_pc.incoming, 'report')
                 
-                if isfield(obj.cam_pc.incoming, 'batch_counter') && isfield(obj.cam_pc.incoming, 'total_batches') 
-                    str{end+1} = sprintf('%d / %d', obj.cam_pc.incoming.batch_counter, obj.cam_pc.incoming.total_batches);
+                str = {};
+                str{end+1} = obj.cam_pc.incoming.report;
+
+                if ~isempty(obj.cam_pc.incoming.report) && ~strcmp(obj.cam_pc.incoming.report, 'idle')
+
+                    if isfield(obj.cam_pc.incoming, 'batch_counter') && isfield(obj.cam_pc.incoming, 'total_batches') 
+                        str{end+1} = sprintf('%d / %d', obj.cam_pc.incoming.batch_counter, obj.cam_pc.incoming.total_batches);
+                    end
+
+                    if isfield(obj.cam_pc.incoming, 'runtime')
+                        str{end+1} = sprintf('%ds', round(obj.cam_pc.incoming.runtime)); 
+                    end
+
                 end
-                
-                if isfield(obj.cam_pc.incoming, 'runtime')
-                    str{end+1} = sprintf('%ds', round(obj.cam_pc.incoming.runtime)); 
-                end
-                
+
+                str = strjoin(str, ', '); 
+
+            else
+                str = '';
             end
-            
-            str = strjoin(str, ', '); 
             
         end
         

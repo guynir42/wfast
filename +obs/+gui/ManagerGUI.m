@@ -278,7 +278,7 @@ classdef ManagerGUI < handle
             obj.panel_camera = GraphicPanel(obj.owner, [0.2 0 0.8 2/N_middle], 'camera');
             obj.panel_camera.addButton('button_stop', 'commandCameraStop', 'push', 'Stop cam', '', '', 0.1, '', '', 'send a stop command to the camera-PC'); 
             obj.panel_camera.addButton('input_arguments', '', 'custom', ' ', '', '', 0.6, '', '', 'use this input to give arguments to the camera-PC'); 
-            obj.panel_camera.addButton('button_stop', 'commandCameraStart', 'push', 'Start cam', '', '', 0.1, '', '', 'send a start command to the camera-PC'); 
+            obj.panel_camera.addButton('button_start', 'commandCameraStart', 'push', 'Start cam', '', '', 0.1, '', '', 'send a start command to the camera-PC'); 
             obj.panel_camera.addButton('button_info', 'camera_info', 'info', ' ', '', '', 0.2, '', '', 'some information from the camera-PC'); 
             
             obj.panel_camera.margin = [0.01 0.1];
@@ -502,8 +502,6 @@ classdef ManagerGUI < handle
             else
                 obj.panel_stop.button_stop.BackgroundColor = obj.color_buttons;
             end 
-            
-            drawnow;
             
         end
                         

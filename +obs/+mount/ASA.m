@@ -1214,7 +1214,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                         if strcmp(obj.pier_side, 'pierEast') % telescope is pointing West
                             obj.slewWithoutPrechecks(obj.hndl.RightAscension-0.5, 45); % do a pre-slew to dec +70 so we can make the flip! 
                         elseif strcmp(obj.pier_side, 'pierWest') % telescope pointing East
-                            obj.slewWithoutPrechecks(obj.hndl.RightAscension+0.5, 45); % do a pre-slew to dec +70 so we can make the flip! 
+                            obj.slewWithoutPrechecks(obj.hndl.RightAscension+0.75, 45); % do a pre-slew to dec +70 so we can make the flip! 
                             % we must move the RA a bit to the East, in
                             % case we are close to meridian, the mount would
                             % "prefer west" and do a flip on its own. 

@@ -96,7 +96,7 @@ classdef Scheduler < handle
         sim_flip_time = 0; % simulate the time (in minutes) it takes to do meridian flip
         sim_focus_time = 0; % time to do focus between runs (in minutes). assume focus is done for each new run
         
-        sim_plot_pause = 0.5; % length of pause for each simulation sampling point when plotting the simulation
+        sim_plot_pause = 0.0; % length of pause for each simulation sampling point when plotting the simulation
         
         sim_time = [];
         current_side_sim = '';
@@ -699,10 +699,18 @@ classdef Scheduler < handle
                 start_time.Hour = 13; % set the time to 16:00 Israel time (in winter??) 
             end
             
+            if ischar(start_time)
+                start_time = head.Ephemeris.parseTime(start_time);
+            end
+            
             if nargin<4 || isempty(end_time)
                 end_time = datetime('today', 'TimeZone', 'UTC'); 
                 end_time = end_time + days(1); % tomorrow morning! 
                 end_time.Hour = 04; % set the time to 7:00 Israel time (in winter??) 
+            end
+            
+            if ischar(end_time)
+                end_time = head.Ephemeris.parseTime(end_time);
             end
             
             obj.brake_bit = 0; % start running
