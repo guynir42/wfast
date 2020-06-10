@@ -365,7 +365,7 @@ classdef Acquisition < file.AstroData
                 
                 obj.stash_parameters;
                 
-                obj.sync.connect;
+%                 obj.sync.connect;
                 
             end
             
@@ -1485,11 +1485,11 @@ classdef Acquisition < file.AstroData
                         obj.brake_bit = 1; % allow for manager to send stop command to camera... 
                     end
                     
-                    obj.parseCommands;
-                    
                     if obj.brake_bit==0 && obj.batch_counter>1
-                        obj.sync.outgoing.report = 'running';
+                        obj.sync.outgoing.report = 'Running';
                     end
+                    
+                    obj.parseCommands;
                     
                     obj.sync.update;
                 
@@ -1519,6 +1519,7 @@ classdef Acquisition < file.AstroData
 %                 fprintf('command_str= %s | command_time= %s\n', obj.sync.incoming.command_str, obj.sync.incoming.command_time); 
                 
                 obj.sync.read_data(obj.sync.hndl_rx, 'rx'); 
+                obj.sync.read_data(obj.sync.hndl_tx, 'tx'); 
                 
                 if ~isempty(obj.sync.incoming.command_str) && ~isempty(obj.sync.incoming.command_time)
                     
@@ -1550,17 +1551,19 @@ classdef Acquisition < file.AstroData
                         input.input_var('mode', 'fast', 'cam_mode', 'camera_mode'); 
                         input.scan_vars(args{:}); 
                         
+                        obj.sync.outgoing.report = 'Starting';
+                        obj.sync.outgoing.batch_counter = 0;
+                        obj.sync.outgoing.total_batches = 0;
+                        obj.sync.outgoing.runtime = 0;
+                        obj.sync.update;
+                        
                         if input.focus 
                             disp('Now running focus by order of dome-PC'); % this message will be removed later on...
-                            obj.sync.outgoing.report = 'Focusing';
                             obj.runFocus;
                         end
                         
                         obj.log.input(sprintf('Starting run command from Dome-PC. Args= "%s"', obj.latest_command_pars)); 
                         disp(obj.log.report); 
-                        
-                        obj.sync.outgoing.report = 'Starting';
-                        
                         if cs(input.mode, 'fast')
                             obj.setupFastMode;
                         elseif cs(input.mode, 'slow')
@@ -1641,7 +1644,7 @@ classdef Acquisition < file.AstroData
             
             delete(timerfind('name', 'acquisition-slow-timer'));
             
-            obj.slow_timer = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-slow-timer', ...
+            obj.slow_timer = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-slow-timer', ...
                 'Period', 300, 'StartDelay', 300, 'TimerFcn', @obj.callback_slow_timer, 'ErrorFcn', @obj.setup_slow_timer);
             
             start(obj.slow_timer);
@@ -2062,8 +2065,6 @@ classdef Acquisition < file.AstroData
                     obj.display_num_rect_stars = 100; % do not plot too many rectangles, as it slows down the display
                 end
                 
-                
-                
                 if obj.use_save && obj.use_autodeflate
                     obj.deflator.setup_timer;
                 end
@@ -2080,11 +2081,19 @@ classdef Acquisition < file.AstroData
                     
                     if obj.debug_bit, disp(str); end
                     
+                    
+                    obj.sync.outgoing.report = 'Finding stars'
+                    obj.sync.update;
+                    
                     obj.single;
                     obj.findStars;
                     
                     if obj.use_astrometry
-                        obj.runAstrometry
+                        
+                        obj.sync.outgoing.report = 'Astrometry'
+                        obj.sync.update;
+                        obj.runAstrometry;
+                        
                     end
                     
                 end
@@ -3013,7 +3022,10 @@ classdef Acquisition < file.AstroData
                 success = 0;
                 
                 for ii = 1:6
-                
+                    
+                    obj.sync.outgoing.report = 'Focusing'
+                    obj.sync.update;
+                    obj.parseCommands; % allow stopping between focus runs...
                     
                     if obj.debug_bit, fprintf('Running focus loop attempt %d\n', ii); end
                     
