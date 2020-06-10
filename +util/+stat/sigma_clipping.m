@@ -40,7 +40,7 @@ function [mu, sigma, values] = sigma_clipping(values, varargin)
         
     end
     
-    if isempty(ax)
+    if isempty(ax) && use_plot
         ax = gca;
     end
     

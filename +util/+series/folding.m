@@ -32,6 +32,7 @@ function [f_folded, std_folded] = folding(f, num_samples, varargin)
     
     if input.oversample
         f = util.series.resample(f, input.oversample); 
+        num_samples = num_samples*input.oversample;
     end
     
     S = size(f); % keep track of the original size of the input
@@ -53,6 +54,10 @@ function [f_folded, std_folded] = folding(f, num_samples, varargin)
     
 %     f_folded = permute(f_folded, [1,3,2]); % get rid of dim 2 which we just integrated over
     f_folded = reshape(f_folded, [size(f_folded,1), S(2:end)]);
+    
+    if input.oversample
+        f_folded = util.series.resample(f_folded, 1./input.oversample); 
+    end
     
     if nargout>1
         

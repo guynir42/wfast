@@ -1621,7 +1621,7 @@ classdef Calibration < handle
 
                 obj.num_pixels_removed = temp.num_pixels_removed;
 
-                if obj.gui.check
+                if ~isempty(obj.gui) && obj.gui.check
                     obj.show;
                 end
                 
