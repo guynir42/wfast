@@ -27,11 +27,7 @@ IC1 = cal.input(I1, 'sum', 100);
 [M1,V1] = util.img.im_stats(IC1, 'tile', 250, 'overlap', 100, 'method', 'median', 'output', 'map');
 T1 = util.img.quick_find_stars(IC1, 'thresh', 5, 'sat', 5e4, 'psf', 0.8, 'unflagged', 1, 'mean', util.stat.median2(M1), 'std', sqrt(V1)); 
 
-cat1.input(T1.pos); 
-
-results1 = cat1.data;
-
-mag1 = cat1.magnitudes; 
+cat1.input(T1); 
 
 x = round(T1.pos(6,1));
 y = round(T1.pos(6,2));
@@ -48,12 +44,12 @@ f1.width = 30;
 
 ax = axes('Parent', f1.fig); 
 
-histogram(ax, results1.Mag_BP, 'BinWidth', 0.1);
+histogram(ax, cat1.data.Mag_BP, 'BinWidth', 0.1);
 hold(ax, 'on'); 
 
-histogram(ax, results1.Mag_RP, 'BinWidth', 0.1);
+histogram(ax, cat1.data.Mag_RP, 'BinWidth', 0.1);
 
-histogram(ax, results1.Mag_G, 'BinWidth', 0.1, 'FaceColor', 'green');
+histogram(ax, cat1.data.Mag_G, 'BinWidth', 0.1, 'FaceColor', 'green');
 
 util.plot.inner_title(sprintf('Exp.Time= %4.2fs (stack 100 images)', cat1.head.EXPTIME), 'ax', ax, 'Position', 'NorthWest', 'FontSize', 26); 
 
@@ -88,6 +84,43 @@ legend(ax2, {'data (Mag BP)', sprintf('fit: mag@5\\sigma= %4.2f', limmag1)});
 
 ax2.FontSize = 20;
 
+%% new plotting tool
+
+f1 = util.plot.FigHandler('stacked fast mode results'); 
+f1.clear;
+f1.height = 18; 
+f1.width = 30;
+
+ax = axes('Parent', f1.fig); 
+
+histogram(ax, cat1.data.Mag_BP, 'BinWidth', 0.1);
+
+util.plot.inner_title(sprintf('Exp.Time= %4.2fs (stack 100 images)', cat1.head.EXPTIME), 'ax', ax, 'Position', 'NorthWest', 'FontSize', 26); 
+
+xlabel(ax, 'GAIA magnitudes'); 
+ylabel(ax, 'Number of stars'); 
+
+ax.FontSize = 26; 
+
+ax.XLim = [4, 18]; 
+
+ax2 = axes('Parent', f1.fig, 'Position', [0.2 0.4 0.4 0.4]); 
+
+fr = util.fit.polyfit(cat1.data.Mag_BP, log10(cat1.data.snr), 'order', 1, 'double', 1);
+util.fit.plot_fit(fr, 'marker', 'p', 'ax', ax2, 'LineWidth', 3); 
+
+ylabel(ax2, 'S/N');
+xlabel(ax2, 'Mag BP'); 
+ax2.YLim = [0.5 max(log10(cat1.data.snr))]; 
+ax2.XTick = 10.^(1:4);
+
+cat1.detection_threshold=5;
+cat1.calcSky;
+
+legend(ax2, {'data (Mag BP)', sprintf('fit: mag@5\\sigma= %4.2f', cat1.detection_limit)}); 
+
+ax2.FontSize = 20;
+
 %% save the plot
 
 util.sys.print(fullfile(getenv('WFAST'), 'scripts/plots/lim_mag_30ms'));
@@ -110,7 +143,7 @@ IC2 = cal.input(I2);
 [M2,V2] = util.img.im_stats(IC2, 'tile', 250, 'overlap', 100, 'method', 'median', 'output', 'map');
 T2 = util.img.quick_find_stars(IC2, 'thresh', 5, 'sat', 5e4, 'psf', 0.9, 'unflagged', 1, 'mean', util.stat.median2(M2), 'std', sqrt(V2)); 
 
-cat2.input(T2.pos); 
+cat2.input(T2); 
 
 results2 = cat2.data;
 
@@ -169,6 +202,43 @@ legend(ax2, {'data (Mag BP)', sprintf('fit: mag@5\\sigma= %4.2f', limmag2)});
 
 ax2.FontSize = 20;
 
+%% new plotting tool
+
+f2 = util.plot.FigHandler('slow mode results'); 
+f2.clear;
+f2.height = 18; 
+f2.width = 30;
+
+ax = axes('Parent', f2.fig); 
+
+histogram(ax, cat2.data.Mag_BP, 'BinWidth', 0.1);
+
+util.plot.inner_title(sprintf('Exp.Time= %4.2fs', cat2.head.EXPTIME), 'ax', ax, 'Position', 'NorthWest', 'FontSize', 26); 
+
+xlabel(ax, 'GAIA magnitudes'); 
+ylabel(ax, 'Number of stars'); 
+
+ax.FontSize = 26; 
+
+ax.XLim = [4, 20]; 
+
+ax2 = axes('Parent', f2.fig, 'Position', [0.2 0.4 0.4 0.4]); 
+
+fr = util.fit.polyfit(cat2.data.Mag_BP, log10(cat2.data.snr), 'order', 1, 'double', 1);
+util.fit.plot_fit(fr, 'marker', 'p', 'ax', ax2, 'LineWidth', 3); 
+
+ylabel(ax2, 'S/N');
+xlabel(ax2, 'Mag BP'); 
+ax2.YLim = [0.5 max(log10(cat2.data.snr))]; 
+ax2.XTick = 10.^(1:4);
+
+cat2.detection_threshold=5;
+cat2.calcSky;
+
+legend(ax2, {'data (Mag BP)', sprintf('fit: mag@5\\sigma= %4.2f', cat2.detection_limit)}); 
+
+ax2.FontSize = 20;
+
 %% calculate the zero point and sky magnitude
 
 dm2 = cat2.magnitudes+2.5*log10(T2.flux);
@@ -203,7 +273,7 @@ IC3 = cal.input(I3);
 [M3,V3] = util.img.im_stats(IC3, 'tile', 250, 'overlap', 100, 'method', 'median', 'output', 'map');
 T3 = util.img.quick_find_stars(IC3, 'thresh', 5, 'sat', 5e4, 'psf', 1.1, 'unflagged', 1, 'mean', util.stat.median2(M3), 'std', sqrt(V3)); 
 
-cat3.input(T3.pos); 
+cat3.input(T3); 
 
 results3 = cat3.data;
 
@@ -261,6 +331,44 @@ hold(ax2, 'off');
 limmag3 = fr.func(log10(5)); 
 
 legend(ax2, {'data (Mag BP)', sprintf('fit: mag@5\\sigma= %4.2f', limmag3)}); 
+
+ax2.FontSize = 20;
+
+%% new plotting tool
+
+f3 = util.plot.FigHandler('30 second results'); 
+f3.clear;
+f3.height = 18; 
+f3.width = 30;
+
+ax = axes('Parent', f3.fig); 
+
+histogram(ax, cat3.data.Mag_BP, 'BinWidth', 0.1);
+
+util.plot.inner_title(sprintf('Exp.Time= %4.2fs', cat3.head.EXPTIME), 'ax', ax, 'Position', 'NorthWest', 'FontSize', 26); 
+
+xlabel(ax, 'GAIA magnitudes'); 
+ylabel(ax, 'Number of stars'); 
+
+ax.FontSize = 26; 
+
+ax.XLim = [4, 22]; 
+
+ax2 = axes('Parent', f3.fig, 'Position', [0.2 0.4 0.4 0.4]); 
+
+fr = util.fit.polyfit(cat3.data.Mag_BP, log10(cat3.data.snr), 'order', 1, 'double', 1);
+util.fit.plot_fit(fr, 'marker', 'p', 'ax', ax2, 'LineWidth', 3); 
+
+ylabel(ax2, 'S/N');
+xlabel(ax2, 'Mag BP'); 
+ax2.YLim = [0.5 max(log10(cat3.data.snr))]; 
+ax2.XLim = [11 22];
+ax2.XTick = 10.^(1:4);
+
+cat3.detection_threshold=5;
+cat3.calcSky;
+
+legend(ax2, {'data (Mag BP)', sprintf('fit: mag@5\\sigma= %4.2f', cat3.detection_limit)}); 
 
 ax2.FontSize = 20;
 

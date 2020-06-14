@@ -17,6 +17,7 @@ function [h_out, h_legend] = plot_fit(fr, varargin)
     input = util.text.InputVars;
     input.input_var('ax', [], 'axes', 'axis'); % axes to plot to (default is gca)
     input.input_var('marker', '.'); % type of marker for data points
+    input.input_var('line_width', 2); % for the fit line
     input.input_var('font_size', 20); % font to use on axes
     input.input_var('legend', false); % do we want to draw a legend
     input.input_var('label', 'data'); 
@@ -41,7 +42,7 @@ function [h_out, h_legend] = plot_fit(fr, varargin)
             input.ax.NextPlot = 'add';
         end
         
-        h{end+1} = plot(input.ax, x_sorted, fr(ii).func(x_sorted), '-'); 
+        h{end+1} = plot(input.ax, x_sorted, fr(ii).func(x_sorted), '-', 'LineWidth', input.line_width); 
         h{end}.DisplayName = fr(ii).model;
         
     end
