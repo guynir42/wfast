@@ -289,8 +289,8 @@ classdef PcSync < handle
             
             if obj.is_connected
                 
-                obj.hndl_rx.BytesAvailableFcn = @obj.read_data_rx;
-                obj.hndl_tx.BytesAvailableFcn = @obj.read_data_tx;
+%                 obj.hndl_rx.BytesAvailableFcn = @obj.read_data_rx;
+%                 obj.hndl_tx.BytesAvailableFcn = @obj.read_data_tx;
                 
                 t = datetime('now', 'TimeZone', 'UTC');
                 obj.outgoing.time = util.text.time2str(t);
@@ -449,14 +449,29 @@ classdef PcSync < handle
         
         function read_data_rx(obj, hndl, ~)
             
+            if nargin<2 || isempty(hndl)
+                hndl = obj.hndl_rx;
+            end
+            
             obj.read_data(hndl, 'rx');
 
         end
         
         function read_data_tx(obj, hndl, ~)
             
+            if nargin<2 || isempty(hndl)
+                hndl = obj.hndl_tx;
+            end
+            
             obj.read_data(hndl, 'tx');
 
+        end
+        
+        function setup_callbacks(obj)
+            
+            obj.hndl_rx.BytesAvailableFcn = @obj.read_data_rx;
+            obj.hndl_tx.BytesAvailableFcn = @obj.read_data_tx;
+            
         end
         
     end

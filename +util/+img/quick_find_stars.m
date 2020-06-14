@@ -106,15 +106,30 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
         T = regionprops('table', BW, I, 'WeightedCentroid', 'PixelValues', 'PixelIdxList', 'PixelList'); 
 
         if ~isempty(T) && ~iscell(T{:,'PixelValues'}) % this happens when all regions are single-pixel
-            T2 = T(:,'WeightedCentroid');
-            T2{:,2} = num2cell(T.PixelValues);
-            T2{:,3} = num2cell(T.PixelIdxList);
-            T2{:,4} = num2cell(T.PixelList);
-            T2.Properties.VariableNames{2} = 'PixelValues';
-            T2.Properties.VariableNames{3} = 'PixelIdxList';
-            T2.Properties.VariableNames{4} = 'PixelList';
+            
+            T2 = table;
+            
+%             T2(:,1) = {num2cell(T.PixelIdxList)};
+            
+            T2{height(T),1:3} = {1}; 
+            for jj = 1:height(T)
+                T2(jj,1) = {num2cell(T.PixelIdxList(jj))};
+            end
+            
+            for jj = 1:height(T)
+                T2(jj,2) = {num2cell(T.PixelList(jj))};
+            end
+            
+            for jj = 1:height(T)
+                T2(jj,3) = {num2cell(T.PixelValues(jj))};
+            end
+            
+            T2{:,4} = T.WeightedCentroid;
+
+            T2.Properties.VariableNames = {'PixelIdxList', 'PixelList', 'PixelValues', 'WeightedCentroid'}; 
             
             T = T2;
+            
         end
         
         N = height(T);

@@ -1085,12 +1085,16 @@ classdef Photometry < handle
             idx = F>util.stat.median2(F) & ~isnan(F) & ~obj.flags; % choose only good flux values
 
             % 1D vectors containing the good values only...
-            F = obj.fluxes(idx);
-            B = obj.backgrounds(idx);
-            V = obj.variances(idx);
-            W = obj.widths(idx);
-            DX = obj.offsets_x(idx);
-            DY = obj.offsets_y(idx);
+            F = obj.fluxes(idx(:,:,1));
+            B = obj.backgrounds(idx(:,:,1));
+            V = obj.variances(idx(:,:,1));
+            W = obj.widths(idx(:,:,1));
+
+            % we need to limit the idx varaible to 2D since it can be
+            % calculated on the aperutre while offsets are calculated on
+            % the gaussian photometry. 
+            DX = obj.offsets_x(idx(:,:,1));
+            DY = obj.offsets_y(idx(:,:,1));
             
             M = nanmean(F,1);
             

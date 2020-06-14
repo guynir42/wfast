@@ -466,6 +466,73 @@ classdef Deflator < file.AstroData
             
         end
         
+        function deleteTempFiles(obj, folder, backup_folder)
+            
+            d_temp = getenv('DATA_TEMP'); 
+            l_temp = length(d_temp);
+            
+            if isempty(d_temp)
+                error('Cannot find the DATA_TEMP folder! Set the environmental variable...'); 
+            end
+            
+            if nargin<2 || isempty(folder)
+                folder = d_temp; 
+            end
+            
+            if nargin<3 || isempty(backup_folder)
+                backup_folder = obj.auto_deflate_destination;
+            end
+            
+            if length(folder)<l_temp || ~strcmp(d_temp, folder(1:l_temp)) % folder must start with DATA_TEMP address
+                folder = fullfile(d_temp, folder); 
+            end
+            
+            if ~exist(folder, 'dir')
+                error('Could not find the folder "%s". ', folder); 
+            end
+            
+            if ~exist(backup_folder, 'dir')
+                error('Could not find the backup folder "%s". ', backup_folder); 
+            end
+            
+            d = util.sys.WorkingDirectory(folder); 
+            
+            list = flip(d.walk);
+            
+            for ii = 1:length(list)
+                
+                if strcmp(d_temp, list{ii}) || strcmp([d_temp '\'], list{ii}) || strcmp([d_temp '/'], list{ii})
+                    continue; % skip the root DATA_TEMP
+                end 
+                
+                d.cd(list{ii}); 
+                
+                files = d.files('', 1);
+                
+                d_bkp = list{ii}(l_temp+1:end);
+                d_bkp = fullfile(backup_folder, d_bkp);
+                
+                for jj = 1:length(files)
+                    
+                    if obj.checkFileExists(files{jj}, d_bkp)
+                        
+                        if obj.debug_bit>1, fprintf('Found copy of file "%s" in "%s". Deleting it now!\n', files{jj}, d_bkp); end
+                        
+                        delete(files{jj}); 
+                        
+                    end
+                    
+                end
+                
+                if d.is_empty
+                    if obj.debug_bit, fprintf('Deleting empty folder "%s".\n', d.pwd); end
+                    rmdir(d.pwd); 
+                end
+                
+            end
+            
+        end
+        
         function setup_timer(obj, hour) % sets up the deflator to automatically deflate latest files in DATA_TEMP at the given hour today (UTC!)
             
             if nargin<2 || isempty(hour)

@@ -280,16 +280,6 @@ classdef WorkingDirectory < handle
             
         end
         
-%         function list = fullnames(obj, directory) % to be depricated! 
-%             
-%             list = obj.files;
-%             
-%             for ii = 1:length(list)
-%                 list{ii} = [obj.cwd list{ii}];
-%             end
-%             
-%         end
-        
         function FL = files_private(obj, directory, use_fullpath) % not sure why we need this in addition to files()
                         
             if nargin<2 || isempty(directory)
@@ -363,6 +353,25 @@ classdef WorkingDirectory < handle
             d = fullfile(c,b);
             
         end
+        
+        function val = is_empty(obj, directory)
+            
+            if nargin<2 || isempty(directory)
+                directory = obj.cwd;
+            end
+            
+            list = obj.ls(directory);
+            
+            if length(list)==2 && strcmp(list{1}, '.') && strcmp(list{2}, '..')
+                val = 1; 
+            elseif length(list)<2
+                error('This should not happen!'); 
+            else
+                val = 0;
+            end
+            
+        end
+        
     end
     
     methods % changing directory

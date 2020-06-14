@@ -87,7 +87,7 @@ classdef Acquisition < file.AstroData
         
         use_focus_on_start = 1; % when true, will do a focus run every time the command to start a new run is given from PcSync
         
-        use_background = 1;
+        use_background = 0; % not sure if subtracting the background gives us anything?
         use_refine_bg = 0;
         
         % these swithces determine how stars are picked when run begins
@@ -194,6 +194,8 @@ classdef Acquisition < file.AstroData
     end
     
     properties(Hidden=true)
+        
+        star_props; % table with the results from quick_find_stars
         
         brake_bit = 1; % when this is set to 1 (using the GUI, for example), the run stops. 
         is_running = 0; % when this is 1, cannot start a new run or anything
@@ -422,6 +424,8 @@ classdef Acquisition < file.AstroData
             obj.sync.outgoing.RA_rate_delta = 0;
             obj.sync.outgoing.DE_rate_delta = 0;
 
+            obj.star_props = [];
+            
             obj.clear;
             
         end
@@ -1408,6 +1412,11 @@ classdef Acquisition < file.AstroData
 
                     drawnow;
                     
+                    if obj.brake_bit==0
+                        obj.sync.read_data_rx;
+                        obj.sync.read_data_tx;
+                    end
+                    
                     obj.sync.update;
 
                     s = obj.sync.incoming;
@@ -1477,9 +1486,11 @@ classdef Acquisition < file.AstroData
                         obj.sync.outgoing.focus_width = obj.cam.af.found_width;
                     end
                     
-                    obj.sync.outgoing.batch_counter = obj.batch_counter;
-                    obj.sync.outgoing.total_batches = obj.num_batches;
-                    obj.sync.outgoing.runtime = obj.prog.getElapsed; 
+                    if isfield(obj.sync.outgoing, 'report') && strcmp(obj.sync.outgoing.report, 'Running')
+                        obj.sync.outgoing.batch_counter = obj.batch_counter;
+                        obj.sync.outgoing.total_batches = obj.num_batches;
+                        obj.sync.outgoing.runtime = obj.prog.getElapsed; 
+                    end
                     
                     if obj.use_sync_stop && isfield(s, 'stop_camera') && s.stop_camera
                         obj.brake_bit = 1; % allow for manager to send stop command to camera... 
@@ -1540,7 +1551,7 @@ classdef Acquisition < file.AstroData
                     obj.latest_command_time = obj.sync.incoming.command_time;
                     obj.latest_command_pars = obj.sync.incoming.command_pars;
                     
-                    if cs(obj.sync.incoming.command_str, 'start') && ...
+                    if cs(obj.sync.incoming.command_str, 'start') && ... % GOT COMMAND TO START A NEW RUN
                             obj.brake_bit && obj.is_running==0 && obj.is_running_single==0 &&...
                             obj.cam.is_running==0 && obj.cam.is_running_focus==0
 
@@ -1551,11 +1562,13 @@ classdef Acquisition < file.AstroData
                         input.input_var('mode', 'fast', 'cam_mode', 'camera_mode'); 
                         input.scan_vars(args{:}); 
                         
+                        obj.sync.outgoing.error = ''; 
                         obj.sync.outgoing.report = 'Starting';
                         obj.sync.outgoing.batch_counter = 0;
                         obj.sync.outgoing.total_batches = 0;
                         obj.sync.outgoing.runtime = 0;
                         obj.sync.update;
+                        pause(0.1); % leave time to update
                         
                         if input.focus 
                             disp('Now running focus by order of dome-PC'); % this message will be removed later on...
@@ -1570,6 +1583,7 @@ classdef Acquisition < file.AstroData
                             obj.setupSlowMode;
                         end
                         
+                        obj.use_save = 1; % verify that we are saving images, unless asked not to by dome-PC
                         obj.run('reset', 1, args{:}); % the rest of the inputs from dome-pc are parsed in the regular way
                         
                     elseif cs(obj.sync.incoming.command_str, 'start') % only get here if the timing is wrong... 
@@ -1591,7 +1605,7 @@ classdef Acquisition < file.AstroData
                 end
                 
             catch ME
-                obj.sync.outgoing.report = sprintf('error! \n%s', ME.getReport); 
+                obj.sync.outgoing.error = sprintf('error! \n%s', ME.getReport); 
                 rethrow(ME); 
             end
 
@@ -1610,7 +1624,7 @@ classdef Acquisition < file.AstroData
             
             delete(timerfind('name', 'acquisition-timer'));
             
-            obj.timer = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-timer', ...
+            obj.timer = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-timer', ...
                 'Period', 30, 'StartDelay', 30, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer, 'BusyMode', 'drop');
             
             start(obj.timer);
@@ -1670,7 +1684,9 @@ classdef Acquisition < file.AstroData
                 end
                 
                 pause(0.05);
-                
+               
+            elseif obj.brake_bit
+                obj.sync.setup_callbacks;
             end
             
         end
@@ -1687,7 +1703,7 @@ classdef Acquisition < file.AstroData
             
             delete(timerfind('name', 'acquisition-backup-timer'));
             
-            obj.backup_timer = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-backup-timer', ...
+            obj.backup_timer = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-backup-timer', ...
                 'Period', 1800, 'StartDelay', 1800, 'TimerFcn', @obj.callback_backup_timer, 'ErrorFcn', @obj.setup_backup_timer);
             
             start(obj.backup_timer);
@@ -1829,7 +1845,7 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function addForcedTarget(obj, varargin)
+        function createForcedTarget(obj, varargin)
             
             s = struct;
             
@@ -1864,22 +1880,10 @@ classdef Acquisition < file.AstroData
                 s.Dec = head.Ephemeris.sex2deg(s.Dec);
             end
             
-            obj.forced_targets(end+1) = s;
-            
-        end
-        
-        function appendTargets(obj)
-            
-            for ii = 1:length(obj.forced_targets)
-                
-                % first get the X/Y from the RA/Dec
-                
-                % add the RA/Dec and X/Y to the catalog
-                
-                % add the position fields
-                
-                % log the indices of the new positions into the forced_indices field
-                
+            if isempty(obj.forced_targets)
+                obj.forced_targets = s;
+            else
+                obj.forced_targets(end+1) = s;
             end
             
         end
@@ -2011,6 +2015,9 @@ classdef Acquisition < file.AstroData
                     return;
                 end
                 
+                obj.sync.hndl_rx.BytesAvailableFcn = '';
+                obj.sync.hndl_tx.BytesAvailableFcn = '';
+                
                 if ~isempty(obj.gui) && obj.gui.check
                     
                     if input.use_reset
@@ -2093,6 +2100,9 @@ classdef Acquisition < file.AstroData
                         obj.sync.outgoing.report = 'Astrometry';
                         obj.sync.update;
                         obj.runAstrometry;
+                        
+                        % add forced cutouts
+                        obj.addForcedPositions; 
                         
                     end
                     
@@ -2219,14 +2229,14 @@ classdef Acquisition < file.AstroData
                         
             if obj.use_save
                 
-                try
+                try % readme file
                     filename = obj.buf.getReadmeFilename('Z');
                     util.oop.save(obj, filename, 'name', 'acquisition'); 
                 catch ME
                     warning(ME.getReport);
                 end
                 
-                try
+                try % save lightcurves
                 
                     if obj.use_save_stack_lcs
                         obj.light_stack.saveAsMAT(fullfile(obj.buf.directory, 'lightcurves.mat'));
@@ -2256,6 +2266,10 @@ classdef Acquisition < file.AstroData
             
             obj.sync.outgoing.RA_rate_delta = 0;
             obj.sync.outgoing.DE_rate_delta = 0;
+            
+            obj.sync.setup_callbacks;
+            
+            obj.sync.outgoing.report = 'idle'; % maybe only do this if there was no error? 
             
             obj.lightcurves.finishup;
             
@@ -2576,8 +2590,10 @@ classdef Acquisition < file.AstroData
                 obj.positions = T.pos;
                 obj.num_stars_found = size(obj.clip.positions,1);
                 
+                obj.star_props = T; 
+                
             else
-                obj.clip.findStars(S);                
+                obj.clip.findStars(S);
             end
             
             obj.ref_stack = obj.stack_proc;
@@ -2598,7 +2614,11 @@ classdef Acquisition < file.AstroData
             obj.cat.detection_stack_number = obj.num_sum;
             obj.cat.detection_exposure_time = obj.expT;
             
-            obj.cat.inputPositions(obj.positions);
+            if ~isempty(obj.star_props)
+                obj.cat.input(obj.star_props); % new method gives additiona data to calculate limiting magnitude etc... 
+            else
+                obj.cat.inputPositions(obj.positions); % old method
+            end
             
             if ~isempty(obj.cat.data) && ~isempty(obj.cat.success) && obj.cat.success % successfully filled the catalog
                 
@@ -2629,6 +2649,23 @@ classdef Acquisition < file.AstroData
             
             if dist>5/3600
                 obj.object_idx = []; % if the closest star found is more than 5" from the required position, it is not really a good match!
+            end
+            
+        end
+        
+        function addForcedPositions(obj)
+            
+            for ii = 1:length(obj.forced_targets)
+                
+                % first get the X/Y from the RA/Dec
+                xy = obj.cat.coo2xy(obj.forced_targets(ii).RA, obj.forced_targets(ii).Dec); 
+                
+                % add the RA/Dec and X/Y to the catalog
+                
+                % add the position fields
+                
+                % log the indices of the new positions into the forced_indices field
+                
             end
             
         end
@@ -3023,7 +3060,7 @@ classdef Acquisition < file.AstroData
                 
                 for ii = 1:6
                     
-                    obj.sync.outgoing.report = 'Focusing'
+                    obj.sync.outgoing.report = 'Focusing';
                     obj.sync.update;
                     obj.parseCommands; % allow stopping between focus runs...
                     
@@ -3032,7 +3069,7 @@ classdef Acquisition < file.AstroData
                     val = obj.cam.autofocus('iteration', ii); 
                     
                     if obj.brake_bit || val==0
-                        break;
+                        break; 
                     end
                     
                     min_pos = obj.cam.af.pos(2); 
