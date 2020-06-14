@@ -64,6 +64,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         use_maintenance_mode = 0; % this disables the function in t3 that re-enables "use_shutdown" every 30 minutes (use with care!!!)
         use_shutdown = 1; % when this is enabled, observatory shuts down on bad weather/device failure
         use_startup = 1; % when this is enabled, observatory opens up and starts working by itself! (currently it only sends an alert email) 
+        use_prompt_user = 1; % when about to open dome or slew to new target, first get confirmation from user
         
         % use these to override these devices/sensors
         use_dome = 1; % override AstroHaven dome
@@ -97,7 +98,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     
     properties(Dependent=true)
         
-        sensors_ok; % all weather sensors give good results
         sensors_report; % if bad weather, report it here
         report; % general report: devices, sensors, shutdown state
         
@@ -350,16 +350,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     end
     
     methods % getters
-        
-        function val = get.sensors_ok(obj) % shortcut to checker, that is updated on t2
-            
-            if isempty(obj.checker)
-                val = [];
-            else
-                val = obj.checker.sensors_ok;
-            end
-            
-        end
         
         function val = get.sensors_report(obj) % shortcut to checker, that is updated on t2
             
@@ -623,7 +613,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     obj.cam_pc.incoming.report = '';
                 end
                 
-                if isempty(obj.cam_pc.outgoing.command_str)
+                if isempty(obj.cam_pc.outgoing.command_str) && ...
+                        ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'report') && strcmp(obj.cam_pc.incoming.report, 'idle')
+%                     obj.sched.finish_current; 
                     obj.gui.panel_camera.button_start.control.Enable = 'on';
                 else
                     obj.gui.panel_camera.button_start.control.Enable = 'off';
@@ -703,7 +695,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             delete(timerfind('name', 'Status-check-t1'));
             
-            obj.t1 = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'Status-check-t1', ...
+            obj.t1 = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'Status-check-t1', ...
                 'Period', obj.period1, 'StartDelay', obj.period1, ...
                 'TimerFcn', @obj.callback_t1, 'ErrorFcn', @obj.setup_t1);
             
@@ -747,7 +739,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             delete(timerfind('name', 'Status-check-t2'));
             
-            obj.t2 = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'Status-check-t2', ...
+            obj.t2 = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'Status-check-t2', ...
                 'Period', obj.period2, 'StartDelay', obj.period2, ...
                 'TimerFcn', @obj.callback_t2, 'ErrorFcn', @obj.setup_t2);
             
@@ -761,9 +753,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end 
         
-        function callback_t3(obj, ~, ~) % make sure t2 is running and re-enables "use_shutdown"
+        function callback_t3(obj, ~, ~) % make sure t2 is running, re-enables "use_shutdown", checks scheduler for new targets!
             
-            try
+            try % make sure t2 is working, cancel maintenance/twilight modes
 
                 if obj.use_maintenance_mode==0
                     obj.use_shutdown = 1;
@@ -793,6 +785,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 rethrow(ME);
             end
             
+            try % check scheduler and move to new target if needed
+                obj.proceedToTarget;
+            catch ME
+                rethrow(ME); 
+            end
+            
         end
         
         function setup_t3(obj, ~, ~) % start the timer t3 with period3
@@ -807,7 +805,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             delete(timerfind('name', 'Status-check-t3'));
             
-            obj.t3 = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', 'Status-check-t3', ...
+            obj.t3 = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'Status-check-t3', ...
                 'Period', obj.period3, 'StartDelay', obj.period3, ...
                 'TimerFcn', @obj.callback_t3, 'ErrorFcn', @obj.setup_t3);
             
@@ -1057,6 +1055,32 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
+        function str = camera_info(obj)
+            
+            if isfield(obj.cam_pc.incoming, 'report')
+                
+                str = {};
+                str{end+1} = obj.cam_pc.incoming.report;
+
+                if ~isempty(obj.cam_pc.incoming.report) && ~strcmp(obj.cam_pc.incoming.report, 'idle')
+
+                    if isfield(obj.cam_pc.incoming, 'batch_counter') && isfield(obj.cam_pc.incoming, 'total_batches') 
+                        str{end+1} = sprintf('%d / %d', obj.cam_pc.incoming.batch_counter, obj.cam_pc.incoming.total_batches);
+                    end
+
+                    if isfield(obj.cam_pc.incoming, 'runtime')
+                        str{end+1} = sprintf('%ds', round(obj.cam_pc.incoming.runtime)); 
+                    end
+
+                end
+
+                str = strjoin(str, ', '); 
+
+            else
+                str = '';
+            end
+            
+        end
         
     end
     
@@ -1101,7 +1125,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
             end
 
-            if obj.use_shutdown && obj.sensors_ok==0 % one of the sensors reports bad weather, must shut down
+            if obj.use_shutdown && (obj.checker.sensors_ok==0 || obj.checker.light_ok==0) % one of the sensors reports bad weather, must shut down
                 if obj.is_shutdown==0 % if already shut down, don't need to do it again
                     fprintf('%s: Bad weather... %s \n', datestr(obj.log.time), obj.checker.report); 
                     obj.shutdown;
@@ -1115,41 +1139,41 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
             end
             
-            if obj.sensors_ok==0 % if at any time weather is bad, reset these counters
+            if obj.checker.sensors_ok==0 || obj.checker.light_ok==0 % if at any time weather is bad, reset these counters (this does not include light)
                 obj.sensor_ok_history = [];
                 obj.latest_email_autostart_date = [];
             end
             
             if obj.use_startup
                 
-                if obj.sensors_ok 
+                t = datetime('now', 'TimeZone', 'UTC');
+                
+                [safe, good_times_minutes] = obj.is_safe_to_open;
+                
+                if safe
                     
-                    t = datetime('now', 'TimeZone', 'UTC');
-                    
-                    good_times_minutes = obj.checkPrevWeather;
-                    
-                    if good_times_minutes>0 % check that weather is good for some time now
-                        
-                        if isempty(obj.latest_email_autostart_date)
-                            
-                            try
-                                name = obj.getObserverName;
-                            catch ME
-                                name = '---';
-                            end
-                            
-                            obj.email.sendToList('subject', ['Ready to open dome ' util.text.time2str(t)], ...
-                                'text', sprintf('Observer: %s.\n Weather data looks good for at least %d minutes. Consider opening for observations. ', ...
-                                name, round(good_times_minutes)));
-                            
-                            obj.latest_email_autostart_date = t;
-                            
+                    if isempty(obj.latest_email_autostart_date)
+
+                        try
+                            name = obj.getObserverName;
+                        catch ME
+                            name = '---';
                         end
-                        
+
+                        obj.email.sendToList('subject', ['Ready to open dome ' util.text.time2str(t)], ...
+                            'text', sprintf('Observer: %s.\n Weather data looks good for at least %d minutes. Consider opening for observations. ', ...
+                            name, round(good_times_minutes)));
+
+                        obj.latest_email_autostart_date = t;
+
                     end
                     
-                    obj.sensor_ok_history = vertcat(obj.sensor_ok_history, t); % add this moment to the list of good weather data
+                    % other things to do like open the dome?? 
                     
+                end
+                
+                if obj.checker.sensors_ok % only care about sensors other than light! 
+                    obj.sensor_ok_history = vertcat(obj.sensor_ok_history, t); % add this moment to the list of good weather data
                 end
                 
             end
@@ -1159,7 +1183,49 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             end
             
         end
+        
+        function [val, good_times_minutes] = is_safe_to_open(obj)
+            
+            val = 0;
+            good_times_minutes = 0;
+            
+            if obj.checker.sensors_ok && obj.checker.light_ok 
+                    
+                good_times_minutes = obj.checkPrevWeather;
+
+                if good_times_minutes>0 % check that weather is good for some time now
+                    val = 1;
+                end
+
+            end
+                    
+        end
+            
+        function val = checkPrevWeather(obj)
+           
+            new_hist = datetime('now', 'TimeZone', 'UTC');
+
+            % collect to a new history all the times that are
+            % spaced more than 4 minutes from the last accepted entry
+            for ii = length(obj.sensor_ok_history):-1:1 % notice we are moving from latest to earliest!!
+                if minutes(new_hist(end)-obj.sensor_ok_history(ii))>4 % measurements less than 4 minutes apart are ignored
+                    new_hist(end+1,1) = obj.sensor_ok_history(ii); 
+                end
+            end
+
+            % new_hist should now contain only well spaced times when
+            % weather was ok (in reversed order!)
+            if numel(new_hist)>=obj.autostart_min_weather_samples && ...
+                minutes(new_hist(1)-new_hist(end))>=obj.autostart_min_weather_minutes
                 
+                val = minutes(new_hist(1)-new_hist(end));
+                
+            else
+                val = 0; 
+            end
+            
+        end
+            
         function updateDevices(obj) % run "update" for each device and see if the status is still good
         
             obj.devices_ok = 1;
@@ -1187,32 +1253,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function val = checkPrevWeather(obj)
-           
-            new_hist = datetime('now', 'TimeZone', 'UTC');
-
-            % collect to a new history all the times that are
-            % spaced more than 4 minutes from the last accepted entry
-            for ii = length(obj.sensor_ok_history):-1:1 % notice we are moving from latest to earliest!!
-                if minutes(new_hist(end)-obj.sensor_ok_history(ii))>4 % measurements less than 4 minutes apart are ignored
-                    new_hist(end+1,1) = obj.sensor_ok_history(ii); 
-                end
-            end
-
-            % new_hist should now contain only well spaced times when
-            % weather was ok (in reversed order!)
-            if numel(new_hist)>=obj.autostart_min_weather_samples && ...
-                minutes(new_hist(1)-new_hist(end))>=obj.autostart_min_weather_minutes
-                
-                val = minutes(new_hist(1)-new_hist(end));
-                
-            else
-                val = 0; 
-            end
-            
-        end
-        
-        function updateCameraComputer(obj) % send updates through the PcSync object to the camera-PC
+        function updateCameraComputer(obj) % send and check for updates through the PcSync object to the camera-PC
             
             try % check if PcSync is not connected
                 
@@ -1261,7 +1302,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 % do nothing, as we can be waiting for ever for server to connect
             end
             
-            % obj.cam_pc.outgoing.OBJECT = ???
             if ~isempty(obj.mount) && obj.use_mount
                 
                 if isempty(obj.mount.cam_pc)
@@ -1271,6 +1311,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.mount.updateCamera; % only update the telescope pointing
                 
             end
+            
+%             if isempty(obj.cam_pc.incoming) || ~isfield(obj.cam_pc.incoming, 'report') || strcmp(obj.cam_pc.incoming.report, 'idle') % add condition for errors? 
+%                 obj.sched.finish_current;
+%             end
             
             obj.cam_pc.outgoing.TEMP_OUT = obj.average_temperature;
             obj.cam_pc.outgoing.WIND_DIR = obj.average_wind_dir;
@@ -1291,10 +1335,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 %                 obj.cam_pc.outgoing.stop_camera = 0;
 %             end
             
-            
-            % add additional parameters and some commands like "start run"
-            
+                        
             obj.cam_pc.update;
+            
+            
             
             % get the observation log from the camera, including how long each target was observed
             if ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'obs_log')
@@ -1337,7 +1381,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                         args = sprintf('%s, %s=%s', args, key, val); 
                     end
 
-                end    
+                end 
+                
             end
             
             obj.cam_pc.outgoing.command_pars = args;
@@ -1360,40 +1405,28 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.commandCamPC('start', obj.camera_args); 
             
             if ~isempty(obj.gui) && obj.gui.check
-                obj.gui.panel_camera.button_info.String = ''; % indicator that the button was clicked
-            end
-            
-        end
-        
-        function str = camera_info(obj)
-            
-            if isfield(obj.cam_pc.incoming, 'report')
                 
-                str = {};
-                str{end+1} = obj.cam_pc.incoming.report;
-
-                if ~isempty(obj.cam_pc.incoming.report) && ~strcmp(obj.cam_pc.incoming.report, 'idle')
-
-                    if isfield(obj.cam_pc.incoming, 'batch_counter') && isfield(obj.cam_pc.incoming, 'total_batches') 
-                        str{end+1} = sprintf('%d / %d', obj.cam_pc.incoming.batch_counter, obj.cam_pc.incoming.total_batches);
-                    end
-
-                    if isfield(obj.cam_pc.incoming, 'runtime')
-                        str{end+1} = sprintf('%ds', round(obj.cam_pc.incoming.runtime)); 
-                    end
-
+                if isfield(obj.cam_pc.incoming, 'batch_counter')
+                    obj.cam_pc.incoming.batch_counter = [];
                 end
-
-                str = strjoin(str, ', '); 
-
-            else
-                str = '';
+                
+                if isfield(obj.cam_pc.incoming, 'total_batches')
+                    obj.cam_pc.incoming.total_batches = [];
+                end
+                
+                if isfield(obj.cam_pc.incoming, 'runtime')
+                    obj.cam_pc.incoming.runtime = [];
+                end
+                
+                obj.gui.panel_camera.button_info.String = ''; % indicator that the button was clicked
+                
             end
             
         end
         
-        function chooseNewTarget(obj, varargin)
+        function new_target = chooseNewTarget(obj, varargin)
             
+            obj.sched.current_side = obj.mount.telHemisphere;
             obj.sched.wind_speed = nanmax(obj.checker.wind_speed.now);
             
             new_target = obj.sched.choose('now', varargin{:}); 
@@ -1409,8 +1442,97 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.mount.object.Dec = new_target.Dec;
             end
             
-            % anything else we need to do to update the scheduler that a
-            % target from its list is going to be observed?
+        end
+        
+        function proceedToTarget(obj, varargin)
+            
+            % maybe parse some varargin options?
+            
+            if obj.dome.is_closed
+%                 return; % we will need to cancel this if we allow this command to open the dome!
+            end
+            
+            if obj.checker.sensors_ok==0 || obj.checker.light_ok==0
+                return; % if weather is bad (or daytime), just ignore this function
+            end
+            
+            try 
+
+                if isempty(obj.cam_pc.outgoing.command_str) && ... % I'm not sure this is the best conditional we can find
+                        ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'report') && strcmp(obj.cam_pc.incoming.report, 'idle')
+                    obj.sched.finish_current; % camera is idle, so we must start a new run! 
+                end
+                
+                new_target = obj.chooseNewTarget(varargin{:}); 
+
+                if obj.sched.continue_run
+
+                    obj.log.input(sprintf('Continuing observations of %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
+                    if obj.debug_bit, disp(obj.log.report); end
+
+                    % do I need to do anything?? 
+
+                elseif isempty(new_target)
+
+                    obj.log.input(sprintf('Could not find any targets. Going to idle mode...\n'));
+                    if obj.debug_bit, disp(obj.log.report); end
+
+                else
+
+                    if obj.use_prompt_user
+
+                        t = datetime('now', 'TimeZone', 'UTC'); 
+
+                        rep = questdlg(regexprep(obj.sched.report, '\s{2,}', newline), 'allow slew?', ...
+                            'slew', 'abort', 'slew'); 
+
+                        if strcmp(rep, 'slew')
+
+                            if obj.checker.sensors_ok==0 || obj.checker.light_ok==0
+                                return; % we add this check in case it was a very long time since the prompt was popped up... 
+                            end
+
+                            dt = minutes(datetime('now', 'TimeZone', 'UTC')-t); % check how long passed since prompt was set up
+
+                            if dt>=5
+                                proceedToTarget(varargin{:}); % cannot depend on the target to still be viable, must recheck and re-prompt
+                                return; % recursive calls should move the telescope, not this call
+                            end
+
+                            % if user clicked the button fast enough after it
+                            % appeared, consider the target still viable
+
+                        else
+                            return;
+                        end
+                           
+                    end
+                        
+                    obj.commandCameraStop;
+                    obj.sched.finish_current;
+
+                    obj.sched.current = new_target;
+                    obj.sched.start_current; 
+
+                    obj.log.input(sprintf('slewing to target: %s at %s%s\n', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
+                    if obj.debug_bit, disp(obj.log.report); end
+
+                    % open dome as well? 
+
+                    success = obj.mount.slew;
+
+                    if success==0
+                        error('Could not successfully slew to target...'); 
+                    end
+
+                    obj.commandCameraStart;
+
+                end
+            
+            catch ME
+                obj.log.error(ME.getReport); 
+                rethrow(ME); 
+            end
             
         end
         
@@ -1434,8 +1556,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 
                 obj.closeDome;
 
-                obj.cam_pc.outgoing.stop_camera = 1; % make sure camera stops running also
+                obj.commandCameraStop;
+                
+%                 obj.cam_pc.outgoing.stop_camera = 1; % make sure camera stops running also
                 obj.cam_pc.update;
+                
+                obj.sched.finish_current;
                 
                 % anything else we can do to put the dome to shutdown mode?
                 % ...

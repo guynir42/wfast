@@ -167,8 +167,9 @@ classdef ManagerGUI < handle
             obj.panel_object.addButton('button_ra', 'mount.objRA', 'input text', 'RA= ', '', 'edit', 0.5, '', '', 'Target right ascention');
             obj.panel_object.addButton('button_dec', 'mount.objDEC', 'input text', 'DE= ', '', 'edit', 0.5, '', '', 'Target declination');
             obj.panel_object.addButton('button_prev_objects', '', 'custom', '', '', '', [], '', '', 'List the last objects that were used to for slew');
-            obj.panel_object.addButton('button_ALT', 'mount.objALT', 'info', 'ALT= ', '', 'edit', 0.5, '', '', 'Target altitute above horizong (degrees)');
-            obj.panel_object.addButton('button_pierside', 'mount.objHemisphere', 'info', 'obj: ', '', 'edit', 0.5, '', '', 'Side of the sky where the object is right now');
+            obj.panel_object.addButton('button_ALT', 'mount.objALT', 'info', 'ALT= ', '', '', 0.4, '', '', 'Target altitute above horizong (degrees)');
+            obj.panel_object.addButton('button_time', 'mount.obj_time_to_limit', 'info', 'lim.= ', ' min', '', 0.4, '', '', 'Calculated time object has until reaching limit'); 
+            obj.panel_object.addButton('button_pierside', 'mount.objHemisphere', 'info', ' ', '', '', 0.2, '', '', 'Side of the sky where the object is right now');
             obj.panel_object.addButton('button_slew', 'mount.slewAskFlip', 'push', 'Slew', '', '', 1, '', '', 'Slew the telescope to the given object'); 
             obj.panel_object.margin = [0.02 0.01];
             obj.panel_object.make;
@@ -215,6 +216,7 @@ classdef ManagerGUI < handle
             
             obj.panel_controls.addButton('button_autostartup', 'use_startup', 'toggle', 'auto start up is disabled', 'auto start up is enabled', '', 1, obj.color_on, 'red'); 
             obj.panel_controls.addButton('button_weather_check', 'callback_t2', 'push', 'Weather check');
+            obj.panel_controls.addButton('button_proceed', 'proceedToTarget', 'push', 'proceed to target'); 
             obj.panel_controls.margin = [0.01 0.01];
             obj.panel_controls.make;
             
@@ -223,6 +225,7 @@ classdef ManagerGUI < handle
             obj.panel_controls.button_twilight.Callback = @obj.callback_twilight_mode;
             obj.panel_controls.button_autostartup.Tooltip = 'Allow manager to open and start observing autonomously. (not implemented yet)';
             obj.panel_controls.button_weather_check.Tooltip = 'Run t2 to check weather and devices'; 
+            obj.panel_controls.button_proceed.Tooltip = 'use scheduler to move to new target'; 
             
             %%%%%%%%%%% panel report %%%%%%%%%%%%%%%%%
             

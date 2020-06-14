@@ -59,7 +59,8 @@ classdef SensorChecker < handle
         wise_report = '';
         
         status = 1;
-        sensors_ok = 1;
+        sensors_ok = 0;
+        light_ok = 0; 
         report = 'OK';
         
         last_night_total_hours;
@@ -690,13 +691,14 @@ classdef SensorChecker < handle
             
 %             obj.status = 1; % all devices are responding
             obj.sensors_ok = 1; % if sensors give bad results this turns to zero
+            obj.light_ok = 1; % if light is too bright, turn this to zero
             obj.report = 'OK'; % summary of conditions
             
             for ii = 1:length(obj.data_types)
                 
                 name = obj.data_types{ii}; 
                 
-                if util.text.cs(name, 'wind_dir', 'pressure'), continue; end
+                if util.text.cs(name, 'light', 'wind_dir', 'pressure'), continue; end % exclude these sensors from the check
                 
                 if ~obj.checkValueOK(name) || ~obj.checkBoolOK(name)
                     obj.sensors_ok = 0;
@@ -704,6 +706,11 @@ classdef SensorChecker < handle
                     break; 
                 end
                 
+            end
+            
+            if ~obj.checkValueOK('light')
+                obj.light_ok = 0;
+                obj.report = obj.light.err_str;
             end
             
             if obj.sensors_ok && obj.use_wise_safe_flag
@@ -733,11 +740,12 @@ classdef SensorChecker < handle
                 
             end
             
-            obj.sun_state = nanmean(obj.light.now)<obj.light.max && obj.use_twilight_mode==0; % this is true when the light is low enough (excluding twilight mode)
+%             obj.sun_state = nanmean(obj.light.now)<obj.light.max && obj.use_twilight_mode==0; % this is true when the light is low enough (excluding twilight mode)
+            obj.sun_state = obj.light_ok && obj.use_twilight_mode==0; % this is true when the light is low enough (excluding twilight mode)
             
             if obj.sun_state==0 % sun is up, the night is over, time to store the collected data and reset for next time
                 
-                if obj.total_time_hours>0
+                if obj.total_time_hours>0 % only at end of night we can log this info
                     obj.last_night_total_hours = obj.total_time_hours;
                     obj.last_night_good_hours = obj.good_time_hours;
                 end
@@ -747,7 +755,7 @@ classdef SensorChecker < handle
                 
             end
             
-            obj.good_state = obj.sensors_ok; 
+            obj.good_state = obj.sensors_ok && obj.light_ok; % log the amount of time between now and next good measurement
             obj.last_measured_time = t; 
             
         end

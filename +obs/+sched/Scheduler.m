@@ -623,6 +623,8 @@ classdef Scheduler < handle
                 obj.obs_history(end).end_time = obj.current.obs_history(end).end_time;
                 obj.obs_history(end).runtime = obj.current.obs_history(end).runtime;
 
+                obj.current = obs.sched.Target.empty;
+                
             else
                 
                 if isempty(obj.current_sim)
