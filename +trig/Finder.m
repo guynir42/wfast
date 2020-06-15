@@ -69,6 +69,7 @@ classdef Finder < handle
         
         gui@trig.gui.FinderGUI;
         hist_fig; % figure used when opening a S/N histogram
+        raw_fig; % figure used when opening a raw flux plot
         bank@occult.ShuffleBank; % randomly picked filter kernels used for matched-filtering (loaded from file when needed)
         
     end
@@ -179,7 +180,7 @@ classdef Finder < handle
         max_stars = 5; % how many stars can we afford to have triggered at the same time? 
         max_frames = 50; % maximum length of trigger area (very long events are disqualified)
         max_num_nans = 1; % events with this many NaN data points (or more) are disqualified
-        max_corr = 0.75; % correlation coeff of flux with e.g., background with value above this, around the event time, disqualify the event
+        max_corr = 7.5; % correlation max/min of flux (with e.g., background) with value above this, around the event time, disqualify the event
         max_offsets = 5; % events with offsets above this number are disqualified
         
         use_timestamp_repair = 1; % use this to fix problems with the timestamps
@@ -1489,6 +1490,25 @@ classdef Finder < handle
             ax.YScale = 'log';
             
             ax.FontSize = 24; 
+            
+        end
+        
+        function figureRawFlux(obj, parent)
+            
+             if nargin<2 || isempty(parent)
+                
+                if isempty(obj.raw_fig) || ~isa(obj.raw_fig, 'matlab.ui.Figure') || ~isvalid(obj.raw_fig)
+                    obj.raw_fig = figure;
+                end
+                
+                parent = obj.raw_fig;
+                
+            end
+            
+            delete(parent.Children);
+            ax = axes('Parent', parent);
+            
+            obj.this_event.plotRawFlux('ax', ax); 
             
         end
         

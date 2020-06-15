@@ -191,19 +191,19 @@ classdef Event < handle
         bad_pixels_time_average;
         bad_pixels_star_average;
         
-        corr_x; % correlation with offsets_x
-        corr_y; % correlation with offsets_y
-        corr_r; % correlation with offset size 
-        corr_b; % correlation with background
-        corr_a; % correlation with area
-        corr_w; % correlation with PSF width
+        corr_x; % correlation max/min inside event with offsets_x
+        corr_y; % correlation max/min inside event with offsets_y
+        corr_r; % correlation max/min inside event with offset size 
+        corr_b; % correlation max/min inside event with background
+        corr_a; % correlation max/min inside event with area
+        corr_w; % correlation max/min inside event with PSF width
         
-        covar_x; % covariance with offsets_x
-        covar_y; % covariance with offsets_y
-        covar_r; % covariance with offset size 
-        covar_b; % covariance with background
-        covar_a; % covariance with area
-        covar_w; % covariance with PSF width
+        corr_coeff_x; % correlation coefficient with offsets_x
+        corr_coeff_y; % correlation coefficient with offsets_y
+        corr_coeff_r; % correlation coefficient with offset size 
+        corr_coeff_b; % correlation coefficient with background
+        corr_coeff_a; % correlation coefficient with area
+        corr_coeff_w; % correlation coefficient with PSF width
         
         aperture; % aperture radius used by photometry (empty if not using aperture photometry)
         gauss_sigma; % gaussian width used by photometry (empty if not using PSF photometry)
@@ -433,7 +433,7 @@ classdef Event < handle
             end
             
             % check for correlation with offsets_x (negative or positive)
-            [obj.corr_x, obj.covar_x] = obj.correlation(obj.offsets_x_at_star);
+            [obj.corr_x, obj.corr_coeff_x] = obj.correlation(obj.offsets_x_at_star);
             if abs(obj.corr_x)>obj.max_corr
                 obj.keep = 0;
                 obj.is_corr_offsets = 1;
@@ -441,7 +441,7 @@ classdef Event < handle
             end
             
             % check for correlation with offsets_y (negative or positive)
-            [obj.corr_y, obj.covar_y] = obj.correlation(obj.offsets_y_at_star);
+            [obj.corr_y, obj.corr_coeff_y] = obj.correlation(obj.offsets_y_at_star);
             if abs(obj.corr_y)>obj.max_corr
                 obj.keep = 0;
                 obj.is_corr_offsets = 1;
@@ -453,31 +453,31 @@ classdef Event < handle
             r = sqrt(x.^2+y.^2); 
             
             % check for correlation with size of offsets (x and y combined)
-            [obj.corr_r, obj.covar_r] = obj.correlation(r);
+            [obj.corr_r, obj.corr_coeff_r] = obj.correlation(r);
             if abs(obj.corr_r)>obj.max_corr
                 obj.keep = 0;
                 obj.is_corr_offsets = 1;
                 obj.addNote(sprintf('correlation->offset size= %f', obj.corr_r));
             end
             
-            % check for negative correlation with the background
-            [obj.corr_b, obj.covar_b] = obj.correlation(obj.backgrounds_at_star);
-            if obj.corr_b<-obj.max_corr
+            % check for correlation with the background
+            [obj.corr_b, obj.corr_coeff_b] = obj.correlation(obj.backgrounds_at_star);
+            if abs(obj.corr_b)>obj.max_corr
                 obj.keep = 0;
                 obj.is_corr_bg = 1;
                 obj.addNote(sprintf('correlation->background= %f', obj.corr_b));
             end
             
             % check for correlation with area
-            [obj.corr_a, obj.covar_a] = obj.correlation(obj.areas_at_star);
-            if obj.corr_a>obj.max_corr
+            [obj.corr_a, obj.corr_coeff_a] = obj.correlation(obj.areas_at_star);
+            if abs(obj.corr_a)>obj.max_corr
                 obj.keep = 0;
                 obj.is_corr_area = 1;
                 obj.addNote(sprintf('correlation->area= %f', obj.corr_a));
             end
             
             % check for correlation with PSF width
-            [obj.corr_w, obj.covar_w] = obj.correlation(obj.widths_at_star);
+            [obj.corr_w, obj.corr_coeff_w] = obj.correlation(obj.widths_at_star);
             if abs(obj.corr_w)>obj.max_corr
                 obj.keep = 0;
                 obj.is_corr_width = 1;
@@ -501,7 +501,7 @@ classdef Event < handle
             
         end
         
-        function [corr, covar] = correlation(obj, vector, flux)
+        function [corr_max, corr_coeff] = correlation(obj, vector, flux)
             
             if nargin<3 || isempty(flux)
                 flux = obj.flux_detrended;
@@ -533,27 +533,41 @@ classdef Event < handle
             f = flux;
             t = obj.time_indices;
             
-            f_temp = f;
-            f_temp(t) = NaN;
-            Mf = nanmean(f_temp); % get the mean outside the event
-            Sf = nanstd(f_temp); % get the std outside the event
-            f = (f - Mf)./Sf;
+            f2 = f-nanmean(f);
+            v2 = vector-nanmean(vector); 
             
-            v_temp = vector;
-            v_temp(t) = NaN;
-            Mv = nanmean(v_temp); % get the mean outside the event
-%             Mv = nanmean(vector(t)); % get the mean inside the event!
-            Sv = nanstd(v_temp); % get the std outside the event!
-            vector = (vector - Mv)./Sv;
+            corr_curve = f2.*v2./sqrt(sum(f2.^2).*sum(v2.^2)); 
             
-            denom = sqrt(nansum((f(t)-nanmean(f(t))).^2).*nansum((vector(t)-nanmean(vector(t))).^2));
-            if denom==0
-                corr = 0;
-            else
-                corr = nansum((f(t)-nanmean(f(t))).*(vector(t)-nanmean(vector(t))))./denom; % ignore the STD normalization and just get the correlation coefficient (the normalized projection)
-            end
+            corr_out = corr_curve;
+            corr_out(t) = NaN;
+            corr_std = nanstd(corr_out); % noise outside event
+            [~,idx] = nanmax(abs(corr_curve(t))); % peak inside event
             
-            covar = nansum(f(t).*vector(t)); % get the covariance between the two vectors in the event region, normalized by the STD outside the event region
+            corr_max = corr_curve(t(idx))./corr_std; 
+            
+            corr_coeff = nansum(corr_curve); 
+            
+%             f_temp = f;
+%             f_temp(t) = NaN;
+%             Mf = nanmean(f_temp); % get the mean outside the event
+%             Sf = nanstd(f_temp); % get the std outside the event
+%             f = (f - Mf)./Sf;
+%             
+%             v_temp = vector;
+%             v_temp(t) = NaN;
+%             Mv = nanmean(v_temp); % get the mean outside the event
+% %             Mv = nanmean(vector(t)); % get the mean inside the event!
+%             Sv = nanstd(v_temp); % get the std outside the event!
+%             vector = (vector - Mv)./Sv;
+%             
+%             denom = sqrt(nansum((f(t)-nanmean(f(t))).^2).*nansum((vector(t)-nanmean(vector(t))).^2));
+%             if denom==0
+%                 corr = 0;
+%             else
+%                 corr = nansum((f(t)-nanmean(f(t))).*(vector(t)-nanmean(vector(t))))./denom; % ignore the STD normalization and just get the correlation coefficient (the normalized projection)
+%             end
+%             
+%             covar = nansum(f(t).*vector(t)); % get the covariance between the two vectors in the event region, normalized by the STD outside the event region
             
         end
         
@@ -628,6 +642,11 @@ classdef Event < handle
                 val = obj.head.OBJECT;
             elseif ~isempty(obj.filename)
                 [~, val] = fileparts(fileparts(obj.filename)); 
+            end
+
+            if ~isempty(obj.head.STARTTIME)
+                date_str = obj.head.STARTTIME(1:10); % get only date, no hours/minutes/seconds
+                val = [date_str '_' val];
             end
 
         end
@@ -1006,6 +1025,24 @@ classdef Event < handle
                 end
                 
             end
+            
+        end
+        
+        function plotRawFlux(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('ax', [], 'axes', 'axis');
+            input.input_var('font_size', 20);
+            input.scan_vars(varargin{:});
+            
+            if isempty(input.ax), input.ax = gca; end
+            
+            plot(input.ax, obj.timestamps, obj.flux_raw_all(:,obj.star_index)); 
+            
+            xlabel(input.ax, 'Time [seconds]'); 
+            ylabel(input.ax, 'Raw Flux'); 
+            
+            input.ax.FontSize = input.font_size; 
             
         end
         

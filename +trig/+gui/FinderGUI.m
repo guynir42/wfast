@@ -134,7 +134,8 @@ classdef FinderGUI < handle
             obj.panel_statistics.addButton('button_num_kept', 'num_kept', 'info', 'Nkept= ', '', 'edit', 1/3, [], [], 'Number of kept events');
             obj.panel_statistics.addButton('button_star_hours', 'star_hours_total', 'info', 'star hours= ', '', 'edit', 1, [], [], 'How may star hours were scanned, total');
 %             obj.panel_statistics.addButton('button_star_hours_lost', 'star_hours_lost', 'info', 'lost= ', '', 'small', 1/3, [], [], 'How may star hours were lost due to overlap with events');
-            obj.panel_statistics.addButton('button_make_histogram', 'histogram', 'push', 'show hist', '', '', 1, [], [], 'Plot a histogram of all S/N results');
+            obj.panel_statistics.addButton('button_make_histogram', 'histogram', 'push', 'show hist', '', '', 0.5, [], [], 'Plot a histogram of all S/N results');
+            obj.panel_statistics.addButton('button_raw_flux', 'figureRawFlux', 'push', 'raw flux', '', '', 0.5, '', '', 'Show the event raw flux'); 
             obj.panel_statistics.number = num_buttons;
             
             obj.panel_statistics.make;
