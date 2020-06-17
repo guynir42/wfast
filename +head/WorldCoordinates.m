@@ -235,7 +235,7 @@ classdef WorldCoordinates < handle
 
         end
         
-        function XY = coo2xy(obj, RA, Dec) % invertion of xy2coo by calling fminsearch and calculating the point nearest to RA/Dec
+        function XY = coo2xy(obj, RA, Dec) % inversion of xy2coo by calling fminsearch and calculating the point nearest to RA/Dec
         % Usage: xy = coo2xy(obj, RA, Dec)
         % Use the GAIA match to transform the given RA/Dec into xy on the 
         % image plane. 

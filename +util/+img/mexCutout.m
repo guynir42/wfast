@@ -3,15 +3,15 @@
 % INPUTS: 
 %   -image: provide a full frame image to cut from. Can handle double 
 %           (64bit), single (32bit), uint16 and logicals.
-%           Can also give a set of images as a 3D matrix. In this case, 
+%           Can also input a set of images as a 3D matrix. In this case, 
 %           will cut the same positions from each image. 
 %   -positions: an Nx2 matrix where the first column is the X positions and 
 %               the second column is the Y positions of the centers of the 
 %               requested cutouts. 
-%   -cut_size: number of pixel on each side of the cutout. The cutouts are
-%              square unless the code is adapted. 
+%   -cut_size: number of pixels on each side of the cutout. The cutouts are
+%              square (making them rectangles requres code adjustments). 
 %   -pad_value: what to put if the cutout falls outside the image (defualt 
-%               is zero but also can use NaN, for double/single precision. 
+%               is zero but also can use NaN, for double/single precision). 
 %   -replace_value: what to put instead of cutouts in the image_subtracted. 
 %                   the default is zero but can be NaN for double/single. 
 %   -debug_bit: level of verbosity (default zero, for quiet execution). 
@@ -30,3 +30,5 @@
 %                      known stars in the image. 
 %                      If no second output is requested, the function does 
 %                      not waste time calculating this. 
+%                      Since it needs to make a copy of the input, this can
+%                      take substantially more time than just making cutous. 
