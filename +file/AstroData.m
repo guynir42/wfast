@@ -32,6 +32,7 @@ classdef AstroData < dynamicprops
         object_idx; % what is the index of the object closest to the coordinates given
         forced_indices; % if any forced targets are added to the positions field, list their indices in a vector
         unlocked_indices; % if any targets are set to adjust cutout position independently (not locked to the mean drift), list their indices in a vector
+        dynamic_indices; % these positions can change with each batch, e.g., for tracking cosmic rays 
         
         coordinates; % match each star/cutout position with RA/DEC (in degrees)
         magnitudes; % each star's magnitude (from catalog)

@@ -1567,7 +1567,7 @@ classdef Lightcurves < handle
             idx = idx | frac_zero>0.1;
             
             % find outliers with many bad pixels a serious fraction of the time
-            frac_bad_px = nansum(obj.bad_pixels>20, 1)./size(obj.bad_pixels, 1);
+            frac_bad_px = nansum(obj.bad_pixels(:,:,obj.index_flux_number)>20, 1)./size(obj.bad_pixels(:,:,obj.index_flux_number), 1);
             idx = idx | frac_bad_px>0.1;
             
             X = F;
@@ -1804,6 +1804,9 @@ classdef Lightcurves < handle
 
 %                 f = obj.fluxes_cal;
                 f = obj.getFluxType(jj); 
+                if size(f,3)>1
+                    f = f(:,:,obj.index_flux_number); 
+                end
                 t = obj.timestamps;
 
                 if isempty(f) || isempty(t)

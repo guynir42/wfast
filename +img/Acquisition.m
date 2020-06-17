@@ -195,6 +195,8 @@ classdef Acquisition < file.AstroData
     
     properties(Hidden=true)
         
+        use_verify_gui = 1; % when true (default) the GUI is loaded if it is not open during an acquisition
+        
         star_props; % table with the results from quick_find_stars
         
         brake_bit = 1; % when this is set to 1 (using the GUI, for example), the run stops. 
@@ -426,13 +428,17 @@ classdef Acquisition < file.AstroData
 
             obj.star_props = [];
             
+            obj.forced_indices = [];
+            obj.unlocked_indices = [];
+            obj.dynamic_indices = []; 
+            
             obj.clear;
             
         end
         
         function resetForcedTargets(obj)
             
-            obj.forced_targets = [];
+            obj.forced_targets = {};
             
         end
         
@@ -1881,9 +1887,9 @@ classdef Acquisition < file.AstroData
             end
             
             if isempty(obj.forced_targets)
-                obj.forced_targets = s;
+                obj.forced_targets{1} = s;
             else
-                obj.forced_targets(end+1) = s;
+                obj.forced_targets{end+1} = s;
             end
             
         end
@@ -1972,6 +1978,18 @@ classdef Acquisition < file.AstroData
             end
             
             obj.cal.camera_name = obj.head.INST;
+            
+            try
+                
+                if obj.use_verify_gui && obj.brake_bit==0
+                    if isempty(obj.gui) || obj.gui.check==0
+                        obj.makeGUI;
+                    end
+                end
+                
+            catch ME
+                warning(ME.getReport);
+            end
             
         end
         
@@ -2087,7 +2105,6 @@ classdef Acquisition < file.AstroData
                     end
                     
                     if obj.debug_bit, disp(str); end
-                    
                     
                     obj.sync.outgoing.report = 'Finding stars';
                     obj.sync.update;
@@ -2214,6 +2231,8 @@ classdef Acquisition < file.AstroData
                 obj.log.error(ME.getReport);
                 obj.unstash_parameters;
                 obj.is_running = 0;
+                obj.sync.outgoing.error = ME.getReport; 
+                obj.sync.outgoing.report = 'idle';
                 rethrow(ME);
             end
             
@@ -2614,6 +2633,16 @@ classdef Acquisition < file.AstroData
             obj.cat.detection_stack_number = obj.num_sum;
             obj.cat.detection_exposure_time = obj.expT;
             
+            if isfield(obj.sync.incoming, 'TELRA')
+                obj.head.TELRA = obj.sync.incoming.TELRA;
+                obj.head.TELRA_DEG = obj.sync.incoming.TELRA_DEG;
+            end
+            
+            if isfield(obj.sync.incoming, 'TELDEC')
+                obj.head.TELDEC = obj.sync.incoming.TELDEC;
+                obj.head.TELDEC_DEG = obj.sync.incoming.TELDEC_DEG;
+            end
+            
             if ~isempty(obj.star_props)
                 obj.cat.input(obj.star_props); % new method gives additiona data to calculate limiting magnitude etc... 
             else
@@ -2655,16 +2684,73 @@ classdef Acquisition < file.AstroData
         
         function addForcedPositions(obj)
             
+            % check if object position is already included in the list of targets
+            
+            found = 0;
+            tol = 3; % arcsec
+            
+            for ii = 1:length(obj.forced_targets)
+                
+                RA = obj.head.RA_DEG;
+                DE = obj.head.DEC_DEG;
+            
+                if abs(obj.forced_targets{ii}.RA - RA)*3600<tol && abs(obj.forced_targets{ii}.Dec - DE)*3600<tol % if an existing target is very close to this forced target
+                    found = ii;
+                    break;
+                end
+                
+            end
+            
+            if found==0 % if not, add it now! 
+                obj.createForcedTarget('RA', obj.head.RA, 'Dec', obj.head.Dec); 
+            end
+            
+
+            default_table = table;
+            
+            props = obj.cat.data.Properties.VariableNames;
+
+            for ii = 1:length(props)
+                
+                if iscell(obj.cat.data{1, props{ii}})
+                    default_table.(props{ii}) = {NaN};
+                else
+                    default_table.(props{ii}) = NaN(size(obj.cat.data{1, props{ii}}), 'Like', obj.cat.data{1, props{ii}});
+                end
+                
+            end
+
+
             for ii = 1:length(obj.forced_targets)
                 
                 % first get the X/Y from the RA/Dec
-                xy = obj.cat.coo2xy(obj.forced_targets(ii).RA, obj.forced_targets(ii).Dec); 
+                xy = obj.cat.coo2xy(obj.forced_targets{ii}.RA, obj.forced_targets{ii}.Dec); 
+                
+                if xy(1)<1 || xy(1)>obj.head.NAXIS2 || xy(2)<1 || xy(2)>obj.head.NAXIS1
+                    continue; % if target is outside field of view, skip it
+                end
+                
+                obj.positions = vertcat(obj.positions, xy); % add the position fields
+                obj.forced_indices(end+1) = size(obj.positions,1); % log the indices of the new positions into the forced_indices field
                 
                 % add the RA/Dec and X/Y to the catalog
+                t = default_table; 
                 
-                % add the position fields
+                list = fields(obj.forced_targets{ii});
                 
-                % log the indices of the new positions into the forced_indices field
+                for jj = 1:length(list)
+                    if any(strcmp(list{jj}, obj.cat.data.Properties.VariableNames))
+                        t.(list{jj}) = obj.forced_targets{ii}.(list{jj});
+                    end
+                end
+                
+                t.pos = xy;
+                
+                obj.cat.data = vertcat(obj.cat.data, t);
+                
+                obj.cat.magnitudes = obj.cat.data.Mag_BP;
+                obj.cat.coordinates = [obj.cat.data.RA, obj.cat.data.Dec]; 
+                obj.cat.temperatures = obj.cat.data.Teff;
                 
             end
             
@@ -2792,17 +2878,21 @@ classdef Acquisition < file.AstroData
             
             obj.cutouts_bg_proc = obj.cal.input(obj.cutouts_bg, 'clip', obj.clip_bg);
             
-            B = obj.back.getPoints(obj.clip.positions); 
-            B = permute(B, [4,3,2,1]); % turn the column vector into a 4D vector
-            % can also get variance from background object...
-            
-            if obj.use_refine_bg
-                % use bg_cutouts to calculate overall differences between
-                % frames to correct for regional results from background
-                % object (based on the stack). 
+            if obj.use_background
+                
+                B = obj.back.getPoints(obj.clip.positions); 
+                B = permute(B, [4,3,2,1]); % turn the column vector into a 4D vector
+                % can also get variance from background object...
+
+                if obj.use_refine_bg
+                    % use bg_cutouts to calculate overall differences between
+                    % frames to correct for regional results from background
+                    % object (based on the stack). 
+                end
+
+                obj.cutouts_proc = obj.cutouts_proc - B/obj.num_sum;
+
             end
-            
-            obj.cutouts_proc = obj.cutouts_proc - B/obj.num_sum;
             
         end
         

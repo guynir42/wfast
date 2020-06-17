@@ -58,6 +58,10 @@ void SaveData::parseVararginPairs(int N, const mxArray *vars[]){
 		
 		else if(cs(keyword, "positions")) positions.input("positions", value, 0);
 		else if(cs(keyword, "obj_idx", "object_idx")) positions.attributes.push_back(MyAttribute("obj_idx", value));
+		else if(cs(keyword, "forced_indices")) positions.attributes.push_back(MyAttribute("forced_indices", value));
+		else if(cs(keyword, "unlocked_indices")) positions.attributes.push_back(MyAttribute("unlocked_indices", value));
+		else if(cs(keyword, "dynamic_indices")) positions.attributes.push_back(MyAttribute("dynamic_indices", value));
+		
 		else if(cs(keyword, "coordinates")) coordinates.input("coordinates", value, 0);
 		else if(cs(keyword, "magnitudes")) magnitudes.input("magnitudes", value, 0);
 		else if(cs(keyword, "temperatures")) temperatures.input("temperature", value, 0);
@@ -139,6 +143,11 @@ void SaveData::readStruct(const mxArray *buf){
 	
 	names.push_back("positions");
 	names.push_back("obj_idx");
+	names.push_back("forced_indices");
+	names.push_back("unlocked_indices");
+	names.push_back("dynamic_indices");
+	
+	
 	names.push_back("coordinates");
 	names.push_back("magnitudes");
 	names.push_back("temperatures");
@@ -190,6 +199,10 @@ void SaveData::readStruct(const mxArray *buf){
 			
 			else if(cs(keyword, "positions", 9)) positions.input("positions", value, 0);
 			else if(cs(keyword, "obj_idx", "object_idx")) positions.attributes.push_back(MyAttribute("obj_idx", value)); 
+			else if(cs(keyword, "forced_indices")) positions.attributes.push_back(MyAttribute("forced_indices", value)); 
+			else if(cs(keyword, "unlocked_indices")) positions.attributes.push_back(MyAttribute("unlocked_indices", value));
+			else if(cs(keyword, "dynamic_indices")) positions.attributes.push_back(MyAttribute("dynamic_indices", value));
+			
 			else if(cs(keyword, "coordinates")) coordinates.input("coordinates", value, 0);
 			else if(cs(keyword, "magnitudes")) magnitudes.input("magnitudes", value, 0);
 			else if(cs(keyword, "temperatures")) temperatures.input("temperature", value, 0);
