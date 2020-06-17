@@ -881,7 +881,11 @@ classdef Scheduler < handle
             
         end
         
-        function plotObservation(obj, s, ax, marker_size)
+        function plotObservation(obj, s, ax, marker_size, font_size)
+            
+            if nargin<5 || isempty(font_size)
+                font_size = 16;
+            end
             
             if strcmp(s.side, 'West')
                 plot(ax, s.RA_deg/15, s.Dec_deg, 'gx', 'MarkerSize', marker_size); 
@@ -889,7 +893,7 @@ classdef Scheduler < handle
                 plot(ax, s.RA_deg/15, s.Dec_deg, 'g+', 'MarkerSize', marker_size); 
             end
             
-            text(ax, s.RA_deg/15+0.2, s.Dec_deg+5, strrep(s.name, '_', ' '), 'Color', 'g', 'FontSize', 12); 
+            text(ax, s.RA_deg/15+0.2, s.Dec_deg+5, strrep(s.name, '_', ' '), 'Color', 'g', 'FontSize', font_size); 
             
             % at some point we will have to figure out a way to put multiple printouts for the same field, beyond East/West...             
             shift_down = 0;
@@ -898,9 +902,9 @@ classdef Scheduler < handle
             end
             
             if ~isempty(s.start_time) && ~isempty(s.end_time)
-                text(ax, s.RA_deg/15+0.3, s.Dec_deg-shift_down, [s.start_time(12:16) '-' s.end_time(12:16)], 'Color', 'g', 'FontSize', 12); 
+                text(ax, s.RA_deg/15+0.3, s.Dec_deg-shift_down, [s.start_time(12:16) '-' s.end_time(12:16)], 'Color', 'g', 'FontSize', font_size); 
             elseif ~isempty(s.start_time)
-                text(ax, s.RA_deg/15+0.3, s.Dec_deg-shift_down, s.start_time(12:16), 'Color', 'y', 'FontSize', 12); 
+                text(ax, s.RA_deg/15+0.3, s.Dec_deg-shift_down, s.start_time(12:16), 'Color', 'y', 'FontSize', font_size); 
             end
             
         end

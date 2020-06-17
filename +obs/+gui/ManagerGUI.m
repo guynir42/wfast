@@ -216,7 +216,7 @@ classdef ManagerGUI < handle
             
             obj.panel_controls.addButton('button_autostartup', 'use_startup', 'toggle', 'auto start up is disabled', 'auto start up is enabled', '', 1, obj.color_on, 'red'); 
             obj.panel_controls.addButton('button_weather_check', 'callback_t2', 'push', 'Weather check');
-            obj.panel_controls.addButton('button_proceed', 'proceedToTarget', 'push', 'proceed to target'); 
+            obj.panel_controls.addButton('button_proceed', 'checkNewTarget', 'push', 'proceed to target'); 
             obj.panel_controls.margin = [0.01 0.01];
             obj.panel_controls.make;
             

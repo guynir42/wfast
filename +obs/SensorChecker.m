@@ -88,6 +88,7 @@ classdef SensorChecker < handle
     properties(Dependent=true)
         
         use_twilight_mode; % set the maximum light to a value high enough to be open at twilight for taking flats
+        
     end
     
     properties(Hidden=true)

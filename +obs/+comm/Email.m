@@ -100,7 +100,7 @@ classdef Email < handle
         
     end
     
-    methods % calculations
+    methods % commands
         
         function readMailingList(obj)
             
@@ -129,7 +129,7 @@ classdef Email < handle
             input.input_var('list', []); % alternative list
             input.input_var('subject', '[WFAST] automated message'); 
             input.input_var('files', {}); 
-            input.scan_vars(varargin{:}); 
+            input.scan_vars(varargin{:}); % the compose() function also reads other arguments like "text" etc... 
             
             if isempty(input.list)
                 obj.readMailingList;
@@ -144,6 +144,36 @@ classdef Email < handle
                 obj.send(obj.mailing_list{ii}, input.subject, str, input.files); 
                 
             end
+            
+        end
+        
+        function sendToAddress(obj, address, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('subject', '[WFAST] automated message'); 
+            input.input_var('files', {}); 
+            input.scan_vars(varargin{:}); % the compose() function also reads other arguments like "text" etc... 
+            
+            str = obj.compose(varargin{:}); 
+            
+            if ~contains(address, '@')
+                
+                if isempty(obj.mailing_list)
+                    obj.readMailingList;
+                end
+            
+                for ii = 1:length(obj.mailing_list)
+                    
+                    if contains(obj.mailing_list{ii}, address)
+                        address = obj.mailing_list{ii}; 
+                        break;
+                    end
+                    
+                end
+                
+            end
+            
+            obj.send(address, input.subject, str, input.files); 
             
         end
         
