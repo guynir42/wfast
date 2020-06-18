@@ -112,6 +112,9 @@ classdef Acquisition < file.AstroData
         use_save_photometry = 1; % save the flux and other products in the HDF5 files along with the images
         use_save_stack_lcs = 1; % save the Lightcurves object from phot_stack to disk at end of run
         
+        use_dynamic_cutouts = 0; % use find_cosmic_rays to detect bleeps in the full data cube and assign cutouts to them
+        num_dynamic_cutouts = 5; % how many additional cutouts we want
+        
         use_model_psf = 0;
         
         use_check_positions = 1;
@@ -1979,18 +1982,6 @@ classdef Acquisition < file.AstroData
             
             obj.cal.camera_name = obj.head.INST;
             
-            try
-                
-                if obj.use_verify_gui && obj.brake_bit==0
-                    if isempty(obj.gui) || obj.gui.check==0
-                        obj.makeGUI;
-                    end
-                end
-                
-            catch ME
-                warning(ME.getReport);
-            end
-            
         end
         
         function check = startup(obj, varargin)
@@ -2570,8 +2561,13 @@ classdef Acquisition < file.AstroData
 %                     obj.prev_average_width = obj.average_width;
                     
                 end
-
                 
+                if obj.use_dynamic_cutouts
+                    
+                    [pos, peaks] = util.img.find_cosmic_rays(obj.images, logical(obj.cal.dark_mask + (obj.stack_proc>1024)), 256, 6, 100);
+                    
+                end
+
             end
             
         end
@@ -2704,7 +2700,6 @@ classdef Acquisition < file.AstroData
             if found==0 % if not, add it now! 
                 obj.createForcedTarget('RA', obj.head.RA, 'Dec', obj.head.Dec); 
             end
-            
 
             default_table = table;
             
@@ -2753,6 +2748,8 @@ classdef Acquisition < file.AstroData
                 obj.cat.temperatures = obj.cat.data.Teff;
                 
             end
+            
+            obj.clip.positions = obj.positions; % update the clipper with the new forced positions
             
         end
         
@@ -3233,6 +3230,18 @@ classdef Acquisition < file.AstroData
                 input = util.text.InputVars;
                 input.input_var('ax', [], 'axes', 'axis');
                 input.scan_vars(varargin{:});
+
+                try
+
+                    if obj.use_verify_gui && obj.brake_bit==0
+                        if isempty(obj.gui) || obj.gui.check==0
+                            obj.makeGUI;
+                        end
+                    end
+
+                catch ME
+                    warning(ME.getReport);
+                end
 
                 if isempty(input.ax)
                     if ~isempty(obj.gui) && obj.gui.check

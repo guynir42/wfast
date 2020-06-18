@@ -59,18 +59,25 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	// check argument 4
 	int num_threads=1;
 	if(nrhs>3 && mxIsEmpty(prhs[3])==0){
-		if(mxIsNumeric(prhs[3])==0 && mxIsScalar(prhs[3])==0) mexErrMsgIdAndTxt("MATLAB:util:img:find_cosmic_rays:inputNotNumericScalar", "Input 4 to find_cosmic_rays is not a numeric scalar!");
+		if(mxIsNumeric(prhs[3])==0 || mxIsScalar(prhs[3])==0) mexErrMsgIdAndTxt("MATLAB:util:img:find_cosmic_rays:inputNotNumericScalar", "Input 4 to find_cosmic_rays is not a numeric scalar!");
 		num_threads=(int) mxGetScalar(prhs[3]);
 	}
 	
 	// check argument 5
 	int max_number=100;
 	if(nrhs>4 && mxIsEmpty(prhs[4])==0){
-		if(mxIsNumeric(prhs[4])==0 && mxIsScalar(prhs[4])==0) mexErrMsgIdAndTxt("MATLAB:util:img:find_cosmic_rays:inputNotNumericScalar", "Input 5 to find_cosmic_rays is not a numeric scalar!");
+		if(mxIsNumeric(prhs[4])==0 || mxIsScalar(prhs[4])==0) mexErrMsgIdAndTxt("MATLAB:util:img:find_cosmic_rays:inputNotNumericScalar", "Input 5 to find_cosmic_rays is not a numeric scalar!");
 		max_number=(int) mxGetScalar(prhs[4]);
 	}
 	
-	printf("cols= %d | rows= %d\n", cols, rows); 
+	// check argument 5
+	int debug_bit=0;
+	if(nrhs>5 && mxIsEmpty(prhs[5])==0){
+		if(mxIsNumeric(prhs[5])==0 && mxIsLogical(prhs[5])==0 || mxIsScalar(prhs[5])==0) mexErrMsgIdAndTxt("MATLAB:util:img:find_cosmic_rays:inputNotNumericScalar", "Input 6 to find_cosmic_rays is not a numeric/logical scalar!");
+		debug_bit=(int) mxGetScalar(prhs[5]);
+	}
+	
+	if(debug_bit) printf("cols= %d | rows= %d\n", cols, rows); 
 	
 	int ***array=new int**[num_threads];
 	for(int t=0;t<num_threads;t++){ 
@@ -151,17 +158,17 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	
 	int N=results.size(); 
 	
-	for(int j=0;j<N;j++) printf("j= %02d | val= %d | x= %d | y= %d | p= %d \n", j, results[j][0],results[j][1],results[j][2],results[j][3]);
+	if(debug_bit) for(int j=0;j<N;j++) printf("j= %02d | val= %d | x= %d | y= %d | p= %d \n", j, results[j][0],results[j][1],results[j][2],results[j][3]);
 	
-	plhs[0]=mxCreateDoubleMatrix(N, 3, mxREAL); // create the output matrix (in matlab)
+	plhs[0]=mxCreateDoubleMatrix(N, 4, mxREAL); // create the output matrix (in matlab)
 	double *pos= mxGetPr(plhs[0]); // get the C type array 
 	
-	plhs[1]=mxCreateDoubleMatrix(N, 1, mxREAL); // create the output matrix (in matlab)
-	double *peak= mxGetPr(plhs[1]); // get the C type array 
+	// plhs[1]=mxCreateDoubleMatrix(N, 1, mxREAL); // create the output matrix (in matlab)
+	// double *peak= mxGetPr(plhs[1]); // get the C type array 
 	
 	for(int j=0;j<N;j++){
 		for(int k=0;k<3;k++) pos[j+k*N]=results[j][k+1]; 
-		peak[j]=results[j][0];
+		pos[j+3*N]=results[j][0];
 	} 
 	
 } // end mex function
