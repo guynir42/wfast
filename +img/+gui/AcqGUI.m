@@ -181,6 +181,7 @@ classdef AcqGUI < handle
             obj.menu_objects.addButton('button_clipper', 'C&lipper', 'push', 'clip', 'Start the Clipper GUI'); 
             obj.menu_objects.addButton('button_photometry', '&Photometry', 'push', 'phot', 'Start the Photometry GUI'); 
             obj.menu_objects.addButton('button_lightcurves', '&Lightcurves', 'push', 'lightcurves', 'Start the Lightcurves GUI'); 
+            obj.menu_objects.addButton('button_stack_lightcurves', '&Stack Light', 'push', 'light_stack', 'Start the stack Lightcurves GUI'); 
             obj.menu_objects.addButton('button_buffers', '&Buffers', 'push', 'buf', 'Start the BufferWheel GUI'); 
             obj.menu_objects.addButton('button_focuser', '&Focuser', 'custom', '', 'Start the Focuser GUI'); 
             obj.menu_objects.addButton('button_deflator', '&Deflator', 'push', 'deflator', 'Start the Deflator GUI'); 
@@ -416,9 +417,9 @@ classdef AcqGUI < handle
                 obj.panel_info.button_message.ForegroundColor = 'black'; 
             end
             
-            if obj.owner.use_show && ~isempty(obj.owner.images)
-                obj.owner.show;
-            end
+%             if obj.owner.use_show && ~isempty(obj.owner.images)
+%                 obj.owner.show;
+%             end
 
             drawnow;
             

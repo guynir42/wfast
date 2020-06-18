@@ -112,7 +112,7 @@ classdef Acquisition < file.AstroData
         use_save_photometry = 1; % save the flux and other products in the HDF5 files along with the images
         use_save_stack_lcs = 1; % save the Lightcurves object from phot_stack to disk at end of run
         
-        use_dynamic_cutouts = 0; % use find_cosmic_rays to detect bleeps in the full data cube and assign cutouts to them
+        use_dynamic_cutouts = 1; % use find_cosmic_rays to detect bleeps in the full data cube and assign cutouts to them
         num_dynamic_cutouts = 5; % how many additional cutouts we want
         
         use_model_psf = 0;
@@ -197,6 +197,8 @@ classdef Acquisition < file.AstroData
     end
     
     properties(Hidden=true)
+        
+        num_cosmic_rays = 0;
         
         use_verify_gui = 1; % when true (default) the GUI is loaded if it is not open during an acquisition
         
@@ -434,6 +436,8 @@ classdef Acquisition < file.AstroData
             obj.forced_indices = [];
             obj.unlocked_indices = [];
             obj.dynamic_indices = []; 
+            
+            obj.num_cosmic_rays = 0;
             
             obj.clear;
             
@@ -2196,9 +2200,7 @@ classdef Acquisition < file.AstroData
                     
                 end
                 
-                if obj.use_audio
-                    try obj.audio.playTakeForever; catch ME, warning(ME.getReport); end
-                end
+                if obj.use_audio, try obj.audio.playTakeForever; catch ME, warning(ME.getReport); end, end
 
                 obj.src.num_batches = obj.num_batches;
                 
@@ -2390,9 +2392,9 @@ classdef Acquisition < file.AstroData
             
             t_show = tic;
             
-%             if obj.use_show
-%                 obj.show;
-%             end
+            if obj.use_show
+                obj.show;
+            end
             
             t_show = toc(t_show);
             
@@ -2513,6 +2515,33 @@ classdef Acquisition < file.AstroData
             
             if ~isempty(obj.positions) % if no positions are known just skip this part
                 
+                if obj.use_dynamic_cutouts
+                    
+                    % the arguments are images, mask, threshold, num_threads, max_number, debug_bit
+                    pos = util.img.find_cosmic_rays(obj.images, logical(obj.cal.dark_mask + (obj.stack_proc>1024)), 256, 6, 100, 0);
+                    
+                    if ~isempty(pos)
+                        pos = sortrows(pos, 4, 'descend'); 
+                    end
+                    
+                    obj.num_cosmic_rays = obj.num_cosmic_rays + size(pos,1); % keep track of how many such events we found
+                    
+                    new_pos = ones(obj.num_dynamic_cutouts,1).*floor(size(obj.stack)/2); 
+                    
+                    for ii = 1:min(size(pos,1), obj.num_dynamic_cutouts)
+                        new_pos(ii,1:2) = pos(ii,1:2); 
+                    end
+                    
+                    obj.positions(obj.dynamic_indices,:) = [];
+                    obj.dynamic_indices = []; 
+                    obj.dynamic_indices = size(obj.positions,1)+1:size(obj.positions,1)+size(new_pos,1); 
+                    
+                    obj.positions = vertcat(obj.positions, new_pos); 
+                    
+                    obj.clip.positions = obj.positions; 
+                    
+                end
+
                 obj.stack_cutouts = obj.clip.input(obj.stack_proc);  
                 
                 obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.clip.positions, 'timestamps', obj.timestamps(1),'juldates', obj.juldates(1)); % run photometry on the stack to verify flux and adjust positions
@@ -2562,12 +2591,6 @@ classdef Acquisition < file.AstroData
                     
                 end
                 
-                if obj.use_dynamic_cutouts
-                    
-                    [pos, peaks] = util.img.find_cosmic_rays(obj.images, logical(obj.cal.dark_mask + (obj.stack_proc>1024)), 256, 6, 100);
-                    
-                end
-
             end
             
         end
@@ -2698,23 +2721,27 @@ classdef Acquisition < file.AstroData
             end
             
             if found==0 % if not, add it now! 
-                obj.createForcedTarget('RA', obj.head.RA, 'Dec', obj.head.Dec); 
-            end
-
-            default_table = table;
-            
-            props = obj.cat.data.Properties.VariableNames;
-
-            for ii = 1:length(props)
-                
-                if iscell(obj.cat.data{1, props{ii}})
-                    default_table.(props{ii}) = {NaN};
-                else
-                    default_table.(props{ii}) = NaN(size(obj.cat.data{1, props{ii}}), 'Like', obj.cat.data{1, props{ii}});
+%                 obj.createForcedTarget('RA', obj.head.RA, 'Dec', obj.head.Dec); 
+                xy = obj.cat.coo2xy(obj.head.RA, obj.head.DEC); 
+                if ~(xy(1)<1 || xy(1)>obj.head.NAXIS2 || xy(2)<1 || xy(2)>obj.head.NAXIS1)
+                    obj.positions = vertcat(obj.positions, xy); % add the position fields
+                    obj.forced_indices(end+1) = size(obj.positions,1); % log the indices of the new positions into the forced_indices field
                 end
-                
             end
 
+%             default_table = table;
+%             
+%             props = obj.cat.data.Properties.VariableNames;
+% 
+%             for ii = 1:length(props)
+%                 
+%                 if iscell(obj.cat.data{1, props{ii}})
+%                     default_table.(props{ii}) = {NaN};
+%                 else
+%                     default_table.(props{ii}) = NaN(size(obj.cat.data{1, props{ii}}), 'Like', obj.cat.data{1, props{ii}});
+%                 end
+%                 
+%             end
 
             for ii = 1:length(obj.forced_targets)
                 
@@ -2728,24 +2755,27 @@ classdef Acquisition < file.AstroData
                 obj.positions = vertcat(obj.positions, xy); % add the position fields
                 obj.forced_indices(end+1) = size(obj.positions,1); % log the indices of the new positions into the forced_indices field
                 
+                % this is commented as I've decided I don't want to update
+                % the catalog with the forced/dynamic targets... 
+                
                 % add the RA/Dec and X/Y to the catalog
-                t = default_table; 
-                
-                list = fields(obj.forced_targets{ii});
-                
-                for jj = 1:length(list)
-                    if any(strcmp(list{jj}, obj.cat.data.Properties.VariableNames))
-                        t.(list{jj}) = obj.forced_targets{ii}.(list{jj});
-                    end
-                end
-                
-                t.pos = xy;
-                
-                obj.cat.data = vertcat(obj.cat.data, t);
-                
-                obj.cat.magnitudes = obj.cat.data.Mag_BP;
-                obj.cat.coordinates = [obj.cat.data.RA, obj.cat.data.Dec]; 
-                obj.cat.temperatures = obj.cat.data.Teff;
+%                 t = default_table; 
+%                 
+%                 list = fields(obj.forced_targets{ii});
+%                 
+%                 for jj = 1:length(list)
+%                     if any(strcmp(list{jj}, obj.cat.data.Properties.VariableNames))
+%                         t.(list{jj}) = obj.forced_targets{ii}.(list{jj});
+%                     end
+%                 end
+%                 
+%                 t.pos = xy;
+%                 
+%                 obj.cat.data = vertcat(obj.cat.data, t);
+%                 
+%                 obj.cat.magnitudes = obj.cat.data.Mag_BP;
+%                 obj.cat.coordinates = [obj.cat.data.RA, obj.cat.data.Dec]; 
+%                 obj.cat.temperatures = obj.cat.data.Teff;
                 
             end
             

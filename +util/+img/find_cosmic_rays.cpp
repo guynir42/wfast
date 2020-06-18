@@ -77,7 +77,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		debug_bit=(int) mxGetScalar(prhs[5]);
 	}
 	
-	if(debug_bit) printf("cols= %d | rows= %d\n", cols, rows); 
+	// if(debug_bit) printf("cols= %d | rows= %d\n", cols, rows); 
 	
 	int ***array=new int**[num_threads];
 	for(int t=0;t<num_threads;t++){ 
