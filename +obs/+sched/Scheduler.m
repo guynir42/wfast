@@ -620,10 +620,12 @@ classdef Scheduler < handle
 
                 obj.current.finish_observation(time);
 
-                obj.obs_history(end).end_time = obj.current.obs_history(end).end_time;
-                obj.obs_history(end).runtime = obj.current.obs_history(end).runtime;
+                if ~isempty(obj.current) && ~isempty(obj.current.obs_history)
+                    obj.obs_history(end).end_time = obj.current.obs_history(end).end_time;
+                    obj.obs_history(end).runtime = obj.current.obs_history(end).runtime;
+                end
 
-                obj.current = obs.sched.Target.empty;
+%                 obj.current = obs.sched.Target.empty;
                 
             else
                 
@@ -632,9 +634,11 @@ classdef Scheduler < handle
                 end
 
                 obj.current_sim.finish_observation(time);
-
-                obj.obs_history_sim(end).end_time = obj.current_sim.obs_history(end).end_time;
-                obj.obs_history_sim(end).runtime = obj.current_sim.obs_history(end).runtime;
+                
+                if ~isempty(obj.obs_history_sim)
+                    obj.obs_history_sim(end).end_time = obj.current_sim.obs_history(end).end_time;
+                    obj.obs_history_sim(end).runtime = obj.current_sim.obs_history(end).runtime;
+                end
                 
             end
             
@@ -650,7 +654,7 @@ classdef Scheduler < handle
             
             if ~use_sim
 
-                if isempty(obj.obs_history(end).RA_deg) || isempty(obj.obs_history(end).Dec_deg)
+                if isempty(obj.obs_history) || isempty(obj.obs_history(end).RA_deg) || isempty(obj.obs_history(end).Dec_deg)
                     val = 0; % no current coordinates, so it can't be close enough
                 elseif abs(target.ephem.RA_deg-obj.obs_history(end).RA_deg)<thresh && ...
                         abs(target.ephem.Dec_deg-obj.obs_history(end).Dec_deg)<thresh % both coordinates are close enough

@@ -102,7 +102,7 @@ classdef ScopeAssistant < handle
 
                 try
                 
-                    obj.disconnect;
+%                     obj.disconnect; % we don't have to disconnect since we could still find this bluetooth object using instrfindall 
 
                     t = datetime('now', 'TimeZone', 'UTC');
                     fprintf('%s: connecting arduino bluetooth\n', t);
@@ -134,42 +134,43 @@ classdef ScopeAssistant < handle
                 obj.bluetooth_id = id;
             end
             
-            % first try to find if there is an orphan Blluetooth object with the righ ID
-            inst=instrfind('RemoteID', obj.bluetooth_name(9:end)); 
-            
-            if ~isempty(inst)
-                obj.hndl = inst;
-            end
-            
-            % make sure to close existing connections before opening a new one
-            try
-                fclose(obj.hndl);
-                delete(obj.hndl);
-            end
-            
             if isempty(obj.bluetooth_name)
                 error('Must supply a name for a bluetooth device (e.g., HC-06)');
             end
             
-            % must be paired to the bluetooth device! 
-            obj.hndl = Bluetooth(obj.bluetooth_name, 1); % second argument is channel==1
-            obj.hndl.Timeout = obj.timeout;
+            % first try to find if there is an orphan Blluetooth object with the righ ID
+            inst=instrfindall; 
             
-            try
-                fopen(obj.hndl);
-            catch
-                try % try, try again
+            ind = find(contains(inst.Name, obj.bluetooth_name), 1, 'first');
+            
+            if isempty(ind)
+                
+                fclose(obj.hndl);
+                delete(obj.hndl);
+                
+                % must be paired to the bluetooth device! 
+                obj.hndl = Bluetooth(obj.bluetooth_name, 1); % second argument is channel==1
+                obj.hndl.Timeout = obj.timeout;
+
+                try
                     fopen(obj.hndl);
-                catch 
-                    t = datetime('now', 'TimeZone', 'UTC');
-                    fprintf('%s: Cannot open bluetooth to ScopeAssistant!\n', t); 
-                    delete(obj.hndl); 
-                    obj.hndl = [];
-                    return; 
+                catch
+                    try % try, try again
+                        fopen(obj.hndl);
+                    catch 
+                        t = datetime('now', 'TimeZone', 'UTC');
+                        fprintf('%s: Cannot open bluetooth to ScopeAssistant!\n', t); 
+                        delete(obj.hndl); 
+                        obj.hndl = [];
+                        return; 
+                    end
                 end
+
+                pause(0.1);
+
+            else
+                obj.hndl = inst(ind);
             end
-            
-            pause(0.1);
             
             obj.update;
             

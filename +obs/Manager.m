@@ -41,9 +41,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         checker@obs.SensorChecker;
         
+        ephem@head.Ephemeris; % use this object to get sun elevation etc. 
+        
         sched@obs.sched.Scheduler;
-        proposed_target@obs.sched.Target; % an object with the latest proposed target from the scheduler
-
+        
         dome; % AstroHaven dome
         mount; % ASA mount
         
@@ -185,6 +186,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.setup_t2; % check devices, collect weather, decide on closing dome, make log report (5 minute period)
             obj.setup_t1; % get sensors to measure weather data for averaging (1 minute period)
                 
+            obj.ephem = head.Ephemeris; 
             
         end
         
@@ -545,19 +547,19 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function val = summarize_target(obj)
             
-            if isempty(obj.proposed_target)
+            if isempty(obj.sched.current)
                 val = 'No targets available, going to idle mode'; 
-            elseif obj.proposed_target.ephem.now_observing
-                val = sprintf('Continue observing "%s" \n coords: %s%s', obj.proposed_target.name, obj.proposed_target.RA, obj.proposed_target.Dec); 
+            elseif obj.sched.current.ephem.now_observing
+                val = sprintf('Continue observing "%s" \n coords: %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec); 
             else
-                val = sprintf('Move to observing "%s" \n coords: %s%s', obj.proposed_target.name, obj.proposed_target.RA, obj.proposed_target.Dec); 
+                val = sprintf('Move to observing "%s" \n coords: %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec); 
             end
                 
-            if ~isempty(obj.proposed_target) 
+            if ~isempty(obj.sched.current) 
                 
-                val = sprintf('%s\n on side: %s', val, obj.proposed_target.side); 
+                val = sprintf('%s\n on side: %s', val, obj.sched.current.side); 
                 
-                if ~strcmp(obj.proposed_target.side, obj.mount.telHemisphere)
+                if ~strcmp(obj.sched.current.side, obj.mount.telHemisphere)
                     val = sprintf('%s (need to flip)!', val); 
                 end
             end
@@ -827,9 +829,30 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             try % check scheduler and move to new target if needed
                 if obj.checker.sensors_ok && obj.checker.light_ok && obj.dome.is_closed==0
                     obj.checkNewTarget;
+                    pause(1); 
+                    if isempty(obj.sched.current) || obj.sched.current.ephem.now_observing
+                        if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
+                            delete(obj.prompt_fig);
+                        end
+                    end
+                    
                 end
             catch ME
+                obj.log.error(ME.getReport);
                 rethrow(ME); 
+            end
+            
+            try % reload the target list and reset the observation history
+               
+                t = datetime('now', 'TimeZone', 'UTC');
+                
+                if t.Hour>13 && t.Hour<15 % just before starting observations
+                    obj.sched.readFile;
+                end
+                
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
             end
             
         end
@@ -1157,7 +1180,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 % make sure that targets being observed are marked as "now_observing"
                 if isfield(obj.cam_pc.incoming, 'report') 
                     
-                    if ~strcmpi(obj.cam_pc.incoming.report, 'idle') && isempty(obj.sched.current) % not observing anything, but we should be! 
+                    if ~strcmpi(obj.cam_pc.incoming.report, 'idle') && (isempty(obj.sched.current) || obj.sched.current.ephem.now_observing==0) % not observing anything, but we should be! 
                         
                         tol = 3; % arcsec
                         
@@ -1215,9 +1238,23 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
             end
             
+            try % try getting the sun altitude
+                
+                obj.ephem.update;
+                if obj.use_shutdown && obj.ephem.sun.Alt>-5
+                    if obj.is_shutdown==0 % if already shut down, don't need to do it again
+                        fprintf('%s:Sun elevation %d is above -5 deg... \n', datestr(obj.log.time), round(obj.ephem.sun.Alt)); 
+                        obj.shutdown;
+                    end
+                end
+
+            catch ME
+                warning(ME.getReport);
+            end
+            
             if obj.use_shutdown && obj.checker.checkDayTime % check if the system clock says it is day time
                 if obj.is_shutdown==0 % if already shut down, don't need to do it again
-                    fprintf('%s: System clock says it is day time... %s \n', datestr(obj.log.time), obj.checker.report); 
+                    fprintf('%s: System clock says it is day time... \n', datestr(obj.log.time)); 
                     obj.shutdown;
                 end
             end
@@ -1466,6 +1503,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             end
             
             obj.cam_pc.outgoing.command_pars = args;
+            obj.cam_pc.outgoing.OBJECT = strrep(strtrim(obj.mount.objName), ' ', '_');
+            obj.cam_pc.outgoing.RA = obj.mount.objRA;
+            obj.cam_pc.outgoing.DEC = obj.mount.objDec;
+                    
             obj.updateCameraComputer;
             
             obj.log.input(sprintf('Sending camera command: "%s" with arguments "%s"', str, args)); 
@@ -1477,12 +1518,24 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         function commandCameraStop(obj)
             
             obj.commandCamPC('stop'); 
+            if ~isempty(obj.sched.current)
+                obj.sched.current.ephem.now_observing = 0;
+            end
             
         end
         
-        function commandCameraStart(obj)
+        function commandCameraStart(obj, added_args)
             
-            obj.commandCamPC('start', obj.camera_args); 
+            args = obj.camera_args;
+            if nargin>=2 && ~isempty(added_args)
+                if isempty(args)
+                    args = added_args;
+                else
+                    args = [args ', ' added_args];
+                end
+            end
+            
+            obj.commandCamPC('start', args); 
             
             if ~isempty(obj.gui) && obj.gui.check
                 
@@ -1502,6 +1555,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
             end
             
+            if ~isempty(obj.sched.current)
+                obj.sched.current.ephem.now_observing = 1;
+            end
+            
         end
         
         function chooseNewTarget(obj, varargin)
@@ -1509,17 +1566,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.sched.current_side = obj.mount.telHemisphere;
             obj.sched.wind_speed = nanmax(obj.checker.wind_speed.now);
             
-            obj.proposed_target = obj.sched.choose('now', varargin{:}); 
+            obj.sched.current = obj.sched.choose('now', varargin{:}); 
             
-            if isempty(obj.proposed_target)
+            if isempty(obj.sched.current)
                 obj.mount.object.name = '';
                 obj.mount.object.RA = '';
                 obj.mount.object.Dec = '';
                 fprintf('Could not find any targets! \nTry changing the constraints or adding new targets and reloading the scheduler.\n'); 
             else
-                obj.mount.object.name = obj.proposed_target.name;
-                obj.mount.object.RA = obj.proposed_target.RA;
-                obj.mount.object.Dec = obj.proposed_target.Dec;
+                obj.mount.object.name = obj.sched.current.name;
+                obj.mount.object.RA = obj.sched.current.RA;
+                obj.mount.object.Dec = obj.sched.current.Dec;
             end
             
         end
@@ -1537,11 +1594,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     
                 end
                 
-                obj.chooseNewTarget(varargin{:}); % put the new target in obj.proposed_target
+                obj.chooseNewTarget(varargin{:}); % put the new target in obj.sched.current
 
                 % we can have 3 options: 
-                % 1) proposed_target can be empty (idle mode)
-                % 2) proposed_target.ephem.now_observing=1 (keep going)
+                % 1) sched.current can be empty (idle mode)
+                % 2) sched.current.ephem.now_observing=1 (keep going)
                 % 3) other cases: need to move to new target / start run
                 
                 if obj.use_prompt_user
@@ -1554,7 +1611,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.log.error(ME.getReport); 
                 rethrow(ME); 
             end
-             
             
         end
         
@@ -1613,7 +1669,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             end
             
             if ~isempty(obj.button_confirm) && isvalid(obj.button_confirm)
-                if obj.dome.is_closed==0 && obj.checker.sensors_ok && obj.checker.light_ok
+                if obj.dome.is_closed==0 && obj.checker.sensors_ok && obj.checker.light_ok && ...
+                    ( isempty(obj.sched.current) || obj.sched.current.ephem.now_observing==0 )
                     obj.button_confirm.Enable = 'on';
                 else
                     obj.button_confirm.Enable = 'off';
@@ -1624,28 +1681,43 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function proceedToTarget(obj, ~, ~)
             
-            if isempty(obj.proposed_target)
+            if isempty(obj.sched.current)
 
                 obj.log.input(sprintf('Could not find any targets. Going to idle mode...\n'));
                 if obj.debug_bit, disp(obj.log.report); end
+                
+                if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
+                    obj.button_target.String = obj.log.report; 
+                    pause(1);
+                end
+                
                 % should I also actively stop the camera?
                 
-            elseif obj.proposed_target.ephem.now_observing
+            elseif obj.sched.current.ephem.now_observing
 
                 obj.log.input(sprintf('Continuing observations of %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
                 if obj.debug_bit, disp(obj.log.report); end
                 
+                if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
+                    obj.button_target.String = obj.log.report; 
+                    pause(1);
+                end
                 % don't need to do anything else! 
                 
             else
                 
-                obj.log.input(sprintf('Moving to target %s at %s%s', obj.proposed_target.name, obj.proposed_target.RA, obj.proposed_target.Dec)); 
+                obj.log.input(sprintf('Moving to target %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
                 if obj.debug_bit, disp(obj.log.report); end
 
                 % actively switch targets and start a new run: 
                 
                 obj.commandCameraStop;
                 obj.sched.finish_current;
+                
+                if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
+                    obj.button_target.String = obj.log.report; 
+                    pause(1);
+                end
                 
                 % wait for camera to send "idle" report
                 res = 0.1; 
@@ -1659,13 +1731,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     
                 end
                 
-                obj.sched.current = obj.proposed_target;
                 obj.sched.start_current; 
                 
                 % do we need this additional log/display? 
                 obj.log.input(sprintf('slewing to target: %s at %s%s\n', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
                 if obj.debug_bit, disp(obj.log.report); end
 
+                if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
+                    obj.button_target.String = obj.log.report; 
+                    pause(1);
+                end
+                
 %                open dome as well? 
 % 
                 success = obj.mount.slew;
@@ -1674,7 +1750,26 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     error('Could not successfully slew to target...'); 
                 end
 
-                obj.commandCameraStart;
+                % see if this target requires tracking to be on
+                if ~isempty(obj.sched.current.tracking)
+                    obj.mount.tracking = obj.sched.current.tracking;
+                end
+                
+                % additional arguments like exp time and slow/fast mode
+                str = '';
+                if ~isempty(obj.sched.current.cam_mode)
+                    str = sprintf('%s, cam_mode= %s', str, obj.sched.current.cam_mode);
+                end
+                
+                if ~isempty(obj.sched.current.exp_time)
+                    str = sprintf('%s, exp_time= %f', str, obj.sched.current.exp_time);
+                end
+                
+                obj.commandCameraStart(str);
+                
+                if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
+                    delete(obj.prompt_fig); 
+                end
 
             end
             

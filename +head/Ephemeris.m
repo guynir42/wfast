@@ -667,7 +667,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 obj.sun.Alt = obj.sun.Alt./RAD; % convert to degrees
                 obj.sun.dAzdt = obj.sun.dAzdt./RAD; % convert to degrees
                 obj.sun.dAltdt = obj.sun.dAltdt./RAD; % convert to degrees
-                
             else
                 obj.sun = [];
             end

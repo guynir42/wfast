@@ -18,7 +18,8 @@ classdef ManagerGUI < handle
         color_on = [0 0.3 1];
         
         color_bg = 0.5*[1 1 1];
-        
+        color_info = 0.6*[1 1 1]; 
+        color_input = 0.85*[1 1 1]; 
         color_buttons = 0.7*[1 1 1]; 
         
         debug_bit = 1;
@@ -339,9 +340,19 @@ classdef ManagerGUI < handle
             end
             
             for ii = 1:length(obj.buttons)
-                obj.buttons{ii}.control.BackgroundColor = obj.color_buttons;
-                obj.buttons{ii}.default_color = obj.color_buttons;
+                
+                if strcmp(obj.buttons{ii}.control.Style, 'popupmenu') || util.text.cs(obj.buttons{ii}.type, 'input_text')
+                    obj.buttons{ii}.control.BackgroundColor = obj.color_input;
+                elseif strcmp(obj.buttons{ii}.type, 'info')
+                    obj.buttons{ii}.BackgroundColor = obj.color_info;
+                else
+                    obj.buttons{ii}.BackgroundColor = obj.color_buttons;
+                    obj.buttons{ii}.default_color = obj.color_buttons;
+                end
+                
             end
+            
+            obj.panel_camera.input_arguments.BackgroundColor = obj.color_input; 
             
             obj.panel_image.BackgroundColor = obj.color_bg;
             

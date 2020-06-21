@@ -164,7 +164,7 @@ classdef Email < handle
             
                 for ii = 1:length(obj.mailing_list)
                     
-                    if contains(obj.mailing_list{ii}, address)
+                    if contains(lower(obj.mailing_list{ii}), lower(address))
                         address = obj.mailing_list{ii}; 
                         break;
                     end
