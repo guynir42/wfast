@@ -20,6 +20,12 @@ function values = parse_inputs(str, delims, remove)
     values = strsplit(str, delims); 
     
     for ii=1:length(values)
+        values{ii} = strtrim(values{ii});
+    end
+    
+    values = values(~cellfun('isempty',values));
+
+    for ii=1:length(values)
         
         for jj = 1:length(remove)
             values{ii} = strrep(values{ii}, remove{jj}, '');

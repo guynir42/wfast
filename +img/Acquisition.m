@@ -20,7 +20,7 @@ classdef Acquisition < file.AstroData
         % input objects
         cam; % can be obs.cam.CameraControl or obs.cam.Andor
         reader@file.Reader;
-        sim; % later add the class for the simulator        
+%         sim; % later add the class for the simulator        
         src; % can be camera, reader or simulator
         
         % image processing
@@ -53,6 +53,8 @@ classdef Acquisition < file.AstroData
         
         forced_targets = []; % structs with target parameters (at least RA/Dec) to add to the positions/cutouts/catalog
         
+        micro_flares = []; % struct with details on flares captured by cosmic ray detector
+        
     end
     
     properties % inputs/outputs
@@ -64,48 +66,32 @@ classdef Acquisition < file.AstroData
         stack_cutouts; 
         stack_cutouts_bg;
         stack_proc;
-        prev_stack;        
-        ref_stack;
-        ref_positions;
-        
-        prev_fluxes; % fluxes measured in previous batch (for triggering)
-        
-        prev_average_width;
-        
-        batch_counter = 0;
         
     end
     
     properties % switches/controls
         
-        start_index; % if non empty, use this number as initial index for run (e.g., to continue from where we stopped)
+        run_name_append = ''; % append this to the run name/folder (e.g., "slow" or "roi")
         
-        run_name_append = '';
-        
-        total_runtime;
+        total_runtime; % how much run time we want for the next run 
         runtime_units = 'minutes';
         
         use_focus_on_start = 1; % when true, will do a focus run every time the command to start a new run is given from PcSync
         
         use_background = 0; % not sure if subtracting the background gives us anything?
-        use_refine_bg = 0;
         
         % these swithces determine how stars are picked when run begins
         detect_thresh = 15; % minimal S/N of the stack stars for selecting cutouts
         use_remove_bad_pixels = true;
         use_remove_saturated = true; % remove all stars with any pixels above saturation value
-        saturation_value = 50000; % consider any pixels above this to be saturated
-        min_star_temp; % set a lower limit on temperature of stars for findStarsMAAT;
-        num_phot_cutouts; % limit the number of cutouts given to photomery (in the fast cadence) to save runtime and RAM in lightcurves
         
-        use_quick_find_stars = true; % use new method that runs faster
-        use_mextractor = false; % use mextractor to identify stars and find their WCS and catalog mag/temp
         use_astrometry = true; % calculate the star positions matched to GAIA DR2 and save catalog
-        use_arbitrary_pos = false; % don't look for stars (e.g., when testing with the dome closed)
         
         use_cutouts = true;
         use_adjust_cutouts = 1; % use adjustments in software (not by moving the mount)
-        use_lock_adjust = 0; % make all cutouts move together based on the average drift
+        use_lock_adjust = 0; % make all cutouts move together based on the average drift (this is not yet implemented!)
+        % add switch to allow unlocking only some of the cutouts (e.g.,
+        % those without a match to GAIA
         
         use_simple_photometry = 1; % use only sums on the cutouts instead of Photometry object for full cutouts (for now we keep this on, to maintain 25 Hz)
         use_store_photometry = 0; % store the photometric products in the Lightcurve object for entire run
@@ -117,13 +103,13 @@ classdef Acquisition < file.AstroData
         
         use_model_psf = 0;
         
+        use_cam_focusing = 1;
+        num_focus_iterations = 6;
+        
         use_check_positions = 1;
-        lost_stars_fraction = 0.3;
-        lost_flux_threshold = 0.3;
-        max_failed_batches = 3; % if star flux is lost for more than this number of batches, quit the run
         
         use_save = false; % must change this when we are ready to really start
-        use_triggered_save = false;
+%         use_triggered_save = false;
         
         use_sync = 1; % if false, do not send or receive messages from PcSync object
         use_ignore_manager = 0; % if true, will not use any data from Manager (via sync object)
@@ -131,8 +117,6 @@ classdef Acquisition < file.AstroData
         use_autoguide = 1; % if true, send back adjustments on drifts to telescope
         use_ignore_sync_object_name = 0; % if true, will not update the head.OBJECT field so it can be changed manually
         use_autodeflate = 1;
-        
-        camera_angle = 60; % degrees between image top and cardinal south/north (when after meridian)
         
         % display parameters
         use_show = true;
@@ -148,27 +132,12 @@ classdef Acquisition < file.AstroData
         use_progress = 1;
         use_print_timing = 0; % print a line each batch with the timing data for each part of the processing chain
         
-        pass_source = {}; % parameters to pass to camera/reader/simulator
-        pass_cal = {}; % parameters to pass to calibration object
-        pass_back = {}; % parameters to pass to background object
-        pass_phot = {}; % parameters to pass to photometry object
-        pass_show = {}; % parameters to pass to show function
-        
         debug_bit = 1;
         log_level = 1;
         
     end
     
     properties(Dependent=true)
-        
-        run_name; % the parameter "target_name" is used here to give a name to the whole run
-        buf_full; % camera's buffers are used for full-frame dump on triggers
-        
-        frame_rate_average; % calculated from this object's timing data
-        
-        % these are read only camera info
-        frame_rate_measured;
-        sensor_temperature;
         
         % get these from camera/reader
         num_batches;
@@ -184,6 +153,18 @@ classdef Acquisition < file.AstroData
         cut_size;
         avoid_edges;
         
+        frame_rate_average; % calculated from this object's timing data
+        
+    end
+        
+    properties(Dependent=true, Hidden=true)
+        
+        run_name; % the parameter "OBJECT" is used here to give a name to the whole run
+        buf_full; % camera's buffers are used for full-frame dump on triggers
+        
+        % these are read only camera info
+        sensor_temperature;
+        
         % get these from background Clipper
         num_backgrounds;
         cut_size_bg;
@@ -197,6 +178,40 @@ classdef Acquisition < file.AstroData
     end
     
     properties(Hidden=true)
+        
+        start_index; % if non empty, use this number as initial index for run (e.g., to continue from where we stopped)
+        
+        use_refine_bg = 0; % use the cutouts_bg of each frame to estimate a different background for each point
+        
+        saturation_value = 50000; % consider any pixels above this to be saturated
+        min_star_temp; % set a lower limit on temperature of stars for findStarsMAAT;
+        num_phot_cutouts; % limit the number of cutouts given to photomery (in the fast cadence) to save runtime and RAM in lightcurves
+        
+        use_quick_find_stars = true; % use new method that runs faster
+        use_mextractor = false; % use mextractor to identify stars and find their WCS and catalog mag/temp
+        use_arbitrary_pos = false; % don't look for stars (e.g., when testing with the dome closed)
+        
+        lost_stars_fraction = 0.3;
+        lost_flux_threshold = 0.3;
+        max_failed_batches = 3; % if star flux is lost for more than this number of batches, quit the run
+        
+        camera_angle = 60; % degrees between image top and cardinal south/north (when after meridian)
+        
+        pass_source = {}; % parameters to pass to camera/reader/simulator
+        pass_cal = {}; % parameters to pass to calibration object
+        pass_back = {}; % parameters to pass to background object
+        pass_phot = {}; % parameters to pass to photometry object
+        pass_show = {}; % parameters to pass to show function
+        
+        prev_stack;        
+        ref_stack;
+        ref_positions;
+        
+        prev_fluxes; % fluxes measured in previous batch (for triggering)
+        
+        prev_average_width;
+        
+        batch_counter = 0;
         
         num_cosmic_rays = 0;
         
@@ -250,7 +265,7 @@ classdef Acquisition < file.AstroData
         use_simple_photometry_;
         use_model_psf_;
         use_save_;
-        use_triggered_save_;
+%         use_triggered_save_;
         use_show_;
         use_audio_;
         use_progress_;
@@ -300,7 +315,7 @@ classdef Acquisition < file.AstroData
                 obj.log.heartbeat(600);
                 
                 obj.reader = file.Reader;
-                obj.sim; % fill this when we have a simulator
+%                 obj.sim; % fill this when we have a simulator
                 
                 obj.cal = img.Calibration;
                 obj.back = img.Background;
@@ -438,6 +453,7 @@ classdef Acquisition < file.AstroData
             obj.dynamic_indices = []; 
             
             obj.num_cosmic_rays = 0;
+            obj.micro_flares = [];
             
             obj.clear;
             
@@ -484,7 +500,7 @@ classdef Acquisition < file.AstroData
         function val = get.run_name(obj)
             
             if ~isempty(obj.head)
-                val = obj.head.target_name;
+                val = obj.head.OBJECT;
             else
                 val = [];
             end
@@ -551,26 +567,6 @@ classdef Acquisition < file.AstroData
                 val = [];
             else
                 val = (obj.num_batches-obj.batch_counter).*obj.batch_size./obj.getFrameRateEstimate;
-            end
-            
-        end
-        
-        function val = convertRuntimeToSeconds(obj)
-            
-            import util.text.cs;
-            
-            if cs(obj.runtime_units, 'seconds')
-                val = 1;
-            elseif cs(obj.runtime_units, 'minutes')
-                val = 60;
-            elseif cs(obj.runtime_units, 'hours')
-                val = 3600;
-            elseif cs(obj.runtime_units, 'batches')
-                val = obj.batch_size./obj.getFrameRateEstimate;
-            elseif cs(obj.runtime_units, 'frames')
-                val = 1./obj.getFrameRateEstimate;
-            else
-                error('Unknown runtime units "%s". Use seconds, minutes, hours, batches or frames', obj.runtime_units);
             end
             
         end
@@ -668,7 +664,7 @@ classdef Acquisition < file.AstroData
             end
             
             if obj.use_model_psf
-                val = sprintf('%s\n PSF widths= %4.2f / %4.2f pix', val, obj.minor_axis, obj.major_axis);
+                val = sprintf('%s\n PSF widths= %4.2f / %4.2f pix', val, obj.model_psf.minor_axis, obj.model_psf.major_axis);
                 val = sprintf('%s\n PSF angle= %4.2f deg', val, obj.model_psf.angle);
             end
             
@@ -830,16 +826,6 @@ classdef Acquisition < file.AstroData
             end
         end
         
-        function val = get.frame_rate_measured(obj)
-            
-            if isa(obj.src, 'obs.cam.Andor')
-                val = obj.src.frame_rate_measured;
-            else
-                val = [];
-            end
-            
-        end
-        
         function val = get.sensor_temperature(obj)
             
             if isa(obj.src, 'obs.cam.Andor')
@@ -896,36 +882,6 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function val = major_axis(obj)
-            
-            val = obj.model_psf.maj_axis;
-            
-        end
-        
-        function val = minor_axis(obj)
-            
-            val = obj.model_psf.min_axis;
-            
-        end
-        
-        function val = is_slow_mode(obj)
-            
-            val = true;
-            val = val && ~isempty(obj.expT) && obj.expT==obj.slow_mode_expT;
-            val = val && ~isempty(obj.frame_rate) && obj.frame_rate==obj.slow_mode_frame_rate;
-            val = val && ~isempty(obj.batch_size) && obj.batch_size==obj.slow_mode_batch_size;
-            
-        end
-        
-        function val = is_fast_mode(obj)
-            
-            val = true;
-            val = val && ~isempty(obj.expT) && obj.expT==obj.fast_mode_expT;
-            val = val && ~isempty(obj.frame_rate) && obj.frame_rate==obj.fast_mode_frame_rate;
-            val = val && ~isempty(obj.batch_size) && obj.batch_size==obj.fast_mode_batch_size;
-            
-        end
-        
     end
     
     methods % setters
@@ -961,7 +917,7 @@ classdef Acquisition < file.AstroData
         function set.run_name(obj, val)
             
             if ~isempty(obj.head)
-                obj.head.target_name = val;
+                obj.head.OBJECT = val;
             end
             
         end
@@ -1094,186 +1050,9 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function setupTestMode(obj)
-            
-            obj.use_arbitrary_pos = 1;
-            obj.use_astrometry = 0;
-            obj.use_adjust_cutouts = 0;
-            obj.use_autodeflate = 0;
-            obj.use_check_positions = 0;
-            obj.use_sync_stop = 0;
-                        
-        end
-        
-        function cancelTestMode(obj)
-            
-            obj.use_arbitrary_pos = 0;
-            obj.use_astrometry = 1;
-            obj.use_adjust_cutouts = 1;
-            obj.use_autodeflate = 1;
-            obj.use_check_positions = 1;
-%             obj.use_sync_stop = 1;
-            
-        end
-        
     end
     
     methods % utilities
-        
-        function input = makeInputVars(obj, varargin)
-            
-            idx = util.text.InputVars.isInputVars(varargin);
-            
-            if ~isempty(varargin) && any(idx) % was given an InputVars object
-            
-                idx = find(idx, 1, 'first');
-                input = varargin{idx}; 
-                varargin(find(idx, 1, 'first')) = []; % remove the one cell with InputVars in it
-            
-            else % use default values (load them from Acquisition object)
-            
-                input = util.text.InputVars;
-                input.input_var('use_reset', false, 'reset'); 
-                input.input_var('start_index', []);
-                input.input_var('use_background', []);
-                input.input_var('use_refine_bg', []);
-                input.input_var('use_remove_saturated', []);
-                input.input_var('saturation_value', []);
-                input.input_var('use_mextractor', []);
-                input.input_var('use_arbitrary_pos', []);
-                input.input_var('use_cutouts', []);
-                input.input_var('use_adjust_cutouts', []);
-                input.input_var('use_simple_photometry', []);
-                input.input_var('use_model_psf', []);
-                input.input_var('use_save', [], 'save');
-                input.input_var('use_trigger_save', []);
-                input.input_var('use_show', [], 'show');
-                input.input_var('use_audio', []);
-                input.input_var('use_progress', []);
-                input.input_var('pass_source', {}, 7); % cell array to pass to camera/reader/simulator
-                input.input_var('pass_cal', {}, 7); % cell array to pass to calibration object
-                input.input_var('pass_back', {}, 7); % cell array to pass to background object
-                input.input_var('pass_phot', {}, 7); % cell array to pass to photometry object
-                input.input_var('pass_show', {}, 7) % cell array to pass to show function
-                input.input_var('debug_bit', []);
-                input.input_var('log_level', []);
-                
-%                 input.input_var('run_name', '', 'name', 'object', 'objname');
-                input.input_var('RA', [], 'right ascention', 'right ascension');
-                input.input_var('DE', [], 'declination');
-                input.input_var('expT', [], 'T', 'exposure time');
-                input.input_var('frame_rate', []); 
-                input.input_var('num_batches', [], 'Nbatches');
-                input.input_var('total_runtime', [], 'runtime');
-                input.input_var('batch_size', [], 'frames');
-                input.input_var('num_stars', [], 'Nstars');
-                input.input_var('cut_size', []);
-                input.input_var('num_backgrounds', [], 'Nbackgrounds');
-                input.input_var('cut_size_bg', []);
-                
-                input.scan_obj(obj); % overwrite defaults using values in Acquisition object
-
-            end
-            
-            input.scan_vars(varargin{:});
-            
-        end
-        
-        function stash_parameters(obj, input) % sets all camera parameters into hidden "stash" parameters. If given an InputVars object, will load parameters from it to the camera object.
-            
-            obj.start_index_ = obj.start_index;
-            obj.use_background_ = obj.use_background;
-            obj.use_refine_bg_ = obj.use_refine_bg;
-            obj.use_remove_saturated_ = obj.use_remove_saturated;
-            obj.saturation_value_ = obj.saturation_value;
-            obj.use_mextractor_ = obj.use_mextractor;
-            obj.use_arbitrary_pos_ = obj.use_arbitrary_pos;
-            obj.use_cutouts_ = obj.use_cutouts;
-            obj.use_adjust_cutouts_ = obj.use_adjust_cutouts;
-            obj.use_simple_photometry_ = obj.use_simple_photometry;
-            obj.use_model_psf_ = obj.use_model_psf;
-            obj.use_save_ = obj.use_save;
-            obj.use_triggered_save_ = obj.use_triggered_save;
-            obj.use_show_ = obj.use_show;
-            obj.use_audio_ = obj.use_audio;
-            obj.use_progress_ = obj.use_progress;
-            obj.pass_source_ = obj.pass_source;
-            obj.pass_cal_ = obj.pass_cal;
-            obj.pass_back_ = obj.pass_back;
-            obj.pass_phot_ = obj.pass_phot;
-            obj.pass_show_ = obj.pass_show;
-            obj.debug_bit_ = obj.debug_bit; 
-            obj.log_level_ = obj.log_level;
-            
-            obj.run_name_ = obj.run_name;
-            obj.batch_size_ = obj.batch_size;
-            obj.total_runtime_ = obj.total_runtime;
-            obj.num_batches_ = obj.num_batches;
-            obj.frame_rate_ = obj.frame_rate;
-            obj.expT_ = obj.expT;
-            obj.num_stars_ = obj.num_stars;
-            obj.cut_size_ = obj.cut_size;
-            obj.num_backgrounds_ = obj.num_backgrounds;
-            obj.cut_size_bg_ = obj.cut_size_bg;
-            
-            obj.use_roi_ = obj.use_roi;
-            obj.roi_size_ = obj.roi_size;
-            obj.roi_center_ = obj.roi_center;
-            
-            % optionally, give the "input" object properties into the public properties of "obj"
-            if nargin>1 && ~isempty(input) && isa(input, 'util.text.InputVars')
-                list = properties(input);
-                for ii = 1:length(list)
-                    if isprop(obj, list{ii})
-                        obj.(list{ii}) = input.(list{ii});
-                    end
-                end
-            end
-            
-        end
-        
-        function unstash_parameters(obj) % return "stashed" parameters to camera object after run is done. 
-            
-            obj.start_index = obj.start_index_;
-            obj.use_background = obj.use_background_;
-            obj.use_refine_bg = obj.use_refine_bg_;
-            obj.use_remove_saturated = obj.use_remove_saturated_;
-            obj.saturation_value = obj.saturation_value_;
-            obj.use_mextractor = obj.use_mextractor_;
-            obj.use_arbitrary_pos = obj.use_arbitrary_pos_;
-            obj.use_cutouts = obj.use_cutouts_;
-            obj.use_adjust_cutouts = obj.use_adjust_cutouts_;
-            obj.use_simple_photometry = obj.use_simple_photometry_;
-            obj.use_model_psf = obj.use_model_psf_;
-            obj.use_save = obj.use_save_;
-            obj.use_triggered_save = obj.use_triggered_save_;
-            obj.use_show = obj.use_show_;
-            obj.use_audio = obj.use_audio_;
-            obj.use_progress = obj.use_progress_;
-            obj.pass_source = obj.pass_source_;
-            obj.pass_cal = obj.pass_cal_;
-            obj.pass_back = obj.pass_back_;
-            obj.pass_phot = obj.pass_phot_;
-            obj.pass_show = obj.pass_show_;
-            obj.debug_bit = obj.debug_bit_; 
-            obj.log_level = obj.log_level_;
-            
-            obj.run_name = obj.run_name_;
-            obj.batch_size = obj.batch_size_;
-            obj.total_runtime = obj.total_runtime_;
-            obj.num_batches = obj.num_batches_;
-            obj.frame_rate = obj.frame_rate_;
-            obj.expT = obj.expT_;
-            obj.num_stars = obj.num_stars_;
-            obj.cut_size = obj.cut_size_;
-            obj.num_backgrounds = obj.num_backgrounds_;
-            obj.cut_size_bg = obj.cut_size_bg_;
-            
-            obj.use_roi = obj.use_roi_;
-            obj.roi_size = obj.roi_size_;
-            obj.roi_center = obj.roi_center_;
-            
-        end
         
         function chooseSource(obj, source)
             
@@ -1320,14 +1099,14 @@ classdef Acquisition < file.AstroData
                     obj.src = obj.cam;
                     
                     
-                elseif cs(source, 'simulator')
-                    
-                    if isempty(obj.sim)
-                        obj.sim = img.Simulator;
-                        obj.sim.head = obj.head;
-                    end
-                    
-                    obj.src = obj.sim;
+%                 elseif cs(source, 'simulator')
+%                     
+%                     if isempty(obj.sim)
+%                         obj.sim = img.Simulator;
+%                         obj.sim.head = obj.head;
+%                     end
+%                     
+%                     obj.src = obj.sim;
 
                 elseif cs(source, {'file reader', 'reader'})
                     
@@ -1364,7 +1143,7 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function chooseDir(obj, dirname)
+        function chooseDir(obj, dirname) % do I need this?
             
             if isempty(obj.src)
                 error('Cannot chooseDir with an empty source');
@@ -1402,15 +1181,626 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function connectSync(obj)
+        function setupSlowMode(obj)
             
-            obj.log.input('Connecting to PcSync as server');
+            obj.expT = obj.slow_mode_expT;
+            obj.frame_rate = obj.slow_mode_frame_rate;
+            obj.batch_size = obj.slow_mode_batch_size;
             
-            try
-                obj.sync.connect;
+            obj.total_runtime = obj.total_runtime; % this triggers the setter and updates num_batches
+            
+        end
+        
+        function setupFastMode(obj)
+            
+            obj.expT = obj.fast_mode_expT;
+            obj.frame_rate = obj.fast_mode_frame_rate;
+            obj.batch_size = obj.fast_mode_batch_size;
+            
+            obj.total_runtime = obj.total_runtime; % this triggers the setter and updates num_batches
+            
+        end
+        
+        function setupTestMode(obj)
+            
+            obj.use_arbitrary_pos = 1;
+            obj.use_astrometry = 0;
+            obj.use_adjust_cutouts = 0;
+            obj.use_autodeflate = 0;
+            obj.use_check_positions = 0;
+            obj.use_sync_stop = 0;
+                        
+        end
+        
+        function cancelTestMode(obj)
+            
+            obj.use_arbitrary_pos = 0;
+            obj.use_astrometry = 1;
+            obj.use_adjust_cutouts = 1;
+            obj.use_autodeflate = 1;
+            obj.use_check_positions = 1;
+%             obj.use_sync_stop = 1;
+            
+        end
+        
+        function createForcedTarget(obj, varargin)
+            
+            s = struct;
+            
+            for ii = 1:2:length(varargin)
+                
+                key = varargin{ii};
+                
+                if length(varargin)>ii
+                    val = varargin{ii+1};
+                else
+                    val = NaN;
+                end
+                
+                % what about strings??
+%                 if ~isscalar(val)
+%                     val = NaN;
+%                 end
+                
+                s.(key) = val;
+
+            end
+            
+            if ~isfield(s, 'RA') || ~isfield(s, 'Dec')
+                error('Must input a target with RA and Dec'); 
+            end
+            
+            if ischar(s.RA)
+                s.RA = head.Ephemeris.hour2deg(s.RA); 
+            end
+            
+            if ischar(s.Dec)
+                s.Dec = head.Ephemeris.sex2deg(s.Dec);
+            end
+            
+            if isempty(obj.forced_targets)
+                obj.forced_targets{1} = s;
+            else
+                obj.forced_targets{end+1} = s;
+            end
+            
+        end
+        
+    end
+    
+    methods % commands/calculations
+        
+        function unlock(obj) % manually remove all locks left over from crashes in mid-recording. Make sure camera is really done! 
+            
+            obj.is_running_single = 0;
+            obj.is_running = 0;
+            obj.brake_bit = 1;
+            
+        end
+        
+        function run(obj, varargin)
+            
+            if obj.is_running || obj.is_running_single
+                disp('Already running, set is_running and is_running_single to zero...');
+                return;
+            else
+                obj.is_running = 1;
+            end
+            
+            check = obj.startup(varargin);
+            
+            try 
+                
+                cleanup = onCleanup(@obj.finishup);
+                
+                if check==0, return; end
+            
+                if obj.start_index
+                    idx = obj.start_index;
+                else
+                    idx = 1;
+                end
+
+                for ii = idx:obj.num_batches
+
+                    if obj.brake_bit
+                        return;
+                    end
+
+                    obj.batch;
+                    
+                end
+
             catch ME
                 obj.log.error(ME.getReport);
                 rethrow(ME);
+            end
+            
+        end
+        
+        function check = single(obj) % get a single batch and calculate stack_proc from it... 
+            
+            check = 0;
+            
+            if obj.is_running_single
+                disp('Already running "single". Set is_running_single to zero...');
+                return;
+            else
+                obj.is_running_single = 1;
+            end
+            
+            obj.log.input('Getting single batch from source');
+            
+            try 
+                
+                obj.reset;
+                
+                obj.src.single; 
+                
+                obj.copyFrom(obj.src); % get the data into this object
+
+                % if src is using ROI, must update the calibration object to do the same
+                if isprop(obj.src, 'use_roi') && obj.src.use_roi 
+
+                    obj.cal.use_roi = 1;
+
+                    obj.cal.ROI = obj.src.ROI;
+
+                else
+                    obj.cal.use_roi = 0;
+                end
+
+                obj.calcStack;
+                
+                if ~isempty(obj.gui)
+                    obj.show; 
+                    obj.gui.update; 
+                end
+                
+                check = 1;
+                obj.is_running_single = 0;
+                
+            catch ME
+                obj.log.error(ME.getReport);
+                obj.is_running_single = 0;
+                rethrow(ME);
+            end
+            
+        end
+        
+        function startLiveView(obj)
+            
+            if ~isempty(obj.cam.gui) && obj.cam.gui.check
+                figure(obj.cam.gui.fig.fig)
+            else
+                obj.cam.makeGUI;
+            end
+            
+            obj.cam.live('autodyn', 1);
+            
+        end
+        
+        function success = runFlat(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('number', 20); % how many flat files we want en-total
+            input.input_var('iterations', 4); % how many iterations of focus run we want to do
+            input.scan_vars(varargin{:}); 
+            
+            success = 0;
+            
+            % find out how many flat files we already took
+            
+            on_cleanup = onCleanup(@obj.setBrake);
+            obj.brake_bit = 0;
+            
+            for ii = 1:input.iterations
+
+                if obj.brake_bit
+                    break;
+                end
+                
+                N_flats = 0; 
+
+                if exist(fullfile(getenv('DATA_TEMP'), util.sys.date_dir('now')), 'dir')
+
+                    d = util.sys.WorkingDirectory;
+                    d.cd(fullfile(getenv('DATA_TEMP'), util.sys.date_dir('now')));
+
+                    if d.cd('flat')
+
+                        N_flats = length(d.match('*.h5*')); 
+
+                    end
+
+                end
+
+                N = input.number-N_flats;
+
+                if N>0
+
+                    obj.cam.record('mode', 'flat', 'num_batches', N, 'batch_size', 100, 'frame_rate', 10, 'expT', 0.03); 
+
+                else
+                    success = 1;
+                    break;
+                end
+
+            end
+            
+        end
+        
+        function runFocus(obj, varargin)
+            
+            obj.log.input('Running autofocus loop.');
+            
+            prev_focus_point = NaN;
+            
+            try
+                
+                obj.brake_bit = 0;
+                
+                if ~isempty(obj.gui) && obj.gui.check
+                    obj.gui.latest_error = '';
+                    obj.gui.latest_warning = '';
+                    lastwarn('');
+                    obj.gui.update;
+                end
+                
+                success = 0;
+                
+                if isempty(obj.cam.focuser)
+                    error('must be connected to camera and focuser!');
+                end
+                
+                for ii = 1:obj.num_focus_iterations
+                    
+                    obj.sync.outgoing.report = 'Focusing';
+                    obj.sync.update;
+                    obj.parseCommands; % allow stopping between focus runs...
+                    
+                    if obj.brake_bit, return; end
+                    
+                    if obj.debug_bit, fprintf('Running focus loop attempt %d\n', ii); end
+                    
+                    if obj.use_cam_focusing
+                        val = obj.cam.autofocus('iteration', ii); % run the autofocus loop inside the Andor class (no calibration...)
+                    else
+                        
+                        obj.cam.af.cam = obj.cam;
+                        
+                        old_pos = obj.cam.focuser.pos;
+                        
+                        try % this runs a single camera focus loop
+                            
+                            obj.cam.is_running_focus = 1; % tell focus GUI to display an indicator that focus is running...
+                            
+                            % make sure finishup is called in the end
+                            on_cleanup = onCleanup(@() obj.cam.finish_focus(old_pos));
+                            
+                            % update the object with the camera parameters
+                            obj.cam.af.x_max = obj.cam.ROI(4);
+                            obj.cam.af.y_max = obj.cam.ROI(3);
+                            
+                            obj.cam.af.pixel_size = obj.head.PIXSIZE;
+                            
+                            if ~isempty(obj.head.FIELDROT)
+                                obj.cam.af.angle = obj.head.FIELDROT;
+                            elseif util.text.cs(obj.head.cam_name, 'Zyla')
+                                obj.cam.af.angle = -15;
+                            elseif util.text.cs(obj.head.cam_name, 'Balor')
+                                obj.cam.af.angle = -60;
+                            end
+                            
+                            if obj.cam.is_running
+                                disp('Camera is already running. Set is_running to zero...');
+                                return;
+                            end
+                            
+                            % the focus positions to scan
+                            p = obj.cam.af.getPosScanValues(obj.cam.focuser.pos);
+                            
+                            if obj.cam.af.use_loop_back
+                                p = [p flip(p)];
+                            end
+                            
+                            obj.cam.af.reset;
+                            obj.cam.af.iteration = ii;
+                            
+                            if isempty(obj.cam.af.gui) || ~obj.cam.af.gui.check
+                                obj.cam.af.makeGUI;
+                            end
+                            
+                            obj.cam.af.gui.update;
+                            obj.cam.af.plot;
+                            
+                            ax = obj.cam.af.gui.axes_image;
+                            
+                            text(ax, mean(ax.XLim), mean(ax.YLim), 'Finding stars for focus run!', 'FontSize', 36, 'HorizontalAlignment', 'Center');
+                            
+                            drawnow;
+                            
+                            figure(obj.cam.af.gui.fig.fig);
+                            
+                            % find stars, the quick version!
+                            obj.cam.single('frame rate', obj.cam.af.frame_rate, 'exp time', obj.cam.af.expT, 'batch size', obj.cam.af.batch_size); % need to first update with observational parameters (using varargin!)
+                            obj.num_sum = size(obj.cam.images,3);
+                            obj.stack = single(sum(obj.cam.images,3));
+                            obj.stack_proc = obj.cal.input(obj.stack, 'num', obj.num_sum); % calibrated sum
+                            obj.star_props = util.img.quick_find_stars(obj.stack_proc, 'threshold', obj.cam.af.threshold,...
+                                'saturation', 5e4*obj.num_sum, 'unflagged', 1, 'num_stars', obj.cam.af.num_stars);
+                            
+                            if obj.brake_bit, return; end
+                            
+                            if isempty(obj.star_props)
+                                error('Could not find any stars for doing focus!');
+                            end
+                            
+                            obj.cam.focuser.pos = p(1);
+                            
+                            % before we start the loop
+                            obj.cam.startup('async', 0, 'num_batches', length(p), 'batch_size', obj.cam.af.batch_size, ...
+                                'reset', 1, 'frame_rate', obj.cam.af.frame_rate, 'exp time', obj.cam.af.expT, ...
+                                'save', 0, 'show', 1, 'log_level', 1, 'progress', 0, 'audio', 1, varargin{:});
+                            
+                            for jj = 1:obj.num_batches
+                                
+                                if obj.brake_bit, return; end
+                                if obj.cam.brake_bit, return; end
+                                
+                                obj.cam.focuser.pos = p(jj);
+                                
+                                obj.cam.batch;
+                                obj.images = obj.cam.images;
+                                
+                                obj.cutouts = util.img.mexCutout(obj.images, obj.star_props.pos, obj.cam.af.cut_size, NaN);
+                                obj.cutouts_proc = obj.cal.input(obj.cutouts, 'clip', obj.star_props.pos);
+                                
+                                C = nansum(obj.cutouts_proc,3);
+                                
+                                obj.cam.af.phot_struct = util.img.photometry2(C, 'aperture', obj.cam.focus_aperture, 'use_aperture', 0, ...
+                                    'use_forced', 1, 'gauss_sigma', 5, 'use_gaussian', 1, 'index', 3, 'threads', 4);
+                                
+                                A = obj.cam.af.phot_struct.forced_photometry.area;
+                                B = obj.cam.af.phot_struct.forced_photometry.background;
+                                fluxes = obj.cam.af.phot_struct.forced_photometry.flux - A.*B;
+                                %                     widths = phot_struct.apertures_photometry.width;
+                                
+                                widths = util.img.fwhm(C-permute(B, [1,3,4,2]), 'method', 'filters', 'min_size', 0.25, 'max_size', 10, 'step', 0.2)/2.355;
+                                widths(widths>10 | widths<0.1) = NaN;
+                                
+                                if jj==1
+                                    [~,idx] = nanmax(fluxes);
+                                    obj.cam.af.star_idx = idx;
+                                end
+                                
+                                obj.cam.af.input(jj, p(jj), widths, (abs(fluxes)), obj.star_props.pos, C);
+                                
+                                obj.cam.af.plot;
+                                obj.cam.af.showCutout;
+                                
+                                drawnow;
+                                
+                            end % for jj
+                            
+                            obj.cam.af.calculate;
+                            obj.cam.af.fitSurface;
+                            obj.cam.af.findPosTipTilt;
+                            obj.cam.af.plot;
+                            
+                            if ~isempty(obj.cam.af.gui)
+                                obj.cam.af.gui.update;
+                            end
+                            
+                            fprintf('FOCUSER RESULTS: width= %f | pos= %f | tip= %f | tilt= %f\n', obj.cam.af.found_width, obj.cam.af.found_pos, obj.cam.af.found_tip, obj.cam.af.found_tilt);
+                            
+                            if ~isnan(obj.cam.af.found_pos)
+                                obj.cam.focuser.pos = obj.cam.af.found_pos;
+                                if obj.cam.af.use_fit_tip_tilt
+                                    obj.cam.focuser.tipRelativeMove(obj.cam.af.found_tip);
+                                    obj.cam.focuser.tiltRelativeMove(obj.cam.af.found_tilt);
+                                end
+                            else
+                                disp('The location of new position is NaN. Choosing original position');
+                                obj.cam.focuser.pos = old_pos;
+                            end
+                            
+                            %                 if isprop(obj.cam.focuser, 'tip') && ~isempty(obj.af.found_tip)
+                            %                     obj.cam.focuser.tip = obj.cam.focuser.tip + obj.af.found_tip;
+                            %                 end
+                            %
+                            %                 if isprop(obj.cam.focuser, 'tilt') && ~isempty(obj.af.found_tilt)
+                            %                     obj.cam.focuser.tilt = obj.cam.focuser.tilt + obj.af.found_tilt;
+                            %                 end
+                            
+                            success = 1;
+                            
+                        catch ME
+                            
+                            obj.cam.focuser.pos = old_pos;
+                            obj.log.error(ME.getReport);
+                            rethrow(ME);
+                            
+                        end
+                        
+                        
+                    end % focus using Analysis tools, not internally in the camera class
+                    
+                    if obj.brake_bit || val==0
+                        break;
+                    end
+                    
+                    min_pos = obj.cam.af.pos(2);
+                    max_pos = obj.cam.af.pos(end-1);
+                    
+                    if obj.debug_bit, fprintf('Resulting focus point is %4.2f at FWHM of %4.2f"\n', obj.cam.af.found_pos, obj.cam.af.found_width.*2.355.*obj.head.SCALE); end
+                    
+                    if obj.cam.af.found_width<1 && obj.cam.af.found_pos>=min_pos && obj.cam.af.found_pos<=max_pos
+                        success = 1;
+                        break; % if focus is good enough and not at the edges of the range, we don't need to repeat it
+                    end
+                    
+                    if abs(obj.cam.af.found_pos - prev_focus_point)<0.05
+                        success = 1;
+                        break; % if focus returns to the same position each time, we can give up on it
+                    end
+                    
+                end % for ii (iterations)
+                
+                % could not find a decent focus:
+                if ~isempty(obj.cam.af.gui) && obj.cam.af.gui.check
+                    
+                    obj.cam.af.plot;
+                    
+                    obj.cam.af.gui.update;
+                    
+                    if success
+                        util.plot.inner_title(sprintf('Focus success after %d iterations!', ii),...
+                            'ax', obj.cam.af.gui.axes_image, 'FontSize', 26, 'Position', 'North');
+                    else
+                        util.plot.inner_title(sprintf('Focus failed after %d iterations!', ii),...
+                            'ax', obj.cam.af.gui.axes_image, 'FontSize', 26, 'Position', 'North');
+                        pause(0.5);
+                    end
+                    
+                end
+                
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
+            
+            obj.brake_bit = 1;
+            
+            if ~isempty(obj.gui) && obj.gui.check
+                obj.gui.update;
+            end
+            
+        end
+        
+    end
+    
+    methods % timer related
+        
+        function stop_timers(obj)
+            
+            stop(obj.backup_timer);
+            stop(obj.slow_timer); 
+            stop(obj.timer); 
+            
+        end
+        
+        function start_timers(obj)
+            
+            obj.setup_backup_timer;
+            obj.setup_slow_timer;
+            obj.setup_timer;
+            
+        end
+        
+        function setup_timer(obj, ~, ~)
+            
+            if ~isempty(obj.timer) && isa(obj.timer, 'timer') && isvalid(obj.timer)
+                if strcmp(obj.timer.Running, 'on')
+                    stop(obj.timer);
+                    delete(obj.timer);
+                    obj.timer = [];
+                end
+            end
+            
+            delete(timerfind('name', 'acquisition-timer'));
+            
+            obj.timer = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-timer', ...
+                'Period', 30, 'StartDelay', 30, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer, 'BusyMode', 'drop');
+            
+            start(obj.timer);
+            
+        end
+        
+        function callback_timer(obj, ~, ~)
+            
+%             disp('timer')
+            
+            if obj.brake_bit
+                obj.updateSyncData; % this also updates the obs_log
+                if ~isempty(obj.gui) 
+                    obj.gui.update;
+                end
+            elseif obj.is_running==0 && obj.is_running_single==0 && obj.cam.is_running==0 && obj.cam.is_running_focus==0
+                obj.sync.outgoing.report = 'idle';
+            end
+            
+        end
+        
+        function setup_slow_timer(obj, ~, ~)
+            
+            if ~isempty(obj.slow_timer) && isa(obj.slow_timer, 'timer') && isvalid(obj.slow_timer)
+                if strcmp(obj.slow_timer.Running, 'on')
+                    stop(obj.slow_timer);
+                    delete(obj.slow_timer);
+                    obj.slow_timer = [];
+                end
+            end
+            
+            delete(timerfind('name', 'acquisition-slow-timer'));
+            
+            obj.slow_timer = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-slow-timer', ...
+                'Period', 300, 'StartDelay', 300, 'TimerFcn', @obj.callback_slow_timer, 'ErrorFcn', @obj.setup_slow_timer);
+            
+            start(obj.slow_timer);
+            
+            
+        end
+        
+        function callback_slow_timer(obj, ~, ~)
+            
+            if ~strcmp(obj.timer.Running, 'on')
+                obj.setup_timer;
+            end
+            
+            obj.sync.update;
+            pause(0.05); 
+            
+            if obj.sync.status==0 && obj.brake_bit % do not stop to reconnect during acquisition! 
+%                 disp('connecting to PcSync'); 
+                obj.connectSync;
+                
+                if obj.sync.status
+                    obj.sync.reco.lock;
+                end
+                
+                pause(0.05);
+               
+            elseif obj.brake_bit
+                obj.sync.setup_callbacks;
+            end
+            
+        end
+        
+        function setup_backup_timer(obj, ~, ~)
+            
+            if ~isempty(obj.backup_timer) && isa(obj.backup_timer, 'timer') && isvalid(obj.backup_timer)
+                if strcmp(obj.backup_timer.Running, 'on')
+                    stop(obj.backup_timer);
+                    delete(obj.backup_timer);
+                    obj.backup_timer = [];
+                end
+            end
+            
+            delete(timerfind('name', 'acquisition-backup-timer'));
+            
+            obj.backup_timer = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-backup-timer', ...
+                'Period', 1800, 'StartDelay', 1800, 'TimerFcn', @obj.callback_backup_timer, 'ErrorFcn', @obj.setup_backup_timer);
+            
+            start(obj.backup_timer);
+            
+            
+        end
+        
+        function callback_backup_timer(obj, ~, ~)
+            
+            if ~strcmp(obj.slow_timer.Running, 'on')
+                obj.setup_slow_timer;
             end
             
         end
@@ -1573,6 +1963,8 @@ classdef Acquisition < file.AstroData
                         input = util.text.InputVars;
                         input.input_var('focus', obj.use_focus_on_start, 'use_focus');
                         input.input_var('mode', 'fast', 'cam_mode', 'camera_mode'); 
+                        input.input_var('exp_time', [], 'exposure_time');
+                        input.input_var('frame_rate', []); 
                         input.scan_vars(args{:}); 
                         
                         obj.sync.outgoing.error = ''; 
@@ -1596,7 +1988,25 @@ classdef Acquisition < file.AstroData
                             obj.setupSlowMode;
                         end
                         
+                        if ~isempty(input.exp_time)
+                            args{end+1} = 'expT'; % this is the only format that is understood by run()
+                            args{end+1} = input.exp_time;
+                            
+                            if isempty(input.frame_rate)
+                                input.frame_rate = (1./input.exp_time).*0.99; % make the frame rate a little lower than the expected
+                            end
+                            
+                            args{end+1} = 'frame_rate';
+                            args{end+1} = input.frame_rate; 
+                        
+                        end
+                        
                         obj.use_save = 1; % verify that we are saving images, unless asked not to by dome-PC
+                        
+                        if ~isempty(obj.gui) && obj.gui.check
+                            figure(obj.gui.fig.fig); % pop the GUI back on top
+                        end
+                        
                         obj.run('reset', 1, args{:}); % the rest of the inputs from dome-pc are parsed in the regular way
                         
                     elseif cs(obj.sync.incoming.command_str, 'start') % only get here if the timing is wrong... 
@@ -1625,331 +2035,162 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function setup_timer(obj, ~, ~)
-            
-            if ~isempty(obj.timer) && isa(obj.timer, 'timer') && isvalid(obj.timer)
-                if strcmp(obj.timer.Running, 'on')
-                    stop(obj.timer);
-                    delete(obj.timer);
-                    obj.timer = [];
-                end
-            end
-            
-            delete(timerfind('name', 'acquisition-timer'));
-            
-            obj.timer = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-timer', ...
-                'Period', 30, 'StartDelay', 30, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer, 'BusyMode', 'drop');
-            
-            start(obj.timer);
-            
-        end
-        
-        function callback_timer(obj, ~, ~)
-            
-%             disp('timer')
-            
-            if obj.brake_bit
-                obj.updateSyncData; % this also updates the obs_log
-                if ~isempty(obj.gui) 
-                    obj.gui.update;
-                end
-            elseif obj.is_running==0 && obj.is_running_single==0 && obj.cam.is_running==0 && obj.cam.is_running_focus==0
-                obj.sync.outgoing.report = 'idle';
-            end
-            
-        end
-        
-        function setup_slow_timer(obj, ~, ~)
-            
-            if ~isempty(obj.slow_timer) && isa(obj.slow_timer, 'timer') && isvalid(obj.slow_timer)
-                if strcmp(obj.slow_timer.Running, 'on')
-                    stop(obj.slow_timer);
-                    delete(obj.slow_timer);
-                    obj.slow_timer = [];
-                end
-            end
-            
-            delete(timerfind('name', 'acquisition-slow-timer'));
-            
-            obj.slow_timer = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-slow-timer', ...
-                'Period', 300, 'StartDelay', 300, 'TimerFcn', @obj.callback_slow_timer, 'ErrorFcn', @obj.setup_slow_timer);
-            
-            start(obj.slow_timer);
-            
-            
-        end
-        
-        function callback_slow_timer(obj, ~, ~)
-            
-            if ~strcmp(obj.timer.Running, 'on')
-                obj.setup_timer;
-            end
-            
-            obj.sync.update;
-            pause(0.05); 
-            
-            if obj.sync.status==0 && obj.brake_bit % do not stop to reconnect during acquisition! 
-%                 disp('connecting to PcSync'); 
-                obj.connectSync;
-                
-                if obj.sync.status
-                    obj.sync.reco.lock;
-                end
-                
-                pause(0.05);
-               
-            elseif obj.brake_bit
-                obj.sync.setup_callbacks;
-            end
-            
-        end
-        
-        function setup_backup_timer(obj, ~, ~)
-            
-            if ~isempty(obj.backup_timer) && isa(obj.backup_timer, 'timer') && isvalid(obj.backup_timer)
-                if strcmp(obj.backup_timer.Running, 'on')
-                    stop(obj.backup_timer);
-                    delete(obj.backup_timer);
-                    obj.backup_timer = [];
-                end
-            end
-            
-            delete(timerfind('name', 'acquisition-backup-timer'));
-            
-            obj.backup_timer = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-backup-timer', ...
-                'Period', 1800, 'StartDelay', 1800, 'TimerFcn', @obj.callback_backup_timer, 'ErrorFcn', @obj.setup_backup_timer);
-            
-            start(obj.backup_timer);
-            
-            
-        end
-        
-        function callback_backup_timer(obj, ~, ~)
-            
-            if ~strcmp(obj.slow_timer.Running, 'on')
-                obj.setup_slow_timer;
-            end
-            
-        end
-        
-        function s = makeObsLog(obj, date) % scan the folders in "data_temp" to get up-to-date info on number of files and runtime for each target
-            
-            if nargin<2 || isempty(date)
-                date = obj.buf.date_dir; 
-            end
-            
-            s = struct;
-            s.date = date;
-            
-            d = util.sys.WorkingDirectory(obj.buf.base_dir);
-            if exist(fullfile(d.pwd, date), 'dir')
-                d.cd(date);
-            elseif exist(fullfile(getenv('DATA_EXTRAS'), date), 'dir')
-                d.cd(fullfile(getenv('DATA_EXTRAS'), date))
-            else
-                s = struct('date', date); 
-                return;
-            end
-            
-            list = d.dir; 
-            
-            for ii = 1:length(list)
-                
-                idx = regexp(list{ii}, '_run\d+$');
-                if isempty(idx)
-                    name = list{ii}; 
-                else
-                    name = list{ii}(1:idx-1); 
-                end
-                
-                if ~isfield(s, name)
-                    s.(name) = struct.empty;
-                end
-                
-                new_struct = struct('name', name, 'start', '', 'end', '', 'runtime', [], 'num_files', []); 
-                new_struct = obj.getObsLogFromFolder(fullfile(d.pwd, list{ii}), new_struct);
-                s.(name) = vertcat(s.(name), new_struct); 
-                
-            end
-            
-        end
-        
-        function log_struct = getObsLogFromFolder(obj, folder, log_struct)
-            
-            import util.text.parse_value;
-            
-            if nargin<3 || isempty(log_struct)
-                log_struct = struct;
-                log_struct.name = '';
-                log_struct.start = '';
-                log_struct.end = '';
-                log_struct.num_files = '';
-                log_struct.runtime = [];
-            end
-            
-            d = util.sys.WorkingDirectory(folder);
-            
-            files = d.match('*.h5*'); 
-            readme = d.match('Z_README.txt');
-            
-            if ~isempty(readme)
-                
-                fid = fopen(readme{1}); 
-                on_cleanup = onCleanup(@() fclose(fid)); 
-                
-                for ii = 1:1e4
-                    
-                    tline = fgetl(fid); 
-                    
-                    if ~ischar(tline)
-                        break;
-                    end
-                    
-                    [~, idx] = regexp(tline, 'RUNSTART:'); 
-                    
-                    if ~isempty(idx) && isempty(log_struct.start)
-                        log_struct.start = strtrim(tline(idx+1:end)); 
-                    end
-                    
-                    [~, idx] = regexp(tline, 'ENDTIME:');
-                    
-                    if ~isempty(idx) && isempty(log_struct.end)
-                        log_struct.end = strtrim(tline(idx+1:end)); 
-                    end
-                    
-                    [~, idx] = regexp(tline, 'END_STAMP:'); 
-                    
-                    if ~isempty(idx) && isempty(log_struct.runtime)
-                        log_struct.runtime = parse_value(tline(idx+1:end)); 
-                    end
-                    
-                end % for ii (file lines)
-                
-            elseif ~isempty(files) % can't find the readme, use the last HDF5 file instead
-                
-                try 
-                    log_struct.start = h5readatt(files{end}, '/head', 'RUNSTART');
-                    log_struct.end = h5readatt(files{end}, '/head', 'ENDTIME'); 
-                    log_struct.runtime = h5readatt(files{end}, '/head', 'END_STAMP'); 
-                catch 
-                    log_struct.start = h5readatt(files{end}, '/header', 'RUNSTART');
-                    log_struct.end = h5readatt(files{end}, '/header', 'ENDTIME'); 
-                    log_struct.runtime = h5readatt(files{end}, '/header', 'END_STAMP'); 
-                end
-                
-            end
-            
-            log_struct.num_files = length(files); 
-            
-        end
-        
-        function s = getDriveSpace(obj)
-            
-            s = struct;
-            
-            for ii = double('A'):double('Z')
-                
-                name = [char(ii) ':\'];
-                if exist(name, 'dir')
-                    s.(char(ii)) = util.sys.disk_space(name); 
-                end
-                
-            end
-            
-        end
-        
-        function createForcedTarget(obj, varargin)
-            
-            s = struct;
-            
-            for ii = 1:2:length(varargin)
-                
-                key = varargin{ii};
-                
-                if length(varargin)>ii
-                    val = varargin{ii+1};
-                else
-                    val = NaN;
-                end
-                
-                % what about strings??
-%                 if ~isscalar(val)
-%                     val = NaN;
-%                 end
-                
-                s.(key) = val;
-
-            end
-            
-            if ~isfield(s, 'RA') || ~isfield(s, 'Dec')
-                error('Must input a target with RA and Dec'); 
-            end
-            
-            if ischar(s.RA)
-                s.RA = head.Ephemeris.hour2deg(s.RA); 
-            end
-            
-            if ischar(s.Dec)
-                s.Dec = head.Ephemeris.sex2deg(s.Dec);
-            end
-            
-            if isempty(obj.forced_targets)
-                obj.forced_targets{1} = s;
-            else
-                obj.forced_targets{end+1} = s;
-            end
-            
-        end
-        
     end
     
-    methods % commands/calculations
+    methods(Hidden=true) % internal functions
         
-        function unlock(obj) % manually remove all locks left over from crashes in mid-recording. Make sure camera is really done! 
+        function input = makeInputVars(obj, varargin)
             
-            obj.is_running_single = 0;
-            obj.is_running = 0;
-            obj.brake_bit = 1;
+            idx = util.text.InputVars.isInputVars(varargin);
+            
+            if ~isempty(varargin) && any(idx) % was given an InputVars object
+            
+                idx = find(idx, 1, 'first');
+                input = varargin{idx}; 
+                varargin(find(idx, 1, 'first')) = []; % remove the one cell with InputVars in it
+            
+            else % use default values (load them from Acquisition object)
+            
+                input = util.text.InputVars;
+                input.input_var('use_reset', false, 'reset'); 
+                input.input_var('start_index', []);
+                input.input_var('use_background', []);
+                input.input_var('use_refine_bg', []);
+                input.input_var('use_remove_saturated', []);
+                input.input_var('saturation_value', []);
+                input.input_var('use_mextractor', []);
+                input.input_var('use_arbitrary_pos', []);
+                input.input_var('use_cutouts', []);
+                input.input_var('use_adjust_cutouts', []);
+                input.input_var('use_simple_photometry', []);
+                input.input_var('use_model_psf', []);
+                input.input_var('use_save', [], 'save');
+                input.input_var('use_trigger_save', []);
+                input.input_var('use_show', [], 'show');
+                input.input_var('use_audio', []);
+                input.input_var('use_progress', []);
+                input.input_var('pass_source', {}, 7); % cell array to pass to camera/reader/simulator
+                input.input_var('pass_cal', {}, 7); % cell array to pass to calibration object
+                input.input_var('pass_back', {}, 7); % cell array to pass to background object
+                input.input_var('pass_phot', {}, 7); % cell array to pass to photometry object
+                input.input_var('pass_show', {}, 7) % cell array to pass to show function
+                input.input_var('debug_bit', []);
+                input.input_var('log_level', []);
+                
+%                 input.input_var('run_name', '', 'name', 'object', 'objname');
+                input.input_var('RA', [], 'right ascention', 'right ascension');
+                input.input_var('DE', [], 'declination');
+                input.input_var('expT', [], 'T', 'exposure time');
+                input.input_var('frame_rate', []); 
+                input.input_var('num_batches', [], 'Nbatches');
+                input.input_var('total_runtime', [], 'runtime');
+                input.input_var('batch_size', [], 'frames');
+                input.input_var('num_stars', [], 'Nstars');
+                input.input_var('cut_size', []);
+                input.input_var('num_backgrounds', [], 'Nbackgrounds');
+                input.input_var('cut_size_bg', []);
+                
+                input.scan_obj(obj); % overwrite defaults using values in Acquisition object
+
+            end
+            
+            input.scan_vars(varargin{:});
             
         end
         
-        function run(obj, varargin)
+        function stash_parameters(obj, input) % sets all camera parameters into hidden "stash" parameters. If given an InputVars object, will load parameters from it to the camera object.
             
-            if obj.is_running || obj.is_running_single
-                disp('Already running, set is_running and is_running_single to zero...');
-                return;
-            else
-                obj.is_running = 1;
-            end
+            obj.start_index_ = obj.start_index;
+            obj.use_background_ = obj.use_background;
+            obj.use_refine_bg_ = obj.use_refine_bg;
+            obj.use_remove_saturated_ = obj.use_remove_saturated;
+            obj.saturation_value_ = obj.saturation_value;
+            obj.use_mextractor_ = obj.use_mextractor;
+            obj.use_arbitrary_pos_ = obj.use_arbitrary_pos;
+            obj.use_cutouts_ = obj.use_cutouts;
+            obj.use_adjust_cutouts_ = obj.use_adjust_cutouts;
+            obj.use_simple_photometry_ = obj.use_simple_photometry;
+            obj.use_model_psf_ = obj.use_model_psf;
+            obj.use_save_ = obj.use_save;
+%             obj.use_triggered_save_ = obj.use_triggered_save;
+            obj.use_show_ = obj.use_show;
+            obj.use_audio_ = obj.use_audio;
+            obj.use_progress_ = obj.use_progress;
+            obj.pass_source_ = obj.pass_source;
+            obj.pass_cal_ = obj.pass_cal;
+            obj.pass_back_ = obj.pass_back;
+            obj.pass_phot_ = obj.pass_phot;
+            obj.pass_show_ = obj.pass_show;
+            obj.debug_bit_ = obj.debug_bit; 
+            obj.log_level_ = obj.log_level;
             
-            check = obj.startup(varargin);
+            obj.run_name_ = obj.run_name;
+            obj.batch_size_ = obj.batch_size;
+            obj.total_runtime_ = obj.total_runtime;
+            obj.num_batches_ = obj.num_batches;
+            obj.frame_rate_ = obj.frame_rate;
+            obj.expT_ = obj.expT;
+            obj.num_stars_ = obj.num_stars;
+            obj.cut_size_ = obj.cut_size;
+            obj.num_backgrounds_ = obj.num_backgrounds;
+            obj.cut_size_bg_ = obj.cut_size_bg;
             
-            try 
-                
-                cleanup = onCleanup(@obj.finishup);
-                
-                if check==0, return; end
+            obj.use_roi_ = obj.use_roi;
+            obj.roi_size_ = obj.roi_size;
+            obj.roi_center_ = obj.roi_center;
             
-                if obj.start_index
-                    idx = obj.start_index;
-                else
-                    idx = 1;
-                end
-
-                for ii = idx:obj.num_batches
-
-                    if obj.brake_bit
-                        return;
+            % optionally, give the "input" object properties into the public properties of "obj"
+            if nargin>1 && ~isempty(input) && isa(input, 'util.text.InputVars')
+                list = properties(input);
+                for ii = 1:length(list)
+                    if isprop(obj, list{ii})
+                        obj.(list{ii}) = input.(list{ii});
                     end
-
-                    obj.batch;
-                    
                 end
-
-            catch ME
-                obj.log.error(ME.getReport);
-                rethrow(ME);
             end
+            
+        end
+        
+        function unstash_parameters(obj) % return "stashed" parameters to camera object after run is done. 
+            
+            obj.start_index = obj.start_index_;
+            obj.use_background = obj.use_background_;
+            obj.use_refine_bg = obj.use_refine_bg_;
+            obj.use_remove_saturated = obj.use_remove_saturated_;
+            obj.saturation_value = obj.saturation_value_;
+            obj.use_mextractor = obj.use_mextractor_;
+            obj.use_arbitrary_pos = obj.use_arbitrary_pos_;
+            obj.use_cutouts = obj.use_cutouts_;
+            obj.use_adjust_cutouts = obj.use_adjust_cutouts_;
+            obj.use_simple_photometry = obj.use_simple_photometry_;
+            obj.use_model_psf = obj.use_model_psf_;
+            obj.use_save = obj.use_save_;
+%             obj.use_triggered_save = obj.use_triggered_save_;
+            obj.use_show = obj.use_show_;
+            obj.use_audio = obj.use_audio_;
+            obj.use_progress = obj.use_progress_;
+            obj.pass_source = obj.pass_source_;
+            obj.pass_cal = obj.pass_cal_;
+            obj.pass_back = obj.pass_back_;
+            obj.pass_phot = obj.pass_phot_;
+            obj.pass_show = obj.pass_show_;
+            obj.debug_bit = obj.debug_bit_; 
+            obj.log_level = obj.log_level_;
+            
+            obj.run_name = obj.run_name_;
+            obj.batch_size = obj.batch_size_;
+            obj.total_runtime = obj.total_runtime_;
+            obj.num_batches = obj.num_batches_;
+            obj.frame_rate = obj.frame_rate_;
+            obj.expT = obj.expT_;
+            obj.num_stars = obj.num_stars_;
+            obj.cut_size = obj.cut_size_;
+            obj.num_backgrounds = obj.num_backgrounds_;
+            obj.cut_size_bg = obj.cut_size_bg_;
+            
+            obj.use_roi = obj.use_roi_;
+            obj.roi_size = obj.roi_size_;
+            obj.roi_center = obj.roi_center_;
             
         end
         
@@ -1992,6 +2233,7 @@ classdef Acquisition < file.AstroData
             
             check = 0;
             
+            % must make this shorter or break it down to smaller functions
             try 
                 
                 if obj.brake_bit==0
@@ -2193,7 +2435,7 @@ classdef Acquisition < file.AstroData
                     
                     try
                         filename = obj.buf.getReadmeFilename;
-                        util.oop.save(obj, filename, 'name', 'acquisition'); 
+                        util.oop.save(obj, filename, 'name', 'acquisition', 'hidden', false); 
                     catch ME
                         warning(ME.getReport); 
                     end
@@ -2243,7 +2485,7 @@ classdef Acquisition < file.AstroData
                 
                 try % readme file
                     filename = obj.buf.getReadmeFilename('Z');
-                    util.oop.save(obj, filename, 'name', 'acquisition'); 
+                    util.oop.save(obj, filename, 'name', 'acquisition', 'hidden', false); 
                 catch ME
                     warning(ME.getReport);
                 end
@@ -2256,6 +2498,21 @@ classdef Acquisition < file.AstroData
                 
                 catch ME
                     warning(ME.getReport);
+                end
+                
+                try % save any microflares
+                    
+                    if ~isempty(obj.micro_flares)
+                        
+                        micro_flares = obj.micro_flares;
+                        head = obj.head;
+                        
+                        save(fullfile(obj.buf.directory, 'micro_flares.mat'), 'micro_flares', 'head', '-v7.3'); 
+                        
+                    end
+                    
+                catch ME
+                    warning(ME.getReport); 
                 end
                 
             end
@@ -2357,8 +2614,6 @@ classdef Acquisition < file.AstroData
                 obj.calcLightcurves;
                 t_light = toc(t_light); 
             
-                obj.calcTrigger;
-                
             end
             
             obj.positions = obj.clip.positions;
@@ -2417,56 +2672,6 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function check = single(obj) % get a single batch and calculate stack_proc from it... 
-            
-            check = 0;
-            
-            if obj.is_running_single
-                disp('Already running "single". Set is_running_single to zero...');
-                return;
-            else
-                obj.is_running_single = 1;
-            end
-            
-            obj.log.input('Getting single batch from source');
-            
-            try 
-                
-                obj.reset;
-                
-                obj.src.single; 
-                
-                obj.copyFrom(obj.src); % get the data into this object
-
-                % if src is using ROI, must update the calibration object to do the same
-                if isprop(obj.src, 'use_roi') && obj.src.use_roi 
-
-                    obj.cal.use_roi = 1;
-
-                    obj.cal.ROI = obj.src.ROI;
-
-                else
-                    obj.cal.use_roi = 0;
-                end
-
-                obj.calcStack;
-                
-                if ~isempty(obj.gui)
-                    obj.show; 
-                    obj.gui.update; 
-                end
-                
-                check = 1;
-                obj.is_running_single = 0;
-                
-            catch ME
-                obj.log.error(ME.getReport);
-                obj.is_running_single = 0;
-                rethrow(ME);
-            end
-            
-        end
-        
         function calcStack(obj)
             
             % make the basic stack image
@@ -2517,8 +2722,8 @@ classdef Acquisition < file.AstroData
                 
                 if obj.use_dynamic_cutouts
                     
-                    % the arguments are images, mask, threshold, num_threads, max_number, debug_bit
-                    pos = util.img.find_cosmic_rays(obj.images, logical(obj.cal.dark_mask + (obj.stack_proc>1024)), 256, 6, 100, 0);
+                    % the arguments are: images, mask, threshold, num_threads, max_number, debug_bit
+                    pos = util.img.find_cosmic_rays(obj.images, logical(obj.cal.dark_mask + (obj.stack_proc>1024*1)), 2*256, 6, 100, 0);
                     
                     if ~isempty(pos)
                         pos = sortrows(pos, 4, 'descend'); 
@@ -2967,89 +3172,178 @@ classdef Acquisition < file.AstroData
                 
             end
             
+            if obj.use_dynamic_cutouts
+                
+                for ii = 1:length(obj.dynamic_indices)
+                    
+                    i2 = obj.dynamic_indices(ii); 
+                    
+                    f = obj.fluxes(:,i2);
+                    
+                    S = nanstd(f); 
+                    M = nanmean(f); 
+                    [mx, idx] = nanmax(f); 
+                    N = nnz((f-M)./S>5);
+                    
+                    if N>0 % at least 3 points above 3 sigma...
+                        
+                        st = struct('filename', obj.buf.filename, 'batch_index', obj.batch_counter+1, 'frame_index', idx, ...
+                            'peak', mx, 'mean', M, 'std', S, 'num_frames', N, 'flux', f, 'cutouts', obj.cutouts_proc(:,:,:,i2)); 
+                        
+                        if isempty(obj.micro_flares)
+                            obj.micro_flares = st;
+                        else
+                            obj.micro_flares(end+1) = st;
+                        end
+                        
+                    end
+                    
+                end
+                
+            end
+            
             if obj.lightcurves.gui.check
                 obj.lightcurves.gui.update;
             end
             
         end
         
-        function calcTrigger(obj)
+        function s = makeObsLog(obj, date) % scan the folders in "data_temp" to get up-to-date info on number of files and runtime for each target
             
-            % to be implemented!
+            if nargin<2 || isempty(date)
+                date = obj.buf.date_dir; 
+            end
             
-        end
-        
-        function roi(obj, position) % this is cool but do we need this??
+            s = struct;
+            s.date = date;
             
-            import util.text.cs;
-            
-            if cs(position, 'none')
-                obj.use_roi = 0;
-            elseif cs(position, 'center')
-                obj.use_roi = 1;
-                obj.roi_x1 = 2160-256; % must change this to width/height of source
-                obj.roi_x2 = 2160+255;
-                obj.roi_y1 = 2560-256;
-                obj.roi_y2 = 2560+255;
-            elseif cs(position, 'northwest')
-                obj.use_roi = 1;
-                obj.roi_x1 = 1;
-                obj.roi_x2 = 512;
-                obj.roi_y1 = 1;
-                obj.roi_y2 = 512;
-            elseif cs(position, 'northeast')
-                obj.use_roi = 1;
-                obj.roi_x1 = 2160-512+1;
-                obj.roi_x2 = 2160;
-                obj.roi_y1 = 1;
-                obj.roi_y2 = 512;
-            elseif cs(position, 'southeast')
-                obj.use_roi = 1;
-                obj.roi_x1 = 2160-512+1;
-                obj.roi_x2 = 2160;
-                obj.roi_y1 = 2560-512+1;
-                obj.roi_y2 = 2560;
-            elseif cs(position, 'southwest')
-               obj.use_roi = 1;
-               obj.roi_x1 = 1;
-                obj.roi_x2 = 512;
-                obj.roi_y1 = 2560-512+1;
-                obj.roi_y2 = 2560;
+            d = util.sys.WorkingDirectory(obj.buf.base_dir);
+            if exist(fullfile(d.pwd, date), 'dir')
+                d.cd(date);
+            elseif exist(fullfile(getenv('DATA_EXTRAS'), date), 'dir')
+                d.cd(fullfile(getenv('DATA_EXTRAS'), date))
             else
-                error('Unknown ROI position "%s". Use "center", "none", "NorthEast" etc...', position);
+                s = struct('date', date); 
+                return;
+            end
+            
+            list = d.dir; 
+            
+            for ii = 1:length(list)
+                
+                idx = regexp(list{ii}, '_run\d+$');
+                if isempty(idx)
+                    name = list{ii}; 
+                else
+                    name = list{ii}(1:idx-1); 
+                end
+                
+                if ~isfield(s, name)
+                    s.(name) = struct.empty;
+                end
+                
+                new_struct = struct('name', name, 'start', '', 'end', '', 'runtime', [], 'num_files', []); 
+                new_struct = obj.getObsLogFromFolder(fullfile(d.pwd, list{ii}), new_struct);
+                s.(name) = vertcat(s.(name), new_struct); 
+                
             end
             
         end
         
-        function setupSlowMode(obj)
+        function log_struct = getObsLogFromFolder(obj, folder, log_struct)
             
-            obj.expT = obj.slow_mode_expT;
-            obj.frame_rate = obj.slow_mode_frame_rate;
-            obj.batch_size = obj.slow_mode_batch_size;
+            import util.text.parse_value;
             
-            obj.total_runtime = obj.total_runtime; % this triggers the setter and updates num_batches
-            
-        end
-        
-        function setupFastMode(obj)
-            
-            obj.expT = obj.fast_mode_expT;
-            obj.frame_rate = obj.fast_mode_frame_rate;
-            obj.batch_size = obj.fast_mode_batch_size;
-            
-            obj.total_runtime = obj.total_runtime; % this triggers the setter and updates num_batches
-            
-        end
-        
-        function startLiveView(obj)
-            
-            if ~isempty(obj.cam.gui) && obj.cam.gui.check
-                figure(obj.cam.gui.fig.fig)
-            else
-                obj.cam.makeGUI;
+            if nargin<3 || isempty(log_struct)
+                log_struct = struct;
+                log_struct.name = '';
+                log_struct.start = '';
+                log_struct.end = '';
+                log_struct.num_files = '';
+                log_struct.runtime = [];
             end
             
-            obj.cam.live('autodyn', 1);
+            d = util.sys.WorkingDirectory(folder);
+            
+            files = d.match('*.h5*'); 
+            readme = d.match('Z_README.txt');
+            
+            if ~isempty(readme)
+                
+                fid = fopen(readme{1}); 
+                on_cleanup = onCleanup(@() fclose(fid)); 
+                
+                for ii = 1:1e4
+                    
+                    tline = fgetl(fid); 
+                    
+                    if ~ischar(tline)
+                        break;
+                    end
+                    
+                    [~, idx] = regexp(tline, 'RUNSTART:'); 
+                    
+                    if ~isempty(idx) && isempty(log_struct.start)
+                        log_struct.start = strtrim(tline(idx+1:end)); 
+                    end
+                    
+                    [~, idx] = regexp(tline, 'ENDTIME:');
+                    
+                    if ~isempty(idx) && isempty(log_struct.end)
+                        log_struct.end = strtrim(tline(idx+1:end)); 
+                    end
+                    
+                    [~, idx] = regexp(tline, 'END_STAMP:'); 
+                    
+                    if ~isempty(idx) && isempty(log_struct.runtime)
+                        log_struct.runtime = parse_value(tline(idx+1:end)); 
+                    end
+                    
+                end % for ii (file lines)
+                
+            elseif ~isempty(files) % can't find the readme, use the last HDF5 file instead
+                
+                try 
+                    log_struct.start = h5readatt(files{end}, '/head', 'RUNSTART');
+                    log_struct.end = h5readatt(files{end}, '/head', 'ENDTIME'); 
+                    log_struct.runtime = h5readatt(files{end}, '/head', 'END_STAMP'); 
+                catch 
+                    log_struct.start = h5readatt(files{end}, '/header', 'RUNSTART');
+                    log_struct.end = h5readatt(files{end}, '/header', 'ENDTIME'); 
+                    log_struct.runtime = h5readatt(files{end}, '/header', 'END_STAMP'); 
+                end
+                
+            end
+            
+            log_struct.num_files = length(files); 
+            
+        end
+        
+        function s = getDriveSpace(obj)
+            
+            s = struct;
+            
+            for ii = double('A'):double('Z')
+                
+                name = [char(ii) ':\'];
+                if exist(name, 'dir')
+                    s.(char(ii)) = util.sys.disk_space(name); 
+                end
+                
+            end
+            
+        end
+        
+        function connectSync(obj)
+            
+            obj.log.input('Connecting to PcSync as server');
+            
+            try
+                obj.sync.connect;
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME);
+            end
             
         end
         
@@ -3059,182 +3353,42 @@ classdef Acquisition < file.AstroData
             
         end
         
-    end
-    
-    methods % optional run commands
-        
-        function success = runFlat(obj, varargin)
+        function val = convertRuntimeToSeconds(obj)
             
-            input = util.text.InputVars;
-            input.input_var('number', 20); % how many flat files we want en-total
-            input.input_var('iterations', 4); % how many iterations of focus run we want to do
-            input.scan_vars(varargin{:}); 
+            import util.text.cs;
             
-            success = 0;
-            
-            % find out how many flat files we already took
-            
-            on_cleanup = onCleanup(@obj.setBrake);
-            obj.brake_bit = 0;
-            
-            for ii = 1:input.iterations
-
-                if obj.brake_bit
-                    break;
-                end
-                
-                N_flats = 0; 
-
-                if exist(fullfile(getenv('DATA_TEMP'), util.sys.date_dir('now')), 'dir')
-
-                    d = util.sys.WorkingDirectory;
-                    d.cd(fullfile(getenv('DATA_TEMP'), util.sys.date_dir('now')));
-
-                    if d.cd('flat')
-
-                        N_flats = length(d.match('*.h5*')); 
-
-                    end
-
-                end
-
-                N = input.number-N_flats;
-
-                if N>0
-
-                    obj.cam.record('mode', 'flat', 'num_batches', N, 'batch_size', 100, 'frame_rate', 10, 'expT', 0.03); 
-
-                else
-                    success = 1;
-                    break;
-                end
-
+            if cs(obj.runtime_units, 'seconds')
+                val = 1;
+            elseif cs(obj.runtime_units, 'minutes')
+                val = 60;
+            elseif cs(obj.runtime_units, 'hours')
+                val = 3600;
+            elseif cs(obj.runtime_units, 'batches')
+                val = obj.batch_size./obj.getFrameRateEstimate;
+            elseif cs(obj.runtime_units, 'frames')
+                val = 1./obj.getFrameRateEstimate;
+            else
+                error('Unknown runtime units "%s". Use seconds, minutes, hours, batches or frames', obj.runtime_units);
             end
             
         end
         
-        function runPreview(obj, varargin) % I'm not sure we need this... 
+        function val = is_slow_mode(obj)
             
-            if obj.is_running
-                disp('Cannot run a preview during another run');
-                return;
-            else
-                obj.is_running = 1;
-            end
-            
-            try 
-                
-                obj.single;
-                obj.findStars;
-                obj.show;
-                obj.is_running = 0;
-
-            catch ME
-                obj.is_running = 0;
-                rethrow(ME);
-            end
+            val = true;
+            val = val && ~isempty(obj.expT) && obj.expT==obj.slow_mode_expT;
+            val = val && ~isempty(obj.frame_rate) && obj.frame_rate==obj.slow_mode_frame_rate;
+            val = val && ~isempty(obj.batch_size) && obj.batch_size==obj.slow_mode_batch_size;
             
         end
         
-        function runLive(obj, varargin) % I'm not sure we need this... 
+        function val = is_fast_mode(obj)
             
-            if obj.is_running
-                return;
-            else
-                obj.is_running = 1;
-            end
+            val = true;
+            val = val && ~isempty(obj.expT) && obj.expT==obj.fast_mode_expT;
+            val = val && ~isempty(obj.frame_rate) && obj.frame_rate==obj.fast_mode_frame_rate;
+            val = val && ~isempty(obj.batch_size) && obj.batch_size==obj.fast_mode_batch_size;
             
-            if ~isempty(varargin) && isa(varargin{1}, 'util.text.InputVars')
-                input = varargin{1};
-                input.scan_vars(varargin{2:end});
-            else
-                input = obj.makeInputVars('num_batches', 1e6, 'batch_size', 1, 'num_stars', 0, ...
-                    'use_save', 0, 'use_audio', 0, 'use_show', 1, varargin{:});
-            end
-            
-            obj.run(input); % take the same run-loop but with different input parameters
-            
-        end
-        
-        function runFocus(obj, varargin)
-            
-            obj.log.input('Running autofocus loop.'); 
-            
-            prev_focus_point = NaN;
-            
-            try
-
-                obj.brake_bit = 0;
-                
-                if ~isempty(obj.gui) && obj.gui.check
-                    obj.gui.latest_error = '';
-                    obj.gui.latest_warning = '';
-                    lastwarn('');
-                    obj.gui.update;
-                end
-                
-                success = 0;
-                
-                for ii = 1:6
-                    
-                    obj.sync.outgoing.report = 'Focusing';
-                    obj.sync.update;
-                    obj.parseCommands; % allow stopping between focus runs...
-                    
-                    if obj.debug_bit, fprintf('Running focus loop attempt %d\n', ii); end
-                    
-                    val = obj.cam.autofocus('iteration', ii); 
-                    
-                    if obj.brake_bit || val==0
-                        break; 
-                    end
-                    
-                    min_pos = obj.cam.af.pos(2); 
-                    max_pos = obj.cam.af.pos(end-1); 
-                    
-                    if obj.debug_bit, fprintf('Resulting focus point is %4.2f at FWHM of %4.2f"\n', obj.cam.af.found_pos, obj.cam.af.found_width.*2.355.*obj.head.SCALE); end
-                    
-                    if obj.cam.af.found_width<1 && obj.cam.af.found_pos>=min_pos && obj.cam.af.found_pos<=max_pos
-                        success = 1;
-                        break; % if focus is good enough and not at the edges of the range, we don't need to repeat it
-                    end
-                    
-                    if abs(obj.cam.af.found_pos - prev_focus_point)<0.05
-                        success = 1;
-                        break; % if focus returns to the same position each time, we can give up on it
-                    end
-                
-                end
-                
-                % could not find a decent focus:
-                if ~isempty(obj.cam.af.gui) && obj.cam.af.gui.check
-                    
-                    obj.cam.af.plot;
-                    
-                    obj.cam.af.gui.update;
-                    
-                    if success
-                        util.plot.inner_title(sprintf('Focus success after %d iterations!', ii),...
-                            'ax', obj.cam.af.gui.axes_image, 'FontSize', 26, 'Position', 'North'); 
-                    else
-                        util.plot.inner_title(sprintf('Focus failed after %d iterations!', ii),...
-                            'ax', obj.cam.af.gui.axes_image, 'FontSize', 26, 'Position', 'North'); 
-                        pause(0.5); 
-                    end
-                    
-                end
-                
-            catch ME
-                obj.log.error(ME.getReport);
-                rethrow(ME);
-            end
-            
-            obj.brake_bit = 1;
-            
-            if ~isempty(obj.gui) && obj.gui.check
-                obj.gui.update;
-            end
-
         end
         
     end

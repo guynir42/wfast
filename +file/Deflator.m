@@ -98,6 +98,7 @@ classdef Deflator < file.AstroData
         use_copy_catalogs = 1; % make sure to copy the catalog MAT-files from each folder
         use_copy_calibration = 1; % make sure to copy the calibration MAT-files from each folder
         use_copy_lightcurves = 1; % make sure to copy the stack lightcurves MAT-files from each folder
+        use_copy_microflares = 1; % make sure to copy the micro flares summary MAT-files from each folder
         debug_bit = 1;
         
     end
@@ -390,6 +391,15 @@ classdef Deflator < file.AstroData
                     
                     if obj.use_copy_lightcurves
                         f = obj.src_subdir.match('lightcurves*.mat');
+                        if ~isempty(f)
+                            [~, name, ext] = fileparts(f{1});
+                            disp(['copying file ' name ext ' from ' obj.src_subdir.pwd ' to ' obj.out_subdir.pwd])
+                            copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir.pwd, name, ext));
+                        end
+                    end
+                    
+                    if obj.use_copy_microflares
+                        f = obj.src_subdir.match('micro_flares*.mat');
                         if ~isempty(f)
                             [~, name, ext] = fileparts(f{1});
                             disp(['copying file ' name ext ' from ' obj.src_subdir.pwd ' to ' obj.out_subdir.pwd])

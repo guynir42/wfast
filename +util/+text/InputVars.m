@@ -217,27 +217,14 @@ classdef InputVars < dynamicprops
             if ~isobject(other) && ~isstruct(other)
                 error('Cannot scan a %s type object. Must supply an object or struct', class(other));
             end
+
+            list = obj.list_added_properties; 
             
-            if isobject(other)
-                list = properties(other);
-            elseif isstruct(other)
-                list = fields(others);
-            end
-            
-            all_keys = obj.alias_dictionary.keys;
-            
-            for ii = 1:length(all_keys)
+            for ii = 1:length(list)
                 
-                idx = find(strcmp(all_keys{ii}, list), 1, 'first');
-                
-                if ~isempty(idx)
-                    
-                    name = list{idx};
-                    
-                    obj.(name) = other.(name);
-                    
+                if isobject(other) && isprop(other, list{ii}) || isstruct(other) && isfield(other, list{ii})
+                    obj.(list{ii}) = other.(list{ii});
                 end
-                
                 
             end
             
