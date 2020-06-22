@@ -298,7 +298,7 @@ classdef SensorChecker < handle
             obj.temperature.units = 'C';
             obj.temperature.err_str = 'Temperature out of range!';
         
-            obj.temperature.max = 30; % night time temperature
+            obj.temperature.max = 32; % night time temperature
             obj.temperature.min = 0; % in C obviously
             
             

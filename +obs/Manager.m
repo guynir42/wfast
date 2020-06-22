@@ -53,6 +53,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         humidity; % humidity/temperature dog
         temperature; % additional temperature meters
         
+        assist@obs.sens.DomeAssistant;
+        
         email@obs.comm.Email; 
         
         cam_pc@obs.comm.PcSync; % communications object to camera PC
@@ -171,6 +173,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             if obj.use_wind
                 obj.connectWindETH;
+            end
+            
+            try
+                obj.connectAssistant;
+            catch ME
+                warning(ME.getReport); 
             end
             
             % add additional devices
@@ -305,6 +313,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 disp('Cannot connect to WindETH sensor.');
                 
             end
+            
+        end
+        
+        function connectAssistant(obj)
+            
+            obj.assist = obs.sens.DomeAssistant; 
             
         end
         
@@ -655,8 +669,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     obj.cam_pc.incoming.report = '';
                 end
                 
-                if ~strcmp(obj.cam_pc.outgoing.command_str, 'start') && ...
-                        ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'report') && strcmp(obj.cam_pc.incoming.report, 'idle') % what if we didn't start any runs and there is no report??
+                if ~isfield(obj.cam_pc.outgoing, 'command_str') || ...
+                    (~strcmp(obj.cam_pc.outgoing.command_str, 'start') && ...
+                        ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'report') && ...
+                        strcmp(obj.cam_pc.incoming.report, 'idle')) % what if we didn't start any runs and there is no report??
                     obj.gui.panel_camera.button_start.control.Enable = 'on';
                 else
                     obj.gui.panel_camera.button_start.control.Enable = 'off';
@@ -665,6 +681,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.gui.panel_camera.button_info.update;
                 
                 obj.gui.updateStopButton;
+                
+                obj.gui.panel_controls.button_lights.update;
                 
             end
             
@@ -1190,7 +1208,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                             
                             t = obj.sched.targets(ii); 
                             
-                            if strcmp(t.name, obj.cam_pc.outgoing.OBJECT) && ...
+                            if isfield(obj.cam_pc.outgoing, 'OBJECT') && strcmp(t.name, obj.cam_pc.outgoing.OBJECT) && ...
                                     abs(t.ephem.RA_deg-obj.cam_pc.outgoing.RA_DEG)*3600<tol && ...
                                     abs(t.ephem.Dec_deg-obj.cam_pc.outgoing.DEC_DEG)*3600<tol
                                 
@@ -1391,7 +1409,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 % trust the "status" flag to check if we need to reconnect
                 if ~obj.cam_pc.is_connected || ~obj.cam_pc.status
-%                     fprintf('%s: now I would be trying to connect...\n', datetime('now', 'TimeZone', 'UTC'));
+%                     fprintf('%s: Trying to connect...\n', datetime('now', 'TimeZone', 'UTC'));
                     obj.cam_pc.connect;
                 end
                 
@@ -1587,8 +1605,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             try 
 
-                if isempty(obj.cam_pc.outgoing.command_str) && ... % I'm not sure this is the best conditional we can find
-                        ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'report') && strcmp(obj.cam_pc.incoming.report, 'idle')
+                if ~isfield(obj.cam_pc.outgoing, 'command_str') || (isempty(obj.cam_pc.outgoing.command_str) && ... % I'm not sure this is the best conditional we can find
+                        ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'report') && strcmp(obj.cam_pc.incoming.report, 'idle'))
                     
                     obj.sched.finish_current; % camera is idle, make sure the scheduler knows the current run is over...  
                     

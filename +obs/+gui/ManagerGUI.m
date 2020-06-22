@@ -215,7 +215,9 @@ classdef ManagerGUI < handle
 %             obj.panel_controls.addButton('button_twilight', 'checker.use_twilight_mode', 'toggle', 'twilight is off', 'twilight is on', '', 0.3, 'red', obj.color_on);
             obj.panel_controls.addButton('button_twilight', '', 'custom', 'twilight is off', 'twilight is on', '', 0.3, 'red', obj.color_on);
             
-            obj.panel_controls.addButton('button_autostartup', 'use_startup', 'toggle', 'auto start up is disabled', 'auto start up is enabled', '', 1, obj.color_on, 'red'); 
+            obj.panel_controls.addButton('button_autostartup', 'use_startup', 'toggle', 'auto start up is disabled', 'auto start up is enabled', '', 0.7, obj.color_on, 'red'); 
+            obj.panel_controls.addButton('button_lights', 'assist.lights', 'toggle', 'LEDs are off', 'LEDs are on', 'edit', 0.3, 'red', obj.color_on);
+            
             obj.panel_controls.addButton('button_weather_check', 'callback_t2', 'push', 'Weather check');
             obj.panel_controls.addButton('button_proceed', 'checkNewTarget', 'push', 'proceed to target'); 
             obj.panel_controls.margin = [0.01 0.01];

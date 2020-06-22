@@ -1107,6 +1107,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function [total_var, RA_var, DE_var] = getVibrationStrength(obj, varargin) % variance in RA/DE in units of degrees (run this only when tracking...)
             
+            if isempty(obj.hndl)
+                total_var = 0;
+                RA_var = 0;
+                DE_var = 0;
+                return;
+            end
+            
             input = util.text.InputVars;
             input.input_var('N', 50, 'number', 'iterations'); 
             input.input_var('delay', 0.01, 'pause'); 

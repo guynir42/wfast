@@ -145,8 +145,10 @@ classdef ScopeAssistant < handle
             
             if isempty(ind)
                 
-                fclose(obj.hndl);
-                delete(obj.hndl);
+                if ~isempty(obj.hndl)
+                    fclose(obj.hndl);
+                    delete(obj.hndl);
+                end
                 
                 % must be paired to the bluetooth device! 
                 obj.hndl = Bluetooth(obj.bluetooth_name, 1); % second argument is channel==1

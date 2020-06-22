@@ -49,7 +49,7 @@ classdef DomeAssistant < handle
     
     properties % switches/controls
         
-        port_number = 7; % e.g., COM7
+        port_number = 14; % e.g., COM7
         timeout = 10; % seconds
         
         debug_bit = 1;
@@ -86,6 +86,7 @@ classdef DomeAssistant < handle
                 
                 obj.data = util.vec.CircularBuffer;
                 obj.connect; % Open serial port
+                obj.lights = 0; 
                 
             end
             
@@ -102,6 +103,8 @@ classdef DomeAssistant < handle
             obj.hndl.BytesAvailableFcn = @obj.read_data;
             
             fopen(obj.hndl); 
+            
+            obj.status = 1;
             
         end
         
@@ -169,7 +172,9 @@ classdef DomeAssistant < handle
         
         function set.lights(obj, val)
             
-            if ischar(val) && util.text.cs(val, 'timer')
+            if isempty(val)
+                obj.send([obj.lights_relay, ', off']); 
+            elseif ischar(val) && util.text.cs(val, 'timer')
                 obj.send([obj.lights_relay, ', watch']); 
                 obj.send([obj.lights_relay, ', mode, expire']); 
             elseif util.text.parse_bool(val)
@@ -177,7 +182,7 @@ classdef DomeAssistant < handle
             elseif util.text.parse_bool(val)==0
                 obj.send([obj.lights_relay, ', off']); 
             else
-                error('Unknown option "%s". Use "on" or "off" or "timer"'); 
+                error('Unknown option "%s". Use "on" or "off" or "timer"', val); 
             end
             
             obj.update;
@@ -191,6 +196,7 @@ classdef DomeAssistant < handle
         function update(obj)
             
             obj.send('measure'); 
+            % need to add some way to figure out if status is ok... 
             
         end
         
