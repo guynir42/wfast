@@ -2240,7 +2240,7 @@ classdef Acquisition < file.AstroData
                     disp('Cannot start a new acquisition while old one is still runnning (turn off brake_bit)');
                     return;
                 end
-
+                
                 input = obj.makeInputVars(varargin{:});
                 
                 obj.update(input); % update header object to current time and input run name, RA/DE if given to input.
@@ -2261,6 +2261,13 @@ classdef Acquisition < file.AstroData
                 
                 obj.stash_parameters(input);
             
+                if obj.use_arbitrary_pos && obj.use_astrometry
+                    obj.gui.latest_error = 'Cannot use astrometry and arbitrary pos at the same time!';
+                    warning(obj.gui.latest_error); 
+                    obj.log.error(obj.gui.latest_error); 
+                    return;
+                end
+                
                 obj.buf.use_save_photometry = obj.use_save_photometry; 
                 
                 if isempty(obj.num_batches)
@@ -2356,7 +2363,9 @@ classdef Acquisition < file.AstroData
                         obj.runAstrometry;
                         
                         % add forced cutouts
-                        obj.addForcedPositions; 
+                        if obj.cat.success==0
+                            obj.addForcedPositions; 
+                        end
                         
                     end
                     
@@ -2722,8 +2731,10 @@ classdef Acquisition < file.AstroData
                 
                 if obj.use_dynamic_cutouts
                     
-                    % the arguments are: images, mask, threshold, num_threads, max_number, debug_bit
-                    pos = util.img.find_cosmic_rays(obj.images, logical(obj.cal.dark_mask + (obj.stack_proc>1024*1)), 2*256, 6, 100, 0);
+                    
+                    mask = imdilate(obj.stack_proc>1024*1, ones(5)); % dilate the area around stars
+                    mask = logical(obj.cal.dark_mask + mask); % add the bad pixels to the mask
+                    pos = util.img.find_cosmic_rays(obj.images, mask, 2*256, 6, 100, 0); % the arguments are: images, mask, threshold, num_threads, max_number, debug_bit
                     
                     if ~isempty(pos)
                         pos = sortrows(pos, 4, 'descend'); 
@@ -2985,6 +2996,7 @@ classdef Acquisition < file.AstroData
             end
             
             obj.clip.positions = obj.positions; % update the clipper with the new forced positions
+            obj.ref_positions = obj.positions; 
             
         end
         
@@ -3180,15 +3192,26 @@ classdef Acquisition < file.AstroData
                     
                     f = obj.fluxes(:,i2);
                     
+                    % get some statistics on the lightcurve
                     S = nanstd(f); 
                     M = nanmean(f); 
                     [mx, idx] = nanmax(f); 
                     N = nnz((f-M)./S>5);
                     
-                    if N>0 % at least 3 points above 3 sigma...
+                    % get the 1st moments
+                    C = obj.cutouts_proc(:,:,:,i2); 
+                    C2 = C - median(C(:)); 
+                    
+                    [X,Y] = meshgrid(floor(-size(C,2)/2)+1:floor(size(C,2)/2));
+                    
+                    cx = squeeze(sum(X.*abs(C2))./sum(abs(C2))); 
+                    cy = squueze(sum(Y.*abs(C2))./sum(abs(C2))); 
+                    
+                    if N>=3 % at least 3 points above 5 sigma...
                         
                         st = struct('filename', obj.buf.filename, 'batch_index', obj.batch_counter+1, 'frame_index', idx, ...
-                            'peak', mx, 'mean', M, 'std', S, 'num_frames', N, 'flux', f, 'cutouts', obj.cutouts_proc(:,:,:,i2)); 
+                            'peak', mx, 'mean', M, 'std', S, 'num_frames', N, 'flux', f, 'cx', cx, 'cy', cy, ...
+                            'cutouts', obj.cutouts_proc(:,:,:,i2)); 
                         
                         if isempty(obj.micro_flares)
                             obj.micro_flares = st;
