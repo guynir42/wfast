@@ -2363,7 +2363,7 @@ classdef Acquisition < file.AstroData
                         obj.runAstrometry;
                         
                         % add forced cutouts
-                        if obj.cat.success==0
+                        if obj.cat.success
                             obj.addForcedPositions; 
                         end
                         
@@ -2731,7 +2731,6 @@ classdef Acquisition < file.AstroData
                 
                 if obj.use_dynamic_cutouts
                     
-                    
                     mask = imdilate(obj.stack_proc>1024*1, ones(5)); % dilate the area around stars
                     mask = logical(obj.cal.dark_mask + mask); % add the bad pixels to the mask
                     pos = util.img.find_cosmic_rays(obj.images, mask, 2*256, 6, 100, 0); % the arguments are: images, mask, threshold, num_threads, max_number, debug_bit
@@ -2942,6 +2941,7 @@ classdef Acquisition < file.AstroData
                 if ~(xy(1)<1 || xy(1)>obj.head.NAXIS2 || xy(2)<1 || xy(2)>obj.head.NAXIS1)
                     obj.positions = vertcat(obj.positions, xy); % add the position fields
                     obj.forced_indices(end+1) = size(obj.positions,1); % log the indices of the new positions into the forced_indices field
+                    if obj.debug_bit, fprintf('adding a forced cutout number %d at x= %f | y= %f\n', obj.forced_indices(end), xy(1), xy(2)); end
                 end
             end
 
@@ -3076,7 +3076,7 @@ classdef Acquisition < file.AstroData
                 if obj.debug_bit, disp('Lost star positions, using quick_align'); end
                     
                 [~,shift] = util.img.quick_align(obj.stack_proc, obj.ref_stack);
-                obj.clip.positions = double(obj.ref_positions + flip(shift));
+                obj.clip.positions(1:size(obj.ref_positions,1),:) = double(obj.ref_positions + flip(shift));
 
                 % this shift should also be reported back to mount controller? 
 
@@ -3205,7 +3205,7 @@ classdef Acquisition < file.AstroData
                     [X,Y] = meshgrid(floor(-size(C,2)/2)+1:floor(size(C,2)/2));
                     
                     cx = squeeze(sum(X.*abs(C2))./sum(abs(C2))); 
-                    cy = squueze(sum(Y.*abs(C2))./sum(abs(C2))); 
+                    cy = squeeze(sum(Y.*abs(C2))./sum(abs(C2))); 
                     
                     if N>=3 % at least 3 points above 5 sigma...
                         
