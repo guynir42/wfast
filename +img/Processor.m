@@ -571,7 +571,7 @@ classdef Processor < dynamicprops
             % estimate the real PSF width from found stars
             C = util.img.mexCutout(obj.data.image_proc, T.pos, obj.pars.cut_size, NaN, NaN); 
             
-            s = util.img.photometry2(C, 'aperture', obj.pars.initial_guess_psf_width.*3); 
+            s = util.img.photometry2(C, 'aperture', obj.pars.initial_guess_psf_width.*3, 'use_forced', 1); 
             
             obj.data.psf_width = util.vec.weighted_average(s.forced_photometry.width, s.forced_photometry.flux, 2);
             
@@ -745,7 +745,7 @@ classdef Processor < dynamicprops
                         rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'green'); % green is for extended sources
                     elseif obj.data.found_stars.flag(ii)==1
                         rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'red'); % red is for saturated stars
-                    elseif isnan(obj.cat.magnitudes(ii))
+                    elseif ~isempty(obj.cat.magnitudes) && isnan(obj.cat.magnitudes(ii))
                         rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'white'); % white is for no match to GAIA
                     else    
                         rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'black'); % black is good stars

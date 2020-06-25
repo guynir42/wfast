@@ -1461,7 +1461,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 c = strsplit(strip(val)); 
                 
                 if length(c)==1 && isempty(idx) % no date is given, use today's date
-                    time = [];
+                    
+                    try 
+                        time = datetime(val);
+                    catch
+                        time = NaT;
+                        return;
+                    end
+                    
                 elseif ~isempty(idx) % split using the 'T' separator
                     time = datetime(val(1:idx-1), 'TimeZone', 'UTC'); % get the date
                     val = val(idx+1:end); % get the hours from the rest of the string
@@ -1483,8 +1490,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                         time = datetime('today', 'TimeZone', 'UTC') + days(1);  
                     end
                 end
-                    
-                time = time + hours(h); % add the hours to the required date. 
+                
+                if ~isempty(h) && ~isnan(h)
+                    time = time + hours(h); % add the hours to the required date. 
+                end
                 
             elseif isa(val, 'datetime')
                 time = val;
