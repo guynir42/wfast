@@ -563,11 +563,13 @@ classdef Deflator < file.AstroData
             obj.timer.Name = 'auto-deflate-timer';
             obj.timer.BusyMode = 'queue';
             
-            t = datetime(util.sys.date_dir('now'));
+            t = datetime(util.sys.date_dir('now'), 'TimeZone', 'UTC');
             
             t = t + days(1); % deflate on the next morning!
+            t.Hour = hour;
+            t.TimeZone = 'local'; % must convert to local time before giving it to startat()
             
-            startat(obj.timer, [t.Year, t.Month, t.Day, hour, 0, 0]);
+            startat(obj.timer, [t.Year, t.Month, t.Day, t.Hour, 0, 0]);
             
         end
         

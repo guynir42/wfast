@@ -113,8 +113,8 @@ classdef Lightcurves < handle
         bad_times_fraction = 0.1; % what fraction of stars need to be NaN to be considered bad times
         
         % processing steps for fluxes_cal:
-        use_airmass_correction = 0;
-        use_psf_correction = 0;
+        use_airmass_correction = 1;
+        use_psf_correction = 1;
         use_zero_point = 0;
         use_sysrem = 1;
         sysrem_iterations = 1;
@@ -1619,7 +1619,7 @@ classdef Lightcurves < handle
                 
                 F = nanmean(flux, 1); % weight for each star
                 
-                W = nansum(F.*obj.widths(:,:,obj.index_flux_number),2)./nansum(F,2); % weighted average PSF width
+                W = util.vec.weighted_average(obj.widths(:,:,obj.index_flux_number), F, 2); 
                 
                 % apply the same correction we applied to the fluxes before
                 if obj.use_airmass_correction 
