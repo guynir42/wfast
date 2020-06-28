@@ -271,7 +271,7 @@ classdef PcSync < handle
             
             res = 0.01;
             
-            timeout = 5;
+            timeout = 3;
             
             for ii = 1:timeout/res
                 
@@ -343,7 +343,7 @@ classdef PcSync < handle
             
             data_temp = obj.(data_name);
             
-            for ii = 1:100
+            for ii = 1:10
 
                 if hndl.BytesAvailable>0
                     

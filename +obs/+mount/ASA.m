@@ -344,7 +344,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 rethrow(ME);
             end
             
-            
         end
         
         function killServer(obj) % kill the applications using the system "taskkill" command

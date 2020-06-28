@@ -129,6 +129,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         sensor_ok_history; % a vector of datetime objects, for each time we have measured good weather (this gets reset upon a single bad weather measurement)
         latest_email_autostart_date = '';
         
+        latest_email_error_date = ''; 
+        error_report = '';
+        
         version = 1.04;
         
     end
@@ -204,6 +207,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             delete(obj.t3);
             delete(obj.t2);
             delete(obj.t1);
+            
+            delete(m.mout); 
+            m.mount = []; 
             
         end
         
@@ -1475,9 +1481,57 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             obj.cam_pc.update;
             
-            % get the observation log from the camera, including how long each target was observed
-            if ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'obs_log')
-                obj.obs_log = obj.cam_pc.incoming.obs_log; 
+            
+            if ~isempty(obj.cam_pc.incoming) 
+                
+                if isfield(obj.cam_pc.incoming, 'obs_log') % get the observation log from the camera, including how long each target was observed
+                    obj.obs_log = obj.cam_pc.incoming.obs_log; 
+                end
+                
+                if isfield(obj.cam_pc.incoming, 'error') && isfield(obj.cam_pc.incoming, 'err_time') && ~isempty(obj.cam_pc.incoming.error)
+                
+                    % if the error has not yet been reported via email
+                    if isempty(obj.latest_email_error_date) || ~strcmp(obj.latest_email_error_date, obj.cam_pc.incoming.err_time)
+                        
+                        str = util.text.eraseTags(obj.cam_pc.incoming.error);
+                        
+                        [~, idx] = regexp(str, 'Error using mg.Acquisition/[a-zA-Z]* \(ine \d*\)[\n\r\s]+', 'once');
+                        
+                        if isempty(idx)
+                            idx = 60;
+                        end
+                        
+                        idx2 = regexp(str(idx+1:end), '\n', 'once');
+                        
+                        obj.error_report = strtrim(str(idx:idx+idx2));
+                        
+                        obj.log.input(sprintf('Reporting error from cam-PC: %s...', obj.error_report)); 
+                        if obj.debug_bit, disp(obj.log.report); end
+                        
+                        try
+                            name = obj.getObserverName;
+                        catch ME
+                            name = '';
+                        end
+                        
+                        if isempty(name)
+                            
+                            obj.email.sendToList('subject', [obj.error_report ' at ' obj.cam_pc.incoming.err_time], ...
+                                'text', sprintf('Observer: %s.\n %s', '----', str));
+                            
+                        else
+                            
+                            obj.email.sendToAddress(name, 'subject',  [obj.error_report ' at ' obj.cam_pc.incoming.err_time], ...
+                                'text', sprintf('Observer: %s.\n %s', name, str))
+                        
+                        end
+                        
+                        obj.latest_email_error_date = obj.cam_pc.incoming.err_time;
+                        
+                    end
+                    
+                end
+                
             end
             
         end
