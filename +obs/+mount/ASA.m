@@ -75,6 +75,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         pid_I = 0.6;
         pid_D = 0.1;
         
+        use_real_epoch = 1; % if false, use J2000, if true, use current epoch
+        
         use_accelerometer = 1; % make constant checks for altitude outside of the mounts own sensors
         use_ultrasonic = 0; % make constant checks that there is nothing in front of the telescope
         
@@ -453,8 +455,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function val = get.telRA_deg(obj)
             
-            try 
-                val = obj.hndl.RightAscension*15; % convert hours to degrees!
+            try % convert the telescope RA into J2000 in degrees
+                
+                if obj.use_real_epoch
+                    
+                    t = datetime('now', 'TimeZone', 'UTC');
+                    Y = t.Year;
+                    
+                    [RA, Dec] = celestial.coo.convert_coo(obj.hndl.RightAscension*15*pi/180, obj.hndl.Declination*pi/180, sprintf('J%4d', Y), 'J2000', juliandate(t));
+                    
+                    val = RA.*180/pi; 
+                    
+                else
+                    val = obj.hndl.RightAscension*15; % convert hours to degrees!
+                end
+                
             catch
                 val = [];
             end
@@ -463,8 +478,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function val = get.telDec_deg(obj)
             
-            try
-                val = obj.hndl.Declination;
+            try % convert the telescope RA into J2000 in degrees
+                
+                if obj.use_real_epoch
+                    
+                    t = datetime('now', 'TimeZone', 'UTC');
+                    Y = t.Year;
+                    
+                    [RA, Dec] = celestial.coo.convert_coo(obj.hndl.RightAscension*15*pi/180, obj.hndl.Declination*pi/180, sprintf('J%4d', Y), 'J2000', juliandate(t));
+                    
+                    val = Dec.*180/pi; 
+                    
+                else
+                    val = obj.hndl.Declination;
+                end
+                
             catch
                 val = [];
             end
