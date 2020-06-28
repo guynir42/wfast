@@ -177,6 +177,8 @@ classdef PcSync < handle
                     
                     obj.disconnect;
 
+                    obj.outgoing = []; % remove any pre-existing commands 
+                    
                     if strcmpi(obj.role, 'server')
                         obj.hndl_rx = obj.connectSocket('rx');
                         obj.hndl_tx = obj.connectSocket('tx');
