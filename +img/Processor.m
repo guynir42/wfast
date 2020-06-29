@@ -669,7 +669,7 @@ classdef Processor < dynamicprops
             if util.text.cs(obj.head.cam_name, 'balor')
                 obj.cat.input_rotation = -60; 
             elseif util.text.cs(obj.head.cam_name, 'zyla')
-                obj.cat.input_rotation = -15; 
+                obj.cat.input_rotation = 15; 
             end
 
             obj.cat.input(obj.data.found_stars); 

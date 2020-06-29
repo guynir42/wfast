@@ -103,8 +103,11 @@ function values_conv = convolution(kernels, values, varargin)
         if memory_needed>input.mem_max
             if input.debug_bit, disp('Memory required is too large. Using a loop instead!'); end
             values_conv = fft_in_a_loop(kernels_fft, values_fft, S_out, Sk, Sv);
-        else
-            values_conv = real(fftshift(ifft(kernels_fft.*values_fft),1)); % just do the whole thing at once
+        else % just do the whole thing at once
+            F_prod = kernels_fft.*values_fft; 
+            F_prod2 = ifft(F_prod);
+            F_prod2 = fftshift(F_prod2, 1); 
+            values_conv = real(F_prod2); 
         end
     catch ME
         if strcmp(ME.identifier, 'MATLAB:nomem')

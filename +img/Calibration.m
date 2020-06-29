@@ -48,8 +48,8 @@ classdef Calibration < handle
 % NOTE 2: the dark_mask is lazy-loaded from dark_mean and dark_var, by
 %         looking for pixels that have mean or variance to far from average. 
 %         This cut is done using "dark_mask_sigma" that kills pixels with
-%         mean N times above noise level, and "dark_mask_var_ratio" that
-%         kills pixels in the highest variance percentile. 
+%         mean N times above noise level, and "dark_mask_var_max" and
+%         "dark_mask_var_min" that define the max/min variance for pixels. 
 %         Changing these parameters (or "dark_mean" or "dark_var") will
 %         reset the "dark_mask" and "dark_mask_cut" and require them to be
 %         re-calculated on demand.
@@ -145,10 +145,8 @@ classdef Calibration < handle
         replace_value = NaN;
         
         dark_mask_sigma = 5; % how hot a pixel must be (relative to dark noise) to be considered a "bad pixel"
-        dark_mask_var_thresh = []; % pixels with variance above this value are bad pixels. (see hidden variables for Zyla/Balor)
+        dark_mask_var_max = []; % pixels with variance above this value are bad pixels. (see hidden variables for Zyla/Balor)
         dark_mask_var_min = 0.5; % pixels with variance below this are dead pixels
-        dark_mask_var_sigma = 100; % how many "sigmas" above the mean variance value to cut (to be depricated)
-        dark_mask_var_ratio = 0.99; % what fraction of pixel variance is considered "bad pixels" (to be depricated)
         
         use_remove_empty_frames = 1;
         
@@ -171,7 +169,7 @@ classdef Calibration < handle
         downsampling = 2;
         
         % switches: 
-        autosave = 1; % once dark or flat is calculated, save it as a .mat file
+        use_autosave = 1; % once dark or flat is calculated, save it as a .mat file
         brake_bit = 1; % stop in mid calculation loop
         debug_bit = 1;
         
@@ -180,14 +178,11 @@ classdef Calibration < handle
     properties (Hidden=true)
     
         default_dark_mask_sigma;
-        default_dark_mask_var_thresh;
-        dark_mask_var_thresh_zyla = 120;
-        dark_mask_var_thresh_balor = 50; 
+        default_dark_mask_var_max;
+        dark_mask_var_max_zyla = 120;
+        dark_mask_var_max_balor = 50; 
         
-        default_dark_mask_var_sigma; % we're not using this anymore...
-        default_dark_mask_var_ratio; % we're not using this anymore...
-        
-        version = 1.06;
+        version = 1.07;
         
     end
     
@@ -206,9 +201,9 @@ classdef Calibration < handle
                 if obj.debug_bit>1, fprintf('Calibration constructor v%4.2f\n', obj.version); end
                 
                 if isempty(obj.camera_name) || strcmpi(obj.camera_name, 'zyla')
-                    obj.dark_mask_var_thresh = obj.dark_mask_var_thresh_zyla;
+                    obj.dark_mask_var_max = obj.dark_mask_var_max_zyla;
                 elseif strcmpi(obj.camera_name, 'balor')
-                    obj.dark_mask_var_thresh = obj.dark_mask_var_thresh_balor;
+                    obj.dark_mask_var_max = obj.dark_mask_var_max_balor;
                 end
                 
                 util.oop.save_defaults(obj);
@@ -280,6 +275,16 @@ classdef Calibration < handle
     end
     
     methods % getters
+        
+        function val = get.prog(obj)
+            
+            if isempty(obj.prog)
+                obj.prog = util.sys.ProgressBar;
+            end
+            
+            val = obj.prog;
+            
+        end
         
         function val = get.height(obj)
             
@@ -521,9 +526,9 @@ classdef Calibration < handle
             
         end
         
-        function set.dark_mask_var_thresh(obj, val)
+        function set.dark_mask_var_max(obj, val)
            
-            obj.dark_mask_var_thresh = val;
+            obj.dark_mask_var_max = val;
             obj.dark_mask = [];
             obj.dark_mask_cut = [];
             
@@ -537,22 +542,6 @@ classdef Calibration < handle
             
         end
         
-        function set.dark_mask_var_sigma(obj, sigma)
-           
-            obj.dark_mask_var_sigma = sigma;
-            obj.dark_mask = [];
-            obj.dark_mask_cut = [];
-            
-        end
-        
-        function set.dark_mask_var_ratio(obj, ratio)
-            
-            obj.dark_mask_var_ratio = ratio;
-            obj.dark_mask = [];
-            obj.dark_mask_cut = [];
-           
-        end
- 
         function set.use_interp_mask(obj, val)
             
             obj.use_interp_mask = val;
@@ -731,7 +720,7 @@ classdef Calibration < handle
 %                 error('add some images to "addDark"!');
                 return;
             end
-                  
+            
             if (~isempty(obj.height) && size(images,1)~=obj.height)
                 error(['size mismatch. size(images)= ' num2str(size(images)) ' | height= ' num2str(obj.height) ' | width= ' num2str(obj.width)])
             end
@@ -740,22 +729,30 @@ classdef Calibration < handle
                 error(['size mismatch. size(images)= ' num2str(size(images)) ' | height= ' num2str(obj.height) ' | width= ' num2str(obj.width)])
             end
             
+            current_frames = size(images,3);
+            
             if obj.use_single
-                current_frames = single(size(images,3));
-                d_sum = util.stat.sum_single(images);
-            else
-                current_frames = size(images,3);
-                d_sum = sum(images,3);
+                current_frames = single(current_frames);
+                images = single(images); 
             end
 
+            d_sum = sum(images, 3);
+            
             obj.dark_mean = runningMean(obj.dark_mean, obj.num_darks, d_sum, current_frames);
             
             % dark variance
-            if obj.use_single
-                d_var = util.stat.sum_single((single(images)-d_sum/current_frames).^2);
-            else
-                d_var = var(double(images), [], 3)*current_frames;
-            end
+%             if obj.use_single
+%                 d_var = util.stat.sum_single((single(images)-d_sum/current_frames).^2);
+%             else
+%                 d_var = var(double(images), [], 3)*current_frames;
+%             end
+
+            Factor = 1./norminv(0.95,0,1);
+
+            % think about making alternative notation that can handle Dim being a vector, or else just write a new rstd2 function for images... 
+            ValLow  = prctile(images, 5, 3);
+            ValHigh = prctile(images, 95, 3);
+            d_var    = ((ValHigh - ValLow).*0.5.*Factor).^2*current_frames;
             
             obj.dark_var = runningMean(obj.dark_var, obj.num_darks, d_var, current_frames);
             
@@ -1009,18 +1006,6 @@ classdef Calibration < handle
         
         function calcDarkMask(obj)
             
-            % kill pixels with mean above/below the average dark_mean value
-%             pix = bsxfun(@rdivide, bsxfun(@minus, obj.dark_mean, mean2(obj.dark_mean)), sqrt(mean2(obj.dark_var)))./obj.dark_mask_sigma;
-%             pix(isnan(pix)) = 1;
-%             M = logical(floor(abs(pix))); % if there are pixels whose means are over Xsigma from the norm
-% 
-%             % kill pixels with the highest variance
-%             V = obj.dark_var(:);
-%             V = sort(V);
-%             index = ceil(obj.dark_mask_var_ratio*length(V)); 
-%             V_thresh = V(index);
-%             M(obj.dark_var>=V_thresh) = 1;
-
             if obj.debug_bit>1, disp('making dark mask'); end
 
             M = false(size(obj.dark_mean)); % start with an empty mask
@@ -1036,13 +1021,8 @@ classdef Calibration < handle
             
             % variance values
             v = obj.dark_var(:);
-            M(v>obj.dark_mask_var_thresh) = true; % replace old method with simple cut value
+            M(v>obj.dark_mask_var_max) = true; % replace old method with simple cut value
             M(v<obj.dark_mask_var_min) = true; % dead pixels have very low variance
-            
-            % find the pixels with unusual variance values (old method)
-%             [mu,sig] = util.stat.sigma_clipping(v, 'dist', 'weibul', 'iterations', 5);
-%             idx = abs(v - mu)>sig*obj.dark_mask_var_sigma;
-%             M(idx) = true;
             
             if obj.debug_bit>2, fprintf('dark_mean stats: mu= %4.2f | sig= %4.2f | num_pix= %d | frac= %g\n', mu, sig, nnz(idx), nnz(idx)/numel(idx)); end
             
