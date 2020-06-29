@@ -133,7 +133,8 @@ classdef AcqGUI < handle
             
             obj.menu_options.addButton('menu_find_stars', '&Find stars', 'menu');
             obj.menu_options.menu_find_stars.addButton('button_astrometry', '&Astrometry', 'toggle', 'use_astrometry', 'use astrometry (with GAIA DR2) to get star positions/magnitudes');
-            obj.menu_options.menu_find_stars.addButton('button_mextractor', '&Mextractor', 'toggle', 'use_mextractor', 'use mextractor to find the star positions');
+            obj.menu_options.menu_find_stars.addButton('button_require', '&Require solution', 'toggle', 'use_require_astrometric_solution', 'when true, throws error if astrometry fails');
+%             obj.menu_options.menu_find_stars.addButton('button_mextractor', '&Mextractor', 'toggle', 'use_mextractor', 'use mextractor to find the star positions');
             obj.menu_options.menu_find_stars.addButton('button_arbitrary', '&Arbitrary pos', 'toggle', 'use_arbitrary_pos', 'set random cutout positions (debugging only!)');
             obj.menu_options.menu_find_stars.addButton('button_threshold', '&Threshold', 'input', 'detect_thresh', 'threshold for detection in stack image (noise rms)');
             obj.menu_options.menu_find_stars.addButton('button_bad_pixels', '&Bad pixels', 'toggle', 'use_remove_bad_pixels', 'remove bad pixels before finding stars');

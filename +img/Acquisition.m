@@ -86,6 +86,7 @@ classdef Acquisition < file.AstroData
         use_remove_saturated = true; % remove all stars with any pixels above saturation value
         
         use_astrometry = true; % calculate the star positions matched to GAIA DR2 and save catalog
+        use_require_astrometric_solution = true; % if true, will throw an error when failing to find an astrometric solution
         
         use_cutouts = true;
         use_adjust_cutouts = 1; % use adjustments in software (not by moving the mount)
@@ -195,6 +196,9 @@ classdef Acquisition < file.AstroData
         lost_flux_threshold = 0.3;
         max_failed_batches = 3; % if star flux is lost for more than this number of batches, quit the run
         
+        sensor_temp_night = 0;
+        sensor_temp_day = 20; 
+        
         camera_angle = 60; % degrees between image top and cardinal south/north (when after meridian)
         
         pass_source = {}; % parameters to pass to camera/reader/simulator
@@ -206,6 +210,10 @@ classdef Acquisition < file.AstroData
         prev_stack;        
         ref_stack;
         ref_positions;
+        
+        cosmic_ray_mask_threshold = 1024;
+        cosmic_ray_mask; 
+        cosmic_ray_peak_threshold = 256;
         
         prev_fluxes; % fluxes measured in previous batch (for triggering)
         
@@ -375,10 +383,10 @@ classdef Acquisition < file.AstroData
                 
                 obj.head = head.Header; % this also gives "head" to all sub-objects
                 obj.cat = head.Catalog(obj.head);
-                obj.cat.RA_scan_step = 2;
-                obj.cat.RA_scan_range = 0;
-                obj.cat.Dec_scan_step = 2;
-                obj.cat.Dec_scan_range = 0;
+                obj.cat.RA_scan_step = 1;
+                obj.cat.RA_scan_range = 1;
+                obj.cat.Dec_scan_step = 1;
+                obj.cat.Dec_scan_range = 1;
                 
                 obj.lightcurves.head = obj.head;
                 obj.lightcurves.cat = obj.cat;
@@ -1430,7 +1438,7 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function runFocus(obj, varargin)
+        function success = runFocus(obj, varargin)
             
             obj.log.input('Running autofocus loop.');
             
@@ -1775,6 +1783,24 @@ classdef Acquisition < file.AstroData
                 obj.sync.setup_callbacks;
             end
             
+            try % adjust the sensor temperature to daytime/night time
+                
+                obj.head.update;
+                
+                if isa(obj.src, 'obs.cam.Andor') && obj.brake_bit==0 && obj.cam.brake_bit==0
+
+                    if obj.head.ephem.sun.Alt>0
+                        obj.cam.setSensorTemp(obj.sensor_temp_day); 
+                    else
+                        obj.cam.setSensorTemp(obj.sensor_temp_night);
+                    end
+
+                end
+                
+            catch ME
+                warning(ME.getReport);
+            end
+            
         end
         
         function setup_backup_timer(obj, ~, ~)
@@ -1968,6 +1994,7 @@ classdef Acquisition < file.AstroData
                         input.scan_vars(args{:}); 
                         
                         obj.sync.outgoing.error = ''; 
+                        obj.sync.outgoing.err_time = ''; 
                         obj.sync.outgoing.report = 'Starting';
                         obj.sync.outgoing.batch_counter = 0;
                         obj.sync.outgoing.total_batches = 0;
@@ -1977,7 +2004,10 @@ classdef Acquisition < file.AstroData
                         
                         if input.focus 
                             disp('Now running focus by order of dome-PC'); % this message will be removed later on...
-                            obj.runFocus;
+                            success = obj.runFocus;
+                            if success==0
+                                error('Could not find a good focus point!'); 
+                            end
                         end
                         
                         obj.log.input(sprintf('Starting run command from Dome-PC. Args= "%s"', obj.latest_command_pars)); 
@@ -2029,6 +2059,8 @@ classdef Acquisition < file.AstroData
                 
             catch ME
                 obj.sync.outgoing.error = sprintf('error! \n%s', ME.getReport); 
+                obj.sync.outgoing.err_time = util.text.time2str(datetime('now', 'TimeZone', 'UTC')); 
+                obj.sync.outgoing.report = 'idle'; 
                 rethrow(ME); 
             end
 
@@ -2217,12 +2249,14 @@ classdef Acquisition < file.AstroData
             obj.head.update;
             
             if isa(obj.src, 'obs.cam.Andor')
+                
                 obj.head.INST = obs.cam.mex_new.get(obj.src.hndl, 'name'); 
                 obj.head.PIXSIZE = obs.cam.mex_new.get(obj.src.hndl, 'pixel width'); 
                 obj.head.NAXIS1 = obs.cam.mex_new.get(obj.src.hndl, 'width');
                 obj.head.NAXIS2 = obs.cam.mex_new.get(obj.src.hndl, 'height');
                 obj.head.NAXIS3 = obj.batch_size;
                 obj.head.NAXIS4 = obj.num_stars;
+                
             end
             
             obj.cal.camera_name = obj.head.INST;
@@ -2362,6 +2396,10 @@ classdef Acquisition < file.AstroData
                         obj.sync.update;
                         obj.runAstrometry;
                         
+                        if obj.use_require_astrometric_solution && obj.cat.success==0
+                            error('Could not find astrometric solution!'); 
+                        end
+                        
                         % add forced cutouts
                         if obj.cat.success
                             obj.addForcedPositions; 
@@ -2476,6 +2514,7 @@ classdef Acquisition < file.AstroData
                 obj.unstash_parameters;
                 obj.is_running = 0;
                 obj.sync.outgoing.error = ME.getReport; 
+                obj.sync.outgoing.err_time = util.text.time2str(datetime('now', 'TimeZone', 'UTC')); 
                 obj.sync.outgoing.report = 'idle';
                 rethrow(ME);
             end
@@ -2731,9 +2770,9 @@ classdef Acquisition < file.AstroData
                 
                 if obj.use_dynamic_cutouts
                     
-                    mask = imdilate(obj.stack_proc>1024*1, ones(5)); % dilate the area around stars
-                    mask = logical(obj.cal.dark_mask + mask); % add the bad pixels to the mask
-                    pos = util.img.find_cosmic_rays(obj.images, mask, 2*256, 6, 100, 0); % the arguments are: images, mask, threshold, num_threads, max_number, debug_bit
+                    obj.cosmic_ray_mask = imdilate(obj.stack_proc>obj.cosmic_ray_mask_threshold, ones(7)); % dilate the area around stars
+                    obj.cosmic_ray_mask = logical(obj.cal.dark_mask + obj.cosmic_ray_mask); % add the bad pixels to the mask
+                    pos = util.img.find_cosmic_rays(obj.images, obj.cosmic_ray_mask,obj.cosmic_ray_peak_threshold, 6, 100, 0); % the arguments are: images, mask, threshold, num_threads, max_number, debug_bit
                     
                     if ~isempty(pos)
                         pos = sortrows(pos, 4, 'descend'); 
@@ -2748,7 +2787,7 @@ classdef Acquisition < file.AstroData
                     end
                     
                     obj.positions(obj.dynamic_indices,:) = [];
-                    obj.dynamic_indices = []; 
+%                     obj.dynamic_indices = []; 
                     obj.dynamic_indices = size(obj.positions,1)+1:size(obj.positions,1)+size(new_pos,1); 
                     
                     obj.positions = vertcat(obj.positions, new_pos); 
@@ -3204,19 +3243,35 @@ classdef Acquisition < file.AstroData
                     
                     [X,Y] = meshgrid(floor(-size(C,2)/2)+1:floor(size(C,2)/2));
                     
-                    cx = squeeze(sum(X.*abs(C2))./sum(abs(C2))); 
-                    cy = squeeze(sum(Y.*abs(C2))./sum(abs(C2))); 
+                    cx = squeeze(util.stat.sum2(X.*abs(C2))./util.stat.sum2(abs(C2))); 
+                    cy = squeeze(util.stat.sum2(Y.*abs(C2))./util.stat.sum2(abs(C2))); 
                     
-                    if N>=3 % at least 3 points above 5 sigma...
+                    if N>=2 % at least 3 points above 5 sigma...
                         
-                        st = struct('filename', obj.buf.filename, 'batch_index', obj.batch_counter+1, 'frame_index', idx, ...
-                            'peak', mx, 'mean', M, 'std', S, 'num_frames', N, 'flux', f, 'cx', cx, 'cy', cy, ...
-                            'cutouts', obj.cutouts_proc(:,:,:,i2)); 
+%                         st = struct('filename', obj.buf.filename, 'batch_index', obj.batch_counter+1, 'frame_index', idx, ...
+%                             'peak', mx, 'mean', M, 'std', S, 'num_frames', N, 'flux', f, 'cx', cx, 'cy', cy, ...
+%                             'cutouts', obj.cutouts_proc(:,:,:,i2)); 
+                        
+                        flare = img.MicroFlare;
+                        flare.file_index = obj.batch_counter+1;
+                        flare.filename = obj.buf.filename;
+                        flare.frame_index = idx;
+                        flare.peak = mx;
+                        flare.pos = obj.positions(i2,:)'; 
+                        flare.flux = obj.fluxes(:,i2); 
+                        flare.mean = M;
+                        flare.std = S;
+                        flare.offset = [cx;cy];
+                        flare.cutouts = obj.cutouts_proc(:,:,:,i2); 
+                        flare.calculate; 
+                        
+                        % can add other photometric products if we use
+                        % full-photometry pipeline on this...
                         
                         if isempty(obj.micro_flares)
-                            obj.micro_flares = st;
+                            obj.micro_flares = flare;
                         else
-                            obj.micro_flares(end+1) = st;
+                            obj.micro_flares(end+1) = flare;
                         end
                         
                     end

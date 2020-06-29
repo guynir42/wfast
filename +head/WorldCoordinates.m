@@ -465,10 +465,10 @@ classdef WorldCoordinates < handle
     
     methods % getters for bullshit dependent properties
         
-        function val = get.CD1_1(obj), if ~isempty(obj.CD), val = obj.CD(1,1); else, val = []; end; end
-        function val = get.CD1_2(obj), if size(obj.CD,1)>1, val = obj.CD(2,1); else, val = []; end; end
-        function val = get.CD2_1(obj), if size(obj.CD,2)>1, val = obj.CD(1,2); else, val = []; end; end
-        function val = get.CD2_2(obj), if numel(obj.CD)>3, val = obj.CD(2,2); else, val = []; end; end
+        function val = get.CD1_1(obj), if ~isempty(obj.CD), val = obj.CD(1); else, val = []; end; end
+        function val = get.CD1_2(obj), if size(obj.CD,1)>1, val = obj.CD(2); else, val = []; end; end
+        function val = get.CD2_1(obj), if size(obj.CD,2)>1, val = obj.CD(3); else, val = []; end; end
+        function val = get.CD2_2(obj), if numel(obj.CD)>3, val = obj.CD(4); else, val = []; end; end
         
         function val = get.PV1_0(obj), if size(obj.PV,1)>0, val = obj.PV(1,1); else, val = []; end; end
         function val = get.PV1_1(obj), if size(obj.PV,1)>1, val = obj.PV(2,1); else, val = []; end; end

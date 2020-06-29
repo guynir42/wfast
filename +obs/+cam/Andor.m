@@ -1933,6 +1933,18 @@ classdef Andor < file.AstroData
             
         end
         
+        function val = getSensorTemp(obj)
+            
+            val = obs.cam.mex_new.get(obj.hndl, 'temp');
+            
+        end
+        
+        function setSensorTemp(obj, val)
+            
+            obs.cam.mex_new.set(obj.hndl, 'temp', val)
+            
+        end
+        
     end
     
     methods % plotting tools / GUI

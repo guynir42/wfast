@@ -934,7 +934,7 @@ classdef Calibration < handle
                 obj.brake_bit = 1;
                 obj.mode = '';
                 
-                if obj.autosave && obj.checkFlat % only save calibration files with flats
+                if obj.use_autosave && obj.checkFlat % only save calibration files with flats
                     obj.save;
                 end
 
@@ -1374,14 +1374,12 @@ classdef Calibration < handle
             obj.clip.clear;
             deflate = 1;
             
-            if ~isempty(obj.reader_dark) && obj.checkDark
-                if obj.debug_bit, disp(['saving calibration data to: ' fullfile(obj.reader_dark.dir.pwd, filename)]); end
-                util.oop.save(obj, fullfile(obj.reader_dark.dir.pwd, filename), 'name', 'cal', 'deflate', deflate);
-            end
-            
             if ~isempty(obj.reader_flat) && obj.checkFlat
                 if obj.debug_bit, disp(['saving calibration data to: ' fullfile(obj.reader_flat.dir.pwd, filename)]); end
                 util.oop.save(obj, fullfile(obj.reader_flat.dir.pwd, filename), 'name', 'cal', 'deflate', deflate);
+            elseif ~isempty(obj.reader_dark) && obj.checkDark
+                if obj.debug_bit, disp(['saving calibration data to: ' fullfile(obj.reader_dark.dir.pwd, filename)]); end
+                util.oop.save(obj, fullfile(obj.reader_dark.dir.pwd, filename), 'name', 'cal', 'deflate', deflate);
             end
             
             if obj.debug_bit, disp(['saving calibration data to: ' fullfile(directory, filename)]); end
@@ -1600,7 +1598,13 @@ classdef Calibration < handle
                 obj.gain = temp.gain;
 
                 obj.num_pixels_removed = temp.num_pixels_removed;
-
+                
+                if isempty(obj.camera_name) || strcmpi(obj.camera_name, 'zyla')
+                    obj.dark_mask_var_max = obj.dark_mask_var_max_zyla;
+                elseif strcmpi(obj.camera_name, 'balor')
+                    obj.dark_mask_var_max = obj.dark_mask_var_max_balor;
+                end
+                
                 if ~isempty(obj.gui) && obj.gui.check
                     obj.show;
                 end
