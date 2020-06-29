@@ -1197,9 +1197,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             if ~isempty(obj.cam_pc) 
                 
-                if ~isempty(obj.mount.tracking) && obj.mount.tracking && obj.dome.is_closed==0
-                    obj.cam_pc.outgoing.stop_camera = 0; % if everything is cool, let the camera keep going
-                end
+%                 if ~isempty(obj.mount.tracking) && obj.mount.tracking && obj.dome.is_closed==0
+%                     obj.cam_pc.outgoing.stop_camera = 0; % if everything is cool, let the camera keep going
+%                 end
                 
                 % make sure that targets being observed are marked as "now_observing"
                 if isfield(obj.cam_pc.incoming, 'report') 
@@ -1229,15 +1229,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                             obj.sched.start_current;
                         end
                         
-                    else
-                        
-                        obj.sched.finish_current;
-                        
-                        for ii = 1:length(obj.sched.targets)
-                            
-                            obj.sched.targets(ii).ephem.now_observing = 0; % what happens if it takes the camera too long to move out of "idle" but in fact we sent a "start" command?
-                            
-                        end
+%                     else
+%                         
+%                         obj.sched.finish_current;
+%                         
+%                         for ii = 1:length(obj.sched.targets)
+%                             
+%                             obj.sched.targets(ii).ephem.now_observing = 0; % what happens if it takes the camera too long to move out of "idle" but in fact we sent a "start" command?
+%                             
+%                         end
                         
                     end
                     
@@ -1633,10 +1633,24 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
+        function matchRuntimes(obj)
+            
+            if ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'obs_log') && ~isempty(obj.cam_pc.incoming.obs_log)
+                obs_log = obj.cam_pc.incoming.obs_log;
+            else
+                obs_log = obj.obs_log;
+            end
+            
+            obj.sched.matchRuntimes(obs_log); 
+            
+        end
+        
         function chooseNewTarget(obj, varargin)
             
             obj.sched.current_side = obj.mount.telHemisphere;
             obj.sched.wind_speed = nanmax(obj.checker.wind_speed.now);
+            
+            obj.matchRuntimes; 
             
             obj.sched.current = obj.sched.choose('now', varargin{:}); 
             

@@ -320,13 +320,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         function val = get.STARTTIME(obj)
             
-            val = util.text.time2str(obj.time);
+            if isempty(obj.start_time) || isnat(obj.start_time)
+                val = '';
+            else
+                val = util.text.time2str(obj.start_time);
+            end
             
         end
         
         function val = get.JD(obj)
 
-            if isempty(obj.STARTTIME)
+            if isempty(obj.time)
                 val = [];
             else
                 val = juliandate(obj.time); 
@@ -337,7 +341,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         function val = get.MJD(obj)
             
-            if isempty(obj.STARTTIME)
+            if isempty(obj.time)
                 val = [];
             else
                 val = obj.JD - 2400000.5;
@@ -586,9 +590,19 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
+        function set.STARTTIME(obj, val)
+            
+            obj.start_time = val; % also parse any time format
+            
+        end
+        
         function set.start_time(obj, val)
             
             obj.start_time = obj.parseTime(val); 
+            
+            if isnat(obj.start_time)
+                obj.start_time = [];
+            end
             
         end
         

@@ -317,7 +317,7 @@ classdef SensorChecker < handle
             obj.wind_speed.units = 'km/h';
             obj.wind_speed.err_str = 'Wind too strong!';
             obj.wind_speed.func = @nanmax; % for wind measurements we want the maximum of all sensors, not the average
-            obj.wind_speed.max = 40; % km/h
+            obj.wind_speed.max = 42; % km/h
             
         end
         

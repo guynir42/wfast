@@ -1430,7 +1430,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 if ~isempty(obj.cam_pc)
                     
-                    obj.cam_pc.outgoing.stop_camera = 0; % need to tell cam-pc to start working! 
+%                     obj.cam_pc.outgoing.stop_camera = 0; % need to tell cam-pc to start working! 
                     
                     % tell the camera there is a new target object
                     obj.cam_pc.outgoing.OBJECT = strrep(strtrim(obj.objName), ' ', '_');

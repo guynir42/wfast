@@ -388,6 +388,50 @@ classdef Scheduler < handle
             
         end
         
+        function matchRuntimes(obj, obs_log) % use obs_log to update the target list with the true runtimes and start times
+            
+            for ii = 1:length(obj.targets)
+                
+                name = obj.targets(ii).name;
+                
+                if isfield(obs_log, name)
+                    
+                    st = obs_log.(name);
+                    dur = 0; % total duration of previous runs (not including current run)
+                    
+                    for jj = 1:length(st)
+
+                        if ~isempty(st(jj).runtime)
+                            dur = dur + st(jj).runtime;
+                        end
+                            
+                        if jj==length(st) % last iteration, update the target ephemeris
+                            
+                            obj.targets(ii).ephem.prev_runtime_minutes = dur/60; % convert to minutes
+                            
+                            if ~isempty(st(jj).start)
+                                obj.targets(ii).ephem.STARTTIME = st(jj).start; 
+                            end
+
+                            if ~isempty(st(jj).end) % the last object in the log has finished observing!
+                                obj.targets(ii).ephem.now_observing = 0;
+                            else % the last object in the log is still running! 
+                                obj.targets(ii).ephem.now_observing = 1;
+                            end
+
+                        end
+                        
+                    end
+                    
+                else
+                    % if it doesn't appear on the obs log, should we reset the runtime? 
+                end
+                
+            end
+            
+            
+        end
+        
         function new_target = choose(obj, time, varargin)
             
             if nargin<2 || isempty(time)
@@ -466,6 +510,7 @@ classdef Scheduler < handle
                 dur_flag = true(length(target_list),1); % indices of the targets that meet the duration prerequisite
 
                 for ii = 1:length(target_list)
+                    
                     e = target_list(ii).ephem; % shorthand
                     
                     if e.getTotalRuntimeMinutes + e.constraints.fudge_time > e.constraints.duration*60

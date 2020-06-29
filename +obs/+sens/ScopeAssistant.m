@@ -109,7 +109,7 @@ classdef ScopeAssistant < handle
 
                     obj.connectBluetooth(varargin{:});
 
-                    pause(0.1);
+                    pause(0.5);
 
                     obj.setupTimer(obj.default_period);
 
@@ -146,7 +146,7 @@ classdef ScopeAssistant < handle
             if isempty(ind)
                 
                 if ~isempty(obj.hndl)
-                    fclose(obj.hndl);
+                    if isvalid(obj.hndl), fclose(obj.hndl); end
                     delete(obj.hndl);
                 end
                 
@@ -172,6 +172,9 @@ classdef ScopeAssistant < handle
 
             else
                 obj.hndl = inst(ind);
+                if strcmp(obj.hndl.Status, 'closed')
+                    fopen(obj.hndl);
+                end
             end
             
             obj.update;
