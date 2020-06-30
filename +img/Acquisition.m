@@ -1787,7 +1787,7 @@ classdef Acquisition < file.AstroData
                 
                 obj.head.update;
                 
-                if isa(obj.src, 'obs.cam.Andor') && obj.brake_bit==0 && obj.cam.brake_bit==0
+                if isa(obj.src, 'obs.cam.Andor') && obj.brake_bit && obj.cam.brake_bit
 
                     if obj.head.ephem.sun.Alt>0
                         obj.cam.setSensorTemp(obj.sensor_temp_day); 

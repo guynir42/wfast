@@ -33,7 +33,6 @@ function [h_out, h_legend] = plot_fit(fr, varargin)
     
     for ii = 1:length(fr)
         
-        
         x_sorted = sort(fr(ii).x); 
         h{end+1} = plot(input.ax, fr(ii).x, fr(ii).y, input.marker);
         h{end}.DisplayName = input.label;
