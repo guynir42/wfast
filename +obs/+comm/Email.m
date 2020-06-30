@@ -1,30 +1,44 @@
 classdef Email < handle
+% Class used to send email messages from the wfast.bot@gmail.com acount. 
+% The mailing list is saved as a text file, and updated when calling the
+% readMailingList() function. 
+%
+% There are a few useful functions that can be used to send mail:
+%   -sendToMailingList(varargin): send to everyone. 
+%   -sendToAddress(address, varargin): send to one user. Can specify whole
+%    address or just the name of user (e.g., sendToAddress('Guy')). 
+%   -html(text, type='p', style=''): wrap some text in HTML tags. The default
+%    type of tag is 'p' (parargraph) and the style field adds CSS styling 
+%    statements to that tag. This is useful when composing HTML based mail.
+%
+% OPTIONAL ARGUMENTS to both "send" commands:
+%   -subject: that appears in the email subject line. 
+%   -text: the email body text, including any HTML tags you like. 
+%   -header: automatic text at start of body. Default is true. 
+%   -footer: automatic text at end of body. Default is true. 
+%   -html: compose email with HTML tags. The "text" field still requires 
+%          each part of the text to have its own tags. 
+%
+% EXAMPLE 1: mail.sendToList('subject', 'test email', 'text', 'here is some
+%            non-html enabled message', 'header', 0, 'footer', 0); 
+%
+% EXAMPLE 2: mail.sendToAddress('guy', 'subject', 'test email', 'text', 
+%            '<p style="font-size:14px"> sample text </p>', 'html', 1); 
+%
+% EXAMPLE 3: mail.sendToList('subject', 'html test', 'text',
+%            mail.html('here is some text to be wrapped in a paragraph',
+%            'p', 'font-family:roman'), 'html', 1, 'header',1, 'footer',1);
+%
 
-    properties(Transient=true)
-        
-    end
-    
-    properties % objects
-        
-        
-        
-    end
-    
     properties % inputs/outputs
         
-        mailing_list = {}; 
+        mailing_list = {}; % this is read from text file
         
     end
     
     properties % switches/controls
         
         debug_bit = 1;
-        
-    end
-    
-    properties(Dependent=true)
-        
-        
         
     end
     
@@ -88,21 +102,9 @@ classdef Email < handle
         
     end
     
-    methods % reset/clear
-        
-    end
-    
-    methods % getters
-        
-    end
-    
-    methods % setters
-        
-    end
-    
     methods % commands
         
-        function readMailingList(obj)
+        function readMailingList(obj) % read mailing list from file
             
             filename = fullfile(getenv('DATA'), 'WFAST/preferences/mailing_list.txt'); 
             
@@ -123,7 +125,7 @@ classdef Email < handle
             
         end
         
-        function sendToList(obj, varargin)
+        function sendToList(obj, varargin) % send an email to the entire mailing list
             
             input = util.text.InputVars;
             input.input_var('list', []); % alternative list
@@ -147,7 +149,7 @@ classdef Email < handle
             
         end
         
-        function sendToAddress(obj, address, varargin)
+        function sendToAddress(obj, address, varargin) % send to a single person (first argument)
             
             input = util.text.InputVars;
             input.input_var('subject', '[WFAST] automated message'); 
@@ -177,10 +179,9 @@ classdef Email < handle
             
         end
         
-        function str = compose(obj, varargin)
+        function str = compose(obj, varargin) % put together the text with header/footer etc...
            
             input = util.text.InputVars;
-            input.input_var('address', 'wfast17@gmail.com'); 
             input.input_var('subject', '[WFAST] automated message'); 
             input.input_var('text', 'This is a default message'); 
             input.input_var('header', true); 
@@ -220,7 +221,7 @@ classdef Email < handle
             
         end
         
-        function send(obj, address, subject, message, files)
+        function send(obj, address, subject, message, files) % low-level command to send the actual email
             
             if nargin<2 || isempty(address)
                 address = 'wfast17@gmail.com'; 
@@ -242,7 +243,7 @@ classdef Email < handle
             
         end
         
-        function val = html(obj, text, type, style)
+        function val = html(obj, text, type, style) % wrap some text in HTML tags
             
             if nargin<3 || isempty(type)
                 type = 'p';
@@ -256,7 +257,7 @@ classdef Email < handle
             
         end
         
-        function val = getQuote(obj, number)
+        function val = getQuote(obj, number) % randomly get a quote from the list
             
             if nargin<2 || isempty(number)
                 number = randi(length(obj.quotes)); 
@@ -267,10 +268,6 @@ classdef Email < handle
         end
         
     end
-    
-    methods % plotting tools / GUI
-        
-    end    
     
 end
 

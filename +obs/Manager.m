@@ -1288,6 +1288,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.latest_email_autostart_date = [];
             end
             
+            obj.matchRuntimes; 
             obj.updateUserPrompt; % make sure the "proceedToTarget" button is greyed out if weather is bad / dome is closed
             
             if obj.use_startup

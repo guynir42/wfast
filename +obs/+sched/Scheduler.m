@@ -408,6 +408,7 @@ classdef Scheduler < handle
                         if jj==length(st) % last iteration, update the target ephemeris
                             
                             obj.targets(ii).ephem.prev_runtime_minutes = dur/60; % convert to minutes
+                            obj.targets(ii).ephem.update;
                             
                             if ~isempty(st(jj).start)
                                 obj.targets(ii).ephem.STARTTIME = st(jj).start; 
