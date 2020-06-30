@@ -353,6 +353,11 @@ classdef Catalog < handle
                 DE = obj.head.DEC_DEG;
             end
             
+            rc_rad = 0.8;
+            if strcmp(obj.head.cam_name, 'Balor')
+                rc_rad = 3.3;
+            end
+            
             list_DE = (-obj.Dec_scan_range:obj.Dec_scan_step:obj.Dec_scan_range);
             [~,idx] = sort(abs(list_DE));
             list_DE = list_DE(idx) + DE; 
@@ -377,7 +382,7 @@ classdef Catalog < handle
                         [R,S2] = astrometry(S, 'RA', head.Ephemeris.deg2hour(list_RA(jj)), 'Dec', head.Ephemeris.deg2sex(list_DE(ii)), 'Scale', obj.head.SCALE, ...
                             'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', obj.block_size.*[1 1], 'ApplyPM', false, 'Flip', obj.flip, ...
                             'MinRot', obj.input_rotation-obj.input_rot_range, 'MaxRot', obj.input_rotation+obj.input_rot_range, ...
-                            'CatColMag', 'Mag_G', 'ImSize', [obj.head.NAXIS2, obj.head.NAXIS1], 'Verbose', false, 'RCrad', 3.3/180*pi);
+                            'CatColMag', 'Mag_G', 'ImSize', [obj.head.NAXIS2, obj.head.NAXIS1], 'Verbose', false, 'RCrad', rc_rad/180*pi);
 
                         warning('on', 'MATLAB:polyfit:PolyNotUnique')
                         warning('on', 'MATLAB:lscov:RankDefDesignMat');
