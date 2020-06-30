@@ -31,6 +31,8 @@ classdef FinderGUI < handle
         
         panel_statistics;
         
+        panel_show;
+        
         panel_close;
         button_close;
         
@@ -126,19 +128,31 @@ classdef FinderGUI < handle
              
             %%%%%%%%%%% panel statistics %%%%%%%%%%%%%%%
             
-            num_buttons = 3;
+            num_buttons = 2;
             pos = pos-num_buttons;
             obj.panel_statistics = GraphicPanel(obj.owner, [0 pos/N_left 0.2 num_buttons/N_left], 'statistics', 1); % last input is for vertical (default)
             obj.panel_statistics.addButton('button_num_batches', 'total_batches', 'info', 'Nbtch= ', '', 'edit', 1/3, [], [], 'Total number of batches processed');
             obj.panel_statistics.addButton('button_num_events', 'num_events', 'info', 'Nev= ', '', 'edit', 1/3, [], [], 'Total number of found events');
             obj.panel_statistics.addButton('button_num_kept', 'num_kept', 'info', 'Nkept= ', '', 'edit', 1/3, [], [], 'Number of kept events');
-            obj.panel_statistics.addButton('button_star_hours', 'star_hours_total', 'info', 'star hours= ', '', 'edit', 1, [], [], 'How may star hours were scanned, total');
+            obj.panel_statistics.addButton('button_star_hours', 'star_hours_total', 'info', 'star hours= ', '', 'edit', 0.7, [], [], 'How may star hours were scanned, total');
 %             obj.panel_statistics.addButton('button_star_hours_lost', 'star_hours_lost', 'info', 'lost= ', '', 'small', 1/3, [], [], 'How may star hours were lost due to overlap with events');
-            obj.panel_statistics.addButton('button_make_histogram', 'histogram', 'push', 'show hist', '', '', 0.5, [], [], 'Plot a histogram of all S/N results');
-            obj.panel_statistics.addButton('button_raw_flux', 'figureRawFlux', 'push', 'raw flux', '', '', 0.5, '', '', 'Show the event raw flux'); 
+            obj.panel_statistics.addButton('button_make_histogram', 'histogram', 'push', 'show hist', '', '', 0.3, [], [], 'Plot a histogram of all S/N results');
+            
             obj.panel_statistics.number = num_buttons;
             
             obj.panel_statistics.make;
+            
+            
+            %%%%%%%%%%% panel show %%%%%%%%%%%%%%%
+            
+            num_buttons = 1;
+            pos = pos-num_buttons;
+            obj.panel_show = GraphicPanel(obj.owner, [0 pos/N_left 0.2 num_buttons/N_left], 'show', 1); % last input is for vertical (default)
+            
+            obj.panel_show.addButton('button_raw_flux', 'figureRawFlux', 'push', 'raw flux', '', '', 0.5, '', '', 'Show the event raw flux'); 
+            obj.panel_show.addButton('button_cutouts', 'figureCutouts', 'push', 'cutouts', '', '', 0.5, '', '', 'Show the event cutouts'); 
+            
+            obj.panel_show.make;
             
             %%%%%%%%%%% panel memory %%%%%%%%%%%%%%%
             

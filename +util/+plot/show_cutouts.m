@@ -20,7 +20,7 @@ function show_cutouts(C, varargin)
     input.input_var('number', 1); % how many cutouts to show (around the key frame)
     input.input_var('frame', 1); % which frame to plot around (key frame)
     input.input_var('star', 1); % which star to look at
-    input.input_var('oversample', []); % how much we want to interpolate to see more details
+    input.input_var('oversample', [], 'oversampling'); % how much we want to interpolate to see more details
     input.input_var('type', 'heat') % can choose "heat" (regular image) or "surf" for 3D plot
     input.input_var('view', []); % pass a 2 or 3 vector to give the viewing angle on the surface plot
     input.input_var('parent', []); 

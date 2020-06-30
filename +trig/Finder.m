@@ -70,6 +70,7 @@ classdef Finder < handle
         gui@trig.gui.FinderGUI;
         hist_fig; % figure used when opening a S/N histogram
         raw_fig; % figure used when opening a raw flux plot
+        cut_fig; % figure used when opening a cutout viewing plot
         bank@occult.ShuffleBank; % randomly picked filter kernels used for matched-filtering (loaded from file when needed)
         
     end
@@ -219,6 +220,10 @@ classdef Finder < handle
         used_background_sub;
         aperture;
         gauss_sigma;
+        
+        show_cutouts_keyframe;
+        show_cutouts_num_frames = 6; 
+        show_cutotus_oversample = 2; 
         
         version = 1.04;
         
@@ -1534,6 +1539,141 @@ classdef Finder < handle
         end
         
         function showSimulatedSNR(obj, varargin)
+            
+        end
+        
+        function figureCutouts(obj, parent)
+            
+            if isempty(obj.this_event) || isempty(obj.this_event.cutouts)
+                return;
+            end
+            
+            if nargin<2 || isempty(parent)
+                
+                if isempty(obj.cut_fig) || ~isa(obj.cut_fig, 'matlab.ui.Figure') || ~isvalid(obj.cut_fig)
+                    obj.cut_fig = figure;
+                end
+                
+                parent = obj.cut_fig;
+                
+                if isa(parent, 'matlab.ui.Figure')
+                    figure(parent); 
+                end
+                
+            end
+                    
+            obj.show_cutouts_keyframe = obj.this_event.frame_index;
+
+            obj.showCutouts(parent); 
+            
+        end
+        
+        function showCutouts(obj, parent)
+                
+            if nargin<2 || isempty(parent)
+                
+                if isempty(obj.cut_fig) || ~isa(obj.cut_fig, 'matlab.ui.Figure') || ~isvalid(obj.cut_fig)
+                    obj.cut_fig = figure;
+                end
+                
+                parent = obj.cut_fig;
+                
+            end
+            
+            C = cat(3, obj.this_event.cutouts_first, obj.this_event.cutouts_second); 
+            
+            util.plot.show_cutouts(C, 'parent', parent, 'oversampling', obj.show_cutotus_oversample, 'type', 'surf', ...
+                'number', obj.show_cutouts_num_frames, 'frame', obj.show_cutouts_keyframe, 'star', obj.this_event.star_index); 
+
+            uicontrol(parent, 'Style', 'pushbutton', 'Units', 'Normalized', 'Position', [0.05 0.05 0.1 0.1], ...
+                'String', '-', 'Callback', @obj.push_back_keyframe, 'FontSize', 16); 
+            
+            uicontrol(parent, 'Style', 'edit', 'Units', 'Normalized', 'Position', [0.15 0.05 0.3 0.1], ...
+                'String', sprintf('key frame= %d', obj.show_cutouts_keyframe), 'Callback', @obj.change_keyframe, 'FontSize', 16); 
+            
+            uicontrol(parent, 'Style', 'pushbutton', 'Units', 'Normalized', 'Position', [0.45 0.05 0.1 0.1], ...
+                'String', '+', 'Callback', @obj.push_forward_keyframe, 'FontSize', 16); 
+            
+            uicontrol(parent, 'Style', 'pushbutton', 'Units', 'Normalized', 'Position', [0.55 0.05 0.1 0.1], ...
+                'String', 'peak', 'Callback', @obj.reset_keyframe, 'FontSize', 16); 
+            
+            uicontrol(parent, 'Style', 'edit', 'Units', 'Normalized', 'Position', [0.7 0.05 0.15 0.1], ...
+                'String', sprintf('num= %d', obj.show_cutouts_num_frames), 'Callback', @obj.change_num_frames, 'FontSize', 16); 
+            
+            uicontrol(parent, 'Style', 'edit', 'Units', 'Normalized', 'Position', [0.85 0.05 0.15 0.1], ...
+                'String', sprintf('over= %d', obj.show_cutotus_oversample), 'Callback', @obj.change_oversample, 'FontSize', 16); 
+            
+        end
+        
+        function push_forward_keyframe(obj, ~, ~)
+            
+            obj.show_cutouts_keyframe = obj.show_cutouts_keyframe + 1;
+            
+            obj.showCutouts(obj.cut_fig);
+            
+        end
+        
+        function push_back_keyframe(obj, ~, ~)
+            
+            obj.show_cutouts_keyframe = obj.show_cutouts_keyframe - 1;
+            
+            obj.showCutouts(obj.cut_fig);
+            
+        end
+        
+        function reset_keyframe(obj, ~, ~)
+            
+            obj.show_cutouts_keyframe = obj.this_event.frame_index;
+            
+            obj.showCutouts(obj.cut_fig);
+            
+        end
+        
+        function change_keyframe(obj, hndl, ~)
+            
+            val = util.text.extract_numbers(hndl.String);
+            
+            if ~isempty(val)
+                val = val{1}; 
+            end
+            
+            if isnumeric(val) && ~isempty(val)
+                obj.show_cutouts_keyframe = val;
+            end
+            
+            obj.showCutouts(obj.cut_fig);
+            
+        end
+        
+        function change_num_frames(obj, hndl, ~)
+            
+            val = util.text.extract_numbers(hndl.String);
+            
+            if ~isempty(val)
+                val = val{1}; 
+            end
+            
+            if isnumeric(val) && ~isempty(val)
+                obj.show_cutouts_num_frames = val;
+            end
+            
+            obj.showCutouts(obj.cut_fig);
+            
+        end
+        
+        function change_oversample(obj, hndl, ~)
+            
+            val = util.text.extract_numbers(hndl.String);
+            
+            if ~isempty(val)
+                val = val{1}; 
+            end
+            
+            if isnumeric(val) && ~isempty(val)
+                obj.show_cutotus_oversample = val;
+            end
+            
+            obj.showCutouts(obj.cut_fig);
             
         end
         
