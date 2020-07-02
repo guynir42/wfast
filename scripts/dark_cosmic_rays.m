@@ -17,8 +17,8 @@ N = length(list);
 % N = 18; % debug only!
 
 cut_size = 25;
-threshold = 7.5; 
-max_hits = 100; % per file... 
+threshold = 15; 
+max_hits = 200; % per file... 
 
 flares = []; % MicroFlare object array
 
@@ -32,18 +32,17 @@ for ii = 1:N
     I = h5read(list{ii}, '/images'); 
     
     IC = cal.input(I); 
-%     IC = IC./sqrt(cal.dark_var);
+    IC2 = IC./sqrt(cal.dark_var);
 
-
-    fprintf('ii= %d | size(cosmic_rays)= %s\n', ii, util.text.print_vec(size(flares))); 
+    fprintf('ii= %d | size(flares)= %s\n', ii, util.text.print_vec(size(flares))); 
     
     clear I;
     
     for jj = 1:max_hits
     
-        [mx,idx] = nanmax(IC(:));
+        [mx,idx] = nanmax(IC2(:));
     
-        if mx./dark_std<threshold
+        if mx<threshold
             break; % skip the rest of this file
         end
         
@@ -65,7 +64,7 @@ for ii = 1:N
         if y_max>size(IC,1), y_max = size(IC,1); end
         
         cutouts = IC(y_min:y_max,x_min:x_max,:); 
-        IC(y_min:y_max,x_min:x_max,:) = 0; 
+        IC2(y_min:y_max,x_min:x_max,:) = 0; 
         
         s = util.img.photometry2(cutouts, 'radius', 3, 'annulus', [5,10], 'use_aperture', 1, 'use_gaussian', 1, 'use_forced', 0); 
         f = s.apertures_photometry.flux;
@@ -86,14 +85,14 @@ for ii = 1:N
         new_flare.filename = list{ii}; 
         new_flare.frame_index = z;
         new_flare.pos = [x;y];
-        new_flare.peak = mx;
+        new_flare.peak = IC(idx);
         new_flare.pixel_var = cal.dark_var(y,x); 
         new_flare.cutouts = cutouts;
         new_flare.flux = f;
         new_flare.background = b;
         new_flare.area = a;
         new_flare.error = e;
-        new_flare.offset = [dx;dy];
+        new_flare.offset = [dx dy];
         new_flare.width = w;
         new_flare.bad_pixels = p;
         
@@ -120,7 +119,7 @@ xy = ([flares.pos])';
 
 bad_pixel_indices = find([flares.num_pixels]==1 | xy(:,1)'==1960);
 cosmic_ray_indices = find([flares.num_pixels]>1 & xy(:,1)'~=1960);
-mulitframe_indices = find([flares.num_frames]>1);
+multiframe_indices = find([flares.num_frames]>1);
 
 
 fprintf('N_total= %d | N_pixels= %d | N_cr= %d | N_multiframe= %d | N_flares= %d\n', ...
@@ -147,7 +146,11 @@ ylabel(ax, 'Flare peak');
 ax.FontSize = 20;
 ax.YScale = 'log';
 
-legend(ax, {'bad pixels', 'cosmic rays', 'multi-frame'}); 
+if ~isempty(mulitframe_indices)
+    legend(ax, {'bad pixels', 'cosmic rays', 'multi-frame'}); 
+else
+    legend(ax, {'bad pixels', 'cosmic rays'}); 
+end
 
 
 

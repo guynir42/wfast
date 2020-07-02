@@ -1,4 +1,4 @@
-function show_cutouts(C, varargin)
+function ax = show_cutouts(C, varargin)
 % Usage: show_cutouts(C, varargin)
 % Show a few cutouts side by side, allowing some interpolation to see the 
 % details better.
@@ -23,6 +23,7 @@ function show_cutouts(C, varargin)
     input.input_var('oversample', [], 'oversampling'); % how much we want to interpolate to see more details
     input.input_var('type', 'heat') % can choose "heat" (regular image) or "surf" for 3D plot
     input.input_var('view', []); % pass a 2 or 3 vector to give the viewing angle on the surface plot
+    input.input_var('color', 'red'); % of the text label
     input.input_var('parent', []); 
     input.scan_vars(varargin{:}); 
     
@@ -30,7 +31,7 @@ function show_cutouts(C, varargin)
         input.parent = gcf;
     end
     
-    if input.frame>=size(C,3)
+    if input.frame>size(C,3)
         indices = 1:size(C,3); 
     else
 
@@ -82,7 +83,9 @@ function show_cutouts(C, varargin)
             lim_min = min(lim_min, ax{counter}.ZLim(1)); 
             lim_max = max(lim_max, ax{counter}.ZLim(2)); 
             
-            util.plot.inner_title(sprintf('frame= %d', indices(counter)), 'ax', ax{counter}); 
+            util.plot.inner_title(sprintf('frame= %d', indices(counter)), 'ax', ax{counter}, 'color', input.color); 
+            
+            ax{counter}.UserData = indices(counter); 
             
             counter = counter + 1;
             

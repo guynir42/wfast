@@ -149,8 +149,8 @@ classdef Calibration < handle
         dark_mask_var_min = 0.5; % pixels with variance below this are dead pixels
         
         use_remove_empty_frames = 1;
+        use_remove_bad_rows_columns = 1; % if a row or column has more than 10% bad pixels, remove the whole row/column
         
-        % switches for making darks/flats (can we get rid of this??)
         use_calc_lightcurve = 1;
         num_flat_sections = 5; % divide the flat field along these lines for lightcurves calculation (use 1 or 2 elements to denote how many rectangles on each side)
 
@@ -537,6 +537,14 @@ classdef Calibration < handle
         function set.dark_mask_var_min(obj, val)
            
             obj.dark_mask_var_min = val;
+            obj.dark_mask = [];
+            obj.dark_mask_cut = [];
+            
+        end
+        
+        function set.use_remove_bad_rows_columns(obj, val)
+            
+            obj.use_remove_bad_rows_columns = val;
             obj.dark_mask = [];
             obj.dark_mask_cut = [];
             
@@ -1027,6 +1035,22 @@ classdef Calibration < handle
             if obj.debug_bit>2, fprintf('dark_mean stats: mu= %4.2f | sig= %4.2f | num_pix= %d | frac= %g\n', mu, sig, nnz(idx), nnz(idx)/numel(idx)); end
             
             obj.dark_mask = M;  
+            
+            if obj.use_remove_bad_rows_columns
+                
+                frac = 0.1;
+                
+                % remove bad columns
+                idx = sum(M,1)./size(M,1) > frac;
+                M(:,idx) = 1; 
+                
+                % remove bad rows
+                idx = sum(M,2)./size(M,2) > frac;
+                M(idx,:) = 1; 
+                
+                obj.dark_mask = M;
+                
+            end
             
         end
         

@@ -26,6 +26,9 @@ classdef MicroFlare < handle
         mean; % mean flux calculated outside the peak region
         std; % RMS flux calculated outside the peak region
         
+        back_mean; % mean of images
+        back_std; % RMS of images
+        
         image; % single cutout at the frame of the peak
         num_peaks; % how many distinct peaks can we find in the one image
         num_frames; % how many continuous frames we have around the peak
@@ -40,6 +43,8 @@ classdef MicroFlare < handle
     properties % switches/controls
         
         pixel_thresh = 256; % threshold of the brightest pixel, used for triggering 
+        region_thresh = 5; % each pixel is counted if it surpasses this many multiples of  image noise 
+        frac_thresh = 0.1; % threshold of pixels around the brightest pixel, as fraction of peak, for finding number of pixels
         flux_thresh = 7.5; % threshold for peak intensity (of the flux, not of single pixel)
         side_thresh = 3; % threshold for flux in frames adjacent to the peak
         interval_peak = 2; % how many frames in either direction from peak should be excluded for calculating the mean/std of the flux
@@ -127,6 +132,7 @@ classdef MicroFlare < handle
             
             input = util.text.InputVars;
             input.input_var('pixel_thresh', [], 'pixel_threshold'); 
+            input.input_var('area_thresh', [], 'area_threshold'); 
             input.input_var('flux_thresh', [], 'flux_threshold'); 
             input.input_var('side_thresh', [], 'side_threshold'); 
             input.input_var('interval_peak', []); 
@@ -141,36 +147,38 @@ classdef MicroFlare < handle
             
             obj.image = obj.cutouts(:,:,obj.frame_index); 
             
-            indices = obj.frame_index;
-            for ii = 1:obj.interval_peak
-                
-                idx = obj.frame_index - ii;
-                if idx<1, break; end
-                
-                indices = [indices idx]; 
-                    
-            end
+%             indices = obj.frame_index;
+%             for ii = 1:obj.interval_peak
+%                 
+%                 idx = obj.frame_index - ii;
+%                 if idx<1, break; end
+%                 
+%                 indices = [indices idx]; 
+%                     
+%             end
+%             
+%             for ii = 1:obj.interval_peak
+%                 
+%                 idx = obj.frame_index + ii;
+%                 if idx>length(obj.flux)
+%                     break;
+%                 end
+%                 
+%                 indices = [indices idx]; 
+%                     
+%             end
+%             
+%             indices = sort(indices);
+%             flux_bg = obj.flux;
+%             flux_bg(indices) = NaN;
+%             
+%             obj.mean = nanmean(flux_bg);
+%             obj.std = nanstd(flux_bg); 
+%             
+%             flux_norm = (obj.flux-obj.mean)./obj.std;
             
-            for ii = 1:obj.interval_peak
-                
-                idx = obj.frame_index + ii;
-                if idx>length(obj.flux)
-                    break;
-                end
-                
-                indices = [indices idx]; 
-                    
-            end
-            
-            indices = sort(indices);
-            flux_bg = obj.flux;
-            flux_bg(indices) = NaN;
-            
-            obj.mean = nanmean(flux_bg);
-            obj.std = nanstd(flux_bg); 
-            
-            flux_norm = (obj.flux-obj.mean)./obj.std;
-            
+            flux_norm = obj.getNormFlux; 
+
             % how many frames above the threshold
             counter = 1;
             for ii = 1:length(flux_norm)
@@ -195,8 +203,11 @@ classdef MicroFlare < handle
             
             obj.num_frames = counter;
             
+            obj.back_mean = nanmedian(util.stat.mean2(obj.cutouts)); 
+            obj.back_std = nanmedian(util.stat.std2(obj.cutouts)); 
+            
             % how many pixels in the image are above the threshold
-            BW = obj.image>obj.pixel_thresh; % black/white image of pixels above the threshold
+            BW = (obj.image-obj.back_mean)./obj.back_std>obj.region_thresh; % black/white image of pixels above the threshold
             N = nnz(BW); 
             
             if N<=1
@@ -232,9 +243,154 @@ classdef MicroFlare < handle
             
         end
         
+        function flux_norm = getNormFlux(obj)
+            
+            indices = obj.frame_index;
+            for ii = 1:obj.interval_peak
+                
+                idx = obj.frame_index - ii;
+                if idx<1, break; end
+                
+                indices = [indices idx]; 
+                    
+            end
+            
+            for ii = 1:obj.interval_peak
+                
+                idx = obj.frame_index + ii;
+                if idx>length(obj.flux)
+                    break;
+                end
+                
+                indices = [indices idx]; 
+                    
+            end
+            
+            indices = sort(indices);
+            flux_bg = obj.flux;
+            flux_bg(indices) = NaN;
+            
+            obj.mean = nanmean(flux_bg);
+            obj.std = nanstd(flux_bg); 
+            
+            flux_norm = (obj.flux-obj.mean)./obj.std;
+            
+        end
+        
     end
     
     methods % plotting tools / GUI
+        
+        function show(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('index', []); 
+            input.input_var('parent', []); 
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.parent)
+                input.parent = gcf;
+            end
+            
+            if ~isempty(input.index) % user input overrides all
+                input.parent.UserData = input.index;
+            elseif ~isempty(input.parent.UserData) % no user input, recover latest index
+                input.index = input.parent.UserData;
+            else % the default is to start with the first index
+                input.parent.UserData = 1;
+                input.index = 1;
+            end
+            
+            this = obj(input.index);
+            
+            clf(input.parent); 
+            
+            panel_filename = uipanel(input.parent, 'Units', 'Normalized', 'Position', [0 0.9 1 0.1]);
+            
+            uicontrol(panel_filename, 'Style', 'pushbutton', 'String', this.filename, ...
+                'Units', 'Normalized', 'Position', [0 0 1 1], 'FontSize', 10); 
+            
+            panel_flux = uipanel(input.parent, 'Units', 'Normalized', 'Position', [0 0 0.5 0.9]); 
+            
+            uicontrol(panel_flux, 'Style', 'pushbutton', 'Units', 'Normalized', 'Position', [0.3 0.05 0.1 0.1], ...
+                'String', '-', 'Callback', @obj.prevShow, 'FontSize', 16); 
+            
+            uicontrol(panel_flux, 'Style', 'edit', 'Units', 'Normalized', 'Position', [0.4 0.05 0.3 0.1], ...
+                'String', sprintf('%d / %d ', input.index, length(obj)), 'Callback', @obj.chooseShow, 'FontSize', 16); 
+            
+            uicontrol(panel_flux, 'Style', 'pushbutton', 'Units', 'Normalized', 'Position', [0.7 0.05 0.1 0.1], ...
+                'String', '+', 'Callback', @obj.nextShow, 'FontSize', 16); 
+            
+            ax = axes('Parent', panel_flux, 'Position', [0.2 0.35 0.7 0.55]);
+            
+            plot(ax, this.flux, 'LineWidth', 2); 
+            
+            xlabel(ax, 'frame number'); 
+            ylabel(ax, 'flux'); 
+            title(ax, sprintf('peak = %4.2f | pix= %d | rms= %4.2f', this.peak, obj(input.index).num_pixels, sqrt(this.pixel_var))); 
+            ax.FontSize = 14;
+            
+            panel_cutouts = uipanel(input.parent, 'Units', 'Normalized', 'Position', [0.5 0 0.5 0.9]); 
+            
+            ax = util.plot.show_cutouts(this.cutouts, 'parent', panel_cutouts, 'frame', this.frame_index, 'number', 9); 
+            
+            for ii = 1:length(ax)
+                if ~isempty(ax{ii}.UserData) && ax{ii}.UserData==this.frame_index
+                    
+                    hold(ax{ii}, 'on'); 
+                    x = size(this.image,2)/2 +0.5; % + this.offset(this.frame_index,1);
+                    y = size(this.image,1)/2 +0.5; % + this.offset(this.frame_index,2);
+                    plot(ax{ii}, x, y, 'ro', 'MarkerSize', 25); 
+                    hold(ax{ii}, 'off'); 
+                    
+                end
+            end
+            
+        end
+        
+        function nextShow(obj, hndl, ~)
+            
+            idx = hndl.Parent.Parent.UserData;
+            
+            idx = idx + 1;
+            if idx>length(obj)
+                idx = 1;
+            end
+            
+            obj.show('parent', hndl.Parent.Parent, 'index', idx); 
+            
+        end
+        
+        function prevShow(obj, hndl, ~)
+            
+            idx = hndl.Parent.Parent.UserData;
+            
+            idx = idx - 1;
+            if idx<1
+                idx = length(obj);
+            end
+            
+            obj.show('parent', hndl.Parent.Parent, 'index', idx); 
+            
+        end
+        
+        function chooseShow(obj, hndl, ~)
+            
+            idx = util.text.extract_numbers(hndl.String);
+            
+            if ~isempty(idx)
+                idx = idx{1}; 
+            end
+            
+            if ~isempty(idx)
+                idx = idx(1);
+            end
+            
+            if isnumeric(idx) && ~isempty(idx)
+                obj.show('parent', hndl.Parent.Parent, 'index', idx); 
+            end
+            
+        end
         
     end    
     
