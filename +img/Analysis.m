@@ -8,6 +8,7 @@ classdef Analysis < file.AstroData
         pool; 
         futures; 
         futures_dir;
+        futures_batches;
         
         aux_figure;
         
@@ -31,6 +32,7 @@ classdef Analysis < file.AstroData
         width_buf@util.vec.CircularBuffer;
         
         lightcurves@img.Lightcurves;
+        buf@file.BufferWheel; 
         
         model_psf@img.ModelPSF;
         
@@ -86,7 +88,16 @@ classdef Analysis < file.AstroData
         use_astrometry = 1;
         use_cutouts = 1;
         use_photometry = 1;
+        
+        use_analysis_dir_save = 0; % do we want to save analysis results
+        use_analysis_dir_log = 0; % do we want analysis log file
+        
+        use_full_lightcurves = 0; % use the Lightcurves object to hold all the fluxes and other measurements for the entire run
+        use_save_full_lightcurves = 1; % save these full lightcurves for the entire run as a single MAT file (ONLY when use_analysis_dir_save=1)
+        use_save_batched_lightcurves = 1; % save each batch's photometric result in a separate file (ONLY when use_analysis_dir_save=1)
+        
         use_psf_model = 1;
+        
         use_event_finding = 1;
         
         use_auto_load_cal = 1;
@@ -145,9 +156,6 @@ classdef Analysis < file.AstroData
         cutout_adjustment_pixels = 0; % how many pixels to push (back or forward) relative to today's positions
         use_cutout_adjustment_floor = 0; % use floor of positions before (instead of) using round(). 
         
-        use_analysis_dir_save = 0; % do we want to save analysis results
-        use_analysis_dir_log = 0; % do we want analysis log file
-        
         log_dir; % where to save the analysis results and log file
         log_name; % name of log file
         log_obj; % name of object text dump
@@ -191,7 +199,10 @@ classdef Analysis < file.AstroData
                 obj.width_buf = util.vec.CircularBuffer;
                 
                 obj.lightcurves = img.Lightcurves; 
-
+                obj.buf = file.BufferWheel;
+                obj.buf.use_async = 0;
+                obj.buf.use_deflate = 1;
+                
                 obj.model_psf = img.ModelPSF;
                 
                 obj.finder = trig.Finder;
@@ -529,13 +540,15 @@ classdef Analysis < file.AstroData
             
             name = obj.get_obj_name;
             
-            try 
-                obj.lightcurves.saveAsMAT(fullfile(obj.log_dir, ['lightcurves_' name]));
+            try % save the full lightcurves
+                if obj.use_full_lightcurves && obj.use_save_full_lightcurves
+                    obj.lightcurves.saveAsMAT(fullfile(obj.log_dir, ['lightcurves_' name]));
+                end
             catch ME
                 warning(ME.getReport);
             end
             
-            try
+            try % save the event finder
                 obj.finder.conserveMemory;
 
                 finder = obj.finder;
@@ -619,6 +632,10 @@ classdef Analysis < file.AstroData
                     fprintf('Future{%2d}: State= %14s%s | Error= %d | runtime= %9s', ii, obj.futures{ii}.State, asterisk, ~isempty(obj.futures{ii}.Error),...
                         char(finish_datetime-obj.futures{ii}.StartDateTime));
                 
+                    if length(obj.futures_batches)>=ii && ~isempty(obj.futures_batches{ii})
+                        fprintf(' | N= % 4d', obj.futures_batches{ii});
+                    end
+                    
                     if length(obj.futures_dir)>=ii && ~isempty(obj.futures_dir{ii})
                         fprintf(' | dir= %s', obj.futures_dir{ii});
                     end
@@ -795,8 +812,9 @@ classdef Analysis < file.AstroData
                 end
             end
             
-            obj.lightcurves.finishup;
-            
+            if obj.use_full_lightcurves
+                obj.lightcurves.finishup;
+            end
             if obj.debug_bit, disp(['Finished run with ' num2str(obj.batch_counter) ' batches.']); end
             
         end
@@ -817,6 +835,7 @@ classdef Analysis < file.AstroData
             
             obj.futures{input.worker} = parfeval(obj.pool, @obj.run, 1, 'reset', input.reset, 'logging', input.logging, 'save', input.save, 'overwrite', input.overwrite); 
             obj.futures_dir{input.worker} = obj.reader.dir.two_tail;
+            obj.futures_batches{input.worker} = obj.num_batches; 
             
         end
         
@@ -970,7 +989,7 @@ classdef Analysis < file.AstroData
                             end
                         end
                     end
-
+                    
                     obj.prog.showif(ii);
 
                     drawnow;
@@ -1068,6 +1087,13 @@ classdef Analysis < file.AstroData
 
                 end
 
+            end
+            
+            if obj.use_analysis_dir_save && obj.use_save_batched_lightcurves && obj.use_photometry
+                obj.phot.cutouts = [];
+                obj.buf.input(obj.phot);
+                obj.buf.directory = obj.log_dir; 
+                obj.buf.save;
             end
             
             if obj.use_fits_save
@@ -1422,13 +1448,18 @@ classdef Analysis < file.AstroData
 
             t = tic;
 
-            obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps, ...
+            obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps,...
+                't_start', obj.t_start, 't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp, ...
                 'juldates', obj.juldates, 'positions', obj.positions, 'variance', single(2.5)); % need to add the sky background too
 
-            obj.lightcurves.getData(obj.phot);
+            if obj.use_full_lightcurves
+                
+                obj.lightcurves.getData(obj.phot);
 
-            if obj.lightcurves.gui.check, obj.lightcurves.gui.update; end
-
+                if obj.lightcurves.gui.check, obj.lightcurves.gui.update; end
+                
+            end
+            
             if obj.debug_bit>1, fprintf('Time for photometry: %f seconds\n', toc(t)); end
             
             t = tic;

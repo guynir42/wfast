@@ -105,6 +105,11 @@ classdef AnalysisGUI < handle
             obj.menu_options.addButton('input_num_batches', '&Num batches', 'input', 'num_batches', '', 1); 
             obj.menu_options.addButton('input_num_stars', 'Num &Stars', 'input', 'num_stars'); 
             
+            obj.menu_options.addButton('menu_lightcurves', '&Lightcurves', 'menu', '', 1); 
+            obj.menu_options.menu_lightcurves.addButton('button_full', 'Use &Full', 'toggle', 'use_full_lightcurves'); 
+            obj.menu_options.menu_lightcurves.addButton('button_save_full', '&Save full', 'toggle', 'use_save_full_lightcurves'); 
+            obj.menu_options.menu_lightcurves.addButton('button_batched', 'Save &Batched', 'toggle', 'use_save_batched_lightcurves'); 
+            
             
             %%%%%%%%%%%%%%%%%%% LEFT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%%
             

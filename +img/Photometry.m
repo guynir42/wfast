@@ -24,6 +24,9 @@ classdef Photometry < handle
         gain; % can be scalar or a map of the same size as cutouts
         
         timestamps;
+        t_start;
+        t_end;
+        t_end_stamp;
         juldates; 
         
         psf; % either given or found from the image (to be depricated)
@@ -342,6 +345,9 @@ classdef Photometry < handle
             input.input_var('gain', [], 'gain_map', 'gain_scalar');
             input.input_var('positions', []);
             input.input_var('timestamps', [], 'times');
+            input.input_var('t_start', []);
+            input.input_var('t_end', []);
+            input.input_var('t_end_stamp', [], 7);
             input.input_var('juldates', [], 'juliandates'); 
             input.scan_vars(varargin{:});
             
@@ -355,6 +361,9 @@ classdef Photometry < handle
             obj.var_map = input.variance;
             obj.gain = input.gain;
             obj.timestamps = input.timestamps;
+            obj.t_start = input.t_start;
+            obj.t_end = input.t_end;
+            obj.t_end_stamp = input.t_end_stamp;
             obj.juldates = input.juldates;
             
             obj.cut_size_latest = size(input.cutouts);

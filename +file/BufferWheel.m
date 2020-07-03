@@ -559,6 +559,9 @@ classdef BufferWheel < file.AstroData
                     val = 'Stack';
                 elseif ~isempty(obj.cutouts)
                     val = 'Cutouts';
+                elseif isempty(obj.cutouts) && isempty(obj.stack) && isempty(obj.images) ...
+                        && ~isempty(obj.fluxes)
+                    val = 'Lightcurves'; 
                 else
                     val = ''; % we really don't know what is stored in these files... 
                 end
@@ -935,6 +938,8 @@ classdef BufferWheel < file.AstroData
                 return; % do not call clear (or anything) if you didn't get any data... 
             elseif isa(varargin{1}, 'file.AstroData') % just grab the data from the object given (including derived classes e.g., img.Acquisition)
                 input = varargin{1};
+            elseif isa(varargin{1}, 'img.Photometry')
+                input = varargin{1}; 
             else
                 input = util.text.InputVars;
                 input.setupDataInput; % default used for scanning all sort of inputs
@@ -948,9 +953,9 @@ classdef BufferWheel < file.AstroData
                 
                 name = list{ii};
                 
-                if isfield(obj.this_buf, name)
+                if isfield(obj.this_buf, name) && isprop(input, list{ii})
                     obj.buf(obj.mod(obj.index)).(name) = input.(name);
-                else
+                elseif ~isfield(obj.this_buf, name)
                     warning(['Cannot find field "' name '" in buffer struct']);
                 end
                 
