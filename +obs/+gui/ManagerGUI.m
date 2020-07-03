@@ -116,10 +116,10 @@ classdef ManagerGUI < handle
             
             obj.panel_devices = GraphicPanel(obj.owner, [0.0 pos/N_left 0.2 N/N_left], 'device status');
             obj.panel_devices.number = N;
-            obj.panel_devices.addButton('button_dome', 'dome', 'push', 'dome', '', '', 1/3);
-            obj.panel_devices.addButton('button_mount', 'mount', 'push', 'mount', '', '', 1/3);
-            obj.panel_devices.addButton('button_weather', 'weather', 'push', 'BoltWood', '', '', 1/3);
-            obj.panel_devices.addButton('button_wind', 'wind', 'push', 'WindETH', '', '', 1/3);
+            obj.panel_devices.addButton('button_dome', 'dome', 'push', 'dome', '', '', 1/3, '', '', 'dome status (click for dome GUI)');
+            obj.panel_devices.addButton('button_mount', 'mount', 'push', 'mount', '', '', 1/3, '', '', 'mount status (click for mount GUI)');
+            obj.panel_devices.addButton('button_weather', 'weather', 'push', 'BoltWood', '', '', 1/3, '', '', 'Boltwood weather stations status');
+            obj.panel_devices.addButton('button_wind', 'wind', 'push', 'WindETH', '', '', 1/3, '', '', 'WindETH sensor status');
             obj.panel_devices.margin = [0.01 0.005];
             obj.panel_devices.make;
             
@@ -129,22 +129,15 @@ classdef ManagerGUI < handle
             pos = pos - N;
             obj.panel_telescope = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'telescope');
             obj.panel_telescope.number = N;
-            obj.panel_telescope.addButton('button_RA', 'RA', 'info', 'RA: ', '', '', 0.5);
-            obj.panel_telescope.addButton('button_DE', 'DEC', 'info', 'DE: ', '', '', 0.5);            
-            obj.panel_telescope.addButton('button_LST', 'LST', 'info', 'LST: ', '', '', 0.5);
-            obj.panel_telescope.addButton('button_ALT', 'ALT', 'info', 'ALT: ', ' deg', '', 0.5);
-            obj.panel_telescope.addButton('button_tracking', 'tracking', 'toggle', 'tracking is off', 'tracking is on', '', 0.5, obj.color_on, 'red');
-            obj.panel_telescope.addButton('button_side', 'mount.telHemisphere', 'info', 'pointing ', '', '', 0.5); 
-            obj.panel_telescope.addButton('button_vibrations', '', 'custom', '', '', '', 0.5); 
+            obj.panel_telescope.addButton('button_RA', 'RA', 'info', 'RA: ', '', '', 0.5, '', '', 'current right ascension of the mount (hours)');
+            obj.panel_telescope.addButton('button_DE', 'DEC', 'info', 'DE: ', '', '', 0.5, '', '', 'current declination of the mount (degrees)');
+            obj.panel_telescope.addButton('button_LST', 'LST', 'info', 'LST: ', '', '', 0.5, '', '', 'Local sidereal time');
+            obj.panel_telescope.addButton('button_ALT', 'ALT', 'info', 'ALT: ', ' deg', '', 0.5, '', '', 'current telescope altitude above horizon(deg)');
+            obj.panel_telescope.addButton('button_tracking', 'tracking', 'toggle', 'tracking is off', 'tracking is on', '', 0.5, obj.color_on, 'red', 'turn the telescope tracking on and off');
+            obj.panel_telescope.addButton('button_side', 'mount.telHemisphere', 'info', 'pointing ', '', '', 0.5, '', '', 'The side (hemisphere) to which the telescope is currently pointing'); 
+            obj.panel_telescope.addButton('button_vibrations', '', 'custom', '', '', '', 0.5, '', '', 'show if telescope is vibrating (tested during weather check)'); 
             obj.panel_telescope.margin = [0.02 0.01];
             obj.panel_telescope.make;
-            
-            obj.panel_telescope.button_RA.Tooltip = 'Current right ascention of mount';
-            obj.panel_telescope.button_DE.Tooltip = 'Current declination of mount';
-            obj.panel_telescope.button_LST.Tooltip = 'Local Sidereal Time';
-            obj.panel_telescope.button_ALT.Tooltip = 'Current altitidue of mount';
-            obj.panel_telescope.button_tracking.Tooltip = 'Turn telescope tracking on and off';
-            obj.panel_telescope.button_side.Tooltip = 'The side to which the telescope is currently pointing';
             
             %%%%%%%%%%% panel scheduler %%%%%%%%%%%%%%%
             
@@ -186,20 +179,17 @@ classdef ManagerGUI < handle
             pos = pos - N;
             obj.panel_dome = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'dome');
             obj.panel_dome.number = N;            
-            obj.panel_dome.addButton('button_close_dome', 'closeDome', 'push', 'Close Dome');
-            obj.panel_dome.addButton('button_shutter_east', '', 'custom', 'East: ', '', 'edit', 0.275);
+            obj.panel_dome.addButton('button_close_dome', 'closeDome', 'push', 'Close Dome', '', '', [], '', '', 'Immediately close both shutters');
+            obj.panel_dome.addButton('button_shutter_east', '', 'custom', 'East: ', '', 'edit', 0.275, '', '', 'Position of West shutter');
             obj.panel_dome.addButton('button_tracking', 'dome.use_tracking', 'toggle', 'dome not tracking', 'dome is tracking', 'edit', 0.45, obj.color_on, '', 'dome can be set to slowly open West and close East'); 
-            obj.panel_dome.addButton('button_shutter_west', '', 'custom', 'West: ', '', 'edit', 0.275);
-            obj.panel_dome.addButton('button_close_east', '', 'custom', 'Close East', '', '', 0.5);
-            obj.panel_dome.addButton('button_close_west', '', 'custom', 'Close West', '', '', 0.5);
-            obj.panel_dome.addButton('button_open_east', '', 'custom', 'Open East', '', '', 0.5);
-            obj.panel_dome.addButton('button_open_west', '', 'custom', 'Open West', '', '', 0.5);
+            obj.panel_dome.addButton('button_shutter_west', '', 'custom', 'West: ', '', 'edit', 0.275, '', '', 'Position of East shutter');
+            obj.panel_dome.addButton('button_close_east', '', 'custom', 'Close East', '', '', 0.5, '', '', 'close the East shutter (hold shift for full close)');
+            obj.panel_dome.addButton('button_close_west', '', 'custom', 'Close West', '', '', 0.5, '', '', 'open the East shutter (hold shift for full open)');
+            obj.panel_dome.addButton('button_open_east', '', 'custom', 'Open East', '', '', 0.5, '', '', 'close the West shutter (hold shift for full close)');
+            obj.panel_dome.addButton('button_open_west', '', 'custom', 'Open West', '', '', 0.5, '', '', 'close the West shutter (hold shift for full open)');
             obj.panel_dome.margin = [0.02 0.01];
             obj.panel_dome.make;
             
-            obj.panel_dome.button_close_dome.Tooltip = 'Immediately close both shutters';
-            obj.panel_dome.button_shutter_west.Tooltip = 'Position of West shutter';
-            obj.panel_dome.button_shutter_east.Tooltip = 'Position of East shutter';
             obj.panel_dome.button_close_west.Callback = @obj.callback_close_west; 
             obj.panel_dome.button_open_west.Callback = @obj.callback_open_west; 
             obj.panel_dome.button_close_east.Callback = @obj.callback_close_east; 
@@ -211,24 +201,22 @@ classdef ManagerGUI < handle
             pos = pos - N;
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N_left 0.2 N/N_left], 'controls');
             obj.panel_controls.number = N;
-            obj.panel_controls.addButton('button_autoshutdown', 'use_shutdown', 'toggle', 'auto shutdown is disabled', 'auto shutdown is enabled', '', 0.7, obj.color_on, 'red'); 
+            obj.panel_controls.addButton('button_autoshutdown', 'use_shutdown', 'toggle', 'auto shutdown is disabled', 'auto shutdown is enabled', '', 0.7, obj.color_on, 'red', ...
+                'allow manager to close dome and stop tracking if weather is bad or if there is a device failure'); 
 %             obj.panel_controls.addButton('button_twilight', 'checker.use_twilight_mode', 'toggle', 'twilight is off', 'twilight is on', '', 0.3, 'red', obj.color_on);
-            obj.panel_controls.addButton('button_twilight', '', 'custom', 'twilight is off', 'twilight is on', '', 0.3, 'red', obj.color_on);
+            obj.panel_controls.addButton('button_twilight', '', 'custom', 'twilight is off', 'twilight is on', '', 0.3, 'red', obj.color_on, 'let the dome stay open during twilight');
             
-            obj.panel_controls.addButton('button_autostartup', 'use_startup', 'toggle', 'auto start up is disabled', 'auto start up is enabled', '', 0.7, obj.color_on, 'red'); 
-            obj.panel_controls.addButton('button_lights', 'assist.lights', 'toggle', 'LEDs are off', 'LEDs are on', 'edit', 0.3, 'red', obj.color_on);
+            obj.panel_controls.addButton('button_autostartup', 'use_startup', 'toggle', 'auto start up is disabled', 'auto start up is enabled', '', 0.7, obj.color_on, 'red', ...
+                 'Manager can choose new targets from scheduler (still requires user confirmation, still doesn''t open dome if closed)'); 
+             
+            obj.panel_controls.addButton('button_lights', 'assist.lights', 'toggle', 'LEDs are off', 'LEDs are on', 'edit', 0.3, 'red', obj.color_on, 'turn on/off dome lights');
             
-            obj.panel_controls.addButton('button_weather_check', 'callback_t2', 'push', 'Weather check');
-            obj.panel_controls.addButton('button_proceed', 'checkNewTarget', 'push', 'proceed to target'); 
+            obj.panel_controls.addButton('button_weather_check', 'callback_t2', 'push', 'Weather check', '', '', [], '', '', 'run callback_t2, starting t1 and calling update to check weather and devices');
+            obj.panel_controls.addButton('button_proceed', 'checkNewTarget', 'push', 'proceed to target', '', '', [], '', '', 'use scheduler to move to new target'); 
             obj.panel_controls.margin = [0.01 0.01];
             obj.panel_controls.make;
             
-            obj.panel_controls.button_autoshutdown.Tooltip = 'Allow manager to close dome and stop tracking if weather is bad or if there is a device failure';
-            obj.panel_controls.button_twilight.Tooltip = 'Let the dome stay open during twilight';
             obj.panel_controls.button_twilight.Callback = @obj.callback_twilight_mode;
-            obj.panel_controls.button_autostartup.Tooltip = 'Allow manager to open and start observing autonomously. (not implemented yet)';
-            obj.panel_controls.button_weather_check.Tooltip = 'Run t2 to check weather and devices'; 
-            obj.panel_controls.button_proceed.Tooltip = 'use scheduler to move to new target'; 
             
             %%%%%%%%%%% panel report %%%%%%%%%%%%%%%%%
             
@@ -248,15 +236,15 @@ classdef ManagerGUI < handle
             pos = pos - N;
             
             obj.panel_weather = GraphicPanel(obj.owner, [0.2, pos/N_middle, 0.8, N/N_middle], 'weather');
-            obj.panel_weather.addButton('button_temperature', 'average_temperature', 'info', 'Amb. Temp= ', 'C', '', 1/4);
-            obj.panel_weather.addButton('button_clouds', 'average_clouds', 'info', 'dT= ', 'C', '', 1/4);
-            obj.panel_weather.addButton('button_light', 'average_light', 'info', 'Light= ', '', '', 1/4);
-            obj.panel_weather.addButton('button_pressure', 'average_pressure', 'info', 'Pres= ', '', '', 1/4); 
+            obj.panel_weather.addButton('button_temperature', 'average_temperature', 'info', 'Amb. Temp= ', ' C', '', 1/4, '', '', 'mean temperature from all sensors');
+            obj.panel_weather.addButton('button_clouds', 'average_clouds', 'info', 'dT= ', ' C', '', 1/4, '', '', 'mean cloud from all sensors (measured as sky-ground temp difference)');
+            obj.panel_weather.addButton('button_light', 'average_light', 'info', 'Light= ', '', '', 1/4, '', '', 'mean light level from all sensors (in arbitrary units between 120-1024)');
+            obj.panel_weather.addButton('button_pressure', 'average_pressure', 'info', 'Pres= ', ' mbar', '', 1/4, '', '', 'mean atmospheric pressure from all sensors'); 
             
-            obj.panel_weather.addButton('button_wind_speed', 'average_wind_speed', 'info', 'wind= ', ' km/h', '', 1/4);
-            obj.panel_weather.addButton('button_wind_dir', 'average_wind_dir', 'info', 'wind dir= ', ' deg', '', 1/4);
-            obj.panel_weather.addButton('button_humidity', 'average_humidity', 'info', 'humid= ', '%', '', 1/4);
-            obj.panel_weather.addButton('button_rain', 'any_rain', 'info', 'rain= ', '', '', 1/4);
+            obj.panel_weather.addButton('button_wind_speed', 'average_wind_speed', 'info', 'wind= ', ' km/h', '', 1/4, '', '', 'maximum wind speed measured from any of the sensors');
+            obj.panel_weather.addButton('button_wind_dir', 'average_wind_dir', 'info', 'wind dir= ', ' deg', '', 1/4, '', '', 'mean wind direction from all sensors');
+            obj.panel_weather.addButton('button_humidity', 'average_humidity', 'info', 'humid= ', '%', '', 1/4, '', '', 'mean humidity measured from all sensors');
+            obj.panel_weather.addButton('button_rain', 'any_rain', 'info', 'rain= ', '', '', 1/4, '', '', 'rain check: if true that means there is actual moisture on one of the sensors!');
             
             obj.panel_weather.margin = [0.01 0.01];
             obj.panel_weather.number = N;
@@ -274,10 +262,13 @@ classdef ManagerGUI < handle
             
             obj.button_reset_axes = GraphicButton(obj.panel_image, [0.0 0.0 0.1 0.05], obj.owner, '', 'custom', 'reset plot');
             obj.button_reset_axes.Callback = @obj.makeAxes;
+            obj.button_reset_axes.Tooltip = 'redraw the weather axes';
             
             obj.button_mean_only = GraphicButton(obj.panel_image, [0.0 0.95 0.1 0.05], obj.owner, 'checker.use_only_plot_mean', 'toggle', 'all', 'mean'); 
+            obj.button_mean_only.Tooltip = 'show weather data for all sensors or only for the mean of each data type';
             
             obj.button_clicker = GraphicButton(obj.panel_image, [0.64 0.45 0.28 0.05], obj.owner, '', 'custom', '', ''); 
+            obj.button_clicker.Tooltip = 'click any weather plot to get the name of sensor and the latest measurement';
             
             %%%%%%%%%%% panel camera %%%%%%%%%%%%%%%%%
             
@@ -297,7 +288,7 @@ classdef ManagerGUI < handle
             
 %             obj.panel_stop = GraphicPanel(obj.owner, [0.2 0 0.8 2/N_middle]);
             obj.panel_stop = GraphicPanel(obj.owner, [0.7 0.2 0.28 0.2]);
-            obj.panel_stop.addButton('button_stop', 'stop', 'push', 'STOP MOUNT AND DOME');
+            obj.panel_stop.addButton('button_stop', 'stop', 'push', 'STOP MOUNT AND DOME', '', '', [], '', '', 'send command to stop dome and mount (and stop tracking)');
 %             obj.panel_stop.margin = [0.01 0.1];
             obj.panel_stop.make;
             
@@ -354,6 +345,11 @@ classdef ManagerGUI < handle
                 
             end
             
+            obj.panel_telescope.button_vibrations.BackgroundColor = obj.color_info;
+            
+            obj.panel_dome.button_shutter_east.BackgroundColor = obj.color_info;
+            obj.panel_dome.button_shutter_west.BackgroundColor = obj.color_info;
+            
             obj.panel_camera.input_arguments.BackgroundColor = obj.color_input; 
             
             obj.panel_image.BackgroundColor = obj.color_bg;
@@ -406,7 +402,7 @@ classdef ManagerGUI < handle
             
             if ~isempty(obj.owner.weather) && obj.owner.weather.status
                 obj.panel_devices.button_weather.String = 'BoltWood ok';
-                obj.panel_devices.button_weather.BackgroundColor = obj.color_buttons;
+                obj.panel_devices.button_weather.BackgroundColor = obj.color_info;
             else
                 obj.panel_devices.button_weather.String = 'BoltWood error';
                 obj.panel_devices.button_weather.BackgroundColor = 'red';
@@ -414,7 +410,7 @@ classdef ManagerGUI < handle
             
             if ~isempty(obj.owner.wind) && obj.owner.wind.status
                 obj.panel_devices.button_wind.String = 'WindETH ok';
-                obj.panel_devices.button_wind.BackgroundColor = obj.color_buttons;
+                obj.panel_devices.button_wind.BackgroundColor = obj.color_info;
             else
                 obj.panel_devices.button_wind.String = 'WindETH error';
                 obj.panel_devices.button_wind.BackgroundColor = 'red';

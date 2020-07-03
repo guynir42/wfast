@@ -69,6 +69,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         use_shutdown = 1; % when this is enabled, observatory shuts down on bad weather/device failure
         use_startup = 1; % when this is enabled, observatory opens up and starts working by itself! (currently it only sends an alert email) 
         use_prompt_user = 1; % when about to open dome or slew to new target, first get confirmation from user
+        use_adjust_dome = 1; % when true, will change dome position when choosing new targets from scheduler (but doesn't open when closed!)
         
         % use these to override these devices/sensors
         use_dome = 1; % override AstroHaven dome
@@ -1820,6 +1821,41 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 obj.sched.start_current; 
                 
+%                adjust the dome position
+                obj.ephem.update;
+                if obj.use_adjust_dome && obj.ephem.sun.Alt<0 && obj.checker.sensors_ok && obj.checker.light_ok ... 
+                        && obj.dome.is_closed==0 % only move dome when weather is good, sun is down, and dome is already open
+                    
+                    if strcmp(obj.mount.obj_pier_side, 'pierWest') % observinf EAST! 
+                        
+                        obj.log.input('opening dome East side'); 
+                        if obj.debug_bit, disp(obj.log.report); end
+                        if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
+                            obj.button_target.String = obj.log.report; 
+                            pause(.01);
+                        end
+                        
+                        obj.dome.openEastFull;
+                        obj.dome.closeWestFull;
+                        obj.dome.openWest(70);
+                        
+                    elseif strcmp(obj.mount.obj_pier_side, 'pierEast') % observing WEST!
+
+                        obj.log.input('opening dome West side'); 
+                        if obj.debug_bit, disp(obj.log.report); end
+                        if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
+                            obj.button_target.String = obj.log.report; 
+                            pause(.01);
+                        end
+                        
+                        obj.dome.openWestFull;
+                        obj.dome.closeEastFull;
+                        obj.dome.openEast(30); 
+                        
+                    end
+                    
+                end
+
                 % do we need this additional log/display? 
                 obj.log.input(sprintf('slewing to target: %s at %s%s\n', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
                 if obj.debug_bit, disp(obj.log.report); end
@@ -1829,8 +1865,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     pause(1);
                 end
                 
-%                open dome as well? 
-% 
                 success = obj.mount.slew;
 
                 if success==0
