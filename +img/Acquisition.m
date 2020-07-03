@@ -3255,13 +3255,16 @@ classdef Acquisition < file.AstroData
                         flare = img.MicroFlare;
                         flare.file_index = obj.batch_counter+1;
                         flare.filename = obj.buf.filename;
+                        flare.folder = obj.buf.directory;
+                        flare.serial = length(obj.micro_flares)+1;
                         flare.frame_index = idx;
                         flare.peak = mx;
                         flare.pos = obj.positions(i2,:)'; 
+                        flare.timestamps = obj.timestamps;
                         flare.flux = obj.fluxes(:,i2); 
                         flare.mean = M;
                         flare.std = S;
-                        flare.offset = [cx;cy];
+                        flare.offset = [cx, cy];
                         flare.cutouts = obj.cutouts_proc(:,:,:,i2); 
                         flare.calculate; 
                         
@@ -3391,6 +3394,14 @@ classdef Acquisition < file.AstroData
                     log_struct.runtime = h5readatt(files{end}, '/header', 'END_STAMP'); 
                 end
                 
+            end
+            
+            if iscell(log_struct.start)
+                log_struct.start = log_struct.start{1};
+            end
+            
+            if iscell(log_struct.end)
+                log_struct.end = log_struct.end{1};
             end
             
             log_struct.num_files = length(files); 

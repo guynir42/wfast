@@ -486,8 +486,8 @@ classdef Catalog < handle
             T.ALPHAWIN_J2000 = T.ALPHAWIN_J2000.*180/pi;
             T.DELTAWIN_J2000 = T.DELTAWIN_J2000.*180/pi;
             
-            idx = find(T.Mag_BP>obj.mag_limit);
-            T{idx,:} = NaN;
+%             idx = find(T.Mag_BP>obj.mag_limit);
+%             T{idx,:} = NaN;
             
             % need to improve this some how...
 %             T.Properties.VariableUnits = {'deg', 'deg', 'year', '"', '"', '"', '"', '"', '"', '"', '"', '', '', '', ...

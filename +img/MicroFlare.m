@@ -7,6 +7,8 @@ classdef MicroFlare < handle
     properties % inputs/outputs
         
         filename; % where the flare was detected
+        folder; % what folder the flare was in
+        serial; % index of the total number of flares detected in this run
         file_index; % index in the run
         frame_index; % what frame did the peak appear in
         pos; % x and y position of the peak pixel in the full-frame image
@@ -15,6 +17,7 @@ classdef MicroFlare < handle
         cutouts; % cutout images around the peak and all frames before/after it in that batch
         
         % from photometry2 or from rough estimates on the whole cutout
+        timestamps;
         flux;
         error;
         background;
@@ -279,6 +282,64 @@ classdef MicroFlare < handle
         
     end
     
+    methods % other utilities (like save)
+        
+        function save(obj, filename)
+            
+            if nargin<2 || isempty(filename)
+                error('Must supply a file name!');
+            end
+            
+            event = obj;
+            
+            save(filename, 'event'); 
+            
+        end
+        
+        function saveDialog(obj, filename)
+            
+            if nargin<2 || isempty(filename)
+                
+                filename = 'flare'; 
+
+                run_name = ''; 
+
+                if ~isempty(obj.folder)
+                    [a, b] = fileparts(obj.folder);
+                    [~, c] = fileparts(a);
+                    run_name = [c '_' b];
+                end
+                
+                if ~isempty(run_name)
+                    filename = [filename '_' run_name];
+                end
+                
+                filename = sprintf('%s_id%03d', filename, obj.serial);
+                
+            end
+            
+            [filepath,filename,ext] = fileparts(filename);
+            
+            if ~isempty(ext)
+                filename = [filename ext];
+            else
+                filename = [filename '.mat']; 
+            end
+            
+            if isempty(filepath)
+                filepath = fullfile(getenv('DATA'), 'WFAST/saved/flares/'); 
+            end
+            
+            [filename, filepath] = uiputfile(fullfile(filepath, filename)); 
+            
+            if ~isequal(filename, 0)
+                obj.save(fullfile(filepath, filename)); 
+            end
+            
+        end
+        
+    end
+    
     methods % plotting tools / GUI
         
         function show(obj, varargin)
@@ -321,13 +382,16 @@ classdef MicroFlare < handle
             uicontrol(panel_flux, 'Style', 'pushbutton', 'Units', 'Normalized', 'Position', [0.7 0.05 0.1 0.1], ...
                 'String', '+', 'Callback', @obj.nextShow, 'FontSize', 16); 
             
+            uicontrol(panel_flux, 'Style', 'pushbutton', 'Units', 'Normalized', 'Position', [0.05 0.05 0.2 0.1], ...
+                'String', 'save', 'Callback', @obj.saveCallback, 'FontSize', 16); 
+            
             ax = axes('Parent', panel_flux, 'Position', [0.2 0.35 0.7 0.55]);
             
             plot(ax, this.flux, 'LineWidth', 2); 
             
             xlabel(ax, 'frame number'); 
             ylabel(ax, 'flux'); 
-            title(ax, sprintf('peak = %4.2f | pix= %d | rms= %4.2f', this.peak, obj(input.index).num_pixels, sqrt(this.pixel_var))); 
+            title(ax, sprintf('peak = %4.2f | pos= %d %d | pix= %d | rms= %4.2f', this.peak, this.pos(1), this.pos(2), obj(input.index).num_pixels, sqrt(this.pixel_var))); 
             ax.FontSize = 14;
             
             panel_cutouts = uipanel(input.parent, 'Units', 'Normalized', 'Position', [0.5 0 0.5 0.9]); 
@@ -389,6 +453,14 @@ classdef MicroFlare < handle
             if isnumeric(idx) && ~isempty(idx)
                 obj.show('parent', hndl.Parent.Parent, 'index', idx); 
             end
+            
+        end
+        
+        function saveCallback(obj, hndl, ~)
+            
+            idx = hndl.Parent.Parent.UserData;
+            
+            obj(idx).saveDialog;
             
         end
         
