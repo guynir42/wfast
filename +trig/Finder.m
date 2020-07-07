@@ -1562,7 +1562,7 @@ classdef Finder < handle
                 
             end
                     
-            obj.show_cutouts_keyframe = obj.this_event.frame_index;
+            obj.show_cutouts_keyframe = obj.this_event.time_index;
 
             obj.showCutouts(parent); 
             
@@ -1583,7 +1583,7 @@ classdef Finder < handle
             C = cat(3, obj.this_event.cutouts_first, obj.this_event.cutouts_second); 
             
             util.plot.show_cutouts(C, 'parent', parent, 'oversampling', obj.show_cutotus_oversample, 'type', 'surf', ...
-                'number', obj.show_cutouts_num_frames, 'frame', obj.show_cutouts_keyframe, 'star', obj.this_event.star_index); 
+                'number', obj.show_cutouts_num_frames, 'frame', obj.show_cutouts_keyframe, 'star', 1); 
 
             uicontrol(parent, 'Style', 'pushbutton', 'Units', 'Normalized', 'Position', [0.05 0.05 0.1 0.1], ...
                 'String', '-', 'Callback', @obj.push_back_keyframe, 'FontSize', 16); 
@@ -1609,6 +1609,10 @@ classdef Finder < handle
             
             obj.show_cutouts_keyframe = obj.show_cutouts_keyframe + 1;
             
+            if obj.show_cutouts_keyframe>size(obj.this_event.cutouts_first,3)+size(obj.this_event.cutouts_second,3);
+                obj.show_cutouts.keyframe = 1;
+            end
+            
             obj.showCutouts(obj.cut_fig);
             
         end
@@ -1616,6 +1620,10 @@ classdef Finder < handle
         function push_back_keyframe(obj, ~, ~)
             
             obj.show_cutouts_keyframe = obj.show_cutouts_keyframe - 1;
+            
+            if obj.show_cutouts_keyframe<1
+                obj.show_cutouts.keyframe = size(obj.this_event.cutouts_first,3)+size(obj.this_event.cutouts_second,3);
+            end
             
             obj.showCutouts(obj.cut_fig);
             
