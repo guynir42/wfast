@@ -432,10 +432,10 @@ classdef Processor < dynamicprops
                     obj.solveAstrometry;
                 end
                 
+                obj.data.ref_image = obj.data.image_proc;
+                obj.data.ref_positions = obj.data.positions;
+
             end
-            
-            obj.data.ref_image = obj.data.image_proc;
-            obj.data.ref_positions = obj.data.positions;
             
             [obj.data.cutouts, obj.data.image_cut] = util.img.mexCutout(obj.data.image_proc, obj.data.positions, obj.pars.cut_size, NaN, NaN); % replace and fill up using NaNs (it is safe, the processed image is single precision
             
