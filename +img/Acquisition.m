@@ -102,6 +102,9 @@ classdef Acquisition < file.AstroData
         use_dynamic_cutouts = 1; % use find_cosmic_rays to detect bleeps in the full data cube and assign cutouts to them
         num_dynamic_cutouts = 5; % how many additional cutouts we want
         
+        use_altitude_focus = 1;  % set an initial focus point based on the altitude 
+        alt_focus_coeffs = [1.15, 0.0255, -0.0001585]; % to improve these coeffs use the scripts/focus_survey.m script
+        
         use_model_psf = 0;
         
         use_cam_focusing = 1;
@@ -118,6 +121,7 @@ classdef Acquisition < file.AstroData
         use_autoguide = 1; % if true, send back adjustments on drifts to telescope
         use_ignore_sync_object_name = 0; % if true, will not update the head.OBJECT field so it can be changed manually
         use_autodeflate = 1;
+        use_delete_temp_files = 1; % automatically delete files on DATA_TEMP that have already been compressed and backed up
         
         % display parameters
         use_show = true;
@@ -320,7 +324,7 @@ classdef Acquisition < file.AstroData
                 if obj.debug_bit>1, fprintf('Acquisition constructor v%4.2f\n', obj.version); end
                 
                 obj.log = util.sys.Logger('Acquisition', obj);
-                obj.log.heartbeat(600);
+%                 obj.log.heartbeat(600);
                 
                 obj.reader = file.Reader;
 %                 obj.sim; % fill this when we have a simulator
@@ -363,7 +367,7 @@ classdef Acquisition < file.AstroData
                     obj.prog = util.sys.ProgressBar;
                     obj.audio = util.sys.AudioControl;
                 catch ME
-                    obj.log.input(['Warning: ' ME.getReport]);
+                    obj.log.input(['Warning: ' ME.getReport('extended', 'hyperlinks', 'off')]);
                     warning(ME.getReport); 
                 end
                 
@@ -621,6 +625,33 @@ classdef Acquisition < file.AstroData
             
         end
         
+        function val = printout(obj)
+            
+            if obj.brake_bit
+                str = 'idle';
+            else
+                str = 'running';
+            end
+            
+            str = sprintf('%s | obj= "%s"', str, obj.head.OBJECT); 
+            str = sprintf('%s | coords= %s %s', str, obj.head.TELRA, obj.head.TELDEC);
+            str = sprintf('%s | batches= %d/%d', str, obj.batch_counter, obj.num_batches); 
+            str = sprintf('%s | T= %4.3fs', str, obj.expT);
+            str = sprintf('%s | f= %4.2fHz', str, obj.frame_rate);
+            str = sprintf('%s | obj= %s', str, obj.head.OBJECT); 
+            str = sprintf('%s | stars= %d/%d ', str, obj.num_stars_found, obj.num_stars);
+            str = sprintf('%s | seeing= %4.2f"', str, obj.head.SCALE.*obj.average_width.*2.355);
+            str = sprintf('%s | sens.temp= %4.2fC', str, obj.sensor_temperature); 
+            str = sprintf('%s | mean f= %4.2fHz', str, obj.frame_rate_average);
+            
+            if nargout==0
+                disp(str);
+            else
+                val = str;
+            end
+            
+        end
+        
         function val = info_short(obj)
             
             val = sprintf('N= %d/%d batches | time left: %s | disk needed= %5.2f GB | frame rate= %4.2f Hz', ...
@@ -636,7 +667,7 @@ classdef Acquisition < file.AstroData
                 
                 val = sprintf('%s\n object: %s', val, obj.head.OBJECT);
                 
-                val = sprintf('%s\n RA:    %s hours\n Dec: %s deg', val, obj.head.RA, obj.head.Dec);
+                val = sprintf('%s\n RA:    %s hours\n Dec: %s deg', val, obj.head.OBJRA, obj.head.OBJDEC);
             
                 val = sprintf('%s\n--------------------------------------', val);
                 
@@ -1320,7 +1351,7 @@ classdef Acquisition < file.AstroData
                 end
 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME.getReport('extended', 'hyperlinks', 'off'));
                 rethrow(ME);
             end
             
@@ -1369,7 +1400,7 @@ classdef Acquisition < file.AstroData
                 obj.is_running_single = 0;
                 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME.getReport('extended', 'hyperlinks', 'off'));
                 obj.is_running_single = 0;
                 rethrow(ME);
             end
@@ -1626,7 +1657,7 @@ classdef Acquisition < file.AstroData
                         catch ME
                             
                             obj.cam.focuser.pos = old_pos;
-                            obj.log.error(ME.getReport);
+                            obj.log.error(ME.getReport('extended', 'hyperlinks', 'off'));
                             rethrow(ME);
                             
                         end
@@ -1674,7 +1705,7 @@ classdef Acquisition < file.AstroData
                 end
                 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME.getReport('extended', 'hyperlinks', 'off'));
                 rethrow(ME);
             end
             
@@ -1801,6 +1832,14 @@ classdef Acquisition < file.AstroData
                 warning(ME.getReport);
             end
             
+            try % print a hearbeat to file
+                
+                obj.log.input(obj.printout); 
+                
+            catch ME
+                warning(ME.getReport); 
+            end
+            
         end
         
         function setup_backup_timer(obj, ~, ~)
@@ -1827,6 +1866,12 @@ classdef Acquisition < file.AstroData
             
             if ~strcmp(obj.slow_timer.Running, 'on')
                 obj.setup_slow_timer;
+            end
+            
+            obj.head.update;
+            
+            if obj.use_delete_temp_files && obj.head.ephem.sun.Alt>0 && obj.head.ephem.time.Hour>8 % only clear up temp file when sun is up and after deflation has begun
+                obj.deflator.deleteTempFiles;
             end
             
         end
@@ -1858,8 +1903,8 @@ classdef Acquisition < file.AstroData
                     
                     if obj.brake_bit==0 % things we want to NOT update during a run? 
                         list = list(~strcmpi(list, 'OBJECT'));
-                        list = list(~strcmpi(list, 'RA'));
-                        list = list(~strcmpi(list, 'DEC'));
+                        list = list(~strcmpi(list, 'OBJRA'));
+                        list = list(~strcmpi(list, 'OBJDEC'));
                         list = list(~strcmpi(list, 'RA_DEG'));
                         list = list(~strcmpi(list, 'DEC_DEG'));
                     end
@@ -1872,6 +1917,15 @@ classdef Acquisition < file.AstroData
                                     obj.head.(list{ii}) = s.(list{ii});
                                 end
                             end
+                        end
+                        
+                        % update the header RA/DEC using TELRA/TELDEC if available. If not, use OBJRA/OBJDEC
+                        if ~isempty(obj.head.TELRA_DEG) && ~isempty(obj.head.TELDEC_DEG)
+                            obj.head.RA_DEG = obj.head.TELRA_DEG;
+                            obj.head.DEC_DEG = obj.head.TELDEC_DEG; 
+                        elseif ~isempty(obj.head.OBJRA_DEG) && ~isempty(obj.head.OBJDEC_DEG)
+                            obj.head.RA_DEG = obj.head.ONJRA_DEG;
+                            obj.head.DEC_DEG = obj.head.OBJDEC_DEG; 
                         end
 
                     end
@@ -2004,6 +2058,14 @@ classdef Acquisition < file.AstroData
                         
                         if input.focus 
                             disp('Now running focus by order of dome-PC'); % this message will be removed later on...
+                            
+                            if obj.use_altitude_focus % set an initial focus point based on the altitude 
+                                C = obj.alt_focus_coeffs;
+                                A = obj.head.ALT;
+                                F = C(1) + C(2).*A + C(3).*A.^2; 
+                                obj.cam.focuser.pos = F; 
+                            end
+                            
                             success = obj.runFocus;
                             if success==0
                                 error('Could not find a good focus point!'); 
@@ -2058,7 +2120,8 @@ classdef Acquisition < file.AstroData
                 end
                 
             catch ME
-                obj.sync.outgoing.error = sprintf('error! \n%s', ME.getReport); 
+%                 obj.sync.outgoing.error = sprintf('error! \n%s', ME.getReport);
+                obj.sync.outgoing.error = ME;
                 obj.sync.outgoing.err_time = util.text.time2str(datetime('now', 'TimeZone', 'UTC')); 
                 obj.sync.outgoing.report = 'idle'; 
                 rethrow(ME); 
@@ -2260,6 +2323,33 @@ classdef Acquisition < file.AstroData
             end
             
             obj.cal.camera_name = obj.head.INST;
+            
+            try % write to log file
+                
+                delay = 150; % estimated number of seconds between updates
+                
+                f = obj.frame_rate_average;
+                if isempty(f)
+                    f = obj.frame_rate;
+                end
+                
+                if isempty(f)
+                    f = 1/obj.expT; 
+                end
+                
+                N = obj.batch_size;
+                
+                T = N/f; % time per batch (seconds)
+                
+                d = round(delay/T); % estimate the number of batches we need to run before "delay" seconds elapse
+                
+                if mod(obj.batch_counter,d)==0
+                    obj.log.input(obj.printout); 
+                end
+                
+            catch ME
+                warning(ME.getReport); 
+            end
             
         end
         
@@ -2510,10 +2600,10 @@ classdef Acquisition < file.AstroData
                 check = 1;
                 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME.getReport('extended', 'hyperlinks', 'off'));
                 obj.unstash_parameters;
                 obj.is_running = 0;
-                obj.sync.outgoing.error = ME.getReport; 
+                obj.sync.outgoing.error = ME; 
                 obj.sync.outgoing.err_time = util.text.time2str(datetime('now', 'TimeZone', 'UTC')); 
                 obj.sync.outgoing.report = 'idle';
                 rethrow(ME);
@@ -2551,6 +2641,15 @@ classdef Acquisition < file.AstroData
                 try % save any microflares
                     
                     if ~isempty(obj.micro_flares)
+                        
+                        d = util.sys.WorkingDirectory(obj.micro_flares(1).folder); 
+                        
+                        files = d.match('*.h5*'); 
+                        
+                        for ii = 1:length(obj.micro_flares) % fix the filenames using the known folder
+                            [~, name, ext] = fileparts(files{obj.micro_flares(ii).file_index});
+                            obj.micro_flares(ii).filename = [name,ext];
+                        end
                         
                         micro_flares = obj.micro_flares;
                         head = obj.head;
@@ -2897,6 +2996,8 @@ classdef Acquisition < file.AstroData
             
             if obj.debug_bit, disp('runAstrometry'); end
             
+            obj.log.input('Runing Astrometry'); 
+            
             if ~isempty(obj.gui)
                 obj.gui.latest_message = 'running astrometry...';
                 obj.gui.update;
@@ -2943,6 +3044,8 @@ classdef Acquisition < file.AstroData
                 obj.gui.latest_message = str;
                 obj.gui.update;
             end
+            
+            obj.log.input(str); 
             
             if obj.debug_bit, disp(str); end
             obj.head.LIMMAG_DETECTION = obj.cat.detection_limit;
@@ -3112,7 +3215,8 @@ classdef Acquisition < file.AstroData
                 
             else
                 
-                if obj.debug_bit, disp('Lost star positions, using quick_align'); end
+                obj.log.input('Lost star positions, using quick_align'); 
+                if obj.debug_bit, disp(obj.log.report); end
                     
                 [~,shift] = util.img.quick_align(obj.stack_proc, obj.ref_stack);
                 obj.clip.positions(1:size(obj.ref_positions,1),:) = double(obj.ref_positions + flip(shift));
@@ -3137,7 +3241,8 @@ classdef Acquisition < file.AstroData
                     
                     if obj.failed_batch_counter>obj.max_failed_batches
                         
-                        fprintf('Cannot find stars %d times in a row. Quiting run...\n', obj.failed_batch_counter);
+                        obj.log.input(sprintf('Cannot find stars %d times in a row. Quiting run...\n', obj.failed_batch_counter));
+                        disp(obj.log.report); 
                         
                         obj.brake_bit = 1; % finish this batch and then quit the run
                         
@@ -3254,10 +3359,11 @@ classdef Acquisition < file.AstroData
                         
                         flare = img.MicroFlare;
                         flare.file_index = obj.batch_counter+1;
-                        flare.filename = obj.buf.filename;
+%                         flare.filename = obj.buf.filename; % the filename in the buffer does not get updated until after we save 
                         flare.folder = obj.buf.directory;
                         flare.serial = length(obj.micro_flares)+1;
                         flare.frame_index = idx;
+                        flare.cut_index = i2;
                         flare.peak = mx;
                         flare.pos = obj.positions(i2,:)'; 
                         flare.timestamps = obj.timestamps;
@@ -3319,6 +3425,11 @@ classdef Acquisition < file.AstroData
                     name = list{ii}(1:idx-1); 
                 end
                 
+                name = strrep(name, '-', '_'); 
+                name = strrep(name, '/', '_'); 
+                name = strrep(name, '\', '_'); 
+                name = strrep(name, ' ', '_'); 
+                                
                 if ~isfield(s, name)
                     s.(name) = struct.empty;
                 end
@@ -3430,7 +3541,7 @@ classdef Acquisition < file.AstroData
             try
                 obj.sync.connect;
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME.getReport('extended', 'hyperlinks', 'off'));
                 rethrow(ME);
             end
             

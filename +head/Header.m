@@ -112,6 +112,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         PRESSURE; % pressure in mbar
         LIGHT; % light value in arbitrary units (from Boltwood, max is 1024, dark is around 100)
 
+        % coordinates of the object as given by user/scheduler
+        OBJRA; 
+        OBJDEC;
+        OBJRA_DEG;
+        OBJDEC_DEG;
+        
         % hardware (mount) coordinates
         TELRA; % telescope RA reported from hardware in sexagesimal hour string
         TELDEC; % telescope Dec reported from hardware in sexagesimal degree string
@@ -807,6 +813,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             
         end 
         
+        function set.RA_DEG(obj, val)
+            
+            obj.ephem.RA = val/15;
+            
+        end
+        
+        function set.DEC_DEG(obj, val)
+            
+            obj.ephem.Dec = val;
+            
+        end
+        
         function set.DEC(obj, val)
             
             if iscell(val) && isscalar(val)
@@ -1126,7 +1144,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         
         function list = makeSyncList % list of parameters to give from dome-PC manager to the PcSync object (so it would be passed to the camera PC)
             
-            list = {'OBJECT', 'RA', 'DEC', 'RA_DEG', 'DEC_DEG', 'TELRA', 'TELDEC', 'TELRA_DEG', 'TELDEC_DEG',...
+            list = {'OBJECT', 'OBJRA', 'OBJDEC', 'OBJRA_DEG', 'OBJDEC_DEG', 'TELRA', 'TELDEC', 'TELRA_DEG', 'TELDEC_DEG',...
                 'TEMP_IN', 'TEMP_OUT', 'WIND_DIR', 'WIND_SPEED', 'HUMID_IN', 'HUMID_OUT', 'PRESSURE', 'LIGHT'};
                 
         end

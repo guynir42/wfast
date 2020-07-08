@@ -506,7 +506,27 @@ classdef Deflator < file.AstroData
             end
             
             d = util.sys.WorkingDirectory(folder); 
+            if isempty(d.dir)
+                return;
+            end
             
+            % check that deflator futures are all done
+            for ii = 1:length(obj.futures)
+                if strcmp(obj.futures{ii}.State, 'running')
+                    return;
+                end
+            end
+
+            % prompt the user for confirmation (at least for now)
+%             rep = questdlg('Ready to delete temp data files', 'Delete files?', 'Yes', 'No', 'Yes');
+%             
+%             if isempty(rep) || strcmp(rep, 'No')
+%                 return;
+%             end
+            
+            if obj.debug_bit, fprintf('%s: Deleting old temporary files.\n', datetime('now', 'TimeZone', 'UTC')); end
+            
+            % run auto-delete!
             list = flip(d.walk);
             
             for ii = 1:length(list)
@@ -707,7 +727,7 @@ classdef Deflator < file.AstroData
                 c = 1;
                 f1 = dir(file_src);
                 f2 = dir(new_file);
-                if f1.bytes>f2.bytes*4
+                if f1.bytes>f2.bytes*5 % if source file (f1) is much bigger than new file (f2) that means f2 is not properly copied 
                     c = 0;
                 end
             else

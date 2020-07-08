@@ -11,6 +11,7 @@ classdef MicroFlare < handle
         serial; % index of the total number of flares detected in this run
         file_index; % index in the run
         frame_index; % what frame did the peak appear in
+        cut_index; % which cutout (star) from the file cutouts is this flare coming from
         pos; % x and y position of the peak pixel in the full-frame image
         peak; % value of the peak pixel
         pixel_var; % variance of underlying pixel (from calibration file)
@@ -346,6 +347,7 @@ classdef MicroFlare < handle
             
             input = util.text.InputVars;
             input.input_var('index', []); 
+            input.input_var('cutouts', 9, 'number'); 
             input.input_var('parent', []); 
             input.scan_vars(varargin{:}); 
             
@@ -357,6 +359,9 @@ classdef MicroFlare < handle
                 input.parent.UserData = input.index;
             elseif ~isempty(input.parent.UserData) % no user input, recover latest index
                 input.index = input.parent.UserData;
+                if input.index>length(obj)
+                    input.index = 1;
+                end
             else % the default is to start with the first index
                 input.parent.UserData = 1;
                 input.index = 1;
@@ -396,7 +401,7 @@ classdef MicroFlare < handle
             
             panel_cutouts = uipanel(input.parent, 'Units', 'Normalized', 'Position', [0.5 0 0.5 0.9]); 
             
-            ax = util.plot.show_cutouts(this.cutouts, 'parent', panel_cutouts, 'frame', this.frame_index, 'number', 9); 
+            ax = util.plot.show_cutouts(this.cutouts, 'parent', panel_cutouts, 'frame', this.frame_index, 'number', input.cutouts); 
             
             for ii = 1:length(ax)
                 if ~isempty(ax{ii}.UserData) && ax{ii}.UserData==this.frame_index

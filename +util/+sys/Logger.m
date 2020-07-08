@@ -366,7 +366,7 @@ classdef Logger < handle
                 return;
             end
             
-            obj.timer = timer('BusyMode', 'queue', 'ExecutionMode', 'fixedRate', 'Name', ['timer-' obj.dev_name], ...
+            obj.timer = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', ['timer-' obj.dev_name], ...
                 'Period', time_sec, 'StartDelay', 0, 'TimerFcn', @obj.timer_callback, 'ErrorFcn', ''); % maybe add a restart when calling ErrorFcn
             
             start(obj.timer);

@@ -477,7 +477,7 @@ classdef Andor < file.AstroData
             
             obj.batch_counter = 0;
             
-            obj.head.reset;
+%             obj.head.reset;
             
             obj.clear;
             
@@ -1430,7 +1430,7 @@ classdef Andor < file.AstroData
             
         end
         
-        function update_header(obj) % make sure "pars" object is updated with hardware values
+        function update_header(obj) % make sure "head" object is updated with hardware values
             
 %             obj.head.datapath = obj.buffers.base_dir;
             
