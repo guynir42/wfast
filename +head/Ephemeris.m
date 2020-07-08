@@ -96,6 +96,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         name; % the generic title for the object (copied into header's OBJECT field, and possibly to folder names)
         keyword; % for dynamically allocated fields like 'moon' or 'ecliptic'
         
+        side; % which hemisphere we are observing: East or West (based only on HA)
+        
         time_str; 
         
         RA; % sexagesimal hour string
@@ -296,6 +298,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 val = obj.keyword_;
             elseif ~isempty(obj.name_)
                 val = obj.name;
+            end
+            
+        end
+        
+        function val = get.side(obj)
+            
+            if obj.HA_deg>=0
+                val = 'West';
+            else
+                val = 'East';
             end
             
         end
@@ -1346,8 +1358,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             s.type = 'ecliptic'; s.RA = 255.5; s.Dec = -24.5; s.ECL_LAT = -1.72; s.GAL_LAT = 10.55; s.stars = 9400;
             obj.default_fields = [obj.default_fields; s];
             
-            s.type = 'ecliptic'; s.RA = 264.0; s.Dec = -18.0; s.ECL_LAT = 5.320; s.GAL_LAT = 7.625; s.stars = 7000;
-            obj.default_fields = [obj.default_fields; s];
+%             s.type = 'ecliptic'; s.RA = 264.0; s.Dec = -18.0; s.ECL_LAT = 5.320; s.GAL_LAT = 7.625; s.stars = 7000;
+%             obj.default_fields = [obj.default_fields; s];
             
             s.type = 'ecliptic'; s.RA = 275; s.Dec = -25.0; s.ECL_LAT = -1.639; s.GAL_LAT = -4.727; s.stars = 20000;
             obj.default_fields = [obj.default_fields; s];

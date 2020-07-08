@@ -1,7 +1,7 @@
 %% this script scans the header / text files and gets the telescope altitude vs. focus point for all runs in a given time range
 
-start_date = datetime('2020-06-01');
-end_date = datetime('2020-06-28'); 
+start_date = datetime('2020-06-15');
+end_date = datetime('2020-07-07'); 
 
 d = util.sys.WorkingDirectory('E:\data_backup'); 
 
@@ -89,7 +89,7 @@ for ii = 1:length(list)
                 [~,idx] = regexp(line, '^ALT:\s+'); 
 
                 if ~isempty(idx) && isnan(st.Alt)
-                    st.Alt = util.text.parse_value(line(idx+2:end));
+                    st.Alt = util.text.parse_value(line(idx+1:end));
                     if isempty(st.Alt) || ischar(st.Alt), st.Alt = NaN; end
                 end
                 
@@ -159,11 +159,17 @@ f1.clear;
 
 ax = axes('Parent', f1.fig); 
 
-plot(ax, [data(east_indices).Alt], [data(east_indices).pos], 'pb'); 
+plot(ax, [data(east_indices).Alt], [data(east_indices).pos], 'pb', 'MarkerSize', 15); 
 
 hold(ax, 'on'); 
 
-plot(ax, [data(west_indices).Alt], [data(west_indices).pos], 'pr'); 
+plot(ax, [data(west_indices).Alt], [data(west_indices).pos], 'pr', 'MarkerSize', 15); 
+
+fr = util.fit.polyfit([data.Alt], [data.pos], 'order', 2); 
+
+plot(ax, sort(fr.x), fr.func(sort(fr.x)), '-', 'LineWidth', 3);
+
+util.plot.inner_title(sprintf('pos= %4.2f + %7.5f*A - %12.10f*A^2', fr.coeffs(1), fr.coeffs(2), abs(fr.coeffs(3))), 'ax', ax, 'Position', 'bottom', 'margin', 0.2); 
 
 hold(ax, 'off'); 
 
@@ -173,7 +179,9 @@ xlabel(ax, 'Altitude above horizon [degrees]');
 ylabel(ax, 'Focuser position [mm]'); 
 ax.FontSize = 20;
 
+%% save the plot
 
+util.sys.print(fullfile(getenv('WFAST'), '/scripts/plots/focus_altitude')); 
 
 
 

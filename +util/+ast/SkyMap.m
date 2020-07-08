@@ -101,7 +101,7 @@ classdef SkyMap < handle
         show_horizon = false; % show the plot overlay with the horizon and alt_limit at the given LST
         
         show_moon = false;
-        dist_moon = 50; % contour around moon for overlay
+%         dist_moon = 50; % contour around moon for overlay
         
         show_ra_units = 'hours'; % choose to show the RA on the plot in "hours" or "degrees"
         show_grid = false; % show an RA/Dec grid on top of the map
@@ -112,7 +112,7 @@ classdef SkyMap < handle
     
     properties(Dependent=true)
         
-        
+        dist_moon; % get this from constraints... 
         
     end
     
@@ -208,6 +208,10 @@ classdef SkyMap < handle
     end
     
     methods % getters
+        
+        function val = get.dist_moon(obj)
+            val = obj.ephem.constraints.moon;
+        end
         
     end
     

@@ -141,7 +141,7 @@ classdef SchedGUI < handle
             obj.panel_display.addButton('button_ecliptic', 'map.show_ecliptic', 'toggle', 'ecliptic', 'ecliptic', '', 0.5, 'red', '', 'show the ecliptic altitude overlay'); 
             obj.panel_display.addButton('input_altitude', 'map.alt_limit', 'input', 'alt_lim= ', '', '', 0.5, '', '', 'alt limit for display on the map only!'); 
             obj.panel_display.addButton('button_moon', 'map.show_moon', 'toggle', 'moon', 'moon', '', 0.5, 'cyan', '', 'show the moon and moon distance overlay'); 
-            obj.panel_display.addButton('input_dist_mon', 'map.dist_moon', 'input', 'dist= ', '', '', 0.5, '', '', 'moon distance for display on the map only!'); 
+%             obj.panel_display.addButton('input_dist_mon', 'map.dist_moon', 'input', 'dist= ', '', '', 0.5, '', '', 'moon distance for display on the map only!'); 
             obj.panel_display.margin = [0.02 0.05];
             obj.panel_display.make;
             

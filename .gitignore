@@ -1,5 +1,6 @@
 *.asv
 ARCHIVE/
+scripts/plots
 test.*
 obj.*
 *.mat

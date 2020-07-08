@@ -149,8 +149,8 @@ classdef FinderGUI < handle
             pos = pos-num_buttons;
             obj.panel_show = GraphicPanel(obj.owner, [0 pos/N_left 0.2 num_buttons/N_left], 'show', 1); % last input is for vertical (default)
             
-            obj.panel_show.addButton('button_raw_flux', 'figureRawFlux', 'push', 'raw flux', '', '', 0.5, '', '', 'Show the event raw flux'); 
-            obj.panel_show.addButton('button_cutouts', 'figureCutouts', 'push', 'cutouts', '', '', 0.5, '', '', 'Show the event cutouts'); 
+            obj.panel_show.addButton('button_raw_flux', 'figureRawFlux', 'push', 'Show raw flux', '', '', 0.5, '', '', 'Show the event raw flux'); 
+            obj.panel_show.addButton('button_cutouts', 'figureCutouts', 'push', 'Show cutouts', '', '', 0.5, '', '', 'Show the event cutouts'); 
             
             obj.panel_show.make;
             
@@ -173,7 +173,7 @@ classdef FinderGUI < handle
             
             num_buttons = 1; pos = pos - num_buttons;            
             obj.panel_close = uipanel('Position', [0 pos 0.2 num_buttons/N_left]);
-            obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE');
+            obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE GUI');
             obj.button_close.Callback = @obj.callback_close;
             
             %%%%%%%%%%%%%%%%%%%%%% MIDDLE %%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -216,7 +216,7 @@ classdef FinderGUI < handle
             obj.panel_chooser.addButton('button_prev', 'display_prev_event', 'push', 'PREV', '', '', [], [], [], 'Show previous event');
             obj.panel_chooser.addButton('input_index', 'display_event_idx', 'input', 'idx= ', '', '', [], [], [], 'Index of currently displayed event');
             obj.panel_chooser.addButton('button_next', 'display_next_event', 'push', 'NEXT', '', '', [], [], [], 'Show next event');
-            obj.panel_chooser.addButton('button_kept', 'use_display_kept_events', 'toggle', 'ALL', 'KEPT');
+            obj.panel_chooser.addButton('button_kept', 'use_display_kept_events', 'toggle', 'Showing ALL', 'Showing KEPT');
             obj.panel_chooser.margin = [0.02 0.1];
             obj.panel_chooser.number = 5;
             obj.panel_chooser.make;

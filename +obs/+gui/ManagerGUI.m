@@ -322,12 +322,18 @@ classdef ManagerGUI < handle
             
             obj.menu_options.addButton('menu_weather', '&Weather', 'menu'); 
             obj.menu_options.menu_weather.addButton('button_wise', 'Use &Wise', 'toggle', 'checker.use_wise_data', 'Close when the Wise observatory deems it dangerous to operate'); 
-            
+
+            obj.menu_options.addButton('menu_robot', '&Robotization', 'menu'); 
+            obj.menu_options.menu_robot.addButton('button_dome', '&Dome adjust', 'toggle', 'use_adjust_dome', 'allow dome to reposition itself for new targets'); 
+            obj.menu_options.menu_robot.addButton('button_prompt', '&Prompt user', 'toggle', 'use_prompt_user', 'pop up a prompt that user must confirm when switching targets using the scheduler'); 
+            obj.menu_options.menu_robot.addButton('button_side', '&Stay on side', 'toggle', 'sched.use_stay_on_side', 'force the scheduler to stay on the same side and not perform a flip on its own'); 
+                        
             obj.menu_objects = MenuItem(obj, '&Device GUIs', 'menu');
             obj.menu_objects.addButton('button_dome', '&Dome', 'push', 'dome', 'dome GUI', 'Open the dome GUI');
             obj.menu_objects.addButton('button_mount', '&Mount', 'push', 'mount', 'mount GUI', 'Open the dome GUI');
             obj.menu_objects.addButton('button_scheduler', '&Scheduler', 'push', 'sched', 'scheduler GUI', 'Open the scheduler GUI');
 
+            
             for ii = 1:length(obj.panels)
                 obj.panels{ii}.panel.BackgroundColor = obj.color_bg; 
             end
@@ -344,8 +350,6 @@ classdef ManagerGUI < handle
                 end
                 
             end
-            
-            obj.panel_telescope.button_vibrations.BackgroundColor = obj.color_info;
             
             obj.panel_dome.button_shutter_east.BackgroundColor = obj.color_info;
             obj.panel_dome.button_shutter_west.BackgroundColor = obj.color_info;

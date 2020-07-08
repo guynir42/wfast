@@ -212,7 +212,7 @@ classdef (CaseInsensitiveProperties) Target < handle
         
         function val = details(obj)
             
-            val = sprintf('HA= %11s (%s) | Alt= %d | A.M.= %4.2f | moon= %3d | ecl/lat= %2d/%2d', ...
+            val = sprintf('HA= %11s (%s) | Alt= %d | A.M.= %4.2f | moon= %3d | ecl/gal= %2d/%2d', ...
                 obj.ephem.HA, obj.side, round(obj.ephem.Alt), obj.airmass, obj.moon, round(obj.ephem.ECL_lat), round(obj.ephem.GAL_lat)); 
             
         end

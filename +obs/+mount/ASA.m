@@ -1123,7 +1123,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             if ~isempty(obj.owner.gui) && obj.owner.gui.check
                 if val
                     obj.owner.gui.panel_telescope.button_vibrations.String = 'no vibrations';                        
-                    obj.owner.gui.panel_telescope.button_vibrations.BackgroundColor = obj.owner.gui.panel_telescope.button_vibrations.default_color;
+                    obj.owner.gui.panel_telescope.button_vibrations.BackgroundColor = obj.owner.gui.color_info;
                 else
                     obj.owner.gui.panel_telescope.button_vibrations.String = sprintf('vibrations: %3.1f"', vib_strength); 
                     obj.owner.gui.panel_telescope.button_vibrations.BackgroundColor = 'red';
@@ -1433,9 +1433,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 %                     obj.cam_pc.outgoing.stop_camera = 0; % need to tell cam-pc to start working! 
                     
                     % tell the camera there is a new target object
-                    obj.cam_pc.outgoing.OBJECT = strrep(strtrim(obj.objName), ' ', '_');
-                    obj.cam_pc.outgoing.RA = obj.objRA;
-                    obj.cam_pc.outgoing.DEC = obj.objDec;
+                    name = obj.objName;
+                    name = strrep(name, ' ', '_'); 
+                    name = strrep(name, '/', '_'); 
+                    name = strrep(name, '\', '_'); 
+                    % any other problematic characters? or maybe we should
+                    % use regexp to replace all at once?
+                    
+                    obj.cam_pc.outgoing.OBJECT = name;
+                    obj.cam_pc.outgoing.OBJRA = obj.objRA;
+                    obj.cam_pc.outgoing.OBJDEC = obj.objDec;
                     
                     obj.updateCamera; % update camera with telescope pointing
                     
@@ -1684,7 +1691,27 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function sync(obj) % this is still not working! 
             
+            current_side = obj.pier_side;
+            
             obj.hndl.SyncToCoordinates(obj.hndl.TargetRightAscension, obj.hndl.TargetDeclination);
+            
+            new_side = obj.pier_side;
+            
+            if ~strcmp(current_side, new_side)
+                
+                obj.stop;
+                
+                if ~isempty(obj.gui) && ~isempty(obj.gui.fig.fig)
+                    delete(obj.gui.fig.fig); 
+                end
+                
+                if ~isempty(obj.gui) && ~isempty(obj.gui.fig.fig)
+                    delete(obj.owner.gui.fig.fig)
+                end
+                
+                error('Critical error: new pier_side "%s" is different than pier side before sync ("%s"). This can cause a telescope crash!', new_side, current_side); 
+                
+            end
             
         end
         
@@ -1783,8 +1810,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function updateCamera(obj) % send details on object coordinates to cam_pc
             
-            obj.cam_pc.outgoing.RA_DEG = obj.objRA_deg;
-            obj.cam_pc.outgoing.DEC_DEG = obj.objDec_deg;
+            obj.cam_pc.outgoing.OBJRA = obj.objRA;
+            obj.cam_pc.outgoing.OBJDEC = obj.objDec;
+            obj.cam_pc.outgoing.OBJRA_DEG = obj.objRA_deg;
+            obj.cam_pc.outgoing.OBJDEC_DEG = obj.objDec_deg;
+            obj.cam_pc.outgoing.OBJRA_DEG = obj.objRA_deg;
+            obj.cam_pc.outgoing.OBJDEC_DEG = obj.objDec_deg;
             obj.cam_pc.outgoing.TELRA = obj.telRA;
             obj.cam_pc.outgoing.TELDEC = obj.telDec;
             obj.cam_pc.outgoing.TELRA_DEG = obj.telRA_deg;

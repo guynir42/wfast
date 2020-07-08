@@ -633,7 +633,7 @@ classdef Analysis < file.AstroData
                         char(finish_datetime-obj.futures{ii}.StartDateTime));
                 
                     if length(obj.futures_batches)>=ii && ~isempty(obj.futures_batches{ii})
-                        fprintf(' | N= % 4d', obj.futures_batches{ii});
+                        fprintf(' | N= %4d', obj.futures_batches{ii});
                     end
                     
                     if length(obj.futures_dir)>=ii && ~isempty(obj.futures_dir{ii})
