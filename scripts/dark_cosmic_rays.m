@@ -117,10 +117,9 @@ prog.finish;
 
 xy = ([flares.pos])';
 
-bad_pixel_indices = find([flares.num_pixels]==1 | xy(:,1)'==1960);
-cosmic_ray_indices = find([flares.num_pixels]>1 & xy(:,1)'~=1960);
+bad_pixel_indices = find([flares.num_pixels]<=2);
+cosmic_ray_indices = find([flares.num_pixels]>2);
 multiframe_indices = find([flares.num_frames]>1);
-
 
 fprintf('N_total= %d | N_pixels= %d | N_cr= %d | N_multiframe= %d | N_flares= %d\n', ...
     numel(flares), numel(bad_pixel_indices), numel(cosmic_ray_indices), numel(mulitframe_indices),...
@@ -131,13 +130,13 @@ f1.clear;
 
 ax = axes('Parent', f1.fig); 
 
-plot(ax, sqrt([flares(bad_pixel_indices).pixel_var]), [flares(bad_pixel_indices).peak], 'b.');
+plot(ax, sqrt([flares(bad_pixel_indices).pixel_var]), [flares(bad_pixel_indices).peak], 'b.', 'MarkerSize', 8);
 
 hold(ax, 'on'); 
 
-plot(ax, sqrt([flares(cosmic_ray_indices).pixel_var]), [flares(cosmic_ray_indices).peak], 'r.');
+plot(ax, sqrt([flares(cosmic_ray_indices).pixel_var]), [flares(cosmic_ray_indices).peak], 'r.', 'MarkerSize', 8);
     
-plot(ax, sqrt([flares(mulitframe_indices).pixel_var]), [flares(mulitframe_indices).peak], 'go');
+plot(ax, sqrt([flares(mulitframe_indices).pixel_var]), [flares(mulitframe_indices).peak], 'go', 'MarkerSize', 10);
 
 hold(ax, 'off'); 
 
@@ -152,9 +151,97 @@ else
     legend(ax, {'bad pixels', 'cosmic rays'}); 
 end
 
+%% save the plot
+
+util.sys.print(fullfile(getenv('WFAST'), 'scripts/plots', 'dark_cosmic_rays_peaks')); 
+
+%% show some cosmic ray examples
+
+f2 = util.plot.FigHandler('cosmic ray examples'); 
+f2.width = 30;
+f2.height = 15;
+f2.clear;
+
+Ncols = 6;
+Nrows = 3;
+N = Ncols*Nrows;
+
+pix = [flares.num_pixels];
+peaks = [flares.num_peaks];
+
+muon_idx = find(pix>1 & pix<=10 & peaks==1);
+worm_idx = find(pix>15 & peaks>1);
+track_idx = find(pix>20 & peaks==1);
+
+indices = [];
+
+idx = randperm(length(muon_idx), Ncols);
+indices(1,:) = muon_idx(idx);
+
+idx = randperm(length(worm_idx), Ncols);
+indices(2,:) = worm_idx(idx);
+
+idx = randperm(length(track_idx), Ncols); 
+indices(3,:) = track_idx(idx);
+
+for ii = 1:N
+    
+    col = mod(ii-1, Ncols);
+    row = floor((ii-1)/Ncols);
+    width = 1./Ncols;
+    height = 1./Nrows;
+    
+    ax = axes('Parent', f2.fig, 'Position', [col*width 1-row*height-height width height]);
+    idx = indices(row+1,col+1);
+    util.plot.show(util.img.pad2size(flares(idx).image, 25), 'fancy', 'off', 'autodyn', 'on', 'mono', 1); 
+    util.plot.inner_title(num2str(idx), 'ax', ax);
+    
+end
 
 
 
+%% save the plot
+
+util.sys.print(fullfile(getenv('WFAST'), 'scripts/plots', 'dark_cosmic_rays_examples')); 
+
+
+%% plot the histogram of the PSF width for cosmic rays
+
+f3 = util.plot.FigHandler('cosmic ray width'); 
+f3.clear;
+
+ax = axes('Parent', f3.fig); 
+
+scale = 2.2918;
+
+histogram(ax, [flares(cosmic_ray_indices).fwhm]*scale, 'BinWidth', 0.2);
+
+ax.FontSize = 20;
+xlabel('Full width half maximum of cosmic ray [arcsec]'); 
+ylabel('Number of cosmic rays'); 
+
+%% save the plot
+
+util.sys.print(fullfile(getenv('WFAST'), 'scripts/plots', 'dark_cosmic_rays_widths')); 
+
+%% show the cosmic rays with comparable FWHM to stars
+
+f4 = util.plot.FigHandler('widest crs'); 
+f4.clear;
+f4.width = 32;
+f4.height = 6;
+
+idx = find([flares.fwhm]*scale>5);
+N = length(idx);
+
+for ii = 1:N
+    ax = axes('Parent', f4.fig, 'Position', [(ii-1)/N 0 1/N 1]); 
+    util.plot.show(flares(idx(ii)).image, 'mono', 1, 'fancy', 0, 'autodyn', 1); 
+end
+
+%% save the plot
+
+util.sys.print(fullfile(getenv('WFAST'), 'scripts/plots', 'dark_cosmic_rays_example_psfs')); 
 
 
 

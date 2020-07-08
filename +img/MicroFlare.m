@@ -94,6 +94,18 @@ classdef MicroFlare < handle
     
     methods % setters
         
+        function set.filename(obj, val)
+            
+            [a,b,c] = fileparts(val);
+            
+            obj.filename = [b,c];
+            
+            if ~isempty(a) && isempty(obj.folder)
+                obj.folder = a;
+            end
+            
+        end
+        
     end
     
     methods(Static=true) % utilities
@@ -150,36 +162,6 @@ classdef MicroFlare < handle
             
             obj.image = obj.cutouts(:,:,obj.frame_index); 
             
-%             indices = obj.frame_index;
-%             for ii = 1:obj.interval_peak
-%                 
-%                 idx = obj.frame_index - ii;
-%                 if idx<1, break; end
-%                 
-%                 indices = [indices idx]; 
-%                     
-%             end
-%             
-%             for ii = 1:obj.interval_peak
-%                 
-%                 idx = obj.frame_index + ii;
-%                 if idx>length(obj.flux)
-%                     break;
-%                 end
-%                 
-%                 indices = [indices idx]; 
-%                     
-%             end
-%             
-%             indices = sort(indices);
-%             flux_bg = obj.flux;
-%             flux_bg(indices) = NaN;
-%             
-%             obj.mean = nanmean(flux_bg);
-%             obj.std = nanstd(flux_bg); 
-%             
-%             flux_norm = (obj.flux-obj.mean)./obj.std;
-            
             flux_norm = obj.getNormFlux; 
 
             % how many frames above the threshold
@@ -215,10 +197,13 @@ classdef MicroFlare < handle
             
             if N<=1
                 obj.num_pixels = 1;
+                obj.num_peaks = 1;
             else
                 
                 C = bwconncomp(BW); 
                 [X,Y] = meshgrid((1:size(obj.image,2))-floor(size(obj.image,2)/2)-1, (1:size(obj.image,1))-floor(size(obj.image,1)/2)-1);
+                
+                obj.num_peaks = C.NumObjects;
                 
                 for ii = 1:C.NumObjects
                     
