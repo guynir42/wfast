@@ -1,10 +1,12 @@
-function ret = telegram(varargin)
-% Usage: ret = telegram(varargin)
-% Send a message to a Telegram bot. 
+function ret = telegram(token, chat_id, varargin)
+% Usage: ret = telegram(token, chat_id, varargin)
+% Send a message using a Telegram bot.
+% Inputs: -token is the bot identifier you got when the bot was created.
+%         -chat_id is the ID of the user you want to send to.
 %
-% Use telegram(varargin) in the same way as sprintf(varargin)
-% Example: telegram('Hello, World!');
-%          telegram('%d + %d = %d',1,2,1+2);
+% Use telegram(token, chat_id, varargin) in the same way as sprintf(varargin)
+% Example: telegram(token, chat_id, 'Hello, World!');
+%          telegram(token, chat_id, '%d + %d = %d',1,2,1+2);
 % 
 % Define token and chat_id before use, 
 % which are the authorization token of the target Telegram bot 
@@ -17,18 +19,18 @@ function ret = telegram(varargin)
 % Seongsik Park
 % seongsikpark@postech.ac.kr
 %
-% Getting the tokens: https://solvit.io/0f9c61a
+% Getting the token and chat_id: https://solvit.io/0f9c61a
 
     if nargin==0; help('util.sys.telegram'); return; end
 
-    % default token and chat_id
-    token = '978929699:AAE9m1EITSSWdfJMVgWHAuI0gJnlEku1aZ0';
-    chat_id = '1121382138';
-
+    if nargin<3 || isempty(token) || isempty(chat_id)
+        error('Must supply a bot token and a chat_id for this to work!');
+    end
+    
     str = sprintf(varargin{:});
 
     % print to MATLAB command window
-    fprintf(str);
+%     fprintf(str);
 
     % convert MATLAB string to url query string
     sendstr = urlencode(str);

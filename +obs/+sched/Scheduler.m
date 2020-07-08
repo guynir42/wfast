@@ -459,17 +459,23 @@ classdef Scheduler < handle
             % add to arguments the chosen side if "stay_on_side" is true, or because of wind
             % ...
             
+            if use_sim
+                this_side = obj.current_side_sim;
+            else
+                this_side = obj.current_side;
+            end
+            
             if obj.wind_state
                 arguments = [arguments 'side', 'East'];
-            elseif obj.use_stay_on_side && use_sim==0
-                arguments = [arguments 'side', obj.current_side];
-            elseif obj.use_stay_on_side && use_sim
-                arguments = [arguments 'side', obj.current_side_sim];
+            elseif obj.use_stay_on_side 
+                arguments = [arguments 'side', this_side];
             end
             
             if ~isempty(varargin)
                 arguments = [arguments varargin];
             end
+            
+%             fprintf('%s: side= %s\n', time, arguments{end}); 
             
             if ~use_sim
                 target_list = obj.targets; % make a copy of the list, that can get shorter because of various external constraints
@@ -486,7 +492,7 @@ classdef Scheduler < handle
                 e.time = time; % make sure all targets are updated to current time
                 e.updateSecondaryCoords;
                 
-                if e.now_observing
+                if e.now_observing && strcmpi(e.side, this_side) % make sure this object is also on the same side as telescope: if we need to flip, we need to choose a new target
                     
                     if e.getRuntimeMinutes + e.constraints.fudge_time < e.constraints.continuous*60
                         new_target = target_list(ii); % this target must be observed for some time before a new target can be observed... 

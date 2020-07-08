@@ -852,7 +852,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             end
             
             try % check scheduler and move to new target if needed
-                if obj.checker.sensors_ok && obj.checker.light_ok && obj.dome.is_closed==0
+                if obj.use_startup && obj.checker.sensors_ok && obj.checker.light_ok && obj.dome.is_closed==0
                     obj.checkNewTarget;
                     pause(1); 
                     if isempty(obj.sched.current) || obj.sched.current.ephem.now_observing
@@ -1175,6 +1175,111 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     
     methods % calculations / commands
         
+        function sendToObserver(obj, subject, text, use_telegram)
+            
+            if nargin<4 || isempty(use_telegram)
+                use_telegram = 0;
+            end
+            
+            try % try to read the observer name from the list
+                name = obj.getObserverName;
+            catch ME
+                name = ''; 
+            end
+
+            try % send an email
+                
+                if obj.debug_bit, fprintf('Sending email to %s with subject: %s\n', name, subject); end
+
+                if isempty(name) % if we cannot get the observer name, send to whole list
+                    obj.email.sendToList('subject', subject, 'text', sprintf('Observer: ----.\n %s', text)); 
+                else
+                    obj.email.sendToAddress(name, 'subject', subject, 'text', sprintf('Observer: %s.\n %s', name, text)); 
+                end
+                
+            catch ME
+                warning(ME.getReport);
+            end
+            
+            try % send a telegram
+                
+                if use_telegram
+                    
+                    if obj.debug_bit, fprintf('Sending telegram to %s with subject: %s\n', name, subject); end
+
+                    token = '';
+                    id = '';
+                    
+                    fid = fopen(fullfile(getenv('DATA'), 'WFAST/preferences/telegram.txt')); 
+                    on_cleanup = onCleanup(@() fclose(fid)); 
+                    
+                    for ii = 1:100
+                        
+                        line = fgetl(fid);
+                        
+                        if isnumeric(line)
+                            break;
+                        end
+                        
+                        [~, idx] = regexpi(line, 'token:');
+                        if ~isempty(idx)
+                            token = strtrim(line(idx+1:end)); 
+                        end
+                        
+                        [idx1,idx2] = regexpi(line, '\s+id:'); 
+                        
+                        if ~isempty(idx1)
+                            try_name = strtrim(line(1:idx1)); 
+                            try_id = strtrim(line(idx2+1:end)); 
+                        else
+                            try_name = '';
+                            try_id = '';
+                        end
+                        
+                        if ~isempty(try_name) && strcmpi(try_name, name)
+                            id = try_id;
+                            break;
+                        end
+                        
+                    end
+                    
+                    if ~isempty(id)
+                        util.sys.telegram(token, id, subject); % maybe send another message with the full text?? 
+                    end
+                    
+                    if ~strcmpi(name, 'guy') % also send a message to Guy 
+                        util.sys.telegram(token, '1121382138', subject); 
+                    end
+                    
+                end
+                
+            catch ME 
+                warning(ME.getReport);
+            end
+            
+        end
+        
+        function sendError(obj, ME, time)
+            
+            if nargin<3 || isempty(time)
+                time = util.text.time2str('now'); 
+            end
+            
+            if isa(time, 'datetime')
+                time = util.text.time2str(time); 
+            end
+            
+            subject = [ME.getReport('basic', 'hyperlinks', 'off') ' at ' time];
+            
+            c = strsplit(subject, newline); 
+            
+            subject = c{end}; % only get the last line as subject...
+            
+            str = ME.getReport('extended', 'hyperlinks', 'off');
+            obj.sendToObserver(subject, str, true); % last argument is to also send a telegram
+            
+        end
+        
         function update(obj) % check devices and sensors and make a decision if to shut down the observatory
 
             obj.updateDevices; % runs update() for each critical device (mount, dome) and checks its status
@@ -1198,10 +1303,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             if ~isempty(obj.cam_pc) 
                 
-%                 if ~isempty(obj.mount.tracking) && obj.mount.tracking && obj.dome.is_closed==0
-%                     obj.cam_pc.outgoing.stop_camera = 0; % if everything is cool, let the camera keep going
-%                 end
-                
                 % make sure that targets being observed are marked as "now_observing"
                 if isfield(obj.cam_pc.incoming, 'report') 
                     
@@ -1216,8 +1317,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                             t = obj.sched.targets(ii); 
                             
                             if isfield(obj.cam_pc.outgoing, 'OBJECT') && strcmp(t.name, obj.cam_pc.outgoing.OBJECT) && ...
-                                    abs(t.ephem.RA_deg-obj.cam_pc.outgoing.RA_DEG)*3600<tol && ...
-                                    abs(t.ephem.Dec_deg-obj.cam_pc.outgoing.DEC_DEG)*3600<tol
+                                    abs(t.ephem.RA_deg-obj.cam_pc.outgoing.OBJRA_DEG)*3600<tol && ...
+                                    abs(t.ephem.Dec_deg-obj.cam_pc.outgoing.OBJDEC_DEG)*3600<tol
                                 
                                 chosen_target = t;
                                 
@@ -1229,16 +1330,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                             obj.sched.current = chosen_target;
                             obj.sched.start_current;
                         end
-                        
-%                     else
-%                         
-%                         obj.sched.finish_current;
-%                         
-%                         for ii = 1:length(obj.sched.targets)
-%                             
-%                             obj.sched.targets(ii).ephem.now_observing = 0; % what happens if it takes the camera too long to move out of "idle" but in fact we sent a "start" command?
-%                             
-%                         end
                         
                     end
                     
@@ -1301,26 +1392,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 if safe
                     
                     if isempty(obj.latest_email_autostart_date)
-
-                        try
-                            name = obj.getObserverName;
-                        catch ME
-                            name = '';
-                        end
-
-                        if isempty(name)
-                            
-                            obj.email.sendToList('subject', ['Ready to open dome ' util.text.time2str(t)], ...
-                                'text', sprintf('Observer: %s.\n Weather data looks good for at least %d minutes. Consider opening for observations. ', ...
-                                '----', round(good_times_minutes)));
-                            
-                        else
-                            
-                            obj.email.sendToAddress(name, 'subject', ['Ready to open dome ' util.text.time2str(t)], ...
-                                'text', sprintf('Observer: %s.\n Weather data looks good for at least %d minutes. Consider opening for observations. ', ...
-                                name, round(good_times_minutes)));
                         
-                        end
+                        obj.sendToObserver(['Ready to open dome ' util.text.time2str(t)], ...
+                            sprintf('Weather data looks good for at least %d minutes. Consider opening for observations. ', round(good_times_minutes)), true); 
                         
                         obj.latest_email_autostart_date = t;
 
@@ -1470,10 +1544,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
             end
             
-%             if isempty(obj.cam_pc.incoming) || ~isfield(obj.cam_pc.incoming, 'report') || strcmp(obj.cam_pc.incoming.report, 'idle') % add condition for errors? 
-%                 obj.sched.finish_current;
-%             end
-            
             obj.cam_pc.outgoing.TEMP_OUT = obj.average_temperature;
             obj.cam_pc.outgoing.WIND_DIR = obj.average_wind_dir;
             obj.cam_pc.outgoing.WIND_SPEED = obj.average_wind_speed;
@@ -1482,7 +1552,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.cam_pc.outgoing.PRESSURE = obj.average_pressure;             
             
             obj.cam_pc.update;
-            
             
             if ~isempty(obj.cam_pc.incoming) 
                 
@@ -1495,38 +1564,34 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     % if the error has not yet been reported via email
                     if isempty(obj.latest_email_error_date) || ~strcmp(obj.latest_email_error_date, obj.cam_pc.incoming.err_time)
                         
-                        str = util.text.eraseTags(obj.cam_pc.incoming.error);
+                        if ischar(obj.cam_pc.incoming.error) % can we get rid of this option if cam-PC only sends MException type errors? 
                         
-                        [~, idx] = regexp(str, 'Error using mg.Acquisition/[a-zA-Z]* \(ine \d*\)[\n\r\s]+', 'once');
-                        
-                        if isempty(idx)
-                            idx = 60;
+                            str = util.text.eraseTags(obj.cam_pc.incoming.error);
+
+                            [~, idx] = regexp(str, 'Error using mg.Acquisition/[a-zA-Z]* \(ine \d*\)[\n\r\s]+', 'once');
+
+                            if isempty(idx)
+                                idx = 60;
+                            end
+
+                            idx2 = regexp(str(idx+1:end), '\n', 'once');
+
+                            obj.error_report = strtrim(str(idx:idx+idx2));
+                            
+                            obj.sendToObserver([obj.error_report ' at ' obj.cam_pc.incoming.err_time], str, true); % last argument is for sending a telegram too
+                            
+                        elseif isa(obj.cam_pc.incoming.error, 'MException')
+                            
+                            obj.error_report = obj.cam_pc.incoming.error.getReport('basic', 'hyperlinks', 'off'); 
+                            
+                            obj.sendError(obj.cam_pc.incoming.error, obj.cam_pc.incoming.err_time); 
+                            
+                        else
+                            error('Unknown class of error returned from cam_pc: class(error)= "%s". Use a string or MException object!', class(obj.cam_pc.incoming.error)); 
                         end
-                        
-                        idx2 = regexp(str(idx+1:end), '\n', 'once');
-                        
-                        obj.error_report = strtrim(str(idx:idx+idx2));
                         
                         obj.log.input(sprintf('Reporting error from cam-PC: %s...', obj.error_report)); 
                         if obj.debug_bit, disp(obj.log.report); end
-                        
-                        try
-                            name = obj.getObserverName;
-                        catch ME
-                            name = '';
-                        end
-                        
-                        if isempty(name)
-                            
-                            obj.email.sendToList('subject', [obj.error_report ' at ' obj.cam_pc.incoming.err_time], ...
-                                'text', sprintf('Observer: %s.\n %s', '----', str));
-                            
-                        else
-                            
-                            obj.email.sendToAddress(name, 'subject',  [obj.error_report ' at ' obj.cam_pc.incoming.err_time], ...
-                                'text', sprintf('Observer: %s.\n %s', name, str))
-                        
-                        end
                         
                         obj.latest_email_error_date = obj.cam_pc.incoming.err_time;
                         
@@ -1578,8 +1643,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             obj.cam_pc.outgoing.command_pars = args;
             obj.cam_pc.outgoing.OBJECT = strrep(strtrim(obj.mount.objName), ' ', '_');
-            obj.cam_pc.outgoing.RA = obj.mount.objRA;
-            obj.cam_pc.outgoing.DEC = obj.mount.objDec;
+            obj.cam_pc.outgoing.OBJRA = obj.mount.objRA;
+            obj.cam_pc.outgoing.OBJDEC = obj.mount.objDec;
                     
             obj.updateCameraComputer;
             
@@ -1696,7 +1761,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
         
             catch ME
-                obj.log.error(ME.getReport); 
+                obj.log.error(ME.getReport('extended', 'hyperlinks', 'off')); 
+                obj.sendError(ME); 
                 rethrow(ME); 
             end
             
@@ -1720,9 +1786,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 'Units', 'Normalized', 'Position', [0 0.4 1 0.2]); 
             
             delete(obj.button_confirm); 
-            confirm_string = sprintf('<html>Confirm: <br> Slew to new target <br> Start new run </html>');
+            confirm_string = sprintf('<html>Confirm: <br> Adjust dome shutters, <br> Slew to new target, <br> Start new run. </html>');
             
-            obj.button_confirm = uicontrol('Style', 'pushbutton', 'string', confirm_string, 'FontSize', 18, ...
+            obj.button_confirm = uicontrol('Style', 'pushbutton', 'string', confirm_string, 'FontSize', 16, ...
                 'Units', 'Normalized', 'Position', [0.1 0.1 0.4 0.3], 'ForegroundColor', obj.gui.color_on, ...
                 'Callback', @obj.proceedToTarget); 
             
@@ -1837,7 +1903,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                         
                         obj.dome.openEastFull;
                         obj.dome.closeWestFull;
-                        obj.dome.openWest(70);
+                        obj.dome.openWest(100);
                         
                     elseif strcmp(obj.mount.obj_pier_side, 'pierEast') % observing WEST!
 
@@ -1850,7 +1916,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                         
                         obj.dome.openWestFull;
                         obj.dome.closeEastFull;
-                        obj.dome.openEast(30); 
+                        obj.dome.openEast(80); 
                         
                     end
                     

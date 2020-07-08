@@ -5,6 +5,9 @@ function str = time2str(time)
 % If given a single (scalar) datetime object, returns a string. 
 % If given a vector of datetime object, returns a cell array of strings. 
 %
+% If given a char equal to "now" it will just make a string with the
+% current time (in UTC). 
+%
 % Example output format: 2020-02-11T23:24:56
     
     if nargin==0, help('util.text.time2str'); return; end
@@ -12,6 +15,10 @@ function str = time2str(time)
     if builtin('isempty', time) || isempty(time)
         str = '';
         return;
+    end
+    
+    if ischar(time) && strcmpi(time, 'now')
+        time = datetime('now', 'TimeZone', 'UTC'); 
     end
 
     vec = datevec(time);
