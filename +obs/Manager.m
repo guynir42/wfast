@@ -133,7 +133,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         latest_email_error_date = ''; 
         error_report = '';
         
-        version = 1.04;
+        latest_response_cam_pc = ''; % time string for last time we had contact with cam-PC
+        latest_error_response = ''; % time string last time we sent an error email about not having contact with cam-PC
+        
+        version = 1.05;
         
     end
     
@@ -848,23 +851,32 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 
             catch ME
                 obj.log.error(ME.getReport);
-                rethrow(ME);
+                warning(ME.getReport);
             end
             
-            try % check scheduler and move to new target if needed
-                if obj.use_startup && obj.checker.sensors_ok && obj.checker.light_ok && obj.dome.is_closed==0
-                    obj.checkNewTarget;
-                    pause(1); 
-                    if isempty(obj.sched.current) || obj.sched.current.ephem.now_observing
-                        if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
-                            delete(obj.prompt_fig);
-                        end
+            try % check that cam-PC is responsive
+                
+                t = datetime('now', 'TimeZone', 'UTC'); 
+                
+                if ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'time') && ~isempty(obj.cam_pc.incoming.time)
+                    dt = minutes(t-util.text.str2time(obj.cam_pc.incoming.time)); 
+                else % we don't know from cam_pc object when we last heard from the cam-PC
+                    
+                    if isempty(obj.latest_response_cam_pc)
+                        dt = 0; % we don't have any record at all of when we last contacted cam-PC 
+                    else
+                        dt = minutes(t - util.text.str2time(obj.latest_response_cam_pc));
                     end
                     
                 end
+                
+                if isempty(obj.latest_error_response) && dt>30 % minutes
+                    obj.latest_error_response = util.text.time2str(t); 
+                    obj.sendError(MException('Manager:cannotContactCamPC', 'It has been over 30 minutes without contact with cam-PC!')); 
+                end
+                
             catch ME
-                obj.log.error(ME.getReport);
-                rethrow(ME); 
+                warning(ME.getReport); 
             end
             
             try % reload the target list and reset the observation history
@@ -877,7 +889,25 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
             catch ME
                 obj.log.error(ME.getReport);
-                rethrow(ME);
+                warning(ME.getReport);
+            end
+            
+            try % check scheduler and move to new target if needed
+                
+                if obj.use_startup && obj.checker.sensors_ok && obj.checker.light_ok && obj.dome.is_closed==0
+                    obj.checkNewTarget;
+                    pause(1); 
+                    if isempty(obj.sched.current) || obj.sched.current.ephem.now_observing
+                        if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
+                            delete(obj.prompt_fig);
+                        end
+                    end
+                    
+                end
+                
+            catch ME
+                obj.log.error(ME.getReport);
+                rethrow(ME); 
             end
             
         end
@@ -1599,6 +1629,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     
                 end
                 
+                if isfield(obj.cam_pc.incoming, 'time') && ~isempty(obj.cam_pc.incoming.time)
+                    obj.latest_response_cam_pc = obj.cam_pc.incoming.time; % keep track of last time we had contact with cam-PC
+                    obj.latest_error_response = ''; % once contact is established, we reset this so it sends an email if contact is lost
+                end
+                
             end
             
         end
@@ -1740,6 +1775,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             try 
 
+                if obj.checker.sensors_ok==0 || obj.checker.light_ok==0 || obj.dome.is_closed % this check needs to be skipped if we are doing simulations during the day etc... 
+                    return;
+                end
+                
                 if ~isfield(obj.cam_pc.outgoing, 'command_str') || (isempty(obj.cam_pc.outgoing.command_str) && ... % I'm not sure this is the best conditional we can find
                         ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'report') && strcmp(obj.cam_pc.incoming.report, 'idle'))
                     
@@ -1833,6 +1872,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
+        function adjustDome(obj) % send dome the telescope coordinates and let it adjust accordingly
+            
+            obj.dome.adjustDome(obj.mount.telHemisphere,... % side the telescope is positioned
+                head.Ephemeris.hour2deg(obj.mount.telHA),... % hour angle in degrees
+                obj.mount.telDec_deg); % declination in degrees
+            
+        end
+        
         function proceedToTarget(obj, ~, ~)
             
             if isempty(obj.sched.current)
@@ -1892,33 +1939,34 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 if obj.use_adjust_dome && obj.ephem.sun.Alt<0 && obj.checker.sensors_ok && obj.checker.light_ok ... 
                         && obj.dome.is_closed==0 % only move dome when weather is good, sun is down, and dome is already open
                     
-                    if strcmp(obj.mount.obj_pier_side, 'pierWest') % observinf EAST! 
-                        
-                        obj.log.input('opening dome East side'); 
-                        if obj.debug_bit, disp(obj.log.report); end
-                        if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
-                            obj.button_target.String = obj.log.report; 
-                            pause(.01);
-                        end
-                        
-                        obj.dome.openEastFull;
-                        obj.dome.closeWestFull;
-                        obj.dome.openWest(100);
-                        
-                    elseif strcmp(obj.mount.obj_pier_side, 'pierEast') % observing WEST!
-
-                        obj.log.input('opening dome West side'); 
-                        if obj.debug_bit, disp(obj.log.report); end
-                        if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
-                            obj.button_target.String = obj.log.report; 
-                            pause(.01);
-                        end
-                        
-                        obj.dome.openWestFull;
-                        obj.dome.closeEastFull;
-                        obj.dome.openEast(80); 
-                        
-                    end
+                    obj.adjustDome; % send dome the telescope coordinates and let it adjust accordingly
+                    
+%                     if strcmp(obj.mount.obj_pier_side, 'pierWest') % observing EAST! 
+%                         
+%                         obj.log.input('opening dome East side'); 
+%                         if obj.debug_bit, disp(obj.log.report); end
+%                         if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
+%                             obj.button_target.String = obj.log.report; 
+%                             pause(.01);
+%                         end
+%                         
+%                         obj.dome.openEastFull;
+%                         obj.dome.closeWestFull;
+%                         obj.dome.openWest(100);
+%                         
+%                     elseif strcmp(obj.mount.obj_pier_side, 'pierEast') % observing WEST!
+% 
+%                         obj.log.input('opening dome West side'); 
+%                         if obj.debug_bit, disp(obj.log.report); end
+%                         if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
+%                             obj.button_target.String = obj.log.report; 
+%                             pause(.01);
+%                         end
+%                         
+%                         obj.dome.openWestFull;
+%                         obj.dome.openEastFull; % need to figure out how much to open vs. declination/HA
+%                         
+%                     end
                     
                 end
 

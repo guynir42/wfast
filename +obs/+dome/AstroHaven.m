@@ -373,6 +373,91 @@ classdef AstroHaven < handle
     
     methods % commands to move or stop shutters
         
+        function adjustDome(obj, side, HA_deg, Dec_deg)
+        % Usage: obj.adjustDome(side, HA_deg, Dec_deg)
+        % Automatically choose the correct position for the dome shutters, 
+        % based on the prefered side and target coordinates. 
+        % Inputs: -side: 'East' or 'West', depending on declination and 
+        %                proximity to meridian. 
+        %          -HA_deg: target hour angle in degrees. 
+        %          -Dec_deg: target declination in degrees. 
+        % 
+        % Will open/close the shutters and start the tracking if needed.
+        %
+        % NOTE: will not do anything if dome is closed. 
+        %
+        % To get the correct parameters you need to know the dome geometry,
+        % relative to the mount+OTA, and also know the conversion btw the 
+        % open/close number and the angle it opens (assuming it is linear, 
+        % which it almost certainly isn't). 
+        % In practice, we just measured this empirically and used
+        % parameters that gave reasonable results at all angles. 
+        
+            if nargin<4
+                help('obs.dome.AstroHaven.adjustDome'); 
+                return;
+            end
+            
+            if obj.is_closed
+                return;
+            end
+            
+            if isempty(HA_deg)
+                error('Must supply a valid hour angle (HA)!'); 
+            end
+            
+            if isempty(Dec_deg) || Dec_deg<-35
+                error('Unable to view targets with %d declinations!', Dec_dec);
+            end
+            
+            if util.text.cs(side, 'East')
+                
+                obj.openEastFull;
+                obj.closeWestFull;
+                
+                % estimate for how much we need to open West shutter when 
+                % reaching meridian (at Dec+30 need 100, at Dec+90 need 200, 
+                % at -30 don't need to open at all). 
+                west_num = 5/3*(Dec_deg+30); 
+                if west_num>0
+                    obj.openWest(west_num);
+                end
+                
+                obj.use_tracking = 0; % no need for tracking on East side
+                
+            elseif util.text.cs(side, 'West')
+                
+                obj.openWestFull; % get a reference position to move from 
+                obj.closeEastFull; % check if we need to open this at all...
+                
+                % estimate for how much we need to open East shutter when
+                % starting observations on meridian (at Dec+30 need 20, 
+                % at Dec 0 need 80, at Dec -30 need almost full open). 
+                east_num = -2*(Dec_deg-40); 
+                if east_num>0
+                    obj.openEast(east_num); 
+                end
+                
+                % need to figure out how much to close the West shutter, 
+                % assuming the dome will also track (slowly open this side
+                % and close the East side during the observations). 
+                
+                angle_to_horizon = 90 - 20 - HA_deg; % degrees
+                west_num = -5/3*(Dec_deg+30) - angle_to_horizon; 
+                if west_num>0
+                    obj.openWest(west_num);
+                end
+                
+                obj.use_tracking = 1; % I don't see any reason not to track on the West side
+                
+                % do we need to set the tracking rate in case someone changed it?
+                
+            else
+                error('Unknown option "%s" to "side" parameter. Use "East" or "West". ', side); 
+            end
+            
+        end
+        
         function emergencyClose(obj) % do everything you can to close dome (including sending the uncancelable 'C' command) 
             
             obj.log.input('Emergency close!');
@@ -399,6 +484,8 @@ classdef AstroHaven < handle
                     number = 1;
                 end
             end
+            
+            number = ceil(number); % avoid fractional numbers
             
             obj.log.input(['Open both. N= ' num2str(number)]);
             
@@ -437,6 +524,8 @@ classdef AstroHaven < handle
                     number = 1;
                 end
             end
+            
+            number = ceil(number); % avoid fractional numbers
             
             obj.log.input(['Close both. N= ' num2str(number)]);
             
@@ -488,6 +577,8 @@ classdef AstroHaven < handle
                 end
             end
             
+            number = ceil(number); % avoid fractional numbers
+            
             obj.log.input(['Open shutter West. N= ' num2str(number)]);
             
             try
@@ -524,6 +615,8 @@ classdef AstroHaven < handle
                     number = 1;
                 end
             end
+            
+            number = ceil(number); % avoid fractional numbers
             
             obj.log.input(['Close shutter West. N= ' num2str(number)]);
             
@@ -573,6 +666,8 @@ classdef AstroHaven < handle
                 end
             end
             
+            number = ceil(number); % avoid fractional numbers
+            
             obj.log.input(['Open shutter East. N= ' num2str(number)]);
             
             try
@@ -609,6 +704,8 @@ classdef AstroHaven < handle
                     number = 1;
                 end
             end
+            
+            number = ceil(number); % avoid fractional numbers
             
             obj.log.input(['Close shutter East. N= ' num2str(number)]);
             
@@ -748,6 +845,8 @@ classdef AstroHaven < handle
             if nargin<3 || isempty(number)
                 number = 1;
             end
+            
+            number = ceil(number); % avoid fractional numbers
             
             if isempty(obj.hndl) || ~isvalid(obj.hndl) || ~strcmp(obj.hndl.Status, 'open')
                 obj.connect;

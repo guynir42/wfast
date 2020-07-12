@@ -544,6 +544,12 @@ classdef (CaseInsensitiveProperties) Target < handle
                     return;
                 end
                 
+                tline = strtrim(tline);
+                
+                if isempty(tline)
+                    continue;
+                end
+                
                 new_obj = obs.sched.Target; 
                 
                 if ~isempty(constraints)
