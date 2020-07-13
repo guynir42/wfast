@@ -534,8 +534,11 @@ classdef Catalog < handle
         
         function calcSky(obj) % get the zero point, mag limit and sky brightness
             
-            
             try % first get the zero point
+                
+                if isempty(obj.flux)
+                    obj.flux = obj.data.flux;
+                end
                 
                 if ~isempty(obj.flux)
                     delta_mag = obj.magnitudes + 2.5*log10(obj.flux); % difference between GAIA mag and the instrumental flux converted to mag

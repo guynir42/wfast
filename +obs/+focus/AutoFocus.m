@@ -14,6 +14,8 @@ classdef AutoFocus < handle
     
     properties % inputs/outputs
         
+        index; 
+        
         pos; % focuser position at each iteration
         widths; % one or multiple measurements per focus position
         weights; % weight of each sampling point (proportional to star flux)
@@ -214,6 +216,8 @@ classdef AutoFocus < handle
             if nargin>=6 && ~isempty(xy_pos)
                 obj.xy_pos = xy_pos;
             end
+            
+            obj.index = idx;
             
             obj.pos(idx) = position;
                 
@@ -512,7 +516,7 @@ classdef AutoFocus < handle
                 end
             end
             
-            util.plot.show(nansum(obj.cutouts(:,:,:,obj.star_idx),3), 'ax', input.ax, 'autodyn', 1, 'fancy', 'off'); 
+            util.plot.show(obj.cutouts(:,:,obj.index,obj.star_idx), 'ax', input.ax, 'autodyn', 1, 'fancy', 'off'); 
             
             util.plot.inner_title(sprintf('weight= %4.2f', nanmean(obj.weights(obj.star_idx,:),2)), 'Position', 'Top', 'Color', 'white', 'ax', input.ax); 
             

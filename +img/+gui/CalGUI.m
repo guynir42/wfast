@@ -202,7 +202,7 @@ classdef CalGUI < handle
             obj.panel_actions.addButton('button_load_browse', 'load_browse', 'push', 'browse', '', '', 0.5, '', '', 'browse for a calibration file to load');
             obj.panel_actions.addButton('button_save', 'save', 'push', 'Save', '', '', 0.5, '', '', 'save calibration files in the calibration folder and along with the raw data files');
             obj.panel_actions.addButton('button_save_browse', 'save_browse', 'push', 'browse', '', '', 0.5, '', '', 'browse the filesystem and save a new calibration file');
-            obj.panel_actions.addButton('button_use_autosave', 'use_autosave', 'toggle', 'autosave off', 'autosave on', '', 1, obj.color_on, '', 'automatically save calibration after running makeDark or makeFlat'); 
+            obj.panel_actions.addButton('button_use_autosave', 'use_autosave', 'toggle', 'autosave is off', 'autosave is on', '', 1, obj.color_on, '', 'automatically save calibration after running makeDark or makeFlat'); 
             obj.panel_actions.margin = [0.02 0.02]; 
             obj.panel_actions.make;
             

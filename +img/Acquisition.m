@@ -200,7 +200,7 @@ classdef Acquisition < file.AstroData
         lost_flux_threshold = 0.3;
         max_failed_batches = 3; % if star flux is lost for more than this number of batches, quit the run
         
-        sensor_temp_night = 0;
+        sensor_temp_night = 10;
         sensor_temp_day = 20; 
         
         camera_angle = 60; % degrees between image top and cardinal south/north (when after meridian)
@@ -387,10 +387,10 @@ classdef Acquisition < file.AstroData
                 
                 obj.head = head.Header; % this also gives "head" to all sub-objects
                 obj.cat = head.Catalog(obj.head);
-                obj.cat.RA_scan_step = 1;
-                obj.cat.RA_scan_range = 1;
-                obj.cat.Dec_scan_step = 1;
-                obj.cat.Dec_scan_range = 1;
+                obj.cat.RA_scan_step = 0.5;
+                obj.cat.RA_scan_range = 1.5;
+                obj.cat.Dec_scan_step = 0.5;
+                obj.cat.Dec_scan_range = 1.5;
                 
                 obj.lightcurves.head = obj.head;
                 obj.lightcurves.cat = obj.cat;
@@ -400,6 +400,8 @@ classdef Acquisition < file.AstroData
                 util.oop.save_defaults(obj); % make sure each default_XXX property is updated with the current XXX property value. 
                 
                 obj.stash_parameters;
+                
+                obj.log.input('Constructed new Analysis object.'); 
                 
 %                 obj.sync.connect;
                 
@@ -1166,6 +1168,9 @@ classdef Acquisition < file.AstroData
                     obj.default_frame_rate = obj.cam.default_frame_rate;
                     
                     obj.src = obj.cam;
+                    
+                    obj.log.input('Successfully initialized camera.'); 
+                    
                 else
                     warning('unknown source "%s"', source);
                 end
@@ -1674,7 +1679,7 @@ classdef Acquisition < file.AstroData
                     
                     if obj.debug_bit, fprintf('Resulting focus point is %4.2f at FWHM of %4.2f"\n', obj.cam.af.found_pos, obj.cam.af.found_width.*2.355.*obj.head.SCALE); end
                     
-                    if obj.cam.af.found_width<1 && obj.cam.af.found_pos>=min_pos && obj.cam.af.found_pos<=max_pos
+                    if obj.cam.af.found_width<1.2 && obj.cam.af.found_pos>=min_pos && obj.cam.af.found_pos<=max_pos
                         success = 1;
                         break; % if focus is good enough and not at the edges of the range, we don't need to repeat it
                     end
@@ -2647,14 +2652,17 @@ classdef Acquisition < file.AstroData
                         files = d.match('*.h5*'); 
                         
                         for ii = 1:length(obj.micro_flares) % fix the filenames using the known folder
-                            [~, name, ext] = fileparts(files{obj.micro_flares(ii).file_index});
-                            obj.micro_flares(ii).filename = [name,ext];
+                            idx = obj.micro_flares(ii).file_index;
+                            if idx<=length(files)
+                                [~, name, ext] = fileparts(files{idx});
+                                obj.micro_flares(ii).filename = [name,ext];
+                            end
                         end
                         
                         micro_flares = obj.micro_flares;
-                        head = obj.head;
+                        header = obj.head;
                         
-                        save(fullfile(obj.buf.directory, 'micro_flares.mat'), 'micro_flares', 'head', '-v7.3'); 
+                        save(fullfile(obj.buf.directory, 'micro_flares.mat'), 'micro_flares', 'header', '-v7.3'); 
                         
                     end
                     
@@ -2664,7 +2672,8 @@ classdef Acquisition < file.AstroData
                 
             end
             
-            if obj.debug_bit, disp(['Finished run "' obj.run_name '" with ' num2str(obj.batch_counter) ' batches.']); end
+            obj.log.input(['Finished run "' obj.run_name '" with ' num2str(obj.batch_counter) ' batches.']);
+            if obj.debug_bit, disp(obj.log.report); end
             
             if obj.use_audio
                 try
@@ -3359,14 +3368,14 @@ classdef Acquisition < file.AstroData
                         
                         flare = img.MicroFlare;
                         flare.file_index = obj.batch_counter+1;
-%                         flare.filename = obj.buf.filename; % the filename in the buffer does not get updated until after we save 
+%                         flare.filename = obj.buf.filename; % the filename in the buffer does not get updated until we call save()
                         flare.folder = obj.buf.directory;
                         flare.serial = length(obj.micro_flares)+1;
                         flare.frame_index = idx;
                         flare.cut_index = i2;
                         flare.peak = mx;
                         flare.pos = obj.positions(i2,:)'; 
-                        flare.timestamps = obj.timestamps;
+                        flare.timestamps = util.oop.full_copy(obj.timestamps);
                         flare.flux = obj.fluxes(:,i2); 
                         flare.mean = M;
                         flare.std = S;
