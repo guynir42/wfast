@@ -1118,7 +1118,7 @@ classdef Calibration < handle
             input = util.text.InputVars;
             input.use_ordered_numeric = 1;
             input.input_var('images', []);
-            input.input_var('clipper', [], 'cut_pos');
+            input.input_var('clipper', [], 'cut_pos', 'positions');
             input.input_var('num_sum', 1, 'sum');
             input.input_var('flat', obj.use_flat);
             input.input_var('median', obj.use_subtract_median, 'subtract_median');

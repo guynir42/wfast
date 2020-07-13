@@ -107,7 +107,7 @@ classdef Acquisition < file.AstroData
         
         use_model_psf = 0;
         
-        use_cam_focusing = 1;
+        use_cam_focusing = 0;
         num_focus_iterations = 6;
         
         use_check_positions = 1;
@@ -195,6 +195,9 @@ classdef Acquisition < file.AstroData
         use_quick_find_stars = true; % use new method that runs faster
         use_mextractor = false; % use mextractor to identify stars and find their WCS and catalog mag/temp
         use_arbitrary_pos = false; % don't look for stars (e.g., when testing with the dome closed)
+        
+        min_stars = 20; % minimal number of stars
+        use_remove_extra_columns = true; 
         
         lost_stars_fraction = 0.3;
         lost_flux_threshold = 0.3;
@@ -965,6 +968,8 @@ classdef Acquisition < file.AstroData
         
         function set.total_runtime(obj, val)
             
+            if isempty(val), return; end % cannot input an empty value! 
+            
             obj.total_runtime = val;
             
             obj.num_batches = ceil(obj.total_runtime.*obj.convertRuntimeToSeconds.*obj.getFrameRateEstimate./obj.batch_size);
@@ -972,6 +977,8 @@ classdef Acquisition < file.AstroData
         end
         
         function set.num_batches(obj, val)
+            
+            if isempty(val), return; end % cannot input an empty value! 
             
             if isprop(obj.src, 'num_batches')
                 obj.src.num_batches = val;
@@ -1331,7 +1338,7 @@ classdef Acquisition < file.AstroData
                 obj.is_running = 1;
             end
             
-            check = obj.startup(varargin);
+            check = obj.startup(varargin{:});
             
             try 
                 
@@ -1571,8 +1578,25 @@ classdef Acquisition < file.AstroData
                             obj.num_sum = size(obj.cam.images,3);
                             obj.stack = single(sum(obj.cam.images,3));
                             obj.stack_proc = obj.cal.input(obj.stack, 'num', obj.num_sum); % calibrated sum
+                            
+                            if obj.use_remove_bad_pixels
+                                obj.stack_proc = util.img.maskBadPixels(obj.stack_proc, NaN); 
+                            end
+
+                            if obj.use_remove_extra_columns
+                                obj.stack_proc(:,1957:1959) = NaN;
+                            end
+                            
                             obj.star_props = util.img.quick_find_stars(obj.stack_proc, 'threshold', obj.cam.af.threshold,...
-                                'saturation', 5e4*obj.num_sum, 'unflagged', 1, 'num_stars', obj.cam.af.num_stars);
+                                'saturation', 5e4*obj.num_sum, 'unflagged', 1, 'num_stars', obj.cam.af.num_stars,...
+                                'psf', 2, 'edges', obj.avoid_edges, 'dilate', obj.cut_size-5);
+                            
+                            if height(obj.star_props)<10
+                                util.plot.inner_title(sprintf('Focus failed after %d iterations!', 0),...
+                                    'ax', obj.cam.af.gui.axes_image, 'FontSize', 26, 'Position', 'North');
+                                pause(1); 
+                                error('Found only %d stars when starting focus run!', height(obj.star_props)); 
+                            end
                             
                             if obj.brake_bit, return; end
                             
@@ -1661,12 +1685,12 @@ classdef Acquisition < file.AstroData
                             
                         catch ME
                             
+                            obj.finishup; 
                             obj.cam.focuser.pos = old_pos;
                             obj.log.error(ME.getReport('extended', 'hyperlinks', 'off'));
                             rethrow(ME);
                             
                         end
-                        
                         
                     end % focus using Analysis tools, not internally in the camera class
                     
@@ -2079,6 +2103,7 @@ classdef Acquisition < file.AstroData
                         
                         obj.log.input(sprintf('Starting run command from Dome-PC. Args= "%s"', obj.latest_command_pars)); 
                         disp(obj.log.report); 
+                        
                         if cs(input.mode, 'fast')
                             obj.setupFastMode;
                         elseif cs(input.mode, 'slow')
@@ -2141,8 +2166,12 @@ classdef Acquisition < file.AstroData
         
         function input = makeInputVars(obj, varargin)
             
+            % override the behavior when inputting only one of these...
+            num_batches = [];
+            total_runtime = []; 
+
             idx = util.text.InputVars.isInputVars(varargin);
-            
+
             if ~isempty(varargin) && any(idx) % was given an InputVars object
             
                 idx = find(idx, 1, 'first');
@@ -2182,19 +2211,44 @@ classdef Acquisition < file.AstroData
                 input.input_var('DE', [], 'declination');
                 input.input_var('expT', [], 'T', 'exposure time');
                 input.input_var('frame_rate', []); 
-                input.input_var('num_batches', [], 'Nbatches');
+                input.input_var('num_batches', [], 'Nbatches', 7);
                 input.input_var('total_runtime', [], 'runtime');
                 input.input_var('batch_size', [], 'frames');
-                input.input_var('num_stars', [], 'Nstars');
+                input.input_var('num_stars', [], 'Nstars', 5);
                 input.input_var('cut_size', []);
-                input.input_var('num_backgrounds', [], 'Nbackgrounds');
+                input.input_var('num_backgrounds', [], 'Nbackgrounds', 7);
                 input.input_var('cut_size_bg', []);
                 
-                input.scan_obj(obj); % overwrite defaults using values in Acquisition object
+                input.scan_vars(varargin{:}); % scan once to get num_batches and total_runtime, then scan again after scaning object... 
+                
+                if ~isempty(input.num_batches) && ~isempty(input.total_runtime) % both have been given! 
+                    num_batches = input.total_runtime;
+                    total_runtime = input.total_runtime; 
+                elseif isempty(input.num_batches) && isempty(input.total_runtime) % neither is given (use defaults)
+                    num_batches = obj.total_runtime;
+                    total_runtime = obj.total_runtime; 
+                elseif ~isempty(input.num_batches) && isempty(input.total_runtime) % use the given value for num_batches
+                    num_batches = input.num_batches;
+                elseif isempty(input.num_batches) && ~isempty(input.total_runtime) % use the given value for total_runtime
+                    total_runtime = input.total_runtime;
+                end
 
+                input.scan_obj(obj); % overwrite defaults using values in Acquisition object
+                
             end
             
             input.scan_vars(varargin{:});
+
+            % now do the right thing, hopefully
+            input.total_runtime = total_runtime;
+            input.num_batches = num_batches; 
+%             if ~isempty(total_runtime)
+%                 obj.total_runtime = total_runtime;
+%             end
+% 
+%             if ~isempty(num_batches)
+%                 obj.num_batches = num_batches;
+%             end
             
         end
         
@@ -2696,6 +2750,8 @@ classdef Acquisition < file.AstroData
             
             obj.sync.outgoing.report = 'idle'; % maybe only do this if there was no error? 
             
+            obj.sync.update;
+            
             obj.lightcurves.finishup;
             
             obj.is_running = 0;
@@ -2971,6 +3027,10 @@ classdef Acquisition < file.AstroData
                 S = util.img.maskBadPixels(S, NaN); 
             end
             
+            if obj.use_remove_extra_columns
+                S(:, 1957:1959) = NaN; 
+            end
+            
             if obj.use_arbitrary_pos
                 obj.clip.arbitraryPositions('im_size', size(obj.stack)); % maybe add some input parameters?
                 obj.positions = obj.clip.positions;
@@ -2980,8 +3040,13 @@ classdef Acquisition < file.AstroData
                 % replaced the psf width with 1, because getWidthEstimate was returning unreasonable results... 
                 T = util.img.quick_find_stars(S, 'psf', 1, 'number', obj.num_stars, 'sigma', obj.detect_thresh, ...
                     'dilate', obj.cut_size-5, 'saturation', obj.saturation_value.*obj.num_sum, 'edges', obj.avoid_edges, 'unflagged', 1); 
+                
                 if isempty(T)
                     error('Could not find any stars using quick_find_stars!');
+                end
+                
+                if ~isempty(obj.min_stars) && height(T)<obj.min_stars
+                    error('Found only %d stars, aborting run!', height(T)); 
                 end
                 
                 obj.head.THRESH_DETECTION = obj.detect_thresh; 

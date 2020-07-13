@@ -489,7 +489,8 @@ classdef AcqGUI < handle
                 obj.owner.use_save = 0;
                 obj.owner.run('reset', 1, 'num_batches', 30);
             catch ME
-                obj.latest_error = util.text.eraseTags(ME.getReport());
+%                 obj.latest_error = util.text.eraseTags(ME.getReport());
+                obj.latest_error = ME.getReport('extended', 'hyperlinks', 'off'); 
                 obj.update;
                 rethrow(ME);
             end
@@ -507,7 +508,8 @@ classdef AcqGUI < handle
             try
                 obj.owner.run;
             catch ME
-                obj.latest_error = util.text.eraseTags(ME.getReport());
+%                 obj.latest_error = util.text.eraseTags(ME.getReport());
+                obj.latest_error = ME.getReport('extended', 'hyperlinks', 'off'); 
                 obj.update;
                 rethrow(ME);
             end

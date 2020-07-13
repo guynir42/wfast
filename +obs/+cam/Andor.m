@@ -1609,7 +1609,7 @@ classdef Andor < file.AstroData
                 obj.focuser.pos = old_pos;
             end
 
-            if ~isempty(obj.af.gui)
+            if ~isempty(obj.af.gui) && obj.af.success
                 obj.af.gui.update
             end
             

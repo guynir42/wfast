@@ -185,6 +185,10 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     
     I_reduced = I_reduced.*input.std + input.mean; % rescale this back to the original values
     
+    if isempty(table_props)
+        return; 
+    end
+    
     T2 = table(flux, flag, snr);
     
     table_props = horzcat(T2, table_props);
