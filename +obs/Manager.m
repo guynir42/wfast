@@ -1235,50 +1235,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 if use_telegram
                     
-                    if obj.debug_bit, fprintf('Sending telegram to %s with subject: %s\n', name, subject); end
-
-                    token = '';
-                    id = '';
-                    
-                    fid = fopen(fullfile(getenv('DATA'), 'WFAST/preferences/telegram.txt')); 
-                    on_cleanup = onCleanup(@() fclose(fid)); 
-                    
-                    for ii = 1:100
-                        
-                        line = fgetl(fid);
-                        
-                        if isnumeric(line)
-                            break;
-                        end
-                        
-                        [~, idx] = regexpi(line, 'token:');
-                        if ~isempty(idx)
-                            token = strtrim(line(idx+1:end)); 
-                        end
-                        
-                        [idx1,idx2] = regexpi(line, '\s+id:'); 
-                        
-                        if ~isempty(idx1)
-                            try_name = strtrim(line(1:idx1)); 
-                            try_id = strtrim(line(idx2+1:end)); 
-                        else
-                            try_name = '';
-                            try_id = '';
-                        end
-                        
-                        if ~isempty(try_name) && strcmpi(try_name, name)
-                            id = try_id;
-                            break;
-                        end
-                        
-                    end
-                    
-                    if ~isempty(id)
-                        util.sys.telegram(token, id, subject); % maybe send another message with the full text?? 
-                    end
+                    obj.sendTelegram(name, subject); 
                     
                     if ~strcmpi(name, 'guy') % also send a message to Guy 
-                        util.sys.telegram(token, '1121382138', subject); 
+                        obj.sendTelegram(name, subject); 
                     end
                     
                 end
@@ -1310,14 +1270,112 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
+        function sendTelegram(obj, name, subject)
+            
+            if obj.debug_bit, fprintf('Sending telegram to %s with subject: %s\n', name, subject); end
+
+            token = '';
+            id = '';
+
+            fid = fopen(fullfile(getenv('DATA'), 'WFAST/preferences/telegram.txt')); 
+            on_cleanup = onCleanup(@() fclose(fid)); 
+
+            for ii = 1:100
+
+                line = fgetl(fid);
+
+                if isnumeric(line)
+                    break;
+                end
+
+                [~, idx] = regexpi(line, 'token:');
+                if ~isempty(idx)
+                    token = strtrim(line(idx+1:end)); 
+                end
+
+                [idx1,idx2] = regexpi(line, '\s+id:'); 
+
+                if ~isempty(idx1)
+                    try_name = strtrim(line(1:idx1)); 
+                    try_id = strtrim(line(idx2+1:end)); 
+                else
+                    try_name = '';
+                    try_id = '';
+                end
+
+                if ~isempty(try_name) && strcmpi(try_name, name)
+                    id = try_id;
+                    break;
+                end
+
+            end
+
+            if ~isempty(id)
+                util.sys.telegram(token, id, subject); % maybe send another message with the full text?? 
+            end
+            
+        end
+        
         function update(obj) % check devices and sensors and make a decision if to shut down the observatory
 
-            obj.updateDevices; % runs update() for each critical device (mount, dome) and checks its status
+            try % try getting the sun altitude
+                
+                obj.ephem.update;
+                if obj.use_shutdown && obj.ephem.sun.Alt>-5
+                    if obj.is_shutdown==0 % if already shut down, don't need to do it again
+                        fprintf('%s:Sun elevation %d is above -5 deg... \n', datestr(obj.log.time), round(obj.ephem.sun.Alt)); 
+                        obj.shutdown;
+                    end
+                end
 
-            obj.checker.decision_all; % collect weather data and make a decision
+            catch ME
+                warning(ME.getReport);
+            end
+            
+            if obj.use_shutdown && obj.checker.checkDayTime % check if the system clock says it is day time
+                if obj.is_shutdown==0 % if already shut down, don't need to do it again
+                    fprintf('%s: System clock says it is day time... \n', datestr(obj.log.time)); 
+                    obj.shutdown;
+                end
+            end
+            
+            % make sure we reach the weather check+shutdown in the end
+            try 
+                obj.updateDevices; % runs update() for each critical device (mount, dome) and checks its status
 
-            obj.log.input(obj.report); % summary of observatory status
+                obj.checker.decision_all; % collect weather data and make a decision
 
+                obj.log.input(obj.report); % summary of observatory status
+                
+            catch ME
+                obj.log.input(obj.report);
+                obj.log.error(sprintf('Problem with device check!\n%s', ME.getReport('extended', 'hyperlinks', 'off')));
+                warning(ME.getReport); 
+            end
+            
+            % the following conditions for shutting down
+            if obj.use_shutdown && obj.devices_ok==0 % critical device failure, must shut down
+                if obj.is_shutdown==0 % if already shut down, don't need to do it again
+                    fprintf('%s: Device problems... %s \n', datestr(obj.log.time), obj.devices_report); 
+                    obj.shutdown;
+                end
+            end
+
+            if obj.use_shutdown && (obj.checker.sensors_ok==0 || obj.checker.light_ok==0) % one of the sensors reports bad weather, must shut down
+                if obj.is_shutdown==0 % if already shut down, don't need to do it again
+                    fprintf('%s: Bad weather... %s \n', datestr(obj.log.time), obj.checker.report); 
+                    obj.shutdown;
+                end
+            end
+            
+            if obj.checker.sensors_ok==0 || obj.checker.light_ok==0 % if at any time weather is bad, reset these counters (this does not include light)
+                obj.sensor_ok_history = [];
+                obj.latest_email_autostart_date = [];
+            end
+            
+            obj.matchRuntimes; 
+            obj.updateUserPrompt; % make sure the "proceedToTarget" button is greyed out if weather is bad / dome is closed
+            
             if ~isempty(obj.mount)
                 
                 % these checks will update the mount gui
@@ -1368,50 +1426,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.cam_pc.update;
                 
             end
-            
-            % the following conditions for shutting down
-            if obj.use_shutdown && obj.devices_ok==0 % critical device failure, must shut down
-                if obj.is_shutdown==0 % if already shut down, don't need to do it again
-                    fprintf('%s: Device problems... %s \n', datestr(obj.log.time), obj.devices_report); 
-                    obj.shutdown;
-                end
-            end
-
-            if obj.use_shutdown && (obj.checker.sensors_ok==0 || obj.checker.light_ok==0) % one of the sensors reports bad weather, must shut down
-                if obj.is_shutdown==0 % if already shut down, don't need to do it again
-                    fprintf('%s: Bad weather... %s \n', datestr(obj.log.time), obj.checker.report); 
-                    obj.shutdown;
-                end
-            end
-            
-            try % try getting the sun altitude
-                
-                obj.ephem.update;
-                if obj.use_shutdown && obj.ephem.sun.Alt>-5
-                    if obj.is_shutdown==0 % if already shut down, don't need to do it again
-                        fprintf('%s:Sun elevation %d is above -5 deg... \n', datestr(obj.log.time), round(obj.ephem.sun.Alt)); 
-                        obj.shutdown;
-                    end
-                end
-
-            catch ME
-                warning(ME.getReport);
-            end
-            
-            if obj.use_shutdown && obj.checker.checkDayTime % check if the system clock says it is day time
-                if obj.is_shutdown==0 % if already shut down, don't need to do it again
-                    fprintf('%s: System clock says it is day time... \n', datestr(obj.log.time)); 
-                    obj.shutdown;
-                end
-            end
-            
-            if obj.checker.sensors_ok==0 || obj.checker.light_ok==0 % if at any time weather is bad, reset these counters (this does not include light)
-                obj.sensor_ok_history = [];
-                obj.latest_email_autostart_date = [];
-            end
-            
-            obj.matchRuntimes; 
-            obj.updateUserPrompt; % make sure the "proceedToTarget" button is greyed out if weather is bad / dome is closed
             
             if obj.use_startup
                 
@@ -1494,21 +1508,43 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.devices_report = 'OK';
             
             if obj.use_dome
-                obj.dome.update;
+                
+                try
+                    obj.dome.update;
+                catch ME
+                    warning(ME.getReport);
+                    obj.dome.status = 0;
+                    obj.devices_report = 'Dome error!';
+                    obj.log.error(sprintf('Dome error!\n %s', ME.getReport('extended', 'hyperlinks', 'off')));
+                end
+                
                 if obj.dome.status==0
                     obj.devices_ok = 0;
                     obj.devices_report = 'Dome error!';
+                    obj.log.error('Dome error'); 
                     return;
                 end
+                
             end
             
             if obj.use_mount
-                obj.mount.update;
+                
+                try 
+                    obj.mount.update;
+                catch ME
+                    warning(ME.getReport); 
+                    obj.mount.status = 0; 
+                    obj.devices_report = 'Mount error!';
+                    obj.log.error(sprintf('Mount error!\n %s', ME.getReport('extended', 'hyperlinks', 'off')));                    
+                end
+                
                 if obj.mount.status==0
                     obj.devices_ok = 0;
                     obj.devices_report = 'Mount error!';
+                    obj.log.error('Mount error!'); 
                     return;
                 end
+                
             end
             
             % add maybe checks for boltwood if we think it is critical?
@@ -1938,6 +1974,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.ephem.update;
                 if obj.use_adjust_dome && obj.ephem.sun.Alt<0 && obj.checker.sensors_ok && obj.checker.light_ok ... 
                         && obj.dome.is_closed==0 % only move dome when weather is good, sun is down, and dome is already open
+                    
+                    obj.log.input(sprintf('Adjusting dome for viewing the %s side', obj.mount.telHemisphere)); 
+                    if obj.debug_bit, disp(obj.log.report); end
                     
                     obj.adjustDome; % send dome the telescope coordinates and let it adjust accordingly
                     

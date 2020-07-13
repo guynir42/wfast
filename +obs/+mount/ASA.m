@@ -1527,7 +1527,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             delete(timerfind('name', 'mount-timer'));
             
             obj.timer = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'mount-timer', ...
-                'Period', 1, 'StartDelay', 1, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer);
+                'Period', 2, 'StartDelay', 1, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer);
             
             start(obj.timer);
             

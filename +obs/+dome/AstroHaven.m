@@ -443,9 +443,9 @@ classdef AstroHaven < handle
                 % and close the East side during the observations). 
                 
                 angle_to_horizon = 90 - 20 - HA_deg; % degrees
-                west_num = -5/3*(Dec_deg+30) - angle_to_horizon; 
+                west_num = 160 - 1.2*(Dec_deg+30) + angle_to_horizon*2;
                 if west_num>0
-                    obj.openWest(west_num);
+                    obj.closeWest(west_num);
                 end
                 
                 obj.use_tracking = 1; % I don't see any reason not to track on the West side
