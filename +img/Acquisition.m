@@ -1363,7 +1363,7 @@ classdef Acquisition < file.AstroData
                 end
 
             catch ME
-                obj.log.error(ME.getReport('extended', 'hyperlinks', 'off'));
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -1412,7 +1412,7 @@ classdef Acquisition < file.AstroData
                 obj.is_running_single = 0;
                 
             catch ME
-                obj.log.error(ME.getReport('extended', 'hyperlinks', 'off'));
+                obj.log.error(ME);
                 obj.is_running_single = 0;
                 rethrow(ME);
             end
@@ -1687,7 +1687,7 @@ classdef Acquisition < file.AstroData
                             
                             obj.finishup; 
                             obj.cam.focuser.pos = old_pos;
-                            obj.log.error(ME.getReport('extended', 'hyperlinks', 'off'));
+                            obj.log.error(ME);
                             rethrow(ME);
                             
                         end
@@ -1734,7 +1734,7 @@ classdef Acquisition < file.AstroData
                 end
                 
             catch ME
-                obj.log.error(ME.getReport('extended', 'hyperlinks', 'off'));
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -2659,7 +2659,7 @@ classdef Acquisition < file.AstroData
                 check = 1;
                 
             catch ME
-                obj.log.error(ME.getReport('extended', 'hyperlinks', 'off'));
+                obj.log.error(ME);
                 obj.unstash_parameters;
                 obj.is_running = 0;
                 obj.sync.outgoing.error = ME; 
@@ -3615,7 +3615,7 @@ classdef Acquisition < file.AstroData
             try
                 obj.sync.connect;
             catch ME
-                obj.log.error(ME.getReport('extended', 'hyperlinks', 'off'));
+                obj.log.error(ME);
                 rethrow(ME);
             end
             

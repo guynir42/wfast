@@ -291,7 +291,7 @@ classdef Andor < file.AstroData
                     end
 
                 catch ME
-                    obj.log.error(ME.getReport);
+                    obj.log.error(ME);
                     rethrow(ME);
                 end
                 
@@ -355,7 +355,7 @@ classdef Andor < file.AstroData
                 obs.cam.mex_new.set(obj.hndl, 'cycle mode', 'Continuous'); % I think we don't need to limit the number of frames (there are explicit stops in the code).
                 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -368,7 +368,7 @@ classdef Andor < file.AstroData
             try 
                 obs.cam.mex_new.disconnect(obj.hndl);
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -989,7 +989,7 @@ classdef Andor < file.AstroData
             catch ME
                 
                 obj.focuser.pos = old_pos;
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
                 
             end
@@ -1057,7 +1057,7 @@ classdef Andor < file.AstroData
                 end
                 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -1204,7 +1204,7 @@ classdef Andor < file.AstroData
                 end
 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 obj.is_running = 0;
                 rethrow(ME);
             end
@@ -1258,7 +1258,7 @@ classdef Andor < file.AstroData
                 end
             
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 obj.is_running = 0;
                 rethrow(ME);
             end
