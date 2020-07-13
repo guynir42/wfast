@@ -578,11 +578,11 @@ classdef Scheduler < handle
                 obj.continue_run = 1; % this is the only case where we do not need to start a new run! 
             end
             
-            if ~use_sim
-                obj.report_log{end+1,1} = obj.report;
-            else
-                obj.report_log_sim{end+1,1} = obj.report;
-            end
+%             if ~use_sim
+%                 obj.report_log{end+1,1} = obj.report;
+%             else
+%                 obj.report_log_sim{end+1,1} = obj.report;
+%             end
             
             if obj.debug_bit>1
                 
@@ -840,6 +840,7 @@ classdef Scheduler < handle
                     obj.current_sim = new_target;
                 end
                 
+                obj.report_log_sim{end+1,1} = obj.report; 
                 obj.rationale_log_sim{end+1,1} = obj.rationale;
             
                 if isempty(obj.current_sim)

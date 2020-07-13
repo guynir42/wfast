@@ -208,7 +208,7 @@ classdef AstroHaven < handle
                 obj.send('R');
                 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
 
@@ -227,7 +227,7 @@ classdef AstroHaven < handle
                 end
                 obj.hndl = [];
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -243,7 +243,7 @@ classdef AstroHaven < handle
                 
             catch ME
                 
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 obj.acc_E = obs.sens.Accelerometer.empty;
                 warning(ME.getWarning);
                 
@@ -255,7 +255,7 @@ classdef AstroHaven < handle
                 
             catch ME
                 
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 obj.acc_E = obs.sens.Accelerometer.empty;
                 warning(ME.getWarning);
                 
@@ -469,7 +469,7 @@ classdef AstroHaven < handle
                 obj.closeBoth(100);
                 obj.update;
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 warning(ME.getReport);
             end
             
@@ -509,7 +509,7 @@ classdef AstroHaven < handle
                 obj.update;
 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -549,7 +549,7 @@ classdef AstroHaven < handle
                 obj.update;
 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -600,7 +600,7 @@ classdef AstroHaven < handle
                 obj.update;
 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -638,7 +638,7 @@ classdef AstroHaven < handle
                 obj.update;
 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -689,7 +689,7 @@ classdef AstroHaven < handle
                 obj.update;
 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -728,7 +728,7 @@ classdef AstroHaven < handle
                 obj.update;
 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -828,7 +828,7 @@ classdef AstroHaven < handle
                     
                 catch ME
                     obj.use_tracking = 0;
-                    obj.log.error(ME.getReport); 
+                    obj.log.error(ME); 
                     rethrow(ME); 
                 end
                 
@@ -911,7 +911,7 @@ classdef AstroHaven < handle
                 end % for ii (number)
 
             catch ME                
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             

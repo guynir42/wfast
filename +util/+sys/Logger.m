@@ -226,7 +226,11 @@ classdef Logger < handle
                 errflag = 0;
             end
             
-            text = util.text.eraseTags(text);
+            if isa(text, 'MException')
+                text = text.getReport('extended', 'hyperlinks', 'off'); 
+            else
+                text = util.text.eraseTags(text);
+            end
             
             new_time = datetime('now', 'timezone', 'UTC'); % update to current time
             
@@ -245,11 +249,14 @@ classdef Logger < handle
             
             timestamp = datestr(obj.time, 'hh:MM:ss.FFF');
             
-            if errflag==0
-                obj.report = sprintf('%s: %s', timestamp, text); % timestamp and input text 
-            else
-                obj.report = sprintf('************ EXCEPTION *****************\n%s: %s', timestamp, text); % add banner
-            end
+            obj.report = sprintf('%s: %s', timestamp, text); % timestamp and input text 
+            
+            % add the EXCEPTION line later on
+%             if errflag==0
+%                 obj.report = sprintf('%s: %s', timestamp, text); % timestamp and input text 
+%             else
+%                 obj.report = sprintf('************ EXCEPTION *****************\n%s: %s', timestamp, text); % add banner
+%             end
             
             if isempty(obj.hndl) || obj.hndl<0
                 obj.makeFile; % make sure the file exists or create a new one if needed
@@ -259,10 +266,15 @@ classdef Logger < handle
                 obj.makeErrFile;
             end
             
-            
             try 
                 
-                fprintf(obj.hndl, '%s\n', obj.report); % print line to normal file
+                if errflag
+                    except_str = sprintf('************ EXCEPTION *****************\n');
+                else
+                    except_str = '';
+                end
+                
+                fprintf(obj.hndl, '%s%s\n', except_str, obj.report); % print line to normal file
                 
                 if obj.use_error_file && errflag
                     fprintf(obj.hndl_err, '%s\n', obj.report); % print error line to additional error file

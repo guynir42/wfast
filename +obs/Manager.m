@@ -31,7 +31,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         t2; % check that everything is connected and that weather is good, print to log file
         t3; % verify that the other two are still running (every half an hour or so)
         
-        gui;
+        gui@obs.gui.ManagerGUI;
         
     end
     
@@ -246,7 +246,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
             catch ME
                 
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 obj.log.input('Connecting dome simulator.');
                 
                 warning(ME.getReport);
@@ -256,7 +256,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 try
                     obj.dome = obs.dome.Simulator;
                 catch ME
-                    obj.log.error(ME.getReport);
+                    obj.log.error(ME);
                     warning(ME.getReport);
                 end
                 
@@ -275,7 +275,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
             catch ME
                 
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
                 
             end
@@ -290,7 +290,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.weather = obs.sens.Boltwood;
             catch ME
                 
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 obj.log.input('Connecting to weather simulator.');
                 warning(ME.getReport);
                 
@@ -299,7 +299,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 try
                     obj.weather = obs.sens.Simulator;
                 catch ME
-                    obj.log.error(ME.getReport);
+                    obj.log.error(ME);
                     warning(ME.getReport);
                 end
                 
@@ -316,7 +316,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             catch ME
                 
                 
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 
                 warning(ME.getReport);
                 
@@ -339,7 +339,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.checker = obs.SensorChecker(obj); % checks the weather using all sensors
                 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 warning(ME.getReport);
                 disp('Cannot initialize SensorChecker!');
             end
@@ -354,7 +354,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.cam_pc.reco.delay_time_minutes = 10;
                 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 warning(ME.getReport);
                 disp('Cannot create a PcSync tcp/ip object')
             end
@@ -419,7 +419,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 val = 1; % if all checks are passed, value can be 1
                 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 warning(ME.getReport);
             end
             
@@ -743,10 +743,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 if ~isempty(obj.gui) && obj.gui.check
                     obj.gui.update;
+                    if ~obj.use_startup
+                        obj.gui.button_info.String = ''; 
+                    end
                 end
                 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -790,7 +793,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.update; % check devices are functioning
                 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -850,7 +853,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 warning(ME.getReport);
             end
             
@@ -888,7 +891,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
                 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 warning(ME.getReport);
             end
             
@@ -906,7 +909,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
                 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME); 
             end
             
@@ -1204,6 +1207,29 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     end
     
     methods % calculations / commands
+        
+        function print_message(obj, text, error_flag)
+            
+            if nargin<3 || isempty(error_flag)
+                error_flag = 0;
+            end
+            
+            obj.log.input(text, error_flag); 
+            
+            if obj.debug_bit, disp(obj.log.report); end
+            
+            if ~isempty(obj.gui) && obj.gui.check
+                obj.gui.button_info.String = obj.log.report;
+                
+                if error_flag
+                    obj.gui.button_info.ForegroundColor = 'red';
+                else
+                    obj.gui.button_info.ForegroundColor = 'black';
+                end
+                
+            end
+            
+        end
         
         function sendToObserver(obj, subject, text, use_telegram)
             
@@ -1656,8 +1682,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                             error('Unknown class of error returned from cam_pc: class(error)= "%s". Use a string or MException object!', class(obj.cam_pc.incoming.error)); 
                         end
                         
-                        obj.log.input(sprintf('Reporting error from cam-PC: %s...', obj.error_report)); 
-                        if obj.debug_bit, disp(obj.log.report); end
+                        obj.print_message(sprintf('Reporting error from cam-PC: %s...', obj.error_report), 1); % report this as an error... 
+%                         obj.log.input(sprintf('Reporting error from cam-PC: %s...', obj.error_report)); 
+%                         if obj.debug_bit, disp(obj.log.report); end
                         
                         obj.latest_email_error_date = obj.cam_pc.incoming.err_time;
                         
@@ -1719,9 +1746,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     
             obj.updateCameraComputer;
             
-            obj.log.input(sprintf('Sending camera command: "%s" with arguments "%s"', str, args)); 
-            
-            if obj.debug_bit, disp(obj.log.report); end
+            obj.print_message(sprintf('Sending camera command: "%s" with arguments "%s"', str, args)); 
+%             obj.log.input(sprintf('Sending camera command: "%s" with arguments "%s"', str, args)); 
+%             if obj.debug_bit, disp(obj.log.report); end
+%             if obj.gui.check, obj.gui.button_info.String = obj.log.report; end
             
         end
         
@@ -1771,7 +1799,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function matchRuntimes(obj)
+        function matchRuntimes(obj) % use obs_log to update the scheduler log
             
             if ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'obs_log') && ~isempty(obj.cam_pc.incoming.obs_log)
                 obs_log = obj.cam_pc.incoming.obs_log;
@@ -1783,7 +1811,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function chooseNewTarget(obj, varargin)
+        function chooseNewTarget(obj, varargin) % this is called when pushing "CHOOSE" or inside the checkNewTarget() function
             
             obj.sched.current_side = obj.mount.telHemisphere;
             obj.sched.wind_speed = nanmax(obj.checker.wind_speed.now);
@@ -1805,7 +1833,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function checkNewTarget(obj, varargin)
+        function checkNewTarget(obj, varargin) % this is called on t3
             
             % maybe parse some varargin options?
             
@@ -1836,8 +1864,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
         
             catch ME
-                obj.log.error(ME.getReport('extended', 'hyperlinks', 'off')); 
-                obj.sendError(ME); 
+                obj.print_message(ME.getReport('extended', 'hyperlinks', 'off'), 1); % log the error to text file, show it in terminal and GUI
+%                 obj.log.error(ME.getReport('extended', 'hyperlinks', 'off')); 
+%                 if obj.gui.check, obj.gui.button_info.String = obj.log.report; end
+                obj.sendError(ME); % send email and telegram
                 rethrow(ME); 
             end
             
@@ -1920,8 +1950,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             if isempty(obj.sched.current)
 
-                obj.log.input(sprintf('Could not find any targets. Going to idle mode...\n'));
-                if obj.debug_bit, disp(obj.log.report); end
+                obj.print_message(sprintf('Could not find any targets. Going to idle mode...\n'));
+%                 obj.log.input(sprintf('Could not find any targets. Going to idle mode...\n'));
+%                 if obj.debug_bit, disp(obj.log.report); end
                 
                 if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
                     obj.button_target.String = obj.log.report; 
@@ -1932,8 +1963,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
             elseif obj.sched.current.ephem.now_observing
 
-                obj.log.input(sprintf('Continuing observations of %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
-                if obj.debug_bit, disp(obj.log.report); end
+                obj.print_message(sprintf('Continuing observations of %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec));
+%                 obj.log.input(sprintf('Continuing observations of %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
+%                 if obj.debug_bit, disp(obj.log.report); end
+%                 if obj.gui.check, obj.gui.button_info.String = obj.log.report; end
                 
                 if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
                     obj.button_target.String = obj.log.report; 
@@ -1943,9 +1976,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
             else
                 
-                obj.log.input(sprintf('Moving to target %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
-                if obj.debug_bit, disp(obj.log.report); end
-
+                obj.print_message(sprintf('Moving to target %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
+%                 obj.log.input(sprintf('Moving to target %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
+%                 if obj.debug_bit, disp(obj.log.report); end
+%                 if obj.gui.check, obj.gui.button_info.String = obj.log.report; end
+                
                 % actively switch targets and start a new run: 
                 
                 obj.commandCameraStop;
@@ -1975,9 +2010,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 if obj.use_adjust_dome && obj.ephem.sun.Alt<0 && obj.checker.sensors_ok && obj.checker.light_ok ... 
                         && obj.dome.is_closed==0 % only move dome when weather is good, sun is down, and dome is already open
                     
-                    obj.log.input(sprintf('Adjusting dome for viewing the %s side', obj.mount.telHemisphere)); 
-                    if obj.debug_bit, disp(obj.log.report); end
-                    
+                    obj.print_message(sprintf('Adjusting dome for viewing the %s side', obj.mount.telHemisphere)); 
+%                     obj.log.input(sprintf('Adjusting dome for viewing the %s side', obj.mount.telHemisphere)); 
+%                     if obj.debug_bit, disp(obj.log.report); end
+%                     if obj.gui.check, obj.gui.button_info.String = obj.log.report; end
+                
                     obj.adjustDome; % send dome the telescope coordinates and let it adjust accordingly
                     
 %                     if strcmp(obj.mount.obj_pier_side, 'pierWest') % observing EAST! 
@@ -2010,9 +2047,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
 
                 % do we need this additional log/display? 
-                obj.log.input(sprintf('slewing to target: %s at %s%s\n', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
-                if obj.debug_bit, disp(obj.log.report); end
-
+                obj.print_message(sprintf('slewing to target: %s at %s%s\n', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
+%                 obj.log.input(sprintf('slewing to target: %s at %s%s\n', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
+%                 if obj.debug_bit, disp(obj.log.report); end
+%                 if obj.gui.check, obj.gui.button_info.String = obj.log.report; end
+                
                 if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
                     obj.button_target.String = obj.log.report; 
                     pause(1);
@@ -2045,6 +2084,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     delete(obj.prompt_fig); 
                 end
 
+                obj.sched.report_log{end+1,1} = obj.sched.report; 
+                obj.sched.rationale_log{end+1,1} = obj.sched.rationale;
+                obj.sched.write_log; % save the report and rationale to text file as well... 
+            
             end
             
         end
@@ -2057,7 +2100,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function shutdown(obj) % command to shut down observatory (close dome, stop tracking)
             
-            obj.log.input('Shutting down observatory!');
+            obj.print_message('Shutting down observatory!'); 
+%             obj.log.input('Shutting down observatory!');
             
             disp([char(obj.log.time) ': Shutting down observatory!']);
             
@@ -2080,7 +2124,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 % ...
 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             

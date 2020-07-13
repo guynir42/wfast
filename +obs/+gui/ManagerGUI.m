@@ -51,7 +51,8 @@ classdef ManagerGUI < handle
         panel_image;
         button_reset_axes;
         button_mean_only;
-        button_clicker
+        button_clicker;
+        button_info; 
         axes_image;
         
         menu_options;
@@ -270,6 +271,8 @@ classdef ManagerGUI < handle
             obj.button_clicker = GraphicButton(obj.panel_image, [0.64 0.45 0.28 0.05], obj.owner, '', 'custom', '', ''); 
             obj.button_clicker.Tooltip = 'click any weather plot to get the name of sensor and the latest measurement';
             
+            obj.button_info = GraphicButton(obj.panel_image, [0.15 0.94 0.7 0.05], obj.owner, '', 'custom', '', ''); 
+            
             %%%%%%%%%%% panel camera %%%%%%%%%%%%%%%%%
             
             obj.panel_camera = GraphicPanel(obj.owner, [0.2 0 0.8 2/N_middle], 'camera');
@@ -357,6 +360,7 @@ classdef ManagerGUI < handle
             obj.panel_camera.input_arguments.BackgroundColor = obj.color_input; 
             
             obj.panel_image.BackgroundColor = obj.color_bg;
+            obj.button_info.BackgroundColor = obj.color_info;
             
             obj.update;
             

@@ -189,7 +189,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 obj.update;
 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -240,8 +240,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     obj.reco.inputSuccess;
 
                 catch ME
-                    obj.reco.inputFailure(ME.getReport);
-                    obj.log.error(ME.getReport);
+                    obj.reco.inputFailure(ME.getReport('basic', 'hyperlinks', 'off'));
+                    obj.log.error(ME);
                     rethrow(ME);
                 end
 
@@ -340,7 +340,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 delete(obj.hndl);
                 obj.hndl = [];
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -706,7 +706,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             try
                 obj.hndl.TargetRightAscension = obj.object.RA_deg/15; % also update the telescope's target field...
             catch ME
-%                 obj.log.error(ME.getReport);
+%                 obj.log.error(ME);
 %                 rethrow(ME);
             end
             
@@ -722,7 +722,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             try
                 obj.hndl.TargetRightAscension = obj.object.RA_deg/15; % also update the telescope's target field...
             catch ME
-%                 obj.log.error(ME.getReport);
+%                 obj.log.error(ME);
 %                 rethrow(ME);
             end
             
@@ -796,7 +796,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 end
                 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -1323,7 +1323,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 success = 1;
                 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -1394,7 +1394,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
             catch ME
                 obj.tracking = tracking_state;
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 obj.tracking = 0;
                 rethrow(ME);
             end
@@ -1613,7 +1613,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 end
                 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
@@ -1792,7 +1792,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 %                 end
                 
             catch ME
-                obj.log.error(ME.getReport);
+                obj.log.error(ME);
                 rethrow(ME);
             end
             
