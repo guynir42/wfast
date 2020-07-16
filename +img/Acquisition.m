@@ -167,9 +167,6 @@ classdef Acquisition < file.AstroData
         run_name; % the parameter "OBJECT" is used here to give a name to the whole run
         buf_full; % camera's buffers are used for full-frame dump on triggers
         
-        % these are read only camera info
-        sensor_temperature;
-        
         % get these from background Clipper
         num_backgrounds;
         cut_size_bg;
@@ -203,6 +200,7 @@ classdef Acquisition < file.AstroData
         lost_flux_threshold = 0.3;
         max_failed_batches = 3; % if star flux is lost for more than this number of batches, quit the run
         
+        sensor_temperature; % current temperature updated on slow timer
         sensor_temp_night = 10;
         sensor_temp_day = 20; 
         
@@ -872,11 +870,15 @@ classdef Acquisition < file.AstroData
         
         function val = get.sensor_temperature(obj)
             
-            if isa(obj.src, 'obs.cam.Andor')
-                val = obj.src.getTemperatureHW;
-            else
-                val = [];
+            if isempty(obj.sensor_temperature)
+                if isa(obj.src, 'obs.cam.Andor')
+                    obj.sensor_temperature = obj.src.getTemperatureHW;
+                else
+                    obj.sensor_temperature = [];
+                end            
             end
+            
+            val = obj.sensor_temperature;
             
         end
         
@@ -1515,7 +1517,7 @@ classdef Acquisition < file.AstroData
                     if obj.debug_bit, fprintf('Running focus loop attempt %d\n', ii); end
                     
                     if obj.use_cam_focusing
-                        val = obj.cam.autofocus('iteration', ii); % run the autofocus loop inside the Andor class (no calibration...)
+                        success = obj.cam.autofocus('iteration', ii); % run the autofocus loop inside the Andor class (no calibration...)
                     else
                         
                         obj.cam.af.cam = obj.cam;
@@ -1694,7 +1696,7 @@ classdef Acquisition < file.AstroData
                         
                     end % focus using Analysis tools, not internally in the camera class
                     
-                    if obj.brake_bit || val==0
+                    if obj.brake_bit || success==0
                         break;
                     end
                     
@@ -1855,6 +1857,8 @@ classdef Acquisition < file.AstroData
                         obj.cam.setSensorTemp(obj.sensor_temp_night);
                     end
 
+                    obj.sensor_temperature = []; 
+                    
                 end
                 
             catch ME

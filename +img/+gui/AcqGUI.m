@@ -140,7 +140,8 @@ classdef AcqGUI < handle
             obj.menu_options.menu_find_stars.addButton('button_bad_pixels', '&Bad pixels', 'toggle', 'use_remove_bad_pixels', 'remove bad pixels before finding stars');
             obj.menu_options.menu_find_stars.addButton('button_saturated', '&Remove saturated', 'toggle', 'use_remove_saturated', 'remove any stars with any saturated pixels');
             obj.menu_options.menu_find_stars.addButton('button_sat_value', '&Saturation value', 'input', 'saturation_value', 'what pixel value is considered saturated');
-            obj.menu_options.menu_find_stars.addButton('button_min_temp', '&Minimal temperature', 'input', 'min_star_temp', 'take only stars with temperature above this value (Kelvin). Works only with astrometry');
+%             obj.menu_options.menu_find_stars.addButton('button_min_temp', '&Minimal temperature', 'input', 'min_star_temp', 'take only stars with temperature above this value (Kelvin). Works only with astrometry');
+            obj.menu_options.menu_find_stars.addButton('button_min_stars', '&Min. num. stars', 'input', 'min_stars', 'minimal number of stars to start a run');
             
             obj.menu_options.addButton('menu_cutouts', '&Cutouts', 'menu');
             obj.menu_options.menu_cutouts.addButton('button_num_stars', '&Num stars', 'input', 'num_stars', 'Maximum number of cutouts around stars');

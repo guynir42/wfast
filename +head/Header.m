@@ -966,29 +966,29 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             
         end
                 
-        function writeFITS(obj, filename, time_delay, num_sum) % open a fits file and write keywords into it
+        function writeFITS(obj, filename, timestamp, num_sum) % open a fits file and write keywords into it
             
             file_ptr = matlab.io.fits.openFile(filename,'readwrite');
             cleanup = onCleanup(@() matlab.io.fits.closeFile(file_ptr)); % make sure file closes at the end
             
-            if nargin<3 || isempty(time_delay)
-                time_delay = [];
+            if nargin<3 || isempty(timestamp)
+                timestamp = [];
             end
             
             if nargin<4 || isempty(num_sum)
                 num_sum = 1;
             end
             
-            obj.writeFitsHeader(file_ptr, time_delay, num_sum);
+            obj.writeFitsHeader(file_ptr, timestamp, num_sum);
             
         end
         
-        function writeFitsHeader(obj, file_ptr, time_delay, num_sum) % write keywords into an open FITS file 
+        function writeFitsHeader(obj, file_ptr, timestamp, num_sum) % write keywords into an open FITS file 
             
-            if nargin<3 || isempty(time_delay)
-                start_time_str = obj.t_start;
+            if nargin<3 || isempty(timestamp)
+                start_time_str = obj.STARTTIME;
             else
-                start_time_str = obj.stamp2str(time_delay);
+                start_time_str = util.text.time2str(obj.observation_time(timestamp)); 
             end
             
             if nargin<4 || isempty(num_sum)
@@ -1105,6 +1105,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
            
             obj.ephem.update;
             obj.STARTTIME = util.text.time2str(obj.ephem.time); 
+            
+        end
+        
+        function val = observation_time(obj, timestamp)
+            
+            time = util.text.str2time(obj.ENDTIME); 
+            
+            val = time + seconds(timestamp - obj.END_STAMP); 
             
         end
         

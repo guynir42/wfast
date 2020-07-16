@@ -768,6 +768,33 @@ classdef Analysis < file.AstroData
             
         end
         
+        function auto_fits_roi(obj, roi_size)
+            
+            if nargin<2 || isempty(roi_size)
+                roi_size = 500; 
+            end
+            
+            if isscalar(roi_size)
+                roi_size = roi_size.*[1 1];
+            end
+            
+            xy = obj.head.wcs.coo2xy(obj.head.RA, obj.head.DEC);
+
+            x1 = round(xy(1)-roi_size(2)/2); 
+            y1 = round(xy(2)-roi_size(1)/2); 
+
+            if x1<1
+                x1 = 1;
+            end
+
+            if y1<1
+                y1 = 1;
+            end
+
+            obj.fits_roi = [x1 y1 roi_size(2), roi_size(1)]; 
+            
+        end
+        
     end
     
     methods % calculations
@@ -1469,11 +1496,11 @@ classdef Analysis < file.AstroData
             obj.back_buf.input(nanmean(obj.phot.backgrounds));
             obj.width_buf.input(nanmean(obj.phot.widths));
             
-            try
-                obj.calcSkyParameters; % get an estimate of the zero point, seeing, background, limiting magnitude, etc. 
-            catch ME
-                warning(ME.getReport); 
-            end
+%             try
+%                 obj.calcSkyParameters; % get an estimate of the zero point, seeing, background, limiting magnitude, etc. 
+%             catch ME
+%                 warning(ME.getReport); 
+%             end
             
             if obj.debug_bit>1, fprintf('Time to calculate sky parameters: %f seconds\n', toc(t)); end
             
@@ -1676,7 +1703,7 @@ classdef Analysis < file.AstroData
             end
 
             fitswrite(I, fullname); 
-            obj.head.writeFITS(fullname, [], obj.num_sum);
+            obj.head.writeFITS(fullname, obj.timestamps(1), obj.num_sum);
 
             
         end

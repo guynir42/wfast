@@ -95,6 +95,16 @@ classdef WorldCoordinates < handle
             
         end
         
+        function val = get.CD(obj)
+            
+            if isempty(obj.CD)
+                val = [];
+            else
+                val = reshape(obj.CD, [2,2]); 
+            end
+            
+        end
+        
 %         function val = get.RA_deg_center(obj)
 %             
 %             if isempty(obj.PV) || isempty(obj.CRVAL)
