@@ -409,7 +409,7 @@ classdef Catalog < handle
                     obj.mextractor_sim = update_coordinates(S2, 'ColNameRA', 'ALPHAWIN_J2000', 'ColNameDec', 'DELTAWIN_J2000'); 
 
                     % test if the astrometric solution even makes sense... 
-                    if any(abs(cell2mat(obj.mextractor_sim.WCS.tpv.KeyVal))>5)
+                    if any(abs(cell2mat(obj.mextractor_sim.WCS.WCS.tpv.KeyVal))>5)
 %                         disp('failed to find a reasonable fit!'); 
 %                         abs(cell2mat(obj.mextractor_sim.WCS.WCS.tpv.KeyVal))
                         obj.success = 0;
