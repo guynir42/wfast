@@ -25,15 +25,14 @@ fprintf('Loading images with exposure time %4.2f seconds.\n', cat1.head.EXPTIME)
 I1 = h5read(filename1, '/images'); % raw image
 
 IC1 = cal.input(single(sum(I1,3)), 'sum', size(I1,3)); 
-%%
 
 [M1,V1] = util.img.im_stats(IC1, 'tile', 250, 'overlap', 100, 'method', 'median', 'output', 'map');
-T1 = util.img.quick_find_stars(IC1, 'thresh', 5, 'sat', 5e4, 'psf', 0.8, 'unflagged', 1, 'mean', util.stat.median2(M1), 'std', sqrt(V1)); 
+T1 = util.img.quick_find_stars(IC1, 'thresh', 5, 'sat', 5e4, 'psf', 1, 'unflagged', 1, 'mean', util.stat.median2(M1), 'std', sqrt(V1));  % use PSF=1 because that's what I use in Acquisition
 
 cutouts1 = util.img.mexCutout(IC1, T1.pos(1:100,:), 15);
-widths1 = [];
+width1 = [];
 for ii = 1:size(cutouts1, 4)
-    width1(ii,1) = util.img.fwhm(cutouts1(:,:,1,ii)); 
+    width1(ii,1) = util.img.fwhm(cutouts1(:,:,1,ii), 'method', 'filters'); 
 end
 
 fprintf('Median width (sigma) is %4.2f\n', nanmedian(width1)./2.355); 
@@ -77,7 +76,7 @@ mag1 = mag1(mag1<18);
 fr = util.fit.polyfit(mag1, log10(snr1), 'order', 1, 'double', 1, 'sigma', 2.5, 'iterations', 10);
 util.fit.plot_fit(fr, 'marker', 'p', 'ax', ax2, 'LineWidth', 3); 
 
-ylabel(ax2, 'S/N');
+ylabel(ax2, 'log_{10}(S/N)');
 xlabel(ax2, 'Mag BP'); 
 ax2.YLim = [0.5 max(log10(cat1.data.snr))]; 
 
@@ -110,12 +109,12 @@ I2 = h5read(filename2, '/images'); % raw image
 IC2 = cal.input(I2); 
 
 [M2,V2] = util.img.im_stats(IC2, 'tile', 250, 'overlap', 100, 'method', 'median', 'output', 'map');
-T2 = util.img.quick_find_stars(IC2, 'thresh', 5, 'sat', 5e4, 'psf', 1.5, 'unflagged', 1, 'mean', util.stat.median2(M2), 'std', sqrt(V2)); 
+T2 = util.img.quick_find_stars(IC2, 'thresh', 5, 'sat', 5e4, 'psf', 1.0, 'unflagged', 1, 'mean', util.stat.median2(M2), 'std', sqrt(V2)); % use PSF=1 because that's what I use in Acquisition 
 
 cutouts2 = util.img.mexCutout(IC2, T2.pos(1:100,:), 15);
-widths2 = [];
+width2 = [];
 for ii = 1:size(cutouts2, 4)
-    width2(ii,1) = util.img.fwhm(cutouts2(:,:,1,ii)); 
+    width2(ii,1) = util.img.fwhm(cutouts2(:,:,1,ii), 'method', 'filters'); 
 end
 
 fprintf('Median width (sigma) is %4.2f\n', nanmedian(width2)./2.355); 
@@ -162,7 +161,7 @@ mag2 = mag2(mag2<20);
 fr = util.fit.polyfit(mag2, log10(snr2), 'order', 1, 'double', 1, 'sigma', 2.5, 'iterations', 10);
 util.fit.plot_fit(fr, 'marker', 'p', 'ax', ax2, 'LineWidth', 3); 
 
-ylabel(ax2, 'S/N');
+ylabel(ax2, 'log_{10}(S/N)');
 xlabel(ax2, 'Mag BP'); 
 ax2.YLim = [0.5 max(log10(cat2.data.snr))]; 
 % ax2.XTick = 10.^(1:4);
@@ -208,7 +207,15 @@ I3 = h5read(filename3, '/images'); % raw image
 IC3 = cal.input(I3); 
 
 [M3,V3] = util.img.im_stats(IC3, 'tile', 250, 'overlap', 100, 'method', 'median', 'output', 'map');
-T3 = util.img.quick_find_stars(IC3, 'thresh', 5, 'sat', 5e4, 'psf', 1.1, 'unflagged', 1, 'mean', util.stat.median2(M3), 'std', sqrt(V3)); 
+T3 = util.img.quick_find_stars(IC3, 'thresh', 5, 'sat', 5e4, 'psf', 1, 'unflagged', 1, 'mean', util.stat.median2(M3), 'std', sqrt(V3)); 
+
+cutouts3 = util.img.mexCutout(IC3, T3.pos(1:100,:), 15);
+width3 = [];
+for ii = 1:size(cutouts3, 4)
+    width3(ii,1) = util.img.fwhm(cutouts3(:,:,1,ii), 'method', 'filters'); 
+end
+
+fprintf('Median width (sigma) is %4.2f\n', nanmedian(width3)./2.355); 
 
 cat3.input(T3); 
 
@@ -253,7 +260,7 @@ mag3 = mag3(mag3<20);
 fr = util.fit.polyfit(mag3, log10(snr3), 'order', 1, 'double', 1);
 util.fit.plot_fit(fr, 'marker', 'p', 'ax', ax2, 'LineWidth', 3); 
 
-ylabel(ax2, 'S/N');
+ylabel(ax2, 'log_{10}(S/N)');
 xlabel(ax2, 'Mag BP'); 
 ax2.YLim = [0.5 max(log10(cat3.data.snr))]; 
 ax2.XLim = [11 20];
