@@ -63,7 +63,11 @@ function ax = show_cutouts(C, varargin)
             
             ax{counter} = axes('Parent', input.parent, 'Position', [jj-1 N-ii 1 1].*width); 
             
-            cutout = C(:,:,indices(counter),input.star);
+            if size(C,4)>1
+                cutout = C(:,:,indices(counter),input.star);
+            else
+                cutout = C(:,:,indices(counter), 1);
+            end
             
             if ~isempty(input.oversample)
                 cutout = real(util.img.oversample(cutout, input.oversample)); 

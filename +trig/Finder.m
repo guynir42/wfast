@@ -1583,7 +1583,7 @@ classdef Finder < handle
             C = cat(3, obj.this_event.cutouts_first, obj.this_event.cutouts_second); 
             
             util.plot.show_cutouts(C, 'parent', parent, 'oversampling', obj.show_cutotus_oversample, 'type', 'surf', ...
-                'number', obj.show_cutouts_num_frames, 'frame', obj.show_cutouts_keyframe, 'star', 1); 
+                'number', obj.show_cutouts_num_frames, 'frame', obj.show_cutouts_keyframe, 'star', obj.this_event.star_index); 
 
             uicontrol(parent, 'Style', 'pushbutton', 'Units', 'Normalized', 'Position', [0.05 0.05 0.1 0.1], ...
                 'String', '-', 'Callback', @obj.push_back_keyframe, 'FontSize', 16); 
