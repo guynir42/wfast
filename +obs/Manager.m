@@ -29,7 +29,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         t0; % lightweight timer that only updates a few GUI buttons
         t1; % quick timer (every minute or so) just to update sensors/devices
         t2; % check that everything is connected and that weather is good, print to log file
-        t3; % verify that the other two are still running (every half an hour or so)
+        t3; % verify that the other two are still running, send morning report, proceed to next target (every 15 minutes)
+        t4; % verify t3 is running, turn off twilight mode and turn on auto-shutdown
         
         gui@obs.gui.ManagerGUI;
         
@@ -82,7 +83,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         period0 = 2; % time between updates of GUI info buttons
         period1 = 60; % time between updates of all devices/sensors
         period2 = 300; % time for equipment/weather check and log file
-        period3 = 1800; % time for verifying shorter timers are working (and other tests?)
+        period3 = 900; % time for verifying shorter timers are working (and other tests?)
+        period4 = 3600; % time for verifying t3 is running and turn on auto shutdown 
         
         autostart_min_weather_samples = 4;
         autostart_min_weather_minutes = 20;
@@ -797,6 +799,22 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 rethrow(ME);
             end
             
+            try % try connecting to mount arduino
+               if obj.mount.use_accelerometer
+                    
+                    if ~isempty(obj.mount.ard)
+                        ok = obj.mount.ard.update;
+                    end
+                    
+                    if isempty(obj.mount.ard) || ok==0
+                        obj.mount.connectArduino;
+                    end
+                    
+                end
+            catch ME
+                warning(ME.getReport);
+            end
+            
         end
         
         function setup_t2(obj, ~, ~) % start the timer t2 with period2
@@ -829,11 +847,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             try % make sure t2 is working, cancel maintenance/twilight modes
 
-                if obj.use_maintenance_mode==0
-                    obj.use_shutdown = 1;
-                    obj.checker.use_twilight_mode = 0; 
-                end
-                
                 % make sure t2 is running! 
                 if isempty(obj.t2) || ~isvalid(obj.t2) || strcmp(obj.t2.Running, 'off')
                     obj.setup_t2;
@@ -940,6 +953,60 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             stop(obj.t3);
             
         end
+        
+        function callback_t4(obj, ~, ~)
+            
+            try % make sure t3 is running
+                
+                % make sure t3 is running! 
+                if isempty(obj.t3) || ~isvalid(obj.t3) || strcmp(obj.t3.Running, 'off')
+                    obj.setup_t3;
+                end
+                
+            catch ME
+                warning(ME.getReport); 
+            end
+            
+            try % turn off twilight mode and turn on auto shutdown
+            
+                if obj.use_maintenance_mode==0
+                    obj.use_shutdown = 1;
+                    obj.checker.use_twilight_mode = 0; 
+                end
+                
+            catch ME
+                warning(ME.getReport); 
+            end
+            
+        end
+        
+        function setup_t4(obj, ~, ~) % start the timer t4 with period4
+            
+            if ~isempty(obj.t4) && isa(obj.t4, 'timer') && isvalid(obj.t4)
+                if strcmp(obj.t4.Running, 'on')
+                    stop(obj.t4);
+                    delete(obj.t4);
+                    obj.t4 = [];
+                end
+            end
+            
+            delete(timerfind('name', 'Status-check-t4'));
+            
+            obj.t4 = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'Status-check-t4', ...
+                'Period', obj.period4, 'StartDelay', obj.period4, ...
+                'TimerFcn', @obj.callback_t4, 'ErrorFcn', @obj.setup_t4);
+            
+            start(obj.t4);
+            
+        end
+        
+        function stop_t4(obj, ~, ~) % stop timer t3
+            
+            stop(obj.t4);
+            
+        end
+        
+        
         
     end
     
@@ -1264,7 +1331,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     obj.sendTelegram(name, subject); 
                     
                     if ~strcmpi(name, 'guy') % also send a message to Guy 
-                        obj.sendTelegram(name, subject); 
+                        obj.sendTelegram('guy', subject); 
                     end
                     
                 end
@@ -1940,9 +2007,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function adjustDome(obj) % send dome the telescope coordinates and let it adjust accordingly
             
-            obj.dome.adjustDome(obj.mount.telHemisphere,... % side the telescope is positioned
+            stop(obj.mount.timer); 
+            
+            obj.dome.adjustDome(obj.mount.objHemisphere,... % side the telescope is positioned
                 head.Ephemeris.hour2deg(obj.mount.telHA),... % hour angle in degrees
                 obj.mount.telDec_deg); % declination in degrees
+            
+            start(obj.mount.timer); 
             
         end
         
@@ -2010,7 +2081,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 if obj.use_adjust_dome && obj.ephem.sun.Alt<0 && obj.checker.sensors_ok && obj.checker.light_ok ... 
                         && obj.dome.is_closed==0 % only move dome when weather is good, sun is down, and dome is already open
                     
-                    obj.print_message(sprintf('Adjusting dome for viewing the %s side', obj.mount.telHemisphere)); 
+                    obj.print_message(sprintf('Adjusting dome for viewing the %s side', obj.mount.objHemisphere)); 
 %                     obj.log.input(sprintf('Adjusting dome for viewing the %s side', obj.mount.telHemisphere)); 
 %                     if obj.debug_bit, disp(obj.log.report); end
 %                     if obj.gui.check, obj.gui.button_info.String = obj.log.report; end

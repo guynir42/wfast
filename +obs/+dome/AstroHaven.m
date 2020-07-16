@@ -88,6 +88,11 @@ classdef AstroHaven < handle
     
     properties (Hidden = true)
         
+        dome_radius = 275; % cm
+        dome_angle = 30; % degrees (relative to East-West direction, clockwise) 
+        tel_offset = 50; % cm (offset of telescope from center of dome)
+        angle_spare = 20; % additional altitude to spare from the calculated shutter position
+        
         % accelerometer names (for future)
         acc_name = 'HC-06';
         acc_id_west = '';
@@ -113,7 +118,7 @@ classdef AstroHaven < handle
         default_number_east;
         default_number_both;
         
-        version = 1.03;
+        version = 1.04;
         
     end
     
@@ -373,6 +378,85 @@ classdef AstroHaven < handle
     
     methods % commands to move or stop shutters
         
+        function adjustDomeNew(obj, side, Az, Alt)
+        % Usage: obj.adjustDome(side, Az, Alt)
+        % Automatically choose the correct position for the dome shutters, 
+        % based on the prefered side and telescope Az/Alt. 
+        % Inputs: -side: 'East' or 'West', depending on declination and 
+        %                proximity to meridian. 
+        %          -Az: telescope azimuth (degrees). 
+        %          -Alt: telescope altitude (degrees). 
+        % 
+        % Will open/close the shutters and start the tracking if needed.
+        %
+        % NOTE: will not do anything if dome is closed. 
+        %
+        % To adjust the dome position use the different dome parameters:
+        % dome_radius, dome_angle, tel_offset, angle_spare
+        % Also we depend on the shutter angle estimates, 
+        
+            if nargin<4
+                help('obs.dome.AstroHaven.adjustDome'); 
+                return;
+            end
+            
+            if obj.is_closed
+                return;
+            end
+            
+            if isempty(HA_deg)
+                error('Must supply a valid hour angle (HA)!'); 
+            end
+            
+            if isempty(Dec_deg) || Dec_deg<-35
+                error('Unable to view targets with %d declinations!', Dec_dec);
+            end
+            
+            if util.text.cs(side, 'East') % east side is still controlled by heuristics
+                
+                obj.openEastFull;
+                obj.closeWestFull;
+                
+                % estimate for how much we need to open West shutter when 
+                % reaching meridian (at Dec+30 need 100, at Dec+90 need 200, 
+                % at -30 don't need to open at all). 
+                west_num = 5/3*(Dec_deg+30); 
+                if west_num>0
+                    obj.openWest(west_num);
+                end
+                
+                obj.use_tracking = 0; % no need for tracking on East side
+                
+            elseif util.text.cs(side, 'West') % new geometry driven formula
+                
+                
+                obj.openWestFull; % get a reference position to move from 
+                obj.closeEastFull; % check if we need to open this at all...
+                
+                % estimate for how much we need to open East shutter when
+                % starting observations on meridian (at Dec+30 need 20, 
+                % at Dec 0 need 80, at Dec -30 need almost full open). 
+                east_num = -2*(Dec_deg-40); 
+                if east_num>0
+                    obj.openEast(east_num); % east side still uses heuristic formula
+                end
+                
+                angle_west = Az - 90 + obj.dome_angle; % the angle of telescope from center of West shutter. 
+                
+                angle_alt = obj.offset_angle(Alt); % get the altitude angle the dome should have to match the telescope altitude angle
+                angle_alt = angle_alt - obj.angle_spare; % get some spare distance
+                
+                
+                obj.use_tracking = 1; % I don't see any reason not to track on the West side
+                
+                % do we need to set the tracking rate in case someone changed it?
+                
+            else
+                error('Unknown option "%s" to "side" parameter. Use "East" or "West". ', side); 
+            end
+            
+        end
+        
         function adjustDome(obj, side, HA_deg, Dec_deg)
         % Usage: obj.adjustDome(side, HA_deg, Dec_deg)
         % Automatically choose the correct position for the dome shutters, 
@@ -394,7 +478,7 @@ classdef AstroHaven < handle
         % parameters that gave reasonable results at all angles. 
         
             if nargin<4
-                help('obs.dome.AstroHaven.adjustDome'); 
+                help('obs.dome.AstroHaven.adjustDomeOld'); 
                 return;
             end
             
@@ -840,6 +924,27 @@ classdef AstroHaven < handle
     
     methods(Hidden=true) % internal functions
         
+        function val = offset_angle(obj, base_angle, offset, radius) % calculate the dome angle, given the telescope angle, telescope offset, and dome radius
+            
+            if nargin<3 || isempty(offset)
+                offset = obj.tel_offset;
+            end
+            
+            if nargin<4 || isempty(radius)
+                radius = obj.dome_radius; 
+            end
+            
+            if base_angle>=90
+                val = 90;
+            elseif base_angle<0
+                val = 0;
+            else
+                func = @(b) abs(tand(base_angle)-(radius*sind(b))/(offset+radius*cosd(b))); 
+                val = fminsearch(func, base_angle);    
+            end
+            
+        end
+        
         function reply = command(obj, command_vector, number) % generic interface to move shutters ("command_vector" is a string sent "number" of times to serial port)
             
             if nargin<3 || isempty(number)
@@ -1021,7 +1126,8 @@ classdef AstroHaven < handle
                     
                     val = asind(sum(obj.acc_W.acc_vec.*obj.cal_g_acc_vec_west)./sqrt(sum(obj.acc_W.acc_vec.^2).*sum(obj.acc_W.acc_vec.^2))); % use dot procuct to calculate the angle, use asind because dome angle is 90-theta
                     
-                elseif ~isempty(obj.cal_open_time_west) && ~isempty(obj.cal_open_time_west)
+                elseif ~isempty(obj.open_time_west) && ~isempty(obj.cal_open_time_west) && ...
+                        ~isempty(obj.close_time_west) && ~isempty(obj.cal_close_time_west)
                     
                     fractional_open = obj.open_time_west./obj.cal_open_time_west;
                     fractional_close = obj.close_time_west./obj.cal_close_time_west;

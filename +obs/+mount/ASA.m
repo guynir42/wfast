@@ -1598,9 +1598,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                         ok = obj.ard.update;
                     end
                     
-                    if isempty(obj.ard) || ok==0
-                        obj.connectArduino;
-                    end
+%                     if isempty(obj.ard) || ok==0
+%                         obj.connectArduino;
+%                     end
                     
                 end
                 
