@@ -115,8 +115,8 @@ classdef Lightcurves < handle
         % processing steps for fluxes_cal:
         use_airmass_correction = 1;
         use_psf_correction = 1;
-        use_zero_point = 0;
-        use_sysrem = 1;
+        use_zero_point = 1;
+        use_sysrem = 0;
         sysrem_iterations = 1;
         use_self_exclude = 0;
         
@@ -192,6 +192,9 @@ classdef Lightcurves < handle
     end
     
     properties(Hidden=true)
+        
+        width_vector; % save a copy of the flux-weighted mean width of all stars. 
+        airmass_vector; % save a copy of the airmass 
         
         % These full datasets can include a lot of extra allocated memory, 
         % filled with NaN, to allow less allocations of the data. 
@@ -1601,11 +1604,11 @@ classdef Lightcurves < handle
             
             if obj.use_airmass_correction
                 
-                A = obj.getAirmass; 
+                obj.airmass_vector = obj.getAirmass; 
                 
                 [L, b] = util.units.flux2lup(flux); % this also finds a reasonable estimate for the softening parameter b
                 
-                fr = util.fit.polyfit(A, L, 'order', 2, 'double', 1, 'sigma', 3); 
+                fr = util.fit.polyfit(obj.airmass_vector, L, 'order', 2, 'double', 1, 'sigma', 3); 
                 
                 model = [fr.ym]; 
                 
@@ -1624,28 +1627,33 @@ classdef Lightcurves < handle
                 % apply the same correction we applied to the fluxes before
                 if obj.use_airmass_correction 
                     
-                    fr_w = util.fit.polyfit(A, W, 'order', 2, 'double', 1, 'sigma', 3); 
+                    fr_w = util.fit.polyfit(obj.airmass_vector, W, 'order', 2, 'double', 1, 'sigma', 3); 
                     
                     W = W - fr_w.ym + nanmedian(W); 
                 
                 end
                 
-                [L, b] = util.units.flux2lup(flux); % this also finds a reasonable estimate for the softening parameter b
+                obj.width_vector = W;
                 
-                fr = util.fit.polyfit(W, L, 'order', 2, 'double', 1, 'sigma', 3); 
+                flux = util.series.remove_aux(flux, obj.width_vector, 'window', 64); 
                 
-                model = [fr.ym]; 
-                
-                L_det = L - model + nanmean(L, 1); 
-                
-                flux = util.units.lup2flux(L_det, b);
+%                 [L, b] = util.units.flux2lup(flux); % this also finds a reasonable estimate for the softening parameter b
+%                 
+%                 fr = util.fit.polyfit(W, L, 'order', 2, 'double', 1, 'sigma', 3); 
+%                 
+%                 model = [fr.ym]; 
+%                 
+%                 L_det = L - model + nanmean(L, 1); 
+%                 
+%                 flux = util.units.lup2flux(L_det, b);
                 
             end
             
             if obj.use_zero_point
                 
                 w = nanmean(flux); % weights are given by the average flux of each star
-
+                w = sqrt(w); 
+                
 %                 f_average = nanmean(flux.*w,2); % weighted average of each frame
                 f_average = nanmean(flux.*w,2); % simple average of each frame
                 f_average_norm = f_average./nanmean(f_average); % normalize by the average of averages
@@ -1700,6 +1708,7 @@ classdef Lightcurves < handle
             input.input_var('frames', [], 'frame_index', 'frame_indices'); 
             input.input_var('font_size', 26); 
             input.input_var('ax', [], 'axes', 'axis');
+            input.input_var('show_indices', 1:10); 
             input.scan_vars(varargin{:});
             
             if isempty(input.stars)
@@ -1768,6 +1777,19 @@ classdef Lightcurves < handle
                 
                 f_transits(idx_transit(:,ii),stars_picked(ii)) = f_transits(idx_transit(:,ii),stars_picked(ii)).*(1-input.depth); 
                 
+            end
+            
+            hold(input.ax, 'off');
+            plot(input.ax, 1:size(f,1), f(:,input.show_indices), '.');
+            
+            input.ax.ColorOrderIndex = 1;
+            hold(input.ax, 'on'); 
+            plot(input.ax, 1:size(f,1), f_transits(:, input.show_indices), '-');
+            hold(input.ax, 'off'); 
+            
+            if nargout==0
+                clear f;
+                clear f_transits;
             end
             
         end
