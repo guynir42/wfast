@@ -315,6 +315,8 @@ classdef AcqGUI < handle
                 colormap(obj.axes_image, 'default');
             end
             
+            util.plot.compass(obj.owner.head.ephem.side, 'parent', obj.panel_image, 'margin', [0.15 0.22]); 
+            
             if ~isempty(obj.owner.images)
                 obj.owner.show;
             end

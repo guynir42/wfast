@@ -188,12 +188,13 @@ classdef AnalysisGUI < handle
             
             obj.panel_fits = GraphicPanel(obj.owner, [0.8 pos/N_right 0.2 N/N_right], 'fits'); 
             obj.panel_fits.number = N;
-            obj.panel_fits.addButton('button_fits_save', 'use_fits_save', 'toggle', 'fits save off', 'fits save on', '', [], obj.color_on);
-            obj.panel_fits.addButton('button_fits_flip', 'use_fits_flip', 'toggle', 'fits flip off', 'fits flip on', '', [], obj.color_on);
-            obj.panel_fits.addButton('button_fits_roi', 'use_fits_roi', 'toggle', 'fits ROI off', 'fits ROI on', '', [], obj.color_on);
+            obj.panel_fits.addButton('button_fits_save', 'use_fits_save', 'toggle', 'fits save off', 'fits save on', '', [], obj.color_on, '', 'save FITS files with images/stacks of this run');
+            obj.panel_fits.addButton('button_fits_flip', 'use_fits_flip', 'toggle', 'fits flip off', 'fits flip on', '', 0.5, obj.color_on, '', 'flip the image by 180 degrees (after ROI)');
+            obj.panel_fits.addButton('button_fits_roi', 'use_fits_roi', 'toggle', 'fits ROI off', 'fits ROI on', '', 0.5, obj.color_on, '', 'Region of Interest for making smaller FITS files');
+            obj.panel_fits.addButton('button_auto_roi', 'auto_fits_roi', 'push', 'AUTO ROI', '', '', [], '', '', 'Automatically set the ROI around the object coordinates');
             obj.panel_fits.addButton('input_fits_roi', 'fits_roi', 'input', 'ROI= ');
             
-            obj.panel_fits.margin = [0.1 0.005];
+            obj.panel_fits.margin = [0.01 0.005];
             obj.panel_fits.make;
             
             

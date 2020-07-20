@@ -110,6 +110,8 @@ classdef BufferWheel < file.AstroData
         use_mex = 1; % use mex interface to write files (use 0 as backup if mex fails or if you want other file types)
         chunk = 64; % chunk size (for deflate only)
         
+        modulator = 10; % only print file numbers when their modulu is equal 1
+        
         use_prefer_images_to_stack = 1; % if given a single image (uint16) save that instead of the stack (single precision)
         
         file_type = 'hdf5'; % support is added for "fits", "mat", and "tiff" in use_mex==0
@@ -249,6 +251,8 @@ classdef BufferWheel < file.AstroData
             
             obj.index = 1;
             obj.index_rec = 1;
+            
+            obj.serial = 1; % why not reset the serial too? 
             
             obj.save_time = 0; 
             obj.num_saved_batches = 0; 
@@ -1015,8 +1019,10 @@ classdef BufferWheel < file.AstroData
             
             obj.buf(buf.buf_number).latest_filename = this_filename; % keep track of the latest filename writen to disk
             
-            if obj.debug_bit
-                fprintf('Buffer %d saving file % 4d  : %s (async: %d defalte: %d)\n', buf.buf_number, obj.serial, this_filename, obj.use_async, obj.use_deflate);
+            if obj.debug_bit 
+                if isempty(obj.modulator) || mod(obj.serial, obj.modulator)==1
+                    fprintf('Buffer %d saving file % 4d  : %s (async: %d defalte: %d)\n', buf.buf_number, obj.serial, this_filename, obj.use_async, obj.use_deflate);
+                end
             end
             
             if obj.use_mex

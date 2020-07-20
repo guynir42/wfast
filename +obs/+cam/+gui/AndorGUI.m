@@ -199,6 +199,8 @@ classdef AndorGUI < handle
             
             obj.panel_contrast.ax = obj.axes_image;
             
+            util.plot.compass(obj.owner.head.ephem.side, 'parent', obj.panel_image, 'margin', [0.15 0.22]); 
+            
         end
                 
         function update(obj,~,~)

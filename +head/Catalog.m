@@ -536,11 +536,11 @@ classdef Catalog < handle
             
             try % first get the zero point
                 
-                if isempty(obj.flux)
+                if isempty(obj.flux) && ismember('flux', obj.data.Properties.VariableNames)
                     obj.flux = obj.data.flux;
                 end
                 
-                if ~isempty(obj.flux)
+                if ~isempty(obj.flux) && size(obj.magnitudes,1)==size(obj.flux,1)
                     delta_mag = obj.magnitudes + 2.5*log10(obj.flux); % difference between GAIA mag and the instrumental flux converted to mag
                     obj.zero_point = util.vec.weighted_average(delta_mag, sqrt(obj.flux)); 
                 end

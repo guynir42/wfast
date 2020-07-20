@@ -105,7 +105,7 @@ classdef Analysis < file.AstroData
         use_fits_save = 0;
         use_fits_flip = 0;
         use_fits_roi = 0;
-        fits_roi = [];
+        fits_roi = []; % [top, left, height, width]
         
         use_audio = 0;
         
@@ -791,7 +791,7 @@ classdef Analysis < file.AstroData
                 y1 = 1;
             end
 
-            obj.fits_roi = [x1 y1 roi_size(2), roi_size(1)]; 
+            obj.fits_roi = [y1 x1 roi_size(1), roi_size(2)]; 
             
         end
         
@@ -1692,14 +1692,15 @@ classdef Analysis < file.AstroData
 
             fullname = fullfile(d,[f,'.fits']);
             fprintf('Saving "stack_proc" in FITS file: %s\n', fullname);
-
+            
             I = double(obj.stack_proc);
-            if obj.use_fits_flip
-                I = rot90(I,2);
-            end
-
+            
             if obj.use_fits_roi && ~isempty(obj.fits_roi)
                 I = I(obj.fits_roi(1):obj.fits_roi(1)+obj.fits_roi(3)-1,obj.fits_roi(2):obj.fits_roi(2)+obj.fits_roi(4)-1);
+            end
+
+            if obj.use_fits_flip
+                I = rot90(I,2);
             end
 
             fitswrite(I, fullname); 
