@@ -90,7 +90,7 @@ classdef Acquisition < file.AstroData
         
         use_cutouts = true;
         use_adjust_cutouts = 1; % use adjustments in software (not by moving the mount)
-        use_lock_adjust = 0; % make all cutouts move together based on the average drift (this is not yet implemented!)
+        use_lock_adjust = 0; % make all cutouts move together based on the average drift 
         % add switch to allow unlocking only some of the cutouts (e.g.,
         % those without a match to GAIA
         
@@ -2979,7 +2979,12 @@ classdef Acquisition < file.AstroData
                 obj.flux_buf.input(obj.phot_stack.fluxes);
 
                 if obj.use_adjust_cutouts
-                    offsets = obj.average_offsets;
+                    if obj.use_lock_adjust
+                        offsets = obj.average_offsets;
+                    else
+                        offsets = [obj.phot_stack.offset_x, obj.phot_stack.offset_y]; 
+                    end
+                    
                     offsets(isnan(offsets)) = 0;
                     obj.clip.positions = double(obj.clip.positions + offsets);
                 else
