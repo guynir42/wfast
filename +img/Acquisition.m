@@ -3506,15 +3506,17 @@ classdef Acquisition < file.AstroData
                     name = list{ii}(1:idx-1); 
                 end
                 
-                name = strrep(name, '-', '_'); 
-                name = strrep(name, '/', '_'); 
-                name = strrep(name, '\', '_'); 
-                name = strrep(name, ' ', '_'); 
+                name = util.text.legalize(name); 
                 
-                if isempty(name) || ~isletter(name(1))
-                    name = ['obj_' name]; 
-                end
-                
+%                 name = strrep(name, '-', '_'); 
+%                 name = strrep(name, '/', '_'); 
+%                 name = strrep(name, '\', '_'); 
+%                 name = strrep(name, ' ', '_'); 
+%                 
+%                 if isempty(name) || ~isletter(name(1))
+%                     name = ['obj_' name]; 
+%                 end
+%                 
                 if ~isfield(s, name)
                     s.(name) = struct.empty;
                 end
