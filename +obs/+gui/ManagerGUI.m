@@ -162,7 +162,7 @@ classdef ManagerGUI < handle
             obj.panel_object.addButton('button_ra', 'mount.objRA', 'input text', 'RA= ', '', 'edit', 0.5, '', '', 'Target right ascention');
             obj.panel_object.addButton('button_dec', 'mount.objDEC', 'input text', 'DE= ', '', 'edit', 0.5, '', '', 'Target declination');
             obj.panel_object.addButton('button_prev_objects', '', 'custom', '', '', '', [], '', '', 'List the last objects that were used to for slew');
-            obj.panel_object.addButton('button_ALT', 'mount.objALT', 'info', 'ALT= ', '', '', 0.4, '', '', 'Target altitute above horizong (degrees)');
+            obj.panel_object.addButton('button_ALT', 'mount.objALT', 'info', 'ALT= ', '', '', 0.4, '', '', 'Target altitute above horizon (degrees)');
             obj.panel_object.addButton('button_time', 'mount.obj_time_to_limit', 'info', 'lim.= ', ' min', '', 0.4, '', '', 'Calculated time object has until reaching limit'); 
             obj.panel_object.addButton('button_pierside', 'mount.objHemisphere', 'info', ' ', '', '', 0.2, '', '', 'Side of the sky where the object is right now');
             obj.panel_object.addButton('button_slew', 'mount.slewAskFlip', 'push', 'Slew', '', '', 1, '', '', 'Slew the telescope to the given object'); 
@@ -314,14 +314,20 @@ classdef ManagerGUI < handle
             obj.menu_options.addButton('menu_object', '&Object', 'menu');
             obj.menu_options.menu_object.addButton('button_sync', '&Sync', 'push', 'mount.syncToTarget', 'Sync telescope to current position');
             obj.menu_options.menu_object.addButton('button_reset_prev', '&Reset history', 'push', 'mount.resetPrevObjects', 'Clear the list of previous targets'); 
+            obj.menu_options.menu_object.addButton('button_add_prev', '&Add to History', 'push', 'mount.addTargetList', 'Add current object to target list without slewing', 1); 
             
             obj.menu_options.addButton('menu_timers', '&Timers', 'menu');
+            obj.menu_options.menu_timers.addButton('button_run_t0', 'run t&1', 'push', 'callback_t0', 'Run the zero timer, that updates the GUI'); 
             obj.menu_options.menu_timers.addButton('button_run_t1', 'run t&1', 'push', 'callback_t1', 'Run the first timer, that updates all devices');
             obj.menu_options.menu_timers.addButton('button_run_t2', 'run t&2', 'push', 'callback_t2', 'Run the second timer, that checks weather and critical device errors (then shuts the dome if needed)');
-            obj.menu_options.menu_timers.addButton('button_run_t3', 'run t&3', 'push', 'callback_t3', 'Run the third timer, that makes sure the other two are running');
+            obj.menu_options.menu_timers.addButton('button_run_t3', 'run t&3', 'push', 'callback_t3', 'Run the third timer, that makes sure t2 is running');
+            obj.menu_options.menu_timers.addButton('button_run_t4', 'run t&4', 'push', 'callback_t4', 'Run the fourth timer, that verifies t3 is running and re-applies auto-shutdown');
+
+            obj.menu_options.menu_timers.addButton('button_period0', 'Period0= %ds', 'input', 'period0', 'Adjust the period of the zero timer');
             obj.menu_options.menu_timers.addButton('button_period1', 'Period1= %ds', 'input', 'period1', 'Adjust the period of the first timer');
             obj.menu_options.menu_timers.addButton('button_period2', 'Period2= %ds', 'input', 'period2', 'Adjust the period of the second timer');
             obj.menu_options.menu_timers.addButton('button_period3', 'Period3= %ds', 'input', 'period3', 'Adjust the period of the third timer');
+            obj.menu_options.menu_timers.addButton('button_period4', 'Period4= %ds', 'input', 'period4', 'Adjust the period of the fourth timer');
             
             obj.menu_options.addButton('menu_weather', '&Weather', 'menu'); 
             obj.menu_options.menu_weather.addButton('button_wise', 'Use &Wise', 'toggle', 'checker.use_wise_data', 'Close when the Wise observatory deems it dangerous to operate'); 
@@ -330,12 +336,12 @@ classdef ManagerGUI < handle
             obj.menu_options.menu_robot.addButton('button_dome', '&Dome adjust', 'toggle', 'use_adjust_dome', 'allow dome to reposition itself for new targets'); 
             obj.menu_options.menu_robot.addButton('button_prompt', '&Prompt user', 'toggle', 'use_prompt_user', 'pop up a prompt that user must confirm when switching targets using the scheduler'); 
             obj.menu_options.menu_robot.addButton('button_side', '&Stay on side', 'toggle', 'sched.use_stay_on_side', 'force the scheduler to stay on the same side and not perform a flip on its own'); 
+            obj.menu_options.menu_robot.addButton('button_maintenance', '&Maintenance mode', 'toggle', 'use_maintenance_mode', 'block all automatic motion of mount/dome. Make sure to turn this off!', 1); 
                         
             obj.menu_objects = MenuItem(obj, '&Device GUIs', 'menu');
             obj.menu_objects.addButton('button_dome', '&Dome', 'push', 'dome', 'dome GUI', 'Open the dome GUI');
             obj.menu_objects.addButton('button_mount', '&Mount', 'push', 'mount', 'mount GUI', 'Open the dome GUI');
             obj.menu_objects.addButton('button_scheduler', '&Scheduler', 'push', 'sched', 'scheduler GUI', 'Open the scheduler GUI');
-
             
             for ii = 1:length(obj.panels)
                 obj.panels{ii}.panel.BackgroundColor = obj.color_bg; 
@@ -542,7 +548,7 @@ classdef ManagerGUI < handle
             if obj.owner.checker.use_twilight_mode
                 obj.owner.checker.use_twilight_mode = 0;
             else
-                obj.owner.setup_t3; % first run this so it doesn't turn off twilight mode very shortly after user enables it
+                obj.owner.setup_t4; % first run this so it doesn't turn off twilight mode very shortly after user enables it
                 obj.owner.checker.use_twilight_mode = 1;
                 obj.owner.callback_t2; % update weather check with new light-level limit
             end

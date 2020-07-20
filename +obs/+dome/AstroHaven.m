@@ -401,7 +401,8 @@ classdef AstroHaven < handle
             end
             
             if obj.is_closed
-                return;
+                error('cannot adjust the dome when it is closed!'); 
+%                 return;
             end
             
             if isempty(HA_deg)
@@ -446,7 +447,6 @@ classdef AstroHaven < handle
                 angle_alt = obj.offset_angle(Alt); % get the altitude angle the dome should have to match the telescope altitude angle
                 angle_alt = angle_alt - obj.angle_spare; % get some spare distance
                 
-                
                 obj.use_tracking = 1; % I don't see any reason not to track on the West side
                 
                 % do we need to set the tracking rate in case someone changed it?
@@ -483,7 +483,8 @@ classdef AstroHaven < handle
             end
             
             if obj.is_closed
-                return;
+                error('cannot adjust the dome when it is closed!'); 
+%                 return;
             end
             
             if isempty(HA_deg)

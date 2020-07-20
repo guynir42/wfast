@@ -111,7 +111,7 @@ classdef ScopeAssistant < handle
 
                     pause(0.5);
 
-                    obj.setupTimer(obj.default_period);
+%                     obj.setupTimer(obj.default_period);
 
                     obj.reco.inputSuccess;
                 

@@ -994,7 +994,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     pause(0.1);
                     
                     if isempty(obj.ard) || obj.ard.status==0 || obj.checkArduinoTime==0 || ok==0
-                        obj.connectArduino;
+%                         obj.connectArduino;
                     end
                     
                 end
@@ -1433,14 +1433,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 %                     obj.cam_pc.outgoing.stop_camera = 0; % need to tell cam-pc to start working! 
                     
                     % tell the camera there is a new target object
-                    name = obj.objName;
-                    name = strrep(name, ' ', '_'); 
-                    name = strrep(name, '/', '_'); 
-                    name = strrep(name, '\', '_'); 
-                    % any other problematic characters? or maybe we should
-                    % use regexp to replace all at once?
-                    
-                    obj.cam_pc.outgoing.OBJECT = name;
+                    obj.cam_pc.outgoing.OBJECT = util.text.legalize(name);
                     obj.cam_pc.outgoing.OBJRA = obj.objRA;
                     obj.cam_pc.outgoing.OBJDEC = obj.objDec;
                     

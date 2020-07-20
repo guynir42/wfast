@@ -604,6 +604,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
+        function val = allow_robotics(obj) % all the checks that should be done before making any robotic/spontaneous movement
+            
+            obj.ephem.update;
+            
+            val = obj.ephem.sun.Alt>-5 && obj.checker.sensors_ok && obj.checker.light_ok && ...
+                obj.dome.is_closed==0 && obj.use_maintenance_mode==0 && obj.use_startup;
+            
+        end
+        
     end
     
     methods % setters
@@ -632,12 +641,33 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             if ~isequal(obj.use_shutdown, val) 
                 
-                if val==0 % if we are disabling this, we may as well get 30 minutes to work before t3 shuts it back up
-                    obj.setup_t3; 
+                if val==0 % if we are disabling this, we may as well get an hour to work before t4 shuts it back up
+                    obj.setup_t4; 
                 end
                 
                 obj.use_shutdown = val;
                 
+            end
+            
+        end
+        
+        function set.use_maintenance_mode(obj, val)
+            
+            if val
+                obj.use_maintenance_mode = true;
+                obj.use_shutdown = 0; 
+                obj.use_startup = 0; 
+                if obj.gui.check
+                    obj.gui.panel_image.BackgroundColor = 'green';
+                end
+            else
+                obj.use_maintenance_mode = false;
+                obj.use_shutdown = 1;
+                obj.use_startup = 1; 
+                obj.checker.use_twilight_mode = 0; 
+                if obj.gui.check
+                    obj.gui.panel_image.BackgroundColor = obj.gui.color_bg;
+                end
             end
             
         end
@@ -807,7 +837,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     end
                     
                     if isempty(obj.mount.ard) || ok==0
-                        obj.mount.connectArduino;
+%                         obj.mount.connectArduino;
                     end
                     
                 end
@@ -845,7 +875,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function callback_t3(obj, ~, ~) % make sure t2 is running, re-enables "use_shutdown", checks scheduler for new targets!
             
-            try % make sure t2 is working, cancel maintenance/twilight modes
+            try % make sure t2 is working, send morning report
 
                 % make sure t2 is running! 
                 if isempty(obj.t2) || ~isvalid(obj.t2) || strcmp(obj.t2.Running, 'off')
@@ -910,7 +940,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             try % check scheduler and move to new target if needed
                 
-                if obj.use_startup && obj.checker.sensors_ok && obj.checker.light_ok && obj.dome.is_closed==0
+                if obj.allow_robotics
                     obj.checkNewTarget;
                     pause(1); 
                     if isempty(obj.sched.current) || obj.sched.current.ephem.now_observing
@@ -972,6 +1002,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 if obj.use_maintenance_mode==0
                     obj.use_shutdown = 1;
                     obj.checker.use_twilight_mode = 0; 
+                else
+                    obj.sendError('Maintenance mode is preventing me from re-enabling auto-shutdown!'); 
                 end
                 
             catch ME
@@ -1005,8 +1037,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             stop(obj.t4);
             
         end
-        
-        
         
     end
     
@@ -1271,10 +1301,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-    end
-    
-    methods % calculations / commands
-        
         function print_message(obj, text, error_flag)
             
             if nargin<3 || isempty(error_flag)
@@ -1352,13 +1378,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 time = util.text.time2str(time); 
             end
             
-            subject = [ME.getReport('basic', 'hyperlinks', 'off') ' at ' time];
+            if ischar(ME)
+                subject = ME; 
+                str = ME; 
+            else
+                subject = [ME.getReport('basic', 'hyperlinks', 'off') ' at ' time];
+                str = ME.getReport('extended', 'hyperlinks', 'off');
+            end
             
             c = strsplit(subject, newline); 
-            
-            subject = c{end}; % only get the last line as subject...
-            
-            str = ME.getReport('extended', 'hyperlinks', 'off');
+            subject = strjoin(c, '\\'); 
+%             subject = c{end}; % only get the last line as subject...
+
             obj.sendToObserver(subject, str, true); % last argument is to also send a telegram
             
         end
@@ -1408,6 +1439,52 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             end
             
         end
+        
+        function [val, good_times_minutes] = is_safe_to_open(obj)
+            
+            val = 0;
+            good_times_minutes = 0;
+            
+            if obj.checker.sensors_ok && obj.checker.light_ok 
+                    
+                good_times_minutes = obj.checkPrevWeather;
+
+                if good_times_minutes>0 % check that weather is good for some time now
+                    val = 1;
+                end
+
+            end
+                    
+        end
+            
+        function val = checkPrevWeather(obj)
+           
+            new_hist = datetime('now', 'TimeZone', 'UTC');
+
+            % collect to a new history all the times that are
+            % spaced more than 4 minutes from the last accepted entry
+            for ii = length(obj.sensor_ok_history):-1:1 % notice we are moving from latest to earliest!!
+                if minutes(new_hist(end)-obj.sensor_ok_history(ii))>4 % measurements less than 4 minutes apart are ignored
+                    new_hist(end+1,1) = obj.sensor_ok_history(ii); 
+                end
+            end
+
+            % new_hist should now contain only well spaced times when
+            % weather was ok (in reversed order!)
+            if numel(new_hist)>=obj.autostart_min_weather_samples && ...
+                minutes(new_hist(1)-new_hist(end))>=obj.autostart_min_weather_minutes
+                
+                val = minutes(new_hist(1)-new_hist(end));
+                
+            else
+                val = 0; 
+            end
+            
+        end
+        
+    end
+    
+    methods % calculations / commands
         
         function update(obj) % check devices and sensors and make a decision if to shut down the observatory
 
@@ -1520,31 +1597,31 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
             end
             
-            if obj.use_startup
-                
-                t = datetime('now', 'TimeZone', 'UTC');
-                
-                [safe, good_times_minutes] = obj.is_safe_to_open;
-                
-                if safe
-                    
-                    if isempty(obj.latest_email_autostart_date)
-                        
-                        obj.sendToObserver(['Ready to open dome ' util.text.time2str(t)], ...
-                            sprintf('Weather data looks good for at least %d minutes. Consider opening for observations. ', round(good_times_minutes)), true); 
-                        
-                        obj.latest_email_autostart_date = t;
+            t = datetime('now', 'TimeZone', 'UTC');
 
-                    end
-                    
-                    % other things to do like open the dome?? 
-                    
+            [safe, good_times_minutes] = obj.is_safe_to_open;
+
+            if safe
+
+                if isempty(obj.latest_email_autostart_date)
+
+                    obj.sendToObserver(['Ready to open dome ' util.text.time2str(t)], ...
+                        sprintf('Weather data looks good for at least %d minutes. Consider opening for observations. ', round(good_times_minutes)), true); 
+
+                    obj.latest_email_autostart_date = t;
+
                 end
-                
-                if obj.checker.sensors_ok % only care about sensors other than light! 
-                    obj.sensor_ok_history = vertcat(obj.sensor_ok_history, t); % add this moment to the list of good weather data
-                end
-                
+
+                % other things to do like open the dome?? 
+
+            end
+
+            if obj.checker.sensors_ok % only care about sensors other than light! 
+                obj.sensor_ok_history = vertcat(obj.sensor_ok_history, t); % add this moment to the list of good weather data
+            end
+
+            if obj.use_maintenance_mode
+                warning('Observatory is in maintenance mode!'); 
             end
             
             if ~isempty(obj.gui) && obj.gui.check
@@ -1553,48 +1630,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function [val, good_times_minutes] = is_safe_to_open(obj)
-            
-            val = 0;
-            good_times_minutes = 0;
-            
-            if obj.checker.sensors_ok && obj.checker.light_ok 
-                    
-                good_times_minutes = obj.checkPrevWeather;
-
-                if good_times_minutes>0 % check that weather is good for some time now
-                    val = 1;
-                end
-
-            end
-                    
-        end
-            
-        function val = checkPrevWeather(obj)
-           
-            new_hist = datetime('now', 'TimeZone', 'UTC');
-
-            % collect to a new history all the times that are
-            % spaced more than 4 minutes from the last accepted entry
-            for ii = length(obj.sensor_ok_history):-1:1 % notice we are moving from latest to earliest!!
-                if minutes(new_hist(end)-obj.sensor_ok_history(ii))>4 % measurements less than 4 minutes apart are ignored
-                    new_hist(end+1,1) = obj.sensor_ok_history(ii); 
-                end
-            end
-
-            % new_hist should now contain only well spaced times when
-            % weather was ok (in reversed order!)
-            if numel(new_hist)>=obj.autostart_min_weather_samples && ...
-                minutes(new_hist(1)-new_hist(end))>=obj.autostart_min_weather_minutes
-                
-                val = minutes(new_hist(1)-new_hist(end));
-                
-            else
-                val = 0; 
-            end
-            
-        end
-            
         function updateDevices(obj) % run "update" for each device and see if the status is still good
         
             obj.devices_ok = 1;
@@ -1807,10 +1842,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             end
             
             obj.cam_pc.outgoing.command_pars = args;
-            obj.cam_pc.outgoing.OBJECT = strrep(strtrim(obj.mount.objName), ' ', '_');
+            obj.cam_pc.outgoing.OBJECT = util.text.legalize(obj.mount.objName);
             obj.cam_pc.outgoing.OBJRA = obj.mount.objRA;
             obj.cam_pc.outgoing.OBJDEC = obj.mount.objDec;
-                    
+            
             obj.updateCameraComputer;
             
             obj.print_message(sprintf('Sending camera command: "%s" with arguments "%s"', str, args)); 
@@ -2007,6 +2042,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function adjustDome(obj) % send dome the telescope coordinates and let it adjust accordingly
             
+            if obj.allow_robotics==0 % do not allow this to happen during bad weather, daylight, or when in maintenance mode
+                return;
+            end
+            
             stop(obj.mount.timer); 
             
             obj.dome.adjustDome(obj.mount.objHemisphere,... % side the telescope is positioned
@@ -2022,9 +2061,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             if isempty(obj.sched.current)
 
                 obj.print_message(sprintf('Could not find any targets. Going to idle mode...\n'));
-%                 obj.log.input(sprintf('Could not find any targets. Going to idle mode...\n'));
-%                 if obj.debug_bit, disp(obj.log.report); end
-                
+ 
                 if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
                     obj.button_target.String = obj.log.report; 
                     pause(1);
@@ -2035,10 +2072,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             elseif obj.sched.current.ephem.now_observing
 
                 obj.print_message(sprintf('Continuing observations of %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec));
-%                 obj.log.input(sprintf('Continuing observations of %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
-%                 if obj.debug_bit, disp(obj.log.report); end
-%                 if obj.gui.check, obj.gui.button_info.String = obj.log.report; end
-                
+ 
                 if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
                     obj.button_target.String = obj.log.report; 
                     pause(1);
@@ -2048,10 +2082,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             else
                 
                 obj.print_message(sprintf('Moving to target %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
-%                 obj.log.input(sprintf('Moving to target %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
-%                 if obj.debug_bit, disp(obj.log.report); end
-%                 if obj.gui.check, obj.gui.button_info.String = obj.log.report; end
-                
+
                 % actively switch targets and start a new run: 
                 
                 obj.commandCameraStop;
@@ -2082,47 +2113,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                         && obj.dome.is_closed==0 % only move dome when weather is good, sun is down, and dome is already open
                     
                     obj.print_message(sprintf('Adjusting dome for viewing the %s side', obj.mount.objHemisphere)); 
-%                     obj.log.input(sprintf('Adjusting dome for viewing the %s side', obj.mount.telHemisphere)); 
-%                     if obj.debug_bit, disp(obj.log.report); end
-%                     if obj.gui.check, obj.gui.button_info.String = obj.log.report; end
-                
+
                     obj.adjustDome; % send dome the telescope coordinates and let it adjust accordingly
-                    
-%                     if strcmp(obj.mount.obj_pier_side, 'pierWest') % observing EAST! 
-%                         
-%                         obj.log.input('opening dome East side'); 
-%                         if obj.debug_bit, disp(obj.log.report); end
-%                         if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
-%                             obj.button_target.String = obj.log.report; 
-%                             pause(.01);
-%                         end
-%                         
-%                         obj.dome.openEastFull;
-%                         obj.dome.closeWestFull;
-%                         obj.dome.openWest(100);
-%                         
-%                     elseif strcmp(obj.mount.obj_pier_side, 'pierEast') % observing WEST!
-% 
-%                         obj.log.input('opening dome West side'); 
-%                         if obj.debug_bit, disp(obj.log.report); end
-%                         if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
-%                             obj.button_target.String = obj.log.report; 
-%                             pause(.01);
-%                         end
-%                         
-%                         obj.dome.openWestFull;
-%                         obj.dome.openEastFull; % need to figure out how much to open vs. declination/HA
-%                         
-%                     end
                     
                 end
 
                 % do we need this additional log/display? 
                 obj.print_message(sprintf('slewing to target: %s at %s%s\n', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
-%                 obj.log.input(sprintf('slewing to target: %s at %s%s\n', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
-%                 if obj.debug_bit, disp(obj.log.report); end
-%                 if obj.gui.check, obj.gui.button_info.String = obj.log.report; end
-                
+
                 if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
                     obj.button_target.String = obj.log.report; 
                     pause(1);
@@ -2172,7 +2170,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         function shutdown(obj) % command to shut down observatory (close dome, stop tracking)
             
             obj.print_message('Shutting down observatory!'); 
-%             obj.log.input('Shutting down observatory!');
             
             disp([char(obj.log.time) ': Shutting down observatory!']);
             
