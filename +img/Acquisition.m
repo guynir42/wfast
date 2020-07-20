@@ -41,11 +41,11 @@ classdef Acquisition < file.AstroData
         
         deflator@file.Deflator;
         
-        sync@obs.comm.PcSync;
+        dome_pc@obs.comm.PcSync;
         
-        timer;
-        slow_timer;
-        backup_timer;
+        t1;
+        t2;
+        t3;
         
         log@util.sys.Logger;
         
@@ -376,13 +376,13 @@ classdef Acquisition < file.AstroData
                 
                 obj.deflator = file.Deflator;
                 
-                obj.sync = obs.comm.PcSync('server'); % no connect command is given, since this is still blocking indefinitely...
-                obj.sync.reco.delay_time_minutes = 10; % this prevents the slow_timer from repeatedly trying to reconnect 
+                obj.dome_pc = obs.comm.PcSync('server'); % no connect command is given, since this is still blocking indefinitely...
+                obj.dome_pc.reco.delay_time_minutes = 10; % this prevents t2 from repeatedly trying to reconnect 
                 
-%                 obj.sync.name = 'Cam-PC';
-                obj.setup_timer;
-                obj.setup_slow_timer;
-                obj.setup_backup_timer;
+%                 obj.dome_pc.name = 'Cam-PC';
+                obj.setup_t1;
+                obj.setup_t2;
+                obj.setup_t3;
                 
                 obj.setupDefaults;
                 
@@ -404,7 +404,7 @@ classdef Acquisition < file.AstroData
                 
                 obj.log.input('Constructed new Analysis object.'); 
                 
-%                 obj.sync.connect;
+%                 obj.dome_pc.connect;
                 
             end
             
@@ -458,8 +458,8 @@ classdef Acquisition < file.AstroData
             
             obj.failed_batch_counter = 0;
             
-            obj.sync.outgoing.RA_rate_delta = 0;
-            obj.sync.outgoing.DE_rate_delta = 0;
+            obj.dome_pc.outgoing.RA_rate_delta = 0;
+            obj.dome_pc.outgoing.DE_rate_delta = 0;
 
             obj.star_props = [];
             
@@ -1508,8 +1508,8 @@ classdef Acquisition < file.AstroData
                 
                 for ii = 1:obj.num_focus_iterations
                     
-                    obj.sync.outgoing.report = 'Focusing';
-                    obj.sync.update;
+                    obj.dome_pc.outgoing.report = 'Focusing';
+                    obj.dome_pc.update;
                     obj.parseCommands; % allow stopping between focus runs...
                     
                     if obj.brake_bit, return; end
@@ -1754,42 +1754,40 @@ classdef Acquisition < file.AstroData
         
         function stop_timers(obj)
             
-            stop(obj.backup_timer);
-            stop(obj.slow_timer); 
-            stop(obj.timer); 
+            stop(obj.t3);
+            stop(obj.t2); 
+            stop(obj.t1); 
             
         end
         
         function start_timers(obj)
             
-            obj.setup_backup_timer;
-            obj.setup_slow_timer;
-            obj.setup_timer;
+            obj.setup_t3;
+            obj.setup_t2;
+            obj.setup_t1;
             
         end
         
-        function setup_timer(obj, ~, ~)
+        function setup_t1(obj, ~, ~)
             
-            if ~isempty(obj.timer) && isa(obj.timer, 'timer') && isvalid(obj.timer)
-                if strcmp(obj.timer.Running, 'on')
-                    stop(obj.timer);
-                    delete(obj.timer);
-                    obj.timer = [];
+            if ~isempty(obj.t1) && isa(obj.t1, 'timer') && isvalid(obj.t1)
+                if strcmp(obj.t1.Running, 'on')
+                    stop(obj.t1);
+                    delete(obj.t1);
+                    obj.t1 = [];
                 end
             end
             
-            delete(timerfind('name', 'acquisition-timer'));
+            delete(timerfind('name', 'acquisition-t1'));
             
-            obj.timer = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-timer', ...
-                'Period', 30, 'StartDelay', 30, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer, 'BusyMode', 'drop');
+            obj.t1 = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-t1', ...
+                'Period', 30, 'StartDelay', 30, 'TimerFcn', @obj.callback_t1, 'ErrorFcn', @obj.setup_timer, 'BusyMode', 'drop');
             
-            start(obj.timer);
+            start(obj.t1);
             
         end
         
-        function callback_timer(obj, ~, ~)
-            
-%             disp('timer')
+        function callback_t1(obj, ~, ~)
             
             if obj.brake_bit
                 obj.updateSyncData; % this also updates the obs_log
@@ -1797,52 +1795,52 @@ classdef Acquisition < file.AstroData
                     obj.gui.update;
                 end
             elseif obj.is_running==0 && obj.is_running_single==0 && obj.cam.is_running==0 && obj.cam.is_running_focus==0
-                obj.sync.outgoing.report = 'idle';
+                obj.dome_pc.outgoing.report = 'idle';
             end
             
         end
         
-        function setup_slow_timer(obj, ~, ~)
+        function setup_t2(obj, ~, ~)
             
-            if ~isempty(obj.slow_timer) && isa(obj.slow_timer, 'timer') && isvalid(obj.slow_timer)
-                if strcmp(obj.slow_timer.Running, 'on')
-                    stop(obj.slow_timer);
-                    delete(obj.slow_timer);
-                    obj.slow_timer = [];
+            if ~isempty(obj.t2) && isa(obj.t2, 'timer') && isvalid(obj.t2)
+                if strcmp(obj.t2.Running, 'on')
+                    stop(obj.t2);
+                    delete(obj.t2);
+                    obj.t2 = [];
                 end
             end
             
-            delete(timerfind('name', 'acquisition-slow-timer'));
+            delete(timerfind('name', 'acquisition-t2'));
             
-            obj.slow_timer = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-slow-timer', ...
-                'Period', 300, 'StartDelay', 300, 'TimerFcn', @obj.callback_slow_timer, 'ErrorFcn', @obj.setup_slow_timer);
+            obj.t2 = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-t2', ...
+                'Period', 300, 'StartDelay', 300, 'TimerFcn', @obj.callback_t2, 'ErrorFcn', @obj.setup_t2);
             
-            start(obj.slow_timer);
+            start(obj.t2);
             
             
         end
         
-        function callback_slow_timer(obj, ~, ~)
+        function callback_t2(obj, ~, ~)
             
-            if ~strcmp(obj.timer.Running, 'on')
-                obj.setup_timer;
+            if ~strcmp(obj.t1.Running, 'on')
+                obj.setup_t1;
             end
             
-            obj.sync.update;
+            obj.dome_pc.update;
             pause(0.05); 
             
-            if obj.sync.status==0 && obj.brake_bit % do not stop to reconnect during acquisition! 
+            if obj.dome_pc.status==0 && obj.brake_bit % do not stop to reconnect during acquisition! 
 %                 disp('connecting to PcSync'); 
                 obj.connectSync;
                 
-                if obj.sync.status
-                    obj.sync.reco.lock;
+                if obj.dome_pc.status
+                    obj.dome_pc.reco.lock;
                 end
                 
                 pause(0.05);
                
             elseif obj.brake_bit
-                obj.sync.setup_callbacks;
+                obj.dome_pc.setup_callbacks;
             end
             
             try % adjust the sensor temperature to daytime/night time
@@ -1875,30 +1873,30 @@ classdef Acquisition < file.AstroData
             
         end
         
-        function setup_backup_timer(obj, ~, ~)
+        function setup_t3(obj, ~, ~)
             
-            if ~isempty(obj.backup_timer) && isa(obj.backup_timer, 'timer') && isvalid(obj.backup_timer)
-                if strcmp(obj.backup_timer.Running, 'on')
-                    stop(obj.backup_timer);
-                    delete(obj.backup_timer);
-                    obj.backup_timer = [];
+            if ~isempty(obj.t3) && isa(obj.t3, 'timer') && isvalid(obj.t3)
+                if strcmp(obj.t3.Running, 'on')
+                    stop(obj.t3);
+                    delete(obj.t3);
+                    obj.t3 = [];
                 end
             end
             
-            delete(timerfind('name', 'acquisition-backup-timer'));
+            delete(timerfind('name', 'acquisition-t3'));
             
-            obj.backup_timer = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-backup-timer', ...
-                'Period', 1800, 'StartDelay', 1800, 'TimerFcn', @obj.callback_backup_timer, 'ErrorFcn', @obj.setup_backup_timer);
+            obj.t3 = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-t3', ...
+                'Period', 1800, 'StartDelay', 1800, 'TimerFcn', @obj.callback_t3, 'ErrorFcn', @obj.setup_t3);
             
-            start(obj.backup_timer);
+            start(obj.t3);
             
             
         end
         
-        function callback_backup_timer(obj, ~, ~)
+        function callback_t3(obj, ~, ~)
             
-            if ~strcmp(obj.slow_timer.Running, 'on')
-                obj.setup_slow_timer;
+            if ~strcmp(obj.t2.Running, 'on')
+                obj.setup_t2;
             end
             
             obj.head.update;
@@ -1915,18 +1913,18 @@ classdef Acquisition < file.AstroData
             
             try 
                 
-                if obj.use_sync && obj.sync.status
+                if obj.use_sync && obj.dome_pc.status
 
                     drawnow;
                     
                     if obj.brake_bit==0
-                        obj.sync.read_data_rx;
-                        obj.sync.read_data_tx;
+                        obj.dome_pc.read_data_rx;
+                        obj.dome_pc.read_data_tx;
                     end
                     
-                    obj.sync.update;
+                    obj.dome_pc.update;
 
-                    s = obj.sync.incoming;
+                    s = obj.dome_pc.incoming;
                     
                     list = head.Header.makeSyncList; 
 
@@ -1988,24 +1986,24 @@ classdef Acquisition < file.AstroData
 
                     end
 
-                    obj.sync.outgoing.obs_log = obj.obs_log; % update the Manager on how much observing time is invested in each target
+                    obj.dome_pc.outgoing.obs_log = obj.obs_log; % update the Manager on how much observing time is invested in each target
                     obj.drive_space_gb = obj.getDriveSpace; % calculate how much space is left in each drive (in Gb) 
-                    obj.sync.outgoing.drives = obj.drive_space_gb;
+                    obj.dome_pc.outgoing.drives = obj.drive_space_gb;
 
                     if obj.cat.success
-                        obj.sync.outgoing.obsRA = head.Ephemeris.deg2hour(obj.cat.central_RA); 
-                        obj.sync.outgoing.obsDec = head.Ephemeris.deg2sex(obj.cat.central_Dec); 
+                        obj.dome_pc.outgoing.obsRA = head.Ephemeris.deg2hour(obj.cat.central_RA); 
+                        obj.dome_pc.outgoing.obsDec = head.Ephemeris.deg2sex(obj.cat.central_Dec); 
                     end
                     
                     if ~isempty(obj.cam) && ~isempty(obj.cam.af) && obj.cam.af.success
-                        obj.sync.outgoing.focus_pos = obj.cam.af.found_pos;
-                        obj.sync.outgoing.focus_width = obj.cam.af.found_width;
+                        obj.dome_pc.outgoing.focus_pos = obj.cam.af.found_pos;
+                        obj.dome_pc.outgoing.focus_width = obj.cam.af.found_width;
                     end
                     
-                    if isfield(obj.sync.outgoing, 'report') && strcmp(obj.sync.outgoing.report, 'Running')
-                        obj.sync.outgoing.batch_counter = obj.batch_counter;
-                        obj.sync.outgoing.total_batches = obj.num_batches;
-                        obj.sync.outgoing.runtime = obj.prog.getElapsed; 
+                    if isfield(obj.dome_pc.outgoing, 'report') && strcmp(obj.dome_pc.outgoing.report, 'Running')
+                        obj.dome_pc.outgoing.batch_counter = obj.batch_counter;
+                        obj.dome_pc.outgoing.total_batches = obj.num_batches;
+                        obj.dome_pc.outgoing.runtime = obj.prog.getElapsed; 
                     end
                     
                     if obj.use_sync_stop && isfield(s, 'stop_camera') && s.stop_camera
@@ -2013,12 +2011,12 @@ classdef Acquisition < file.AstroData
                     end
                     
                     if obj.brake_bit==0 && obj.batch_counter>1
-                        obj.sync.outgoing.report = 'Running';
+                        obj.dome_pc.outgoing.report = 'Running';
                     end
                     
                     obj.parseCommands;
                     
-                    obj.sync.update;
+                    obj.dome_pc.update;
                 
                 end
                 
@@ -2036,22 +2034,22 @@ classdef Acquisition < file.AstroData
             
             try 
                 
-                if ~isfield(obj.sync.incoming, 'command_str')
+                if ~isfield(obj.dome_pc.incoming, 'command_str')
                     return;
                 end
                 
-                obj.sync.outgoing.echo_str = obj.sync.incoming.command_str;
-                obj.sync.outgoing.echo_time = obj.sync.incoming.command_time;
+                obj.dome_pc.outgoing.echo_str = obj.dome_pc.incoming.command_str;
+                obj.dome_pc.outgoing.echo_time = obj.dome_pc.incoming.command_time;
                 
-%                 fprintf('command_str= %s | command_time= %s\n', obj.sync.incoming.command_str, obj.sync.incoming.command_time); 
+%                 fprintf('command_str= %s | command_time= %s\n', obj.dome_pc.incoming.command_str, obj.dome_pc.incoming.command_time); 
                 
-                obj.sync.read_data(obj.sync.hndl_rx, 'rx'); 
-                obj.sync.read_data(obj.sync.hndl_tx, 'tx'); 
+                obj.dome_pc.read_data(obj.dome_pc.hndl_rx, 'rx'); 
+                obj.dome_pc.read_data(obj.dome_pc.hndl_tx, 'tx'); 
                 
-                if ~isempty(obj.sync.incoming.command_str) && ~isempty(obj.sync.incoming.command_time)
+                if ~isempty(obj.dome_pc.incoming.command_str) && ~isempty(obj.dome_pc.incoming.command_time)
                     
                     t1 = util.text.str2time(obj.latest_command_time);
-                    t2 = util.text.str2time(obj.sync.incoming.command_time);
+                    t2 = util.text.str2time(obj.dome_pc.incoming.command_time);
                     
                     if isempty(obj.latest_command_time)
                         dt = 0;
@@ -2059,15 +2057,15 @@ classdef Acquisition < file.AstroData
                         dt = abs(minutes(t2-t1)); % the time since we got the last command needs to be long enough
                     end
 
-                    if strcmp(obj.sync.incoming.command_str, obj.latest_command_str) && dt<1 % cannot take the same command over and over in such a short interval...
+                    if strcmp(obj.dome_pc.incoming.command_str, obj.latest_command_str) && dt<1 % cannot take the same command over and over in such a short interval...
                         return;
                     end 
                     
-                    obj.latest_command_str = obj.sync.incoming.command_str;
-                    obj.latest_command_time = obj.sync.incoming.command_time;
-                    obj.latest_command_pars = obj.sync.incoming.command_pars;
+                    obj.latest_command_str = obj.dome_pc.incoming.command_str;
+                    obj.latest_command_time = obj.dome_pc.incoming.command_time;
+                    obj.latest_command_pars = obj.dome_pc.incoming.command_pars;
                     
-                    if cs(obj.sync.incoming.command_str, 'start') && ... % GOT COMMAND TO START A NEW RUN
+                    if cs(obj.dome_pc.incoming.command_str, 'start') && ... % GOT COMMAND TO START A NEW RUN
                             obj.brake_bit && obj.is_running==0 && obj.is_running_single==0 &&...
                             obj.cam.is_running==0 && obj.cam.is_running_focus==0
 
@@ -2080,13 +2078,13 @@ classdef Acquisition < file.AstroData
                         input.input_var('frame_rate', []); 
                         input.scan_vars(args{:}); 
                         
-                        obj.sync.outgoing.error = ''; 
-                        obj.sync.outgoing.err_time = ''; 
-                        obj.sync.outgoing.report = 'Starting';
-                        obj.sync.outgoing.batch_counter = 0;
-                        obj.sync.outgoing.total_batches = 0;
-                        obj.sync.outgoing.runtime = 0;
-                        obj.sync.update;
+                        obj.dome_pc.outgoing.error = ''; 
+                        obj.dome_pc.outgoing.err_time = ''; 
+                        obj.dome_pc.outgoing.report = 'Starting';
+                        obj.dome_pc.outgoing.batch_counter = 0;
+                        obj.dome_pc.outgoing.total_batches = 0;
+                        obj.dome_pc.outgoing.runtime = 0;
+                        obj.dome_pc.update;
                         pause(0.1); % leave time to update
                         
                         if input.focus 
@@ -2135,29 +2133,29 @@ classdef Acquisition < file.AstroData
                         
                         obj.run('reset', 1, args{:}); % the rest of the inputs from dome-pc are parsed in the regular way
                         
-                    elseif cs(obj.sync.incoming.command_str, 'start') % only get here if the timing is wrong... 
+                    elseif cs(obj.dome_pc.incoming.command_str, 'start') % only get here if the timing is wrong... 
                         warning('Got command to start running, but already running...'); 
-                    elseif cs(obj.sync.incoming.command_str, 'stop') 
+                    elseif cs(obj.dome_pc.incoming.command_str, 'stop') 
                         
                         obj.brake_bit = 1;
                         
-                        obj.sync.outgoing.report = 'idle';
+                        obj.dome_pc.outgoing.report = 'idle';
 
                     else
-                        error('Unknown command: %s! Use "start" or "stop", etc...', obj.sync.incoming.command_str); 
+                        error('Unknown command: %s! Use "start" or "stop", etc...', obj.dome_pc.incoming.command_str); 
                     end
 
                     % careful: there is a "return" statement in there
                     
-                    obj.sync.outgoing.report = 'idle'; % even if we started a new run, it will have to be over before we can set report back to "idle"
+                    obj.dome_pc.outgoing.report = 'idle'; % even if we started a new run, it will have to be over before we can set report back to "idle"
                 
                 end
                 
             catch ME
-%                 obj.sync.outgoing.error = sprintf('error! \n%s', ME.getReport);
-                obj.sync.outgoing.error = ME;
-                obj.sync.outgoing.err_time = util.text.time2str(datetime('now', 'TimeZone', 'UTC')); 
-                obj.sync.outgoing.report = 'idle'; 
+%                 obj.dome_pc.outgoing.error = sprintf('error! \n%s', ME.getReport);
+                obj.dome_pc.outgoing.error = ME;
+                obj.dome_pc.outgoing.err_time = util.text.time2str(datetime('now', 'TimeZone', 'UTC')); 
+                obj.dome_pc.outgoing.report = 'idle'; 
                 rethrow(ME); 
             end
 
@@ -2368,7 +2366,7 @@ classdef Acquisition < file.AstroData
 
             end
             
-            if obj.use_sync && obj.use_ignore_manager==0 && ~isempty(obj.sync)
+            if obj.use_sync && obj.use_ignore_manager==0 && ~isempty(obj.dome_pc)
                 obj.updateSyncData;
             end
             
@@ -2432,7 +2430,7 @@ classdef Acquisition < file.AstroData
                 
                 obj.update(input); % update header object to current time and input run name, RA/DE if given to input.
                 
-                if obj.use_sync && obj.sync.status==0
+                if obj.use_sync && obj.dome_pc.status==0
                     obj.gui.latest_error = 'Cannot start a run without a PcSync connection to dome-PC!';
                     warning(obj.gui.latest_error); 
                     obj.log.error(obj.gui.latest_error); 
@@ -2464,8 +2462,8 @@ classdef Acquisition < file.AstroData
                     return;
                 end
                 
-                obj.sync.hndl_rx.BytesAvailableFcn = '';
-                obj.sync.hndl_tx.BytesAvailableFcn = '';
+                obj.dome_pc.hndl_rx.BytesAvailableFcn = '';
+                obj.dome_pc.hndl_tx.BytesAvailableFcn = '';
                 
                 if ~isempty(obj.gui) && obj.gui.check
                     
@@ -2537,16 +2535,16 @@ classdef Acquisition < file.AstroData
                     
                     if obj.debug_bit, disp(str); end
                     
-                    obj.sync.outgoing.report = 'Finding stars';
-                    obj.sync.update;
+                    obj.dome_pc.outgoing.report = 'Finding stars';
+                    obj.dome_pc.update;
                     
                     obj.single;
                     obj.findStars;
                     
                     if obj.use_astrometry
                         
-                        obj.sync.outgoing.report = 'Astrometry';
-                        obj.sync.update;
+                        obj.dome_pc.outgoing.report = 'Astrometry';
+                        obj.dome_pc.update;
                         obj.runAstrometry;
                         
                         if obj.use_require_astrometric_solution && obj.cat.success==0
@@ -2666,9 +2664,9 @@ classdef Acquisition < file.AstroData
                 obj.log.error(ME);
                 obj.unstash_parameters;
                 obj.is_running = 0;
-                obj.sync.outgoing.error = ME; 
-                obj.sync.outgoing.err_time = util.text.time2str(datetime('now', 'TimeZone', 'UTC')); 
-                obj.sync.outgoing.report = 'idle';
+                obj.dome_pc.outgoing.error = ME; 
+                obj.dome_pc.outgoing.err_time = util.text.time2str(datetime('now', 'TimeZone', 'UTC')); 
+                obj.dome_pc.outgoing.report = 'idle';
                 rethrow(ME);
             end
             
@@ -2747,14 +2745,14 @@ classdef Acquisition < file.AstroData
             
             obj.buf.directory_override = '';
             
-            obj.sync.outgoing.RA_rate_delta = 0;
-            obj.sync.outgoing.DE_rate_delta = 0;
+            obj.dome_pc.outgoing.RA_rate_delta = 0;
+            obj.dome_pc.outgoing.DE_rate_delta = 0;
             
-            obj.sync.setup_callbacks;
+            obj.dome_pc.setup_callbacks;
             
-            obj.sync.outgoing.report = 'idle'; % maybe only do this if there was no error? 
+            obj.dome_pc.outgoing.report = 'idle'; % maybe only do this if there was no error? 
             
-            obj.sync.update;
+            obj.dome_pc.update;
             
             obj.lightcurves.finishup;
             
@@ -2988,7 +2986,7 @@ classdef Acquisition < file.AstroData
                     
                 end
                 
-                if obj.batch_counter>2 && obj.use_sync && obj.use_autoguide && obj.sync.status && ~isempty(obj.getFrameRateEstimate)
+                if obj.batch_counter>2 && obj.use_sync && obj.use_autoguide && obj.dome_pc.status && ~isempty(obj.getFrameRateEstimate)
                     % send the average adjustment back to mount controller (should we still adjust the cutouts though??)
                     rot = [cosd(obj.camera_angle) sind(obj.camera_angle); -sind(obj.camera_angle) cosd(obj.camera_angle)];
                     vec = rot*(obj.average_offsets.*obj.head.SCALE./obj.batch_size.*obj.getFrameRateEstimate)'; % units of arcsec/second
@@ -2996,12 +2994,12 @@ classdef Acquisition < file.AstroData
                     dRA = vec(1)/15; % convert from arcsec to sidereal seconds
                     dDE = vec(2);
                     
-                    obj.sync.outgoing.RA_rate_delta = dRA;
-                    obj.sync.outgoing.DE_rate_delta = dDE;
+                    obj.dome_pc.outgoing.RA_rate_delta = dRA;
+                    obj.dome_pc.outgoing.DE_rate_delta = dDE;
                     
 %                     fprintf('dx= %6.4f | dy= %6.4f | dRA= %6.4f | dDE= %6.4f\n', obj.average_offsets(1), obj.average_offsets(2), dRA, dDE); 
                     
-                    obj.sync.update;
+                    obj.dome_pc.update;
                      
                 end
 
@@ -3085,14 +3083,14 @@ classdef Acquisition < file.AstroData
             obj.cat.detection_stack_number = obj.num_sum;
             obj.cat.detection_exposure_time = obj.expT;
             
-            if isfield(obj.sync.incoming, 'TELRA')
-                obj.head.TELRA = obj.sync.incoming.TELRA;
-                obj.head.TELRA_DEG = obj.sync.incoming.TELRA_DEG;
+            if isfield(obj.dome_pc.incoming, 'TELRA')
+                obj.head.TELRA = obj.dome_pc.incoming.TELRA;
+                obj.head.TELRA_DEG = obj.dome_pc.incoming.TELRA_DEG;
             end
             
-            if isfield(obj.sync.incoming, 'TELDEC')
-                obj.head.TELDEC = obj.sync.incoming.TELDEC;
-                obj.head.TELDEC_DEG = obj.sync.incoming.TELDEC_DEG;
+            if isfield(obj.dome_pc.incoming, 'TELDEC')
+                obj.head.TELDEC = obj.dome_pc.incoming.TELDEC;
+                obj.head.TELDEC_DEG = obj.dome_pc.incoming.TELDEC_DEG;
             end
             
             if ~isempty(obj.star_props)
@@ -3289,7 +3287,7 @@ classdef Acquisition < file.AstroData
             
             if obj.checkFluxes % check that stars are still aligned properly... 
                 
-                if obj.use_sync, obj.sync.outgoing.stars_visible = 1;  end
+                if obj.use_sync, obj.dome_pc.outgoing.stars_visible = 1;  end
                 
             else
                 
@@ -3311,7 +3309,7 @@ classdef Acquisition < file.AstroData
                     
                     obj.failed_batch_counter = 0;
                     
-                    if obj.use_sync, obj.sync.outgoing.stars_visible = 1;  end
+                    if obj.use_sync, obj.dome_pc.outgoing.stars_visible = 1;  end
                     
                 else
                     
@@ -3324,7 +3322,7 @@ classdef Acquisition < file.AstroData
                         
                         obj.brake_bit = 1; % finish this batch and then quit the run
                         
-                        if obj.use_sync, obj.sync.outgoing.stars_visible = 0;  end
+                        if obj.use_sync, obj.dome_pc.outgoing.stars_visible = 0;  end
                         
                     end
                     
@@ -3507,7 +3505,11 @@ classdef Acquisition < file.AstroData
                 name = strrep(name, '/', '_'); 
                 name = strrep(name, '\', '_'); 
                 name = strrep(name, ' ', '_'); 
-                                
+                
+                if isempty(name) || ~isletter(name(1))
+                    name = ['obj_' name]; 
+                end
+                
                 if ~isfield(s, name)
                     s.(name) = struct.empty;
                 end
@@ -3617,7 +3619,7 @@ classdef Acquisition < file.AstroData
             obj.log.input('Connecting to PcSync as server');
             
             try
-                obj.sync.connect;
+                obj.dome_pc.connect;
             catch ME
                 obj.log.error(ME);
                 rethrow(ME);
