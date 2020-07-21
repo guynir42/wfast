@@ -863,8 +863,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                     if isnan(RA) || isnan(DEC) % failed to resolve
                         
                         try
-                        [RA, DEC] = celestial.coo.convert2equatorial(keyword, [], 'JD', obj.JD, ...
-                            'ObsCoo', [obj.longitude, obj.latitude, 800], 'OutputUnits', 'deg', 'NameServer', 'jpl');
+                            [RA, DEC] = celestial.coo.convert2equatorial(keyword, [], 'JD', obj.JD, ...
+                                'ObsCoo', [obj.longitude, obj.latitude, obj.elevation], 'OutputUnits', 'deg', 'NameServer', 'jpl');
                         catch ME
                             if strcmp(ME.identifier, 'MATLAB:structRefFromNonStruct')
                                 fprintf('Could not resolve name "%s" with convert2equatorial()!\n', keyword);
@@ -876,6 +876,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                         
                         if isnan(RA) || isnan(DEC) % failed to resolve using JPL also
                             fprintf('Could not resolve name "%s" with convert2equatorial()!\n', keyword);
+                            return;
                         end
                         
                     else

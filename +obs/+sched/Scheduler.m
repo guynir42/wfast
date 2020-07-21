@@ -702,7 +702,8 @@ classdef Scheduler < handle
                 use_sim = 0;
             end
             
-            thresh = 30/60; % let's take 30 arcminutes as the threshold for moving to a new field?
+%             thresh = 30/60; % let's take 30 arcminutes as the threshold for moving to a new field?
+            thresh = 1; % one degree threshold, on either RA or Dec, to consider this field as a separate field...
             
             if ~use_sim
 

@@ -1433,7 +1433,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 %                     obj.cam_pc.outgoing.stop_camera = 0; % need to tell cam-pc to start working! 
                     
                     % tell the camera there is a new target object
-                    obj.cam_pc.outgoing.OBJECT = util.text.legalize(name);
+                    obj.cam_pc.outgoing.OBJECT = util.text.legalize(obj.objName);
                     obj.cam_pc.outgoing.OBJRA = obj.objRA;
                     obj.cam_pc.outgoing.OBJDEC = obj.objDec;
                     

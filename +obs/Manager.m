@@ -608,7 +608,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             obj.ephem.update;
             
-            val = obj.ephem.sun.Alt>-5 && obj.checker.sensors_ok && obj.checker.light_ok && ...
+            val = obj.ephem.sun.Alt<-5 && obj.checker.sensors_ok && obj.checker.light_ok && ...
                 obj.dome.is_closed==0 && obj.use_maintenance_mode==0 && obj.use_startup;
             
         end
