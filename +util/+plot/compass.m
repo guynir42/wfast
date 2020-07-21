@@ -73,23 +73,26 @@ function ax = compass(side, varargin)
     
     ax = axes('Parent', input.figure, 'Position', pos); 
     
+    
     quiver(ax, [0 0], [0 0],...
-        [sind(input.angle) sind(input.angle+90)], ...
-        [cosd(input.angle) cosd(input.angle+90)], ...
+        [sind(input.angle-90) sind(input.angle)], ...
+        [cosd(input.angle-90) cosd(input.angle)], ...
         '-', 'filled', 'LineWidth', 1.5, 'MaxHeadSize', 1, ...
         'Color', input.color)
     
-    Nx = sind(input.angle); 
-    Ny = cosd(input.angle); 
-    Ex = sind(input.angle+90); 
-    Ey = cosd(input.angle+90); 
+    ax.Tag = 'util.plot.compass'; 
+    
+    offset = 1.2;
+    Nx = offset*sind(input.angle-90); 
+    Ny = offset*cosd(input.angle-90); 
+    Ex = offset*sind(input.angle); 
+    Ey = offset*cosd(input.angle); 
     
     text(ax, Nx, Ny, 'N', 'FontUnits', 'Normalized', 'FontSize', input.font_size, 'Color', input.color,...
-        'Rotation', -input.angle, 'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom'); 
+        'Rotation', 0, 'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle'); 
     text(ax, Ex, Ey, 'E', 'FontUnits', 'Normalized', 'FontSize', input.font_size, 'Color', input.color,... 
-        'Rotation', -input.angle, 'HorizontalAlignment', 'left', 'VerticalAlignment', 'middle');  
+        'Rotation', 0, 'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle');  
     
-    ax.Tag = 'util.plot.compass'; 
     ax.XLim = [-1 1];
     ax.YLim = [-1 1]; 
     axis(ax, 'square'); 

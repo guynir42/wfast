@@ -54,7 +54,7 @@ function [image_reduced, mask] = maskBadPixels(image, filler, sigma, saturation)
     mask = logical( abs(double(image))>abs(sigma.*(image_conv)) );
     
     if ~isempty(saturation)
-        mask = mask | image>saturation;
+        mask = mask & image<saturation;
     end
     
     image_reduced = image;
