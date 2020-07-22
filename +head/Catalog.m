@@ -797,6 +797,18 @@ classdef Catalog < handle
                 % what to do with this...?
             end
             
+            obj.loadFromTable; 
+            
+            obj.success = 1; % assume that a saved catalog is a successful catalog... maybe add some tests? 
+            
+        end
+        
+        function loadFromTable(obj, data)
+            
+            if nargin>1 && ~isempty(data)
+                obj.data = data;
+            end
+            
             % add positions, magnitudes, coordinates and temperatures from the table
             obj.positions = [obj.data.X obj.data.Y];
             obj.magnitudes = obj.data.Mag_BP;
@@ -810,8 +822,6 @@ classdef Catalog < handle
             obj.detection_threshold = obj.head.THRESH_DETECTION;
             obj.detection_stack_number = obj.head.NAXIS3;
             obj.detection_exposure_time = obj.head.EXPTIME;
-            
-            obj.success = 1; % assume that a saved catalog is a successful catalog... maybe add some tests? 
             
         end
         

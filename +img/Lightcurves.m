@@ -1001,6 +1001,10 @@ classdef Lightcurves < handle
         
         function val = getAirmass(obj)
             
+            if isempty(obj.juldates)
+                obj.calcJuldates; 
+            end
+            
             if isempty(obj.juldates) || isempty(obj.head) || isempty(obj.head.RA) || isempty(obj.head.DEC)
                 val = [];
             else
@@ -1885,6 +1889,20 @@ classdef Lightcurves < handle
             
         end
         
+        function calcJuldates(obj)
+            
+            if isempty(obj.head) || isempty(obj.head.ENDTIME) || isempty(obj.head.END_STAMP)
+                error('Must have header with ENDTIME and END_STAMP to calculate julian dates'); 
+            end
+            
+            t0 = util.text.str2time(obj.head.ENDTIME) - seconds(obj.head.END_STAMP); % datetime at timestamps=0
+            
+            t = t0 + seconds(obj.timestamps_full); 
+            
+            obj.juldates_full = juliandate(t); 
+            
+        end
+        
         function repairTimestamps(obj)
             
             t = obj.timestamps_full;
@@ -2084,7 +2102,7 @@ classdef Lightcurves < handle
             
             obj.reset; % reset after making sure we managed to load this file! 
             
-            if isfield(loaded, 'timestamp'), obj.timestamps_full = loaded.timestamps; end
+            if isfield(loaded, 'timestamps'), obj.timestamps_full = loaded.timestamps; end
             if isfield(loaded, 'fluxes'), obj.fluxes_full = loaded.fluxes; end
             if isfield(loaded, 'errors'), obj.errors_full = loaded.errors; end
             if isfield(loaded, 'areas'), obj.areas_full = loaded.areas; end
@@ -2102,14 +2120,22 @@ classdef Lightcurves < handle
             obj.head = head.Header.empty;
             if isfield(loaded, 'pars') && isa(loaded.pars, 'head.Parameters'), obj.head = loaded.pars; end
             if isfield(loaded, 'pars') && isa(loaded.pars, 'struct'), obj.head.loadFromStruct(loaded.pars); end 
-            if isfield(loaded, 'header') && isa(loaded.pars, 'head.Header'), obj.head = loaded.header; end
-            if isfield(loaded, 'header') && isa(loaded.pars, 'struct'), obj.head.loadFromStruct(loaded.header); end
+            if isfield(loaded, 'header') && isa(loaded.header, 'head.Header'), obj.head = loaded.header; end
+            if isfield(loaded, 'header') && isa(loaded.header, 'struct'), obj.head.loadFromStruct(loaded.header); end
             
             obj.cat = head.Catalog.empty;
-            if isfield(loaded, 'cat') && isa(loaded.cat, 'head.Catalog'), obj.cat = loaded.cat; end
-            if isfield(loaded, 'cat') && isa(loaded.cat, 'table'), obj.cat.loadFromTable(loaded.cat); end
+            if isfield(loaded, 'cat') && isa(loaded.cat, 'head.Catalog')
+                obj.cat = loaded.cat; 
+                obj.cat.head = obj.head; 
+            end
             
-            obj.frame_index = size(obj.timestamps,1) + 1; 
+            if isfield(loaded, 'cat') && isa(loaded.cat, 'table')
+                obj.cat = head.Catalog;
+                obj.cat.head = obj.head; 
+                obj.cat.loadFromTable(loaded.cat); 
+            end
+            
+            obj.frame_index = size(obj.fluxes_full,1) + 1; 
             
         end
         
