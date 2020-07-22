@@ -2155,12 +2155,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     delete(obj.prompt_fig); 
                 end
 
-                obj.sched.report_log{end+1,1} = obj.sched.report; 
-                obj.sched.rationale_log{end+1,1} = obj.sched.rationale;
-                obj.sched.write_log; % save the report and rationale to text file as well... 
-            
             end
-            
+
+            obj.sched.report_log{end+1,1} = obj.sched.report; 
+            obj.sched.rationale_log{end+1,1} = obj.sched.rationale;
+            obj.sched.write_log; % save the report and rationale to text file as well... 
+
         end
         
         function closeDome(obj) % shortcut to closing both sides of the dome
