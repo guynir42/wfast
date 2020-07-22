@@ -1475,16 +1475,19 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function slewWithoutPrechecks(obj, ra_hours_Jnow, dec_deg_Jnow) % internal command to move, to be called after doing pre-checks
             
             obj.brake_bit = 0;
-            
+            for ii = 1:3
+                
             try
                 obj.hndl.SlewToCoordinatesAsync(ra_hours_Jnow, dec_deg_Jnow);
             catch ME
                 if strcmp(ME.identifier, 'MATLAB:COM:E2148734208')
-                    fprintf('Hardware error: "%s". Slewing again...\n', ME.identifier);
-                    obj.hndl.SlewToCoordinatesAsync(ra_hours_Jnow, dec_deg_Jnow);
+                    fprintf('Hardware error: "%s". Slewing again (attempt %d)...\n', ME.identifier, ii);
+                    obj.hndl.ErrorClear; 
+%                     obj.hndl.SlewToCoordinatesAsync(ra_hours_Jnow, dec_deg_Jnow);
                 end
             end
             
+            end
             
             for ii = 1:100000
 

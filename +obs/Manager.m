@@ -2052,7 +2052,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 head.Ephemeris.hour2deg(obj.mount.telHA),... % hour angle in degrees
                 obj.mount.telDec_deg); % declination in degrees
             
-            start(obj.mount.timer); 
+            if strcmp(obj.mount.timer.Running, 'off')
+                start(obj.mount.timer); 
+            end
             
         end
         

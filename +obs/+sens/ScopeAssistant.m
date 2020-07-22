@@ -354,7 +354,8 @@ classdef ScopeAssistant < handle
                     fprintf(obj.hndl, str);
                     ok = 1;
                 catch ME
-%                     disp('Failed second attempt to write'); 
+                    disp('Failed second attempt to write'); 
+                    warning(ME.getReport); 
                     ok = 0;
                     obj.status = 0;
                 end
