@@ -49,7 +49,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	if(rc) mexErrMsgIdAndTxt( "MATLAB:obs:cam:mex:connect:checkTempIsWritable", "Got error code %d when checking if target temperature is writable!", rc);
 
 	if(bool_value){ 
-		rc=AT_SetFloat(*hndl, L"TargetSensorTemperature", 0); // set target temperature to zero. If it was set too low it causes a camera overheat! 
+		rc=AT_SetFloat(*hndl, L"TargetSensorTemperature", 10); // set target temperature to 10. If it was set too low it causes a camera overheat! 
 		if(rc) mexErrMsgIdAndTxt( "MATLAB:obs:cam:mex:connect:setTargetTemperature", "Got error code %d when setting target temperature!", rc);
 	}
 	

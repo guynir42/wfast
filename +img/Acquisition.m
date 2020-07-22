@@ -641,7 +641,6 @@ classdef Acquisition < file.AstroData
             str = sprintf('%s | batches= %d/%d', str, obj.batch_counter, obj.num_batches); 
             str = sprintf('%s | T= %4.3fs', str, obj.expT);
             str = sprintf('%s | f= %4.2fHz', str, obj.frame_rate);
-            str = sprintf('%s | obj= %s', str, obj.head.OBJECT); 
             str = sprintf('%s | stars= %d/%d ', str, obj.num_stars_found, obj.num_stars);
             str = sprintf('%s | seeing= %4.2f"', str, obj.head.SCALE.*obj.average_width.*2.355);
             str = sprintf('%s | sens.temp= %4.2fC', str, obj.sensor_temperature); 
@@ -1955,7 +1954,7 @@ classdef Acquisition < file.AstroData
                             obj.head.RA_DEG = obj.head.TELRA_DEG;
                             obj.head.DEC_DEG = obj.head.TELDEC_DEG; 
                         elseif ~isempty(obj.head.OBJRA_DEG) && ~isempty(obj.head.OBJDEC_DEG)
-                            obj.head.RA_DEG = obj.head.ONJRA_DEG;
+                            obj.head.RA_DEG = obj.head.OBJRA_DEG;
                             obj.head.DEC_DEG = obj.head.OBJDEC_DEG; 
                         end
 
@@ -2141,6 +2140,9 @@ classdef Acquisition < file.AstroData
                         
                         obj.dome_pc.outgoing.report = 'idle';
 
+                        obj.log.input('Received "stop" command from dome-PC'); 
+                        disp(obj.log.report); 
+                        
                     else
                         error('Unknown command: %s! Use "start" or "stop", etc...', obj.dome_pc.incoming.command_str); 
                     end
@@ -2982,7 +2984,7 @@ classdef Acquisition < file.AstroData
                     if obj.use_lock_adjust
                         offsets = obj.average_offsets;
                     else
-                        offsets = [obj.phot_stack.offset_x, obj.phot_stack.offset_y]; 
+                        offsets = [obj.phot_stack.offsets_x', obj.phot_stack.offsets_y']; 
                     end
                     
                     offsets(isnan(offsets)) = 0;

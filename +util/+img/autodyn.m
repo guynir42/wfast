@@ -24,13 +24,13 @@ function [dynamic_range_vector, image_reduced] = autodyn(image, filler, sigma, s
     end
     
     if nargin<4 || isempty(saturation)
-        saturation = [];
+        saturation = 5e4;
     end
     
 %     image_reduced = image;
     
     image_reduced = maskBadPixels(image, filler, sigma, saturation);
-
+    
 %     ker = ones(3)./8;
 %     ker(2,2) = 0;
 %     
@@ -40,8 +40,10 @@ function [dynamic_range_vector, image_reduced] = autodyn(image, filler, sigma, s
     % dynamic_range_vector(2) = max2(image_reduced);
     
     M = median2(image_reduced);
-    S = std2(image_reduced);
     
+    
+    image_reduced(image_reduced>saturation) = M; 
+    S = std2(image_reduced);
     dynamic_range_vector(1) = util.stat.min2(squeeze(double(M)-S));
     dynamic_range_vector(2) = util.stat.max2(squeeze(double(M)+10*S));
     
