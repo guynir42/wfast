@@ -75,18 +75,18 @@ function ax = compass(side, varargin)
     
     
     quiver(ax, [0 0], [0 0],...
-        [sind(input.angle-90) sind(input.angle)], ...
-        [cosd(input.angle-90) cosd(input.angle)], ...
+        [sind(input.angle) sind(input.angle+90)], ...
+        [cosd(input.angle) cosd(input.angle+90)], ...
         '-', 'filled', 'LineWidth', 1.5, 'MaxHeadSize', 1, ...
         'Color', input.color)
     
     ax.Tag = 'util.plot.compass'; 
     
     offset = 1.2;
-    Nx = offset*sind(input.angle-90); 
-    Ny = offset*cosd(input.angle-90); 
-    Ex = offset*sind(input.angle); 
-    Ey = offset*cosd(input.angle); 
+    Nx = offset*sind(input.angle); 
+    Ny = offset*cosd(input.angle); 
+    Ex = offset*sind(input.angle+90); 
+    Ey = offset*cosd(input.angle+90); 
     
     text(ax, Nx, Ny, 'N', 'FontUnits', 'Normalized', 'FontSize', input.font_size, 'Color', input.color,...
         'Rotation', 0, 'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle'); 
