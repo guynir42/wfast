@@ -2797,7 +2797,9 @@ classdef Acquisition < file.AstroData
             obj.copyFrom(obj.src); % get the data into this object
             t_copy = toc(t_copy);
             
-            if obj.debug_bit>1, fprintf('Starting batch %d. Loaded %d images from "%s" source.\n', obj.batch_counter+1, size(obj.images,3), class(obj.src)); end
+            str = sprintf('Starting batch %d. Loaded %d images from "%s" source.', obj.batch_counter+1, size(obj.images,3), class(obj.src));
+            if obj.log_level>2, obj.log.input(str); end
+            if obj.debug_bit>1,  disp(str); end
             
             obj.head.END_STAMP = obj.t_end_stamp;
                         
@@ -2820,15 +2822,24 @@ classdef Acquisition < file.AstroData
             obj.calcStack;
             t_stack = toc(t_stack);
             
+            str = sprintf('Finished calculating stack'); 
+            if obj.log_level>4, obj.log.input(str); end
+            
             if obj.use_cutouts
                 
                 t_cut = tic;
                 obj.calcCutouts;
                 t_cut = toc(t_cut);
             
+                str = sprintf('Finished calculating cutouts'); 
+                if obj.log_level>4, obj.log.input(str); end
+                
                 t_light = tic;
                 obj.calcLightcurves;
                 t_light = toc(t_light); 
+                
+                str = sprintf('Finished calculating lightcurves'); 
+                if obj.log_level>4, obj.log.input(str); end
             
             end
             
@@ -2844,6 +2855,9 @@ classdef Acquisition < file.AstroData
                 obj.buf.save;
                 obj.buf.nextBuffer;
                 % check triggering then call the camera save mode
+
+                str = sprintf('Finished sending data to be saved... '); 
+                if obj.log_level>4, obj.log.input(str); end
                 
             end
             
@@ -2881,9 +2895,13 @@ classdef Acquisition < file.AstroData
             
             obj.runtime_buffer.input([size(obj.images,3), toc(t0)]);
             
+            str = sprintf('TIMING: batch= %4.2f | copy= %4.2f | stack= %4.2f | cut= %4.2f | light= %4.2f | save= %4.2f | show= %4.2f | gui= %4.2f\n', ...
+                    t_batch, t_copy, t_stack, t_cut, t_light, t_save, t_show, t_gui);
+            
+            if obj.log_level>2, obj.log.input(str); end
+                
             if obj.use_print_timing
-                fprintf('TIMING: batch= %4.2f | copy= %4.2f | stack= %4.2f | cut= %4.2f | light= %4.2f | save= %4.2f | show= %4.2f | gui= %4.2f\n', ...
-                    t_batch, t_copy, t_stack, t_cut, t_light, t_save, t_show, t_gui); 
+                 disp(str); 
             end
             
         end
