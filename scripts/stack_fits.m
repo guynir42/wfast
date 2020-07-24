@@ -1,6 +1,9 @@
 %% use this script to stack FITS files in a given folder
 
-d = util.sys.WorkingDirectory; 
+if ~exist('d', 'var') || isempty(d) || ~isa(d, 'util.sys.WorkingDirectory')
+    d = util.sys.WorkingDirectory; 
+end
+
 d.browse; 
 
 files = d.match('*.fits'); 
@@ -45,7 +48,7 @@ for ii = 1:N_files
     
     I(:,:,mod(ii-1,N_stack)+1) = fitsread(files{ii}); 
     
-    if mod(ii, N_stack)==0
+    if mod(ii, N_stack)==0 || ii==length(files)
         
         S = nansum(I,3); 
 
@@ -63,3 +66,9 @@ for ii = 1:N_files
     
     
 end
+
+fclose(fid); 
+
+
+
+
