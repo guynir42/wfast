@@ -849,6 +849,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             
         end
         
+        function set.OBSLONG(obj, val)
+            
+            obj.ephem.longitude = val;
+            
+        end
+        
+        function set.OBSLAT(obj, val)
+            
+            obj.ephem.latitude = val;
+            
+        end
+        
         function addStar(obj, varargin)
                         
             obj.stars(end+1) = head.Star('pars', obj, varargin{:});
@@ -1023,6 +1035,79 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             if ~isempty(obj.INSTR), matlab.io.fits.writeKey(file_ptr, 'INSTRUME', obj.INSTR); end
             matlab.io.fits.writeKey(file_ptr, 'INPUTFMT', 'FITS');
             
+        end
+        
+        function readFitsHeader(obj, filename)
+            
+            in = fitsinfo(filename); 
+            
+            keys = in.PrimaryData.Keywords;
+            
+            obj.COMMENT = ''; 
+            
+            for ii = 1:size(keys,1)
+                
+                success = 1; 
+                
+                if strcmp(keys{ii,1}, 'COMMENT') && ~isempty(keys{ii,2})
+                    obj.comment = [obj.comment ' ' keys{ii,2}]; % append to comment
+                elseif isprop(obj, keys{ii,1})
+                    try
+                        obj.(keys{ii,1}) = keys{ii,2}; 
+                    end
+                elseif strcmp(keys{ii,1}, 'DATE-OBS')
+                    obj.STARTTIME = keys{ii,2}; 
+                    obj.ephem.time = keys{ii,2};
+                elseif strcmp(keys{ii,1}, 'XPIXSZ') || strcmp(keys{ii,1}, 'YPIXSZ')
+                    obj.PIXSIZE = keys{ii,2}; 
+                elseif strcmp(keys{ii,1}, 'XBINNING')
+                    obj.BINX = keys{ii,2}; 
+                elseif strcmp(keys{ii,1}, 'YBINNING')
+                    obj.BINY = keys{ii,2}; 
+                elseif strcmp(keys{ii,1}, 'YBINNING')
+                    obj.YBIN = keys{ii,2}; 
+                elseif strcmp(keys{ii,1}, 'APTDIA')
+                    if isempty(keys{ii,3}) || strcmpi(keys{ii,3}, 'cm')
+                        obj.TEL_APER = keys{ii,2}; 
+                    elseif strcmpi(keys{ii,3}, 'mm')
+                        obj.TEL_APER = keys{ii,2}/10; 
+                    elseif strcmpi(keys{ii,3}, 'm')
+                        obj.TEL_APER = keys{ii,2}*100; 
+                    end
+                elseif strcmp(keys{ii,1}, 'FOCALLEN')
+                    if isempty(keys{ii,3}) || strcmpi(keys{ii,3}, 'cm')
+                        obj.FOCLEN = keys{ii,2}; 
+                    elseif strcmpi(keys{ii,3}, 'mm')
+                        obj.FOCLEN = keys{ii,2}/10; 
+                    elseif strcmpi(keys{ii,3}, 'm')
+                        obj.FOCLEN = keys{ii,2}*100; 
+                    end
+                elseif strcmp(keys{ii,1}, 'OBJCTRA')
+                    obj.OBJRA = keys{ii,2}; 
+                elseif strcmp(keys{ii,1}, 'OBJCTDEC')
+                    obj.OBJDEC = keys{ii,2}; 
+                elseif strcmp(keys{ii,1}, 'OBJCTHA')
+                    obj.OBJRA = keys{ii,2}; 
+                elseif strcmp(keys{ii,1}, 'INSTRUME')
+                    obj.INST= keys{ii,2}; 
+                elseif strcmp(keys{ii,1}, 'OBJCTHA')
+                    obj.FOCLEN = keys{ii,2}; 
+                elseif strcmp(keys{ii,1}, 'IMAGETYP')
+                    obj.TYPE = keys{ii,2}; 
+                else
+                    success = 0; 
+                end
+                
+                if obj.debug_bit>1
+                    if success
+                        fprintf('Reading keyword* "%s" with value "%s" of type "%s".\n', keys{ii,1}, util.text.print_value(keys{ii,2}), class(keys{ii,2}));
+                    else
+                        fprintf('No property matches the key "%s"...\n', keys{ii,1}); 
+                    end
+                end
+                
+            end
+                        
         end
         
         function s = obj2struct(obj) % turn this object, and all sub objects, into structs
