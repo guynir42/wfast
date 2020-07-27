@@ -51,7 +51,7 @@ function data_out = remove_aux(data, aux, varargin)
     
     data_filtered = data_f - conj(covar)./ps_aux.*aux_f;
     
-    data_out = ifft(data_filtered);
+    data_out = real(ifft(data_filtered));
 
     data_out = data_out + M_data; 
     

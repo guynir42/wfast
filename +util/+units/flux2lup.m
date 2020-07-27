@@ -8,7 +8,7 @@ function [M, b] = flux2lup(flux, b)
 % to the flux noise level ("one sigma"). 
 % If it is left empty, we use the median value of the std of each flux. 
 %
-% Ref paper: 
+% Ref paper: https://ui.adsabs.harvard.edu/abs/1999AJ....118.1406L
 
     if nargin==0, help('util.units.flux2lup'); return; end
     

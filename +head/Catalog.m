@@ -785,6 +785,10 @@ classdef Catalog < handle
                 obj.data = CatTable;
             end
             
+            if isempty(obj.head)
+                obj.head = head.Header;
+            end
+            
             if exist('header', 'var')
                 obj.head.struct2obj(header); 
             elseif exist('head', 'var')

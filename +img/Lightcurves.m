@@ -1502,6 +1502,30 @@ classdef Lightcurves < handle
                 obj.magnitudes = obj.magnitudes(indices); 
             end
             
+            if ~isempty(obj.cat)
+                
+                if ~isempty(obj.cat.data)
+                    obj.cat.data = obj.cat.data(indices,:); 
+                end
+                
+                if ~isempty(obj.cat.magnitudes)
+                    obj.cat.magnitudes = obj.cat.magnitudes(indices);
+                end
+                
+                if ~isempty(obj.cat.positions)
+                    obj.cat.positions = obj.cat.positions(indices, :);
+                end
+                
+                if ~isempty(obj.cat.coordinates)
+                    obj.cat.coordinates = obj.cat.coordinates(indices, :);
+                end
+                
+                if ~isempty(obj.cat.temperatures)
+                    obj.cat.temperatures = obj.cat.temperatures(indices); 
+                end
+                
+            end
+            
             obj.clearIntermidiate;
             obj.clearFits;
             obj.clearFluxes;
@@ -1639,7 +1663,11 @@ classdef Lightcurves < handle
                 
                 obj.width_vector = W;
                 
-                flux = util.series.remove_aux(flux, obj.width_vector, 'window', 64); 
+                N = 20; 
+                window_size = size(flux,1)/N; 
+                window_size = max(window_size, 64); 
+                
+                flux = util.series.remove_aux(flux, obj.width_vector, 'window', window_size); 
                 
 %                 [L, b] = util.units.flux2lup(flux); % this also finds a reasonable estimate for the softening parameter b
 %                 
@@ -1656,7 +1684,7 @@ classdef Lightcurves < handle
             if obj.use_zero_point
                 
                 w = nanmean(flux); % weights are given by the average flux of each star
-                w = sqrt(w); 
+                w = sqrt(abs(w)); 
                 
 %                 f_average = nanmean(flux.*w,2); % weighted average of each frame
                 f_average = nanmean(flux.*w,2); % simple average of each frame
@@ -2136,6 +2164,72 @@ classdef Lightcurves < handle
             end
             
             obj.frame_index = size(obj.fluxes_full,1) + 1; 
+            
+        end
+        
+        function loadHDF5(obj, folder, use_reset)
+            
+            if isa(folder, 'util.sys.WorkingDirectory')
+                % do nothing! 
+            elseif ischar(folder) && exist(folder, 'dir')
+                folder = util.sys.WorkingDirectory(folder); 
+            else
+                error('Must input a valid folder name or a WorkingDirectory object'); 
+            end
+            
+            input = util.text.InputVars;
+            % ...
+            
+            if nargin<3 || isempty(use_reset)
+                use_reset = 1; % by default must reset this object before adding another folder!
+            end
+            
+            if use_reset, obj.reset; end
+            
+            files = folder.match('*.h5*'); 
+            list = {'timestamps', 'fluxes', 'errors', 'areas', 'backgrounds', 'variances', ...
+                'centroids_x', 'centroids_y', 'offsets_x', 'offsets_y', 'widths', ...
+                'bad_pixels', 'flags'}; 
+            
+            prog = util.sys.ProgressBar;
+            prog.start(length(files)); 
+            
+            for ii = 1:length(files)
+                
+                if ii==1 % preallocate on the first batch...
+                    f = h5read(files{1}, '/fluxes'); 
+                    obj.startup(length(files)*size(f,1), size(f,2), size(f,3)); % preallocate! 
+                end
+                
+                for jj = 1:length(list)
+                    
+                    name = list{jj}; 
+                    name_slash = ['/' name]; 
+                    name_full = [name '_full']; 
+                    
+                    use_copy = 0; % the last input is zero telling insert_matrix NOT to make a copy of the big matrices and modify them in place
+                    
+                    if strcmp(name, 'timestamps')
+                        start_vec = [obj.frame_index 1];
+                    else
+                        start_vec = [obj.frame_index 1 1];
+                    end
+                    
+                    data = h5read(files{ii}, name_slash);
+                    if ~isempty(data)
+                        N = size(data,1);
+                        obj.(name_full) = util.vec.insert_matrix(obj.(name_full), data, start_vec, NaN, obj.use_double_up, use_copy);
+                    end
+                    
+                end
+                
+                obj.frame_index = obj.frame_index + N;
+                
+                prog.showif(ii); 
+                
+            end
+            
+            prog.finish; 
             
         end
         

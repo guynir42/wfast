@@ -1,13 +1,33 @@
-function [mu, sigma, values] = sigma_clipping(values, varargin)
-   
+function [mu, sigma, values, N_exc] = sigma_clipping(values, varargin)
+% Usage: [mu, sigma, values, N_exc] = sigma_clipping(values, varargin)
+% Calculate a fit to the distribution of "values", iteratively removing
+% outliers and refitting. 
+%
+% Input: a vector of values to fit to a distribution. 
+% Outputs: -the mean of the final, fitted distribution. 
+%          -the standard devaition of the final distribution. 
+%          -a vector of values after removing outliers. 
+%          -the number of excluded values. 
+%
+% OPTIONAL ARGUMENTS:
+%   *sigma: how many standard deviations from the mean we use to clip values. 
+%           Default is 5. 
+%   *iterations: how many maximal iterations should we do. The function
+%                quits if no new values are excluded, or when reaching this
+%                parameter value. Default is 5. 
+%   *distribution: what to fit to the histogram of values. Default is
+%                  "gauss" but can also handle "weibull" (extreme value). 
+%   *plot: display the fitting process for debugging (default false). 
+%   *axes: what axes to plot to. Default is "gca". 
+%   *pause: add additional time between iteration when plotting. Default 0.
+%   
+
     import util.text.*;
     import util.stat.*;
     
-    if nargin<1
-        fprintf('usage: [mu,sigma] = sigma_clipping(values, varargin)\n');
-        fprintf('--Options: nsigma, iterations, distribution, plotting, axis, pause\n');
-        return;
-    end
+    if nargin==0, help('util.stat.sigma_clipping'); return; end
+    
+    N_exc = 0; % number of excluded values
     
     % add input checks on "values"
     values = values(:);
@@ -98,7 +118,10 @@ function [mu, sigma, values] = sigma_clipping(values, varargin)
             
         end
         
-        values = values(values>mu-Nsigma*sigma & values<mu+Nsigma*sigma);
+        keep_idx = values>mu-Nsigma*sigma & values<mu+Nsigma*sigma;
+        
+        N_exc = N_exc + numel(values) - nnz(keep_idx); 
+        values = values(keep_idx);
                 
         N = numel(values);        
         
