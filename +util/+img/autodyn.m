@@ -39,8 +39,7 @@ function [dynamic_range_vector, image_reduced] = autodyn(image, filler, sigma, s
     % dynamic_range_vector(1) = min2(image_reduced);
     % dynamic_range_vector(2) = max2(image_reduced);
     
-    M = median2(image_reduced);
-    
+    M = nanmedian(image_reduced(:));
     
     image_reduced(image_reduced>saturation) = M; 
     S = std2(image_reduced);
