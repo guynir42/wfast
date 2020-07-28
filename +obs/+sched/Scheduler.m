@@ -297,11 +297,54 @@ classdef Scheduler < handle
                 filename = obj.filename;
             end
             
-            obj.reset;
+            new_targets = obs.sched.Target.readFile(filename, obj.ephem.constraints); 
             
-            obj.targets = obs.sched.Target.readFile(filename, obj.ephem.constraints);
+            % copy all data from new targets to old targets
+            for ii = 1:length(new_targets)
+                
+                matched = 0; 
+                
+                for jj = 1:length(obj.targets)
+                
+                    if strcmpi(new_targets(ii).name, obj.targets(jj).name)
+                        obj.targets(jj).copy_pars(new_targets(ii)); 
+                        matched = 1; 
+                    end
+                    
+                end
+                
+                if matched==0
+                    obj.targets(end+1) = new_targets(ii); 
+                end
+                
+            end
             
-            obj.targets_sim = util.oop.full_copy(obj.targets); 
+            % copy all data from new targets to old targets for simulation
+            for ii = 1:length(new_targets)
+                
+                matched = 0; 
+                
+                for jj = 1:length(obj.targets)
+                    
+                    if strcmpi(new_targets(ii).name, obj.targets_sim(jj).name)
+                        obj.targets_sim(jj).copy_pars(new_targets(ii)); 
+                        matched = 1;
+                    end
+                
+                end
+                
+                if matched==0
+                    obj.targets_sim(end+1) = new_targets(ii); 
+                end
+                
+            end
+            
+            % get rid of targets that don't appear on the list...
+            idx = ismember({obj.targets.name}, {new_targets.name}); % index is true where targets are members of new_targets
+            obj.targets(~idx) = []; 
+            
+            idx = ismember({obj.targets_sim.name}, {new_targets.name}); % index is true where targets are members of new_targets
+            obj.targets_sim(~idx) = []; 
             
         end
         
@@ -454,7 +497,10 @@ classdef Scheduler < handle
                 varargin(idx_sim) = []; 
             end
             
-            arguments = obj.ephem.constraints.output_vars;
+            obj.readFile; % update the targets from the text file
+            
+%             arguments = obj.ephem.constraints.output_vars;
+            arguments = {}; % all the global constraints from ephem are already copied into each target in readFile, then overwritten by target list
             
             % add to arguments the chosen side if "stay_on_side" is true, or because of wind
             % ...
@@ -472,7 +518,7 @@ classdef Scheduler < handle
             end
             
             if ~isempty(varargin)
-                arguments = [arguments varargin];
+                arguments = [arguments varargin]; % add any special requests from user, on top of default constraints and target list constraints
             end
             
 %             fprintf('%s: side= %s\n', time, arguments{end}); 
@@ -485,12 +531,18 @@ classdef Scheduler < handle
             
             new_target = obs.sched.Target.empty;
             
-            % see if any of the targets is now observing and is still inside the "continuous" constraint
+            % make sure all Ephemeris objects are up to date
             for ii = 1:length(target_list)
                 
                 e = target_list(ii).ephem; % shorthand
                 e.time = time; % make sure all targets are updated to current time
+                e.constraints.scan_vars(arguments{:}); % update the Ephemeris object with any user arguments or wind/stay on side constraints
                 e.updateSecondaryCoords;
+                % we are deliberately not useing resolve() here, as we may
+                % choose to continue observing the minimal time before
+                % moving to a new field/coordinates. 
+              
+                % see if any of the targets is now observing and is still inside the "continuous" constraint
                 
                 if e.now_observing && strcmpi(e.side, this_side) % make sure this object is also on the same side as telescope: if we need to flip, we need to choose a new target
                     
@@ -510,7 +562,8 @@ classdef Scheduler < handle
                 
                 for ii = 1:length(target_list) % go over the list an re-resolve any targets that need to be updated
                     if target_list(ii).use_resolver
-                        target_list(ii).ephem.resolve([], arguments{:}); % also updates secondaries
+%                         target_list(ii).ephem.resolve([], arguments{:}); % also updates secondaries
+                        target_list(ii).ephem.resolve; % also updates secondaries
                     end 
                 end
 
@@ -528,14 +581,16 @@ classdef Scheduler < handle
 
                 target_list_duration = target_list(dur_flag); % narrow down to a subset of legal targets...
                 
-                new_target = best_target(target_list_duration, 'time', time, arguments{:}); % try to find a good target under the "duration" constraint
-                
+%                 new_target = best_target(target_list_duration, 'time', time, arguments{:}); % try to find a good target under the "duration" constraint
+                new_target = best_target(target_list_duration, 'time', time); % try to find a good target under the "duration" constraint
+
                 if ~isempty(new_target) % we managed to find a good target below "duration" condition
                     obj.record_rational(time, target_list, new_target, dur_flag); % keep a record for each target why it was or wasn't picked
                 else % this happens if we didn't find any targets that haven't been observed "duration" hours -> choose a target that has surpassed the "duration" condition
                     
-                    new_target = best_target(target_list(~dur_flag), 'time', time, arguments{:}); % run only the targets that have longer than duration
-                    
+%                     new_target = best_target(target_list(~dur_flag), 'time', time, arguments{:}); % run only the targets that have longer than duration
+                    new_target = best_target(target_list(~dur_flag), 'time', time); % run only the targets that have longer than duration
+
                     if ~isempty(new_target)
                         obj.record_rational(time, target_list, new_target); % keep a record for each target why it was or wasn't picked
                     end

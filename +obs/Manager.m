@@ -931,7 +931,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 t = datetime('now', 'TimeZone', 'UTC');
                 
                 if t.Hour>13 && t.Hour<15 % just before starting observations
-                    obj.sched.readFile;
+                    obj.sched.reset; % remove the observing logs from last night
                 end
                 
             catch ME

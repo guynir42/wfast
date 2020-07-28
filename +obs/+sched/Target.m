@@ -243,13 +243,14 @@ classdef (CaseInsensitiveProperties) Target < handle
     
     methods % calculations
         
-        function parse(obj, str) % get target parameters from a line of text
-        % Usage: parseText(obj, str)
+        function parse(obj, str, use_resolve) % get target parameters from a line of text
+        % Usage: parseText(obj, str, use_resolve=0)
         % The basic target syntax is kept simple based on comma separators. 
         % Each line MUST begin with the name of the object/field. 
         % This is followed by coordinates, e.g., 18:30:00.3+22:40:52.8. 
         % Coordinates must be given as RA (hours) and Dec (degrees) with 
         % a plus or minus separating them. 
+        % Second argument is to use resolver after loading (default false):
         % If coordinates are left empty, the object name is given to the 
         % head.Ephemeris object's name interpreter. 
         %
@@ -269,6 +270,10 @@ classdef (CaseInsensitiveProperties) Target < handle
             
             if nargin==1, help('obs.sched.Target.parseText'); return; end
         
+            if nargin<3 || isempty(use_resolve)
+                use_resolve = 0;
+            end
+            
             if isempty(str)
                 error('Must give a non-empty string');
             end
@@ -351,7 +356,7 @@ classdef (CaseInsensitiveProperties) Target < handle
                 obj.Dec = new_Dec;
                 obj.ephem.updateSecondaryCoords;
 
-            else
+            elseif use_resolve
 
                 obj.ephem.resolve; % use the name resolver. Internally Ephemeris looks first for "keyword", then for "name" to resolve
 
@@ -359,14 +364,28 @@ classdef (CaseInsensitiveProperties) Target < handle
                     warning('Could not parse the name "%s"!', obj.name); 
                 end
 
-            end 
+            end
                 
             obj.clear; % clear the observed time and so on
             
         end
         
-        function copy_pars(obj, other)
+        function copy_pars(obj, other) % get the parameters from another Target object, without reseting observation history
             
+            if nargin<2 || isempty(other) || ~isa(other, 'obs.sched.Target')
+                error('Must supply a valid Target object!'); 
+            end
+            
+            % copy only the constraints
+            obj.ephem.constraints = util.oop.full_copy(other.ephem.constraints); 
+            
+            obj.use_resolver = other.use_resolver; 
+            
+            obj.priority = other.priority; 
+            obj.decay_rate = other.decay_rate;
+            obj.tracking = other.tracking;
+            obj.cam_mode = other.cam_mode;
+            obj.exp_time = other.exp_time;
             
             
         end
@@ -568,7 +587,6 @@ classdef (CaseInsensitiveProperties) Target < handle
                 obj_vec(end).index = length(obj_vec); 
                 
             end
-            
             
         end
         
