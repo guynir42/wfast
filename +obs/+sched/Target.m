@@ -365,6 +365,12 @@ classdef (CaseInsensitiveProperties) Target < handle
             
         end
         
+        function copy_pars(obj, other)
+            
+            
+            
+        end
+        
         function val = observable(obj, varargin) % check if this object is inside the observational constraints
              
             import util.text.cs;

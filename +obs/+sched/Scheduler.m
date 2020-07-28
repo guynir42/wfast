@@ -392,7 +392,7 @@ classdef Scheduler < handle
             
             for ii = 1:length(obj.targets)
                 
-                name = obj.targets(ii).name;
+                name = util.text.legalize(obj.targets(ii).name);
                 
                 if isfield(obs_log, name)
                     
@@ -496,7 +496,7 @@ classdef Scheduler < handle
                     
                     if e.getRuntimeMinutes + e.constraints.fudge_time < e.constraints.continuous*60
                         new_target = target_list(ii); % this target must be observed for some time before a new target can be observed... 
-                        obj.rationale = sprintf('%s: Target %s has been observed for only %d minutes! Continuing observations... ', time, new_target.name, e.getRuntimeMinutes); 
+                        obj.rationale = sprintf('%s: Target %s has been observed for only %d minutes! Continuing observations... ', time, new_target.name, floor(e.getRuntimeMinutes)); 
                         obj.continue_run = 1; % by default we do not need to continue the run, and will instead start a new one
                         break; % skip the other targets (assume there is only one target being observed at each time)
                     end

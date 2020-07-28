@@ -310,6 +310,8 @@ classdef AstroHaven < handle
             
             if strcmp(obj.shutter_west, 'closed')
                 val = 90;
+%             elseif strcmp(obj.shutter_west, 'open full')
+%                 val = 0; 
             else
                 val = obj.calcAngle('West');
             end
@@ -377,6 +379,25 @@ classdef AstroHaven < handle
     end
     
     methods % commands to move or stop shutters
+        
+        function adjustDomeMaxOpen(obj, side) % open the dome as far as you can
+            
+            if obj.is_closed
+                error('cannot adjust the dome when it is closed!'); 
+%                 return;
+            end
+            
+            if util.text.cs(side, 'East')
+                obj.openEastFull;
+                obj.closeWestFull;
+                obj.openWest(100); % make sure the top shutter is off
+            elseif util.text.cs(side, 'West')
+                obj.openBothFull;
+            else
+                error('Unknown option "%s" to "side" parameter. Use "East" or "West". ', side); 
+            end
+            
+        end
         
         function adjustDomeNew(obj, side, Az, Alt)
         % Usage: obj.adjustDome(side, Az, Alt)

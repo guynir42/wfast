@@ -858,7 +858,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 if ~isempty(which('celestial.coo.convert2equatorial', 'function')) % use Eran's IMPROVED name resolver
                     
                     [RA, DEC] = celestial.coo.convert2equatorial(keyword, [], 'JD', obj.JD, ...
-                        'ObsCoo', [obj.longitude, obj.latitude, 800], 'OutputUnits', 'deg', 'NameServer', 'simbad');
+                        'ObsCoo', [obj.longitude, obj.latitude, obj.elevation], 'OutputUnits', 'deg', 'NameServer', 'simbad');
 
                     if isnan(RA) || isnan(DEC) % failed to resolve
                         

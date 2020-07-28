@@ -274,6 +274,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                         obj.ard.telescope = obj;
                     end
                     
+                    obj.ard.disconnect;
                     obj.ard.connect;
 
                     obj.ard.update;
@@ -953,6 +954,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 obj.objName = name;
             end
             
+            obj.updateCamera;
+            obj.cam_pc.outgoing.OBJECT = util.text.legalize(obj.objName);
+            
         end
         
         function addTargetList(obj, str) % add an object to the list of recent targets
@@ -1523,7 +1527,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             delete(timerfind('name', 'mount-timer'));
             
             obj.timer = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'mount-timer', ...
-                'Period', 2, 'StartDelay', 1, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer);
+                'Period', 2.5, 'StartDelay', 1, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer);
             
             start(obj.timer);
             

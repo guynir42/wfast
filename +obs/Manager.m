@@ -69,7 +69,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         use_maintenance_mode = 0; % this disables the function in t3 that re-enables "use_shutdown" every 30 minutes (use with care!!!)
         use_shutdown = 1; % when this is enabled, observatory shuts down on bad weather/device failure
         use_startup = 1; % when this is enabled, observatory opens up and starts working by itself! (currently it only sends an alert email) 
-        use_prompt_user = 1; % when about to open dome or slew to new target, first get confirmation from user
+        use_prompt_user = 0; % when about to open dome or slew to new target, first get confirmation from user
         use_adjust_dome = 1; % when true, will change dome position when choosing new targets from scheduler (but doesn't open when closed!)
         
         % use these to override these devices/sensors
@@ -138,7 +138,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         latest_response_cam_pc = ''; % time string for last time we had contact with cam-PC
         latest_error_response = ''; % time string last time we sent an error email about not having contact with cam-PC
         
-        version = 1.05;
+        need_full_open_dome = 0; % this is marked true when cam_pc is unable to find stars. When true, Manager skips adjusting the dome and just fully opens it. 
+        
+        version = 1.06;
         
     end
     
@@ -815,9 +817,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function callback_t2(obj, ~, ~) % collect (averaged) sensor data and check devices are all ok
             
-            try
-
-                % make sure t1 is running! 
+            try % make sure t1 is running! 
+                
                 if isempty(obj.t1) || ~isvalid(obj.t1) || strcmp(obj.t1.Running, 'off')
                     obj.setup_t1;
                 end
@@ -1387,7 +1388,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             end
             
             c = strsplit(subject, newline); 
-            subject = strjoin(c, '\\'); 
+            subject = strjoin(c, '... '); 
 %             subject = c{end}; % only get the last line as subject...
 
             obj.sendToObserver(subject, str, true); % last argument is to also send a telegram
@@ -1757,37 +1758,31 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                     % if the error has not yet been reported via email
                     if isempty(obj.latest_email_error_date) || ~strcmp(obj.latest_email_error_date, obj.cam_pc.incoming.err_time)
+                            
+                        obj.error_report = obj.cam_pc.incoming.error.getReport('basic', 'hyperlinks', 'off'); 
                         
-                        if ischar(obj.cam_pc.incoming.error) % can we get rid of this option if cam-PC only sends MException type errors? 
+                        skip_report_error = 0; % the default is that we will send a report
                         
-                            str = util.text.eraseTags(obj.cam_pc.incoming.error);
-
-                            [~, idx] = regexp(str, 'Error using mg.Acquisition/[a-zA-Z]* \(ine \d*\)[\n\r\s]+', 'once');
-
-                            if isempty(idx)
-                                idx = 60;
+                        idx = regexp(obj.error_report, 'Found only \d+ stars when starting focus run!'); 
+                        
+                        if ~isempty(idx) % the cam-PC reported no stars, maybe we need to try to adjust the dome
+                            if obj.dome.shutter_east_deg==0 && obj.dome.shutter_west_deg==0 % we already fully opened the dome! 
+                                skip_report_error = 0;
+                            else
+                                obj.need_full_open_dome = 1; % make sure to tell the proceedToTarget() function that we need to try again with an open dome
+                                skip_report_error = 1; % skip the reporting this once
                             end
-
-                            idx2 = regexp(str(idx+1:end), '\n', 'once');
-
-                            obj.error_report = strtrim(str(idx:idx+idx2));
-                            
-                            obj.sendToObserver([obj.error_report ' at ' obj.cam_pc.incoming.err_time], str, true); % last argument is for sending a telegram too
-                            
-                        elseif isa(obj.cam_pc.incoming.error, 'MException')
-                            
-                            obj.error_report = obj.cam_pc.incoming.error.getReport('basic', 'hyperlinks', 'off'); 
-                            
-                            obj.sendError(obj.cam_pc.incoming.error, obj.cam_pc.incoming.err_time); 
-                            
-                        else
-                            error('Unknown class of error returned from cam_pc: class(error)= "%s". Use a string or MException object!', class(obj.cam_pc.incoming.error)); 
                         end
                         
-                        obj.print_message(sprintf('Reporting error from cam-PC: %s...', obj.error_report), 1); % report this as an error... 
-%                         obj.log.input(sprintf('Reporting error from cam-PC: %s...', obj.error_report)); 
-%                         if obj.debug_bit, disp(obj.log.report); end
+                        obj.print_message(sprintf('Reporting error from cam-PC: %s. Sending email is %d...', obj.error_report, ~skip_report_error), 1); % report this as an error...
+
+                        if skip_report_error==0
+                            obj.sendError(obj.cam_pc.incoming.error, obj.cam_pc.incoming.err_time); 
+                        end
                         
+                        % If we sent a report or not, we must log this time
+                        % to prevent another send attempt. 
+                        % If the error returns, we may send the new one.
                         obj.latest_email_error_date = obj.cam_pc.incoming.err_time;
                         
                     end
@@ -1849,9 +1844,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.updateCameraComputer;
             
             obj.print_message(sprintf('Sending camera command: "%s" with arguments "%s"', str, args)); 
-%             obj.log.input(sprintf('Sending camera command: "%s" with arguments "%s"', str, args)); 
-%             if obj.debug_bit, disp(obj.log.report); end
-%             if obj.gui.check, obj.gui.button_info.String = obj.log.report; end
             
         end
         
@@ -2040,7 +2032,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function adjustDome(obj) % send dome the telescope coordinates and let it adjust accordingly
+        function adjustDome(obj, option) % send dome the telescope coordinates and let it adjust accordingly
+            
+            if nargin<2 || isempty(option)
+                option = ''; 
+            end
             
             if obj.allow_robotics==0 % do not allow this to happen during bad weather, daylight, or when in maintenance mode
                 return;
@@ -2048,10 +2044,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             stop(obj.mount.timer); 
             
-            obj.dome.adjustDome(obj.mount.objHemisphere,... % side the telescope is positioned
-                head.Ephemeris.hour2deg(obj.mount.telHA),... % hour angle in degrees
-                obj.mount.telDec_deg); % declination in degrees
+            if util.text.cs(option, 'full')
+                obj.dome.openBothFull; % fully open the dome
+            else
+                obj.dome.adjustDome(obj.mount.objHemisphere,... % side the telescope is positioned
+                    head.Ephemeris.hour2deg(obj.mount.telHA),... % hour angle in degrees
+                    obj.mount.telDec_deg); % declination in degrees
             
+            end
+                
             if strcmp(obj.mount.timer.Running, 'off')
                 start(obj.mount.timer); 
             end
@@ -2115,8 +2116,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                         && obj.dome.is_closed==0 % only move dome when weather is good, sun is down, and dome is already open
                     
                     obj.print_message(sprintf('Adjusting dome for viewing the %s side', obj.mount.objHemisphere)); 
-
-                    obj.adjustDome; % send dome the telescope coordinates and let it adjust accordingly
+                    
+                    if ~obj.need_full_open_dome
+                        obj.adjustDome; % send dome the telescope coordinates and let it adjust accordingly
+                    else
+                        obj.adjustDome('full'); 
+                    end
                     
                 end
 
@@ -2155,6 +2160,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     delete(obj.prompt_fig); 
                 end
 
+                obj.need_full_open_dome = 0; % assume cam_pc could find stars. If it still can't, with dome open, it should report an error
+                
             end
 
             obj.sched.report_log{end+1,1} = obj.sched.report; 

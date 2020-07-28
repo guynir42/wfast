@@ -345,6 +345,7 @@ classdef ScopeAssistant < handle
             end
             
             try 
+                
                 fprintf(obj.hndl, str);
                 ok = 1;
             catch ME
@@ -354,9 +355,12 @@ classdef ScopeAssistant < handle
                     fprintf(obj.hndl, str);
                     ok = 1;
                 catch ME
-                    disp('Failed second attempt to write'); 
-                    warning(ME.getReport); 
+%                     disp('Failed second attempt to write'); 
+%                     warning(ME.getReport); 
                     ok = 0;
+                    if obj.status
+                        fprintf('%s: ScopeAssistant has disconnected!\n', datetime('now', 'TimeZone', 'UTC'));
+                    end
                     obj.status = 0;
                 end
                 

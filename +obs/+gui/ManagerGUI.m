@@ -208,16 +208,17 @@ classdef ManagerGUI < handle
             obj.panel_controls.addButton('button_twilight', '', 'custom', 'twilight is off', 'twilight is on', '', 0.3, 'red', obj.color_on, 'let the dome stay open during twilight');
             
             obj.panel_controls.addButton('button_autostartup', 'use_startup', 'toggle', 'auto start up is disabled', 'auto start up is enabled', '', 0.7, obj.color_on, 'red', ...
-                 'Manager can choose new targets from scheduler (still requires user confirmation, still doesn''t open dome if closed)'); 
+                 'Manager can choose new targets from scheduler (still doesn''t open dome if closed)'); 
              
             obj.panel_controls.addButton('button_lights', 'assist.lights', 'toggle', 'LEDs are off', 'LEDs are on', 'edit', 0.3, 'red', obj.color_on, 'turn on/off dome lights');
             
             obj.panel_controls.addButton('button_weather_check', 'callback_t2', 'push', 'Weather check', '', '', [], '', '', 'run callback_t2, starting t1 and calling update to check weather and devices');
-            obj.panel_controls.addButton('button_proceed', 'checkNewTarget', 'push', 'proceed to target', '', '', [], '', '', 'use scheduler to move to new target'); 
+            obj.panel_controls.addButton('button_proceed', '', 'custom', 'proceed to target', '', '', [], '', '', 'use scheduler to move to new target'); 
             obj.panel_controls.margin = [0.01 0.01];
             obj.panel_controls.make;
             
             obj.panel_controls.button_twilight.Callback = @obj.callback_twilight_mode;
+            obj.panel_controls.button_proceed.Callback = @obj.callback_proceed;
             
             %%%%%%%%%%% panel report %%%%%%%%%%%%%%%%%
             
@@ -552,6 +553,17 @@ classdef ManagerGUI < handle
                 obj.owner.checker.use_twilight_mode = 1;
                 obj.owner.callback_t2; % update weather check with new light-level limit
             end
+            
+            obj.update;
+            
+        end
+        
+        function callback_proceed(obj, ~, ~)
+            
+            if obj.debug_bit>1, disp('Callback: proceed to target'); end
+            
+            obj.owner.setup_t3; % setting up the timer means the next time it triggers is only X minutes after this call
+            obj.owner.proceedToTarget; 
             
             obj.update;
             
