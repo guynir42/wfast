@@ -69,8 +69,9 @@ classdef DomeAssistant < handle
     properties(Hidden=true)
        
         lights_relay = 'relay1';
+        lights_switch = 4; 
         
-        version = 1.00;
+        version = 1.01;
         
     end
     

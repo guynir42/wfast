@@ -138,6 +138,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
     
     properties(Hidden=true)
        
+        arduinos_switch = 6; % the outlet controlling the Arduinos
+        
         % the default alt-az is parking 2 (zenith west)
         target_altitude = 90;
         target_azimuth = 270;
@@ -253,20 +255,20 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 
             obj.log.input('Connecting Arduino.');
             
-            if isempty(obj.ard) 
+            if isempty(obj.ard) % if there is no matlab object, first create it!
 
                 try
                     
                     obj.ard = obs.sens.ScopeAssistant;
                     
                 catch ME
-%                     obj.use_accelerometer = 0;
-                    warning(ME.getReport);
+                    obj.log.error(ME); 
+                    rethrow(ME.getReport);
                 end
 
             end
             
-            if ~isempty(obj.ard)
+            if ~isempty(obj.ard) % now we have an object, we need to make sure it is connected
                 
                 try
                     
@@ -274,14 +276,58 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                         obj.ard.telescope = obj;
                     end
                     
-                    obj.ard.disconnect;
-                    obj.ard.connect;
-
                     obj.ard.update;
                     
+                    if obj.ard.status==0
+                        obj.ard.disconnect;
+                        obj.ard.connect;
+                    end
+                    
+                    obj.ard.update;
+                    
+                    if obj.ard.status==0
+                        
+                        RA = obj.telRA_deg; 
+                        DE = obj.telDec_deg; 
+                        side = obj.telHemisphere;
+                        
+                        % turn off the power to the Arduinos (more info: https://www.digital-loggers.com/curl.html)
+                        [rc, rv] = system('curl -u admin:kbos http://192.168.1.104:8000/outlet?6=OFF');
+                        
+                        pause(3); 
+                        
+                        % turn the power back on
+                        [rc, rv] = system('curl -u admin:kbos http://192.168.1.104:8000/outlet?6=ON');
+
+                        pause(3); 
+                        
+                        % now reconnect the Autoslew software
+                        obj.connect; 
+                        
+                        pause(2); 
+                        
+                        if abs(RA - obj.telRA_deg)>1 || abs(DE - obj.telDec_deg)>1 || ~strcmp(side, obj.telHemisphere)
+                            error('Mount restart error: coordinates before: %s%s (%s) do not match coordinates after: %s%s (%s)', ...
+                                head.Ephemeris.deg2hour(RA), head.Ephemeris.deg2sex(DE), side, ...
+                                head.Ephemeris.deg2hour(obj.telRA_deg), head.Ephemeris.deg2sex(obj.telDec_deg), obj.telHemisphere); 
+                        end
+                        
+                        obj.ard.update;
+                        pause(1); 
+                        
+                        if obj.ard.status==0
+                            obj.ard.disconnect;
+                            obj.ard.connect;
+                        end
+
+                        obj.ard.update;
+                        pause(1); 
+                        
+                    end
+                    
                 catch ME
-%                     obj.use_accelerometer = 0; % this prevents endless loops of reconnect but also doesn't allow multiple reconnects
-                    warning(ME.getReport);
+                    obj.log.error(ME); 
+                    rethrow(ME.getReport);
                 end
                 
             end
@@ -998,7 +1044,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     pause(0.1);
                     
                     if isempty(obj.ard) || obj.ard.status==0 || obj.checkArduinoTime==0 || ok==0
-%                         obj.connectArduino;
+                        obj.connectArduino;
                     end
                     
                 end

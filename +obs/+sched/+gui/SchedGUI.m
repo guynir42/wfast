@@ -172,9 +172,9 @@ classdef SchedGUI < handle
             
             %%%%%%%%%%% panel filename %%%%%%%%%%%%%%%
             
-            obj.panel_filename = GraphicPanel(obj.owner, [0.2 0 0.8 1/N], 'report', 1);  % last input is for vertical (default)
-            obj.panel_filename.addButton('input_filename', 'filename', 'input', '', '', '', 0.6, '', '', 'give the filename to load the target list from'); 
-            obj.panel_filename.addButton('button_read', 'readFile', 'push', 'read targets', '', '', 0.2, '', '', 'read the targets from current file'); 
+            obj.panel_filename = GraphicPanel(obj.owner, [0.2 0 0.8 1/N], 'target list', 1);  % last input is for vertical (default)
+            obj.panel_filename.addButton('input_filename', 'filename', 'input', '', '', '', 0.8, '', '', 'give the filename to load the target list from'); 
+%             obj.panel_filename.addButton('button_read', 'readFile', 'push', 'read targets', '', '', 0.2, '', '', 'read the targets from current file'); 
             obj.panel_filename.addButton('button_browse', '', 'custom', 'browse', '', '', 0.2, '', '', 'choose a new file for the target list'); 
             obj.panel_filename.margin = [0.01 0.02];
             obj.panel_filename.make;

@@ -713,10 +713,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     obj.cam_pc.incoming.report = '';
                 end
                 
-                if ~isfield(obj.cam_pc.outgoing, 'command_str') || ...
-                    (~strcmp(obj.cam_pc.outgoing.command_str, 'start') && ...
+                if ~isfield(obj.cam_pc.outgoing, 'command_str')
+                    obj.gui.panel_camera.button_start.control.Enable = 'on';
+                elseif ~strcmp(obj.cam_pc.outgoing.command_str, 'start') && ...
                         ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'report') && ...
-                        strcmp(obj.cam_pc.incoming.report, 'idle')) % what if we didn't start any runs and there is no report??
+                        (strcmp(obj.cam_pc.incoming.report, 'idle') || isempty(obj.cam_pc.incoming.report) ) % what if we didn't start any runs and there is no report??
                     obj.gui.panel_camera.button_start.control.Enable = 'on';
                 else
                     obj.gui.panel_camera.button_start.control.Enable = 'off';
@@ -1576,8 +1577,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                             t = obj.sched.targets(ii); 
                             
                             if isfield(obj.cam_pc.outgoing, 'OBJECT') && strcmp(t.name, obj.cam_pc.outgoing.OBJECT) && ...
-                                    abs(t.ephem.RA_deg-obj.cam_pc.outgoing.OBJRA_DEG)*3600<tol && ...
-                                    abs(t.ephem.Dec_deg-obj.cam_pc.outgoing.OBJDEC_DEG)*3600<tol
+                                    ~isempty(t.ephem.RA) && abs(t.ephem.RA_deg-obj.cam_pc.outgoing.OBJRA_DEG)*3600<tol && ...
+                                    ~isempty(t.ephem.Dec_deg) && abs(t.ephem.Dec_deg-obj.cam_pc.outgoing.OBJDEC_DEG)*3600<tol
                                 
                                 chosen_target = t;
                                 
