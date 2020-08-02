@@ -199,6 +199,8 @@ classdef Andor < file.AstroData
         clip_limit = 16000; % any pixels above this value will display a "clipping" warning... 
         is_clipping = 0; % update this manually in record/live view
         
+        use_update_sensor_temp = 0; % when true, will check the sensor temperature each batch to add it to the header
+        
         % these are hardware related parameters (used for synchronous record)
         imageSizeBytes; % need this to setup buffers for the camera
         AOIwidth_c;  % this helps understand how to parse the raw buffers
@@ -1102,6 +1104,8 @@ classdef Andor < file.AstroData
                 obj.setExpTimeHW(obj.expT); 
                 obj.setFrameRateHW(obj.frame_rate);
 
+                obj.head.SENSOR_TEMP = obj.getSensorTemp; 
+                
                 if isempty(obj.frame_rate) || isnan(obj.frame_rate) % in this mode the camera takes an image as soon as it gets a command to "software trigger"
 %                     [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'TriggerMode','Software'); obs.cam.sdk.AT_CheckWarning(rc);
                     obs.cam.mex_new.set(obj.hndl, 'trigger mode', 'Software'); 
@@ -1281,6 +1285,10 @@ classdef Andor < file.AstroData
             end
             
             obj.frame_rate_camera = size(obj.images,3)./(obj.t_end_stamp - obj.timestamps(1)); % how many frames in what time (not including dead time and read time)
+            
+            if obj.use_update_sensor_temp
+               obj.head.SENSOR_TEMP = obj.getSensorTemp;  
+            end
             
             if ~isempty(obj.buffers.t_start)
                 

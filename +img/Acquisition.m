@@ -138,7 +138,7 @@ classdef Acquisition < file.AstroData
         use_print_timing = 0; % print a line each batch with the timing data for each part of the processing chain
         
         debug_bit = 1;
-        log_level = 1;
+        log_level = 5;
         
     end
     
@@ -413,7 +413,7 @@ classdef Acquisition < file.AstroData
         function setupDefaults(obj)
 
             obj.runtime_units = 'hours';
-            obj.total_runtime = 4;
+            obj.total_runtime = 2;
 %             obj.num_batches = 500;
             obj.batch_size = 100;
             
@@ -1328,6 +1328,16 @@ classdef Acquisition < file.AstroData
             obj.is_running = 0;
             obj.brake_bit = 1;
             
+            if isa(obj.src, 'obs.cam.Andor')
+                obj.src.brake_bit = 1;
+                obj.src.is_running = 0;
+                obj.cam.is_running_focus = 0;
+            end
+            
+            obj.setup_t3;
+            obj.setup_t2;
+            obj.setup_t1;
+            
         end
         
         function run(obj, varargin)
@@ -1592,7 +1602,7 @@ classdef Acquisition < file.AstroData
                                 'saturation', 5e4*obj.num_sum, 'unflagged', 1, 'num_stars', obj.cam.af.num_stars,...
                                 'psf', 2, 'edges', obj.avoid_edges, 'dilate', obj.cut_size-5);
                             
-                            if height(obj.star_props)<10
+                            if height(obj.star_props)<1
                                 util.plot.inner_title(sprintf('Focus failed after %d iterations!', 0),...
                                     'ax', obj.cam.af.gui.axes_image, 'FontSize', 26, 'Position', 'North');
                                 pause(1); 
@@ -1780,7 +1790,7 @@ classdef Acquisition < file.AstroData
             delete(timerfind('name', 'acquisition-t1'));
             
             obj.t1 = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-t1', ...
-                'Period', 30, 'StartDelay', 30, 'TimerFcn', @obj.callback_t1, 'ErrorFcn', @obj.setup_timer, 'BusyMode', 'drop');
+                'Period', 30, 'StartDelay', 30, 'TimerFcn', @obj.callback_t1, 'ErrorFcn', @obj.setup_t1, 'BusyMode', 'drop');
             
             start(obj.t1);
             
@@ -2226,10 +2236,10 @@ classdef Acquisition < file.AstroData
                 input.scan_vars(varargin{:}); % scan once to get num_batches and total_runtime, then scan again after scaning object... 
                 
                 if ~isempty(input.num_batches) && ~isempty(input.total_runtime) % both have been given! 
-                    num_batches = input.total_runtime;
+                    num_batches = input.num_batches;
                     total_runtime = input.total_runtime; 
                 elseif isempty(input.num_batches) && isempty(input.total_runtime) % neither is given (use defaults)
-                    num_batches = obj.total_runtime;
+                    num_batches = obj.num_batches;
                     total_runtime = obj.total_runtime; 
                 elseif ~isempty(input.num_batches) && isempty(input.total_runtime) % use the given value for num_batches
                     num_batches = input.num_batches;
@@ -2479,8 +2489,17 @@ classdef Acquisition < file.AstroData
                     
                 end
                 
-                if input.log_level
-                    obj.log.input(sprintf('Starting a new run "%s" (saving is %d). ', obj.run_name, obj.use_save)); 
+                
+                if input.use_reset % this parameter is not saved in the object because we only use it here... 
+                    
+                    obj.reset;
+                    
+                    if obj.debug_bit, disp(['Starting run "' obj.run_name '" for ' num2str(obj.num_batches) ' batches.']); end
+
+                    if input.log_level
+                        obj.log.input(sprintf('Starting a new run "%s" (saving is %d). ', obj.run_name, obj.use_save)); 
+                    end
+                    
                 end
                 
                 if ~obj.cal.checkDark
@@ -2502,19 +2521,6 @@ classdef Acquisition < file.AstroData
                     warning(obj.gui.latest_error);
                     obj.log.error(obj.gui.latest_error);
                     return;
-                end
-                
-                if input.use_reset % this parameter is not saved in the object because we only use it here... 
-                    
-                    obj.reset;
-                    
-                    if obj.debug_bit, disp(['Starting run "' obj.run_name '" for ' num2str(obj.num_batches) ' batches.']); end
-
-                end
-                
-                % update the obs_log with the new run
-                if obj.use_save && input.use_reset
-                    
                 end
                 
                 if obj.display_num_rect_stars>100
@@ -2682,7 +2688,7 @@ classdef Acquisition < file.AstroData
             
             obj.src.finishup;
                         
-            if obj.use_save
+            if obj.use_save && obj.batch_counter>0
                 
                 try % readme file
                     filename = obj.buf.getReadmeFilename('Z');
@@ -2954,7 +2960,7 @@ classdef Acquisition < file.AstroData
             
             if ~isempty(obj.positions) % if no positions are known just skip this part
                 
-                if obj.use_dynamic_cutouts
+                if obj.use_dynamic_cutouts && obj.num_sum>1
                     
                     obj.cosmic_ray_mask = imdilate(obj.stack_proc>obj.cosmic_ray_mask_threshold, ones(7)); % dilate the area around stars
                     obj.cosmic_ray_mask = logical(obj.cal.dark_mask + obj.cosmic_ray_mask); % add the bad pixels to the mask
@@ -3361,7 +3367,12 @@ classdef Acquisition < file.AstroData
             
             obj.cutouts = obj.clip.input(obj.images);
             
+            str = sprintf('Finished making cutouts'); 
+            if obj.log_level>4, obj.log.input(str); end
+            
             obj.cutouts_proc = obj.cal.input(obj.cutouts, 'clip', obj.clip);
+            str = sprintf('Finished calibrating cutouts'); 
+            if obj.log_level>4, obj.log.input(str); end
             
             obj.cutouts_bg = obj.clip_bg.input(obj.images);
             

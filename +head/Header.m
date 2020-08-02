@@ -112,6 +112,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         PRESSURE; % pressure in mbar
         LIGHT; % light value in arbitrary units (from Boltwood, max is 1024, dark is around 100)
 
+        SENSOR_TEMP; % temperature in C of the sensor
+        
         % coordinates of the object as given by user/scheduler
         OBJRA; 
         OBJDEC;

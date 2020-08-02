@@ -86,6 +86,8 @@ classdef Calibration < handle
         reader_dark@file.Reader; % reads the dark images to generate the dark frame
         reader_flat@file.Reader; % reads the flat images to generate the flat frame
         
+        futures; % use this to make async calls to makeFlat
+        
     end
     
     properties % outputs
@@ -263,6 +265,12 @@ classdef Calibration < handle
         function resetReaderFlat(obj)
             
             obj.reader_flat.reset;
+            
+        end
+        
+        function reset_futures(obj)
+            
+            obj.futures = {};
             
         end
         
@@ -949,7 +957,9 @@ classdef Calibration < handle
                 try
                     obj.prog.show(reader.getNumBatches);
                     obj.prog.pause;
-                    obj.audio.playShowsOver;
+                    if ~isempty(obj.audio)
+                        obj.audio.playShowsOver;
+                    end
                 catch ME
                     warning(ME.getReport);
                 end
@@ -958,7 +968,7 @@ classdef Calibration < handle
             
         end
         
-        function makeDark(obj) % sets "mode=dark" and runs the loop
+        function obj = makeDark(obj) % sets "mode=dark" and runs the loop
            
             if isempty(obj.reader_dark)
                 error('cannot make dark without a reader_dark!');
@@ -975,8 +985,13 @@ classdef Calibration < handle
             obj.brake_bit = 0;
             
             try
-                obj.audio.playTakeForever;
+                               
+                if ~isempty(obj.audio)
+                    obj.audio.playTakeForever;
+                end
+                
                 obj.prog.start(obj.reader_dark.getNumBatches);
+                
             catch ME
                 warning(ME.getReport)
             end
@@ -985,7 +1000,12 @@ classdef Calibration < handle
             
         end
         
-        function makeFlat(obj) % sets "mode=flat" and runs the loop
+        function obj = makeFlat(obj, varargin) % sets "mode=flat" and runs the loop
+            
+            input = util.text.InputVars;
+            input.input_var('reset', [], 'use_reset', 5); 
+            input.input_var('save', [], 'use_save', 5); 
+            input.scan_vars(varargin{:}); 
             
             if isempty(obj.reader_flat)
                 error('cannot make flat without a reader_flat!');
@@ -996,19 +1016,38 @@ classdef Calibration < handle
             if obj.reader_flat.is_finished
                 error('no images found for making flats...');
             end
-                        
+            
             obj.mode = 'flat';
+            
+            if ~isempty(input.reset) && input.reset
+                obj.resetFlat; 
+            end
+            
+            if ~isempty(input.save)
+                obj.use_autosave = input.save; 
+            end
             
             obj.brake_bit = 0;
             
             try
-                obj.audio.playTakeForever;
+                
+                if ~isempty(obj.audio)
+                    obj.audio.playTakeForever;
+                end
+                
                 obj.prog.start(obj.reader_flat.getNumBatches);
+                
             catch ME
                 warning(ME.getReport)
             end
             
             obj.loop; 
+            
+        end
+        
+        function makeFlatAsync(obj)
+            
+            obj.futures{end+1} = parfeval(@obj.makeFlat, 1, 'save', true, 'reset', true); 
             
         end
         

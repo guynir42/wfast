@@ -35,7 +35,7 @@ elseif exist(fullfile(d.pwd, 'STACK', '00README.txt'), 'file')
 end
 
 fid = fopen(fullfile(d.pwd, 'STACK', '00README.txt'), 'wt'); 
-on_cleanup = onCleanup(@() fclose(fid)); 
+% on_cleanup = onCleanup(@() fclose(fid)); 
 
 for ii = 1:N_files
     
@@ -62,8 +62,6 @@ for ii = 1:N_files
         fprintf(fid, '%s\n', [name ext]); 
         
     end
-    
-    
     
 end
 
