@@ -863,7 +863,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                     if isnan(RA) || isnan(DEC) % failed to resolve
                         
                         try
-                            [RA, DEC] = celestial.coo.convert2equatorial(keyword, [], 'JD', obj.JD, ...
+                            [RA, DEC] = celestial.coo.convert2equatorial(keyword, [], 'JD', obj.JD, 'HorizonsObsCode', '097', ...
                                 'ObsCoo', [obj.longitude, obj.latitude, obj.elevation], 'OutputUnits', 'deg', 'NameServer', 'jpl');
                         catch ME
                             if strcmp(ME.identifier, 'MATLAB:structRefFromNonStruct')

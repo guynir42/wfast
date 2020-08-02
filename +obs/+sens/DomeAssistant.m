@@ -38,6 +38,8 @@ classdef DomeAssistant < handle
         
         status = 0; % false - readings are unreliable, true - ok
         
+        id = 'assist'; 
+        
         JD;
         temperature;
         humidity;

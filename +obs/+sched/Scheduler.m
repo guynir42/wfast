@@ -172,24 +172,18 @@ classdef Scheduler < handle
     
     methods % reset/clear
         
-        function reset(obj) % this is called before reading a new target list
+        function reset(obj, use_sim)
+            
+            if nargin<2 || isempty(use_sim)
+                use_sim = 0;
+            end
+             % call this at the start of the night/simulation
             
             obj.targets = obs.sched.Target.empty; 
             obj.current = obs.sched.Target.empty; 
             
             obj.targets_sim = obs.sched.Target.empty; 
             obj.current_sim = obs.sched.Target.empty; 
-            
-            obj.clear;
-            
-        end
-        
-        function clear(obj, use_sim) % call this at the start of the night/simulation
-            
-            if nargin<2 || isempty(use_sim)
-                use_sim = 0;
-            end
-            
             
             if use_sim==0
 
@@ -324,7 +318,7 @@ classdef Scheduler < handle
                 
                 matched = 0; 
                 
-                for jj = 1:length(obj.targets)
+                for jj = 1:length(obj.targets_sim)
                     
                     if strcmpi(new_targets(ii).name, obj.targets_sim(jj).name)
                         obj.targets_sim(jj).copy_pars(new_targets(ii)); 
@@ -385,7 +379,7 @@ classdef Scheduler < handle
             
         end
         
-        function record_rational(obj, time, target_list, new_target, dur_flag)
+        function record_rationale(obj, time, target_list, new_target, dur_flag)
             
             if nargin<5 || isempty(dur_flag)
                 dur_flag = true(length(target_list),1); 
@@ -498,6 +492,8 @@ classdef Scheduler < handle
             end
             
             obj.readFile; % update the targets from the text file
+            obj.report = '';
+            obj.rationale = ''; 
             
 %             arguments = obj.ephem.constraints.output_vars;
             arguments = {}; % all the global constraints from ephem are already copied into each target in readFile, then overwritten by target list
@@ -557,6 +553,8 @@ classdef Scheduler < handle
                 
             end
             
+            % up to this point we still did not use resolve() to update the coordinates of any targets... 
+            
             % if we didn't find any target that is still constrained by "continuous", look for the best available target
             if isempty(new_target) % this happens if there is no target currently under "continuous" condition
                 
@@ -585,21 +583,19 @@ classdef Scheduler < handle
                 new_target = best_target(target_list_duration, 'time', time); % try to find a good target under the "duration" constraint
 
                 if ~isempty(new_target) % we managed to find a good target below "duration" condition
-                    obj.record_rational(time, target_list, new_target, dur_flag); % keep a record for each target why it was or wasn't picked
+                    obj.record_rationale(time, target_list, new_target, dur_flag); % keep a record for each target why it was or wasn't picked
                 else % this happens if we didn't find any targets that haven't been observed "duration" hours -> choose a target that has surpassed the "duration" condition
                     
 %                     new_target = best_target(target_list(~dur_flag), 'time', time, arguments{:}); % run only the targets that have longer than duration
                     new_target = best_target(target_list(~dur_flag), 'time', time); % run only the targets that have longer than duration
 
-                    if ~isempty(new_target)
-                        obj.record_rational(time, target_list, new_target); % keep a record for each target why it was or wasn't picked
+                    if ~isempty(new_target) % we tried again to find a target, so maybe now "new_target" is no longer empty
+                        obj.record_rationale(time, target_list, new_target); % keep a record for each target why it was or wasn't picked
                     end
                     
                 end
                 
-            end
-            
-            obj.continue_run = 0; % in most cases we do not need to continue the run. This can change if the best target chosen is the same one we are observing
+            end % if isempty(new_target)
             
             % load the target we are now observing
             if ~use_sim
@@ -613,10 +609,12 @@ classdef Scheduler < handle
             %%%%%% now we have made the selection of the best target, lets see what we can do with it %%%%%%% 
             if isempty(new_target) % no targets are currently observable! 
                 
-                obj.record_rational(time, target_list, new_target); % keep a record for each target why it was or wasn't picked
+                obj.record_rationale(time, target_list, new_target); % keep a record for each target why it was or wasn't picked
                 
                 obj.report = sprintf('%s: No available targets. Going to idle mode...', time); 
                 
+%                 obj.continue_run = 0; % we need to move to a new target
+            
             elseif ~isequal(this_target, new_target) || ~obj.compare_coordinates(new_target, use_sim) % different target
             % new target is different from the current one, or current target is empty, 
             % or targets are the same but have different coordinates 
@@ -624,10 +622,14 @@ classdef Scheduler < handle
                 
                 obj.report = sprintf('%s: Moving to new object: %50s', time, new_target.summary); 
                 
+                obj.continue_run = 0; % we need to move to a new target (the new target is distinct from old one)
+            
             elseif ~isempty(this_side) && ~isequal(this_side, new_target.side) % same target, new side
                 
                 obj.report = sprintf('%s: Flip to same object:  %50s', time, new_target.summary); 
                 
+                obj.continue_run = 0; % we need to move to a new target (because of flip)
+            
             else % same target, same side -> continue observing
                 obj.report = sprintf('%s: Continue observing:   %50s', time, new_target.summary); 
                 obj.continue_run = 1; % this is the only case where we do not need to start a new run! 
@@ -767,7 +769,7 @@ classdef Scheduler < handle
                 elseif abs(target.ephem.RA_deg-obj.obs_history(end).RA_deg)<thresh && ...
                         abs(target.ephem.Dec_deg-obj.obs_history(end).Dec_deg)<thresh % both coordinates are close enough
                     val = 1; 
-                else
+                else % coordinates are too far, consider this a new target
                     val = 0; 
                 end
 
@@ -793,7 +795,7 @@ classdef Scheduler < handle
             end
             
             if ~isempty(obj.rationale)
-                obj.log.input(obj.rationale);
+                obj.log.input([obj.rationale newline]);
             end
             
         end
@@ -802,10 +804,10 @@ classdef Scheduler < handle
     
     methods % simulations
         
-        function run_simulation(obj, use_clear, start_time, end_time)
+        function run_simulation(obj, use_reset, start_time, end_time)
             
-            if nargin<2 || isempty(use_clear)
-                use_clear = 0; 
+            if nargin<2 || isempty(use_reset)
+                use_reset = 0; 
             end
             
             if nargin<3 || isempty(start_time)
@@ -829,10 +831,10 @@ classdef Scheduler < handle
             
             obj.brake_bit = 0; % start running
             
-            if use_clear % only start a new simulation if requested specifically to do so... 
+            if use_reset % only start a new simulation if requested specifically to do so... 
                 
                 obj.sim_time = start_time; % this is the virtual clock we will use throughout
-                obj.clear(1); % start a new night (the argument is for use_sim=1)
+                obj.reset(1); % start a new night (the argument is for use_sim=1)
                 
                 % move forward in time without calling update() until reaching night time
                 for ii = 1:1e4 % arbitrary timeout

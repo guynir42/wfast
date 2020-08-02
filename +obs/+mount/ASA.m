@@ -80,6 +80,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         use_accelerometer = 1; % make constant checks for altitude outside of the mounts own sensors
         use_ultrasonic = 0; % make constant checks that there is nothing in front of the telescope
         
+        use_ask_flip = 1; % if true, will allow a dialog to pop up when slewing across a meridian flip
+        
         move_rate = 3; % manual slew rate in deg/sec
         
         step_arcsec = 5; % not used yet
@@ -1266,7 +1268,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 error('Please provide a target with viable RA/DE');
             end
             
-            if input.ask_flip && obj.check_need_flip
+            if input.ask_flip && obj.check_need_flip && obj.use_ask_flip
                 res = questdlg('Need to flip for this target. Are you sure?', 'Flip needed!', 'Slew', 'Abort', 'Slew');
                 if isempty(res) || strcmp(res, 'Abort')
                     return; % return with success=0

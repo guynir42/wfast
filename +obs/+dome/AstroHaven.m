@@ -499,7 +499,7 @@ classdef AstroHaven < handle
         % parameters that gave reasonable results at all angles. 
         
             if nargin<4
-                help('obs.dome.AstroHaven.adjustDomeOld'); 
+                help('obs.dome.AstroHaven.adjustDome'); 
                 return;
             end
             

@@ -94,7 +94,7 @@ classdef SensorChecker < handle
     properties(Hidden=true)
         
         % list all the classes that status checker is following
-        sensor_classes = {'obs.sens.Simulator', 'obs.sens.Boltwood', 'obs.sens.WindETH', 'obs.sens.VirtualSensor'}; 
+        sensor_classes = {'obs.sens.Simulator', 'obs.sens.Boltwood', 'obs.sens.WindETH', 'obs.sens.VirtualSensor'};  % , 'obs.sens.DomeAssistant'
         
         total_time_hours = 0;
         good_time_hours = 0;
@@ -822,7 +822,7 @@ classdef SensorChecker < handle
             ax_max = 50;
             ax_min = 0;
             
-            markers = {'o', '+', '*', 's', 'v', 'x', 'd', 'p', '^', '>', '<', 'h'}; 
+            markers = {'o', '+', 'p', '*', 's', 'v', 'x', 'd', '^', '>', '<', 'h'}; 
             Nmark = length(markers); 
             lines = {'-', '--', ':', '-.'}; 
             colors = {'yellow', 'cyan', 'red', 'magenta', 'black', 'blue', 'green', 'black'}; 

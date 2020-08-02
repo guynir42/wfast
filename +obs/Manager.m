@@ -56,6 +56,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         assist@obs.sens.DomeAssistant;
         
+        outlets@obs.comm.OutletControl; 
+        
         email@obs.comm.Email; 
         
         cam_pc@obs.comm.PcSync; % communications object to camera PC
@@ -198,6 +200,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.connectSensorChecker; % create checker object that collects sensor data
             
             obj.constructPcSync;
+            obj.constructOutlets;
             obj.constructEmail;
             
             % start the 3 layers of timers
@@ -362,6 +365,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 warning(ME.getReport);
                 disp('Cannot create a PcSync tcp/ip object')
             end
+            
+        end
+        
+        function constructOutlets(obj)
+            
+            obj.outlets = obs.comm.OutletControl; 
             
         end
         
@@ -818,34 +827,34 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function callback_t2(obj, ~, ~) % collect (averaged) sensor data and check devices are all ok
             
+            obj.update; % check devices are functioning
+            
             try % make sure t1 is running! 
                 
                 if isempty(obj.t1) || ~isvalid(obj.t1) || strcmp(obj.t1.Running, 'off')
                     obj.setup_t1;
                 end
 
-                obj.update; % check devices are functioning
-                
             catch ME
                 obj.log.error(ME);
                 rethrow(ME);
             end
             
-            try % try connecting to mount arduino
-               if obj.mount.use_accelerometer
-                    
-                    if ~isempty(obj.mount.ard)
-                        ok = obj.mount.ard.update;
-                    end
-                    
-                    if isempty(obj.mount.ard) || ok==0
-%                         obj.mount.connectArduino;
-                    end
-                    
-                end
-            catch ME
-                warning(ME.getReport);
-            end
+%             try % try connecting to mount arduino
+%                if obj.mount.use_accelerometer
+%                     
+%                     if ~isempty(obj.mount.ard)
+%                         ok = obj.mount.ard.update;
+%                     end
+%                     
+% %                     if isempty(obj.mount.ard) || ok==0
+% %                         obj.mount.connectArduino;
+% %                     end
+%                     
+%                 end
+%             catch ME
+%                 warning(ME.getReport);
+%             end
             
         end
         
@@ -927,7 +936,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 warning(ME.getReport); 
             end
             
-            try % reload the target list and reset the observation history
+            try % reset the observation history
                
                 t = datetime('now', 'TimeZone', 'UTC');
                 
@@ -1513,6 +1522,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             % make sure we reach the weather check+shutdown in the end
             try 
+                
                 obj.updateDevices; % runs update() for each critical device (mount, dome) and checks its status
 
                 obj.checker.decision_all; % collect weather data and make a decision
@@ -2072,21 +2082,23 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
                 
                 % should I also actively stop the camera?
+                pause(1);
                 
             elseif obj.sched.current.ephem.now_observing
 
                 obj.print_message(sprintf('Continuing observations of %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec));
- 
+                
                 if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
                     obj.button_target.String = obj.log.report; 
                     pause(1);
                 end
                 % don't need to do anything else! 
+                pause(1);
                 
             else
                 
                 obj.print_message(sprintf('Moving to target %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
-
+                pause(1); 
                 % actively switch targets and start a new run: 
                 
                 obj.commandCameraStop;

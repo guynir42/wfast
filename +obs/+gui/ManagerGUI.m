@@ -269,7 +269,7 @@ classdef ManagerGUI < handle
             obj.button_mean_only = GraphicButton(obj.panel_image, [0.0 0.95 0.1 0.05], obj.owner, 'checker.use_only_plot_mean', 'toggle', 'all', 'mean'); 
             obj.button_mean_only.Tooltip = 'show weather data for all sensors or only for the mean of each data type';
             
-            obj.button_clicker = GraphicButton(obj.panel_image, [0.64 0.45 0.28 0.05], obj.owner, '', 'custom', '', ''); 
+            obj.button_clicker = GraphicButton(obj.panel_image, [0.64 0.35 0.28 0.05], obj.owner, '', 'custom', '', ''); 
             obj.button_clicker.Tooltip = 'click any weather plot to get the name of sensor and the latest measurement';
             
             obj.button_info = GraphicButton(obj.panel_image, [0.15 0.94 0.7 0.05], obj.owner, '', 'custom', '', ''); 
@@ -291,7 +291,7 @@ classdef ManagerGUI < handle
             %%%%%%%%%%% panel stop %%%%%%%%%%%%%%%%%%%
             
 %             obj.panel_stop = GraphicPanel(obj.owner, [0.2 0 0.8 2/N_middle]);
-            obj.panel_stop = GraphicPanel(obj.owner, [0.7 0.2 0.28 0.2]);
+            obj.panel_stop = GraphicPanel(obj.owner, [0.7 0.15 0.28 0.2]);
             obj.panel_stop.addButton('button_stop', 'stop', 'push', 'STOP MOUNT AND DOME', '', '', [], '', '', 'send command to stop dome and mount (and stop tracking)');
 %             obj.panel_stop.margin = [0.01 0.1];
             obj.panel_stop.make;
