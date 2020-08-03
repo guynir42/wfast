@@ -97,10 +97,10 @@ classdef WorldCoordinates < handle
         
         function val = get.CD(obj)
             
-            if isempty(obj.CD)
-                val = [];
-            else
+            if numel(obj.CD)==4
                 val = reshape(obj.CD, [2,2]); 
+            else
+                val = [];
             end
             
         end

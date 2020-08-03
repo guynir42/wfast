@@ -541,9 +541,9 @@ classdef Event < handle
             corr_out = corr_curve;
             corr_out(t) = NaN;
             corr_std = nanstd(corr_out); % noise outside event
-            [~,idx] = nanmax(abs(corr_curve(t))); % peak inside event
+            [~,idx] = nanmax(abs(corr_curve(t))); % peak inside event (location only)
             
-            corr_max = corr_curve(t(idx))./corr_std; 
+            corr_max = corr_curve(t(idx))./corr_std; % recover the max correlation (position or negative)
             
             corr_coeff = nansum(corr_curve); 
             
@@ -770,20 +770,30 @@ classdef Event < handle
         function showFlux(obj, varargin)
             
             input = util.text.InputVars;
+            input.input_var('timestamps', false); % show frame indices or timestamps
             input.input_var('ax', [], 'axes', 'axis');
             input.input_var('font_size', 12);
             input.scan_vars(varargin{:});
             
             if isempty(input.ax), input.ax = gca; end
             
+            if input.timestamps
+                x = obj.timestamps; 
+                xk = obj.kernel_timestamps+obj.peak_timestamp;
+            else
+                x = 1:length(obj.timestamps); 
+                xk = 1:length(obj.best_kernel);
+                xk = xk + obj.time_index - length(obj.best_kernel)/2;                
+            end
+            
             input.ax.NextPlot = 'replace';
-            h1 = plot(input.ax, obj.timestamps, obj.flux_filtered, 'LineWidth', 2);
+            h1 = plot(input.ax, x, obj.flux_filtered, 'LineWidth', 2);
             h1.DisplayName = 'Filtered LC';
             
             input.ax.NextPlot = 'add';
             range = obj.time_indices;
             if ~isempty(range)
-                h2 = plot(input.ax, obj.timestamps(range), obj.flux_filtered(range), 'LineWidth', 2);
+                h2 = plot(input.ax, x(range), obj.flux_filtered(range), 'LineWidth', 2);
                 h2.DisplayName = 'trigger region';
             end
             
@@ -791,7 +801,7 @@ classdef Event < handle
             s = obj.std_flux;
             
             input.ax.ColorOrderIndex = 3;
-            h3 = plot(input.ax, obj.timestamps, f./s, '-');
+            h3 = plot(input.ax, x, f./s, '-');
             h3.DisplayName = 'Raw LC';
             
             sign = 1;
@@ -799,26 +809,25 @@ classdef Event < handle
                 sign = -1;
             end
 
-            h4 = plot(input.ax, obj.kernel_timestamps+obj.peak_timestamp, obj.best_kernel*5*sign, ':');
+            h4 = plot(input.ax, xk, obj.best_kernel*5*sign, ':');
             h4.DisplayName = 'best filter';
             
-            h5 = plot(input.ax, obj.timestamps, obj.backgrounds_at_star, '--'); 
+            h5 = plot(input.ax, x, obj.backgrounds_at_star, '--'); 
             h5.DisplayName = 'background';
             
-            h6 = plot(input.ax, obj.timestamps, obj.widths_at_star, 'p', 'MarkerSize', 3);
+            h6 = plot(input.ax, x, obj.widths_at_star, 'p', 'MarkerSize', 3);
             h6.DisplayName = 'PSF width';
             
-            h6 = plot(input.ax, obj.timestamps, obj.offsets_x_at_star, 'x', 'MarkerSize', 4);
+            h6 = plot(input.ax, x, obj.offsets_x_at_star, 'x', 'MarkerSize', 4);
             h6.DisplayName = 'offset x';
             
-            h8 = plot(input.ax, obj.timestamps, obj.offsets_y_at_star, '+', 'MarkerSize', 4);
+            h8 = plot(input.ax, x, obj.offsets_y_at_star, '+', 'MarkerSize', 4);
             h8.DisplayName = 'offset y';
             
 %             h8 = bar(input.ax, obj.timestamps, obj.bad_pixels_at_star-mean(obj.bad_pixels_at_star)-5, 'BaseValue', -5, 'FaceAlpha', 0.5);
 %             h8.DisplayName = 'relative bad pixels';
             
-            xlabel(input.ax, 'timestamp (seconds)');
-            ylabel(input.ax, 'flux S/N');
+           
             
 %             if strcmp(obj.which_batch, 'first')
 %                 lh = legend(input.ax, 'Location', 'SouthEast');
@@ -831,11 +840,6 @@ classdef Event < handle
             lh.FontSize = input.font_size;
             lh.NumColumns = 3;
 
-            title(input.ax, obj.notes, 'FontSize', input.font_size);
-            
-            util.plot.inner_title(sprintf('id: %d | star: %d | batches: %d-%d | event S/N= %4.2f | star S/N= %4.2f', ...
-                obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.star_snr),...
-                'ax', input.ax, 'Position', 'NorthWest', 'FontSize', input.font_size);
             
             mx = max(max(abs(obj.flux_filtered)), max(abs(f./s))); 
             
@@ -844,10 +848,27 @@ classdef Event < handle
 %             input.ax.YLim(2) = max(abs(input.ax.YLim));
 %             input.ax.YLim(1) = -max(abs(input.ax.YLim))-2;
             
-            if obj.timestamps(1)<obj.timestamps(end)
-                input.ax.XLim = [obj.timestamps(1) obj.timestamps(end)];
+            if input.timestamps
+                
+                xlabel(input.ax, 'timestamp (seconds)');
+                
+                if obj.timestamps(1)<obj.timestamps(end)
+                    input.ax.XLim = [obj.timestamps(1) obj.timestamps(end)];
+                end
+                
+            else
+                xlabel(input.ax, 'frame index');
+                input.ax.XLim = [x(1) x(end)]; 
             end
-
+            
+            ylabel(input.ax, 'flux S/N');
+            
+            title(input.ax, obj.notes, 'FontSize', input.font_size);
+            
+            util.plot.inner_title(sprintf('id: %d | star: %d | batches: %d-%d | event S/N= %4.2f | star S/N= %4.2f', ...
+                obj.serial, obj.star_index, obj.batch_index_first, obj.batch_index_second, obj.snr, obj.star_snr),...
+                'ax', input.ax, 'Position', 'NorthWest', 'FontSize', input.font_size);
+            
             input.ax.NextPlot = 'replace';
             
         end
@@ -855,6 +876,7 @@ classdef Event < handle
         function showCutouts(obj, varargin)
             
             input = util.text.InputVars;
+            input.input_var('crosshair', true); 
             input.input_var('parent', []); 
             input.input_var('ax', [], 'axes', 'axis');
             input.input_var('position', []);
@@ -951,10 +973,24 @@ classdef Event < handle
                     ax{ii} = axes('Position', [x/Ncols y/Nrows 1/Ncols 1/Nrows], 'Parent', panel);
 
                     imagesc(ax{ii}, cutouts(:,:,idx_start+ii-1));
+                    
                     ax{ii}.CLim = dyn;
                     axis(ax{ii}, 'image');
                     ax{ii}.XTick = [];
                     ax{ii}.YTick = [];
+                    
+                    if input.crosshair
+                        
+                        ax{ii}.NextPlot = 'add'; 
+                        
+                        x0 = ceil(size(cutouts,1)/2); 
+                        
+                        plot(ax{ii}, [x0 x0], [0 x0-1], '-m'); 
+                        plot(ax{ii}, [0 x0-1], [x0 x0], '-m'); 
+                        
+                        ax{ii}.NextPlot = 'replace'; 
+                        
+                    end
                     
                     if idx_start+ii-1==idx
                         util.plot.inner_title([num2str(idx_start+ii-1) '*'], 'Position', 'NorthWest', 'Color', 'red', 'FontSize', input.font_size, 'ax', ax{ii});
@@ -1031,15 +1067,27 @@ classdef Event < handle
         function plotRawFlux(obj, varargin)
             
             input = util.text.InputVars;
+            input.input_var('timestamps', false); % show frame indices or timestamps
             input.input_var('ax', [], 'axes', 'axis');
             input.input_var('font_size', 20);
             input.scan_vars(varargin{:});
             
             if isempty(input.ax), input.ax = gca; end
             
-            plot(input.ax, obj.timestamps, obj.flux_raw_all(:,obj.star_index)); 
+            if input.timestamps
+                x = obj.timestamps; 
+            else
+                x = 1:length(obj.timestamps); 
+            end
             
-            xlabel(input.ax, 'Time [seconds]'); 
+            plot(input.ax, x, obj.flux_raw_all(:,obj.star_index)); 
+            
+            if input.timestamps
+                xlabel(input.ax, 'Time [seconds]'); 
+            else
+                xlabel(input.ax, 'Frame index'); 
+            end
+            
             ylabel(input.ax, 'Raw Flux'); 
             
             input.ax.FontSize = input.font_size; 
