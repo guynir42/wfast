@@ -822,7 +822,7 @@ classdef SensorChecker < handle
             ax_max = 50;
             ax_min = 0;
             
-            markers = {'o', '+', 'p', '*', 's', 'v', 'x', 'd', '^', '>', '<', 'h'}; 
+            markers = {'o', '+', '*', 's', 'v', 'x', 'd', '^', '>', '<', 'h'}; 
             Nmark = length(markers); 
             lines = {'-', '--', ':', '-.'}; 
             colors = {'yellow', 'cyan', 'red', 'magenta', 'black', 'blue', 'green', 'black'}; 

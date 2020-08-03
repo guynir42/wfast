@@ -210,7 +210,7 @@ classdef ManagerGUI < handle
             obj.panel_controls.addButton('button_autostartup', 'use_startup', 'toggle', 'auto start up is disabled', 'auto start up is enabled', '', 0.7, obj.color_on, 'red', ...
                  'Manager can choose new targets from scheduler (still doesn''t open dome if closed)'); 
              
-            obj.panel_controls.addButton('button_lights', 'assist.lights', 'toggle', 'LEDs are off', 'LEDs are on', 'edit', 0.3, 'red', obj.color_on, 'turn on/off dome lights');
+            obj.panel_controls.addButton('button_lights', 'lights', 'toggle', 'LEDs are off', 'LEDs are on', 'edit', 0.3, 'red', obj.color_on, 'turn on/off dome lights');
             
             obj.panel_controls.addButton('button_weather_check', 'callback_t2', 'push', 'Weather check', '', '', [], '', '', 'run callback_t2, starting t1 and calling update to check weather and devices');
             obj.panel_controls.addButton('button_proceed', '', 'custom', 'proceed to target', '', '', [], '', '', 'use scheduler to move to new target'); 
@@ -343,6 +343,7 @@ classdef ManagerGUI < handle
             obj.menu_objects.addButton('button_dome', '&Dome', 'push', 'dome', 'dome GUI', 'Open the dome GUI');
             obj.menu_objects.addButton('button_mount', '&Mount', 'push', 'mount', 'mount GUI', 'Open the dome GUI');
             obj.menu_objects.addButton('button_scheduler', '&Scheduler', 'push', 'sched', 'scheduler GUI', 'Open the scheduler GUI');
+            obj.menu_objects.addButton('button_outlets', '&Outlets', 'push', 'outlets', 'Outlets GUI', 'Open the outlet control GUI'); 
             
             for ii = 1:length(obj.panels)
                 obj.panels{ii}.panel.BackgroundColor = obj.color_bg; 

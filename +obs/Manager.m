@@ -110,6 +110,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         sensors_report; % if bad weather, report it here
         report; % general report: devices, sensors, shutdown state
         
+        lights; % turn on/off the LED lights from both DomeAssistant and the OutletControl
+        
         RA;  % shortcut to mount telRA
         DEC; % shortcut to mount telDEC
         ALT; % shortcut to mount telALT
@@ -615,6 +617,27 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
+        function val = get.lights(obj)
+            
+            val1 = 0; 
+            val2 = 0;
+            
+            try % get the info from the DomeAssistant
+                val1 = obj.assist.lights; 
+            catch ME
+                warning(ME.getReport);
+            end
+            
+            try % get the info from the OutletControl
+                val2 = obj.outlets.lights; 
+            catch ME
+                warning(ME.getReport);
+            end
+            
+            val = val1 || val2; % if any of the lights are on
+            
+        end
+        
         function val = allow_robotics(obj) % all the checks that should be done before making any robotic/spontaneous movement
             
             obj.ephem.update;
@@ -679,6 +702,24 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 if obj.gui.check
                     obj.gui.panel_image.BackgroundColor = obj.gui.color_bg;
                 end
+            end
+            
+        end
+        
+        function set.lights(obj, val)
+            
+            val = util.text.parse_bool(val); 
+            
+            try % set the light status of the DomeAssistant
+                obj.assist.lights = val; 
+            catch ME
+                warning(ME.getReport);
+            end
+            
+            try % set the light status of the OutletControl
+                obj.outlets.lights = val; 
+            catch ME
+                warning(ME.getReport);
             end
             
         end
@@ -791,6 +832,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                         obj.gui.button_info.String = ''; 
                     end
                 end
+                
+            catch ME
+                obj.log.error(ME);
+                rethrow(ME);
+            end
+            
+            try % update the OutletControl object
+                
+                obj.outlet.update;
                 
             catch ME
                 obj.log.error(ME);
