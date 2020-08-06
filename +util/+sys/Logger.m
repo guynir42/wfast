@@ -292,6 +292,35 @@ classdef Logger < handle
             
         end
         
+        function newline(obj)
+            
+            new_time = datetime('now', 'timezone', 'UTC'); % update to current time
+            
+            % if we passed noon UTC we should generate new log files
+            if ~isempty(obj.time) && new_time.Day>=obj.time.Day && new_time.Hour>=12 && obj.time.Hour<12
+                obj.reset;
+            end
+            
+            old_time = datetime(obj.filename(1:10), 'TimeZone', 'UTC');
+            
+            if hours(new_time-old_time)>24 || (new_time.Day==old_time.Day && new_time.Hour>=12 && old_time.Hour<12)
+                obj.reset;
+            end
+            
+            obj.time = new_time;
+            
+            if isempty(obj.hndl) || obj.hndl<0
+                obj.makeFile; % make sure the file exists or create a new one if needed
+            end
+            
+            try 
+                fprintf(obj.hndl, '\n'); 
+            catch ME
+                warning(ME.getReport);
+            end
+            
+        end
+        
         function makeFile(obj) % make the text file, folder (if needed) and keep the filename
             
             dir = obj.base_dir;

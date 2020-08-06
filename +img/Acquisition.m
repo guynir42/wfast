@@ -402,7 +402,8 @@ classdef Acquisition < file.AstroData
                 
                 obj.stash_parameters;
                 
-                obj.log.input('Constructed new Analysis object.'); 
+                obj.log.newline; 
+                obj.log.input('Constructed new Acquisition object.'); 
                 
 %                 obj.dome_pc.connect;
                 
