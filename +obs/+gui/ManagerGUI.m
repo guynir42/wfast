@@ -564,7 +564,7 @@ classdef ManagerGUI < handle
             if obj.debug_bit>1, disp('Callback: proceed to target'); end
             
             obj.owner.setup_t3; % setting up the timer means the next time it triggers is only X minutes after this call
-            obj.owner.proceedToTarget; 
+            obj.owner.checkNewTarget; 
             
             obj.update;
             

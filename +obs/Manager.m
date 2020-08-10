@@ -162,6 +162,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 obj.connect; % connect to all hardware and objects
                 
+                obj.update; 
+                
             end
             
         end
@@ -623,18 +625,26 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             val2 = 0;
             
             try % get the info from the DomeAssistant
-                val1 = obj.assist.lights; 
+                if isempty(obj.assist)
+                    val1 = [];
+                else
+                    val1 = obj.assist.lights; 
+                end
             catch ME
                 warning(ME.getReport);
             end
             
             try % get the info from the OutletControl
-                val2 = obj.outlets.lights; 
+                if isempty(obj.outlets)
+                    val2 = [];
+                else
+                    val2 = obj.outlets.lights; 
+                end
             catch ME
                 warning(ME.getReport);
             end
             
-            val = val1 || val2; % if any of the lights are on
+            val = ~isempty(val1) && val1>0 && ~isempty(val2) && val2>0; % if any of the lights are on
             
         end
         
@@ -2243,16 +2253,37 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             obj.print_message('Shutting down observatory!'); 
             
-            disp([char(obj.log.time) ': Shutting down observatory!']);
+%             disp([char(obj.log.time) ': Shutting down observatory!']);
             
-            try 
+            try % stop dome and mount
 
                 obj.stop; % stop any slews or shutter motion
 
-                obj.mount.tracking = 0; % later add command to park the telescope? 
-
+            catch ME
+                obj.log.error(ME);
+                rethrow(ME);
+            end
+            
+            try % close dome
+                
                 obj.closeDome;
 
+            catch ME
+                obj.log.error(ME);
+                rethrow(ME);
+            end
+            
+            try % stop tracking also
+                
+                obj.mount.tracking = 0; % later add command to park the telescope? 
+
+            catch ME
+                obj.log.error(ME);
+                rethrow(ME);
+            end
+            
+            try % stop camera, update cam_pc, update the scheduler... 
+                
                 obj.commandCameraStop;
                 
 %                 obj.cam_pc.outgoing.stop_camera = 1; % make sure camera stops running also
@@ -2260,14 +2291,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 obj.sched.finish_current;
                 
-                % anything else we can do to put the dome to shutdown mode?
-                % ...
-
             catch ME
                 obj.log.error(ME);
                 rethrow(ME);
             end
             
+            % anything else we can do to put the dome to shutdown mode?
+            % ...
+
         end
         
         function stop(obj) % stop dome and mount motion

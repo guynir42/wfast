@@ -287,6 +287,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     
                     obj.ard.update;
                     
+                    pause(1); 
+                    
                     if obj.ard.status==0
                         
                         RA = obj.telRA_deg; 
@@ -323,7 +325,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                         end
 
                         obj.ard.update;
-                        pause(1); 
+                        pause(2); 
                         
                     end
                     
@@ -828,7 +830,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     obj.hndl.Tracking = val;
 
                     res = 0.01;
-                    N = 100;
+                    N = 300;
                     tic;
                     for ii = 1:N
 

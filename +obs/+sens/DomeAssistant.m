@@ -109,6 +109,8 @@ classdef DomeAssistant < handle
             
             obj.status = 1;
             
+            obj.update; 
+            
         end
         
         function disconnect(obj)

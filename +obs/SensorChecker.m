@@ -151,15 +151,17 @@ classdef SensorChecker < handle
             for ii = 1:length(list)
                 
                 name = list{ii};
-                
-                if isobject(obj.owner.(name))
-                    
-                    if any(strcmp(class(obj.owner.(name)), obj.sensor_classes))
-                        obj.sensors{end+1} = obj.owner.(name);
+                try
+                    if isobject(obj.owner.(name))
+
+                        if any(strcmp(class(obj.owner.(name)), obj.sensor_classes))
+                            obj.sensors{end+1} = obj.owner.(name);
+                        end
+
                     end
-                    
+                catch ME
+                    fprintf('Problem connecting to sensor "%s"\n', name); 
                 end
-                
             end
             
             if obj.use_wise_data

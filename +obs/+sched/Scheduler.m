@@ -729,7 +729,7 @@ classdef Scheduler < handle
 
                 obj.current.finish_observation(time);
 
-                if ~isempty(obj.current) && ~isempty(obj.current.obs_history)
+                if ~isempty(obj.obs_history) && ~isempty(obj.current) && ~isempty(obj.current.obs_history)
                     obj.obs_history(end).end_time = obj.current.obs_history(end).end_time;
                     obj.obs_history(end).runtime = obj.current.obs_history(end).runtime;
                 end
