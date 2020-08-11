@@ -86,6 +86,9 @@
 %       *use_forced: If false, skip doing forced photometry (default true). 
 %       *use_median: If true, use median value of annulus pixels to calculate
 %                    the background (instead of mean). Default true. 
+%       *use_positives: when calculating the widths (2nd moments), turn any 
+%                       negative values in the cutout up to zero, to prevent
+%                       unphysical results like negative 2nd moments. 
 %       *debug_bit: Level of verbosity of the code (default: 0). 
 %       
 %

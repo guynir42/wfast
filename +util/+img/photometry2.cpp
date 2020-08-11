@@ -567,6 +567,19 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			}
 			
 		}
+		else if(cs(key, "use_positives", "positives")){
+			if(val==0 || mxIsEmpty(val)) use_positives=1; // if no input, assume positive
+			else{
+				
+				bool value=0;
+				if(mxIsScalar(val) && (mxIsNumeric(val) || mxIsLogical(val))) value=(bool) mxGetScalar(val); 
+				else if(mxIsChar(val)) value=parse_bool(val); 
+				else mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry must be scalar or string", i+2);
+				use_positives=value;
+				
+			}
+			
+		}
 		else if(cs(key, "debug_bit")){
 			if(val==0 || mxIsEmpty(val)) debug_bit=1; // if no input, assume positive
 			else{
@@ -576,7 +589,6 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			
 		}
 	}
-	
 	
 	if(debug_bit>1){ // check that all inputs have been received! 
 		mexPrintf("cutouts: [");
@@ -980,6 +992,7 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 	offset_y[j]=m1y;
 
 	// second moments
+	float norm2=sumArrays(image, background[j]); // the total flux, subtracting background, possibly ignoring negative pixels
 	float m2x=sumArrays(image, background[j], X, m1x, X, m1x)/norm; // I*(X-m1x)^2 / norm
 	float m2y=sumArrays(image, background[j], Y, m1y, Y, m1y)/norm; // I*(Y-m1y)^2 / norm
 	float mxy=sumArrays(image, background[j], X, m1x, Y, m1y)/norm; // I*(X-m1x)*(Y-m1y) / norm
@@ -1043,7 +1056,8 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 			if(use_median) background[j]=medianIndices(image, annulus_indices, idx); 
 			else background[j]=sumIndices(image, annulus_indices, idx)/annulus_pixels; 	
 			
-			norm=flux[j]-area[j]*background[j];
+			flux[j]=flux[j]-area[j]*background[j];
+			norm=flux[j]; 
 			
 			m1x=sumArrays(image, background[j], X, &gaussians[idx*N])/norm;
 			m1y=sumArrays(image, background[j], Y, &gaussians[idx*N])/norm;
@@ -1061,9 +1075,11 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 		
 		error[j]=getError(flux[j]-area[j]*background[j], area[j]*variance[j], annulus_pixels*variance[j]);
 		
-		m2x=sumArrays(image, background[j], X, m1x, X, m1x, &gaussians[idx*N])/norm;
-		m2y=sumArrays(image, background[j], Y, m1y, Y, m1y, &gaussians[idx*N])/norm;
-		mxy=sumArrays(image, background[j], X, m1x, Y, m1y, &gaussians[idx*N])/norm;
+		norm2=sumArrays(image, background[j], &gaussians[idx*N]); 
+		
+		m2x=sumArrays(image, background[j], X, m1x, X, m1x, &gaussians[idx*N])/norm2;
+		m2y=sumArrays(image, background[j], Y, m1y, Y, m1y, &gaussians[idx*N])/norm2;
+		mxy=sumArrays(image, background[j], X, m1x, Y, m1y, &gaussians[idx*N])/norm2;
 		
 		width[j]=getWidthFromMoments(m2x, m2y, mxy); 
 				
@@ -1153,9 +1169,11 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 				mxy+=partial_mxy[k-m];
 			}
 			
-			m2x/=norm;
-			m2y/=norm;
-			mxy/=norm;
+			float norm2=sumIndices(image, background[j], aperture_indices, idx+num_shifts*k);
+
+			m2x/=norm2;
+			m2y/=norm2;
+			mxy/=norm2;
 			
 			error[j+num_cutouts*k]=getError(flux[j+num_cutouts*k]-area[j+num_cutouts*k]*background[j], area[j+num_cutouts*k]*variance[j], annulus_pixels*variance[j]);
 			width[j+num_cutouts*k]=getWidthFromMoments(m2x, m2y, mxy); 
@@ -1318,9 +1336,11 @@ void Photometry::calculateForced(int j){
 			mxy+=partial_mxy[k-m];
 		}
 		
-		m2x/=norm;
-		m2y/=norm;
-		mxy/=norm;
+		float norm2=sumIndices(image, background[j], aperture_indices, idx+num_shifts*k);
+
+		m2x/=norm2;
+		m2y/=norm2;
+		mxy/=norm2;
 		
 		error[j+num_cutouts*k]=getError(flux[j+num_cutouts*k]-area[j+num_cutouts*k]*background[j], area[j+num_cutouts*k]*variance[j], annulus_pixels*variance[j]);
 		width[j+num_cutouts*k]=getWidthFromMoments(m2x, m2y, mxy); 
@@ -1556,6 +1576,19 @@ float Photometry::sumArrays(const float *array1){ // just the sum of all non-NaN
 	
 }
 
+float Photometry::sumArrays(const float *array1, float offset1){
+	
+	float S=0;
+	
+	if(use_positives)
+		for(int i=0;i<N;i++) if(array1[i]>offset1) S+=array1[i]-offset1;
+	else
+		for(int i=0;i<N;i++) if(array1[i]==array1[i]) S+=array1[i];
+	
+	return S;
+	
+}
+
 float Photometry::sumArrays(const float *array1, const float *array2){ // sum of all non-NaN values of array1*array2
 	
 	float S=0;
@@ -1580,13 +1613,20 @@ float Photometry::sumArrays(const float *array1, float offset1, const float *arr
 	
 }
 
-float Photometry::sumArrays(const float *array1, const float *array2, const float *array3){ // sum of all non-NaN values of array1*array2*array3
+float Photometry::sumArraysPos(const float *array1, float offset1, const float *array2){ // sum of all non-NaN values of array1*array2
 	
 	float S=0;
 	
-	for(int i=0;i<N;i++) 
-		if(array1[i]==array1[i])
-			S+=array1[i]*array2[i]*array3[i];
+	for(int i=0;i<N;i++){ 
+	
+		float value = array1[i]-offset1;
+		if(use_positives){
+			if(array1[i]>0) S+=value*array2[i];
+		}
+		else{
+			if(array1[i]==array1[i]) S+=value*array2[i];
+		}
+	}
 	
 	return S;
 	
@@ -1604,42 +1644,27 @@ float Photometry::sumArrays(const float *array1, float offset1, const float *arr
 	
 }
 
-float Photometry::sumArrays(const float *array1, const float *array2, float offset2, const float *array3, float offset3){ // sum of all non-NaN values of array1*array2*array3
-	
-	float S=0;
-	
-	for(int i=0;i<N;i++) 
-		//if(_isnanf(array1[i])==0 && _isnanf(array2[i])==0 && _isnanf(array3[i])==0) 
-		//if(_isnanf(array1[i]))
-		if(array1[i]==array1[i])
-			S+=array1[i]*(array2[i]-offset2)*(array3[i]-offset3);
-	
-	return S;
-	
-}
-
 float Photometry::sumArrays(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3){ // sum of all non-NaN values of array1*array2*array3
 	
-	float S=0;
-	
-	for(int i=0;i<N;i++) 
-		//if(_isnanf(array1[i])==0 && _isnanf(array2[i])==0 && _isnanf(array3[i])==0) 
-		//if(_isnanf(array1[i]))
-		if(array1[i]==array1[i])
-			S+=(array1[i]-offset1)*(array2[i]-offset2)*(array3[i]-offset3);
-	
-	return S;
-	
-}
-
-float Photometry::sumArrays(const float *array1, const float *array2, const float *array3, const float *array4){ // sum of all non-NaN values of array1*array2*array3*array4
+	// use this for calculating the 2nd moments with simple (raw) photometry: 
+	// array1 is the image, offset1 is the background,
+	// array2 and array3 are X or Y, their offsets are the 1st moments. 
 	
 	float S=0;
 	
-	for(int i=0;i<N;i++) 
-		// if(_isnanf(array1[i])==0 && _isnanf(array2[i])==0 && _isnanf(array3[i])==0 && _isnanf(array4[i])==0) 
-		if(array1[i]==array1[i])
-			S+=array1[i]*array2[i]*array3[i]*array4[i];
+	if(use_positives){
+		for(int i=0;i<N;i++) 
+			if(array1[i]>offset1) // when true, the array-offset is positive (and non-NaN)
+				S+=(array1[i]-offset1)*(array2[i]-offset2)*(array3[i]-offset3);
+	}
+	else{
+			
+		for(int i=0;i<N;i++) 
+			//if(_isnanf(array1[i])==0 && _isnanf(array2[i])==0 && _isnanf(array3[i])==0) 
+			//if(_isnanf(array1[i]))
+			if(array1[i]==array1[i]) // only sum non-NaN numbers
+				S+=(array1[i]-offset1)*(array2[i]-offset2)*(array3[i]-offset3);
+	}
 	
 	return S;
 	
@@ -1647,12 +1672,28 @@ float Photometry::sumArrays(const float *array1, const float *array2, const floa
 
 float Photometry::sumArrays(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3, const float *array4){ // sum of all non-NaN values of array1*array2*array3*array4
 	
+	// use this for calculating the 2nd moments with gaussian weights: 
+	// array1 is the image, offset1 is the background,
+	// array2 and array3 are X or Y, their offsets are the 1st moments, 
+	// array4 is the gaussian (so it doesn't need an offset). 
+	
 	float S=0;
 	
-	for(int i=0;i<N;i++) 
-		// if(_isnanf(array1[i])==0 && _isnanf(array2[i])==0 && _isnanf(array3[i])==0 && _isnanf(array4[i])==0) 
-		if(array1[i]==array1[i])
-			S+=(array1[i]-offset1)*(array2[i]-offset2)*(array3[i]-offset3)*array4[i];
+	// this is used to calculate 2nd moment, so we can have two options:
+	if(use_positives){
+		for(int i=0;i<N;i++) 
+			if(array1[i]>offset1) // when true, the array-offset is positive
+				S+=(array1[i]-offset1)*(array2[i]-offset2)*(array3[i]-offset3)*array4[i];
+	
+		
+	}
+	else{ 
+		for(int i=0;i<N;i++) 
+			// if(_isnanf(array1[i])==0 && _isnanf(array2[i])==0 && _isnanf(array3[i])==0 && _isnanf(array4[i])==0) 
+			if(array1[i]==array1[i])
+				S+=(array1[i]-offset1)*(array2[i]-offset2)*(array3[i]-offset3)*array4[i];
+	
+	}
 	
 	return S;
 	
@@ -1683,6 +1724,28 @@ float Photometry::sumIndices(const float *array1, const std::vector<int> *vector
 		float value=array1[vector[idx][i]]; 
 		
 		if(value==value) sum+=value;
+		
+	}
+
+	return sum;
+	
+}
+
+float Photometry::sumIndices(const float *array1, float offset1, const std::vector<int> *vector, int idx){
+	
+	
+	float sum=0;
+	
+	for(int i=0; i<vector[idx].size(); i++){
+		
+		float value1=array1[vector[idx][i]]-offset1; 
+		
+		if(use_positives){
+			if(value1>0) sum+=value1;
+		}
+		else{
+			if(value1==value1) sum+=value1;
+		}
 		
 	}
 
@@ -1744,15 +1807,25 @@ float Photometry::sumIndices(const float *array1, float offset1, const float *ar
 
 float Photometry::sumIndices(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3, const std::vector<int> *vector, int idx){
 	
+	// use this for calculating the 2nd moments with different apertures: 
+	// array1 is the image, offset1 is the background,
+	// array2 and array3 are X or Y, their offsets are the 1st moments, 
+	// then it is just an indices vector
+	
 	float sum=0;
-		
+
 	for(int i=0; i<vector[idx].size(); i++){
 		
 		float value1=array1[vector[idx][i]]-offset1; 
 		float value2=array2[vector[idx][i]]-offset2; 
 		float value3=array3[vector[idx][i]]-offset3; 
 		
-		if(value1==value1) sum+=value1*value2*value3;
+		if(use_positives){
+			if(value1>0) sum+=value1*value2*value3; // when use_positive is true, only sum positive pixels for 2nd moments
+		}
+		else{ 
+			if(value1==value1) sum+=value1*value2*value3; // otherwise sum any non-NaN pixels
+		}
 		
 	}
 
@@ -1781,37 +1854,6 @@ float Photometry::medianIndices(const float *array, const std::vector<int> *vect
 		
 	}
 }
-
-// float Photometry::medianIndicesDebug(const float *array, const std::vector<int> *vector, int idx){ // find the median of the array points indicated by vector[idx]
-	
-	// printf("DEBUG: ");
-	
-	// std::vector<float> values=std::vector<float>(); // an empty vector 
-	
-	// for(int i=0;i<vector[idx].size(); i++) if(array[vector[idx][i]]==array[vector[idx][i]]) values.push_back(array[vector[idx][i]]); 
-	
-	// if(values.size()==0) return 0; 
-	
-	// for(int i=0;i<values.size();i++) printf("%f ", values[i]); 
-	// printf("\n"); 
-	
-	// std::sort(values.begin(), values.end()); 
-	
-	// printf("SORTED:");
-	// for(int i=0;i<values.size();i++) printf("%f ", values[i]); 
-	// printf("\n"); 
-	
-	// if(values.size()%2==1){ // odd number (pick middle value)
-		
-		// return values[values.size()/2];
-		
-	// }
-	// else{ // even number (take average of two middle values)
-		
-		// return (values[values.size()/2] + values[values.size()/2+1])/2;
-		
-	// }
-// }
 
 // UTILITIES
 

@@ -56,11 +56,18 @@ Optional arguments:
        *use_gaussian: If falue, skip gaussians altogether (default true).
        *use_apertures: If false, skip aperture photometery (default true).
        *use_forced: If false, skip doing forced photometry (default true). 
+	   *use_median: If true, use median value of annulus pixels to calculate
+                    the background (instead of mean). Default true. 
+       *use_positives: when calculating the widths (2nd moments), turn any 
+                      negative values in the cutout up to zero, to prevent
+                      unphysical results like negative 2nd moments. 
        *debug_bit: Level of verbosity of the code (default: 0). 
 
 For more information about how to use this function, see photometry2.m
 
 Updates:
+2020-08-04 Guy: added option "use_positives" to make 2nd moment calculation only use non-negative values. 
+
 2020-02-27 Guy: Added multiple objects in global scope, added parseIndex method to find which one to use. 
                 This prevents users that do photometry on multiple data sets of differing size from resetting
 				the whole preallocation mechanisms. 
@@ -68,7 +75,7 @@ Updates:
 				This way no need to reallocate the data twice each batch. 
 				
 				
-Original code by Guy Nir Dec 2019
+Original code by Guy Nir, Dec 2019
 
 Additional developer notes after the header
 
@@ -100,6 +107,7 @@ class Photometry{
 	bool use_apertures=1; // decide if you want to use aperture photometry (wedding cake)
 	bool use_forced=1; // decide if you want to use forced photometry after finding the best offsets
 	bool use_median=1; // decide if you want to use median (instead of mean) to get the background value
+	bool use_positives=1; // when true, will ignore any negative values in the cutout when calculating 2nd moments
 	
 	int debug_bit=0;
 	
@@ -196,23 +204,22 @@ class Photometry{
 	// the sum of the product of array1...
 	int countNaNs(const float *array); // count the number of NaNs in the array
 	float countNaNs(const float *array, const float *array2); // count the number of NaNs weighted by a mask in array2
-	float sumArrays(const float *array1);
-	float sumArrays(const float *array1, const float *array2);
-	float sumArrays(const float *array1, float offset1, const float *array2);
-	float sumArrays(const float *array1, const float *array2, const float *array3);
-	float sumArrays(const float *array1, float offset1, const float *array2, const float *array3);
-	float sumArrays(const float *array1, const float *array2, float offset2, const float *array3, float offset3);	
-	float sumArrays(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3);
-	float sumArrays(const float *array1, const float *array2, const float *array3, const float *array4);
-	float sumArrays(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3, const float *array4);
+	float sumArrays(const float *array1); // e.g., raw sum of image, or area of gaussian
+	float sumArrays(const float *array1, float offset1); // raw sum of image, subtracting background, maybe taking only positive pixels
+	float sumArrays(const float *array1, const float *array2); // e.g., I*gaussian (and remove background later)
+	float sumArrays(const float *array1, float offset1, const float *array2); // e.g., (I-B)*X for raw 1st moment
+	float sumArraysPos(const float *array1, float offset1, const float *array2); // e.g., (I-B)*gaussian (this is different than the above func because it can use_positives only)
+	float sumArrays(const float *array1, float offset1, const float *array2, const float *array3); // e.g., (I-B)*X*gaussian
+	float sumArrays(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3); // e.g., (I-B)*(X-mx)*(Y-my) (raw photometry)
+	float sumArrays(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3, const float *array4); // e.g., (I-B)*(X-mx)*(Y-my)*gaussian
 
 	int countNonNaNsIndices(const float *array1, const std::vector<int> *vector, int idx); // sum the number of non-NaN values in array1 on the indices in vector[idx]
-	float sumIndices(const float *array1, const std::vector<int> *vector, int idx); // sum the values of array1 on the indices in vector[idx]
-	float sumIndices(const float *array1, float offset1, const std::vector<int> *vector, int idx); 
+	float sumIndices(const float *array1, const std::vector<int> *vector, int idx); // sum the values of array1 on the indices in vector[idx], e.g., I*aperture or I*annulus
+	float sumIndices(const float *array1, float offset1, const std::vector<int> *vector, int idx); // e.g., calculating the norm for 2nd moments: (I-B)*aperture
 	float sumIndices(const float *array1, const float *array2, const std::vector<int> *vector, int idx);
-	float sumIndices(const float *array1, float offset1, const float *array2, const std::vector<int> *vector, int idx);
-	float sumIndices(const float *array1, float offset1, const float *array2, float offset2, const std::vector<int> *vector, int idx);
-	float sumIndices(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3, const std::vector<int> *vector, int idx);
+	float sumIndices(const float *array1, float offset1, const float *array2, const std::vector<int> *vector, int idx); // e.g., 1st moment=(I-B)*X*aperture
+	float sumIndices(const float *array1, float offset1, const float *array2, float offset2, const std::vector<int> *vector, int idx); // e.g., variance=(I-B)*(I-B)*annulus
+	float sumIndices(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3, const std::vector<int> *vector, int idx); // e.g., 2nd moment=(I-B)*(X-mx)*(Y-my)*aperture
 	float medianIndices(const float *array, const std::vector<int> *vector, int idx); // find the median of the array points indicated by vector[idx]
 	// float medianIndicesDebug(const float *array, const std::vector<int> *vector, int idx); // find the median of the array points indicated by vector[idx]
 	

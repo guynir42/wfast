@@ -71,7 +71,8 @@ classdef Photometry < handle
         use_aperture = 0; % no need to do aperture because forced is much better
         use_forced = 1;
         use_best_offsets = 1; % if this is true, keep the offsets from gaussian even if using aperture/forced 
-        use_best_widths = 0; % if this is true, keep the widths from gaussian even if using aperture/forced (it is not very good, biased to lower values)
+        use_best_widths = 1; % if this is true, keep the widths from gaussian even if using aperture/forced BUT correct them for the use of an added gaussian! 
+        use_positive = 0; % only take positive values when calculating 2nd moments
         
         corner_size = 0.15; % fraction of the cut_size or pixel value (must be smaller than cut_size!)
         aperture = 6; % for now lets keep it short by using just the big aperture
@@ -374,7 +375,7 @@ classdef Photometry < handle
                 s = util.img.photometry2(single(obj.cutouts), 'iterations', obj.iterations, ...
                     'radii', obj.aperture, 'annulus', [obj.annulus, obj.annulus_outer], 'sigma', obj.gauss_sigma, ...
                     'use_gaussian', obj.use_gaussian, 'use_centering', obj.use_centering, ...
-                    'use_apertures', obj.use_aperture, 'use_forced', obj.use_forced, ...
+                    'use_apertures', obj.use_aperture, 'use_forced', obj.use_forced, 'use_positive', obj.use_positive, ...
                     'threads', obj.num_threads, 'debug_bit', obj.debug_bit, 'index', obj.index); 
                 
                 obj.pars_struct = s.parameters;
@@ -472,13 +473,14 @@ classdef Photometry < handle
                         end
                         
                         if obj.use_best_widths==0
-                            obj.widths = obj.widths_ap;
+                            % this correction comes from the fact we are multiplying a Gaussian by another Gaussian...
+                            obj.widths = obj.gauss_sigma.*obj.widths_ap./sqrt(obj.gauss_sigma.^2-obj.widths_ap.^2); 
+                            obj.flags = obj.flags_ap;
                         end
                         
                     end
                     
                     obj.bad_pixels = obj.bad_pixels_ap;
-                    obj.flags = obj.flags_ap;
                     
                 end
                 
