@@ -371,51 +371,55 @@ classdef ScopeAssistant < handle
         
         function read_data(obj, ~, ~)
             
-            obj.reply = strip(fgetl(obj.hndl)); % text reply
-
-%             t = datetime('now', 'TimeZone', 'UTC'); 
-%             fprintf('%s Arduino reply: %s\n', t, obj.reply); 
-            
-%             reply = str2double(regexp(obj.reply,'-?\d*','Match'));
-            numeric_reply = str2double(split(obj.reply, ','))';
-            
-            if isnan(numeric_reply), disp(obj.reply); end
-            
-            if length(numeric_reply)<5, return; end
-            
-            obj.acc_vec_raw = numeric_reply(1:3);
-            obj.distance = numeric_reply(4);
-            obj.period = numeric_reply(5);
-            obj.time = datetime('now', 'timezone', 'UTC');
-            obj.jd = juliandate(obj.time);
-            obj.status = 1;
-            
-            obj.data.input([obj.jd obj.acc_vec obj.distance]);
-            
-            if obj.debug_bit>1
-                disp(['ALT= ' num2str(obj.ALT)]);
-            end
-            
-            if ~isempty(obj.telescope) && obj.telescope.use_accelerometer && obj.use_check_alt && obj.ALT<obj.alt_limit
+            if obj.is_connected && obj.hndl.BytesAvailable>0
                 
-                try 
-                    
-                    obj.telescope.stop;
+                obj.reply = strip(fgetl(obj.hndl)); % text reply
 
-                    if obj.log_message_sent==0
-                        obj.telescope.log.input(['Arduino stopped telescope at angle ALT: ' num2str(obj.ALT) ' degrees...']);
-                        fprintf('%s: Arduino sending stop signal to telescope!\n', obj.telescope.log.report(1:8));
-                        obj.log_message_sent = 1;
+    %             t = datetime('now', 'TimeZone', 'UTC'); 
+    %             fprintf('%s Arduino reply: %s\n', t, obj.reply); 
+
+    %             reply = str2double(regexp(obj.reply,'-?\d*','Match'));
+                numeric_reply = str2double(split(obj.reply, ','))';
+
+                if isnan(numeric_reply), disp(obj.reply); end
+
+                if length(numeric_reply)<5, return; end
+
+                obj.acc_vec_raw = numeric_reply(1:3);
+                obj.distance = numeric_reply(4);
+                obj.period = numeric_reply(5);
+                obj.time = datetime('now', 'timezone', 'UTC');
+                obj.jd = juliandate(obj.time);
+                obj.status = 1;
+
+                obj.data.input([obj.jd obj.acc_vec obj.distance]);
+
+                if obj.debug_bit>1
+                    disp(['ALT= ' num2str(obj.ALT)]);
+                end
+
+                if ~isempty(obj.telescope) && obj.telescope.use_accelerometer && obj.use_check_alt && obj.ALT<obj.alt_limit
+
+                    try 
+
+                        obj.telescope.stop;
+
+                        if obj.log_message_sent==0
+                            obj.telescope.log.input(['Arduino stopped telescope at angle ALT: ' num2str(obj.ALT) ' degrees...']);
+                            fprintf('%s: Arduino sending stop signal to telescope!\n', obj.telescope.log.report(1:8));
+                            obj.log_message_sent = 1;
+                        end
+
+                    catch ME
+                        warning(ME.getReport);
                     end
 
-                catch ME
-                    warning(ME.getReport);
                 end
-                
-            end
-            
-            if obj.ALT>30
-                obj.log_message_sent = 0;
+
+                if obj.ALT>30
+                    obj.log_message_sent = 0;
+                end
+
             end
             
         end

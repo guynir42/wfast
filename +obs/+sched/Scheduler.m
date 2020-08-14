@@ -179,14 +179,11 @@ classdef Scheduler < handle
             end
              % call this at the start of the night/simulation
             
-            obj.targets = obs.sched.Target.empty; 
-            obj.current = obs.sched.Target.empty; 
-            
-            obj.targets_sim = obs.sched.Target.empty; 
-            obj.current_sim = obs.sched.Target.empty; 
-            
             if use_sim==0
 
+                obj.targets = obs.sched.Target.empty; 
+                obj.current = obs.sched.Target.empty; 
+            
                 for ii = 1:length(obj.targets)
                     obj.targets(ii).clear;
                 end
@@ -209,6 +206,9 @@ classdef Scheduler < handle
                 
             else
 
+                obj.targets_sim = obs.sched.Target.empty; 
+                obj.current_sim = obs.sched.Target.empty; 
+            
                 for ii = 1:length(obj.targets_sim)
                     obj.targets_sim(ii).clear;
                 end
