@@ -191,6 +191,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         CAMS_VER; % camera firmware version
         TELS_VER; % telescope firmware version
         
+        PHOT_PARS; % a structure with the parameters used for photometry
+        
         debug_bit = 1; 
         version = 4.00;
           

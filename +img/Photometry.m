@@ -31,6 +31,8 @@ classdef Photometry < handle
         
         psf; % either given or found from the image (to be depricated)
         
+        filename = ''; % the full path + name of the file from which we got this latest batch of data
+        
         % outputs
         fluxes;
         errors;
@@ -350,6 +352,7 @@ classdef Photometry < handle
             input.input_var('t_end', []);
             input.input_var('t_end_stamp', [], 7);
             input.input_var('juldates', [], 'juliandates'); 
+            input.input_var('filename', ''); 
             input.scan_vars(varargin{:});
             
             if isa(input.cutouts, 'single')
@@ -366,9 +369,17 @@ classdef Photometry < handle
             obj.t_end = input.t_end;
             obj.t_end_stamp = input.t_end_stamp;
             obj.juldates = input.juldates;
+            obj.filename = input.filename; 
             
             obj.cut_size_latest = size(input.cutouts);
             obj.cut_size_latest = obj.cut_size(1:2);
+            
+            if isempty(obj.juldates) && ~isempty(obj.timestamps) && ...
+                    ~isempty(obj.t_end) && ~isempty(obj.t_end_stamp)
+                
+                obj.juldates = juliandate(util.text.str2time(obj.t_end) + seconds(obj.timestamps - obj.t_end_stamp)); 
+                
+            end
             
             if obj.use_new_method 
                 
