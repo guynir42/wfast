@@ -20,18 +20,21 @@ classdef DataStore < handle
         timestamps_buffer; % timestamps for the flux buffer
         juldates_buffer; % julian dates for each flux measurement
         filename_buffer = {}; % full path + filename for each measurement in the buffer
+        frame_num_buffer = []; % frame inside each file
         
         background_flux; % cut out the background flux for calculating the variance outside the search region
         background_aux; % cut out the background aux for calculating the variance outside the search region
         background_timestamps; % timestamps for the background region
         background_juldates; % for each timestamp calculate the julian date
         background_filenames = {}; % a cell array the same length as the timestamps, with the filename of the source of each measurement
+        background_frame_num = []; 
         
         extended_flux; % cutout of the flux from the flux_buffer extended around the search region
         extended_aux; % cutout of the aux from the aux_buffer extended around the search region 
         extended_timestamps; % timestamps for the extended batch region
         extended_juldates; % for each timestamp calculate the julian date
         extended_filenames = {}; % a cell array the same length as the timestamps, with the filename of the source of each measurement
+        extended_frame_num = [];  % frame inside each file
         
         search_start_idx; % starting index for the search region out of the EXTENDED BATCH!
         search_end_idx;  % end index for the search region out of the EXTENDED BATCH!
@@ -41,6 +44,7 @@ classdef DataStore < handle
         search_timestamps;  % timestamps for the search region
         search_juldates; % juldates for the search region
         search_filenames = {}; % filename cell array for each measurement in the search region
+        search_frame_num = [];  % frame inside each file
         
         aux_names = {'errors', 'areas', 'backgrounds', 'variances', 'offsets_x', 'offsets_y', 'centroids_x', 'centroids_y', 'widths', 'bad_pixels', 'flags'}; % add more aux measurements if you want! 
         aux_indices; % struct with field=number for each of the above aux names
@@ -106,13 +110,14 @@ classdef DataStore < handle
         function reset(obj)
             
             obj.checker.reset;
-             
+            
+            obj.timestamps = [];
             obj.flux_buffer = [];
             obj.aux_buffer = [];
             obj.timestamps_buffer = [];
             obj.juldates_buffer = [];
             obj.filename_buffer = {};
-            
+            obj.frame_num_buffer = []; 
             obj.frame_counter = 0; 
         
             obj.calcAuxIndices;
@@ -131,12 +136,14 @@ classdef DataStore < handle
             obj.background_timestamps = [];
             obj.background_juldates = []; 
             obj.background_filenames = {};
+            obj.background_frame_num = [];
             
             obj.extended_flux = [];
             obj.extended_aux = [];
             obj.extended_timestamps = [];
             obj.extended_juldates = [];
             obj.extended_filenames = {}; 
+            obj.extended_frame_num = [];
             
             obj.search_start_idx = [];
             obj.search_end_idx = [];
@@ -146,6 +153,7 @@ classdef DataStore < handle
             obj.search_timestamps = [];
             obj.search_juldates = [];
             obj.search_filenames = {}; 
+            obj.search_frame_num = []; 
             
         end
             
@@ -270,6 +278,8 @@ classdef DataStore < handle
                 
             obj.clear;
             
+            obj.frame_counter = obj.frame_counter + size(obj.this_input.fluxes,1); 
+            
             if obj.use_threshold && obj.is_done_burn % we need to keep only good stars at the input level
                 
                 if isempty(obj.star_indices)
@@ -292,12 +302,14 @@ classdef DataStore < handle
             obj.timestamps_buffer = vertcat(obj.timestamps_buffer, obj.this_input.timestamps);
             obj.juldates_buffer = vertcat(obj.juldates_buffer, obj.this_input.juldates); 
             obj.filename_buffer = vertcat(obj.filename_buffer, repmat({obj.this_input.filename}, [length(obj.this_input.timestamps), 1])); 
+            obj.frame_num_buffer = vertcat(obj.frame_num_buffer, (1:length(obj.this_input.timestamps))'); % assume the frame numbers are just run continuously from 1->number of frames in batch
             
             if size(obj.flux_buffer,1)>obj.length_psd
                 obj.flux_buffer = obj.flux_buffer(end-obj.length_psd+1:end,:,:); 
                 obj.timestamps_buffer = obj.timestamps_buffer(end-obj.length_psd+1:end); 
                 obj.juldates_buffer = obj.juldates_buffer(end-obj.length_psd+1:end); 
                 obj.filename_buffer = obj.filename_buffer(end-obj.length_psd+1:end); 
+                obj.frame_num_buffer = obj.frame_num_buffer(end-obj.length_psd+1:end); 
             end
             
             % store the new aux data
@@ -320,8 +332,6 @@ classdef DataStore < handle
                 obj.checker.input(obj); % feed the data into the quality checker
             end
             
-            obj.frame_counter = obj.frame_counter + size(obj.this_input.fluxes,1); 
-            
         end
         
         function calcSubBuffers(obj)
@@ -334,6 +344,7 @@ classdef DataStore < handle
             obj.extended_timestamps = obj.timestamps_buffer(extended_start_idx:end); 
             obj.extended_juldates = obj.juldates_buffer(extended_start_idx:end); 
             obj.extended_filenames = obj.filename_buffer(extended_start_idx:end); 
+            obj.extended_frame_num= obj.frame_num_buffer(extended_start_idx:end); 
             
             % the search region is defined in the middle of the extended batch
             margins = floor((obj.length_extended - obj.length_search)/2); 
@@ -341,10 +352,11 @@ classdef DataStore < handle
             obj.search_start_idx = margins + 1; 
             obj.search_end_idx = size(obj.extended_flux,1) - margins; 
             obj.search_flux = obj.extended_flux(obj.search_start_idx:obj.search_end_idx,:,:); % cut the search region out of the extended batch
-                        
+            
             obj.search_timestamps = obj.extended_timestamps(obj.search_start_idx:obj.search_end_idx);
             obj.search_juldates = obj.extended_juldates(obj.search_start_idx:obj.search_end_idx);
             obj.search_filenames = obj.extended_filenames(obj.search_start_idx:obj.search_end_idx); 
+            obj.search_frame_num = obj.extended_frame_num(obj.search_start_idx:obj.search_end_idx); 
             
             obj.search_aux = obj.extended_aux(obj.search_start_idx:obj.search_end_idx,:,:); % cut the search region out of the extended batch
             
@@ -356,6 +368,7 @@ classdef DataStore < handle
             obj.background_timestamps = obj.timestamps_buffer(background_start_idx:background_end_idx);
             obj.background_juldates = obj.juldates_buffer(background_start_idx:background_end_idx);
             obj.background_filenames = obj.filename_buffer(background_start_idx:background_end_idx);
+            obj.background_frame_num = obj.frame_num_buffer(background_start_idx:background_end_idx);
             
             background_end_idx_aux = extended_start_idx_aux-1;
             obj.background_aux = obj.aux_buffer(1:background_end_idx_aux,:,:); % the size of the aux buffer is just big enough to get the background+extended regions

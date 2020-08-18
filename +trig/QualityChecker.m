@@ -243,7 +243,7 @@ classdef QualityChecker < handle
             if isempty(obj.extended_flux)
                 val = 0;
             else
-                val = size(obj.search_flux,1); 
+                val = size(obj.extended_flux,1); 
             end
             
         end
@@ -394,31 +394,31 @@ classdef QualityChecker < handle
             idx = obj.search_start_idx:obj.search_end_idx;
             
             if obj.use_delta_t
-                obj.cut_flag_matrix(:,:,obj.cut_indices.('delta_t')) = (abs(obj.delta_t(idx)) > obj.thresh_delta_t) .* all_stars; % any large time delay/jump is considered a region with bad timestamps
+                obj.cut_flag_matrix(:,:,obj.cut_indices.('delta_t')) = (abs(obj.delta_t) > obj.thresh_delta_t) .* all_stars; % any large time delay/jump is considered a region with bad timestamps
             end
             
             if obj.use_shakes
-                obj.cut_flag_matrix(:,:,obj.cut_indices.('shakes')) = (obj.shakes(idx) > obj.thresh_shakes) .* all_stars; 
+                obj.cut_flag_matrix(:,:,obj.cut_indices.('shakes')) = (obj.shakes > obj.thresh_shakes) .* all_stars; 
             end
             
             if obj.use_defocus
-                obj.cut_flag_matrix(:,:,obj.cut_indices.('defocus')) = (obj.defocus(idx) > obj.thresh_defocus) .* all_stars; 
+                obj.cut_flag_matrix(:,:,obj.cut_indices.('defocus')) = (obj.defocus > obj.thresh_defocus) .* all_stars; 
             end
             
             if obj.use_offset_size
-                obj.cut_flag_matrix(:,:,obj.cut_indices.('offset_size')) = obj.offset_size(idx,:) > obj.thresh_offset_size;
+                obj.cut_flag_matrix(:,:,obj.cut_indices.('offset_size')) = obj.offset_size > obj.thresh_offset_size;
             end
 
             if obj.use_nan_flux
-                obj.cut_flag_matrix(:,:,obj.cut_indices.('nan_flux')) = obj.nan_flux(idx,:);
+                obj.cut_flag_matrix(:,:,obj.cut_indices.('nan_flux')) = obj.nan_flux;
             end
             
             if obj.use_nan_offsets
-                obj.cut_flag_matrix(:,:,obj.cut_indices.('nan_offsets')) = obj.nan_offsets(idx,:);
+                obj.cut_flag_matrix(:,:,obj.cut_indices.('nan_offsets')) = obj.nan_offsets;
             end
             
             if obj.use_photo_flag
-                obj.cut_flag_matrix(:,:,obj.cut_indices.('photometry')) = obj.photo_flag(idx,:); 
+                obj.cut_flag_matrix(:,:,obj.cut_indices.('photometry')) = obj.photo_flag; 
             end
             
             if obj.use_correlations
@@ -429,7 +429,7 @@ classdef QualityChecker < handle
 
                         name = sprintf('corr_%s_%d', obj.corr_types{ii}, obj.corr_timescales(jj)); % e.g., corr_a_25 or corr_x_100 
 
-                        obj.cut_flag_matrix(:,:,obj.cut_indices.(name)) = obj.correlations(idx,:,ii,jj) > obj.thresh_correlation; 
+                        obj.cut_flag_matrix(:,:,obj.cut_indices.(name)) = obj.correlations(:,:,ii,jj) > obj.thresh_correlation; 
 
                     end
 
@@ -472,11 +472,11 @@ classdef QualityChecker < handle
                 obj.makeHistograms;
             end
             
-            star_edges = 1:obj.num_stars+1; 
-            star_edges_rep = repmat(star_edges, [obj.num_frames, 1]);
-            star_edges_rep = star_edges_rep(:,1:end-1); 
+            idx = obj.search_start_idx:obj.search_end_idx; % indices inside the search region
             
-            idx = obj.search_start_idx:obj.search_end_idx;
+            star_edges = 1:obj.num_stars+1; 
+            star_edges_rep = repmat(star_edges, [length(idx), 1]);
+            star_edges_rep = star_edges_rep(:,1:end-1); 
             
             for ii = 1:length(obj.cut_names) 
                 
@@ -532,7 +532,6 @@ classdef QualityChecker < handle
             end
                 
         end
-        
         
     end
     

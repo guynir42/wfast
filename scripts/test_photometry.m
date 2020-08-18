@@ -11,7 +11,9 @@ phot = img.Photometry;
 
 light = img.Lightcurves;
 
-store = trig.DataStore; 
+% store = trig.DataStore; 
+
+finder = trig.EventFinder; 
 
 cal = img.Calibration;
 cal.loadByDate('2020-06-09', 'Balor'); 
@@ -58,6 +60,8 @@ hold(ax, 'off');
 cat = head.Catalog;
 cat.head = header; 
 
+%% 
+
 cat.input(T); 
 
 %% load astrometry from file
@@ -67,7 +71,7 @@ cat.loadMAT(fullfile(d.pwd, 'catalog.mat'));
 %% start running photometry!
 
 N = length(files); 
-% N = 500; % cut it short
+% N = 100; % cut it short
 
 prog = util.sys.ProgressBar;
 
@@ -85,10 +89,11 @@ light.reset;
 light.head = header; 
 light.startup(N,size(P,1),1); % preallocate
 
-store.reset;
-store.use_threshold = 1; 
-store.length_burn_in = 5000; 
-store.checker.hours.snr_bin_max = 20; 
+finder.reset;
+finder.store.use_threshold = 1; 
+finder.store.length_burn_in = 5000; 
+finder.store.checker.hours.snr_bin_max = 20; 
+finder.use_sim_sporadic = 1;
 
 % light2 = util.oop.full_copy(light); 
 
@@ -108,7 +113,7 @@ for ii = 1:N
     phot.input(CC, 'pos', P, 'times', t, 't_start', t_start, 't_end', t_end, 't_end_stamp', t_end_stamp, 'filename', files{ii}); 
 %     light.getData(phot); 
     
-    store.input(phot); 
+    finder.input(phot); 
     
 %     phot2.input(CC, 'pos', P, 'times', t, 't_start', t_start, 't_end', t_end, 't_end_stamp', t_end_stamp); 
 %     light2.getData(phot2); 

@@ -126,7 +126,7 @@ classdef StarHours < handle
             obj.idx_start = checker.search_start_idx; 
             obj.idx_end = checker.search_end_idx; 
         
-            obj.flags = checker.cut_flag_matrix; 
+            obj.flags = checker.cut_flag_matrix(obj.idx_start:obj.idx_end,:,:); % only look at the search region! 
             
             obj.cut_names = checker.cut_names; 
             obj.cut_indices = checker.cut_indices;
