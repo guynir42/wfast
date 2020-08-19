@@ -7,12 +7,14 @@ classdef Candidate < handle
     properties % objects
         
         head; % header information
-        kernel_props; % struct with the data about the best kernel
+        kern_props; % struct with the data about the best kernel
         star_props; % table with one row from astrometry/GAIA
         
     end
     
     properties % inputs/outputs
+        
+        serial; % each candidates's id in the run
         
         identification_time = ''; % timestring when this event was identified by analysis (UTC)
         
@@ -20,15 +22,18 @@ classdef Candidate < handle
         
         cutouts; % cutouts of the selected star, for the duration of the extended region
         stack; % stack of the images in which this event is detected (optional)
+        kernel; % the lightcurve of the matched-filter kernel used 
         
         time_index; % out of the extended region
         kern_index; % from the full filter bank
         star_index; % from the stars that passed the initial burn-in (not from the subset that survived the pre-filter
         star_index_global; % from all the stars in this run (compare this to the catalog, cutouts, etc)
         frame_index; % the frame of the peak inside the original batch/file
-                
-        time_range; % time indices around time_index that are considered "part of the event"
         
+        time_range; % time indices around time_index that are considered "part of the event"
+        flux_mean; % mean of the raw flux (calculated over the background region)
+        flux_std; % standard deviation of the raw flux (calculated over the background region)
+                
         filenames; % cell array with the filenames for each frame in the extended region
         frame_numbers; % frame numbers for each frame inside its respective file
         
@@ -43,11 +48,19 @@ classdef Candidate < handle
         aux_names; % cell array with the names of each auxiliary
         aux_indices; % struct with a field for each auxiliary name, containing the index in the big matrix
         
+        relative_dx; % the offsets_x for this star, minus the flux weighted mean offsets_x of all stars
+        relative_dy; % the offsets_x for this star, minus the flux weighted mean offsets_x of all stars
+        
+        correlations; % the correlations matrix from the QualityChecker (for the extended region)
+        corr_names; % a cell array with the names of the correlations, e.g., {'a', 'b', 'x', 'y', 'r', 'w'}
+        corr_indices; % a struct with each correlation name as a field containing the index of that correlation in the matrix's 3rd dim
+        
         used_psd_corr; % did we apply a PSD correction?
         used_filt_std; % did we correct for each filtered flux's noise after filtering?
         
         snr;
         threshold;
+        
         
     end
     
@@ -67,9 +80,23 @@ classdef Candidate < handle
     
     properties(Hidden=true)
         
+        is_positive; 
+        
         is_simulated = 0; % by default events are not simulated
         sim_pars; % struct with the simulation parameters (for simulated events only)
 
+        cut_string;
+        cut_value;
+        cut_name;
+        cut_vector; 
+        cut_thresh;
+        
+        flux_raw_all; % the raw flux (over the extended region) for all stars
+        flux_corrected_all; % the corrected flux (over the exteneded region) for all stars
+        
+        search_start_idx;
+        search_end_idx;
+        
         % lower thresholds used to find time range, kernels and stars around
         % the peak that are also included. 
         thresh_time;
@@ -105,6 +132,88 @@ classdef Candidate < handle
     
     methods % getters
         
+        function val = kernel_timestamps(obj)
+            
+            dt = median(diff(obj.timestamps));
+            
+            val = (-floor(length(obj.kernel)/2):floor(length(obj.kernel)/2)).*dt;
+            
+        end
+        
+        function val = kernel_lightcurve(obj, flip)
+            
+            if nargin<2 || isempty(flip)
+                flip = 0;
+            end
+            
+            if isempty(obj.kernel) || isempty(obj.kern_props)
+                val = [];
+            else
+                val = (-1).^flip.*obj.kernel.*obj.kern_props.norm + 1; 
+            end
+            
+        end
+        
+        function val = star_snr(obj)
+            
+            if isempty(obj.flux_mean) || isempty(obj.flux_std)
+                val = [];
+            else
+                val = obj.flux_mean./obj.flux_std;
+            end
+            
+        end
+        
+        function val = time_start(obj)
+            
+            val = obj.timestamps(obj.search_start_idx);
+            
+        end
+        
+        function val = time_end(obj)
+            
+            val = obj.timestamps(obj.search_end_idx);
+            
+        end
+        
+        function str = printSummary(obj)
+            
+            str = sprintf('id: %d | star: %d | time: %d-%ds | event S/N= %4.2f | star S/N= %4.2f', ...
+                    obj.serial, obj.star_index, round(obj.time_start), round(obj.time_end), obj.snr, obj.star_snr);
+            
+        end
+        
+        function str = printKernelProps(obj)
+            
+            if isempty(obj.kern_props)
+                str = '';
+            else
+                str = sprintf('R= %4.2f | r= %4.2f | b= %4.2f | v= %4.1f', ...
+                    obj.kern_props.R, obj.kern_props.r, obj.kern_props.b, obj.kern_props.v);
+            end 
+            
+        end
+        
+        function str = printStellarProps(obj)
+            
+            if isempty(obj.star_props)
+                str = '';
+            else
+                str = sprintf('mag= %4.2f | temp= %dK', obj.star_props.Mag_BP, round(obj.star_props.Teff)); 
+            end
+            
+        end
+        
+        function str = printPhotometricPars(obj)
+            
+            if isempty(obj.head) || isempty(obj.head.PHOT_PARS)
+                str = '';
+            else
+                str = sprintf(); % fill this at some point? 
+            end
+            
+        end
+        
     end
     
     methods % setters
@@ -119,6 +228,56 @@ classdef Candidate < handle
             
         end
         
+        function addCutString(obj, str)
+            
+            if isempty(obj.cut_string)
+                obj.cut_string{1} = str;
+            else
+                obj.cut_string{end+1} = str;
+            end
+            
+        end
+        
+        function addCutValue(obj, val)
+            
+            if isempty(obj.cut_value)
+                obj.cut_value{1} = val;
+            else
+                obj.cut_value{end+1} = val;
+            end
+            
+        end
+        
+        function addCutName(obj, name)
+            
+            if isempty(obj.cut_name)
+                obj.cut_name{1} = name;
+            else
+                obj.cut_name{end+1} = name;
+            end
+            
+        end
+        
+        function addCutVector(obj, vec)
+            
+            if isempty(obj.cut_vector)
+                obj.cut_vector{1} = vec;
+            else
+                obj.cut_vector{end+1} = vec;
+            end
+            
+        end
+        
+        function addCutThreshold(obj, val)
+            
+            if isempty(obj.cut_thresh)
+                obj.cut_thresh{1} = val;
+            else
+                obj.cut_thresh{end+1} = val;
+            end
+            
+        end
+        
     end
     
     methods % calculations
@@ -127,7 +286,599 @@ classdef Candidate < handle
     
     methods % plotting tools / GUI
         
-    end    
+        function show(obj_vec, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('index', []); 
+            input.input_var('kept', false, 'show_kept'); 
+            input.input_var('parent', []);
+            input.input_var('font_size', 18);
+            input.scan_vars(varargin{:});
+            
+            if isempty(input.parent)
+                input.parent = gcf;
+            end
+            
+            if isempty(input.index)
+                if ~isempty(input.parent.UserData) && isfield(input.parent.UserData, 'index')
+                    input.index = input.parent.UserData.index; 
+                else
+                    input.index = 1;
+                end
+            end
+            
+            if ~isempty(input.kept)
+                if ~isempty(input.parent.UserData) && isfield(input.parent.UserData, 'show_kept')
+                    input.kept = input.parent.UserData.show_kept; 
+                else
+                    input.kept = false;
+                end
+            end
+            
+            if isempty(input.parent.UserData)
+                input.parent.UserData = struct('number', length(obj_vec), 'index', input.index, 'show_kept', input.kept); % add other state variables here
+            else
+                input.parent.UserData.number = length(obj_vec); 
+                input.parent.UserData.index = input.index;
+                input.parent.UserData.show_kept = input.kept;
+            end
+            
+            idx = input.parent.UserData.index;
+            if idx>length(obj_vec)
+                input.parent.UserData.index = 1;
+                idx = 1;
+            end
+            
+            obj = obj_vec(idx); 
+            
+            delete(input.parent.Children);
+            
+            margin_left = 0.07;
+            
+            ax1 = axes('Parent', input.parent, 'Position', [margin_left 0.55 0.55 0.35]);
+            obj.showRawFlux('ax', ax1, 'on_top', 1, 'equal', 0, 'title', 0);
+            
+            ax2 = axes('Parent', input.parent, 'Position', [margin_left 0.2 0.55 0.35]);
+            obj.showFilteredFlux('ax', ax2, 'title', 0);            
+            
+            ax3 = axes('Parent', input.parent, 'Position', [0.66 0.2 0.35 0.5]);
+            obj.showCutouts('ax', ax3);
+            
+            info_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [margin_left 0.9 1-margin_left*2 0.1], 'title', 'info'); 
+            uicontrol(info_panel, 'Style', 'text', 'string', '', ...
+                'Units', 'Normalized', 'Position', [0 0 1 1]); 
+            
+            uicontrol(info_panel, 'Style', 'text', 'string', strjoin({obj.printSummary, [obj.printStellarProps, ' | ', obj.printKernelProps]}, newline), ...
+                'Units', 'Normalized', 'Position', [0.05 0 0.9 1], 'FontSize', 14, 'HorizontalAlignment', 'Left'); 
+            
+            
+            notes_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [0.66 0.7 0.33 0.2], 'Title', 'notes'); 
+            uicontrol(notes_panel, 'Style', 'text', 'string', strjoin(obj.notes, newline), ...
+                'Units', 'Normalized', 'Position', [0.05 0 0.9 1], 'FontSize', 14, 'HorizontalAlignment', 'Left'); 
+            
+            control_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [margin_left 0.0 1-margin_left*2 0.1], 'title', 'controls'); 
+            
+            uicontrol(control_panel, 'Style', 'pushbutton', 'String', '-', 'FontSize', 20, ...
+                'Units', 'Normalized', 'Position', [0.00 0 0.1 1], ...
+                'Callback', @obj_vec.callback_prev, 'UserData', input.parent.UserData); 
+            
+            uicontrol(control_panel, 'Style', 'edit', 'String', sprintf('index= %d', input.parent.UserData.index), 'FontSize', 16, ...
+                'Units', 'Normalized', 'Position', [0.1 0 0.15 1], ...
+                'Callback', @obj_vec.callback_index, 'UserData', input.parent.UserData); 
+            
+            uicontrol(control_panel, 'Style', 'pushbutton', 'String', '+', 'FontSize', 20, ...
+                'Units', 'Normalized', 'Position', [0.25 0 0.1 1], ...
+                'Callback', @obj_vec.callback_next, 'UserData', input.parent.UserData); 
+            
+            if input.parent.UserData.show_kept
+                kept_string = 'kept';
+            else
+                kept_string = 'all'; 
+            end
+            
+            uicontrol(control_panel, 'Style', 'pushbutton', 'String', kept_string, 'FontSize', 20, ...
+                'Units', 'Normalized', 'Position', [0.38 0 0.1 1], ...
+                'Callback', @obj_vec.callback_kept, 'UserData', input.parent.UserData); 
+            
+            
+            
+%             ax4 = axes('Parent', input.parent, 'Position', [0.7 0.3 0.25 0.4]);
+%             obj.showStack('ax', ax4);
+
+            % TODO: notes section + add not button
+            % TODO: popup stack image (+load from file) 
+            % TODO: popup cutouts viewer
+            % TODO: secret info?? is_sim and velocity match... 
+
+        end
+        
+        function showRawFlux(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('timestamps', false); % show frame indices or timestamps
+            input.input_var('title', true); 
+            input.input_var('ax', [], 'axes', 'axis');
+            input.input_var('font_size', 16);
+            input.input_var('equal_limits', false); 
+            input.input_var('on_top', false); 
+            input.scan_vars(varargin{:});
+            
+            if isempty(input.ax), input.ax = gca; end
+            
+            if input.timestamps
+                x = obj.timestamps; 
+                xk = obj.kernel_timestamps+obj.peak_timestamp;
+            else
+                x = 1:length(obj.timestamps); 
+                xk = 1:length(obj.kernel);
+                xk = xk + obj.time_index - length(obj.kernel)/2;    
+            end
+            
+            yyaxis(input.ax, 'left'); 
+            
+            input.ax.NextPlot = 'replace';
+            
+            h1 = plot(input.ax, x, obj.flux_raw, '-', 'LineWidth', 2, 'Color', [0.929 0.694 0.125]);
+            h1.DisplayName = 'raw flux';
+            
+            input.ax.NextPlot = 'add';
+            h2 = plot(input.ax, xk, obj.flux_mean*obj.kernel_lightcurve(~obj.is_positive), ':', 'LineWidth', 2, 'Color', input.ax.Colormap(4,:));
+            h2.DisplayName = 'best kernel';
+            
+            input.ax.NextPlot = 'replace';
+            
+            input.ax.FontSize = input.font_size;
+            input.ax.YAxis(1).Color = [0 0 0];
+            
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            yyaxis(input.ax, 'right'); 
+                        
+            input.ax.NextPlot = 'replace';
+            input.ax.ColorOrderIndex = 5;
+            
+            h3 = plot(input.ax, x, obj.auxiliary(:,obj.star_index, obj.aux_indices.backgrounds), '--', 'Color', [0.2 0.6 0.2]); 
+            h3.DisplayName = 'background';
+            
+            aux = obj.auxiliary(:,obj.star_index, obj.aux_indices.backgrounds);
+            
+            input.ax.NextPlot = 'add';
+            
+            w = obj.auxiliary(:,obj.star_index, obj.aux_indices.widths);
+            
+            w = w.*2.355; 
+            
+%             if ~isempty(obj.head) && ~isempty(obj.head.SCALE)
+%                 w = w.*obj.head.SCALE;
+%             end
+            
+            h4 = plot(input.ax, x, w, 'p', 'MarkerSize', 3, 'Color', [0.2 0.5 1]);
+            h4.DisplayName = 'PSF FWHM';
+            
+            aux = horzcat(aux, w); 
+            
+            h5 = plot(input.ax, x, obj.relative_dx, 'x', 'MarkerSize', 4, 'Color', [1 0.3 0.2]);
+            h5.DisplayName = 'relative dx';
+            
+            aux = horzcat(aux, obj.relative_dx); 
+            
+            h6 = plot(input.ax, x, obj.relative_dy, '+', 'MarkerSize', 4, 'Color', [0.8 0.3 0.4]);
+            h6.DisplayName = 'relative dy';
+            
+            aux = horzcat(aux, obj.relative_dy); 
+            
+            if obj.is_positive
+                lh = legend(input.ax, 'Location', 'SouthEast', 'Orientation', 'Vertical');
+            else
+                lh = legend(input.ax, 'Location', 'NorthEast', 'Orientation', 'Vertical');
+            end
+            
+            lh.FontSize = input.font_size-4;
+%             lh.NumColumns = 3;
+
+            if input.timestamps
+                
+                xlabel(input.ax, 'timestamp (seconds)');
+                
+                if obj.timestamps(1)<obj.timestamps(end)
+                    input.ax.XLim = [obj.timestamps(1) obj.timestamps(end)];
+                end
+                
+            else
+                xlabel(input.ax, 'frame index');
+                input.ax.XLim = [x(1) x(end)]; 
+            end
+            
+%             title(input.ax, strjoin(obj.notes, ', '), 'FontSize', input.font_size);
+            
+            if input.title
+                util.plot.inner_title(obj.printSummary, 'ax', input.ax, 'Position', 'NorthWest', 'FontSize', input.font_size);
+            end
+            
+            mx = util.stat.max2(aux(obj.time_range,:));
+            mn = util.stat.min2(aux(obj.time_range,:)); 
+            
+            input.ax.YLim = [mn-0.25.*abs(mn) mx+0.25.*abs(mx)]; 
+            
+            ylabel(input.ax, 'pixels or count/pixel');
+    
+            input.ax.YAxis(2).Color = [0 0 0];
+            
+            input.ax.NextPlot = 'replace';
+            
+            input.ax.FontSize = input.font_size;
+            
+            yyaxis(input.ax, 'left'); % go back to the left axis by default
+            
+            ylabel(input.ax, 'raw flux [counts]');
+            
+            if input.equal_limits
+                mx = max(abs(obj.flux_raw - obj.flux_mean)); 
+                input.ax.YLim = obj.flux_mean + [-1 1].*1.2.*mx;
+            end
+            
+            if input.on_top
+                input.ax.XTick = [];
+%                 input.ax.YTick = input.ax.YTick(2:end); 
+            end
+            
+        end
+        
+        function showFilteredFlux(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('timestamps', false); % show frame indices or timestamps
+            input.input_var('title', true); 
+            input.input_var('ax', [], 'axes', 'axis');
+            input.input_var('font_size', 16);
+            input.input_var('equal_limits', false); 
+            input.input_var('on_top', false); 
+            input.scan_vars(varargin{:});
+            
+            if isempty(input.ax), input.ax = gca; end
+            
+            if input.timestamps
+                x = obj.timestamps; 
+                xk = obj.kernel_timestamps+obj.peak_timestamp;
+            else
+                x = 1:length(obj.timestamps); 
+                xk = 1:length(obj.kernel);
+                xk = xk + obj.time_index - length(obj.kernel)/2;                
+            end
+            
+            input.ax.NextPlot = 'replace';
+            h1 = plot(input.ax, x, obj.flux_filtered, 'LineWidth', 2);
+            h1.DisplayName = 'filtered flux';
+            
+            input.ax.NextPlot = 'add';
+            range = obj.time_range;
+            if ~isempty(range)
+                h2 = plot(input.ax, x(range), obj.flux_filtered(range), 'LineWidth', 2);
+                h2.DisplayName = 'time range';
+            end
+            
+            f = obj.flux_corrected;
+            s = nanstd(obj.flux_corrected); 
+            
+            input.ax.ColorOrderIndex = 3;
+            h3 = plot(input.ax, x, f./s, '-');
+            h3.DisplayName = 'corrected flux';
+            
+            sign = 1;
+            if obj.is_positive==0
+                sign = -1;
+            end
+
+            h4 = plot(input.ax, xk, obj.kernel*5*sign, ':');
+            h4.DisplayName = 'best kernel';
+            
+%             h5 = plot(input.ax, x, obj.auxiliary(:,obj.star_index, obj.aux_indices.backgrounds), '--'); 
+%             h5.DisplayName = 'background';
+%             
+%             w = obj.auxiliary(:,obj.star_index, obj.aux_indices.widths);
+%             
+%             w = w.*2.355; 
+%             w_str = 'PSF FWHM (pix)';
+%             
+%             if ~isempty(obj.head) && ~isempty(obj.head.SCALE)
+%                 w = w.*obj.head.SCALE;
+%                 w_str = 'PSF FWHM (")';
+%             end
+%             
+%             h6 = plot(input.ax, x, w, 'p', 'MarkerSize', 3);
+%             h6.DisplayName = w_str;
+%             
+%             h6 = plot(input.ax, x, obj.relative_dx, 'x', 'MarkerSize', 4);
+%             h6.DisplayName = 'relative dx';
+%             
+%             h8 = plot(input.ax, x, obj.relative_dy, '+', 'MarkerSize', 4);
+%             h8.DisplayName = 'relative dy';
+            
+            if obj.is_positive
+                lh = legend(input.ax, 'Location', 'NorthEast', 'Orientation', 'Vertical');
+            else
+                lh = legend(input.ax, 'Location', 'SouthEast', 'Orientation', 'Vertical');
+            end
+            
+            lh.FontSize = input.font_size-4;
+%             lh.NumColumns = 3;
+
+            if input.equal_limits
+                mx = max(max(abs(obj.flux_filtered)), max(abs(f./s)));             
+                input.ax.YLim = [-1 1].*1.2.*mx;
+            else
+                ff_ext = [ -abs(nanmin(obj.flux_filtered)).*1.3 abs(nanmax(obj.flux_filtered).*1.3)]; % fluxes_filtered extrema
+                fc_ext = [ -abs(nanmin(f./s)).*1.3 abs(nanmax(f./s).*1.3)]; % fluxes_corrected extrema
+                input.ax.YLim = [min(fc_ext(1), ff_ext(1)) max(fc_ext(2), ff_ext(2))];
+            end
+            
+            if input.timestamps
+                
+                xlabel(input.ax, 'timestamp (seconds)');
+                
+                if obj.timestamps(1)<obj.timestamps(end)
+                    input.ax.XLim = [obj.timestamps(1) obj.timestamps(end)];
+                end
+                
+            else
+                xlabel(input.ax, 'frame index');
+                input.ax.XLim = [x(1) x(end)]; 
+            end
+            
+            ylabel(input.ax, 'flux [S/N]');
+            
+            if input.on_top
+                input.ax.XTick = [];
+%                 input.ax.YTick = input.ax.YTick(2:end); 
+            end
+            
+%             title(input.ax, strjoin(obj.notes, ', '), 'FontSize', input.font_size);
+            
+            if input.title
+                util.plot.inner_title(obj.printSummary, 'ax', input.ax, 'Position', 'NorthWest', 'FontSize', input.font_size);
+            end
+            
+            input.ax.NextPlot = 'replace';
+            input.ax.FontSize = input.font_size;
+            
+        end
+        
+        function showCutouts(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('crosshair', true); 
+            input.input_var('parent', []); 
+            input.input_var('ax', [], 'axes', 'axis');
+            input.input_var('position', []);
+            input.input_var('number', 9);
+            input.input_var('bias', []);
+            input.input_var('dynamic_range', []);
+            input.input_var('font_size', 10);
+            input.scan_vars(varargin{:});
+            
+            if isempty(obj.cutouts)
+                return;
+            end
+            
+            % deal with the rest of this later! 
+            
+            if isempty(input.parent) && isempty(input.ax)
+                    
+                input.parent = gcf;
+%                     delete(input.parent.Children);
+                if ~isempty(input.position)
+                    panel = util.plot.stretchy_panel('Parent', input.parent, 'Position', input.position);
+                else
+                    panel = util.plot.stretchy_panel('Parent', input.parent);
+                end
+
+            elseif isempty(input.parent) && ~isempty(input.ax)
+
+                pos = input.ax.Position;
+
+                parent = input.ax.Parent;
+
+                panel = util.plot.stretchy_panel('Position', pos, 'Parent', parent);
+
+                delete(input.ax);
+
+            end
+
+            idx = obj.time_index; 
+
+            idx_start = idx - floor(input.number/2); 
+            idx_end = idx + ceil(input.number/2) - 1;
+
+            if idx_start<1
+                idx_end = idx_end + 1 - idx_start;
+                idx_start = 1;
+            end
+
+            if idx_end>size(obj.cutouts,3)
+                idx_start = idx_start + size(obj.cutouts,3) - idx_end;
+                idx_end = size(obj.cutouts,3);
+            end
+
+            rad = [];
+%             if ~isempty(obj.relative_dx) && ~isempty(obj.relative_dx)
+% 
+%                 cen = floor([size(obj.cutouts,2), size(obj.cutouts,1)]/2)+1;
+%                 cen = cen + [obj.relative_dx(idx_start:idx_end) obj.relative_dx(idx_start:idx_end)];
+% 
+%                 if ~isempty(obj.head) && ~isempty(obj.head.PHOT_PARS) && ~isempty(obj.head.PHOT_PARS.aperture_radius)
+%                     rad = obj.head.PHOT_PARS.aperture_radius;
+%                     str = sprintf('ap= %4.2f', rad(end)); 
+%                     col = 'green';
+%                 end
+% 
+%             end
+
+            Nrows = ceil(sqrt(input.number));
+            Ncols = Nrows;
+
+            if isempty(input.bias) || isempty(input.dynamic_range)
+                dyn = util.img.autodyn(obj.cutouts(:,:,obj.time_range,obj.star_index));
+%                 dyn = [0, nanmax(squeeze(util.stat.max2(obj.cutouts(:,:,obj.time_range,obj.star_index))))];
+                if ~isempty(input.bias)
+                    dyn(1) = input.bias;
+                elseif ~isempty(input.dynamic_range)
+                    dyn(2) = input.dynamic_range;
+                end
+
+            else
+                dyn = [input.bias, input.dynamic_range];
+            end
+
+            for ii = 1:input.number
+
+                x = mod(ii-1, Nrows);
+                y = floor((ii-1)/Nrows);
+
+                ax{ii} = axes('Position', [x/Ncols y/Nrows 1/Ncols 1/Nrows], 'Parent', panel);
+
+                imagesc(ax{ii}, obj.cutouts(:,:,idx_start+ii-1, obj.star_index));
+
+                ax{ii}.CLim = dyn;
+                axis(ax{ii}, 'image');
+                ax{ii}.XTick = [];
+                ax{ii}.YTick = [];
+
+                if input.crosshair
+
+                    ax{ii}.NextPlot = 'add'; 
+
+                    x0 = ceil(size(obj.cutouts,1)/2); 
+
+                    plot(ax{ii}, [x0 x0], [0 x0-1], '-m'); 
+                    plot(ax{ii}, [0 x0-1], [x0 x0], '-m'); 
+
+                    ax{ii}.NextPlot = 'replace'; 
+
+                end
+
+                if idx_start+ii-1==idx
+                    util.plot.inner_title([num2str(idx_start+ii-1) '*'], 'Position', 'NorthWest', 'Color', 'red', 'FontSize', input.font_size, 'ax', ax{ii});
+                else
+                    util.plot.inner_title(num2str(idx_start+ii-1), 'Position', 'NorthWest', 'FontSize', input.font_size, 'ax', ax{ii});
+                end
+
+                if ~isempty(rad)
+                    viscircles(ax{ii}, cen(ii,:), rad(end), 'EdgeColor', col);
+                    if idx_start+ii-1==idx
+                        util.plot.inner_title(str, 'Position', 'bottom', 'Color', col, 'FontSize', input.font_size, 'ax', ax{ii});
+                    end
+                end
+
+            end
+
+            panel.Children = panel.Children([5,1,2,3,4,6,7,8,9]); % move the center cutout to top (for the inner titles)
+%                 
+%                 clim = ax{idx-idx_start+1}.CLim;
+%                 for ii = 1:length(ax)
+%                     ax{ii}.CLim = clim;
+%                 end
+%                     
+            
+        end
+        
+        function callback_prev(obj, hndl, ~)
+            
+            num = hndl.UserData.number;
+            idx = hndl.UserData.index;
+            use_kept = hndl.UserData.show_kept;
+            
+            if use_kept
+                N = num+1;
+            else
+                N = 1;
+            end
+            
+            for ii = 1:N
+                
+                idx = idx - 1; 
+                if idx<1
+                    idx = num;
+                end
+                
+                if use_kept && obj(idx).kept % when we stumble on a kept event
+                    break;
+                end
+                
+            end
+            
+            obj.show('index', idx); 
+            
+        end
+        
+        function callback_index(obj, hndl, ~)
+            
+            num = hndl.UserData.number;
+            idx = hndl.UserData.index;
+            
+            val = util.text.extract_numbers(hndl.String);
+            
+            if ~isempty(val)
+                val = val{1}; 
+            end
+            
+            if ~isempty(val)
+                idx = val;
+            end
+            
+            if idx<1 || idx>num
+                error('Index is outside range of candidates (1 to %d)', num); 
+            end
+            
+            obj.show('index', idx);
+            
+        end
+        
+        function callback_next(obj, hndl, ~)
+            
+            num = hndl.UserData.number;
+            idx = hndl.UserData.index;
+            use_kept = hndl.UserData.show_kept;
+            
+            if use_kept
+                N = num+1;
+            else
+                N = 1;
+            end
+            
+            for ii = 1:N
+                
+                idx = idx + 1; 
+                if idx>num
+                    idx = 1;
+                end
+                
+                if use_kept && obj(idx).kept % when we stumble on a kept event
+                    break;
+                end
+                
+            end
+            
+            obj.show('index', idx); 
+            
+        end
+        
+        function callback_kept(obj, hndl, ~)
+            
+            use_kept = ~hndl.UserData.show_kept;
+            
+            hndl.UserData.show_kept = use_kept;
+            
+            hndl.Value = use_kept;
+            
+            if use_kept
+                hndl.String = 'kept';
+            else
+                hndl.String = 'all';
+            end
+            
+        end
+        
+    end
     
 end
 

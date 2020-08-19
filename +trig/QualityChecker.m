@@ -273,6 +273,22 @@ classdef QualityChecker < handle
             val = logical(sum(obj.cut_flag_matrix,3)); 
             
         end
+       
+        function val = getCorrNames(obj)
+            
+            val = {}; 
+            
+            for ii = 1:length(obj.corr_types)
+                
+                for jj = 1:length(obj.corr_timescales)
+                    
+                    val{end+1} = sprintf('corr_%s_%d', obj.corr_types{ii}, obj.corr_timescales(jj)); 
+                    
+                end
+                
+            end
+            
+        end
         
     end
     
@@ -376,12 +392,21 @@ classdef QualityChecker < handle
             aux(:,:,obj.corr_indices.y) = y;
             aux(:,:,obj.corr_indices.r) = r;
             aux(:,:,obj.corr_indices.w) = w;
-
+            
+            obj.correlations = zeros(size(aux,1), size(aux,2), size(aux,3), length(obj.corr_timescales), 'like', aux); 
+            
             for ii = 1:length(obj.corr_timescales)
                 % correlation of (mean reduced) x and y is x.*y./sqrt(sum(x.^2)*sum(y.^2))
                 % the correction term sqrt(N) is to compensate because the 
                 % shorter time scales always have higher correlations. 
-                obj.correlations(:,:,:,ii) = util.series.correlation(f, aux, obj.corr_timescales(ii))*sqrt(obj.corr_timescales(ii)); 
+                
+                norm = sqrt(obj.corr_timescales(ii));
+                if isa(f, 'single') && isa(aux, 'single')
+                    norm = single(norm);
+                end
+                
+                obj.correlations(:,:,:,ii) = util.series.correlation(f, aux, obj.corr_timescales(ii)).*sqrt(obj.corr_timescales(ii)); 
+                
             end
             
             obj.fillHistograms; 

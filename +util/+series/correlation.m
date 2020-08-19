@@ -31,6 +31,10 @@ function corr = correlation(v1, v2, timescale, varargin)
     
     kernel = ones(timescale,1);
     
+    if isa(v1, 'single') && isa(v2, 'single')
+        kernel = single(kernel); 
+    end
+    
     % these are replaced with util.vec.convolution because filter2 can't handle 3D inputs properly... 
 %     numer = filter2(kernel,  v1.*v2); 
 %     sum1 = filter2(kernel, v1.^2); 

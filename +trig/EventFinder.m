@@ -120,6 +120,7 @@ classdef EventFinder < handle
         function reset(obj)
             
             obj.cand = trig.Candidate.empty;
+            obj.latest_candidates = trig.Candidate.empty;
             
             obj.black_list_stars = [];
             obj.black_list_batches = [];
@@ -132,6 +133,8 @@ classdef EventFinder < handle
             
             obj.snr_values = [];
             obj.var_values = [];
+            
+            obj.clear;
             
         end
         
@@ -393,7 +396,7 @@ classdef EventFinder < handle
                                 
                                 if obj.use_prefilter % need to draw from the background region an calculate the filtered flux noise
                                     [bg_flux, bg_std] = obj.correctFluxes(obj.store.background_flux(:,star_index_sim), star_index_sim); % run correction on the background region
-                                    bg_ff = obj.bank.input(background_flux, background_std); % filter these background fluxes also
+                                    bg_ff = obj.bank.input(bg_flux, bg_std); % filter these background fluxes also
                                     bg_ff_std = nanstd(bg_ff); 
                                 else % we have a var_buf for every star, we can just get the noise from that
                                     bg_ff_std = sqrt(obj.var_buf.mean);
@@ -466,7 +469,11 @@ classdef EventFinder < handle
         function c = makeNewCandidate(obj, fluxes_raw, fluxes_corrected, fluxes_filtered, idx, star_indices)
 
             c = trig.Candidate;
+            
+            c.serial = length(obj.cand) + length(obj.latest_candidates) + 1; 
+            
             c.snr = abs(fluxes_filtered(idx(1),idx(2),idx(3))); % note this is positive even for negative filter responses! 
+            c.is_positive = fluxes_filtered(idx(1),idx(2),idx(3))>0; 
             c.threshold = obj.threshold; 
             
             c.time_index = idx(1); % time index inside of the extended region
@@ -474,6 +481,9 @@ classdef EventFinder < handle
             c.star_index = star_indices(idx(3)); % which star (out of all stars that passed the burn-in)
             c.star_index_global = obj.store.star_indices(star_indices(idx(3))); % get the star index in the original list of stars before pre-filter and before burn-in
 
+            c.kernel = obj.bank.kernels(:,c.kern_index); 
+            c.kern_props = obj.bank.pars(c.kern_index); 
+            
             c.time_range = obj.findTimeRange(fluxes_filtered, idx(1), idx(2), idx(3)); % find continuous area (in the extended region) that is above time_range_thresh 
             c.thresh_time = obj.getTimeThresh;
             
@@ -486,22 +496,52 @@ classdef EventFinder < handle
             % save the timing data
             c.timestamps = obj.store.extended_timestamps;
             c.juldates = obj.store.extended_juldates;
-
+            c.search_start_idx = obj.store.search_start_idx;
+            c.search_end_idx = obj.store.search_end_idx;
+            
             % save the filenames and frame numbers
             c.filenames = obj.store.extended_filenames;
             c.frame_numbers = obj.store.extended_frame_num;
             c.frame_index = obj.store.extended_frame_num(c.time_index); 
 
+            % keep a copy of the cutouts
+            c.cutouts = obj.store.cutouts; 
+            
             % store the different types of flux
             c.flux_raw = fluxes_raw(:,c.star_index); 
             c.flux_corrected = fluxes_corrected(:,c.star_index); 
             c.flux_filtered = fluxes_filtered(:,idx(2),idx(3));
 
+            c.flux_raw_all = fluxes_raw; 
+            c.flux_corrected_all = fluxes_corrected; 
+            
+            % store some statistics on this star's raw flux
+            c.flux_mean = nanmean(obj.store.background_flux(:,c.star_index)); 
+            c.flux_std = nanstd(obj.store.background_flux(:,c.star_index)); 
+            
             % save the auxiliary data (like background and offsets)
             c.auxiliary = obj.store.extended_aux; 
             c.aux_names = obj.store.aux_names;
             c.aux_indices = obj.store.aux_indices;
 
+            F = nanmean(obj.store.extended_flux,1);
+            DX = c.auxiliary(:,:, c.aux_indices.offsets_x); % the offsets_x for all stars
+            dx = DX(:,c.star_index) - util.vec.weighted_average(DX,F,2); % reduced the mean offsets_x
+            DY = c.auxiliary(:,:, c.aux_indices.offsets_y); % the offsets_y for all stars
+            dy = DY(:,c.star_index) - util.vec.weighted_average(DY,F,2); % reduced the mean offsets_y
+            
+            c.relative_dx = dx; 
+            c.relative_dy = dy; 
+            
+            % keep the correlations for all stars
+            c.correlations = obj.store.checker.correlations(:,:,:); % linearize the last dimension so instead of dim3=types and dim4=timescales we have dim3=names on one list
+            c.corr_names = obj.store.checker.getCorrNames;
+            
+            c.corr_indices = struct; 
+            for ii = 1:length(c.corr_names)
+                c.corr_indices.(c.corr_names{ii}) = ii; 
+            end
+            
             % keep track of what parameters were used in this analysis
             c.used_psd_corr = obj.use_psd_correction;
             c.used_filt_std = obj.use_std_filtered; 
@@ -509,10 +549,10 @@ classdef EventFinder < handle
             % get the observational parameters and the star parameters from astrometry/GAIA
             c.head = obj.head;
             if ~isempty(obj.cat) && obj.cat.success
-                c.star_props = obj.data(c.star_index,:); % copy a table row from the catalog
+                c.star_props = obj.cat.data(c.star_index,:); % copy a table row from the catalog
             end
 
-            % check all the cut flags
+            % disqualify event based on any cut flag
             M = obj.store.checker.cut_flag_matrix; % dim1 is time, dim2 is stars, dim3 is type of cut
             cut = obj.store.checker.cut_names; % cell array of names of each cut in the matrix
 
@@ -527,9 +567,11 @@ classdef EventFinder < handle
                         corr_index = obj.store.checker.corr_indices.(cut{ii}(6)); 
                         timescale_index = find(obj.store.checker.corr_timescales==str2double(cut{ii}(8:end))); 
                         cut_values = obj.store.checker.correlations(:,:,corr_index,timescale_index); 
+                        thresh = obj.store.checker.thresh_correlation; 
                         
                     elseif isprop(obj.store.checker, cut{ii})
                         cut_values = obj.store.checker.(cut{ii});
+                        thresh = obj.store.checker.(['thresh_' cut{ii}]); 
                     end
                     
                     if size(cut_values,2)>1
@@ -540,11 +582,15 @@ classdef EventFinder < handle
                     
                     mx = max(cut_vector(c.time_range)); % the maximum cut value inside the event time
                     
-                    c.addNote(sprintf('Cut "%s" failed with value %4.2f"', cut{ii}, mx));
+                    str = sprintf('Cut "%s" failed with value %4.2f', cut{ii}, mx);
+                    c.addNote(str);
+                    c.addCutString(str); 
+                    c.addCutValue(mx); 
+                    c.addCutName(cut{ii}); 
+                    c.addCutVector(cut_vector); % also keep a vector of the values that didn't pass the cut
+                    c.addCutThreshold(thresh); 
                     
                     c.kept = 0; 
-                    
-                    % should we also keep the full cut_vector for this event? 
                     
                 end
                 

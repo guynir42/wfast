@@ -3,7 +3,7 @@
 
 %% load the data
 
-d = util.sys.WorkingDirectory('R:\Dropbox (Weizmann Institute)\DATA_ALL\WFAST\2020\2020-06-09\ecliptic_run1'); 
+d = util.sys.WorkingDirectory(fullfile(getenv('DATA'), 'WFAST\2020\2020-06-09\ecliptic_run1')); 
 
 files = d.match('*.h5*');
 
@@ -94,6 +94,9 @@ finder.store.use_threshold = 1;
 finder.store.length_burn_in = 5000; 
 finder.store.checker.hours.snr_bin_max = 20; 
 finder.use_sim_sporadic = 1;
+
+finder.head = header;
+finder.cat = cat; 
 
 % light2 = util.oop.full_copy(light); 
 

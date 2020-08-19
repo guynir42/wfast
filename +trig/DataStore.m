@@ -15,6 +15,8 @@ classdef DataStore < handle
         
         timestamps; % keep a journal of the timestamps for the entire run
         
+        cutouts; % keep cutouts ONLY for the extended region
+        
         flux_buffer; % biggest flux buffer used for PSD (we cut from it smaller buffers)
         aux_buffer; % derive all other aux buffers from this (by default this buffer is just equal to the background_aux buffer, but we may change that in the future)
         timestamps_buffer; % timestamps for the flux buffer
@@ -125,6 +127,8 @@ classdef DataStore < handle
             obj.star_indices = []; 
             obj.star_snr = [];
             
+            obj.cutouts = [];
+            
             obj.clear;
             
         end
@@ -207,6 +211,7 @@ classdef DataStore < handle
             % these inputs are used for explicitely giving the photometric products
             val.input_var('timestamps', []); 
             val.input_var('fluxes', []);
+            val.input_var('cutouts', []); 
             
             for ii = 1:length(obj.aux_names)
                 if ~strcmp(obj.aux_names{ii}, 'fluxes')
@@ -288,6 +293,7 @@ classdef DataStore < handle
                 end
                 
                 obj.this_input.fluxes = obj.this_input.fluxes(:,obj.star_indices,:); 
+                obj.this_input.cutouts = obj.this_input.cutouts(:,:,:,obj.star_indices); 
                 
                 for ii = 1:length(obj.aux_names)
                     new_data = obj.this_input.(obj.aux_names{ii});
@@ -297,12 +303,12 @@ classdef DataStore < handle
             end
             
             % store the new fluxes and timestamps
-            obj.flux_buffer = vertcat(obj.flux_buffer, obj.this_input.fluxes);
-            obj.timestamps = vertcat(obj.timestamps, obj.this_input.timestamps); % this tracks timestamps for the entire run
-            obj.timestamps_buffer = vertcat(obj.timestamps_buffer, obj.this_input.timestamps);
+            obj.flux_buffer = vertcat(obj.flux_buffer, single(obj.this_input.fluxes));
+            obj.timestamps = vertcat(obj.timestamps, single(obj.this_input.timestamps)); % this tracks timestamps for the entire run
+            obj.timestamps_buffer = vertcat(obj.timestamps_buffer, single(obj.this_input.timestamps));
             obj.juldates_buffer = vertcat(obj.juldates_buffer, obj.this_input.juldates); 
             obj.filename_buffer = vertcat(obj.filename_buffer, repmat({obj.this_input.filename}, [length(obj.this_input.timestamps), 1])); 
-            obj.frame_num_buffer = vertcat(obj.frame_num_buffer, (1:length(obj.this_input.timestamps))'); % assume the frame numbers are just run continuously from 1->number of frames in batch
+            obj.frame_num_buffer = vertcat(obj.frame_num_buffer, single(1:length(obj.this_input.timestamps))'); % assume the frame numbers are just run continuously from 1->number of frames in batch
             
             if size(obj.flux_buffer,1)>obj.length_psd
                 obj.flux_buffer = obj.flux_buffer(end-obj.length_psd+1:end,:,:); 
@@ -310,6 +316,12 @@ classdef DataStore < handle
                 obj.juldates_buffer = obj.juldates_buffer(end-obj.length_psd+1:end); 
                 obj.filename_buffer = obj.filename_buffer(end-obj.length_psd+1:end); 
                 obj.frame_num_buffer = obj.frame_num_buffer(end-obj.length_psd+1:end); 
+            end
+            
+            % store the cutouts for the extended region only
+            obj.cutouts = cat(3, obj.cutouts, obj.this_input.cutouts); 
+            if size(obj.cutouts,3)>obj.length_extended
+                obj.cutouts = obj.cutouts(:,:,end-obj.length_extended+1:end,:); 
             end
             
             % store the new aux data
@@ -390,6 +402,7 @@ classdef DataStore < handle
             obj.clear;
             obj.flux_buffer = obj.flux_buffer(:,obj.star_indices,:); 
             obj.aux_buffer = obj.aux_buffer(:,obj.star_indices,:); 
+            obj.cutouts = obj.cutouts(:,:,:,obj.star_indices); 
             
         end
         
