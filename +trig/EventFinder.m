@@ -62,14 +62,14 @@ classdef EventFinder < handle
         use_psd_correction = 1; % use welch on a flux buffer to correct red noise
         use_std_filtered = 1; % normalize variance of each filtered flux to the average of previous batches (averaging size is set by length of "var_buf")
         
-        use_prefilter = 0; % filter all stars on a smaller bank, using a lower threshold, and then vet the survivors only with the full filter bank
+        use_prefilter = 1; % filter all stars on a smaller bank, using a lower threshold, and then vet the survivors only with the full filter bank
         pre_threshold = 5; % threshold for the pre-filter
         
         use_keep_variances = 0; % keep a copy of the variance of each star/kernel for the entire run (this may be a bit heavy on the memory)
         use_conserve_memory = 1; % throw away large image data for disqualified events (reduces size of MAT files, and these data can be restored from file)
         
         use_sim_sporadic = 0; % add simulated events in a few batches randomly spread out in the whole run
-        num_sim_events_per_batch = 0.05; % fractional probability to add a simulated event into each new batch. 
+        num_sim_events_per_batch = 0.01; % fractional probability to add a simulated event into each new batch. 
         
         use_sim_full = 0; % if true, will run all filter banks on each batch, to measure detectability of different kernels. 
         
@@ -504,8 +504,8 @@ classdef EventFinder < handle
             c.frame_numbers = obj.store.extended_frame_num;
             c.frame_index = obj.store.extended_frame_num(c.time_index); 
 
-            % keep a copy of the cutouts
-            c.cutouts = obj.store.cutouts; 
+            % keep a copy of the cutouts, but only for the relevant star!
+            c.cutouts = obj.store.cutouts(:,:,:,obj.star_index); 
             
             % store the different types of flux
             c.flux_raw = fluxes_raw(:,c.star_index); 
@@ -533,8 +533,8 @@ classdef EventFinder < handle
             c.relative_dx = dx; 
             c.relative_dy = dy; 
             
-            % keep the correlations for all stars
-            c.correlations = obj.store.checker.correlations(:,:,:); % linearize the last dimension so instead of dim3=types and dim4=timescales we have dim3=names on one list
+            % keep the correlations for this star ONLY!
+            c.correlations = obj.store.checker.correlations(:,c.star_index,:); % linearize the last dimension so instead of dim3=types and dim4=timescales we have dim3=names on one list
             c.corr_names = obj.store.checker.getCorrNames;
             
             c.corr_indices = struct; 
@@ -583,14 +583,16 @@ classdef EventFinder < handle
                     mx = max(cut_vector(c.time_range)); % the maximum cut value inside the event time
                     
                     str = sprintf('Cut "%s" failed with value %4.2f', cut{ii}, mx);
-                    c.addNote(str);
                     c.addCutString(str); 
                     c.addCutValue(mx); 
                     c.addCutName(cut{ii}); 
+                    c.addCutRegion(M(:,c.star_index,ii)); 
                     c.addCutVector(cut_vector); % also keep a vector of the values that didn't pass the cut
                     c.addCutThreshold(thresh); 
                     
                     c.kept = 0; 
+                    
+                    c.setRunNameDate;
                     
                 end
                 

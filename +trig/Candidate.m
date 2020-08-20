@@ -68,6 +68,8 @@ classdef Candidate < handle
         
         kept = 1; % by default any new event is considered real (kept)
         
+        classification = ''; 
+        
         debug_bit = 1;
         
     end
@@ -80,6 +82,11 @@ classdef Candidate < handle
     
     properties(Hidden=true)
         
+        use_show_secrets = true; % this should be turned off at some point
+        
+        run_name; 
+        run_date;
+        
         is_positive; 
         
         is_simulated = 0; % by default events are not simulated
@@ -89,6 +96,7 @@ classdef Candidate < handle
         cut_value;
         cut_name;
         cut_vector; 
+        cut_region; 
         cut_thresh;
         
         flux_raw_all; % the raw flux (over the extended region) for all stars
@@ -131,6 +139,12 @@ classdef Candidate < handle
     end
     
     methods % getters
+        
+        function classes = getListOfClasses(obj)
+            
+            classes = {'cosmic ray', 'satellite', 'flare', 'occultation', 'mystery', 'edge effect', 'artefact'};
+            
+        end
         
         function val = kernel_timestamps(obj)
             
@@ -176,10 +190,40 @@ classdef Candidate < handle
             
         end
         
+        function val = getFilename(obj)
+            
+            if isempty(obj.filenames) || isempty(obj.time_index)
+                val = '';
+            else
+                val = obj.filenames{obj.time_index}; 
+            end
+            
+        end
+        
         function str = printSummary(obj)
             
             str = sprintf('id: %d | star: %d | time: %d-%ds | event S/N= %4.2f | star S/N= %4.2f', ...
                     obj.serial, obj.star_index, round(obj.time_start), round(obj.time_end), obj.snr, obj.star_snr);
+            
+        end
+        
+        function str = printNotes(obj)
+            
+            str = {};
+            
+            if ~isempty(obj.cut_string)
+                str = vertcat(str, util.vec.tocolumn(obj.cut_string));
+            end
+            
+            if ~isempty(obj.classification)
+                str = vertcat(str, {sprintf('classified as "%s"', obj.classification)}); 
+            end
+            
+            if ~isempty(obj.notes)
+                str = vertcat(str, util.vec.tocolumn(obj.notes));
+            end
+            
+            str = strjoin(str, newline); 
             
         end
         
@@ -188,8 +232,8 @@ classdef Candidate < handle
             if isempty(obj.kern_props)
                 str = '';
             else
-                str = sprintf('R= %4.2f | r= %4.2f | b= %4.2f | v= %4.1f', ...
-                    obj.kern_props.R, obj.kern_props.r, obj.kern_props.b, obj.kern_props.v);
+                str = sprintf('R= %4.2f | r= %4.2f | b= %4.2f | v= %4.1f | invert= %d', ...
+                    obj.kern_props.R, obj.kern_props.r, obj.kern_props.b, obj.kern_props.v, ~obj.is_positive);
             end 
             
         end
@@ -210,6 +254,33 @@ classdef Candidate < handle
                 str = '';
             else
                 str = sprintf(); % fill this at some point? 
+            end
+            
+        end
+        
+        function str = printRunData(obj)
+           
+            RA = ''; 
+            Dec = '';
+            ECL = [];
+            
+            if ~isempty(obj.head)
+                RA = obj.head.OBSRA;
+                Dec = obj.head.OBSDEC; 
+                ECL = obj.head.ephem.ECL_lat;
+            end
+            
+            str = sprintf('Run: "%s" | ecl lat= %4.1f deg \ncoords: %s %s', obj.run_name, ECL, RA, Dec); 
+            
+        end
+        
+        function str = printSimulationData(obj)
+            
+            if ~obj.is_simulated
+                str = '';
+            else
+                str = sprintf('SIM: R= %4.2f | r= %4.2f | b= %4.2f | v= %4.1f', ...
+                    obj.sim_pars.R, obj.sim_pars.r, obj.sim_pars.b, obj.sim_pars.v); 
             end
             
         end
@@ -268,12 +339,33 @@ classdef Candidate < handle
             
         end
         
+        function addCutRegion(obj, vec)
+            
+            if isempty(obj.cut_region)
+                obj.cut_region{1} = vec;
+            else
+                obj.cut_region{end+1} = vec;
+            end
+            
+        end
+        
         function addCutThreshold(obj, val)
             
             if isempty(obj.cut_thresh)
                 obj.cut_thresh{1} = val;
             else
                 obj.cut_thresh{end+1} = val;
+            end
+            
+        end
+        
+        function setRunNameDate(obj)
+            
+            path = fileparts(obj.getFilename); 
+            
+            if ~isempty(path)
+                [path, obj.run_name] = fileparts(path); 
+                [path, obj.run_date] = fileparts(path); 
             end
             
         end
@@ -290,7 +382,8 @@ classdef Candidate < handle
             
             input = util.text.InputVars;
             input.input_var('index', []); 
-            input.input_var('kept', false, 'show_kept'); 
+            input.input_var('kept', [], 'show_kept'); 
+            input.input_var('cuts', []); 
             input.input_var('parent', []);
             input.input_var('font_size', 18);
             input.scan_vars(varargin{:});
@@ -299,7 +392,7 @@ classdef Candidate < handle
                 input.parent = gcf;
             end
             
-            if isempty(input.index)
+            if isempty(input.index) % default value
                 if ~isempty(input.parent.UserData) && isfield(input.parent.UserData, 'index')
                     input.index = input.parent.UserData.index; 
                 else
@@ -307,7 +400,7 @@ classdef Candidate < handle
                 end
             end
             
-            if ~isempty(input.kept)
+            if isempty(input.kept) % default value
                 if ~isempty(input.parent.UserData) && isfield(input.parent.UserData, 'show_kept')
                     input.kept = input.parent.UserData.show_kept; 
                 else
@@ -315,12 +408,23 @@ classdef Candidate < handle
                 end
             end
             
+            if isempty(input.cuts) % default value
+                if ~isempty(input.parent.UserData) && isfield(input.parent.UserData, 'show_cuts')
+                    input.cuts = input.parent.UserData.show_cuts; 
+                else
+                    input.cuts = false;
+                end
+            end
+            
             if isempty(input.parent.UserData)
-                input.parent.UserData = struct('number', length(obj_vec), 'index', input.index, 'show_kept', input.kept); % add other state variables here
+                input.parent.UserData = struct('number', length(obj_vec), 'index', input.index, ...
+                    'show_kept', input.kept, 'show_cuts', input.cuts); % add other state variables here
             else
                 input.parent.UserData.number = length(obj_vec); 
                 input.parent.UserData.index = input.index;
                 input.parent.UserData.show_kept = input.kept;
+                input.parent.UserData.show_cuts = input.cuts; 
+                % and add them here too
             end
             
             idx = input.parent.UserData.index;
@@ -339,36 +443,46 @@ classdef Candidate < handle
             obj.showRawFlux('ax', ax1, 'on_top', 1, 'equal', 0, 'title', 0);
             
             ax2 = axes('Parent', input.parent, 'Position', [margin_left 0.2 0.55 0.35]);
-            obj.showFilteredFlux('ax', ax2, 'title', 0);            
+            obj.showFilteredFlux('ax', ax2, 'title', 0, 'cuts', input.cuts); 
             
-            ax3 = axes('Parent', input.parent, 'Position', [0.66 0.2 0.35 0.5]);
+            ax3 = axes('Parent', input.parent, 'Position', [0.68 0.2 0.3 0.5]);
             obj.showCutouts('ax', ax3);
             
-            info_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [margin_left 0.9 1-margin_left*2 0.1], 'title', 'info'); 
-            uicontrol(info_panel, 'Style', 'text', 'string', '', ...
-                'Units', 'Normalized', 'Position', [0 0 1 1]); 
+            %%%%%%%%%%%%%%%%%%%%%% panel info %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            info_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [margin_left 0.9 1-margin_left 0.1], 'title', 'info'); 
             
             uicontrol(info_panel, 'Style', 'text', 'string', strjoin({obj.printSummary, [obj.printStellarProps, ' | ', obj.printKernelProps]}, newline), ...
+                'Units', 'Normalized', 'Position', [0.02 0 0.88 1], 'FontSize', 14, 'HorizontalAlignment', 'Left'); 
+            
+            if obj.use_show_secrets
+                uicontrol(info_panel, 'Style', 'pushbutton', 'string', 'reveal', ...
+                    'Units', 'Normalized', 'Position', [0.9 0.1 0.1 0.9], 'FontSize', 14,...
+                    'Callback', @obj.callback_show_secrets, 'UserData', input.parent)
+            end
+            
+            %%%%%%%%%%%%%%%%%%%%%% panel notes %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            notes_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [0.68 0.7 0.3 0.2], 'Title', 'notes'); 
+            
+            uicontrol(notes_panel, 'Style', 'text', 'string', obj.printNotes, ...
                 'Units', 'Normalized', 'Position', [0.05 0 0.9 1], 'FontSize', 14, 'HorizontalAlignment', 'Left'); 
             
-            
-            notes_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [0.66 0.7 0.33 0.2], 'Title', 'notes'); 
-            uicontrol(notes_panel, 'Style', 'text', 'string', strjoin(obj.notes, newline), ...
-                'Units', 'Normalized', 'Position', [0.05 0 0.9 1], 'FontSize', 14, 'HorizontalAlignment', 'Left'); 
+            %%%%%%%%%%%%%%%%%%%%%% panel controls %%%%%%%%%%%%%%%%%%%%%%%%%
             
             control_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [margin_left 0.0 1-margin_left*2 0.1], 'title', 'controls'); 
             
             uicontrol(control_panel, 'Style', 'pushbutton', 'String', '-', 'FontSize', 20, ...
-                'Units', 'Normalized', 'Position', [0.00 0 0.1 1], ...
-                'Callback', @obj_vec.callback_prev, 'UserData', input.parent.UserData); 
+                'Units', 'Normalized', 'Position', [0.0 0.1 0.1 0.9], ...
+                'Callback', @obj_vec.callback_prev, 'UserData', input.parent); 
             
-            uicontrol(control_panel, 'Style', 'edit', 'String', sprintf('index= %d', input.parent.UserData.index), 'FontSize', 16, ...
-                'Units', 'Normalized', 'Position', [0.1 0 0.15 1], ...
-                'Callback', @obj_vec.callback_index, 'UserData', input.parent.UserData); 
+            uicontrol(control_panel, 'Style', 'edit', 'String', sprintf('index= %d / %d', input.parent.UserData.index, length(obj_vec)), 'FontSize', 16, ...
+                'Units', 'Normalized', 'Position', [0.1 0.1 0.2 0.9], ...
+                'Callback', @obj_vec.callback_index, 'UserData', input.parent); 
             
             uicontrol(control_panel, 'Style', 'pushbutton', 'String', '+', 'FontSize', 20, ...
-                'Units', 'Normalized', 'Position', [0.25 0 0.1 1], ...
-                'Callback', @obj_vec.callback_next, 'UserData', input.parent.UserData); 
+                'Units', 'Normalized', 'Position', [0.3 0.1 0.1 0.9], ...
+                'Callback', @obj_vec.callback_next, 'UserData', input.parent); 
             
             if input.parent.UserData.show_kept
                 kept_string = 'kept';
@@ -377,18 +491,31 @@ classdef Candidate < handle
             end
             
             uicontrol(control_panel, 'Style', 'pushbutton', 'String', kept_string, 'FontSize', 20, ...
-                'Units', 'Normalized', 'Position', [0.38 0 0.1 1], ...
-                'Callback', @obj_vec.callback_kept, 'UserData', input.parent.UserData); 
+                'Units', 'Normalized', 'Position', [0.43 0.1 0.1 0.9], ...
+                'Callback', @obj_vec.callback_kept, 'UserData', input.parent); 
             
+            if input.cuts
+                str = 'with cuts';
+            else
+                str = 'no cuts';
+            end
+            
+            uicontrol(control_panel, 'Style', 'pushbutton', 'String', str, ...
+                'Units', 'Normalized', 'Position', [0.55 0.1 0.1 0.9], 'FontSize', 12, ...
+                'Callback', @obj_vec.callback_cuts, 'UserData', input.parent);
+            
+            
+            uicontrol(control_panel, 'Style', 'pushbutton', 'String', 'Classify', 'FontSize', 18, ...
+                'Units', 'Normalized', 'Position', [0.67 0.1 0.1 0.9], ...
+                'Callback', @obj_vec.callback_classify, 'UserData', input.parent); 
             
             
 %             ax4 = axes('Parent', input.parent, 'Position', [0.7 0.3 0.25 0.4]);
 %             obj.showStack('ax', ax4);
 
-            % TODO: notes section + add not button
+            % TODO: notes section + add note button
             % TODO: popup stack image (+load from file) 
             % TODO: popup cutouts viewer
-            % TODO: secret info?? is_sim and velocity match... 
 
         end
         
@@ -529,6 +656,7 @@ classdef Candidate < handle
             input = util.text.InputVars;
             input.input_var('timestamps', false); % show frame indices or timestamps
             input.input_var('title', true); 
+            input.input_var('cuts', false);
             input.input_var('ax', [], 'axes', 'axis');
             input.input_var('font_size', 16);
             input.input_var('equal_limits', false); 
@@ -571,28 +699,6 @@ classdef Candidate < handle
 
             h4 = plot(input.ax, xk, obj.kernel*5*sign, ':');
             h4.DisplayName = 'best kernel';
-            
-%             h5 = plot(input.ax, x, obj.auxiliary(:,obj.star_index, obj.aux_indices.backgrounds), '--'); 
-%             h5.DisplayName = 'background';
-%             
-%             w = obj.auxiliary(:,obj.star_index, obj.aux_indices.widths);
-%             
-%             w = w.*2.355; 
-%             w_str = 'PSF FWHM (pix)';
-%             
-%             if ~isempty(obj.head) && ~isempty(obj.head.SCALE)
-%                 w = w.*obj.head.SCALE;
-%                 w_str = 'PSF FWHM (")';
-%             end
-%             
-%             h6 = plot(input.ax, x, w, 'p', 'MarkerSize', 3);
-%             h6.DisplayName = w_str;
-%             
-%             h6 = plot(input.ax, x, obj.relative_dx, 'x', 'MarkerSize', 4);
-%             h6.DisplayName = 'relative dx';
-%             
-%             h8 = plot(input.ax, x, obj.relative_dy, '+', 'MarkerSize', 4);
-%             h8.DisplayName = 'relative dy';
             
             if obj.is_positive
                 lh = legend(input.ax, 'Location', 'NorthEast', 'Orientation', 'Vertical');
@@ -640,6 +746,50 @@ classdef Candidate < handle
             
             input.ax.NextPlot = 'replace';
             input.ax.FontSize = input.font_size;
+            
+            if input.cuts && ~isempty(obj.cut_vector)
+                
+                yyaxis(input.ax, 'right');
+                input.ax.NextPlot = 'replace'; 
+                
+                vectors = [];
+                
+                colors = {'g', 'b', 'y'}; 
+                
+                for ii = 1:length(obj.cut_vector)
+                    
+                    col_idx = mod(ii-1,length(colors))+1; 
+                    
+                    h = plot(input.ax, x, obj.cut_vector{ii}, '-', 'LineWidth', 1.5, 'Color', colors{col_idx}); 
+                    h.DisplayName = strrep(sprintf('%s=%4.2f', obj.cut_name{ii}, obj.cut_value{ii}), '_', ' '); 
+                    
+                    vectors = horzcat(vectors, obj.cut_vector{ii}); % keep track of all cuts to set the bounds
+                    
+                    input.ax.NextPlot = 'add'; 
+                    
+                    region = single(obj.cut_region{ii});
+%                     region = imdilate(region, ones(3,1)); 
+                    region(~region) = NaN; 
+                    
+%                     plot(input.ax, x, region.*obj.cut_thresh{ii}, '-', 'Color', h.Color, 'HandleVisibility', 'off'); 
+                    plot(input.ax, x, region.*obj.cut_vector{ii}, '*', 'Color', 'm', 'HandleVisibility', 'off'); 
+                    plot(input.ax, x, ones(length(x),1).*obj.cut_thresh{ii}, ':', 'Color', 'm', 'HandleVisibility', 'off'); 
+                    
+                end
+                
+                input.ax.NextPlot = 'replace'; 
+                
+                mn = util.stat.min2(vectors); 
+                mx = util.stat.max2(vectors);
+                
+                input.ax.YLim = [mn - 0.2*abs(mn), mx + 0.2*abs(mx)]; 
+                
+                input.ax.YAxis(2).Color = [0 0 0];
+                ylabel(input.ax, 'cut values'); 
+            
+                yyaxis(input.ax, 'left');
+                
+            end
             
         end
         
@@ -717,8 +867,8 @@ classdef Candidate < handle
             Ncols = Nrows;
 
             if isempty(input.bias) || isempty(input.dynamic_range)
-                dyn = util.img.autodyn(obj.cutouts(:,:,obj.time_range,obj.star_index));
-%                 dyn = [0, nanmax(squeeze(util.stat.max2(obj.cutouts(:,:,obj.time_range,obj.star_index))))];
+                dyn = util.img.autodyn(obj.cutouts(:,:,obj.time_range));
+%                 dyn = [0, nanmax(squeeze(util.stat.max2(obj.cutouts(:,:,obj.time_range))))];
                 if ~isempty(input.bias)
                     dyn(1) = input.bias;
                 elseif ~isempty(input.dynamic_range)
@@ -736,7 +886,7 @@ classdef Candidate < handle
 
                 ax{ii} = axes('Position', [x/Ncols y/Nrows 1/Ncols 1/Nrows], 'Parent', panel);
 
-                imagesc(ax{ii}, obj.cutouts(:,:,idx_start+ii-1, obj.star_index));
+                imagesc(ax{ii}, obj.cutouts(:,:,idx_start+ii-1));
 
                 ax{ii}.CLim = dyn;
                 axis(ax{ii}, 'image');
@@ -781,11 +931,51 @@ classdef Candidate < handle
             
         end
         
+        function popupSecrets(obj)
+            
+            str1 = obj.printRunData;
+            str2 = obj.printSimulationData;
+            
+            options.WindowStyle = 'non-modal'; 
+            options.Interpreter = 'tex'; 
+            
+            if isempty(str2)
+                str = [str1 newline 'This event is not simulated!']; 
+            else
+                str = (strjoin({str1, str2}, newline));
+            end
+            
+            str = strrep(str, '_', ' '); 
+            str = ['\fontsize{16}' str];
+            
+            msgbox(str, 'secret info', options); 
+            
+        end
+        
+        function popupClassifier(obj)
+            
+            str = 'Classify this candidate:';
+            
+            classes = obj.getListOfClasses;
+            
+            rep = listdlg('ListString', classes, 'PromptString', str, 'ListSize',[150,250],...
+                'InitialValue',length(classes), 'SelectionMode','single', 'Name','classification');
+            
+            if ~isempty(rep)
+                obj.classification = classes{rep}; 
+            end
+            
+        end
+        
+    end
+    
+    methods % callbacks to the show() method
+        
         function callback_prev(obj, hndl, ~)
             
-            num = hndl.UserData.number;
-            idx = hndl.UserData.index;
-            use_kept = hndl.UserData.show_kept;
+            num = hndl.UserData.UserData.number;
+            idx = hndl.UserData.UserData.index;
+            use_kept = hndl.UserData.UserData.show_kept;
             
             if use_kept
                 N = num+1;
@@ -812,8 +1002,8 @@ classdef Candidate < handle
         
         function callback_index(obj, hndl, ~)
             
-            num = hndl.UserData.number;
-            idx = hndl.UserData.index;
+            num = hndl.UserData.UserData.number;
+            idx = hndl.UserData.UserData.index;
             
             val = util.text.extract_numbers(hndl.String);
             
@@ -822,7 +1012,7 @@ classdef Candidate < handle
             end
             
             if ~isempty(val)
-                idx = val;
+                idx = val(1);
             end
             
             if idx<1 || idx>num
@@ -835,9 +1025,9 @@ classdef Candidate < handle
         
         function callback_next(obj, hndl, ~)
             
-            num = hndl.UserData.number;
-            idx = hndl.UserData.index;
-            use_kept = hndl.UserData.show_kept;
+            num = hndl.UserData.UserData.number;
+            idx = hndl.UserData.UserData.index;
+            use_kept = hndl.UserData.UserData.show_kept;
             
             if use_kept
                 N = num+1;
@@ -864,9 +1054,9 @@ classdef Candidate < handle
         
         function callback_kept(obj, hndl, ~)
             
-            use_kept = ~hndl.UserData.show_kept;
+            use_kept = ~hndl.UserData.UserData.show_kept;
             
-            hndl.UserData.show_kept = use_kept;
+            hndl.UserData.UserData.show_kept = use_kept;
             
             hndl.Value = use_kept;
             
@@ -877,6 +1067,41 @@ classdef Candidate < handle
             end
             
         end
+        
+        function callback_cuts(obj, hndl, ~)
+            
+            use_cuts = ~hndl.UserData.UserData.show_cuts;
+            
+            hndl.UserData.UserData.show_cuts = use_cuts;
+            
+            hndl.Value = use_cuts;
+            
+            if use_cuts
+                hndl.String = 'show cuts';
+            else
+                hndl.String = 'no cuts';
+            end
+            
+            obj.show;
+            
+        end
+        
+        function callback_classify(obj, hndl, ~)
+            
+            idx = hndl.UserData.UserData.index;
+            
+            obj(idx).popupClassifier;
+            
+            obj.show;
+            
+        end
+        
+        function callback_show_secrets(obj, hndl, ~)
+            
+            obj.popupSecrets; 
+            
+        end
+        
         
     end
     

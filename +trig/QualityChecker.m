@@ -378,11 +378,11 @@ classdef QualityChecker < handle
             obj.near_bad_rows_cols = false(size(X)); % initialize to all zero
             
             for ii = 1:length(obj.bad_rows)
-                obj.near_bad_rows_cols = obj.near_bad_rows_cols | abs(Y-obj.bad_rows(ii))>obj.distance_bad_rows_cols;
+                obj.near_bad_rows_cols = obj.near_bad_rows_cols | (abs(Y-obj.bad_rows(ii))<obj.distance_bad_rows_cols);
             end
             
             for ii = 1:length(obj.bad_columns)
-                obj.near_bad_rows_cols = obj.near_bad_rows_cols | abs(X-obj.bad_columns(ii))>obj.distance_bad_rows_cols;
+                obj.near_bad_rows_cols = obj.near_bad_rows_cols | (abs(X-obj.bad_columns(ii))<obj.distance_bad_rows_cols);
             end
             
             aux = zeros(size(f,1),size(f,2),length(obj.corr_types), 'like', f); 
@@ -444,6 +444,10 @@ classdef QualityChecker < handle
             
             if obj.use_photo_flag
                 obj.cut_flag_matrix(:,:,obj.cut_indices.('photometry')) = obj.photo_flag; 
+            end
+            
+            if obj.use_near_bad_rows_cols
+                obj.cut_flag_matrix(:,:,obj.cut_indices.('near_bad_rows_cols')) = obj.near_bad_rows_cols; 
             end
             
             if obj.use_correlations
