@@ -9,6 +9,11 @@ classdef Candidate < handle
         head; % header information
         kern_props; % struct with the data about the best kernel
         star_props; % table with one row from astrometry/GAIA
+        sim_pars = struct; % struct with the simulation parameters (for simulated events only)
+
+        finder_pars;
+        store_pars;
+        checker_pars; 
         
     end
     
@@ -16,7 +21,7 @@ classdef Candidate < handle
         
         serial; % each candidates's id in the run
         
-        identification_time = ''; % timestring when this event was identified by analysis (UTC)
+        analysis_time = ''; % timestring when this event was identified by analysis (UTC)
         
         notes = {}; % anything added to the event, like failed cuts
         
@@ -33,7 +38,7 @@ classdef Candidate < handle
         time_range; % time indices around time_index that are considered "part of the event"
         flux_mean; % mean of the raw flux (calculated over the background region)
         flux_std; % standard deviation of the raw flux (calculated over the background region)
-                
+        
         filenames; % cell array with the filenames for each frame in the extended region
         frame_numbers; % frame numbers for each frame inside its respective file
         
@@ -51,16 +56,19 @@ classdef Candidate < handle
         relative_dx; % the offsets_x for this star, minus the flux weighted mean offsets_x of all stars
         relative_dy; % the offsets_x for this star, minus the flux weighted mean offsets_x of all stars
         
-        correlations; % the correlations matrix from the QualityChecker (for the extended region)
-        corr_names; % a cell array with the names of the correlations, e.g., {'a', 'b', 'x', 'y', 'r', 'w'}
-        corr_indices; % a struct with each correlation name as a field containing the index of that correlation in the matrix's 3rd dim
+        cut_matrix; % the different cuts from the QualityChecker (for this star, on the extended region)
+        cut_names; % a cell array with the names of the cuts, e.g., 'shakes', 'offset_size', 'corr_x_25',...
+        cut_indices; % a struct with each cut name as a field containing the index of that cut in the matrix's 2nd dim
+        cut_thresh; % which threshold is used for each cut (a row vector)
+        cut_two_sided; % true when the cut value should be compared in abs() to the threshold (a row vector)
         
-        used_psd_corr; % did we apply a PSD correction?
-        used_filt_std; % did we correct for each filtered flux's noise after filtering?
+        cut_string = {}; % cell string discribing the cuts that this event hit
+        cut_hits = []; % which cuts coincide with the event peak
+        cut_value = []; % what is the value that triggered the cut (maximum within range of the peak)
+        
+        batch_number;
         
         snr;
-        threshold;
-        
         
     end
     
@@ -69,6 +77,8 @@ classdef Candidate < handle
         kept = 1; % by default any new event is considered real (kept)
         
         classification = ''; 
+        
+        display_cuts = []; % user can add more cuts to display even if the event did not happen to cross that cut
         
         debug_bit = 1;
         
@@ -90,26 +100,12 @@ classdef Candidate < handle
         is_positive; 
         
         is_simulated = 0; % by default events are not simulated
-        sim_pars; % struct with the simulation parameters (for simulated events only)
 
-        cut_string;
-        cut_value;
-        cut_name;
-        cut_vector; 
-        cut_region; 
-        cut_thresh;
-        
         flux_raw_all; % the raw flux (over the extended region) for all stars
         flux_corrected_all; % the corrected flux (over the exteneded region) for all stars
         
         search_start_idx;
         search_end_idx;
-        
-        % lower thresholds used to find time range, kernels and stars around
-        % the peak that are also included. 
-        thresh_time;
-        thresh_kern;
-        thresh_star;
         
         kern_extra; % any other kernels that passed the lower threshold for kernels
         star_extra; % any other stars that passed the lower threshold for stars
@@ -202,8 +198,8 @@ classdef Candidate < handle
         
         function str = printSummary(obj)
             
-            str = sprintf('id: %d | star: %d | time: %d-%ds | event S/N= %4.2f | star S/N= %4.2f', ...
-                    obj.serial, obj.star_index, round(obj.time_start), round(obj.time_end), obj.snr, obj.star_snr);
+            str = sprintf('id: %d | star: %d | frame= %d | time: %d-%ds | event S/N= %4.2f | star S/N= %4.2f', ...
+                    obj.serial, obj.star_index, obj.time_index, round(obj.time_start), round(obj.time_end), obj.snr, obj.star_snr);
             
         end
         
@@ -270,7 +266,10 @@ classdef Candidate < handle
                 ECL = obj.head.ephem.ECL_lat;
             end
             
-            str = sprintf('Run: "%s" | ecl lat= %4.1f deg \ncoords: %s %s', obj.run_name, ECL, RA, Dec); 
+            v = obj.head.ephem.getShadowVelocity;
+            v = sqrt(sum(v.^2)); 
+            
+            str = sprintf('Run: "%s" | ecl lat= %4.1f deg \ncoords: %s %s | V= %d', obj.run_name, ECL, RA, Dec, round(v)); 
             
         end
         
@@ -299,66 +298,6 @@ classdef Candidate < handle
             
         end
         
-        function addCutString(obj, str)
-            
-            if isempty(obj.cut_string)
-                obj.cut_string{1} = str;
-            else
-                obj.cut_string{end+1} = str;
-            end
-            
-        end
-        
-        function addCutValue(obj, val)
-            
-            if isempty(obj.cut_value)
-                obj.cut_value{1} = val;
-            else
-                obj.cut_value{end+1} = val;
-            end
-            
-        end
-        
-        function addCutName(obj, name)
-            
-            if isempty(obj.cut_name)
-                obj.cut_name{1} = name;
-            else
-                obj.cut_name{end+1} = name;
-            end
-            
-        end
-        
-        function addCutVector(obj, vec)
-            
-            if isempty(obj.cut_vector)
-                obj.cut_vector{1} = vec;
-            else
-                obj.cut_vector{end+1} = vec;
-            end
-            
-        end
-        
-        function addCutRegion(obj, vec)
-            
-            if isempty(obj.cut_region)
-                obj.cut_region{1} = vec;
-            else
-                obj.cut_region{end+1} = vec;
-            end
-            
-        end
-        
-        function addCutThreshold(obj, val)
-            
-            if isempty(obj.cut_thresh)
-                obj.cut_thresh{1} = val;
-            else
-                obj.cut_thresh{end+1} = val;
-            end
-            
-        end
-        
         function setRunNameDate(obj)
             
             path = fileparts(obj.getFilename); 
@@ -373,6 +312,113 @@ classdef Candidate < handle
     end
     
     methods % calculations
+        
+        function checkIfPeakIsIncluded(obj) % check if the time_index is really the highest point in the filtered flux (return false if the real peak is outside the search region)
+            
+            f = obj.flux_filtered;
+            
+            idx = obj.time_index; 
+            
+            mx = 0; % best maximum outside the search region
+            real_peak_idx = []; 
+            
+            % go forward
+            for ii = 1:length(f)
+                
+                idx = idx + 1;
+                
+                if idx>length(f)
+                    break; % out of bounds!
+                end
+                
+                if abs(f(idx))<obj.finder_pars.time_range_thresh
+                    break; % reached the end of the event on this side
+                end
+                
+                if idx>obj.search_end_idx % we are now outside the search region
+                
+                    if abs(f(idx))>abs(mx)
+                        mx = f(idx);
+                        real_peak_idx = idx; 
+                    end
+                    
+                end
+                
+            end
+            
+            idx = obj.time_index;
+             
+            % go backwards
+            for ii = 1:length(f)
+                
+                idx = idx - 1;
+                
+                if idx<1
+                    break; % out of bounds!
+                end
+                
+                if abs(f(idx))<obj.finder_pars.time_range_thresh
+                    break; % reached the end of the event on this side
+                end
+                
+                if idx<obj.search_start_idx % we are now outside the search region
+                
+                    if abs(f(idx))>abs(mx)
+                        mx = f(idx);
+                        real_peak_idx = idx; 
+                    end
+                    
+                end
+                
+            end
+            
+            if abs(mx)>abs(f(obj.time_index))
+                obj.notes{end+1} = sprintf('Peak outside, frame= %d, S/N= %4.2f', real_peak_idx, mx); 
+                obj.kept = 0;
+            end
+            
+        end
+        
+        function val = correlateSlopes(obj, timescale)
+            
+            if nargin<2 || isempty(timescale)
+                timescale = 10;
+            end
+            
+            t = obj.timestamps;
+            x = obj.auxiliary(:,obj.star_index,obj.aux_indices.offsets_x);
+            y = obj.auxiliary(:,obj.star_index,obj.aux_indices.offsets_y);
+            
+            cx = util.series.correlation(x,t, timescale).*sqrt(timescale);
+            cy = util.series.correlation(y,t, timescale).*sqrt(timescale);
+            
+            val = (abs(cx)+abs(cy));
+            
+        end
+        
+        function val = getSlopes(obj, timescale)
+            
+            if nargin<2 || isempty(timescale)
+                timescale = 10;
+            end
+            
+            t = obj.timestamps;
+            x = obj.auxiliary(:,obj.star_index,obj.aux_indices.offsets_x);
+            y = obj.auxiliary(:,obj.star_index,obj.aux_indices.offsets_y);
+            
+            x = x-nanmedian(x); 
+            y = y-nanmedian(y); 
+            
+            k = (-timescale/2:timescale/2)'; 
+%             k = (1:timescale)'; 
+            k = k./sqrt(sum(k.^2)); 
+            
+            val = [x,y];
+            val = abs(filter2(k,val)); 
+%             val = sqrt(sum(val.^2,2)); 
+            val = [x,y,val]; 
+                        
+        end
         
     end
     
@@ -452,37 +498,41 @@ classdef Candidate < handle
             
             info_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [margin_left 0.9 1-margin_left 0.1], 'title', 'info'); 
             
-            uicontrol(info_panel, 'Style', 'text', 'string', strjoin({obj.printSummary, [obj.printStellarProps, ' | ', obj.printKernelProps]}, newline), ...
+            button = uicontrol(info_panel, 'Style', 'text', 'string', strjoin({obj.printSummary, ['Star: ' obj.printStellarProps ' | Kernel: ' obj.printKernelProps]}, newline), ...
                 'Units', 'Normalized', 'Position', [0.02 0 0.88 1], 'FontSize', 14, 'HorizontalAlignment', 'Left'); 
             
             if obj.use_show_secrets
-                uicontrol(info_panel, 'Style', 'pushbutton', 'string', 'reveal', ...
+                button = uicontrol(info_panel, 'Style', 'pushbutton', 'string', 'reveal', ...
                     'Units', 'Normalized', 'Position', [0.9 0.1 0.1 0.9], 'FontSize', 14,...
-                    'Callback', @obj.callback_show_secrets, 'UserData', input.parent)
+                    'Callback', @obj.callback_show_secrets, 'UserData', input.parent, ...
+                    'Tooltip', 'Show the run name, coordinates, and simulation status for this event');
             end
             
             %%%%%%%%%%%%%%%%%%%%%% panel notes %%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
             notes_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [0.68 0.7 0.3 0.2], 'Title', 'notes'); 
             
-            uicontrol(notes_panel, 'Style', 'text', 'string', obj.printNotes, ...
+            button = uicontrol(notes_panel, 'Style', 'text', 'string', obj.printNotes, ...
                 'Units', 'Normalized', 'Position', [0.05 0 0.9 1], 'FontSize', 14, 'HorizontalAlignment', 'Left'); 
             
             %%%%%%%%%%%%%%%%%%%%%% panel controls %%%%%%%%%%%%%%%%%%%%%%%%%
             
             control_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [margin_left 0.0 1-margin_left*2 0.1], 'title', 'controls'); 
             
-            uicontrol(control_panel, 'Style', 'pushbutton', 'String', '-', 'FontSize', 20, ...
+            button = uicontrol(control_panel, 'Style', 'pushbutton', 'String', '-', 'FontSize', 20, ...
                 'Units', 'Normalized', 'Position', [0.0 0.1 0.1 0.9], ...
-                'Callback', @obj_vec.callback_prev, 'UserData', input.parent); 
+                'Callback', @obj_vec.callback_prev, 'UserData', input.parent, ...
+                'Tooltip', 'go back to previous candidate'); 
             
-            uicontrol(control_panel, 'Style', 'edit', 'String', sprintf('index= %d / %d', input.parent.UserData.index, length(obj_vec)), 'FontSize', 16, ...
+            button = uicontrol(control_panel, 'Style', 'edit', 'String', sprintf('index= %d / %d', input.parent.UserData.index, length(obj_vec)), 'FontSize', 16, ...
                 'Units', 'Normalized', 'Position', [0.1 0.1 0.2 0.9], ...
-                'Callback', @obj_vec.callback_index, 'UserData', input.parent); 
+                'Callback', @obj_vec.callback_index, 'UserData', input.parent, ...
+                'Tooltip', 'jump to any candidate index'); 
             
-            uicontrol(control_panel, 'Style', 'pushbutton', 'String', '+', 'FontSize', 20, ...
+            button = uicontrol(control_panel, 'Style', 'pushbutton', 'String', '+', 'FontSize', 20, ...
                 'Units', 'Normalized', 'Position', [0.3 0.1 0.1 0.9], ...
-                'Callback', @obj_vec.callback_next, 'UserData', input.parent); 
+                'Callback', @obj_vec.callback_next, 'UserData', input.parent, ...
+                'Tooltip', 'go forward to next candidate'); 
             
             if input.parent.UserData.show_kept
                 kept_string = 'kept';
@@ -490,9 +540,15 @@ classdef Candidate < handle
                 kept_string = 'all'; 
             end
             
-            uicontrol(control_panel, 'Style', 'pushbutton', 'String', kept_string, 'FontSize', 20, ...
+            button = uicontrol(control_panel, 'Style', 'pushbutton', 'String', kept_string, 'FontSize', 20, ...
                 'Units', 'Normalized', 'Position', [0.43 0.1 0.1 0.9], ...
                 'Callback', @obj_vec.callback_kept, 'UserData', input.parent); 
+            
+            if input.parent.UserData.show_kept
+                button.TooltipString = 'Showing only the kept candidates';
+            else
+                button.TooltipString = 'Showing all candidates';
+            end
             
             if input.cuts
                 str = 'with cuts';
@@ -500,15 +556,27 @@ classdef Candidate < handle
                 str = 'no cuts';
             end
             
-            uicontrol(control_panel, 'Style', 'pushbutton', 'String', str, ...
+            button = uicontrol(control_panel, 'Style', 'pushbutton', 'String', str, ...
                 'Units', 'Normalized', 'Position', [0.55 0.1 0.1 0.9], 'FontSize', 12, ...
                 'Callback', @obj_vec.callback_cuts, 'UserData', input.parent);
             
+            if input.cuts
+                button.TooltipString = 'show cuts on top of the filtered flux';
+            else
+                button.TooltipString = 'show only the filtered flux without cuts'; 
+            end
             
-            uicontrol(control_panel, 'Style', 'pushbutton', 'String', 'Classify', 'FontSize', 18, ...
-                'Units', 'Normalized', 'Position', [0.67 0.1 0.1 0.9], ...
+            button = uicontrol(control_panel, 'Style', 'edit', 'String', ['Cuts= ' util.text.print_vec([obj.cut_hits, obj.display_cuts], ', ')], 'FontSize', 18, ...
+                'Units', 'Normalized', 'Position', [0.67 0.1 0.2 0.9], ...
+                'Callback', @obj_vec.callback_parse_cuts, 'UserData', input.parent);
+            
+            button.TooltipString = sprintf('Showing the cuts for: %s', strjoin(obj.cut_names([obj.cut_hits, obj.display_cuts]), ', '));  
+            
+            button = uicontrol(control_panel, 'Style', 'pushbutton', 'String', 'Classify', 'FontSize', 18, ...
+                'Units', 'Normalized', 'Position', [0.89 0.1 0.1 0.9], ...
                 'Callback', @obj_vec.callback_classify, 'UserData', input.parent); 
             
+            button.TooltipString = 'choose a classification for this candidate'; 
             
 %             ax4 = axes('Parent', input.parent, 'Position', [0.7 0.3 0.25 0.4]);
 %             obj.showStack('ax', ax4);
@@ -579,27 +647,34 @@ classdef Candidate < handle
 %                 w = w.*obj.head.SCALE;
 %             end
             
-            h4 = plot(input.ax, x, w, 'p', 'MarkerSize', 3, 'Color', [0.2 0.5 1]);
+            h4 = plot(input.ax, x, w, 'p', 'MarkerSize', 4, 'Color', [0.2 0.5 1]);
             h4.DisplayName = 'PSF FWHM';
             
             aux = horzcat(aux, w); 
             
-            h5 = plot(input.ax, x, obj.relative_dx, 'x', 'MarkerSize', 4, 'Color', [1 0.3 0.2]);
+            h5 = plot(input.ax, x, obj.relative_dx, 'x', 'MarkerSize', 7, 'Color', [1 0.3 0.2]);
             h5.DisplayName = 'relative dx';
             
             aux = horzcat(aux, obj.relative_dx); 
             
-            h6 = plot(input.ax, x, obj.relative_dy, '+', 'MarkerSize', 4, 'Color', [0.8 0.3 0.4]);
+            h6 = plot(input.ax, x, obj.relative_dy, '+', 'MarkerSize', 6, 'Color', [0.8 0.3 0.4]);
             h6.DisplayName = 'relative dy';
             
             aux = horzcat(aux, obj.relative_dy); 
             
             if obj.is_positive
-                lh = legend(input.ax, 'Location', 'SouthEast', 'Orientation', 'Vertical');
+                leg_pos_y = 'South'; 
             else
-                lh = legend(input.ax, 'Location', 'NorthEast', 'Orientation', 'Vertical');
+                leg_pos_y = 'North'; 
             end
             
+            if obj.time_index>=floor(length(obj.timestamps)/2)
+                leg_pos_x = 'West'; 
+            else
+                leg_pos_x = 'East'; 
+            end
+            
+            lh = legend(input.ax, 'Location', [leg_pos_y leg_pos_x], 'Orientation', 'Vertical');
             lh.FontSize = input.font_size-4;
 %             lh.NumColumns = 3;
 
@@ -697,15 +772,22 @@ classdef Candidate < handle
                 sign = -1;
             end
 
-            h4 = plot(input.ax, xk, obj.kernel*5*sign, ':');
+            h4 = plot(input.ax, xk, obj.kernel*5*sign, '--');
             h4.DisplayName = 'best kernel';
             
             if obj.is_positive
-                lh = legend(input.ax, 'Location', 'NorthEast', 'Orientation', 'Vertical');
+                leg_pos_y = 'North'; 
             else
-                lh = legend(input.ax, 'Location', 'SouthEast', 'Orientation', 'Vertical');
+                leg_pos_y = 'South'; 
             end
             
+            if obj.time_index>=floor(length(obj.timestamps)/2)
+                leg_pos_x = 'West'; 
+            else
+                leg_pos_x = 'East'; 
+            end
+            
+            lh = legend(input.ax, 'Location', [leg_pos_y leg_pos_x], 'Orientation', 'Vertical');
             lh.FontSize = input.font_size-4;
 %             lh.NumColumns = 3;
 
@@ -747,8 +829,11 @@ classdef Candidate < handle
             input.ax.NextPlot = 'replace';
             input.ax.FontSize = input.font_size;
             
-            if input.cuts && ~isempty(obj.cut_vector)
+            hits = obj.cut_hits;
+            hits = unique([hits, obj.display_cuts]); 
                 
+            if input.cuts && ~isempty(hits)
+                                
                 yyaxis(input.ax, 'right');
                 input.ax.NextPlot = 'replace'; 
                 
@@ -756,24 +841,40 @@ classdef Candidate < handle
                 
                 colors = {'g', 'b', 'y'}; 
                 
-                for ii = 1:length(obj.cut_vector)
+                for ii = 1:length(hits)
+                    
+                    vec = obj.cut_matrix(:,hits(ii));
+                    
+                    
+                    if obj.cut_two_sided(hits(ii))
+                        region = single(abs(vec)>=obj.cut_thresh(hits(ii)));
+                    else
+                        region = single(vec>=obj.cut_thresh(hits(ii)));
+                        vec(vec<0) = 0; 
+                    end
                     
                     col_idx = mod(ii-1,length(colors))+1; 
                     
-                    h = plot(input.ax, x, obj.cut_vector{ii}, '-', 'LineWidth', 1.5, 'Color', colors{col_idx}); 
-                    h.DisplayName = strrep(sprintf('%s=%4.2f', obj.cut_name{ii}, obj.cut_value{ii}), '_', ' '); 
+                    h = plot(input.ax, x, vec, '-', 'LineWidth', 1.5, 'Color', colors{col_idx}); 
                     
-                    vectors = horzcat(vectors, obj.cut_vector{ii}); % keep track of all cuts to set the bounds
+                    cut_idx = find(obj.cut_hits==hits(ii));
+                    
+                    if ~isempty(cut_idx) % if this was a triggered cut 
+                        val = obj.cut_value(cut_idx);
+                    else % or a user added cut
+                        val = obj.cut_matrix(obj.time_index, hits(ii));
+                    end
+                    
+                    h.DisplayName = strrep(sprintf('%s=%4.2f', obj.cut_names{hits(ii)}, val), '_', ' '); 
+                    
+                    vectors = horzcat(vectors, vec); % keep track of all cuts to set the bounds
                     
                     input.ax.NextPlot = 'add'; 
                     
-                    region = single(obj.cut_region{ii});
-%                     region = imdilate(region, ones(3,1)); 
                     region(~region) = NaN; 
                     
-%                     plot(input.ax, x, region.*obj.cut_thresh{ii}, '-', 'Color', h.Color, 'HandleVisibility', 'off'); 
-                    plot(input.ax, x, region.*obj.cut_vector{ii}, '*', 'Color', 'm', 'HandleVisibility', 'off'); 
-                    plot(input.ax, x, ones(length(x),1).*obj.cut_thresh{ii}, ':', 'Color', 'm', 'HandleVisibility', 'off'); 
+                    plot(input.ax, x, region.*vec, '*', 'Color', 'm', 'HandleVisibility', 'off'); 
+                    plot(input.ax, x, ones(length(x),1).*obj.cut_thresh(hits(ii)), ':', 'Color', 'm', 'HandleVisibility', 'off'); 
                     
                 end
                 
@@ -899,8 +1000,8 @@ classdef Candidate < handle
 
                     x0 = ceil(size(obj.cutouts,1)/2); 
 
-                    plot(ax{ii}, [x0 x0], [0 x0-1], '-m'); 
-                    plot(ax{ii}, [0 x0-1], [x0 x0], '-m'); 
+                    plot(ax{ii}, [x0 x0], [0.5 x0-1], '-m'); 
+                    plot(ax{ii}, [0.5 x0-1], [x0 x0], '-m'); 
 
                     ax{ii}.NextPlot = 'replace'; 
 
@@ -1102,6 +1203,44 @@ classdef Candidate < handle
             
         end
         
+        function callback_parse_cuts(obj, hndl, ~)
+            
+            idx = hndl.UserData.UserData.index;
+            str = hndl.String;
+            
+            c = util.text.parse_inputs(str);
+            
+            obj(idx).display_cuts = [];
+            
+            for ii = 1:length(c)
+                
+                arg = util.text.parse_value(c{ii}); 
+                
+                if iscell(arg)
+                    arg = strjoin(arg, '_');
+                end
+                
+                if ischar(arg) 
+                    if isfield(obj(idx).cut_indices, arg)
+                        value = obj(idx).cut_indices.(arg); 
+                    else
+                        value = [];
+                    end
+                elseif isnumeric(arg) && isscalar(arg)
+                    value = arg;
+                else
+                    value = [];
+                end
+                
+                if ~isempty(value) && ~ismember(value, obj(idx).cut_hits) && ~ismember(value, obj(idx).display_cuts)
+                    obj(idx).display_cuts = horzcat(obj(idx).display_cuts, value); 
+                end
+                
+            end
+            
+            obj.show; 
+            
+        end
         
     end
     

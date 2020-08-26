@@ -1,5 +1,5 @@
 function corr = correlation(v1, v2, timescale, varargin)
-% Usage: corr = correlation(v1, v2, timescale=[], varargin)
+% Usage: corr = correlation(v1, v2, timescale=10, varargin)
 % Correlate the two vectors v1 and v2, to see if any part of the series has 
 % the same kinds of variations. 
 % 

@@ -6,8 +6,10 @@ classdef DataStore < handle
     
     properties % objects
         
+        head@head.Header; 
         checker@trig.QualityChecker;
         this_input@util.text.InputVars; 
+        pars; % a struct with all the user-defined parameters
         
     end
     
@@ -56,21 +58,6 @@ classdef DataStore < handle
         star_indices = []; 
         star_snr = [];
         
-    end
-    
-    properties % switches/controls
-        
-        % number of frames to keep for each type of calculation
-        length_burn_in = 5e3; % this mininal number of frames is needed to start event finding! 
-        length_psd = 2e4; % this many flux measurements used for calculating the PSD
-        length_background = 2000; % this many flux/aux measurements used for calculating the variance of the background (outside the search region)
-        length_extended = 200; % extended region around the search region, used for overlap, filter edges, etc. 
-        length_search = 100; % the area searched in each batch (ideally equal to each batch so there's no need to search the same region twice)
-        
-        use_threshold = true; % use the minimal S/N to keep out bad stars and not even store them
-        threshold = 5; % stars with S/N lower than this are disqualified after the burn-in period!
-        func_rms = @nanstd; % which function should be used for calculating the noise in S/N 
-        
         debug_bit = 1;
         
     end
@@ -99,7 +86,7 @@ classdef DataStore < handle
             
                 obj.checker = trig.QualityChecker;
                 
-                obj.reset;
+                obj.resetPars;
 
             end
             
@@ -108,6 +95,28 @@ classdef DataStore < handle
     end
     
     methods % reset/clear
+        
+        function resetPars(obj)
+           
+            obj.pars = struct;
+            
+            % number of frames to keep for each type of calculation
+            obj.pars.length_burn_in = 5e3; % this mininal number of frames is needed to start event finding! 
+            obj.pars.length_psd = 2e4; % this many flux measurements used for calculating the PSD
+            obj.pars.length_background = 2000; % this many flux/aux measurements used for calculating the variance of the background (outside the search region)
+            obj.pars.length_extended = 200; % extended region around the search region, used for overlap, filter edges, etc. 
+            obj.pars.length_search = 100; % the area searched in each batch (ideally equal to each batch so there's no need to search the same region twice)
+
+            obj.pars.use_threshold = true; % use the minimal S/N to keep out bad stars and not even store them
+            obj.pars.threshold = 5; % stars with S/N lower than this are disqualified after the burn-in period!
+            obj.pars.func_rms = @nanstd; % which function should be used for calculating the noise (for star S/N)
+
+            obj.pars.use_remove_cosmic_rays = true; % get rid of intense cosmic rays before even inputting the flux into the buffers
+            obj.pars.cosmic_ray_threshold = 8; % in units of S/N
+
+            obj.reset;
+            
+        end
         
         function reset(obj)
             
@@ -177,7 +186,7 @@ classdef DataStore < handle
         
         function val = is_done_burn(obj)
             
-            val = obj.frame_counter>obj.length_burn_in;
+            val = obj.frame_counter>obj.pars.length_burn_in;
             
         end
         
@@ -198,6 +207,14 @@ classdef DataStore < handle
     end
     
     methods % setters
+        
+        function set.head(obj, val)
+            
+            obj.head = val;
+            
+            obj.checker.head = val;
+            
+        end
         
     end
     
@@ -280,12 +297,12 @@ classdef DataStore < handle
             if ndims(obj.this_input.widths)>2
                 error('This class cannot handle more than 2D auxiliary measurements!'); 
             end
-                
+            
             obj.clear;
             
             obj.frame_counter = obj.frame_counter + size(obj.this_input.fluxes,1); 
             
-            if obj.use_threshold && obj.is_done_burn % we need to keep only good stars at the input level
+            if obj.pars.use_threshold && obj.is_done_burn % we need to keep only good stars at the input level
                 
                 if isempty(obj.star_indices)
                     obj.calcGoodStars; % this produces the star indices
@@ -302,6 +319,13 @@ classdef DataStore < handle
                 
             end
             
+            if obj.pars.use_remove_cosmic_rays
+                obj.removeCosmicRays;
+            end
+            
+            % we may as well interpolate the NaNs right here...
+            obj.this_input.fluxes = fillmissing(obj.this_input.fluxes, 'spline'); 
+            
             % store the new fluxes and timestamps
             obj.flux_buffer = vertcat(obj.flux_buffer, single(obj.this_input.fluxes));
             obj.timestamps = vertcat(obj.timestamps, single(obj.this_input.timestamps)); % this tracks timestamps for the entire run
@@ -310,23 +334,23 @@ classdef DataStore < handle
             obj.filename_buffer = vertcat(obj.filename_buffer, repmat({obj.this_input.filename}, [length(obj.this_input.timestamps), 1])); 
             obj.frame_num_buffer = vertcat(obj.frame_num_buffer, single(1:length(obj.this_input.timestamps))'); % assume the frame numbers are just run continuously from 1->number of frames in batch
             
-            if size(obj.flux_buffer,1)>obj.length_psd
-                obj.flux_buffer = obj.flux_buffer(end-obj.length_psd+1:end,:,:); 
-                obj.timestamps_buffer = obj.timestamps_buffer(end-obj.length_psd+1:end); 
-                obj.juldates_buffer = obj.juldates_buffer(end-obj.length_psd+1:end); 
-                obj.filename_buffer = obj.filename_buffer(end-obj.length_psd+1:end); 
-                obj.frame_num_buffer = obj.frame_num_buffer(end-obj.length_psd+1:end); 
+            if size(obj.flux_buffer,1)>obj.pars.length_psd
+                obj.flux_buffer = obj.flux_buffer(end-obj.pars.length_psd+1:end,:,:); 
+                obj.timestamps_buffer = obj.timestamps_buffer(end-obj.pars.length_psd+1:end); 
+                obj.juldates_buffer = obj.juldates_buffer(end-obj.pars.length_psd+1:end); 
+                obj.filename_buffer = obj.filename_buffer(end-obj.pars.length_psd+1:end); 
+                obj.frame_num_buffer = obj.frame_num_buffer(end-obj.pars.length_psd+1:end); 
             end
             
             % store the cutouts for the extended region only
             obj.cutouts = cat(3, obj.cutouts, obj.this_input.cutouts); 
-            if size(obj.cutouts,3)>obj.length_extended
-                obj.cutouts = obj.cutouts(:,:,end-obj.length_extended+1:end,:); 
+            if size(obj.cutouts,3)>obj.pars.length_extended
+                obj.cutouts = obj.cutouts(:,:,end-obj.pars.length_extended+1:end,:); 
             end
             
             % store the new aux data
             list = obj.aux_names;
-            new_aux = NaN(size(obj.this_input.errors,1), size(obj.this_input.errors,2), length(list), 'like', obj.this_input.errors); % preallocate
+            new_aux = NaN(size(obj.this_input.errors,1), size(obj.this_input.widths,2), length(list), 'like', obj.this_input.widths); % preallocate
             
             for ii = 1:length(list)
                 new_aux(:,:,ii) = obj.this_input.(list{ii}); 
@@ -334,8 +358,8 @@ classdef DataStore < handle
             
             obj.aux_buffer = vertcat(obj.aux_buffer, new_aux);
 
-            if size(obj.aux_buffer,1)>obj.length_background+obj.length_extended % the aux buffer is smaller than flux buffer: it is only long enough for background+extended region
-                obj.aux_buffer = obj.aux_buffer(end-(obj.length_background+obj.length_extended)+1:end,:,:); 
+            if size(obj.aux_buffer,1)>obj.pars.length_background+obj.pars.length_extended % the aux buffer is smaller than flux buffer: it is only long enough for background+extended region
+                obj.aux_buffer = obj.aux_buffer(end-(obj.pars.length_background+obj.pars.length_extended)+1:end,:,:); 
             end
 
             obj.calcSubBuffers;
@@ -349,8 +373,8 @@ classdef DataStore < handle
         function calcSubBuffers(obj)
             
             % the extended batch region reaches from the end of the flux buffer back "length_extended"
-            extended_start_idx = max(1, size(obj.flux_buffer,1)-obj.length_extended+1);
-            extended_start_idx_aux = max(1, size(obj.aux_buffer,1)-obj.length_extended+1);
+            extended_start_idx = max(1, size(obj.flux_buffer,1)-obj.pars.length_extended+1);
+            extended_start_idx_aux = max(1, size(obj.aux_buffer,1)-obj.pars.length_extended+1);
             obj.extended_flux = obj.flux_buffer(extended_start_idx:end,:,:); 
             obj.extended_aux = obj.aux_buffer(extended_start_idx_aux:end,:,:);
             obj.extended_timestamps = obj.timestamps_buffer(extended_start_idx:end); 
@@ -359,7 +383,7 @@ classdef DataStore < handle
             obj.extended_frame_num= obj.frame_num_buffer(extended_start_idx:end); 
             
             % the search region is defined in the middle of the extended batch
-            margins = floor((obj.length_extended - obj.length_search)/2); 
+            margins = floor((obj.pars.length_extended - obj.pars.length_search)/2); 
             
             obj.search_start_idx = margins + 1; 
             obj.search_end_idx = size(obj.extended_flux,1) - margins; 
@@ -373,7 +397,7 @@ classdef DataStore < handle
             obj.search_aux = obj.extended_aux(obj.search_start_idx:obj.search_end_idx,:,:); % cut the search region out of the extended batch
             
             % the background region goes back from the start of extended region up to "length_background" before that
-            background_start_idx = max(1, extended_start_idx-obj.length_background);
+            background_start_idx = max(1, extended_start_idx-obj.pars.length_background);
             background_end_idx = extended_start_idx-1;
             obj.background_flux = obj.flux_buffer(background_start_idx:background_end_idx,:,:);
 
@@ -390,10 +414,10 @@ classdef DataStore < handle
         function calcGoodStars(obj)
             
             S = nanmean(obj.flux_buffer); % signal
-            N = obj.func_rms(obj.flux_buffer); % noise
+            N = obj.pars.func_rms(obj.flux_buffer); % noise
             
             obj.star_snr = S./N;
-            obj.star_indices =  find(obj.star_snr >= obj.threshold); 
+            obj.star_indices =  find(obj.star_snr >= obj.pars.threshold); 
             
         end
         
@@ -403,6 +427,59 @@ classdef DataStore < handle
             obj.flux_buffer = obj.flux_buffer(:,obj.star_indices,:); 
             obj.aux_buffer = obj.aux_buffer(:,obj.star_indices,:); 
             obj.cutouts = obj.cutouts(:,:,:,obj.star_indices); 
+            
+        end
+        
+        function removeCosmicRays(obj)
+            
+            low_thresh = 3.5; % set the limit for the neighbors of cosmic rays to be some low value like 3.5 sigma
+                
+            f = obj.this_input.fluxes;
+
+            if isempty(obj.flux_buffer)
+                noise = nanstd(f); 
+                average = nanmean(f); 
+            else
+                noise = nanstd(obj.flux_buffer); 
+                average = nanmean(obj.flux_buffer); 
+            end
+
+            f2 = (f-average)./noise; % normalized flux
+
+            idx = f2>obj.pars.cosmic_ray_threshold; % mark regions where there is a cosmic ray
+            list = find(idx); % linear indices in a vector
+
+            for ii = 1:length(list) % go over the list and check these are individual detections
+
+                [frame, star] = ind2sub(size(idx), list(ii));
+
+                if frame==1 % first frame of this input
+                    if f2(frame+1,star)>low_thresh % the very next frame is also above a few sigma, so this doesn't look like a cosmic ray
+                        idx(frame, star) = false; % this is no longer seen as a cosmic ray index
+                    end
+                elseif frame==size(f,1) % last frame of this input
+                    if f2(frame-1,star)>low_thresh % the previous frame is also above a few sigma, so this doesn't look like a cosmic ray
+                        idx(frame, star) = false; % this is no longer seen as a cosmic ray index
+                    end
+                else
+                    if f2(frame+1,star)>low_thresh && f2(frame-1,star)>low_thresh % both of the two nearest neighbors is also above a few sigma, so this doesn't look like a cosmic ray
+                        idx(frame, star) = false; % this is no longer seen as a cosmic ray index
+                    end
+                end
+
+            end % for ii in list
+
+            obj.this_input.fluxes(idx) = NaN; % replace the cosmic rays frames with NaNs 
+            
+        end
+        
+        function saveHours(obj, bad_batch)
+            
+            if nargin<3 || isempty(bad_batch)
+                bad_batch = 0;
+            end
+            
+            obj.checker.hours.input(obj.checker, bad_batch); 
             
         end
         

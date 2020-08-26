@@ -23,6 +23,8 @@ classdef EventFinder < handle
         cand@trig.Candidate;
         latest_candidates@trig.Candidate; 
         
+        pars; % a struct with all the user-defined parameters
+        
     end
     
     properties % inputs/outputs
@@ -37,41 +39,17 @@ classdef EventFinder < handle
         filtered_fluxes; % fluxes after matched-filtering with the bank of templates
         bg_filtered_std; % measured background standard deviation after filtering
         
-%         star_indices; % a list of the more promising stars that should be turned over to full filtering (e.g., from the pre-filter)
-%         star_indices_sim; % same thing, only for stars that have been injected with a simulated event
-        
         black_list_stars; % a slowly growing list of stars that display too many events, so that all their events are marked as false
-        black_list_batches; % a slowly growing list of batches that display too many events, so that all their events are marked as false
+%         black_list_batches; % a slowly growing list of batches that display too many events, so that all their events are marked as false
         
-    end
+        % simulated events are saved (their index in the shuffle bank) 
+        % the passed events have been detected and the failed events have
+        % been rejected by the system (we will try to put events outside 
+        % the areas disqualified by the checker
+        sim_events_passed;
+        sim_events_failed;
     
-    properties % switches/controls
-        
-        threshold = 7.5; % threshold (in units of S/N) for peak of event 
-        time_range_thresh = -2.5; % threshold for including area around peak (in continuous time)
-        kern_range_thresh = -1; % area threshold (in kernels, discontinuous) NOTE: if negative this will be relative to "threshold"
-        star_range_thresh = -1; % area threshold (in stars, discontinuous) NOTE: if this is higher than "threshold" there will be no area around peak
-        min_time_spread = 4; % how many frames around the peak to keep, in both directions, even if the flux drops below threshold 
-        % (min event duration is 1+2*min_time_spread, unless at the edge) 
-        
-        max_events = 5; % how many events can we have triggered on the same 2-batch window?
-        max_stars = 5; % how many stars can we afford to have triggered at the same time? 
-        
-        num_hits_black_list = 4; % how many repeated events can we allow before including star or batch in black list
-        
-        use_psd_correction = 1; % use welch on a flux buffer to correct red noise
-        use_std_filtered = 1; % normalize variance of each filtered flux to the average of previous batches (averaging size is set by length of "var_buf")
-        
-        use_prefilter = 1; % filter all stars on a smaller bank, using a lower threshold, and then vet the survivors only with the full filter bank
-        pre_threshold = 5; % threshold for the pre-filter
-        
-        use_keep_variances = 0; % keep a copy of the variance of each star/kernel for the entire run (this may be a bit heavy on the memory)
-        use_conserve_memory = 1; % throw away large image data for disqualified events (reduces size of MAT files, and these data can be restored from file)
-        
-        use_sim_sporadic = 0; % add simulated events in a few batches randomly spread out in the whole run
-        num_sim_events_per_batch = 0.01; % fractional probability to add a simulated event into each new batch. 
-        
-        use_sim_full = 0; % if true, will run all filter banks on each batch, to measure detectability of different kernels. 
+        total_batches = []; % optionally give the finder the number of files/batches in this run
         
         debug_bit = 1;
         
@@ -103,6 +81,8 @@ classdef EventFinder < handle
             else
                 if obj.debug_bit>1, fprintf('EventFinder constructor v%4.2f\n', obj.version); end
             
+                obj.resetPars; 
+                
                 obj.psd = trig.CorrectPSD;
             
                 obj.store = trig.DataStore;
@@ -117,13 +97,47 @@ classdef EventFinder < handle
     
     methods % reset/clear
         
+        function resetPars(obj)
+            
+            obj.pars = struct;
+            
+            obj.pars.threshold = 7.5; % threshold (in units of S/N) for peak of event 
+            obj.pars.time_range_thresh = -2.5; % threshold for including area around peak (in continuous time)
+            obj.pars.kern_range_thresh = -1; % area threshold (in kernels, discontinuous) NOTE: if negative this will be relative to "threshold"
+            obj.pars.star_range_thresh = -1; % area threshold (in stars, discontinuous) NOTE: if this is higher than "threshold" there will be no area around peak
+            obj.pars.min_time_spread = 4; % how many frames around the peak to keep, in both directions, even if the flux drops below threshold 
+            % (min event duration is 1+2*min_time_spread, unless at the edge) 
+
+            obj.pars.max_events = 5; % we will search iteratively up to this many times for new candidates in each batch
+            obj.pars.num_hits_black_list = 4; % how many repeated events can we allow before including star or batch in black list
+
+            obj.pars.use_psd_correction = 1; % use welch on a flux buffer to correct red noise
+            obj.pars.use_std_filtered = 1; % normalize variance of filtered flux of each kernel to the average of previous batches (averaging size is set by length_background in the store)
+
+            obj.pars.use_prefilter = 1; % filter all stars on a smaller bank, using a lower threshold, and then only vet the survivors with the full filter bank
+            obj.pars.pre_threshold = 5; % threshold for the pre-filter
+            obj.pars.filter_bank_full_filename = '/WFAST/saved/FilterBankShuffle.mat'; % filename where the filter bank was taken from (relative to the DATA folder)
+            obj.pars.filter_bank_small_filename = '/WFAST/saved/FilterBankShuffleSmall.mat'; % filename where the smaller filter bank was taken from (relative to the DATA folder)
+            
+            obj.pars.limit_events_per_batch = 5;
+            obj.pars.limit_events_per_star = 5; 
+
+            obj.pars.use_keep_variances = 1; % keep a copy of the variance of each star/kernel for the entire run (this may be a bit heavy on the memory)
+
+            obj.pars.use_sim = 0; % add simulated events in a few batches randomly spread out in the whole run
+            obj.pars.num_sim_events_per_batch = 0.01; % fractional probability to add a simulated event into each new batch. 
+            
+            obj.reset;
+            
+        end
+        
         function reset(obj)
             
             obj.cand = trig.Candidate.empty;
             obj.latest_candidates = trig.Candidate.empty;
             
             obj.black_list_stars = [];
-            obj.black_list_batches = [];
+%             obj.black_list_batches = [];
             
             obj.display_candidate_idx = [];
             
@@ -133,6 +147,11 @@ classdef EventFinder < handle
             
             obj.snr_values = [];
             obj.var_values = [];
+            
+            obj.sim_events_passed = [];
+            obj.sim_events_failed = [];
+            
+            obj.total_batches = [];
             
             obj.clear;
             
@@ -159,35 +178,35 @@ classdef EventFinder < handle
         
         function val = getTimeThresh(obj)
             
-            if obj.time_range_thresh>0
-                val = obj.time_range_thresh;
+            if obj.pars.time_range_thresh>0
+                val = obj.pars.time_range_thresh;
             else
-                val = obj.threshold + obj.time_range_thresh;
+                val = obj.pars.threshold + obj.pars.time_range_thresh;
             end
             
         end
         
         function val = getKernThresh(obj)
             
-            if obj.time_range_thresh>0
-                val = obj.kern_range_thresh;
+            if obj.pars.time_range_thresh>0
+                val = obj.pars.kern_range_thresh;
             else
-                val = obj.threshold + obj.kern_range_thresh;
+                val = obj.pars.threshold + obj.pars.kern_range_thresh;
             end
             
         end
         
         function val = getStarThresh(obj)
             
-            if obj.star_range_thresh>0
-                val = obj.star_range_thresh;
+            if obj.pars.star_range_thresh>0
+                val = obj.pars.star_range_thresh;
             else
-                val = obj.threshold + obj.star_range_thresh;
+                val = obj.pars.threshold + obj.pars.star_range_thresh;
             end
             
         end
         
-        function val = num_batches_scanned(obj)
+        function val = batch_counter(obj)
             
             val = length(obj.snr_values);
             
@@ -243,7 +262,7 @@ classdef EventFinder < handle
                 val = sprintf('aperture: %s pix | annulus: %s pix | iterations: %d | var_buf: %d | PSD: %d ', ...
                     util.text.print_vec(obj.head.PHOT_PARS.aperture_radius),...
                     util.text.print_vec(obj.head.PHOT_PARS.annulus_radii),...
-                    obj.head.PHOT_PARS.iterations, obj.use_var_buf, obj.use_psd_correction);
+                    obj.head.PHOT_PARS.iterations, obj.pars.use_var_buf, obj.pars.use_psd_correction);
                 
             end
             
@@ -253,13 +272,12 @@ classdef EventFinder < handle
     
     methods % setters
         
-        function set.display_candidate_idx(obj, val)
+        function set.head(obj, val)
             
-            obj.display_candidate_idx = val;
-            if ~isempty(obj.display_candidate_idx) && ~isempty(obj.gui) && obj.gui.check
-                obj.cand(obj.display_candidate_idx).show('parent', obj.gui.panel_image);
-            end
-
+            obj.head = val;
+            
+            obj.store.head = val;
+            
         end
         
     end
@@ -272,165 +290,137 @@ classdef EventFinder < handle
             
             obj.store.input(varargin{:});
             
+            obj.pars.analysis_time = util.text.time2str('now'); 
+            
             if isempty(obj.bank)
                 obj.loadFilterBank;
             end
             
-            if obj.use_prefilter && isempty(obj.bank_small)
+            if obj.pars.use_prefilter && isempty(obj.bank_small)
                 obj.loadFilterBankSmall;
             end
             
-            if obj.use_sim_full
+            if obj.pars.use_sim
                 obj.loadSimulationBank;
             end
             
             if obj.store.is_done_burn % do not do any more calculations until done with "burn-in" period
                 
-                if obj.use_psd_correction
-                    obj.psd.calcPSD(obj.store.flux_buffer, obj.store.timestamps_buffer, obj.store.length_extended, obj.store.length_background*2); % first off, make the PSD correction for the current batch
+                if obj.pars.use_psd_correction
+                    obj.psd.calcPSD(obj.store.flux_buffer, obj.store.timestamps_buffer, obj.store.pars.length_extended, obj.store.pars.length_background*2); % first off, make the PSD correction for the current batch
                 end
                                 
                 if obj.var_buf.is_empty % check if we haven't used this since the last reset() call
-                    N = ceil(obj.store.length_background./obj.store.length_search); % how many batches we want to keep as "background" sample 
+                    N = ceil(obj.store.pars.length_background./obj.store.pars.length_search); % how many batches we want to keep as "background" sample 
                     obj.var_buf.reset(N); 
                 end
+ 
+                [obj.corrected_fluxes, obj.corrected_stds] = obj.correctFluxes(obj.store.extended_flux, 1);
 
-                if obj.use_sim_full
-                    
-                else
-                     
-                    [obj.corrected_fluxes, obj.corrected_stds] = obj.correctFluxes(obj.store.extended_flux, 1);
-                    
-                    if obj.use_prefilter % use a small filter bank and only send the best stars to the big bank
+                if obj.pars.use_prefilter % use a small filter bank and only send the best stars to the big bank
+
+                    obj.bank_small.input(obj.corrected_fluxes, obj.corrected_stds); 
+
+                    if obj.pars.use_std_filtered
+
+                        V = nanvar(obj.bank_small.fluxes_filtered);
+
+                        obj.var_buf.input(V); 
+
+                        if obj.pars.use_keep_variances
+                            obj.var_values = vertcat(obj.var_values, V); 
+                        end
+
+                        bg_filtered_std = sqrt(obj.var_buf.mean); 
+
+                    else
+                        bg_filtered_std = 1; % do not correct for filtered flux background noise
+                    end
+
+                    pre_snr = squeeze(util.stat.max2(obj.bank_small.fluxes_filtered./bg_filtered_std)); % signal to noise peak for each star at any time and any filter kernel
+
+                    star_indices = find(pre_snr>=obj.pars.pre_threshold); 
+
+                else % do not prefilter, just put all stars into the big filter bank
+
+                    star_indices = 1:size(obj.corrected_fluxes,2); % just list all the stars
+
+                end
+
+                best_snr = []; 
+                
+                if ~isempty(star_indices) % if no stars passed the pre-filter, we will just skip to the next batch
+
+                    obj.filtered_fluxes = obj.bank.input(obj.corrected_fluxes(:,star_indices), obj.corrected_stds(1,star_indices)); % filtered flux for each star/kernel
+
+                    if obj.pars.use_std_filtered % get the noise in the filtered flux background region
+
+                        if obj.pars.use_prefilter % if we used a pre-filter we must also get the background noise for each chosen star, and we don't have var_buf for this!
+
+                            [background_flux, background_std] = obj.correctFluxes(obj.store.background_flux(:,star_indices), star_indices); % run the PSD or linear fit removal, but this time on the background area
+
+                            background_ff = obj.bank.input(background_flux, background_std); % filter these background fluxes also
+
+                            obj.bg_filtered_std = nanstd(background_ff); % this reflects the noise in a few previous batches, on the filtered fluxes, including only the chosen stars
+
+                        else % we can just use the var_buf for this
+                            obj.var_buf.input(nanvar(obj.filtered_fluxes)); 
+                            obj.bg_filtered_std = sqrt(obj.var_buf.mean); 
+                        end
+
+                    else
+                        obj.bg_filtered_std = 1; % just assume the filters have unit standard deviation by construction
+                    end
+
+                    obj.filtered_fluxes = obj.filtered_fluxes./obj.bg_filtered_std; % normalize the filtered flux by the background std
+
+                    [obj.latest_candidates, best_snr] = obj.searchForCandidates(obj.store.extended_flux, obj.corrected_fluxes, obj.filtered_fluxes, star_indices); 
+
+                    if length(obj.latest_candidates)>=obj.pars.limit_events_per_batch % this batch has too many events, need to mark them as black-listed! 
                         
-                        obj.bank_small.input(obj.corrected_fluxes, obj.corrected_stds); 
-                        
-                        if obj.use_std_filtered
-                            
-                            V = nanvar(obj.bank_small.fluxes_filtered);
-
-                            obj.var_buf.input(V); 
-
-                            if obj.use_keep_variances
-                                obj.var_values = vertcat(obj.var_values, V); 
-                            end
-                            
-                            bg_filtered_std = sqrt(obj.var_buf.mean); 
-
-                        else
-                            bg_filtered_std = 1; % do not correct for filtered flux background noise
+                        for ii = 1:length(obj.latest_candidates)
+                            obj.latest_candidates(ii).notes{end+1} = sprintf('Batch is black listed with %d events', length(obj.latest_candidates)); 
+                            obj.latest_candidates(ii).kept = 0;
                         end
                         
-                        pre_snr = squeeze(util.stat.max2(obj.bank_small.fluxes_filtered./bg_filtered_std)); % signal to noise peak for each star at any time and any filter kernel
+                        obj.store.saveHours(1); % mark this as a bad batch...
                         
-                        star_indices = find(pre_snr>=obj.pre_threshold); 
-                        
-                    else % do not prefilter, just put all stars into the big filter bank
-                        
-                        star_indices = 1:size(obj.corrected_fluxes,2); % just list all the stars
-                        
+                    else
+                        obj.store.saveHours; % make sure to count the hours in this batch if it isn't black listed
                     end
                     
-                    if ~isempty(star_indices) % if no stars passed the pre-filter, we will just skip to the next batch
+                    if obj.pars.use_sim
                         
-                        obj.filtered_fluxes = obj.bank.input(obj.corrected_fluxes(:,star_indices), obj.corrected_stds(1,star_indices)); % filtered flux for each star/kernel
+                        star_indices = obj.findStarsForSim(star_indices);
                         
-                        if obj.use_std_filtered % get the noise in the filtered flux background region
-
-                            if obj.use_prefilter % if we used a pre-filter we must also get the background noise for each chosen star, and we don't have var_buf for this!
-
-                                [background_flux, background_std] = obj.correctFluxes(obj.store.background_flux(:,star_indices), star_indices); % run the PSD or linear fit removal, but this time on the background area
-
-                                background_ff = obj.bank.input(background_flux, background_std); % filter these background fluxes also
-
-                                obj.bg_filtered_std = nanstd(background_ff); % this reflects the noise in a few previous batches, on the filtered fluxes, including only the chosen stars
-
-                            else % we can just use the var_buf for this
-                                obj.var_buf.input(nanvar(obj.filtered_fluxes)); 
-                                obj.bg_filtered_std = sqrt(obj.var_buf.mean); 
-                            end
-
-                        else
-                            obj.bg_filtered_std = 1; % just assume the filters have unit standard deviation by construction
-                        end
-                        
-                        obj.filtered_fluxes = obj.filtered_fluxes./obj.bg_filtered_std; % normalize the filtered flux by the background std
-                        
-                        obj.latest_candidates = obj.searchForCandidates(obj.store.extended_flux, obj.corrected_fluxes, obj.filtered_fluxes, star_indices); 
-                        
-                    end
-                    
-                    if obj.use_sim_sporadic
-
-                        if rand<obj.num_sim_events_per_batch
-
-                            candidate_stars = false(1,size(obj.corrected_fluxes,2)); % logical vector with 1s where any star has a chance of already having an event
-
-                            if length(star_indices)==size(obj.corrected_fluxes,2) % when not using pre-filter, or if by some coincidence the pre-filter triggered all stars! 
-                                candidate_stars([obj.latest_candidates.star_index]) = true; % choose only stars that have a recent candidate
-                            else
-                                candidate_stars(star_indices) = true; % just mark all the stars chosen by the pre-filter
-                            end
-
-                            star_indices = find(~candidate_stars); % all the other stars are good choices for simulations
-                            
-                            if isscalar(star_indices)
-                                star_index_sim = star_indices;
-                            else
-                                star_index_sim = star_indices(randperm(length(star_indices),1)); % this should now contain exactly one star
-                            end
-
-                            f = obj.store.extended_flux; 
-                            
-                            [f_sim, sim_pars] = obj.addSimulatedEvent(f(:,star_index_sim)); % add the simulated occultation to the raw fluxes
-                            
-                            f(:,star_index_sim) = f_sim;
-                            
-                            [f_corr, std_corr] = obj.correctFluxes(f); 
-                            
-                            f_filt = obj.bank.input(f_corr(:,star_index_sim), std_corr(star_index_sim)); % filter only the star with the simulated event on it
-                            
-                            % get an estimate for the background of this flux
-                            
-                            if obj.use_std_filtered % need to correct the filtered fluxes by their measured noise
-                                
-                                if obj.use_prefilter % need to draw from the background region an calculate the filtered flux noise
-                                    [bg_flux, bg_std] = obj.correctFluxes(obj.store.background_flux(:,star_index_sim), star_index_sim); % run correction on the background region
-                                    bg_ff = obj.bank.input(bg_flux, bg_std); % filter these background fluxes also
-                                    bg_ff_std = nanstd(bg_ff); 
-                                else % we have a var_buf for every star, we can just get the noise from that
-                                    bg_ff_std = sqrt(obj.var_buf.mean);
-                                    bg_ff_std = bg_ff_std(star_index_sim); 
-                                end
-                                
-                                f_filt = f_filt./bg_ff_std; 
-                                
-                            end
-                            
-                            new_event_sim = obj.searchForCandidates(f, f_corr, f_filt, star_index_sim, 1); 
-                            
-                            if ~isempty(new_event_sim)
-                                new_event_sim.is_simulated = 1; 
-                                new_event_sim.sim_pars = sim_pars; 
-                                obj.latest_candidates = vertcat(obj.latest_candidates, new_event_sim); 
-                            end
-                            
+                        for ii = 1:obj.getNumSimulations
+                            obj.simulate(star_indices); % each call to this function tries to add a single simulated event to a random star from the list                            
                         end
                         
                     end
                     
                     obj.cand = vertcat(obj.cand, obj.latest_candidates); % store all the candidates that were found in the last batch
                     
+                end % check any stars passed the prefilter
+
+                if ~isempty(obj.latest_candidates)
+                    obj.snr_values(end+1) = max(abs([obj.latest_candidates.snr])); 
+                elseif ~isempty(best_snr)
+                    obj.snr_values(end+1) = best_snr; % no candidates, instead just return the best S/N found when searching for candidates
+                elseif obj.pars.use_prefilter && isempty(best_snr) % we used a pre-filter and didn't get any stars that passed
+                    obj.snr_values(end+1) = max(pre_snr);
+                else
+                    error('This shouldn''t happen!'); 
                 end
                 
-            end
+            end % done burn
             
         end
         
-        function new_candidates = searchForCandidates(obj, fluxes_raw, fluxes_corrected, fluxes_filtered, star_indices, max_num_events)
+        function [new_candidates, best_snr] = searchForCandidates(obj, fluxes_raw, fluxes_corrected, fluxes_filtered, star_indices, max_num_events)
 
             if nargin<6 || isempty(max_num_events)
-                max_num_events = obj.max_events;
+                max_num_events = obj.pars.max_events;
             end
             
             new_candidates = trig.Candidate.empty;
@@ -447,19 +437,25 @@ classdef EventFinder < handle
                     idx(3) = 1;
                 end
                 
-                if ii==1
-                    obj.snr_values(end+1) = fluxes_filtered(idx(1),idx(2),idx(3)); % keep track of the highest S/N in this batch (including if it is positive OR negative)
-                end
-
-                if mx>=obj.threshold % at least one part of the filtered lightcurves passed the threshold
+                if ii==1, best_snr = mx; end % return the best S/N from this batch
+                
+                if mx>=obj.pars.threshold % at least one part of the filtered lightcurves passed the threshold
 
                     c = obj.makeNewCandidate(fluxes_raw, fluxes_corrected, fluxes_filtered, idx, star_indices); 
 
-                    % add the new event and remove its footprint from the fluxes to search
-                    new_candidates = vertcat(new_candidates, c); 
-
+                    % check this event doesn't peak outside the search region! 
+%                     if c.time_index<obj.store.search_start_idx || c.time_index>obj.store.search_end_idx 
+                        % do nothing, just don't add this event (but remove it's footprint because we don't want to keep finding it over and over again
+%                     else
+                    c.serial = length(obj.cand) + length(obj.latest_candidates) + 1; % new event gets a serial number
+                    new_candidates = vertcat(new_candidates, c); % did not fail any tests, we can add this event to the list
+%                     end
+                    
+                    % remove the new event's footprint from the fluxes to search
                     fluxes_filtered(c.time_range, :, :) = NaN; % don't look at the same region twice
 
+                    % do we have to ALSO reduce this region from the star hours?
+                    
                 end
 
             end
@@ -470,12 +466,9 @@ classdef EventFinder < handle
 
             c = trig.Candidate;
             
-            c.serial = length(obj.cand) + length(obj.latest_candidates) + 1; 
-            
             c.snr = abs(fluxes_filtered(idx(1),idx(2),idx(3))); % note this is positive even for negative filter responses! 
             c.is_positive = fluxes_filtered(idx(1),idx(2),idx(3))>0; 
-            c.threshold = obj.threshold; 
-            
+                        
             c.time_index = idx(1); % time index inside of the extended region
             c.kern_index = idx(2); % which kernel triggered
             c.star_index = star_indices(idx(3)); % which star (out of all stars that passed the burn-in)
@@ -483,15 +476,16 @@ classdef EventFinder < handle
 
             c.kernel = obj.bank.kernels(:,c.kern_index); 
             c.kern_props = obj.bank.pars(c.kern_index); 
+            c.kern_props.inverted = ~c.is_positive; % if the filtered flux was negative, it means we had to invert the kernel
             
-            c.time_range = obj.findTimeRange(fluxes_filtered, idx(1), idx(2), idx(3)); % find continuous area (in the extended region) that is above time_range_thresh 
-            c.thresh_time = obj.getTimeThresh;
+            % find continuous area (in the extended region) that is above time_range_thresh 
+            c.time_range = obj.findTimeRange(fluxes_filtered, idx(1), idx(2), idx(3)); 
             
-            c.kern_extra = find(max(abs(fluxes_filtered(c.time_range, :, idx(3))))>obj.getKernThresh); % find (non-continuous) list of kernels that also show some response at the same time/star
-            c.thresh_kern = obj.getKernThresh;
+            % find (non-continuous) list of kernels that also show some response at the same time/star
+            c.kern_extra = find(max(abs(fluxes_filtered(c.time_range, :, idx(3))))>obj.getKernThresh); 
             
-            c.star_extra = star_indices(find(max(abs(fluxes_filtered(c.time_range, idx(2), :)))>obj.getStarThresh)); % find (non-continuous) list of stars that also show some response at the same time/kernel
-            c.thresh_star = obj.getStarThresh; 
+            % find (non-continuous) list of stars that also show some response at the same time/kernel
+            c.star_extra = star_indices(find(max(abs(fluxes_filtered(c.time_range, idx(2), :)))>obj.getStarThresh));
             
             % save the timing data
             c.timestamps = obj.store.extended_timestamps;
@@ -505,7 +499,7 @@ classdef EventFinder < handle
             c.frame_index = obj.store.extended_frame_num(c.time_index); 
 
             % keep a copy of the cutouts, but only for the relevant star!
-            c.cutouts = obj.store.cutouts(:,:,:,obj.star_index); 
+            c.cutouts = obj.store.cutouts(:,:,:,c.star_index); 
             
             % store the different types of flux
             c.flux_raw = fluxes_raw(:,c.star_index); 
@@ -524,75 +518,70 @@ classdef EventFinder < handle
             c.aux_names = obj.store.aux_names;
             c.aux_indices = obj.store.aux_indices;
 
-            F = nanmean(obj.store.extended_flux,1);
             DX = c.auxiliary(:,:, c.aux_indices.offsets_x); % the offsets_x for all stars
-            dx = DX(:,c.star_index) - util.vec.weighted_average(DX,F,2); % reduced the mean offsets_x
+            dx = DX(:,c.star_index) - obj.store.checker.mean_x; % reduced the mean offsets_x
             DY = c.auxiliary(:,:, c.aux_indices.offsets_y); % the offsets_y for all stars
-            dy = DY(:,c.star_index) - util.vec.weighted_average(DY,F,2); % reduced the mean offsets_y
+            dy = DY(:,c.star_index) - obj.store.checker.mean_y; % reduced the mean offsets_y
             
             c.relative_dx = dx; 
             c.relative_dy = dy; 
             
-            % keep the correlations for this star ONLY!
-            c.correlations = obj.store.checker.correlations(:,c.star_index,:); % linearize the last dimension so instead of dim3=types and dim4=timescales we have dim3=names on one list
-            c.corr_names = obj.store.checker.getCorrNames;
-            
-            c.corr_indices = struct; 
-            for ii = 1:length(c.corr_names)
-                c.corr_indices.(c.corr_names{ii}) = ii; 
-            end
-            
-            % keep track of what parameters were used in this analysis
-            c.used_psd_corr = obj.use_psd_correction;
-            c.used_filt_std = obj.use_std_filtered; 
-
             % get the observational parameters and the star parameters from astrometry/GAIA
             c.head = obj.head;
             if ~isempty(obj.cat) && obj.cat.success
                 c.star_props = obj.cat.data(c.star_index,:); % copy a table row from the catalog
             end
 
-            % disqualify event based on any cut flag
-            M = obj.store.checker.cut_flag_matrix; % dim1 is time, dim2 is stars, dim3 is type of cut
-            cut = obj.store.checker.cut_names; % cell array of names of each cut in the matrix
+            % save the parameters used by the finder, store and quality checker
+            c.finder_pars = obj.pars; 
+            c.store_pars = obj.store.pars;
+            c.checker_pars = obj.store.checker.pars;
+            % add StarHours parameters?? 
+            
+            c.finder_pars.time_range_thresh = obj.getTimeThresh;
+            c.finder_pars.kern_range_thresh = obj.getKernThresh;
+            c.finder_pars.star_range_thresh = obj.getStarThresh; 
+            c.finder_pars.total_batches = obj.total_batches; 
+            c.batch_number = obj.batch_counter; 
 
-            for ii = 1:size(M,3)
-                
-                if any(M(c.time_range, c.star_index, ii))
+            % store the name and date of the run (from the filenames)
+            c.setRunNameDate; 
+            
+            c.checkIfPeakIsIncluded; % set kept=0 for candidates that have a higher peak outside the search region than inside it
+            
+            % disqualify event based on any cut flag
+            c.cut_matrix = permute(obj.store.checker.cut_values_matrix(:,c.star_index,:), [1,3,2]); % dim1 is time, dim2 is type of cut
+            c.cut_names = obj.store.checker.cut_names; % cell array of names of each cut in the matrix
+            c.cut_indices = obj.store.checker.cut_indices; % struct with the indices of each cut in each field
+            c.cut_thresh = obj.store.checker.cut_thresholds; 
+            c.cut_two_sided = obj.store.checker.cut_two_sided; 
+            
+            for ii = 1:length(c.cut_names)
+            
+                if obj.store.checker.cut_flag_matrix(c.time_index, c.star_index, ii) % the event occurs on one of the flagged frames/stars
                     
-                    if strcmpi(cut{ii}(1:4), 'corr')
+                    if obj.store.checker.pars.use_dilate
+                        indices = (-obj.store.checker.pars.dilate_region:obj.store.checker.pars.dilate_region) + c.time_index; % region around peak that can be excluded by this cut
+                        if c.cut_two_sided(ii)
+                            [~, idx] = max(abs(c.cut_matrix(indices,ii))); % find the absolute max, then...
+                            mx = max(c.cut_matrix(indices(idx),ii)); % get the value with sign
+                        else
+                            mx = max(c.cut_matrix(indices,ii)); % maximum value of this cut in this region
+                        end
                         
-                        % the name of the cut is corr_<letter>_<timescale number> 
-                        % so we need to extract the index of the correlation type and timescale
-                        corr_index = obj.store.checker.corr_indices.(cut{ii}(6)); 
-                        timescale_index = find(obj.store.checker.corr_timescales==str2double(cut{ii}(8:end))); 
-                        cut_values = obj.store.checker.correlations(:,:,corr_index,timescale_index); 
-                        thresh = obj.store.checker.thresh_correlation; 
-                        
-                    elseif isprop(obj.store.checker, cut{ii})
-                        cut_values = obj.store.checker.(cut{ii});
-                        thresh = obj.store.checker.(['thresh_' cut{ii}]); 
-                    end
-                    
-                    if size(cut_values,2)>1
-                        cut_vector = cut_values(:, c.star_index); % extract only the vector pertaining to this star
                     else
-                        cut_vector = cut_values;
+                        mx = c.cut_matrix(c.time_index,ii);
                     end
                     
-                    mx = max(cut_vector(c.time_range)); % the maximum cut value inside the event time
+                    if isfield(obj.store.checker.pars, ['thresh_' c.cut_names{ii}]) || strcmp(c.cut_names{ii}(1:4), 'corr') % this is a "threshold" type test
+                        c.cut_string{end+1,1} = sprintf('Cut "%s" failed with value %4.2f', c.cut_names{ii}, mx);
+                    else % this is a pass/fail type cut
+                        c.cut_string{end+1,1} = sprintf('Cut "%s" failed', c.cut_names{ii});
+                    end
                     
-                    str = sprintf('Cut "%s" failed with value %4.2f', cut{ii}, mx);
-                    c.addCutString(str); 
-                    c.addCutValue(mx); 
-                    c.addCutName(cut{ii}); 
-                    c.addCutRegion(M(:,c.star_index,ii)); 
-                    c.addCutVector(cut_vector); % also keep a vector of the values that didn't pass the cut
-                    c.addCutThreshold(thresh); 
-                    
+                    c.cut_value(end+1) = mx; 
+                    c.cut_hits(end+1) = ii;
                     c.kept = 0; 
-                    
-                    c.setRunNameDate;
                     
                 end
                 
@@ -616,7 +605,7 @@ classdef EventFinder < handle
                 if idx<1, break; end
 
 %                 if any(abs(ff(idx, :, star_index))>=thresh)
-                if abs(ff(idx, kern_index, star_index))>=thresh || jj<=obj.min_time_spread || jj<=kernel_min_spread
+                if abs(ff(idx, kern_index, star_index))>=thresh || jj<=obj.pars.min_time_spread || jj<=kernel_min_spread
                     time_range = [time_range, idx];
                 else
                     break;
@@ -633,7 +622,7 @@ classdef EventFinder < handle
                 if idx>N, break; end
 
 %                 if any(abs(ff(idx, :, star_index))>=thresh)
-                if abs(ff(idx, kern_index, star_index))>=thresh || jj<=obj.min_time_spread || jj<=kernel_min_spread
+                if abs(ff(idx, kern_index, star_index))>=thresh || jj<=obj.pars.min_time_spread || jj<=kernel_min_spread
                     time_range = [time_range, idx];
                 else
                     break;
@@ -649,7 +638,7 @@ classdef EventFinder < handle
                 star_indices = 1:size(fluxes,2);
             end
             
-            if obj.use_psd_correction
+            if obj.pars.use_psd_correction
                 flux_out = obj.psd.input(fluxes, 1, star_indices); 
             else
                 flux_out = obj.removeLinearFit(fluxes, obj.store.extended_timestamps); 
@@ -676,40 +665,9 @@ classdef EventFinder < handle
             
         end
         
-        function [flux, sim_pars] = addSimulatedEvent(obj, flux)
-        
-            obj.loadSimulationBank; % lazy load the sim_bank
-            
-            [lc, sim_pars] = obj.sim_bank.randomLC(0.5); % let's set the stellar radius R=0.5 Fresnel units
-            
-            margin = length(flux) - length(lc);
-            
-            t = (1:length(flux))';
-            
-            fr = util.fit.polyfit(t, flux, 'order', 2); 
-            
-            flux_mean = fr.ym; 
-            flux_noise = flux - flux_mean; % separate the noise from the mean flux
-            
-            if margin>0 % if the lc is similar in size to the search region, this push ensures the peak is in that region
-                push = randi(margin); 
-                lc = vertcat(lc, ones(margin,1)); 
-                lc = circshift(lc, push); 
-            elseif margin<0
-                error('need to handle this case at some point...'); 
-            else
-                 % do nothing?
-            end
-            
-            flux_mean = flux_mean.*lc;
-            
-            flux = flux_mean + flux_noise; 
-            
-        end
-            
         function loadFilterBank(obj)
 
-            f = fullfile(getenv('DATA'), '/WFAST/saved/FilterBankShuffle.mat');
+            f = fullfile(getenv('DATA'), obj.pars.filter_bank_full_filename);
             if exist(f, 'file')
                 load(f, 'bank');
                 obj.bank = bank;
@@ -721,7 +679,7 @@ classdef EventFinder < handle
         
         function loadFilterBankSmall(obj)
 
-            f = fullfile(getenv('DATA'), '/WFAST/saved/FilterBankShuffleSmall.mat');
+            f = fullfile(getenv('DATA'), obj.pars.filter_bank_small_filename);
             if exist(f, 'file')
                 load(f, 'bank');
                 obj.bank_small = bank;
@@ -752,6 +710,185 @@ classdef EventFinder < handle
 
         end
         
+        function finishup(obj)
+            
+            real_events = ~[obj.cand.is_simulated]; % don't include simulated events in the black list! 
+            
+            N = histcounts([obj.cand(real_events).star_index], 'BinEdges', 1:size(obj.store.extended_flux,2)+1);
+            
+            idx = N>=obj.pars.limit_events_per_star;
+            
+            obj.black_list_stars = find(idx); 
+            
+            obj.store.checker.hours.removeStars(idx); 
+            
+            for ii = 1:length(obj.cand)
+                
+                star = obj.cand(ii).star_index; 
+                
+                if ismember(star, obj.black_list_stars)
+                    str = sprintf('Star %d blacklisted with %d events', star, N(star)); 
+                    str_idx = strcmp(str, obj.cand(ii).notes);
+                    if isempty(str_idx)
+                        obj.cand(ii).notes{end+1} = str; 
+                    end
+                    obj.cand(ii).kept = 0; 
+                end
+                
+            end
+            
+        end
+        
+    end
+    
+    methods % simulations
+        
+        function star_indices = findStarsForSim(obj, star_indices) % take a list of stars from the prefilter (or all stars) and get a list of good stars for a simulated event
+           
+            stars_not_for_sim = false(1,size(obj.corrected_fluxes,2)); % logical vector with 1s where any star has a chance of already having an event
+
+            if length(star_indices)==size(obj.corrected_fluxes,2) % when not using pre-filter, or if by some coincidence the pre-filter triggered all stars! 
+                stars_not_for_sim([obj.latest_candidates.star_index]) = true; % choose only stars that have a recent candidate
+            else
+                stars_not_for_sim(star_indices) = true; % just mark all the stars chosen by the pre-filter
+            end
+
+            % make sure to take only stars with good frames! 
+            B = obj.store.checker.bad_times;                            
+            stars_not_for_sim = stars_not_for_sim | all(B(obj.store.search_start_idx:obj.store.search_end_idx,:)); % also disqualify stars that are completely ruled out by the checker
+
+            star_indices = find(~stars_not_for_sim); % all the other stars are good choices for simulations
+            
+        end
+        
+        function val = getNumSimulations(obj)
+            
+            if obj.pars.num_sim_events_per_batch<1
+                val = double(rand<obj.pars.num_sim_events_per_batch);
+            else
+                val = poissrnd(obj.pars.num_sim_events_per_batch); 
+            end
+            
+        end
+        
+        function simulate(obj, star_indices)
+            
+            if isscalar(star_indices)
+                star_index_sim = star_indices;
+            else
+                star_index_sim = star_indices(randperm(length(star_indices),1)); % this should now contain exactly one star
+            end
+
+            f = obj.store.extended_flux; 
+
+            [f_sim, sim_pars] = obj.addSimulatedEvent(f, star_index_sim); % add the simulated occultation to the raw fluxes
+
+            f(:,star_index_sim) = f_sim;
+
+            [f_corr, std_corr] = obj.correctFluxes(f); 
+
+            f_filt = obj.bank.input(f_corr(:,star_index_sim), std_corr(star_index_sim)); % filter only the star with the simulated event on it
+
+            % get an estimate for the background of this flux
+
+            if obj.pars.use_std_filtered % need to correct the filtered fluxes by their measured noise
+
+                if obj.pars.use_prefilter % need to draw from the background region an calculate the filtered flux noise
+                    [bg_flux, bg_std] = obj.correctFluxes(obj.store.background_flux(:,star_index_sim), star_index_sim); % run correction on the background region
+                    bg_ff = obj.bank.input(bg_flux, bg_std); % filter these background fluxes also
+                    bg_ff_std = nanstd(bg_ff); 
+                else % we have a var_buf for every star, we can just get the noise from that
+                    bg_ff_std = sqrt(obj.var_buf.mean);
+                    bg_ff_std = bg_ff_std(star_index_sim); 
+                end
+
+                f_filt = f_filt./bg_ff_std; 
+
+            end
+
+            new_event_sim = obj.searchForCandidates(f, f_corr, f_filt, star_index_sim, 1); 
+
+            if ~isempty(new_event_sim)
+                
+                sim_pars.detect_snr = new_event_sim.snr; 
+                
+                new_event_sim.is_simulated = 1; 
+                new_event_sim.sim_pars = sim_pars; 
+                obj.latest_candidates = vertcat(obj.latest_candidates, new_event_sim); 
+                
+                if isempty(obj.sim_events_passed)
+                    obj.sim_events_passed = sim_pars;
+                else
+                    obj.sim_events_passed(end+1) = sim_pars;
+                end
+                
+            else
+                
+                if isempty(obj.sim_events_failed)
+                    obj.sim_events_failed = sim_pars;
+                else
+                    obj.sim_events_failed(end+1) = sim_pars;
+                end
+                
+            end
+
+        end
+        
+        function [flux, sim_pars] = addSimulatedEvent(obj, flux, star_idx)
+        
+            obj.loadSimulationBank; % lazy load the sim_bank
+            
+            [lc, sim_pars] = obj.sim_bank.randomLC(0.5); % let's set the stellar radius R=0.5 (Fresnel units)
+            
+            flux = flux(:,star_idx); 
+            
+            margin = length(flux) - length(lc);
+            
+            t = (1:length(flux))';
+            
+            fr = util.fit.polyfit(t, flux, 'order', 2); 
+            
+            flux_mean = fr.ym; 
+            flux_noise = flux - flux_mean; % separate the noise from the mean flux
+            
+            B = obj.store.checker.bad_times; % bad times matrix
+            
+            good_times = obj.store.search_start_idx + find(~B(obj.store.search_start_idx:obj.store.search_end_idx,star_idx));
+            
+            if isempty(good_times)
+                error('this shouldn''t happen!'); 
+            end
+            
+            if margin>0 % if the lc is similar in size to the search region, this push ensures the peak is in that region
+                
+                if length(good_times)>1
+                    peak_idx = randperm(length(good_times),1); 
+                else
+                    peak_idx = 1;
+                end
+                
+                peak = good_times(peak_idx);
+                
+                lc2 = vertcat(lc, ones(margin,1)); 
+                lc2 = circshift(lc2, peak - floor(length(lc)/2) - 1); 
+                
+            elseif margin<0
+                error('need to handle this case at some point...'); 
+            else
+                 % do nothing?
+            end
+            
+            flux_mean = flux_mean.*lc2;
+            
+            flux = flux_mean + flux_noise; 
+            
+            sim_pars.time_index = peak;
+            sim_pars.star_index = star_idx;
+            sim_pars.star_snr = obj.store.star_snr(obj.store.star_indices(star_idx)); % translate to the global star index to get the S/N from the store
+            sim_pars.calc_snr = sqrt(nansum((lc-1).^2)).*sim_pars.star_snr; % estimate the event S/N with analytical formula (and assuming the star has white, gaussian noise)
+            
+        end
+            
     end
     
     methods % plotting tools / GUI

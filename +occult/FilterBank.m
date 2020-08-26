@@ -377,8 +377,10 @@ classdef FilterBank < handle
                 end
                 
                 [sub_r, sub_b, sub_v] = ind2sub(S(3:end), idx);
-            
+                
                 lc = obj.bank(:, sub_R, sub_r, sub_b, sub_v); 
+                
+                idx = idx + prod(S(3:end))*sub_R; 
                 
             end
                 
@@ -389,6 +391,8 @@ classdef FilterBank < handle
             pars.W = obj.W;
             pars.T = obj.T;
             pars.f = obj.f; 
+            
+            pars.bank_index = idx; 
             
         end
         

@@ -6,6 +6,8 @@ classdef StarHours < handle
     
     properties % objects
         
+        head@head.Header;
+        
     end
     
     properties % inputs/outputs
@@ -15,8 +17,10 @@ classdef StarHours < handle
         
         runtime = 0; % total runtime since last reset()
         histogram; % the number of useful seconds accumulated for each star and each S/N bin (this is saved after subtracting losses)
+        histogram_with_losses; % the number of seconds accumulated without excluding anything
         losses_exclusive; % same as histogram, only counting the losses due to each cut (exclusive means times where ONLY this cut was responsible)
         losses_inclusive; % same as histogram, only counting the losses due to each cut (inclusive means times where this cut was ALSO responsible)
+        losses_bad_stars; % number of seconds lost when disqualifying stars from the black list 
         
         cut_names = {}; % get these from the QualityChecker
         cut_indices = {}; % get these from the QualityChecker
@@ -37,7 +41,7 @@ classdef StarHours < handle
         
         snr_bin_min = 5; % stars with lower S/N are not even tested for events (here S/N is calculated on the raw fluxes)
         snr_bin_width = 0.5; % for the star-hour histogram
-        snr_bin_max = 100; % biggest value we expect to see in the star-hour histogram
+        snr_bin_max = 40; % biggest value we expect to see in the star-hour histogram
         
         debug_bit = 1;
         
@@ -81,8 +85,10 @@ classdef StarHours < handle
             
             obj.runtime = 0;
             obj.histogram = [];
+            obj.histogram_with_losses = [];
             obj.losses_exclusive = [];
             obj.losses_inclusive = [];
+            obj.losses_bad_stars = [];
             obj.snr_bin_edges = [];
             obj.star_bin_edges = []; 
             
@@ -116,7 +122,11 @@ classdef StarHours < handle
     
     methods % calculations
         
-        function input(obj, checker)
+        function input(obj, checker, bad_batch)
+            
+            if nargin<3 || isempty(bad_batch)
+                bad_batch = 0;
+            end
             
             obj.clear;
             
@@ -144,24 +154,34 @@ classdef StarHours < handle
             obj.runtime = obj.runtime + obj.batch_length; 
             
             obj.star_snr_dist = histcounts2(obj.star_snr, obj.star_bin_edges(1:end-1), obj.snr_bin_edges, obj.star_bin_edges-0.5); % resulting histogram is stars on the X axis and S/N on the Y axis
-            bad_times = checker.bad_times; % this has "true" in every frame/star that is disqualified for anything
-            lost_time = sum(bad_times).*obj.time_step; 
             
-            obj.histogram = obj.histogram + obj.star_snr_dist.*(obj.batch_length - lost_time); % add the amount of time for each star in the right bin
-            
-%             flag_also = false(size(bad_times,1), size(bad_times,2), length(obj.cut_names)); % logical "true" in each frame/star where this cut is also or only included
-%             flag_only = false(size(bad_times,1), size(bad_times,2), length(obj.cut_names)); % logical "true" in each frame/star where this cut is only included (with no others!)
-            
-            flag_only = false(size(obj.flags)); % logical "true" in each frame/star where this cut is only included (with no others!)
+            if isempty(obj.histogram_with_losses)
+                obj.histogram_with_losses = obj.star_snr_dist.*obj.batch_length; % add the amount of time for each star in the right bin
+            else
+                obj.histogram_with_losses = obj.histogram_with_losses + obj.star_snr_dist.*obj.batch_length; % add the amount of time for each star in the right bin
+            end
+            if ~bad_batch % do not include anything in histogram or losses when the batch is bad
+                
+                bad_times = checker.bad_times; % this has "true" in every frame/star that is disqualified for anything
+                lost_time = sum(bad_times(obj.idx_start:obj.idx_end,:)).*obj.time_step; 
 
-            for ii = 1:length(obj.cut_names)
-                
-                num_xors = sum(xor(obj.flags(:,:,ii), obj.flags),3); % each frame/star counts the number of places in other cuts that were not "true" at the same time as the current cut
-                flag_only(:,:,ii) = num_xors==length(obj.cut_names)-1; % for each frame/star if all other cuts have zero here, then the xor would be "true" for all other cuts except the current cut
-            
-                obj.losses_inclusive(:,:,ii) = obj.losses_inclusive(:,:,ii) + obj.star_snr_dist.*sum(obj.flags(:,:,ii)).*obj.time_step; % add the amount of time (per star, per S/N) for this cut (even if this time is shared with other cuts)
-                obj.losses_exclusive(:,:,ii) = obj.losses_exclusive(:,:,ii) + obj.star_snr_dist.*sum(flag_only(:,:,ii)).*obj.time_step; % add the amount of time (per star, per S/N) for this cut (even if this time is shared with other cuts)
-                
+                obj.histogram = obj.histogram + obj.star_snr_dist.*(obj.batch_length - lost_time); % add the amount of time for each star in the right bin
+
+    %             flag_also = false(size(bad_times,1), size(bad_times,2), length(obj.cut_names)); % logical "true" in each frame/star where this cut is also or only included
+    %             flag_only = false(size(bad_times,1), size(bad_times,2), length(obj.cut_names)); % logical "true" in each frame/star where this cut is only included (with no others!)
+
+                flag_only = false(size(obj.flags)); % logical "true" in each frame/star where this cut is only included (with no others!)
+
+                for ii = 1:length(obj.cut_names)
+
+                    num_xors = sum(xor(obj.flags(:,:,ii), obj.flags),3); % each frame/star counts the number of places in other cuts that were not "true" at the same time as the current cut
+                    flag_only(:,:,ii) = num_xors==length(obj.cut_names)-1; % for each frame/star if all other cuts have zero here, then the xor would be "true" for all other cuts except the current cut
+
+                    obj.losses_inclusive(:,:,ii) = single(obj.losses_inclusive(:,:,ii) + obj.star_snr_dist.*sum(obj.flags(:,:,ii)).*obj.time_step); % add the amount of time (per star, per S/N) for this cut (even if this time is shared with other cuts)
+                    obj.losses_exclusive(:,:,ii) = single(obj.losses_exclusive(:,:,ii) + obj.star_snr_dist.*sum(flag_only(:,:,ii)).*obj.time_step); % add the amount of time (per star, per S/N) for this cut (even if this time is shared with other cuts)
+
+                end
+
             end
             
         end
@@ -174,6 +194,17 @@ classdef StarHours < handle
             obj.histogram = zeros(length(obj.snr_bin_edges)-1, length(obj.star_bin_edges)-1); 
             obj.losses_exclusive = zeros(length(obj.snr_bin_edges)-1, length(obj.star_bin_edges)-1, length(obj.cut_names));
             obj.losses_inclusive = zeros(length(obj.snr_bin_edges)-1, length(obj.star_bin_edges)-1, length(obj.cut_names)); 
+            
+        end
+        
+        function removeStars(obj, idx)
+            
+            obj.losses_bad_stars = sum(obj.histogram(:,idx),2); % store the number of star seconds that were lost when we remove bad stars from the histograms
+            
+            % maybe replace NaN with zero? 
+            obj.histogram(:,idx) = NaN;
+            obj.losses_exclusive(:,idx,:) = NaN;
+            obj.losses_inclusive(:,idx,:) = NaN;
             
         end
         
@@ -203,6 +234,10 @@ classdef StarHours < handle
                 input.axes = gca;
             end
             
+            if strcmp(input.axes.NextPlot, 'replace')
+                reset(input.axes); 
+            end
+            
             if isempty(input.type)
                 
                 values = obj.histogram;
@@ -222,7 +257,7 @@ classdef StarHours < handle
                     exc = '(inclusively)'; 
                 end
                 
-                str = sprintf('Time lost %s to "%s"', exc, strrep(obj.cut_names{input.type}, '_', ' '));
+                str = sprintf('Time lost %s\nto "%s"', exc, strrep(obj.cut_names{input.type}, '_', ' '));
                 
             end
             
@@ -235,14 +270,14 @@ classdef StarHours < handle
             
             if input.sum
                 
-                values = sum(values,2);
+                values = nansum(values,2);
                 h = bar(input.axes, obj.snr_bin_edges(1:end-1), values, 'FaceAlpha',input.alpha); 
                 
                 if ~isempty(input.color)
                     h.FaceColor = input.color;
                 end
                 
-                mx = max(values); 
+                mx = nanmax(values); 
                 
                 if mx<=0
                     mx = 1;
@@ -287,6 +322,69 @@ classdef StarHours < handle
             input.axes.FontSize = input.font_size;
             axis(input.axes, 'normal'); 
             axis(input.axes, 'xy'); 
+            
+        end
+        
+        function printReport(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('units', 'hours'); % can also choose "hours" or "percent"
+            
+            input.scan_vars(varargin{:}); 
+            
+            if util.text.cs(input.units, 'seconds')
+                unit_str = 's'; 
+            elseif util.text.cs(input.units, 'hours')
+                unit_str = 'h'; 
+            elseif util.text.cs(input.units, 'percent', '%')
+                unit_str = '%'; 
+            else
+                error('Unknown option "%s" to "units" argument. Try using "seconds" or "hours" or "percent"...', input.units); 
+            end
+            
+            fprintf('%-20s | inclusive[%s] | exclusive[%s] \n', 'Cut name', unit_str, unit_str); 
+            fprintf('---------------------+--------------+------------- \n'); 
+            
+            useful = util.stat.sum2(obj.histogram); 
+            total = util.stat.sum2(obj.histogram_with_losses); 
+            
+            % get the total star hours, not including losses
+            
+            for ii = 1:length(obj.cut_names)
+                
+                inc = util.stat.sum2(obj.losses_inclusive(:,:,ii));
+                if unit_str=='h'
+                    inc = inc/3600;
+                elseif unit_str=='%'
+                    inc = inc/total.*100; 
+                end
+                
+                exc = util.stat.sum2(obj.losses_exclusive(:,:,ii));
+                if unit_str=='h'
+                    exc = exc/3600;
+                elseif unit_str=='%'
+                    exc = exc/total.*100; 
+                end
+                
+                fprintf('%-20s | %12.2f | %12.2f \n', obj.cut_names{ii}, inc, exc);
+                
+                
+            end
+            
+            stars = util.stat.sum2(obj.losses_bad_stars); 
+            
+            if unit_str=='h'
+                stars= stars/3600;
+            elseif unit_str=='%'
+                stars = stars/total.*100; 
+            end
+            
+            fprintf('Bad stars            | %12.2f |         ---  \n', stars); 
+            
+            fprintf('---------------------+--------------+------------- \n'); 
+            
+            fprintf('%-20s | %11.1fh | %11.1fh \n', 'Good / total time', useful/3600, total/3600); % always show it as hours!  
+
             
         end
         

@@ -432,6 +432,11 @@ classdef Photometry < handle
                     obj.bad_pixels_gauss = s.gaussian_photometry.bad_pixels;
                     obj.flags_gauss = s.gaussian_photometry.flag;
 
+                    % this correction comes from the fact we are multiplying a Gaussian by another Gaussian...
+                    good_widths = obj.widths_gauss<obj.gauss_sigma; 
+                    obj.widths_gauss = real(obj.gauss_sigma.*obj.widths_gauss./sqrt(obj.gauss_sigma.^2-obj.widths_gauss.^2));  % the measured width should not be larger than the gaussian tapered aperture. If it is, put NaN instead!
+                    obj.widths_gauss(~good_widths) = NaN;
+                    
                     if ~isempty(obj.positions)
                         obj.centroids_x_gauss = obj.offsets_x_gauss + obj.positions(:,1)';
                         obj.centroids_y_gauss = obj.offsets_y_gauss + obj.positions(:,2)';
@@ -445,7 +450,8 @@ classdef Photometry < handle
                     obj.variances = obj.variances_gauss;
                     obj.offsets_x = obj.offsets_x_gauss;
                     obj.offsets_y = obj.offsets_y_gauss;
-                    obj.widths = obj.widths_gauss;
+                    obj.widths = obj.widths_gauss; 
+
                     obj.bad_pixels = obj.bad_pixels_gauss;
                     obj.flags = obj.flags_gauss;
                     
@@ -484,8 +490,7 @@ classdef Photometry < handle
                         end
                         
                         if obj.use_best_widths==0
-                            % this correction comes from the fact we are multiplying a Gaussian by another Gaussian...
-                            obj.widths = obj.gauss_sigma.*obj.widths_ap./sqrt(obj.gauss_sigma.^2-obj.widths_ap.^2); 
+                            obj.widths = obj.widths_ap; % obj.gauss_sigma.*obj.widths_ap./sqrt(obj.gauss_sigma.^2-obj.widths_ap.^2); 
                             obj.flags = obj.flags_ap;
                         end
                         
@@ -529,6 +534,7 @@ classdef Photometry < handle
                         
                         if obj.use_best_widths==0
                             obj.widths = cat(3, obj.widths_ap, obj.widths_forced);
+                            obj.flags = cat(3, obj.flags_ap, obj.flags_forced);
                         end
                         
                     end
