@@ -735,14 +735,14 @@ classdef ManagerGUI < handle
             
             if obj.debug_bit>1, disp('Callback: slew'); end
             
-            if obj.owner.mount.check_need_flip
-                res = questdlg('Need to flip for this target. Are you sure?', 'Flip needed!', 'Slew', 'Abort', 'Slew');
-                if isempty(res) || strcmp(res, 'Abort')
-                    return;
-                end
-            end
+%             if obj.owner.mount.check_need_flip
+%                 res = questdlg('Need to flip for this target. Are you sure?', 'Flip needed!', 'Slew', 'Abort', 'Slew');
+%                 if isempty(res) || strcmp(res, 'Abort')
+%                     return;
+%                 end
+%             end
             
-            obj.owner.mount.slew;
+            obj.owner.mount.slew('ask_flip', 1);
             
             obj.update;
             

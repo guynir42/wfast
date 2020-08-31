@@ -1086,14 +1086,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             try 
                 
                 if obj.telALT<obj.limit_alt
-                    fprintf('Alt limit crossed!'); 
+                    fprintf('Alt limit crossed! \n'); 
                     return;
                 end
 
                 % is it better to rely on the timer for these checks??
                 ok = obj.ard.update;
                 
-                if obj.ard.ALT<obj.limit_alt || ok==0
+                if obj.ard.ALT<obj.ard.alt_limit || ok==0
+                    fprintf('ALT= %f\n', obj.ard.alt); 
                     return;
                 end
                 
@@ -1134,7 +1135,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 threshold = 600; % can change this default later 
             end
             
-            if isempty(obj.objRA_deg) || isempty(obj.objDec_deg)
+            if ~obj.status || isempty(obj.objRA_deg) || isempty(obj.objDec_deg)
                 val = [];
             else
                 val = abs(obj.telRA_deg-obj.objRA_deg)*3600<threshold &&...
