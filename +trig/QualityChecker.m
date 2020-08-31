@@ -369,6 +369,8 @@ classdef QualityChecker < handle
             
             obj.hours.head = val;
             
+            obj.setupSensor;
+            
         end
         
         function setupSensor(obj, camera)
@@ -504,8 +506,12 @@ classdef QualityChecker < handle
                     norm = single(norm);
                 end
                 
-                obj.correlations(:,:,:,ii) = util.series.correlation(f, aux, obj.pars.corr_timescales(ii)).*norm; 
-                
+                try
+                    obj.correlations(:,:,:,ii) = util.series.correlation(f, aux, obj.pars.corr_timescales(ii)).*norm; 
+                catch
+                    disp('here'); 
+                    rethrow(ME); 
+                end
             end
             
             %%%%%%%%%%%%% find all the bad frames %%%%%%%%%%%%%%%%%%%%%
@@ -544,7 +550,7 @@ classdef QualityChecker < handle
             end
             
             if obj.pars.use_photo_flag
-                obj.cut_values_matrix(:,:,obj.cut_indices.photometry) = obj.photo_flag; 
+                obj.cut_values_matrix(:,:,obj.cut_indices.photo_flag) = obj.photo_flag; 
             end
             
             if obj.pars.use_near_bad_rows_cols
@@ -691,10 +697,10 @@ classdef QualityChecker < handle
             else
             
                 if util.text.cs(name(1:4), 'corr')
-                    thresh = obj.thresh_correlation;
+                    thresh = obj.pars.thresh_correlation;
                 else
-                    if isprop(obj, ['thresh_' name])
-                        thresh = obj.(['thresh_' name]); 
+                    if isfield(obj.pars, ['thresh_' name])
+                        thresh = obj.pars.(['thresh_' name]); 
                     else
                         thresh = 0.5;
                     end
@@ -707,12 +713,14 @@ classdef QualityChecker < handle
                     mx = max(values); 
                     mx = mx.*1.1;
 
-                    input.axes.YLim = [0 mx]; 
 
                     colorbar(input.axes, 'off'); 
                     
-                    if input.log
+                    if input.log                        
                         input.axes.YScale = 'log'; 
+                        input.axes.YLim = [1 mx]; 
+                    else
+                        input.axes.YLim = [0 mx]; 
                     end
 
                 else
@@ -736,16 +744,16 @@ classdef QualityChecker < handle
 
                 yyaxis(input.axes, 'right'); 
 
-                plot(input.axes, thresh.*[1 1], [0 mx], 'r--'); 
+                plot(input.axes, thresh.*[1 1], [0 1e20], 'r--'); 
 
                 if obj.cut_two_sided(input.type)
                     hold(input.axes, 'on'); 
-                    plot(input.axes,  -thresh.*[1 1], [0 mx], 'r--');     
+                    plot(input.axes,  -thresh.*[1 1], [0 1e20], 'r--');     
                 end
 
                 input.axes.YTick = [];
                 input.axes.YAxis(2).Color = [0 0 0];
-                input.axes.YLim = [0 mx];
+%                 input.axes.YLim = [1 mx];
                 
                 hold(input.axes, 'off'); 
                 

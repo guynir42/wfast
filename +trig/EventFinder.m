@@ -63,6 +63,8 @@ classdef EventFinder < handle
     
     properties(Hidden=true)
         
+        background_ff; % filtered flux background data (either flux values or the variance from the var_buf)
+        
         display_candidate_idx = []; % GUI parameter, which event is to be shown now
         use_display_kept_candidates = 0; % GUI parameter, to show only kept events or all events (default)
         use_show_truth = 0; % if true, will show the field name/coords and for each candidate will reveal if it is simulated
@@ -81,13 +83,13 @@ classdef EventFinder < handle
             else
                 if obj.debug_bit>1, fprintf('EventFinder constructor v%4.2f\n', obj.version); end
             
-                obj.resetPars; 
-                
                 obj.psd = trig.CorrectPSD;
             
                 obj.store = trig.DataStore;
                 
                 obj.var_buf = util.vec.CircularBuffer; 
+                
+                obj.resetPars; 
                 
             end
             
@@ -359,13 +361,14 @@ classdef EventFinder < handle
 
                             [background_flux, background_std] = obj.correctFluxes(obj.store.background_flux(:,star_indices), star_indices); % run the PSD or linear fit removal, but this time on the background area
 
-                            background_ff = obj.bank.input(background_flux, background_std); % filter these background fluxes also
+                            obj.background_ff = obj.bank.input(background_flux, background_std); % filter these background fluxes also
 
-                            obj.bg_filtered_std = nanstd(background_ff); % this reflects the noise in a few previous batches, on the filtered fluxes, including only the chosen stars
+                            obj.bg_filtered_std = nanstd(obj.background_ff); % this reflects the noise in a few previous batches, on the filtered fluxes, including only the chosen stars
 
                         else % we can just use the var_buf for this
                             obj.var_buf.input(nanvar(obj.filtered_fluxes)); 
-                            obj.bg_filtered_std = sqrt(obj.var_buf.mean); 
+                            obj.background_ff = obj.var_buf.data_ordered; 
+                            obj.bg_filtered_std = sqrt(nanmean(obj.background_ff)); 
                         end
 
                     else
@@ -508,6 +511,13 @@ classdef EventFinder < handle
 
             c.flux_raw_all = fluxes_raw; 
             c.flux_corrected_all = fluxes_corrected; 
+            
+            idx = find(star_indices==obj.star_index); 
+            c.filtered_flux_past_values = obj.background_ff(:,idx);
+            c.flux_buffer = obj.store.flux_buffer(:,obj.star_index); 
+            c.flux_timestamps_buffer = obj.store.timestamps_buffer; 
+            c.psd = obj.psd.power_spectrum; 
+            c.freq_psd = obj.psd.freq; 
             
             % store some statistics on this star's raw flux
             c.flux_mean = nanmean(obj.store.background_flux(:,c.star_index)); 
@@ -773,7 +783,9 @@ classdef EventFinder < handle
         
         function simulate(obj, star_indices)
             
-            if isscalar(star_indices)
+            if isempty(star_indices)
+                return;
+            elseif isscalar(star_indices)
                 star_index_sim = star_indices;
             else
                 star_index_sim = star_indices(randperm(length(star_indices),1)); % this should now contain exactly one star
@@ -795,10 +807,11 @@ classdef EventFinder < handle
 
                 if obj.pars.use_prefilter % need to draw from the background region an calculate the filtered flux noise
                     [bg_flux, bg_std] = obj.correctFluxes(obj.store.background_flux(:,star_index_sim), star_index_sim); % run correction on the background region
-                    bg_ff = obj.bank.input(bg_flux, bg_std); % filter these background fluxes also
-                    bg_ff_std = nanstd(bg_ff); 
+                    obj.background_ff = obj.bank.input(bg_flux, bg_std); % filter these background fluxes also
+                    bg_ff_std = nanstd(obj.background_ff); 
                 else % we have a var_buf for every star, we can just get the noise from that
-                    bg_ff_std = sqrt(obj.var_buf.mean);
+                    obj.background_ff = obj.var_buf.data_ordered; 
+                    bg_ff_std = sqrt(nanmean(obj.background_ff));
                     bg_ff_std = bg_ff_std(star_index_sim); 
                 end
 

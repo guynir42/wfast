@@ -3,7 +3,7 @@
 
 %% load the data
 
-d = util.sys.WorkingDirectory(fullfile(getenv('DATA'), 'WFAST\2020\2020-06-09\Kepler_run1')); 
+d = util.sys.WorkingDirectory(fullfile(getenv('DATA'), 'WFAST\2020\2020-06-09\Kepler_run2')); 
 
 files = d.match('*.h5*');
 
@@ -67,11 +67,12 @@ cat.head = header;
 %% load astrometry from file
 
 cat.loadMAT(fullfile(d.pwd, 'catalog.mat')); 
+cat.addBolometricMags; 
 
 %% start running photometry!
 
 N = length(files); 
-N = 200; % cut it short
+% N = 50; % cut it short
 
 prog = util.sys.ProgressBar;
 

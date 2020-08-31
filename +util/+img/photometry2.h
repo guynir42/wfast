@@ -98,24 +98,32 @@ class Photometry{
 	int num_cutouts=0;  // number of cutouts (dim 3 times dim 4)
 	int N=0; // number of pixels in each cutout (dim 1 times dim 2)
 	
-	double gain=1; // calculate the source noise using the gain
-	double scintillation_fraction=0; // use this to add the estimated scintillation noise (in fractions of the reduced flux)
-	int num_threads=1; // for future use with built-in multithreading
-	int num_iterations=2; // how many iterations of repositioning should we do
-	bool use_centering_aperture=1; // run one level of aperture photometry (centroids only) before the first gaussian iterations
-	bool use_gaussian=1; // decide if you want to use gaussians photometry at all
-	bool use_apertures=1; // decide if you want to use aperture photometry (wedding cake)
-	bool use_forced=1; // decide if you want to use forced photometry after finding the best offsets
-	bool use_median=1; // decide if you want to use median (instead of mean) to get the background value
-	bool use_positives=1; // when true, will ignore any negative values in the cutout when calculating 2nd moments
+	// default values are defined in the reset() function!
+	double gain; // calculate the source noise using the gain
+	double scintillation_fraction; // use this to add the estimated scintillation noise (in fractions of the reduced flux)
+	int num_threads; // for future use with built-in multithreading
+	int num_iterations; // how many iterations of repositioning should we do
+	bool use_raw; // use a raw aperture before everything
+	bool use_centering_aperture; // run one level of aperture photometry (centroids only) before the first gaussian iterations
+	bool use_gaussian; // decide if you want to use gaussians photometry at all
+	bool use_apertures; // decide if you want to use aperture photometry (wedding cake)
+	bool use_forced; // decide if you want to use forced photometry after finding the best offsets
+	bool use_median; // decide if you want to use median (instead of mean) to get the background value
+	bool use_positives; // when true, will ignore any negative values in the cutout when calculating 2nd moments
+	double gauss_sigma; // the width of the gaussian (in pixels)
+	double inner_radius; // of the annulus (pixels)
+	double outer_radius; // of the annulus (pixels)
+	int num_radii; // how many different aperture arrays do we have for the wedding cake
+	double *ap_radii=0; // radii of different apertures, given in pixel units (default is 3,5,7, given in the constructor)
+	int resolution; // how many different aperture/gaussian shifts we want in each pixel
 	
-	int debug_bit=0;
+	int debug_bit;
+	
 	
 	// these can be shared with all calculations (i.e., they are kept in memory between calls to photometry2!)
 	float *X=0; // grid points not including shifts. 
 	float *Y=0; // grid points not including shifts. 
 	
-	int resolution=1; // how many different aperture/gaussian shifts we want in each pixel
 	mwSize shift_dims[2]={0}; // dimensions of shift matrices dx/dy	
 	int num_shifts=0; // number of shifts we need to cover all possible star positions (i.e., the length of dx and dy, shift_dims[0]*shift_dims[1])
 	float *dx=0; // list of offsets in x for the center of the mask
@@ -127,16 +135,11 @@ class Photometry{
 
 	float *apertures=0; // 4D matrix of aperture+annuli for the wedding cake photometry
 	std::vector<int> *aperture_indices=0; // array of length "num_shifts" of index vectors telling what part of each matrix to sum in wedding cake photometry
-	int num_radii=0; // how many different aperture arrays do we have for the wedding cake
-	double *ap_radii=0; // radii of different apertures, given in pixel units (default is 3,5,7, given in the constructor)
 	
 	float *annulii=0; // 3D matrix of the annulus used for all kinds of photometry, one for each dx/dy shift
 	std::vector<int> *annulus_indices=0; // array of length "num_shifts" of index vectors telling what part of each matrix to sum in annulus calculation
-	double inner_radius=10; // of the annulus (pixels)
-	double outer_radius=0; // of the annulus (pixels)
-
+	
 	float *gaussians=0; // 3D matrix of gaussian weighted apertures for "PSF" photometry, one for each dx/dy shift
-	double gauss_sigma=2; // the width of the gaussian (in pixels)
 	
 	// output arrays are defined here (in C++)
 	mwSize output_size[2]={0}; // the same as dim 3 and dim 4 of cutouts
@@ -155,6 +158,7 @@ class Photometry{
 	// function prototypes (implementation at the end)
 	Photometry();
 	~Photometry();
+	void reset(); 
 	void parseInputs(int nrhs, const mxArray *prhs[]);
 	mxArray *outputStruct(float **output, int num_fluxes=1); // wrap up the output matrices as a nice matlab style array
 	mxArray *outputAverages(); // add a struct with the average offsets and widths

@@ -80,7 +80,7 @@ classdef Photometry < handle
         aperture = 6; % for now lets keep it short by using just the big aperture
         annulus = 7.5;
         annulus_outer = 10; % empty means take the rest of the cutout
-        gauss_sigma = 2;
+        gauss_sigma = 2.5;
         gauss_thresh = 1e-6;
         
         use_fitter = 0;
@@ -391,34 +391,38 @@ classdef Photometry < handle
                 
                 obj.pars_struct = s.parameters;
                 
-                obj.fluxes_basic = s.raw_photometry.flux;
-                obj.areas_basic = s.raw_photometry.area;
-                obj.errors_basic = s.raw_photometry.error;
-                obj.backgrounds_basic = s.raw_photometry.background;
-                obj.variances_basic = s.raw_photometry.variance;
-                obj.offsets_x_basic = s.raw_photometry.offset_x;
-                obj.offsets_y_basic = s.raw_photometry.offset_y;
-                obj.widths_basic = s.raw_photometry.width;
-                obj.bad_pixels_basic = s.raw_photometry.bad_pixels;
-                obj.flags_basic = s.raw_photometry.flag;
+                if ~isempty(s.raw_photometry)
+
+                    obj.fluxes_basic = s.raw_photometry.flux;
+                    obj.areas_basic = s.raw_photometry.area;
+                    obj.errors_basic = s.raw_photometry.error;
+                    obj.backgrounds_basic = s.raw_photometry.background;
+                    obj.variances_basic = s.raw_photometry.variance;
+                    obj.offsets_x_basic = s.raw_photometry.offset_x;
+                    obj.offsets_y_basic = s.raw_photometry.offset_y;
+                    obj.widths_basic = s.raw_photometry.width;
+                    obj.bad_pixels_basic = s.raw_photometry.bad_pixels;
+                    obj.flags_basic = s.raw_photometry.flag;
+
+                    if ~isempty(obj.positions)
+                        obj.centroids_x_basic = obj.offsets_x_basic + obj.positions(:,1)';
+                        obj.centroids_y_basic = obj.offsets_y_basic + obj.positions(:,2)';
+                    end
+
+                    % update the newest values
+                    obj.fluxes = obj.fluxes_basic;
+                    obj.areas = obj.areas_basic;
+                    obj.errors = obj.errors_basic;
+                    obj.backgrounds = obj.backgrounds_basic;
+                    obj.variances = obj.variances_basic;
+                    obj.offsets_x = obj.offsets_x_basic;
+                    obj.offsets_y = obj.offsets_y_basic;
+                    obj.widths = obj.widths_basic;
+                    obj.bad_pixels = obj.bad_pixels_basic;
+                    obj.flags = obj.flags_basic;
                 
-                if ~isempty(obj.positions)
-                    obj.centroids_x_basic = obj.offsets_x_basic + obj.positions(:,1)';
-                    obj.centroids_y_basic = obj.offsets_y_basic + obj.positions(:,2)';
                 end
                 
-                % update the newest values
-                obj.fluxes = obj.fluxes_basic;
-                obj.areas = obj.areas_basic;
-                obj.errors = obj.errors_basic;
-                obj.backgrounds = obj.backgrounds_basic;
-                obj.variances = obj.variances_basic;
-                obj.offsets_x = obj.offsets_x_basic;
-                obj.offsets_y = obj.offsets_y_basic;
-                obj.widths = obj.widths_basic;
-                obj.bad_pixels = obj.bad_pixels_basic;
-                obj.flags = obj.flags_basic;
-                                
                 if obj.use_gaussian
 
                     obj.fluxes_gauss = s.gaussian_photometry.flux;

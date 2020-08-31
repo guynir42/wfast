@@ -44,8 +44,8 @@ function [m1x, m1y, m2x, m2y, mxy] = moments(I, varargin)
         mxy(S==0) = NaN;
 
         % make sure there are no negative second moments
-        m2x(m2x<0) = NaN;
-        m2y(m2y<0) = NaN;
+%         m2x(m2x<0) = NaN;
+%         m2y(m2y<0) = NaN;
 
     end
 

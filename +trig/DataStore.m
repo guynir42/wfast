@@ -436,13 +436,8 @@ classdef DataStore < handle
                 
             f = obj.this_input.fluxes;
 
-            if isempty(obj.flux_buffer)
-                noise = nanstd(f); 
-                average = nanmean(f); 
-            else
-                noise = nanstd(obj.flux_buffer); 
-                average = nanmean(obj.flux_buffer); 
-            end
+            noise = util.stat.rstd(f); 
+            average = nanmedian(f); 
 
             f2 = (f-average)./noise; % normalized flux
 

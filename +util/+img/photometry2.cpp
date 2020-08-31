@@ -28,6 +28,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 
 	int idx=parseIndex(nrhs, prhs);
 	
+	photometry[idx].reset(); 
 	photometry[idx].parseInputs(nrhs, prhs);
 	photometry[idx].makeArrays(); 
 	
@@ -45,7 +46,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	
 	plhs[0]=mxCreateStructMatrix(1,1,6, (const char**) field_names); 
 		
-	mxSetFieldByNumber(plhs[0], 0, 0, photometry[idx].outputStruct(photometry[idx].output_raw)); 
+	if(photometry[idx].use_raw) mxSetFieldByNumber(plhs[0], 0, 0, photometry[idx].outputStruct(photometry[idx].output_raw)); 
 	if(photometry[idx].use_forced) mxSetFieldByNumber(plhs[0], 0, 1, photometry[idx].outputStruct(photometry[idx].output_forced, photometry[idx].num_radii)); 
 	if(photometry[idx].use_apertures) mxSetFieldByNumber(plhs[0], 0, 2, photometry[idx].outputStruct(photometry[idx].output_apertures, photometry[idx].num_radii)); 
 	if(photometry[idx].use_gaussian) mxSetFieldByNumber(plhs[0], 0, 3, photometry[idx].outputStruct(photometry[idx].output_gaussian)); 
@@ -90,12 +91,7 @@ int parseIndex(int nrhs, const mxArray *prhs[]){
 
 Photometry::Photometry(){ // class constructor
 
-	// start by initializing any default arrays we may have
-	ap_radii=new double[3];
-	ap_radii[0]=5;
-	ap_radii[1]=7;
-	ap_radii[2]=9; 
-	num_radii=3; 
+	reset(); 
 
 }
 
@@ -106,6 +102,36 @@ Photometry::~Photometry(){ // destructor cleans up intermidiate arrays
 	if(ap_radii) delete(ap_radii); // make sure to free this little array
 	
 	deleteArrays();
+	
+}
+
+void Photometry::reset(){
+	
+	gain=1; // calculate the source noise using the gain
+	scintillation_fraction=0; // use this to add the estimated scintillation noise (in fractions of the reduced flux)
+	num_threads=1; // for future use with built-in multithreading
+	num_iterations=2; // how many iterations of repositioning should we do
+	use_raw=0; // use a raw aperture before everything
+	use_centering_aperture=1; // run one level of aperture photometry (centroids only) before the first gaussian iterations
+	use_gaussian=1; // decide if you want to use gaussians photometry at all
+	use_apertures=1; // decide if you want to use aperture photometry (wedding cake)
+	use_forced=1; // decide if you want to use forced photometry after finding the best offsets
+	use_median=1; // decide if you want to use median (instead of mean) to get the background value
+	use_positives=1; // when true, will ignore any negative values in the cutout when calculating 2nd moments
+	gauss_sigma=2; // the width of the gaussian (in pixels)
+	inner_radius=10; // of the annulus (pixels)
+	outer_radius=0; // of the annulus (pixels)
+	resolution=1; // how many different aperture/gaussian shifts we want in each pixel
+	
+	if(ap_radii){ delete ap_radii; ap_radii=0; }
+	
+	ap_radii=new double[3];
+	ap_radii[0]=5;
+	ap_radii[1]=7;
+	ap_radii[2]=9; 
+	num_radii=3; 
+	
+	debug_bit=0;
 	
 }
 
@@ -505,6 +531,14 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			else{
 				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
 				num_iterations=(int) mxGetScalar(val);
+			}
+			
+		}
+		else if(cs(key, "use_raw")){
+			if(val==0 || mxIsEmpty(val)) use_raw=1; // if no input, assume positive
+			else{
+				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
+				use_raw=parse_bool(val);
 			}
 			
 		}
@@ -940,6 +974,16 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 	
 	bad_pixels[j]=(float) countNaNs(image);
 	
+	int idx=getShiftIndex(0,0); // for the first order, raw photometry estimate of the background, use centered annulus
+	int annulus_pixels=0; 
+	float norm=0;
+	float m1x=0;
+	float m1y=0;
+	float norm2=0;
+	float m2x=0;
+	float m2y=0;
+	float mxy=0;
+	
 	if(bad_pixels[j]==N){ // image is all NaN!
 		
 		flux[j]=NAN;
@@ -968,42 +1012,49 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 		
 	}
 	
-	flux[j]=sumArrays(image); // simple raw photometry! 
+	best_offset_x[j]=0;
+	best_offset_y[j]=0;
 	
-	area[j]=N-bad_pixels[j]; 
-	
-	int idx=getShiftIndex(0,0); // for the first order, raw photometry estimate of the background, use centered annulus
-	int annulus_pixels=countNonNaNsIndices(image, annulus_indices, idx); // how many non-NaN do we have in this annulus?
+	if(use_raw){
 
-	// what happens if annulus_pixels is zero?
-	if(use_median) background[j]=medianIndices(image, annulus_indices, idx); 
-	else background[j]=sumIndices(image, annulus_indices, idx)/annulus_pixels;
-	
-	variance[j]=sumIndices(image, background[j], image, background[j], annulus_indices, idx)/annulus_pixels; // subtract the average b/g then take the square, and sum all the values (then divide by number of pixels)
-	
-	error[j]=getError(flux[j]-area[j]*background[j], area[j]*variance[j], annulus_pixels*variance[j]); 
-	
-	// first moments:
-	float norm=flux[j]-area[j]*background[j]; // what if norm is zero or very close to zero?
-	float m1x=sumArrays(image, background[j], X)/norm;
-	float m1y=sumArrays(image, background[j], Y)/norm;
-	
-	offset_x[j]=m1x;
-	offset_y[j]=m1y;
+		flux[j]=sumArrays(image); // simple raw photometry! 
+		
+		area[j]=N-bad_pixels[j]; 
+		
+		int idx=getShiftIndex(0,0); // for the first order, raw photometry estimate of the background, use centered annulus
+		annulus_pixels=countNonNaNsIndices(image, annulus_indices, idx); // how many non-NaN do we have in this annulus?
+		
+		// what happens if annulus_pixels is zero?
+		if(use_median) background[j]=medianIndices(image, annulus_indices, idx); 
+		else background[j]=sumIndices(image, annulus_indices, idx)/annulus_pixels;
+		
+		variance[j]=sumIndices(image, background[j], image, background[j], annulus_indices, idx)/annulus_pixels; // subtract the average b/g then take the square, and sum all the values (then divide by number of pixels)
+		
+		error[j]=getError(flux[j]-area[j]*background[j], area[j]*variance[j], annulus_pixels*variance[j]); 
+		
+		// first moments:
+		norm=flux[j]-area[j]*background[j]; // what if norm is zero or very close to zero?
+		m1x=sumArrays(image, background[j], X)/norm;
+		m1y=sumArrays(image, background[j], Y)/norm;
+		
+		offset_x[j]=m1x;
+		offset_y[j]=m1y;
 
-	// second moments
-	float norm2=sumArrays(image, background[j]); // the total flux, subtracting background, possibly ignoring negative pixels
-	float m2x=sumArrays(image, background[j], X, m1x, X, m1x)/norm; // I*(X-m1x)^2 / norm
-	float m2y=sumArrays(image, background[j], Y, m1y, Y, m1y)/norm; // I*(Y-m1y)^2 / norm
-	float mxy=sumArrays(image, background[j], X, m1x, Y, m1y)/norm; // I*(X-m1x)*(Y-m1y) / norm
-	
-	width[j]=getWidthFromMoments(m2x, m2y, mxy); 
-	
-	flag[j]=checkMoments(offset_x[j], offset_y[j], width[j]); 
-	
-	// keep track of the best estimate offsets
-	best_offset_x[j]=offset_x[j];
-	best_offset_y[j]=offset_y[j];
+		// second moments
+		norm2=sumArrays(image, background[j]); // the total flux, subtracting background, possibly ignoring negative pixels
+		m2x=sumArrays(image, background[j], X, m1x, X, m1x)/norm; // I*(X-m1x)^2 / norm
+		m2y=sumArrays(image, background[j], Y, m1y, Y, m1y)/norm; // I*(Y-m1y)^2 / norm
+		mxy=sumArrays(image, background[j], X, m1x, Y, m1y)/norm; // I*(X-m1x)*(Y-m1y) / norm
+		
+		width[j]=getWidthFromMoments(m2x, m2y, mxy); 
+		
+		flag[j]=checkMoments(offset_x[j], offset_y[j], width[j]); 
+		
+		// keep track of the best estimate offsets
+		best_offset_x[j]=offset_x[j];
+		best_offset_y[j]=offset_y[j];
+		
+	}
 	
 	if(use_centering_aperture){ // do one iteration with large aperture to improve centroid positions
 		
@@ -1024,7 +1075,9 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 		// keep track of the best estimate offsets
 		best_offset_x[j]=m1x;
 		best_offset_y[j]=m1y;
-		
+
+		 // printf("x= %f | y= %f\n", best_offset_x[j], best_offset_y[j]); 
+				
 		// check if offsets make sense!
 		
 	} // finished centering aperture
@@ -1068,6 +1121,8 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 			best_offset_x[j]=m1x;
 			best_offset_y[j]=m1y;
 			
+			// printf("x= %f | y= %f | B= %f\n", best_offset_x[j], best_offset_y[j], background[j]); 
+				
 		}// for k (iterations)
 		
 		// only get the variance/error/width after choosing the best spot
@@ -1279,7 +1334,7 @@ void Photometry::calculateForced(int j){
 	else background[j]=sumIndices(image, annulus_indices, idx)/annulus_pixels; 	
 	
 	variance[j]=sumIndices(image, background[j], image, background[j], annulus_indices, idx)/annulus_pixels; // subtract the average b/g then take the square, and sum all the values (then divide by number of pixels)
-		
+	
 	float *partial_m1x=new float[num_radii];
 	float *partial_m1y=new float[num_radii];
 	float *partial_m2x=new float[num_radii];
@@ -1411,19 +1466,34 @@ bool Photometry::checkMoments(float offset_x, float offset_y, float width){ // r
 float Photometry::getWidthFromMoments(float m2x, float m2y, float mxy){ // calculate the eigenvalues of the 2nd moments and from that find the average width
 // got this little nugget from: https://yutsumura.com/express-the-eigenvalues-of-a-2-by-2-matrix-in-terms-of-the-trace-and-determinant/
 
+	float tr=m2x+m2y; // trace of the matrix
+	float det=m2x*m2y - mxy*mxy; // determinant of the matrix
 	
+	if( (tr*tr-4*det) > 0){ // matrix has two different eigenvalues 
 
-	float tr=m2x+m2y;
-	float det=m2x*m2y - mxy*mxy;
+		float eig1=(tr-sqrt(tr*tr-4*det))/2; // the eigenvalues of this matrix
+		float eig2=(tr+sqrt(tr*tr-4*det))/2; // help define the ellipse major/minor semi-axes
+
+		 // printf("m2x= %f | m2y= %f | tr= %f | det= %f | eig1= %f | eig2=%f\n", m2x, m2y, tr, det, eig1, eig2);
 	
-	if( (tr*tr-4*det) < 0) return std::nanf("");
+		if (eig1<0 || eig2<0) return std::nanf(""); // if one of the eigenvalues is negative we are in trouble
+		// if (eig1<0 && eig2<0) return std::nanf(""); // if both of the eigenvalues is negative we are in trouble
+		// else if (eig1<0) return sqrt(eig2); // use only one eigenvalue
+		// else if (eig2<0) return sqrt(eig1); // use only one eigenvalue
+		else return (sqrt(eig1)+sqrt(eig2))/2; // the sqrt of the eigenvalues are the minor/major semi-axes (return their average)
+		
+	} 
+	else{ // matrix has two very similar eigenvalues, we should use only the trace
+		
+		float eig=tr/2; 
+		
+		 // printf("m2x= %f | m2y= %f | tr= %f | det= %f | eig= %f\n", m2x, m2y, tr, det);
 	
-	float r1=(tr-sqrt(tr*tr-4*det))/2;
-	float r2=(tr+sqrt(tr*tr-4*det))/2;
-
-	if(m2x<0 || m2y<0 || r1<0 || r2<0) return std::nanf("");	
-	else return (sqrt(r1)+sqrt(r2))/2;
-
+		if (eig<0) return std::nanf(""); 
+		else return sqrt(eig); 
+		
+	}
+	
 }
 
 void Photometry::calcFrameAverages(float **output, int num_radii){ // save the average offset_x, offset_y and width for each frame
@@ -1583,7 +1653,7 @@ float Photometry::sumArrays(const float *array1, float offset1){
 	if(use_positives)
 		for(int i=0;i<N;i++) if(array1[i]>offset1) S+=array1[i]-offset1;
 	else
-		for(int i=0;i<N;i++) if(array1[i]==array1[i]) S+=array1[i];
+		for(int i=0;i<N;i++) if(array1[i]==array1[i]) S+=array1[i]-offset1;
 	
 	return S;
 	
@@ -1594,8 +1664,6 @@ float Photometry::sumArrays(const float *array1, const float *array2){ // sum of
 	float S=0;
 	
 	for(int i=0;i<N;i++) 
-		// if(_isnanf(array1[i])==0 && _isnanf(array2[i])==0) 
-		//if(_isnanf(array1[i])==0) 
 		if(array1[i]==array1[i])
 			S+=array1[i]*array2[i];
 	
@@ -1654,14 +1722,12 @@ float Photometry::sumArrays(const float *array1, float offset1, const float *arr
 	
 	if(use_positives){
 		for(int i=0;i<N;i++) 
-			if(array1[i]>offset1) // when true, the array-offset is positive (and non-NaN)
+			if(array1[i]>offset1) // when true, array1-offset1 is positive (and non-NaN)
 				S+=(array1[i]-offset1)*(array2[i]-offset2)*(array3[i]-offset3);
 	}
 	else{
 			
 		for(int i=0;i<N;i++) 
-			//if(_isnanf(array1[i])==0 && _isnanf(array2[i])==0 && _isnanf(array3[i])==0) 
-			//if(_isnanf(array1[i]))
 			if(array1[i]==array1[i]) // only sum non-NaN numbers
 				S+=(array1[i]-offset1)*(array2[i]-offset2)*(array3[i]-offset3);
 	}
@@ -1682,14 +1748,13 @@ float Photometry::sumArrays(const float *array1, float offset1, const float *arr
 	// this is used to calculate 2nd moment, so we can have two options:
 	if(use_positives){
 		for(int i=0;i<N;i++) 
-			if(array1[i]>offset1) // when true, the array-offset is positive
+			if(array1[i]>offset1) // when true, array1-offset1 is positive
 				S+=(array1[i]-offset1)*(array2[i]-offset2)*(array3[i]-offset3)*array4[i];
 	
-		
 	}
 	else{ 
 		for(int i=0;i<N;i++) 
-			// if(_isnanf(array1[i])==0 && _isnanf(array2[i])==0 && _isnanf(array3[i])==0 && _isnanf(array4[i])==0) 
+
 			if(array1[i]==array1[i])
 				S+=(array1[i]-offset1)*(array2[i]-offset2)*(array3[i]-offset3)*array4[i];
 	
@@ -1842,7 +1907,7 @@ float Photometry::medianIndices(const float *array, const std::vector<int> *vect
 	if(values.size()==0) return 0; 
 	
 	std::sort(values.begin(), values.end()); 
-		
+	
 	if(values.size()%2==1){ // odd number (pick middle value)
 		
 		return values[values.size()/2];
@@ -1850,7 +1915,7 @@ float Photometry::medianIndices(const float *array, const std::vector<int> *vect
 	}
 	else{ // even number (take average of two middle values)
 		
-		return (values[values.size()/2] + values[values.size()/2+1])/2;
+		return (values[values.size()/2-1] + values[values.size()/2])/2;
 		
 	}
 }

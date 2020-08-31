@@ -48,6 +48,8 @@ classdef Candidate < handle
         flux_raw; % all fluxes for all stars, without any processing
         flux_corrected; % fluxes for all stars, corrected by PSD or by removing linear fit
         flux_filtered; % flux after matched-filtering, for the peak star and kernel
+        psd; % power spectral density for this star only
+        freq_psd; % frequency values for the PSD
         
         auxiliary; % values of auxiliary measurements (e.g., background, offsets) for all stars and all frames in the extended region
         aux_names; % cell array with the names of each auxiliary
@@ -101,6 +103,10 @@ classdef Candidate < handle
         
         is_simulated = 0; % by default events are not simulated
 
+        flux_buffer; % flux buffer going back as far as possible, for this star only
+        timestamp_buffer; % timestamps for the above
+        filtered_flux_past_values; % normalization data for this star and this kernel only. Can be either raw filtered_flux values for the last "backround" period, or the variance values from the var_buf
+        
         flux_raw_all; % the raw flux (over the extended region) for all stars
         flux_corrected_all; % the corrected flux (over the exteneded region) for all stars
         
@@ -240,6 +246,30 @@ classdef Candidate < handle
                 str = '';
             else
                 str = sprintf('mag= %4.2f | temp= %dK', obj.star_props.Mag_BP, round(obj.star_props.Teff)); 
+            end
+            
+        end
+        
+        function val = getStellarSize(obj)
+            
+            if ~isempty(obj.star_props) && ismember('Mag_BP', obj.star_props.Properties.VariableNames) && ~isnan(obj.star_props.Mag_BP) && ...
+                    ismember('Teff', obj.star_props.Properties.VariableNames) && ~isnan(obj.star_props.Teff) % catalog entry exists and has non NaN mag/temperature
+                
+                if ~ismember('BolMag', obj.star_props.Properties.VariableNames) || isnan(obj.star_props.BolMag) || ...
+                    ~ismember('BolTemp', obj.star_props.Properties.VariableNames) || ~isnan(obj.star_props.BolTemp) % no bolometric data, need to calculate it now
+                
+                    [C,T] = util.ast.bol_corr(obj.star_props.Teff, obj.star_props.Mag_BP, obj.star_props.Mag_RP, 'BP', 'RP', 'GAIA', 0);
+                
+                    bol_mag = obj.star_props.Mag_BP + C; 
+                
+                    obj.star_props.BolMag = bol_mag;
+                    obj.star_props.BolTemp = T; 
+                end
+                
+                val = util.ast.stellar_size(obj.star_props.BolMag, obj.star_props.BolTemp, 'units', 'FSU', 'dist', 40/206000); % distance is given in parsec (40AU)
+                
+            else
+                val = NaN; 
             end
             
         end
@@ -702,7 +732,8 @@ classdef Candidate < handle
             
             input.ax.YLim = [mn-0.25.*abs(mn) mx+0.25.*abs(mx)]; 
             
-            ylabel(input.ax, 'pixels or count/pixel');
+%             ylabel(input.ax, 'pixels or count/pixel');
+            ylabel(input.ax, 'auxiliary data');
     
             input.ax.YAxis(2).Color = [0 0 0];
             
@@ -883,7 +914,9 @@ classdef Candidate < handle
                 mn = util.stat.min2(vectors); 
                 mx = util.stat.max2(vectors);
                 
-                input.ax.YLim = [mn - 0.2*abs(mn), mx + 0.2*abs(mx)]; 
+                if mn~=0 || mx~=0
+                    input.ax.YLim = [mn - 0.2*abs(mn), mx + 0.2*abs(mx)]; 
+                end
                 
                 input.ax.YAxis(2).Color = [0 0 0];
                 ylabel(input.ax, 'cut values'); 
