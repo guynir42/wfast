@@ -49,6 +49,7 @@ Optional arguments:
                  least threads<5. Default is 1 (no multithreading). 
        *iterations: How many repositions of the gaussians are used on each
                     cutout before settling on the results. Default: 2.
+	   *use_raw: If false, skip doing raw photometery (Default false). 
        *use_centering_aperture: If true, use a an aperture at the position
                                 from the raw photometery, just to get a
                                 little better positioning before going on
@@ -98,27 +99,31 @@ class Photometry{
 	int num_cutouts=0;  // number of cutouts (dim 3 times dim 4)
 	int N=0; // number of pixels in each cutout (dim 1 times dim 2)
 	
-	// default values are defined in the reset() function!
-	double gain; // calculate the source noise using the gain
-	double scintillation_fraction; // use this to add the estimated scintillation noise (in fractions of the reduced flux)
-	int num_threads; // for future use with built-in multithreading
-	int num_iterations; // how many iterations of repositioning should we do
-	bool use_raw; // use a raw aperture before everything
-	bool use_centering_aperture; // run one level of aperture photometry (centroids only) before the first gaussian iterations
-	bool use_gaussian; // decide if you want to use gaussians photometry at all
-	bool use_apertures; // decide if you want to use aperture photometry (wedding cake)
-	bool use_forced; // decide if you want to use forced photometry after finding the best offsets
-	bool use_median; // decide if you want to use median (instead of mean) to get the background value
-	bool use_positives; // when true, will ignore any negative values in the cutout when calculating 2nd moments
-	double gauss_sigma; // the width of the gaussian (in pixels)
-	double inner_radius; // of the annulus (pixels)
-	double outer_radius; // of the annulus (pixels)
-	int num_radii; // how many different aperture arrays do we have for the wedding cake
-	double *ap_radii=0; // radii of different apertures, given in pixel units (default is 3,5,7, given in the constructor)
-	int resolution; // how many different aperture/gaussian shifts we want in each pixel
+	// these are read by varargin
+	struct Parameters {
 	
-	int debug_bit;
-	
+		double gain=1; // calculate the source noise using the gain
+		double scintillation_fraction=0; // use this to add the estimated scintillation noise (in fractions of the reduced flux)
+		int num_threads=1; // for future use with built-in multithreading
+		int num_iterations=2; // how many iterations of repositioning should we do
+		bool use_raw=0; // use a raw aperture before everything
+		bool use_centering_aperture=1; // run one level of aperture photometry (centroids only) before the first gaussian iterations
+		bool use_gaussian=1; // decide if you want to use gaussians photometry at all
+		bool use_apertures=1; // decide if you want to use aperture photometry (wedding cake)
+		bool use_forced=1; // decide if you want to use forced photometry after finding the best offsets
+		bool use_median=0; // decide if you want to use median (instead of mean) to get the background value
+		bool use_positives=0; // when true, will ignore any negative values in the cutout when calculating 2nd moments
+		double gauss_sigma=2; // the width of the gaussian (in pixels)
+		double inner_radius=7.5; // of the annulus (pixels)
+		double outer_radius=10; // of the annulus (pixels)
+		int num_radii=3; // how many different aperture arrays do we have for the wedding cake
+		double *ap_radii=new double[3]; // radii of different apertures, given in pixel units (default is 3,5,7, given in the constructor)
+		
+		int resolution=1; // how many different aperture/gaussian shifts we want in each pixel
+		
+		int debug_bit=0;
+		
+	} pars;
 	
 	// these can be shared with all calculations (i.e., they are kept in memory between calls to photometry2!)
 	float *X=0; // grid points not including shifts. 
@@ -158,8 +163,9 @@ class Photometry{
 	// function prototypes (implementation at the end)
 	Photometry();
 	~Photometry();
-	void reset(); 
+	// void reset(); 
 	void parseInputs(int nrhs, const mxArray *prhs[]);
+	void ingestParameters(Parameters new_pars); 
 	mxArray *outputStruct(float **output, int num_fluxes=1); // wrap up the output matrices as a nice matlab style array
 	mxArray *outputAverages(); // add a struct with the average offsets and widths
 	mxArray *outputMetadataStruct(); // add a struct with some of the parameters and the different aperture masks used
@@ -200,10 +206,7 @@ class Photometry{
 	// make averages over the results
 	float getWidthFromMoments(float m2x, float m2y, float mxy); // from the eigenvalues of the 2nd moments
 	void calcFrameAverages(float **output, int num_radii=1); // save the average offset_x, offset_y and width for each frame
-	// these are obsolete
-	float getAverageWidth(float **output); // get the "flux weighted" average width on all non NaN, non flagged cutouts
-	float getAverageOffsetX(float **output); // get the "flux weighted" average offset_x on all non NaN, non flagged cutouts
-	float getAverageOffsetY(float **output); // get the "flux weighted" average offset_y on all non NaN, non flagged cutouts
+	void resetFrameAverages(); // set all offsets/widths to zero
 	
 	// the sum of the product of array1...
 	int countNaNs(const float *array); // count the number of NaNs in the array

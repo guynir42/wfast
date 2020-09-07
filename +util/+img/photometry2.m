@@ -46,10 +46,11 @@
 %               it would save you some time allocating the output arrays if
 %               you keep each calculation on a different object. 
 %       *aperture or radius: a vector of aperture radii to be used for
-%                            aperture photometry (in pixels!). The biggest 
-%                            radius is also used for recentering (see
-%                            below) and for forced photometry. 
-%                            Default is [5,7,9].
+%                            aperture photometry (in pixels!). 
+%                            The same apertures are used for forced 
+%                            photometry. 
+%                            The biggest aperture is used for the centering
+%                            circle as well. Default is [5,6,7].
 %       *gauss_sigma: the width of the gaussian used in PSF photometery.
 %                     Default is 2 pixels. 
 %       *annulus: a one or two element vector for the inner and outer
@@ -77,6 +78,7 @@
 %                 least threads<5. Default is 1 (no multithreading). 
 %       *iterations: How many repositions of the gaussians are used on each
 %                    cutout before settling on the results. Default: 2.
+%       *use_raw: If false, will skip doing raw photometery (Default false). 
 %       *use_centering_aperture: If true, use a an aperture at the position
 %                                from the raw photometery, just to get a
 %                                little better positioning before going on
@@ -89,6 +91,7 @@
 %       *use_positives: when calculating the widths (2nd moments), turn any 
 %                       negative values in the cutout up to zero, to prevent
 %                       unphysical results like negative 2nd moments. 
+%                       Default is false, this is unreliable. 
 %       *debug_bit: Level of verbosity of the code (default: 0). 
 %       
 %
