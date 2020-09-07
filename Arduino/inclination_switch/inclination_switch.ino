@@ -1,14 +1,8 @@
 /***************************************
- * This device needs to be hooked up to the front of the telescope plate. 
- * It has 3 functions:
- * 1) Measure acceleration to give the orientation of the telescope (and measure strong vibrations). 
- * 2) MEasure the distance to nearest object in front of telescope using ultrasonic sensor. 
- * 3) Turn on/off some devices on top of the telescope (e.g., heaters, lens cap). 
- * 
- * Usage / control: 
- * 
- */
+This device is a hard-limit based on an accelerometer (ADXL345). 
+It will kill the current as soon as it measures that it is under the horizon. 
 
+*/
 
 #include "Parser.h"
 #include "VoltagePin.h"
