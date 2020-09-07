@@ -27,7 +27,7 @@ loaded_struct = [];
 
 S = size(sim_bank.bank); 
 
-N = 10; 
+N = 300; 
 N_templates = prod(S(2:end)); % number of templates in the higher dims of the bank
 % N_templates = 10; 
 
@@ -64,7 +64,7 @@ for ii = 1:N % over random instances of gaussian noise
         
     end
     
-    prog.showif(N); 
+    prog.showif(ii); 
     
 end
 
@@ -112,12 +112,29 @@ hl.FontSize = 22;
 
 %% count the number of points that would have passed the big bank ratio but not the small one
 
-nnz(r>thresh_ratio)
+fprintf('Total simulations: %d | exceed threshold ratio: %d | under unity ratio: %d\n', numel(r), nnz(r>thresh_ratio), nnz(r<1));
 
-nnz(r<1)
+%%
 
+f2 = util.plot.FigHandler('snr histogram'); 
+f2.width = 28;
+f2.height = 18; 
+f2.clear;
 
+ax = axes('Parent', f2.fig); 
 
+histogram(ax, r); 
 
+ax.YScale = 'log';
+hold(ax, 'on'); 
+
+plot(ax, thresh_ratio*[1 1], ax.YLim, '--r'); 
+
+hold(ax, 'off'); 
+
+xlabel(ax, 'score (big)/score (small)'); 
+ 
+
+ax.FontSize = 22; 
 
 
