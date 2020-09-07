@@ -28,6 +28,7 @@ classdef QualityChecker < handle
         photo_flag; % places flagged by photometry (mainly offsets and widths that are NaN)
         near_bad_rows_cols; % flag places where the centroids are too close to a bad row/column
         linear_motion; % are the x/y offsets moving in a linear line across the cutout (like a satellite?)
+        background_intensity; % the background per pixel value (remove frames with star in annulus or when the sky is too bright)
         
         mean_x; % the weighted average offset for all stars
         mean_y; % the weighted average offset for all stars
@@ -62,8 +63,8 @@ classdef QualityChecker < handle
         aux_names; % get the names (and indices below) from DataStore
         aux_indices; % struct with field=number for each of the above aux names
         
-        histograms = [];
-        hist_edges = []; 
+        histograms = []; % cut values accumulated over the run, with dim1 the edges defined for each cut type, dim2 the star number and dim3 is the cut type
+        hist_edges = []; % edges for each cut (each row is edges for a different cut)
         
         mean_width_values; % track the mean width for all batches in this run
         
@@ -124,12 +125,16 @@ classdef QualityChecker < handle
             obj.pars.use_shakes = true;
             obj.pars.use_defocus = true;
             obj.pars.use_slope = true;
+            obj.pars.use_near_bad_rows_cols = true;     
+            
             obj.pars.use_offset_size = true;
+            obj.pars.use_linear_motion = true;
+            obj.pars.use_background_intensity = true; 
+            
             obj.pars.use_nan_flux = false;
             obj.pars.use_nan_offsets = false;
             obj.pars.use_photo_flag = false; 
-            obj.pars.use_near_bad_rows_cols = true;     
-            obj.pars.use_linear_motion = true;
+            
             obj.pars.use_correlations = true;
 
             obj.pars.corr_types = {'b', 'x', 'y', 'r', 'w'}; % types of auxiliary we will use for correlations (r is derived from x and y)
@@ -141,6 +146,8 @@ classdef QualityChecker < handle
             obj.pars.thresh_slope = 5; % events where the slope is larger than this value (in abs. value) are disqualified
             obj.pars.thresh_offset_size = 4; % events with offsets above this number are disqualified (after subtracting mean offsets)
             obj.pars.thresh_linear_motion = 2; % events showing linear motion of the centroids are disqualified
+            obj.pars.thresh_background_intensity = 10; % events where the background per pixel is above this threshold are disqualified
+            
             obj.pars.thresh_correlation = 4; % correlation max/min of flux (with e.g., background) with value above this disqualifies the region
 
             obj.pars.smoothing_slope = 50; % number of frames to average over when calculating slope
@@ -211,24 +218,6 @@ classdef QualityChecker < handle
                 obj.cut_two_sided(end+1) = true;
             end
             
-            if obj.pars.use_nan_flux 
-                obj.cut_names{end+1} = 'nan_flux'; 
-                obj.cut_thresholds(end+1) = 1;
-                obj.cut_two_sided(end+1) = false;
-            end
-            
-            if obj.pars.use_nan_offsets 
-                obj.cut_names{end+1} = 'nan_offsets'; 
-                obj.cut_thresholds(end+1) = 1;
-                obj.cut_two_sided(end+1) = false;
-            end
-            
-            if obj.pars.use_photo_flag 
-                obj.cut_names{end+1} = 'photo_flag'; 
-                obj.cut_thresholds(end+1) = 1;
-                obj.cut_two_sided(end+1) = false;
-            end
-            
             if obj.pars.use_near_bad_rows_cols 
                 obj.cut_names{end+1} = 'near_bad_rows_cols'; 
                 obj.cut_thresholds(end+1) = 1; 
@@ -244,6 +233,30 @@ classdef QualityChecker < handle
             if obj.pars.use_linear_motion
                 obj.cut_names{end+1} = 'linear_motion'; 
                 obj.cut_thresholds(end+1) = obj.pars.thresh_linear_motion; 
+                obj.cut_two_sided(end+1) = false;
+            end
+            
+            if obj.pars.use_background_intensity
+                obj.cut_names{end+1} = 'background_intensity'; 
+                obj.cut_thresholds(end+1) = obj.pars.thresh_background_intensity;
+                obj.cut_two_sided(end+1) = false;
+            end
+            
+            if obj.pars.use_nan_flux 
+                obj.cut_names{end+1} = 'nan_flux'; 
+                obj.cut_thresholds(end+1) = 1;
+                obj.cut_two_sided(end+1) = false;
+            end
+            
+            if obj.pars.use_nan_offsets 
+                obj.cut_names{end+1} = 'nan_offsets'; 
+                obj.cut_thresholds(end+1) = 1;
+                obj.cut_two_sided(end+1) = false;
+            end
+            
+            if obj.pars.use_photo_flag 
+                obj.cut_names{end+1} = 'photo_flag'; 
+                obj.cut_thresholds(end+1) = 1;
                 obj.cut_two_sided(end+1) = false;
             end
             
@@ -486,6 +499,8 @@ classdef QualityChecker < handle
             
             obj.linear_motion = sqrt(LX.^2 + LY.^2).*ff; % linear motion is set to be proportional to the filtered flux
             
+            obj.background_intensity = b; % just the background level
+            
             aux = zeros(size(f,1),size(f,2),length(obj.pars.corr_types), 'like', f); 
 %             aux(:,:,obj.corr_indices.a) = a;
             aux(:,:,obj.corr_indices.b) = b;
@@ -646,7 +661,7 @@ classdef QualityChecker < handle
         
         function makeHistograms(obj)
             
-            obj.histograms = zeros(obj.pars.num_hist_edges, obj.num_stars, length(obj.cut_indices)); 
+            obj.histograms = zeros(obj.pars.num_hist_edges, obj.num_stars, length(obj.cut_indices), 'single'); 
             
             for ii = 1:length(obj.cut_names) 
                 

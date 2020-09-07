@@ -42,10 +42,11 @@ classdef EventFinder < handle
         black_list_stars; % a slowly growing list of stars that display too many events, so that all their events are marked as false
 %         black_list_batches; % a slowly growing list of batches that display too many events, so that all their events are marked as false
         
-        % simulated events are saved (their index in the shuffle bank) 
-        % the passed events have been detected and the failed events have
-        % been rejected by the system (we will try to put events outside 
-        % the areas disqualified by the checker
+        % simulated events are saved (a short struct describing the event). 
+        % The passed events have been detected and the failed events have
+        % been rejected by the system. Note that simulated events are placed
+        % outside of the data cuts, so most of them are not rejected by them, 
+        % but only by the S/N threshold. 
         sim_events_passed;
         sim_events_failed;
     
@@ -511,6 +512,7 @@ classdef EventFinder < handle
 
             c.flux_raw_all = fluxes_raw; 
             c.flux_corrected_all = fluxes_corrected; 
+            c.auxiliary_all = obj.auxiliary; 
             
             idx = find(star_indices==obj.star_index); 
             c.filtered_flux_past_values = obj.background_ff(:,idx);
@@ -524,7 +526,7 @@ classdef EventFinder < handle
             c.flux_std = nanstd(obj.store.background_flux(:,c.star_index)); 
             
             % save the auxiliary data (like background and offsets)
-            c.auxiliary = obj.store.extended_aux; 
+            c.auxiliary = permute(obj.store.extended_aux(:,c.star_index,:), [1,3,2]); 
             c.aux_names = obj.store.aux_names;
             c.aux_indices = obj.store.aux_indices;
 
@@ -746,6 +748,46 @@ classdef EventFinder < handle
                 end
                 
             end
+            
+        end
+        
+        function s = produceSummary(obj)
+            
+            % add varargin? 
+            
+            s = trig.RunSummary; 
+            s.head = util.oop.full_copy(obj.head); % I want to make sure this summary is distinct from the original finder
+            
+            % load the content of the finder
+            s.finder_pars = obj.pars;
+            s.snr_values = obj.snr_values;
+            s.total_batches = obj.total_batches; 
+            s.sim_events_passed = obj.sim_events_passed;
+            s.sim_events_failed = obj.sim_events_failed;
+            s.black_list_stars = obj.black_list_stars;
+            
+            % load the content of the store
+            s.store_pars = obj.store.pars;
+            s.good_stars = obj.store.star_indices;
+            
+            % load the content of the checker
+            s.checker_pars = obj.store.checker.pars;
+            s.cut_names = obj.store.checker.cut_names;
+            s.cut_indices = obj.store.checker.cut_indices; 
+            s.cut_thresholds = obj.store.checker.cut_thresholds;
+            s.cut_two_sided = obj.store.checker.cut_two_sided;
+            s.cut_histograms = permute(nansum(obj.store.checker.histograms,2), [1,3,2]);
+            s.cut_bin_edges = obj.store.checker.hist_edges;
+            
+            % load the content of the star hours
+            s.snr_bin_edges = obj.store.checker.hours.snr_bin_edges;
+            s.star_seconds = permute(nansum(obj.store.checker.hours.histogram,2),[1,3,2]);
+            s.star_seconds_with_losses = permute(nansum(obj.store.checker.hours.histogram_with_losses,2),[1,3,2]);
+            s.losses_exclusive = permute(nansum(obj.store.checker.hours.losses_exclusive, 2), [1,3,2]);
+            s.losses_inclusive = permute(nansum(obj.store.checker.hours.losses_inclusive, 2), [1,3,2]);
+            s.losses_bad_stars = permute(nansum(obj.store.checker.hours.losses_bad_stars, 2), [1,3,2]);
+            s.runtime = obj.store.checker.hours.runtime; 
+            
             
         end
         

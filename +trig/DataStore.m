@@ -294,8 +294,8 @@ classdef DataStore < handle
                 error('This class cannot handle more than 3D fluxes!'); 
             end
             
-            if ndims(obj.this_input.widths)>2
-                error('This class cannot handle more than 2D auxiliary measurements!'); 
+            if ndims(obj.this_input.widths)>3
+                error('This class cannot handle more than 3D auxiliary measurements!'); 
             end
             
             obj.clear;
@@ -350,16 +350,16 @@ classdef DataStore < handle
             
             % store the new aux data
             list = obj.aux_names;
-            new_aux = NaN(size(obj.this_input.errors,1), size(obj.this_input.widths,2), length(list), 'like', obj.this_input.widths); % preallocate
+            new_aux = NaN(size(obj.this_input.errors,1), size(obj.this_input.widths,2), length(list), size(obj.this_input.widths,3), 'like', obj.this_input.widths); % preallocate
             
             for ii = 1:length(list)
-                new_aux(:,:,ii) = obj.this_input.(list{ii}); 
+                new_aux(:,:,ii,:) = permute(obj.this_input.(list{ii}), [1,2,4,3]); % allow multiple apertures (3D aux matrices from photometry) 
             end
             
             obj.aux_buffer = vertcat(obj.aux_buffer, new_aux);
 
             if size(obj.aux_buffer,1)>obj.pars.length_background+obj.pars.length_extended % the aux buffer is smaller than flux buffer: it is only long enough for background+extended region
-                obj.aux_buffer = obj.aux_buffer(end-(obj.pars.length_background+obj.pars.length_extended)+1:end,:,:); 
+                obj.aux_buffer = obj.aux_buffer(end-(obj.pars.length_background+obj.pars.length_extended)+1:end,:,:,:); 
             end
 
             obj.calcSubBuffers;
@@ -376,7 +376,7 @@ classdef DataStore < handle
             extended_start_idx = max(1, size(obj.flux_buffer,1)-obj.pars.length_extended+1);
             extended_start_idx_aux = max(1, size(obj.aux_buffer,1)-obj.pars.length_extended+1);
             obj.extended_flux = obj.flux_buffer(extended_start_idx:end,:,:); 
-            obj.extended_aux = obj.aux_buffer(extended_start_idx_aux:end,:,:);
+            obj.extended_aux = obj.aux_buffer(extended_start_idx_aux:end,:,:,:);
             obj.extended_timestamps = obj.timestamps_buffer(extended_start_idx:end); 
             obj.extended_juldates = obj.juldates_buffer(extended_start_idx:end); 
             obj.extended_filenames = obj.filename_buffer(extended_start_idx:end); 
@@ -394,7 +394,7 @@ classdef DataStore < handle
             obj.search_filenames = obj.extended_filenames(obj.search_start_idx:obj.search_end_idx); 
             obj.search_frame_num = obj.extended_frame_num(obj.search_start_idx:obj.search_end_idx); 
             
-            obj.search_aux = obj.extended_aux(obj.search_start_idx:obj.search_end_idx,:,:); % cut the search region out of the extended batch
+            obj.search_aux = obj.extended_aux(obj.search_start_idx:obj.search_end_idx,:,:,:); % cut the search region out of the extended batch
             
             % the background region goes back from the start of extended region up to "length_background" before that
             background_start_idx = max(1, extended_start_idx-obj.pars.length_background);
@@ -407,7 +407,7 @@ classdef DataStore < handle
             obj.background_frame_num = obj.frame_num_buffer(background_start_idx:background_end_idx);
             
             background_end_idx_aux = extended_start_idx_aux-1;
-            obj.background_aux = obj.aux_buffer(1:background_end_idx_aux,:,:); % the size of the aux buffer is just big enough to get the background+extended regions
+            obj.background_aux = obj.aux_buffer(1:background_end_idx_aux,:,:,:); % the size of the aux buffer is just big enough to get the background+extended regions
             
         end
         

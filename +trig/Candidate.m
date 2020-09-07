@@ -109,6 +109,7 @@ classdef Candidate < handle
         
         flux_raw_all; % the raw flux (over the extended region) for all stars
         flux_corrected_all; % the corrected flux (over the exteneded region) for all stars
+        auxiliary_all; % the auxiliary data (for the extended region) for all stars. 
         
         search_start_idx;
         search_end_idx;
@@ -416,8 +417,8 @@ classdef Candidate < handle
             end
             
             t = obj.timestamps;
-            x = obj.auxiliary(:,obj.star_index,obj.aux_indices.offsets_x);
-            y = obj.auxiliary(:,obj.star_index,obj.aux_indices.offsets_y);
+            x = obj.auxiliary(:,obj.aux_indices.offsets_x);
+            y = obj.auxiliary(:,obj.aux_indices.offsets_y);
             
             cx = util.series.correlation(x,t, timescale).*sqrt(timescale);
             cy = util.series.correlation(y,t, timescale).*sqrt(timescale);
@@ -433,8 +434,8 @@ classdef Candidate < handle
             end
             
             t = obj.timestamps;
-            x = obj.auxiliary(:,obj.star_index,obj.aux_indices.offsets_x);
-            y = obj.auxiliary(:,obj.star_index,obj.aux_indices.offsets_y);
+            x = obj.auxiliary(:,obj.aux_indices.offsets_x);
+            y = obj.auxiliary(:,obj.aux_indices.offsets_y);
             
             x = x-nanmedian(x); 
             y = y-nanmedian(y); 
@@ -662,14 +663,14 @@ classdef Candidate < handle
             input.ax.NextPlot = 'replace';
             input.ax.ColorOrderIndex = 5;
             
-            h3 = plot(input.ax, x, obj.auxiliary(:,obj.star_index, obj.aux_indices.backgrounds), '--', 'Color', [0.2 0.6 0.2]); 
+            h3 = plot(input.ax, x, obj.auxiliary(:,obj.aux_indices.backgrounds), '--', 'Color', [0.2 0.6 0.2]); 
             h3.DisplayName = 'background';
             
-            aux = obj.auxiliary(:,obj.star_index, obj.aux_indices.backgrounds);
+            aux = obj.auxiliary(:,obj.aux_indices.backgrounds);
             
             input.ax.NextPlot = 'add';
             
-            w = obj.auxiliary(:,obj.star_index, obj.aux_indices.widths);
+            w = obj.auxiliary(:,obj.aux_indices.widths);
             
             w = w.*2.355; 
             

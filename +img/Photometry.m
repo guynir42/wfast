@@ -63,8 +63,8 @@ classdef Photometry < handle
         use_mex = 1; % use the (now old) mex function for faster processing 
         use_new_method = 1; % use the new mex function that is much faster and more accurate
         num_threads = 4; % for multithreaded mex photometry
-        use_backgrounds = 1; % remove background from individual cutout
-        use_self_psf = 0; % use image as a proxy for its own PSF
+        use_backgrounds = 1; % remove background from individual cutout (old method only...)
+        use_self_psf = 0; % use image as a proxy for its own PSF (don't use this!)
         
         iterations = 2; % repeat the photometry and relocate the aperutre to the centroid
         use_basic = 1;
@@ -82,6 +82,8 @@ classdef Photometry < handle
         annulus_outer = 10; % empty means take the rest of the cutout
         gauss_sigma = 2.5;
         gauss_thresh = 1e-6;
+        
+        binning_factor = 1; % if bigger than 1, will sum the cutouts before sending them to photometry2
         
         use_fitter = 0;
 %         use_gaussian_psf = 1; % just use a simple PSF 
@@ -488,12 +490,18 @@ classdef Photometry < handle
                     
                     if obj.use_gaussian % if we used gaussian and "use_best_offsets/widths" then save the gaussian offsets/widths instead of these new values
                         
-                        if obj.use_best_offsets==0
+                        if obj.use_best_offsets
+                            obj.offsets_x = repmat(obj.offsets_x, [1 1 size(obj.fluxes,3)]); 
+                            obj.offsets_y = repmat(obj.offsets_y, [1 1 size(obj.fluxes,3)]); 
+                        else
                             obj.offsets_x = obj.offsets_x_ap;
                             obj.offsets_y = obj.offsets_y_ap;
                         end
                         
-                        if obj.use_best_widths==0
+                        if obj.use_best_widths
+                            obj.widths = repmat(obj.widths, [1 1 size(obj.fluxes,3)]); 
+                            obj.flags = repmat(obj.flags, [1 1 size(obj.fluxes,3)]); 
+                        else
                             obj.widths = obj.widths_ap; % obj.gauss_sigma.*obj.widths_ap./sqrt(obj.gauss_sigma.^2-obj.widths_ap.^2); 
                             obj.flags = obj.flags_ap;
                         end
@@ -531,12 +539,18 @@ classdef Photometry < handle
                     
                     if obj.use_gaussian % if we used gaussian and "use_best_offsets/widths" then save the gaussian offsets/widths instead of these new values
                         
-                        if obj.use_best_offsets==0
+                        if obj.use_best_offsets
+                            obj.offsets_x = cat(3, obj.offsets_x_ap, repmat(obj.offsets_x, [1 1 size(obj.fluxes,3)])); 
+                            obj.offsets_y = cat(3, obj.offsets_y_ap, repmat(obj.offsets_y, [1 1 size(obj.fluxes,3)])); 
+                        else
                             obj.offsets_x = cat(3, obj.offsets_x_ap, obj.offsets_x_forced);
                             obj.offsets_y = cat(3, obj.offsets_y_ap, obj.offsets_y_forced);
                         end
                         
-                        if obj.use_best_widths==0
+                        if obj.use_best_widths
+                            obj.widths = cat(3, obj.widths_ap, repmat(obj.widths, [1 1 size(obj.fluxes,3)])); 
+                            obj.flags = cat(3, obj.flags_ap, repmat(obj.flags, [1 1 size(obj.fluxes,3)])); 
+                        else
                             obj.widths = cat(3, obj.widths_ap, obj.widths_forced);
                             obj.flags = cat(3, obj.flags_ap, obj.flags_forced);
                         end
@@ -1144,6 +1158,7 @@ classdef Photometry < handle
             obj.pars_struct = struct;
             obj.pars_struct.used_bg_sub = obj.use_backgrounds;
             obj.pars_struct.use_self_psf = obj.use_self_psf;
+            obj.pars_struct.binning_factor = obj.binning_factor; 
             
             if ~isempty(obj.var_map)
                 if isscalar(obj.var_map)

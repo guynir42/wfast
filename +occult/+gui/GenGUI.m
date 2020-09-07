@@ -378,7 +378,7 @@ classdef GenGUI < handle
                     obj.button_limits.String = 'uniform limits';
                     
                     text(-obj.owner.W/2, 0.3, sprintf('runtime= %5.3fs', obj.owner.runtime_get), 'FontSize', obj.font_size);
-                    text( obj.owner.W/2, 0.3, sprintf('S/N= %5.3fs', obj.owner.detectionSNR), 'FontSize', obj.font_size, 'HorizontalAlignment', 'right');
+                    text(-obj.owner.W/2, 1.7, sprintf('S/N= %s', util.text.print_vec(round(obj.owner.detectionSNR,1), ', ')), 'FontSize', obj.font_size, 'HorizontalAlignment', 'left');
 
                 else
                     
@@ -388,7 +388,7 @@ classdef GenGUI < handle
                     obj.button_limits.String = 'auto limits';
                     
                     text(-obj.owner.W/2, (1+obj.axes_image.YLim(1))/2, sprintf('runtime= %5.3fs', obj.owner.runtime_get), 'FontSize', obj.font_size);
-                    text( obj.owner.W/2, (1+obj.axes_image.YLim(1))/2, sprintf('S/N= %5.3fs', obj.owner.detectionSNR), 'FontSize', obj.font_size, 'HorizontalAlignment', 'right');
+                    text(obj.owner.W/2, (1+obj.axes_image.YLim(1))/2, sprintf('S/N= %s', util.text.print_vec(round(obj.owner.detectionSNR, 1), ', ')), 'FontSize', obj.font_size, 'HorizontalAlignment', 'right');
 
                 end
                     
@@ -400,7 +400,7 @@ classdef GenGUI < handle
                 obj.owner.showMap;
                 
                 text(obj.axes_image.XLim(1)/2, obj.axes_image.YLim(2)/2, sprintf('runtime= %5.3fs', obj.owner.runtime_get), 'FontSize', obj.font_size);
-                text(obj.axes_image.XLim(1)/2, obj.axes_image.YLim(2)/1.5, sprintf('S/N= %5.3fs', obj.owner.detectionSNR), 'FontSize', obj.font_size);
+                text(obj.axes_image.XLim(1)/2, obj.axes_image.YLim(2)/1.5, sprintf('S/N= %s', util.text.print_vec(round(obj.owner.detectionSNR,1), ', ')), 'FontSize', obj.font_size);
                 
             else
                 error('Unknown "show_what" option: "%s". Use "lightcurve" or "map"', obj.show_what);

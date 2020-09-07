@@ -39,6 +39,7 @@ classdef StarHours < handle
     
     properties % switches/controls
         
+        % the following properties are used to build the S/N bin edges
         snr_bin_min = 5; % stars with lower S/N are not even tested for events (here S/N is calculated on the raw fluxes)
         snr_bin_width = 0.5; % for the star-hour histogram
         snr_bin_max = 40; % biggest value we expect to see in the star-hour histogram
@@ -191,9 +192,9 @@ classdef StarHours < handle
             obj.star_bin_edges = 1:size(obj.flux,2)+1;
             obj.snr_bin_edges = obj.snr_bin_min:obj.snr_bin_width:obj.snr_bin_max;
             
-            obj.histogram = zeros(length(obj.snr_bin_edges)-1, length(obj.star_bin_edges)-1); 
-            obj.losses_exclusive = zeros(length(obj.snr_bin_edges)-1, length(obj.star_bin_edges)-1, length(obj.cut_names));
-            obj.losses_inclusive = zeros(length(obj.snr_bin_edges)-1, length(obj.star_bin_edges)-1, length(obj.cut_names)); 
+            obj.histogram = zeros(length(obj.snr_bin_edges)-1, length(obj.star_bin_edges)-1, 'single'); 
+            obj.losses_exclusive = zeros(length(obj.snr_bin_edges)-1, length(obj.star_bin_edges)-1, length(obj.cut_names), 'single');
+            obj.losses_inclusive = zeros(length(obj.snr_bin_edges)-1, length(obj.star_bin_edges)-1, length(obj.cut_names), 'single'); 
             
         end
         
@@ -327,23 +328,39 @@ classdef StarHours < handle
         
         function printReport(obj, varargin)
             
+            import util.text.cs;
+            
             input = util.text.InputVars;
             input.input_var('units', 'hours'); % can also choose "hours" or "percent"
-            
+            input.input_var('format', 'text'); % can aso choose "latex"
             input.scan_vars(varargin{:}); 
             
-            if util.text.cs(input.units, 'seconds')
+            if cs(input.units, 'seconds')
                 unit_str = 's'; 
-            elseif util.text.cs(input.units, 'hours')
+            elseif cs(input.units, 'hours')
                 unit_str = 'h'; 
-            elseif util.text.cs(input.units, 'percent', '%')
+            elseif cs(input.units, 'percent', '%')
                 unit_str = '%'; 
             else
                 error('Unknown option "%s" to "units" argument. Try using "seconds" or "hours" or "percent"...', input.units); 
             end
             
-            fprintf('%-20s | inclusive[%s] | exclusive[%s] \n', 'Cut name', unit_str, unit_str); 
-            fprintf('---------------------+--------------+------------- \n'); 
+            if cs(input.format, 'text')
+                sep = '|';
+                line = '--------------------------+--------------+------------- \n';
+                ending = newline;
+                code = @(str) str;
+            elseif cs(input.format, 'latex')
+                sep = '&';
+                line = ['\\hline' newline]; 
+                ending = ['\\' newline]; 
+                code = @(str) sprintf('\\code{%s}', str); 
+            else
+                error('Unknown "format" option "%s". Use "text" or "latex" instead...', input.format); 
+            end
+            
+            fprintf('%-25s %s inclusive[%s] %s exclusive[%s] %s', 'Cut name', sep, unit_str, sep, unit_str, ending); 
+            fprintf(line); 
             
             useful = util.stat.sum2(obj.histogram); 
             total = util.stat.sum2(obj.histogram_with_losses); 
@@ -366,7 +383,7 @@ classdef StarHours < handle
                     exc = exc/total.*100; 
                 end
                 
-                fprintf('%-20s | %12.2f | %12.2f \n', obj.cut_names{ii}, inc, exc);
+                fprintf('%-25s %s %12.2f %s %12.2f %s', code(obj.cut_names{ii}), sep, inc, sep, exc, ending);
                 
                 
             end
@@ -379,11 +396,11 @@ classdef StarHours < handle
                 stars = stars/total.*100; 
             end
             
-            fprintf('Bad stars            | %12.2f |         ---  \n', stars); 
+            fprintf('%-25s %s %12.2f %s         ---  %s', code('Bad stars'), sep, stars, sep, ending); 
             
-            fprintf('---------------------+--------------+------------- \n'); 
+            fprintf(line); 
             
-            fprintf('%-20s | %11.1fh | %11.1fh \n', 'Good / total time', useful/3600, total/3600); % always show it as hours!  
+            fprintf('%-25s %s %11.1fh %s %11.1fh %s', 'Good / total time', sep, useful/3600, sep, total/3600, ending); % always show it as hours!  
 
             
         end
