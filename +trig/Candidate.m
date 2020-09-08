@@ -96,15 +96,17 @@ classdef Candidate < handle
         
         use_show_secrets = true; % this should be turned off at some point
         
-        run_name; 
-        run_date;
+%         run_name; 
+%         run_date;
         
+        run_identifier = ''; % use this to find the files in the database. Format: <date folder>\<run_name_folder> e.g., 2020-09-07\ecliptic_run1
+
         is_positive; 
         
         is_simulated = 0; % by default events are not simulated
 
         flux_buffer; % flux buffer going back as far as possible, for this star only
-        timestamp_buffer; % timestamps for the above
+        timestamps_buffer; % timestamps for the above
         filtered_flux_past_values; % normalization data for this star and this kernel only. Can be either raw filtered_flux values for the last "backround" period, or the variance values from the var_buf
         
         flux_raw_all; % the raw flux (over the extended region) for all stars
@@ -145,7 +147,7 @@ classdef Candidate < handle
         
         function classes = getListOfClasses(obj)
             
-            classes = {'cosmic ray', 'satellite', 'flare', 'occultation', 'mystery', 'edge effect', 'artefact'};
+            classes = {'occultation certain', 'occultation possible', 'cosmic ray', 'satellite', 'flare', 'edge effect', 'artefact', 'mystery'};
             
         end
         
@@ -329,7 +331,7 @@ classdef Candidate < handle
             
         end
         
-        function setRunNameDate(obj)
+        function setRunNameDate(obj) % we don't need this if the finder puts the run_identifier in the header
             
             path = fileparts(obj.getFilename); 
             

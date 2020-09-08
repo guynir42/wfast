@@ -176,6 +176,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
     
     properties(Hidden=true) 
        
+        run_identifier = '';  
+        
         DEADTIME = 0; % time lost after each frame, in seconds (needs to be updated someday)
         
         QE = 1; % quantum efficiency (needs to be updated someday)
@@ -1215,25 +1217,25 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             
         end
         
-        function val = run_identifier(obj) % get the identifier for the current run (date+object name)
-            
-            val = '';
-            
-            if length(obj.STARTTIME)>=10
-                val = obj.STARTTIME(1:10);
-            end
-            
-            if ~isempty(obj.OBJECT)
-                
-                if ~isempty(val)
-                    val = [val '_'];
-                end
-                
-                val = [val obj.OBJECT];
-                
-            end
-            
-        end
+%         function val = run_identifier(obj) % get the identifier for the current run (date+object name)
+%             
+%             val = '';
+%             
+%             if length(obj.STARTTIME)>=10
+%                 val = obj.STARTTIME(1:10);
+%             end
+%             
+%             if ~isempty(obj.OBJECT)
+%                 
+%                 if ~isempty(val)
+%                     val = [val '_'];
+%                 end
+%                 
+%                 val = [val obj.OBJECT];
+%                 
+%             end
+%             
+%         end
         
     end
     

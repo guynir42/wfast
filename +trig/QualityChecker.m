@@ -67,6 +67,7 @@ classdef QualityChecker < handle
         hist_edges = []; % edges for each cut (each row is edges for a different cut)
         
         mean_width_values; % track the mean width for all batches in this run
+        mean_background_values;  % track the mean background for all batches in this run
         
         debug_bit = 1;
         
@@ -178,6 +179,7 @@ classdef QualityChecker < handle
             obj.histograms = [];
             
             obj.mean_width_values = [];
+            obj.mean_background_values = [];
             
             obj.clear;
             
@@ -445,6 +447,7 @@ classdef QualityChecker < handle
             obj.defocus = util.vec.weighted_average(w,F.^2,2); % get the average PSF width (for focus tests)
             
             obj.mean_width_values = vertcat(obj.mean_width_values, obj.defocus); % keep a log of the focus for the entire run
+            obj.mean_background_values = vertcat(obj.mean_background_values, nanmedian(b,2)); % keep a log of the sky background level for the entire run
             
             if obj.pars.subtract_mean_offsets
                 x = x - obj.mean_x; 
@@ -501,6 +504,8 @@ classdef QualityChecker < handle
             
             obj.background_intensity = b; % just the background level
             
+            
+            
             aux = zeros(size(f,1),size(f,2),length(obj.pars.corr_types), 'like', f); 
 %             aux(:,:,obj.corr_indices.a) = a;
             aux(:,:,obj.corr_indices.b) = b;
@@ -523,7 +528,7 @@ classdef QualityChecker < handle
                 
                 try
                     obj.correlations(:,:,:,ii) = util.series.correlation(f, aux, obj.pars.corr_timescales(ii)).*norm; 
-                catch
+                catch ME
                     disp('here'); 
                     rethrow(ME); 
                 end

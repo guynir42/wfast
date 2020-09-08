@@ -2616,7 +2616,15 @@ classdef Acquisition < file.AstroData
                             if ~exist(dirname, 'dir')
                                 mkdir(dirname);
                                 obj.buf.directory_override = dirname;
+                                
+                                % get the date and run name subfolders
+                                [dirname, run_name] = fileparts(dirname); 
+                                [dirname, run_date] = fileparts(dirname); 
+                                
+                                obj.head.run_identifier(fullfile(run_date, run_name);
+                                
                                 break;
+                                
                             end
                             
                         end

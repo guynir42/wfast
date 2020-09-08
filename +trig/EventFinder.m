@@ -307,6 +307,17 @@ classdef EventFinder < handle
                 obj.loadSimulationBank;
             end
             
+            if isempty(obj.head)
+                error('Cannot find events without a header object...'); 
+            end
+            
+            if isempty(obj.head.run_identifier) % must have a run identifier to tag each event
+                d = fileparts(obj.store.filename_buffer{1}); 
+                [d, run_name] = fileparts(d); 
+                [d, run_date] = fileparts(d); 
+                obj.head.run_identifier = fullfile(run_date, run_name); 
+            end
+            
             if obj.store.is_done_burn % do not do any more calculations until done with "burn-in" period
                 
                 if obj.pars.use_psd_correction
@@ -512,12 +523,12 @@ classdef EventFinder < handle
 
             c.flux_raw_all = fluxes_raw; 
             c.flux_corrected_all = fluxes_corrected; 
-            c.auxiliary_all = obj.auxiliary; 
+            c.auxiliary_all = obj.store.extended_aux; 
             
-            idx = find(star_indices==obj.star_index); 
+            idx = find(star_indices==c.star_index); 
             c.filtered_flux_past_values = obj.background_ff(:,idx);
-            c.flux_buffer = obj.store.flux_buffer(:,obj.star_index); 
-            c.flux_timestamps_buffer = obj.store.timestamps_buffer; 
+            c.flux_buffer = obj.store.flux_buffer(:,c.star_index); 
+            c.timestamps_buffer = obj.store.timestamps_buffer; 
             c.psd = obj.psd.power_spectrum; 
             c.freq_psd = obj.psd.freq; 
             
@@ -530,10 +541,10 @@ classdef EventFinder < handle
             c.aux_names = obj.store.aux_names;
             c.aux_indices = obj.store.aux_indices;
 
-            DX = c.auxiliary(:,:, c.aux_indices.offsets_x); % the offsets_x for all stars
-            dx = DX(:,c.star_index) - obj.store.checker.mean_x; % reduced the mean offsets_x
-            DY = c.auxiliary(:,:, c.aux_indices.offsets_y); % the offsets_y for all stars
-            dy = DY(:,c.star_index) - obj.store.checker.mean_y; % reduced the mean offsets_y
+            DX = c.auxiliary(:,c.aux_indices.offsets_x); % the offsets_x for all stars
+            dx = DX - obj.store.checker.mean_x; % reduced the mean offsets_x
+            DY = c.auxiliary(:,c.aux_indices.offsets_y); % the offsets_y for all stars
+            dy = DY - obj.store.checker.mean_y; % reduced the mean offsets_y
             
             c.relative_dx = dx; 
             c.relative_dy = dy; 
@@ -557,8 +568,9 @@ classdef EventFinder < handle
             c.batch_number = obj.batch_counter; 
 
             % store the name and date of the run (from the filenames)
-            c.setRunNameDate; 
-            
+%             c.setRunNameDate; 
+            c.run_identifier = obj.head.run_identifier; 
+
             c.checkIfPeakIsIncluded; % set kept=0 for candidates that have a higher peak outside the search region than inside it
             
             % disqualify event based on any cut flag

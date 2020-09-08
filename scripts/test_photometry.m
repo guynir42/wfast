@@ -3,7 +3,7 @@
 
 %% load the data
 
-d = util.sys.WorkingDirectory(fullfile(getenv('DATA'), 'WFAST\2020\2020-06-09\Kepler_run2')); 
+d = util.sys.WorkingDirectory(fullfile(getenv('DATA'), 'WFAST\2020\2020-06-09\ecliptic_run1')); 
 
 files = d.match('*.h5*');
 
@@ -72,13 +72,14 @@ cat.addBolometricMags;
 %% start running photometry!
 
 N = length(files); 
-% N = 50; % cut it short
+% N = 40; % cut it short
 
 prog = util.sys.ProgressBar;
 
 cal.use_interp_mask=0; 
 
 phot.reset;
+phot.aperture = 1:5; 
 phot.use_best_widths = 1; % use the Gaussian width, and apply a correction to it
 
 % phot2 = util.oop.full_copy(phot); 
@@ -129,13 +130,23 @@ finder.finishup;
 
 
 %% plot some results
-% 
-% f2 = util.plot.FigHandler('bad photometry');
-% f2.clear;
-% 
-% ax = axes('Parent', f2.fig); 
-% 
-% imagesc(ax, light.flags); 
+
+f2 = util.plot.FigHandler('star hours');
+f2.width = 26;
+f2.height = 16;
+f2.clear;
+
+ax = axes('Parent', f2.fig); 
+
+finder.store.checker.hours.showHistogram('ax', ax, 'sum', 1); 
+
+ax.XLim = [4.5 26]; 
+ylabel(ax, 'Star hours'); 
+xlabel(ax, 'Signal to noise ratio'); 
+legend(ax, 'off'); 
+
+finder.store.checker.hours.printReport('format', 'latex'); 
+
 
 
 

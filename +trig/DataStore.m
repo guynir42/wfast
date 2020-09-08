@@ -58,6 +58,8 @@ classdef DataStore < handle
         star_indices = []; 
         star_snr = [];
         
+        aperture_index = [];
+        
         debug_bit = 1;
         
     end
@@ -69,7 +71,9 @@ classdef DataStore < handle
     end
     
     properties(Hidden=true)
-       
+        
+        bad_ratios; % if there is a big difference between the flux in different apertures we disqualify those stars too (e.g., binaries)
+        
         version = 1.00;
         
     end
@@ -109,7 +113,6 @@ classdef DataStore < handle
 
             obj.pars.use_threshold = true; % use the minimal S/N to keep out bad stars and not even store them
             obj.pars.threshold = 5; % stars with S/N lower than this are disqualified after the burn-in period!
-            obj.pars.func_rms = @nanstd; % which function should be used for calculating the noise (for star S/N)
 
             obj.pars.use_remove_cosmic_rays = true; % get rid of intense cosmic rays before even inputting the flux into the buffers
             obj.pars.cosmic_ray_threshold = 8; % in units of S/N
@@ -135,6 +138,8 @@ classdef DataStore < handle
             
             obj.star_indices = []; 
             obj.star_snr = [];
+            
+            obj.aperture_index = []; 
             
             obj.cutouts = [];
             
@@ -238,6 +243,7 @@ classdef DataStore < handle
             
             val.input_var('filename', ''); 
             val.input_var('juldates', [], 'julian_dates'); 
+            val.input_var('pars_struct', []); 
             
         end
         
@@ -265,6 +271,7 @@ classdef DataStore < handle
                 obj.this_input = util.oop.full_copy(varargin{1});
                 % what happens to any other varargin pairs?
             elseif isa(varargin{1}, 'img.Photometry')
+                
                 obj.this_input = obj.makeInputVars;
                 
                 list = obj.this_input.list_added_properties;
@@ -272,7 +279,7 @@ classdef DataStore < handle
                 for ii = 1:length(list)
                     obj.this_input.(list{ii}) = varargin{1}.(list{ii}); 
                 end
-                    
+               
             else
                 obj.this_input = obj.makeInputVars;
                 obj.this_input.scan_vars(varargin{:}); 
@@ -290,6 +297,10 @@ classdef DataStore < handle
 
             end
             
+            if ~isempty(obj.head)
+                obj.head.PHOT_PARS = obj.this_input.pars_struct; 
+            end
+            
             if ndims(obj.this_input.fluxes)>3
                 error('This class cannot handle more than 3D fluxes!'); 
             end
@@ -302,20 +313,31 @@ classdef DataStore < handle
             
             obj.frame_counter = obj.frame_counter + size(obj.this_input.fluxes,1); 
             
-            if obj.pars.use_threshold && obj.is_done_burn % we need to keep only good stars at the input level
+            if obj.pars.use_threshold && obj.is_done_burn % we need to keep only good stars / aperture at the input level
                 
                 if isempty(obj.star_indices)
-                    obj.calcGoodStars; % this produces the star indices
-                    obj.dumpBadStarsFromBuffer; % this reduces the flux and aux buffers to only the good stars
+                    obj.calcGoodStarsAndApertures; % this produces the star indices
+                    obj.dumpBadStarsAndAperturesFromBuffer; % this reduces the flux and aux buffers to only the good stars
                 end
                 
-                obj.this_input.fluxes = obj.this_input.fluxes(:,obj.star_indices,:); 
+                obj.this_input.fluxes = obj.this_input.fluxes(:,obj.star_indices,obj.aperture_index); 
+                
                 obj.this_input.cutouts = obj.this_input.cutouts(:,:,:,obj.star_indices); 
                 
                 for ii = 1:length(obj.aux_names)
                     new_data = obj.this_input.(obj.aux_names{ii});
-                    obj.this_input.(obj.aux_names{ii}) = new_data(:,obj.star_indices); 
+                    obj.this_input.(obj.aux_names{ii}) = new_data(:,obj.star_indices,obj.aperture_index); 
                 end
+                
+            elseif ~isempty(obj.aperture_index) % if not using the burn in and threshold, we must define the aperture index manually after calling reset()
+                
+                obj.this_input.fluxes = obj.this_input.fluxes(:,:,obj.aperture_index); 
+                
+                for ii = 1:length(obj.aux_names)
+                    new_data = obj.this_input.(obj.aux_names{ii});
+                    obj.this_input.(obj.aux_names{ii}) = new_data(:,:,obj.aperture_index); 
+                end
+                
                 
             end
             
@@ -358,8 +380,8 @@ classdef DataStore < handle
             
             obj.aux_buffer = vertcat(obj.aux_buffer, new_aux);
 
-            if size(obj.aux_buffer,1)>obj.pars.length_background+obj.pars.length_extended % the aux buffer is smaller than flux buffer: it is only long enough for background+extended region
-                obj.aux_buffer = obj.aux_buffer(end-(obj.pars.length_background+obj.pars.length_extended)+1:end,:,:,:); 
+            if size(obj.aux_buffer,1)>obj.pars.length_psd 
+                obj.aux_buffer = obj.aux_buffer(end-(obj.pars.length_psd)+1:end,:,:,:); 
             end
 
             obj.calcSubBuffers;
@@ -411,21 +433,49 @@ classdef DataStore < handle
             
         end
         
-        function calcGoodStars(obj)
+        function calcGoodStarsAndApertures(obj)
             
-            S = nanmean(obj.flux_buffer); % signal
-            N = obj.pars.func_rms(obj.flux_buffer); % noise
+            f = obj.flux_buffer; 
+            b = permute(obj.aux_buffer(:,:,obj.aux_indices.backgrounds,:),[1,2,4,3]); % We permute to move dim4 to dim3, the aperture number
+            a = permute(obj.aux_buffer(:,:,obj.aux_indices.areas,:),[1,2,4,3]); % We permute to move dim4 to dim3, the aperture number
             
-            obj.star_snr = S./N;
-            obj.star_indices =  find(obj.star_snr >= obj.pars.threshold); 
+            % permute puts star number in dim1 and aperture number in dim2
+            S = permute(nanmean(f - a.*b), [2,3,1]); % the mean flux is taken minus the background
+            N = permute(nanmedian(util.series.binning(f, obj.pars.length_extended ,'func', 'std')), [2,3,1]); % for noise calculations we don't subtract background. 
+            % This is the same as calculating the RMS of each extended region (the median ignores outlier batches)
+            
+            obj.star_snr = S./N;  
+            
+            passed = obj.star_snr >= obj.pars.threshold; 
+            
+            [~,obj.aperture_index] = max(sum(passed,1), [], 2); % count how many stars are above threshold in each aperture number, pick the best one
+            
+            passed = passed(:,obj.aperture_index); % keep only the stars on the column of the best aperture
+            
+            obj.bad_ratios = false(size(S,1),1); 
+            
+            if obj.aperture_index>1
+                r = S(:,obj.aperture_index)./S(:,1);
+                obj.bad_ratios = obj.bad_ratios | (r-nanmedian(r))./nanstd(r) > 3;
+            end
+            
+            if obj.aperture_index<size(S,2)
+                r = S(:,end)./S(:,obj.aperture_index);
+                obj.bad_ratios = obj.bad_ratios | (r-nanmedian(r))./nanstd(r) > 3;
+            end
+            
+            passed = passed & ~obj.bad_ratios; 
+            
+            obj.star_snr = obj.star_snr(:,obj.aperture_index); 
+            obj.star_indices = find(passed)'; 
             
         end
         
-        function dumpBadStarsFromBuffer(obj)
+        function dumpBadStarsAndAperturesFromBuffer(obj)
             
             obj.clear;
-            obj.flux_buffer = obj.flux_buffer(:,obj.star_indices,:); 
-            obj.aux_buffer = obj.aux_buffer(:,obj.star_indices,:); 
+            obj.flux_buffer = obj.flux_buffer(:,obj.star_indices,obj.aperture_index); 
+            obj.aux_buffer = obj.aux_buffer(:,obj.star_indices,:,obj.aperture_index); 
             obj.cutouts = obj.cutouts(:,:,:,obj.star_indices); 
             
         end
@@ -446,19 +496,19 @@ classdef DataStore < handle
 
             for ii = 1:length(list) % go over the list and check these are individual detections
 
-                [frame, star] = ind2sub(size(idx), list(ii));
+                [frame, star, ap] = ind2sub(size(idx), list(ii));
 
                 if frame==1 % first frame of this input
-                    if f2(frame+1,star)>low_thresh % the very next frame is also above a few sigma, so this doesn't look like a cosmic ray
-                        idx(frame, star) = false; % this is no longer seen as a cosmic ray index
+                    if f2(frame+1,star,ap)>low_thresh % the very next frame is also above a few sigma, so this doesn't look like a cosmic ray
+                        idx(frame, star,ap) = false; % this is no longer seen as a cosmic ray index
                     end
                 elseif frame==size(f,1) % last frame of this input
-                    if f2(frame-1,star)>low_thresh % the previous frame is also above a few sigma, so this doesn't look like a cosmic ray
-                        idx(frame, star) = false; % this is no longer seen as a cosmic ray index
+                    if f2(frame-1,star,ap)>low_thresh % the previous frame is also above a few sigma, so this doesn't look like a cosmic ray
+                        idx(frame, star,ap) = false; % this is no longer seen as a cosmic ray index
                     end
                 else
-                    if f2(frame+1,star)>low_thresh && f2(frame-1,star)>low_thresh % both of the two nearest neighbors is also above a few sigma, so this doesn't look like a cosmic ray
-                        idx(frame, star) = false; % this is no longer seen as a cosmic ray index
+                    if f2(frame+1,star,ap)>low_thresh && f2(frame-1,star,ap)>low_thresh % both of the two nearest neighbors is also above a few sigma, so this doesn't look like a cosmic ray
+                        idx(frame, star,ap) = false; % this is no longer seen as a cosmic ray index
                     end
                 end
 
