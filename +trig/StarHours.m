@@ -1,4 +1,88 @@
 classdef StarHours < handle
+% Container for storing useful (and also disqualified) star-time at different
+% values of S/N and for each star separately. 
+% 
+% The only way to use this object is to give it a QualityChecker object as
+% the first argument to the input() function. The second optional input to  
+% this function, bad_batch=0, can be set to true to tell StarHours that the
+% incoming batch is completely disqualified. This can happen if e.g., there
+% are too many event candidates in a single batch (and it is black-listed). 
+% 
+% This object does not have many user-defined parameters. They are:
+% -snr_bin_min: minimal S/N values to store in the histogram. Default 5. 
+% -snr_bin_max: maximal S/N values to store in the histogram. Default 40. 
+% -snr_bin_width: the bin size of the histogram. Default 0.5. 
+%
+% Once these are defined, the object simply sorts the star-time it receives 
+% from the QualityChecker for each batch, placing the amount of time (in 
+% seconds) into the right bin based on the star index and S/N value at that 
+% time. That means each star can contribute, during the course of a run, to
+% several different S/N bins. 
+% The reason to keep each star individually is twofold:
+% (a) we can debug certain runs, finding out where star-time was lost. 
+% (b) if we black list any stars at the end of the run, we must remove
+%     their contribution to the star-time histograms. 
+% After the run is done and stars are removed, we can safely sum the data
+% into 1D histograms for different S/N bins only. This is done when these
+% histograms are transferred to the RunSummary object. 
+% 
+% The outputs from this object are:
+% -runtime: the total time, in seconds, that was processed (not including 
+%           the burn-in period. 
+% -histogram: a 2D histogram of the useful star-time for each S/N and each 
+%             star index. This is the main data product. 
+% -histogram_with_losses: the same as histogram, but without disqualifying 
+%                         any time for any reason. This represents the total
+%                         time that was scanned. 
+% -losses_exclusive: the amount of time, in each S/N bin and for each star
+%                    index, for each data quality cut type. This is a 3D 
+%                    matrix where the last index can be matched to each cut
+%                    type using "cut_indices" (see example in QualityChecker). 
+%                    The "exclusive" losses mean times that were disqualified
+%                    only by a single cut. This helps answer "how much time
+%                    would we gain if we did not place this cut". 
+% -losses_inclusive: The same as the above, only including time lost to each 
+%                    cut regardless of whether other cuts also affected that
+%                    star at that time. It answers the question: "how much 
+%                    time would we lose if we only place this cut."
+% -losses_bad_stars: The amount of time lost because stars were black listed
+%                    and removed from the run. This only happens if running
+%                    event-finding and too many candidates show up in one star. 
+% -snr_bin_edges: the edges of the bins are stored for plotting, etc. 
+% -star_bin_edges: same as above. This will just be 1:number of stars. 
+% 
+% NOTE: all histograms are saved in SECONDS, so star-hours can be recovered
+%       by dividing the values by 3600 (as done in the plotting tools). 
+%
+% Plotting: use the showHistogram() function to display the results. 
+% Some optional parameters that can be used with this function are:
+% -type: specificy which cut you want to view losses for, as a number or as 
+%        a name of the cut. Default is [], which shows just the good star
+%        hours instead of the losses. 
+% -exclusive: when true, show exclusive losses. Only works when specifying 
+%             the "type" option. Default is false. 
+% -min_snr and max_snr: put limits on what to plot in the S/N range. The 
+%                       default is full bin range (snr_bin_min to snr_bin_max). 
+% -sum: if false, will show the values for each star individually (in 2D). 
+%       if true, will show the summed result for all stars. Default false. 
+% -hours: translate the star-seconds to star-hours. Default true. 
+% -axes: which axes to plot into. Default is gca(). 
+% -font_size: for the axes and labels. Default is 18. 
+% -log: show the results in log-scale. Default is true. 
+% -color: give a specific color to the bars (for multiple plots). Default 
+%         is [], which just picks the figure's next color. 
+% -alpha: the transparency of the bars. Default is 0.7. 
+% 
+% Another diagnostic tool is the printReport() function. 
+% It prints a summary of the star hours and the losses to each cut. 
+% Optional arguments:
+% -units: choose "seconds" or "hours" (default) or "percent" (or "%"). 
+%         This shows the losses in different units, or as a fraction of the 
+%         total star-time. The total good times are always shown as hours. 
+% -format: choose "text" (default) or "latex". The default just prints a 
+%          table in regular ascii. The "latex" option formats the table as 
+%          a latex table that can be copied into a tabular environment. 
+
 
     properties(Transient=true)
         
@@ -41,8 +125,8 @@ classdef StarHours < handle
         
         % the following properties are used to build the S/N bin edges
         snr_bin_min = 5; % stars with lower S/N are not even tested for events (here S/N is calculated on the raw fluxes)
-        snr_bin_width = 0.5; % for the star-hour histogram
         snr_bin_max = 40; % biggest value we expect to see in the star-hour histogram
+        snr_bin_width = 0.5; % for the star-hour histogram
         
         debug_bit = 1;
         
@@ -218,10 +302,9 @@ classdef StarHours < handle
             input = util.text.InputVars;
             input.input_var('type', []); % choose cut type or leave empty to get the good hours
             input.input_var('exclusive', false); % if false, show inclusive losses
-            input.input_var('stars', []); 
             input.input_var('max_snr', obj.snr_bin_max); 
             input.input_var('min_snr', obj.snr_bin_min); 
-            input.input_var('rebin', []); 
+            input.input_var('rebin', []); % to be added later
             input.input_var('sum', false);
             input.input_var('hours', true); 
             input.input_var('axes', [], 'axis'); 

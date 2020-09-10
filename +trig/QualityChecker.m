@@ -1,4 +1,81 @@
 classdef QualityChecker < handle
+% Data quality checker class. 
+% This object is fed data from the DataStore and uses a bunch of cuts to 
+% define what region of each lightcurve is useful or disqualified. 
+% 
+% The only way to input data to this object is by giving it a DataStore 
+% object as the sole argument of the input() method. 
+%
+% This object has two purposes: 
+% (a) To check the data and flag only the useful data that should be 
+%     counted as good star-time. These values are reported to the StarHour
+%     object and counted. This is important so we know how much time we 
+%     really scanned for occultations. 
+%     This can be used even when not doing full event-finding, only checking
+%     the number of star hours. 
+% (b) To disqualify event candidates that occur during bad times in the data. 
+%     Each candidate that crosses the threshold in the EventFinder can be
+%     checked agains the quality cuts in this object. If the peak of the 
+%     event coincides with times/stars that are marked as bad, then the 
+%     candidate is marked as un-kept. 
+%
+% The user-defined parameters of this class are saved as a struct "pars". 
+% These parameters are defined in the "reset/clear" methods block, inside
+% the resetPars() function. Refer to the inline docs for info on each parameter. 
+%
+% Some notable parameters are:
+% -use_auto_count_hours: automatically add the new data into the StarHours 
+%  object. This is useful if you are only scanning the data quality. When
+%  using this object in event-finding, you may want to have control over if
+%  a batch is added to the star hours (based on not having many candidates). 
+%  The default is false (as most reasonable for event finding). 
+% -use_dilate and dilate_region: any bad regions in the data are expanded
+%  by this amount on either side, representing the fact that even if the 
+%  event peaks close to a bad region we still disqualify it. 
+%  Defaults are true and 5. 
+% -use_subtract_mean_offsets: calculate the mean offsets and then subtract
+%  them from each star's individual offset. This is useful as it reveals 
+%  the real star's motion, and removes the tracking errors from this estimate. 
+%  Default is true. 
+% -use_XXX and thresh_XXX: these control the different cuts. A few exceptions
+%  must be noted: (a) some cuts don't have a threshold. They are logical 
+%  cuts, whenever the value is non-zero they are considered to be triggered. 
+%  (b) The correlations cuts are all treated with a single use_correlations
+%  and thresh_correlations, event though they include multiple cuts. 
+% -corr_types and corr_timescales: the correlation cuts correlate the flux
+%  to one of the types of auxiliary (default is b, x, y, r, and w). 
+%  The timescales denote how many frames are used in calculating those 
+%  correlations, defaulting to 10, 25, and 50. 
+% -bad_rows and bad_columns: indices of these rows and columns mark bad 
+%  regions in the sensor. They can be filled automatically using the 
+%  setupSensor() function. Make sure the header is up to date and contains
+%  the correct camera in the INST field. 
+%  
+% The cut results are stored in matrices where dim1 is time, dim2 is star
+% index, and dim3 is the cut index. The index corresponding to each cut is
+% defined in "cut_names" and "cut_indices". You can find the right cut:
+% >> offset_size_cut = checker.cut_values_matrix(:,:,checker.cut_indices.offset_size); 
+%
+% The cut_flag_matrix is a logical matrix that shows where the cuts exceeded
+% their respective threshold. This region is also expanded if using dilate. 
+% The logical sum of the 3rd dimension of this matrix is accessible using
+% the bad_times() function, which tells for each frame and star if that data
+% is usable or disqualified. 
+% 
+% A note on histograms: this object also keeps a histogram of each cut, with
+% the number of times each value range was measured, for each star separately. 
+% This is used for debugging and optimizing the cuts. 
+% To view these histograms use the plotting tool showHistogram(). 
+% Some parameters for this function are:
+% -type: which cut should be displayed. Use the index or name. Default 1. 
+% -sum: if false, show the values for each star. If true, sum the data
+%       into a 1D histogram, showing the values for all stars together. 
+%       Default is false (show each star separately). 
+% -axes: which axes to draw into. Default is gca(). 
+% -font_size: to use on the axes. Default is 18. 
+% -log: show the values on a logarithmic scale. Default is true. 
+% 
+
 
     properties(Transient=true)
         
@@ -119,23 +196,23 @@ classdef QualityChecker < handle
             % (default is false, we want to manually add hours after checking the batch is good!)
             obj.pars.use_auto_count_hours = false; 
 
-            obj.pars.subtract_mean_offsets = true; % before doing any calculations on the offsets, remove the mean offsets that also affect the forced photometry centroids
+            obj.pars.use_dilate = true; % do we want to spread out bad regions a few frames in either direction? 
+            obj.pars.dilate_region = 5; % how many frames, on either side, do we flag next to each bad point? 
+            
+            obj.pars.use_subtract_mean_offsets = true; % before doing any calculations on the offsets, remove the mean offsets that also affect the forced photometry centroids
 
             % do we want to apply all these cuts? 
             obj.pars.use_delta_t = true;
             obj.pars.use_shakes = true;
             obj.pars.use_defocus = true;
             obj.pars.use_slope = true;
-            obj.pars.use_near_bad_rows_cols = true;     
-            
+            obj.pars.use_near_bad_rows_cols = true;            
             obj.pars.use_offset_size = true;
             obj.pars.use_linear_motion = true;
-            obj.pars.use_background_intensity = true; 
-            
+            obj.pars.use_background_intensity = true;
             obj.pars.use_nan_flux = false;
             obj.pars.use_nan_offsets = false;
             obj.pars.use_photo_flag = false; 
-            
             obj.pars.use_correlations = true;
 
             obj.pars.corr_types = {'b', 'x', 'y', 'r', 'w'}; % types of auxiliary we will use for correlations (r is derived from x and y)
@@ -148,21 +225,17 @@ classdef QualityChecker < handle
             obj.pars.thresh_offset_size = 4; % events with offsets above this number are disqualified (after subtracting mean offsets)
             obj.pars.thresh_linear_motion = 2; % events showing linear motion of the centroids are disqualified
             obj.pars.thresh_background_intensity = 10; % events where the background per pixel is above this threshold are disqualified
-            
             obj.pars.thresh_correlation = 4; % correlation max/min of flux (with e.g., background) with value above this disqualifies the region
 
             obj.pars.smoothing_slope = 50; % number of frames to average over when calculating slope
             obj.pars.distance_bad_rows_cols = 5; % how many pixels away from a bad row/column would we still disqualify a star? (on either side, inclusive)
+            obj.pars.linear_timescale = 25; % timescale for linear_motion cut
+
+            obj.pars.num_hist_edges = 200; % including 100 negative and 100 positive values
+
             obj.pars.bad_columns = []; % which columns are considered bad
             obj.pars.bad_rows = []; % which rows are considered bad
 
-            obj.pars.linear_timescale = 25; % timescale for linear_motion cut
-
-            obj.pars.use_dilate = true; % do we want to spread out bad regions a few frames in either direction? 
-            obj.pars.dilate_region = 5; % how many frames, on either side, do we flag next to each bad point? 
-
-            obj.pars.num_hist_edges = 200; % including 100 negative and 100 positive values
-            
             obj.setupSensor;
             
             obj.reset; 
@@ -416,7 +489,7 @@ classdef QualityChecker < handle
     
     methods % calculations
         
-        function input(obj, store)
+        function input(obj, store) % do all the calculations
             
             if nargin<2 || isempty(store) || ~isa(store, 'trig.DataStore')
                 error('Must supply a valid DataStore!'); 
@@ -449,7 +522,7 @@ classdef QualityChecker < handle
             obj.mean_width_values = vertcat(obj.mean_width_values, obj.defocus); % keep a log of the focus for the entire run
             obj.mean_background_values = vertcat(obj.mean_background_values, nanmedian(b,2)); % keep a log of the sky background level for the entire run
             
-            if obj.pars.subtract_mean_offsets
+            if obj.pars.use_subtract_mean_offsets
                 x = x - obj.mean_x; 
                 y = y - obj.mean_y;
             end
@@ -620,7 +693,7 @@ classdef QualityChecker < handle
             
         end
         
-        function ingestStore(obj, store)
+        function ingestStore(obj, store) % parse the data from the store into similar containers in this object
             
             obj.background_flux = store.background_flux;
             obj.background_aux = store.background_aux;
@@ -641,7 +714,26 @@ classdef QualityChecker < handle
             
         end
         
-        function fillHistograms(obj)
+        function makeHistograms(obj) %  make histograms for each cut type, keeping the number of times a cut had such-and-such value for each star
+            
+            obj.histograms = zeros(obj.pars.num_hist_edges, obj.num_stars, length(obj.cut_indices), 'single'); 
+            
+            for ii = 1:length(obj.cut_names) 
+                
+                name = obj.cut_names{ii};
+                
+                thresh = obj.cut_thresholds(ii)*2; 
+                
+                if obj.cut_two_sided(ii)
+                    obj.hist_edges(obj.cut_indices.(name),:) = linspace(-thresh, thresh, obj.pars.num_hist_edges+1); 
+                else
+                    obj.hist_edges(obj.cut_indices.(name),:) = linspace(0, thresh, obj.pars.num_hist_edges+1); 
+                end
+            end
+                
+        end
+        
+        function fillHistograms(obj) % put data into the cut value histograms
             
             if isempty(obj.histograms)
                 obj.makeHistograms;
@@ -664,25 +756,6 @@ classdef QualityChecker < handle
             
         end
         
-        function makeHistograms(obj)
-            
-            obj.histograms = zeros(obj.pars.num_hist_edges, obj.num_stars, length(obj.cut_indices), 'single'); 
-            
-            for ii = 1:length(obj.cut_names) 
-                
-                name = obj.cut_names{ii};
-                
-                thresh = obj.cut_thresholds(ii)*2; 
-                
-                if obj.cut_two_sided(ii)
-                    obj.hist_edges(obj.cut_indices.(name),:) = linspace(-thresh, thresh, obj.pars.num_hist_edges+1); 
-                else
-                    obj.hist_edges(obj.cut_indices.(name),:) = linspace(0, thresh, obj.pars.num_hist_edges+1); 
-                end
-            end
-                
-        end
-        
     end
     
     methods % plotting tools / GUI
@@ -691,7 +764,6 @@ classdef QualityChecker < handle
             
             input = util.text.InputVars;
             input.input_var('type', 1); 
-            input.input_var('stars', []); 
             input.input_var('sum', false);
             input.input_var('axes', [], 'axis'); 
             input.input_var('font_size', 18); 

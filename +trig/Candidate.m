@@ -1,9 +1,81 @@
 classdef Candidate < handle
+% A container for a single occultation event candidate. 
+% This is one of the main outputs of the occultation pipeline. 
+% Each candidate contains all data needed to make a decision if it is real
+% or just an artefact / false positive. 
+% The candidate object contains a history of the parameters of all objects
+% used in the event finding pipeline, including the header data that also
+% holds the photometric parameters (e.g., what aperture was used). 
+% The objects used to keep this metadata are:
+% "head", "kern_props", "star_props", "sim_pars", "finder_pars", 
+% "store_pars", and "checker_pars". 
+% 
+% Other data saved with the candidate includes the time_index, star_index
+% and kern_index (specifying the time, place, and best filter template) 
+% that triggered the event. 
+% There are fluxes, auxiliary data and cutouts saved for the time surrounding
+% the event peak (the extended region as defined in the DataStore). 
+% Additional parameters are described in the properties blocks, in the 
+% inline comments.  
+% 
+% Some events are marked as kept=1 and some kept=0. The unkept events have
+% been disqualified based on various conditions, mostly quality cuts and 
+% black lists. See the EventFinder and QualityChecker objects for more info. 
+% Each unkept candidate keeps a list of the cuts that triggered it's 
+% removal, with the name and value of those cuts in "cut_hits", "cut_string"
+% and "cut_value". In addition, the user can add notes to the event, and
+% classify it into one of several categories (see getListOfClasses()). 
+%
+% Kept candidates should be vetted and classified by a human scanner. 
+% Once they are classified they can be saved into some database for future
+% reference and for applying statistical tools on multiple detections. 
+% 
+% Some candidates are simulated events that are injected into real data, and 
+% are meant to be classified along with the real candidates. The idea is that
+% during the classification / scanning phase, simulated events would be 
+% indistinguishable from regular events, and a census of the number of such 
+% events that were accepted/rejected by the scanners also helps quantify 
+% the efficiency of the scanners. 
+% Once classified, the simulated candidates should be skipped when running 
+% statistics on real occultations. 
+% 
+% Plotting tools: 
+% To make candidate vetting easier, there is a show() method that can be
+% called on a vector of candidates, e.g., the output from the finder:
+% >> finder.cand.show;
+% This generates a simple GUI that shows all relevant data on the candidate, 
+% and makes it easy to view, vet, and classify candidates. 
+% The optional arguments to this function are:
+% -index: which candidate from the vector given, should be plotted. This 
+%         defaults to the previous index plotted in this figure/panel, but
+%         will be set to 1 if the previous number doesn't exist or if it 
+%         exceeds the number of candidates in the vector. 
+% -kept: set the GUI to filter only kept events when pushing the prev/next
+%        buttons to jump the index back/forward. 
+% -cuts: add a list of cut values to display, on top of any triggered cuts. 
+%        Triggered cuts are those that caused the candidate to be disqualified. 
+%        Adding extra cuts helps figure out if some cut is borderline or if
+%        the cut thresholds should be adjusted to handle more false positives. 
+% -parent: the figure or panel into which we plot the different panels of 
+%          this GUI. Default is gcf(). 
+% -font_size: for axes labels etc. Default is 18. 
+% 
+% NOTE: the preferences for display are not saved in the candidate objects
+%       themselves, but as a struct in the UserData field of the parent. 
+%       Make sure not to overwrite this struct to maintain consistent plots. 
+%       When closing the figure, it also resets these preferences. 
+%
+% The "reveal" button is only available if "use_show_secrets" is true. It 
+% makes a pop-up window that shows the most important (and hidden) data
+% about the event. This includes the ecliptic latitude, the shadow velocity
+% and if the event is simulated. 
+% To prevent biasing the scanners, we hide all this information. 
+% E.g., a scanner might disqualify more events on high ecliptic latitude, 
+% since KBOs are not expected to be found there, or disqualify events with 
+% a velocity that doesn't match the observing direction. 
+% When debugging is done, the unblinded sample should be scanned with the
+% use_show_secrets=0. 
 
-    properties(Transient=true)
-        
-    end
-    
     properties % objects
         
         head; % header information
@@ -11,9 +83,9 @@ classdef Candidate < handle
         star_props; % table with one row from astrometry/GAIA
         sim_pars = struct; % struct with the simulation parameters (for simulated events only)
 
-        finder_pars;
-        store_pars;
-        checker_pars; 
+        finder_pars; % parameters defining the EventFinder object
+        store_pars; % parameters defining the DataStore object
+        checker_pars; % parameters defining the QualityChecker object
         
     end
     
@@ -64,7 +136,7 @@ classdef Candidate < handle
         cut_thresh; % which threshold is used for each cut (a row vector)
         cut_two_sided; % true when the cut value should be compared in abs() to the threshold (a row vector)
         
-        cut_string = {}; % cell string discribing the cuts that this event hit
+        cut_string = {}; % cell string describing the cuts that this event hit
         cut_hits = []; % which cuts coincide with the event peak
         cut_value = []; % what is the value that triggered the cut (maximum within range of the peak)
         
@@ -86,24 +158,15 @@ classdef Candidate < handle
         
     end
     
-    properties(Dependent=true)
-        
-        
-        
-    end
-    
     properties(Hidden=true)
         
         use_show_secrets = true; % this should be turned off at some point
         
-%         run_name; 
-%         run_date;
-        
         run_identifier = ''; % use this to find the files in the database. Format: <date folder>\<run_name_folder> e.g., 2020-09-07\ecliptic_run1
 
-        is_positive; 
+        is_positive; % if the filtered flux peak is positive. If not, it means the flux is opposite the template (e.g., a flare with an occultation template)
         
-        is_simulated = 0; % by default events are not simulated
+        is_simulated = 0; % by default candidates are not simulated. If true, this candidate is an injected simulated event.  
 
         flux_buffer; % flux buffer going back as far as possible, for this star only
         timestamps_buffer; % timestamps for the above
@@ -113,8 +176,8 @@ classdef Candidate < handle
         flux_corrected_all; % the corrected flux (over the exteneded region) for all stars
         auxiliary_all; % the auxiliary data (for the extended region) for all stars. 
         
-        search_start_idx;
-        search_end_idx;
+        search_start_idx; % the frame index inside the extended region, where the search region starts (often this is 51)
+        search_end_idx; % the frame index inside the extended region, where the search region ends (often this is 150)
         
         kern_extra; % any other kernels that passed the lower threshold for kernels
         star_extra; % any other stars that passed the lower threshold for stars
@@ -136,10 +199,6 @@ classdef Candidate < handle
             end
             
         end
-        
-    end
-    
-    methods % reset/clear
         
     end
     
@@ -302,7 +361,7 @@ classdef Candidate < handle
             v = obj.head.ephem.getShadowVelocity;
             v = sqrt(sum(v.^2)); 
             
-            str = sprintf('Run: "%s" | ecl lat= %4.1f deg \ncoords: %s %s | V= %d', obj.run_name, ECL, RA, Dec, round(v)); 
+            str = sprintf('Run: "%s" | ecl lat= %4.1f deg \ncoords: %s %s | V= %d', strrep(obj.run_identifier, '\', '/'), ECL, RA, Dec, round(v)); 
             
         end
         
@@ -321,23 +380,12 @@ classdef Candidate < handle
     
     methods % setters
         
-        function addNote(obj, str)
+        function addNote(obj, str) % free form string comment by users
             
             if isempty(obj.notes)
                 obj.notes{1} = str;
             else
                 obj.notes{end+1} = str;
-            end
-            
-        end
-        
-        function setRunNameDate(obj) % we don't need this if the finder puts the run_identifier in the header
-            
-            path = fileparts(obj.getFilename); 
-            
-            if ~isempty(path)
-                [path, obj.run_name] = fileparts(path); 
-                [path, obj.run_date] = fileparts(path); 
             end
             
         end
@@ -412,58 +460,17 @@ classdef Candidate < handle
             
         end
         
-        function val = correlateSlopes(obj, timescale)
-            
-            if nargin<2 || isempty(timescale)
-                timescale = 10;
-            end
-            
-            t = obj.timestamps;
-            x = obj.auxiliary(:,obj.aux_indices.offsets_x);
-            y = obj.auxiliary(:,obj.aux_indices.offsets_y);
-            
-            cx = util.series.correlation(x,t, timescale).*sqrt(timescale);
-            cy = util.series.correlation(y,t, timescale).*sqrt(timescale);
-            
-            val = (abs(cx)+abs(cy));
-            
-        end
-        
-        function val = getSlopes(obj, timescale)
-            
-            if nargin<2 || isempty(timescale)
-                timescale = 10;
-            end
-            
-            t = obj.timestamps;
-            x = obj.auxiliary(:,obj.aux_indices.offsets_x);
-            y = obj.auxiliary(:,obj.aux_indices.offsets_y);
-            
-            x = x-nanmedian(x); 
-            y = y-nanmedian(y); 
-            
-            k = (-timescale/2:timescale/2)'; 
-%             k = (1:timescale)'; 
-            k = k./sqrt(sum(k.^2)); 
-            
-            val = [x,y];
-            val = abs(filter2(k,val)); 
-%             val = sqrt(sum(val.^2,2)); 
-            val = [x,y,val]; 
-                        
-        end
-        
     end
     
     methods % plotting tools / GUI
         
-        function show(obj_vec, varargin)
+        function show(obj_vec, varargin) % generate a GUI-like interface for a vector of Candidate objects
             
             input = util.text.InputVars;
-            input.input_var('index', []); 
-            input.input_var('kept', [], 'show_kept'); 
-            input.input_var('cuts', []); 
-            input.input_var('parent', []);
+            input.input_var('index', []); % which event in the vector to plot (default is 1 or what was plotted previously)
+            input.input_var('kept', [], 'show_kept'); % if true, filter only the kept events when pressing the prev/next buttons
+            input.input_var('cuts', []); % additional cut types to show on the flux plot
+            input.input_var('parent', []); % parent graphic object to plot to (figure or panel, default is gcf())
             input.input_var('font_size', 18);
             input.scan_vars(varargin{:});
             
@@ -511,6 +518,8 @@ classdef Candidate < handle
                 input.parent.UserData.index = 1;
                 idx = 1;
             end
+            
+            
             
             obj = obj_vec(idx); 
             

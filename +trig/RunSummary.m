@@ -1,5 +1,25 @@
 classdef RunSummary < handle
-
+% Lightweight object that summarizes the parameters, the data quality and 
+% the key results from an occultation scanning run. 
+% It is produced by the EventFinder using the produceSummary() method. 
+% 
+% The parameters for each relevant object are saved as structs, "finder_pars", 
+% "store_pars", and "checker_pars". The header info is save in "head" as usual. 
+% 
+% An important result is the histogram of star-time per S/N bin. 
+% This is stored without separating into bins for each star, but only for 
+% each S/N value. This is done so we can stack the total hours or bin them
+% by e.g., ecliptic latitude later on. 
+% 
+% Other interesting results are the "snr_values" saved for each batch in the 
+% run, the cut values (again, histogrammed by values only, not by star), and 
+% the parameters of failed/passed simulated events. 
+% That last one can be used to find what occultation parameters manage to 
+% pass our threshold (and it can be compared to the theoretical values). 
+% accumulating these events can help define the real thresholds for different
+% types of occultations. 
+% 
+    
     properties(Transient=true)
         
     end

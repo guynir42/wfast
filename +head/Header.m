@@ -358,7 +358,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         % camera and filter 
         function str = cam_name(obj)
            
-            c = strsplit(obj.INSTR, {' ','_'});
+            c = strsplit(obj.INST, {' ','_'});
             
             str = c{1};
             
@@ -1038,7 +1038,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             if ~isempty(obj.OBSLAT), matlab.io.fits.writeKey(file_ptr, 'SITELAT', obj.OBSLAT, 'degrees'); end
             if ~isempty(obj.JD), matlab.io.fits.writeKey(file_ptr, 'JD', obj.JD); end
             if ~isempty(obj.AIRMASS), matlab.io.fits.writeKey(file_ptr, 'AIRMASS', obj.AIRMASS); end
-            if ~isempty(obj.INSTR), matlab.io.fits.writeKey(file_ptr, 'INSTRUME', obj.INSTR); end
+            if ~isempty(obj.INST), matlab.io.fits.writeKey(file_ptr, 'INSTRUME', obj.INST); end
             matlab.io.fits.writeKey(file_ptr, 'INPUTFMT', 'FITS');
             
         end
