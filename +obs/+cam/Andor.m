@@ -134,7 +134,7 @@ classdef Andor < file.AstroData
         batch_size = 100; % how many frames in each batch
         num_batches = 2; % how many batches before finishing the run
         
-        expT = 0.03; % exposure time (seconds)
+        expT = 0.0395; % exposure time (seconds)
         expT_deep = 1; % for previews (this is never stashed or updated from InputVars)
         frame_rate = 25; % frame rate (Hz) used for general capures. Use NaN to let camera take images as soon as it can, regardless of timing. 
         frame_rate_live = 4; % use this frame rate as the default for "live". 
