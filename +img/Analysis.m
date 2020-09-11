@@ -36,7 +36,7 @@ classdef Analysis < file.AstroData
         
         model_psf@img.ModelPSF;
         
-        finder@trig.Finder;
+        finder@trig.EventFinder;
         
         sky_pars;
         
@@ -205,8 +205,8 @@ classdef Analysis < file.AstroData
                 
                 obj.model_psf = img.ModelPSF;
                 
-                obj.finder = trig.Finder;
-                obj.finder.loadFilterBank;
+                obj.finder = trig.eventFinder;
+%                 obj.finder.loadFilterBank;
                 
                 obj.prog = util.sys.ProgressBar;
                 obj.audio = util.sys.AudioControl;
@@ -488,20 +488,20 @@ classdef Analysis < file.AstroData
             obs_date = obj.head.STARTTIME;
             read_date = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
             
-            if isempty(str)
-                ev_str = '';
-
-                for ii = 1:length(obj.finder.last_events)
-
-                    if obj.finder.last_events(ii).keep
-                        star_str = '*';
-                    else
-                        star_str = '';
-                    end
-
-                    ev_str = sprintf('%s%4.2f%s ', ev_str, obj.finder.last_events(ii).snr, star_str);
-
-                end
+%             if isempty(str)
+%                 ev_str = '';
+% 
+%                 for ii = 1:length(obj.finder.last_events)
+% 
+%                     if obj.finder.last_events(ii).keep
+%                         star_str = '*';
+%                     else
+%                         star_str = '';
+%                     end
+% 
+%                     ev_str = sprintf('%s%4.2f%s ', ev_str, obj.finder.last_events(ii).snr, star_str);
+% 
+%                 end
 
                 f = [0 0 0];
                 if ~isempty(obj.fluxes), f(1) = obj.fluxes(1,1); end
@@ -549,7 +549,7 @@ classdef Analysis < file.AstroData
             end
             
             try % save the event finder
-                obj.finder.conserveMemory;
+%                 obj.finder.conserveMemory;
 
                 finder = obj.finder;
 
@@ -587,21 +587,21 @@ classdef Analysis < file.AstroData
 
                 fprintf(fid, 'S/N for the last %d batches is distrubuted: min= %f median= %f max= %f\n', numel(v), nanmin(v), nanmedian(v), nanmax(v));
 
-                v = abs([obj.finder.all_events.snr]);
+                v = abs([obj.finder.cand.snr]);
 
                 fprintf(fid, 'S/N for %d triggered events is distrubuted: min= %f median= %f max= %f\n', numel(v), nanmin(v), nanmedian(v), nanmax(v));
 
-                v = abs([obj.finder.kept_events.snr]);
+                v = abs([obj.finder.kept.snr]);
 
                 fprintf(fid, 'S/N for %d kept events is distrubuted: min= %f median= %f max= %f\n', numel(v), nanmin(v), nanmedian(v), nanmax(v));
 
-                fprintf(fid, 'Number of events: total= %d | kept= %d\n', length(obj.finder.all_events), length(obj.finder.kept_events));
+                fprintf(fid, 'Number of events: total= %d | kept= %d\n', length(obj.finder.cand), length(obj.finder.kept));
             
-                fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr, obj.finder.star_hours_total);
-                
-                fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr*2, obj.finder.star_hours_total_better);
-                
-                fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr*4, obj.finder.star_hours_total_best);
+%                 fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr, obj.finder.star_hours_total);
+%                 
+%                 fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr*2, obj.finder.star_hours_total_better);
+%                 
+%                 fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr*4, obj.finder.star_hours_total_best);
                 
             end
             
@@ -1530,9 +1530,9 @@ classdef Analysis < file.AstroData
                     return;
                 end
 
-                if isempty(obj.head.THRESH_INDIVIDUAL)
-                    obj.head.THRESH_INDIVIDUAL = obj.finder.min_star_snr;
-                end
+%                 if isempty(obj.head.THRESH_INDIVIDUAL)
+%                     obj.head.THRESH_INDIVIDUAL = obj.finder.min_star_snr;
+%                 end
                 
                 if ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
                     delete(obj.aux_figure.Children);
@@ -1662,11 +1662,13 @@ classdef Analysis < file.AstroData
                 r = obj.phot.aperture;
             end
 
-            obj.finder.input(f, e, a, b, v, x, y, w, p, F, r, g, ...
-                obj.timestamps, obj.cutouts, obj.positions, obj.stack, ...
-                obj.batch_counter+1, 'filename', obj.thisFilename, ...
-                't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp,...
-                'used_background', obj.phot.use_backgrounds, 'pars', phot_pars);
+            obj.finder.input(obj.phot); 
+            
+%             obj.finder.input(f, e, a, b, v, x, y, w, p, F, r, g, ...
+%                 obj.timestamps, obj.cutouts, obj.positions, obj.stack, ...
+%                 obj.batch_counter+1, 'filename', obj.thisFilename, ...
+%                 't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp,...
+%                 'used_background', obj.phot.use_backgrounds, 'pars', phot_pars);
 
             if obj.debug_bit>1, fprintf('Time to find events: %f seconds\n', toc(t)); end
 

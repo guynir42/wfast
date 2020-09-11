@@ -1037,6 +1037,12 @@ classdef EventFinder < handle
             
         end
         
+        function showLatest(obj, ax)
+            
+            % need to finish this... 
+            
+        end
+        
     end    
     
 end
