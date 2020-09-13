@@ -149,6 +149,7 @@ classdef EventFinder < handle
                 if obj.debug_bit>1, fprintf('EventFinder copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
+                
                 if obj.debug_bit>1, fprintf('EventFinder constructor v%4.2f\n', obj.version); end
             
                 obj.psd = trig.CorrectPSD;
@@ -288,7 +289,7 @@ classdef EventFinder < handle
         
         function val = kept(obj) % filter only the kept candidates
             
-            val = obj.cand([obj.cand.keep]==1);
+            val = obj.cand([obj.cand.kept]==1);
             
         end
         

@@ -217,7 +217,8 @@ classdef StarHours < handle
             
             % get the data from checker
             obj.timestamps = checker.extended_timestamps;
-            obj.flux = checker.extended_flux;
+            obj.flux = checker.extended_flux - ...
+                checker.extended_aux(:,:,checker.aux_indices.backgrounds).*checker.extended_aux(:,:,checker.aux_indices.areas);
             obj.idx_start = checker.search_start_idx; 
             obj.idx_end = checker.search_end_idx; 
         
