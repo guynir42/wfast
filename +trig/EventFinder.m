@@ -67,7 +67,7 @@ classdef EventFinder < handle
     
     properties(Transient=true)
 
-        gui; % class added later
+        gui@trig.gui.EvFinderGUI; % class added later
         bank@occult.ShuffleBank; % randomly picked filter kernels used for matched-filtering (loaded from file when needed)
         bank_small@occult.ShuffleBank; % a smaller filter bank used to weed out only the good stars for full-filtering
         sim_bank@occult.FilterBank; % simulated occultation templates in predefined intervals for checking detection S/N of injected events
@@ -337,6 +337,42 @@ classdef EventFinder < handle
             
         end
                 
+        function val = runtime_hours(obj)
+            
+            val = obj.store.checker.hours.runtime/3600; 
+            
+        end
+        
+        function val = runtime_batches_str(obj)
+            
+            val = sprintf('%5.1fh, %d batches', round(obj.runtime_hours,1), obj.batch_counter); 
+            
+        end
+        
+        function val = star_hours(obj)
+            
+            val = util.stat.sum2(obj.store.checker.hours.histogram)/3600;
+            
+        end
+        
+        function val = star_hours_total(obj)
+            
+            val = util.stat.sum2(obj.store.checker.hours.histogram_with_losses)/3600;
+            
+        end
+        
+        function val = star_hours_str(obj)
+            
+            val = sprintf('star hours= %d/%d', round(obj.star_hours), round(obj.star_hours_total)); 
+            
+        end
+        
+        function val = num_stars_str(obj)
+            
+            val = sprintf('stars= %d/%d', length(obj.store.star_indices), length(obj.store.star_snr)); 
+            
+        end
+        
     end
     
     methods % setters
@@ -1030,16 +1066,51 @@ classdef EventFinder < handle
         function makeGUI(obj)
             
             if isempty(obj.gui)
-                obj.gui = trig.gui.EvFindGUI(obj); 
+                obj.gui = trig.gui.EvFinderGUI(obj); 
             end
             
             obj.gui.make; 
             
         end
         
-        function showLatest(obj, ax)
+        function showCandidates(obj, varargin)
             
-            % need to finish this... 
+            if ~isempty(obj.gui) && obj.gui.check
+                args = horzcat({'parent', obj.gui.panel_image}, varargin); 
+            else
+                args = horzcat({'parent', gcf}, varargin); 
+            end
+            
+            obj.cand.show(args{:}); 
+            
+        end
+        
+        function showLatest(obj) % call this from e.g., the Analysis to update the plot if there is a new candidate
+            
+            if isempty(obj.gui.panel_image.Children) || isempty(obj.gui.panel_image.UserData) || ... 
+                    ~isstruct(obj.gui.panel_image.UserData) || ~isfield(obj.gui.panel_image.UserData, 'index') % no proper plotting has been done so far
+                
+                obj.showCandidates('index', obj.num_candidates); 
+                
+            elseif obj.gui.panel_image.UserData.show_kept==0 && obj.gui.panel_image.UserData.index<obj.num_candidates % not showing the last candidate in the list
+                obj.showCandidates('index', obj.num_candidates); 
+            elseif obj.gui.panel_image.UserData.show_kept % if we are only showing the kept events, we must check if there is a more recent kept event to show:
+
+                index = 0; 
+                
+                for ii = obj.gui.panel_image.UserData.index+1:obj.num_candidates
+
+                    if obj.cand(ii).kept
+                        index = ii; 
+                    end
+
+                end
+            
+                if index
+                    obj.showCandidates('index', index); 
+                end
+                
+            end
             
         end
         

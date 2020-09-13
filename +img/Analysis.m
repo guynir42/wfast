@@ -1737,7 +1737,7 @@ classdef Analysis < file.AstroData
             end
 
             if ~isempty(obj.finder.gui) && obj.finder.gui.check
-                obj.finder.showLatest(obj.finder.gui.panel_image);
+                obj.finder.showLatest;
 %             elseif ~isempty(obj.aux_figure) && isvalid(obj.aux_figure)
 %                 obj.finder.showLatest(obj.aux_figure);
             end

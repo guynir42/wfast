@@ -519,8 +519,6 @@ classdef Candidate < handle
                 idx = 1;
             end
             
-            
-            
             obj = obj_vec(idx); 
             
             delete(input.parent.Children);
@@ -1142,7 +1140,7 @@ classdef Candidate < handle
                 
             end
             
-            obj.show('index', idx); 
+            obj.show('parent', hndl.UserData, 'index', idx); 
             
         end
         
@@ -1165,7 +1163,7 @@ classdef Candidate < handle
                 error('Index is outside range of candidates (1 to %d)', num); 
             end
             
-            obj.show('index', idx);
+            obj.show('parent', hndl.UserData, 'index', idx);
             
         end
         
@@ -1194,7 +1192,7 @@ classdef Candidate < handle
                 
             end
             
-            obj.show('index', idx); 
+            obj.show('parent', hndl.UserData, 'index', idx); 
             
         end
         
@@ -1228,7 +1226,7 @@ classdef Candidate < handle
                 hndl.String = 'no cuts';
             end
             
-            obj.show;
+            obj.show('parent', hndl.UserData);
             
         end
         
@@ -1238,7 +1236,7 @@ classdef Candidate < handle
             
             obj(idx).popupClassifier;
             
-            obj.show;
+            obj.show('parent', hndl.UserData);
             
         end
         
@@ -1283,7 +1281,7 @@ classdef Candidate < handle
                 
             end
             
-            obj.show; 
+            obj.show('parent', hndl.UserData); 
             
         end
         
