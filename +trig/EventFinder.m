@@ -179,8 +179,7 @@ classdef EventFinder < handle
             % (min event duration is 1+2*min_time_spread, unless at the edge) 
 
             obj.pars.max_events = 5; % we will search iteratively up to this many times for new candidates in each batch
-            obj.pars.num_hits_black_list = 4; % how many repeated events can we allow before including star or batch in black list
-
+            
             obj.pars.use_psd_correction = 1; % use welch on a flux buffer to correct red noise
             obj.pars.use_std_filtered = 1; % normalize variance of filtered flux of each kernel to the average of previous batches (averaging size is set by length_background in the store)
 
