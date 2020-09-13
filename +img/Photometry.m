@@ -1128,7 +1128,7 @@ classdef Photometry < handle
             F = obj.fluxes;
             
 %             idx = F>util.stat.max2(F).*obj.percentile & ~isnan(F) & ~obj.flags; % choose only good flux values
-            idx = F>util.stat.median2(F) & ~isnan(F) & ~obj.flags; % choose only good flux values
+            idx = (F>util.stat.median2(F)) & ~isnan(F) & obj.flags==0; % choose only good flux values
 
             % 1D vectors containing the good values only...
             F = obj.fluxes(idx(:,:,1));

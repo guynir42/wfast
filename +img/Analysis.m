@@ -187,6 +187,7 @@ classdef Analysis < file.AstroData
                 obj.clip_bg.use_adjust = 0; % this should be disabled and depricated!
                 obj.back = img.Background;
                 obj.phot = img.Photometry;
+                obj.phot.aperture = [3 5 7]; 
                 obj.phot.index = 1;
                 
                 obj.phot_stack = img.Photometry;
@@ -205,7 +206,7 @@ classdef Analysis < file.AstroData
                 
                 obj.model_psf = img.ModelPSF;
                 
-                obj.finder = trig.eventFinder;
+                obj.finder = trig.EventFinder;
 %                 obj.finder.loadFilterBank;
                 
                 obj.prog = util.sys.ProgressBar;
@@ -215,6 +216,7 @@ classdef Analysis < file.AstroData
                 obj.cat = head.Catalog(obj.head);
                 obj.finder.cat = obj.cat;
                 obj.finder.head = obj.head;
+                obj.finder.store.checker.setupSensor; 
                 obj.lightcurves.head = obj.head;
                 obj.lightcurves.cat = obj.cat;
                 
@@ -502,28 +504,28 @@ classdef Analysis < file.AstroData
 %                     ev_str = sprintf('%s%4.2f%s ', ev_str, obj.finder.last_events(ii).snr, star_str);
 % 
 %                 end
-
-                f = [0 0 0];
-                if ~isempty(obj.fluxes), f(1) = obj.fluxes(1,1); end
-                if size(obj.fluxes,2)>=10, f(2) = obj.fluxes(1,10); end
-                if size(obj.fluxes,2)>=100, f(3) = obj.fluxes(1,100); end
-
-                fprintf(fid, 'Batch: %04d, ObsDate: %s, Flux: [% 9.1f % 8.1f % 7.1f]', obj.batch_counter+1, obs_date, f(1), f(2), f(3));
-                
-                if ~isempty(obj.sky_pars)
-                    if isfield(obj.sky_pars, 'zero_point'), zp = obj.sky_pars.zero_point; else, zp = NaN; end
-    %                 if isfield(obj.sky_pars, 'noise_level'), nl = obj.sky_pars.noise_level; else, nl = NaN; end
-                    if isfield(obj.sky_pars, 'limiting_mag'), lm = obj.sky_pars.limiting_mag; else, lm = NaN; end
-
-                    fprintf(fid, ' | seeing: %4.2f" | back: %5.3f | area: %4.2f | zp: %6.4g | lim. mag: %4.2f', ...
-                        obj.sky_pars.seeing, obj.sky_pars.background, obj.sky_pars.area, zp, lm);
-                end
-                
-                fprintf(fid, ' | Events S/N: [%s], ReadDate: %s\n', ev_str, read_date);
-            
-            else
-                fprintf(fid, '%s: %s\n', read_date, str);
-            end
+% 
+%                 f = [0 0 0];
+%                 if ~isempty(obj.fluxes), f(1) = obj.fluxes(1,1); end
+%                 if size(obj.fluxes,2)>=10, f(2) = obj.fluxes(1,10); end
+%                 if size(obj.fluxes,2)>=100, f(3) = obj.fluxes(1,100); end
+% 
+%                 fprintf(fid, 'Batch: %04d, ObsDate: %s, Flux: [% 9.1f % 8.1f % 7.1f]', obj.batch_counter+1, obs_date, f(1), f(2), f(3));
+%                 
+%                 if ~isempty(obj.sky_pars)
+%                     if isfield(obj.sky_pars, 'zero_point'), zp = obj.sky_pars.zero_point; else, zp = NaN; end
+%     %                 if isfield(obj.sky_pars, 'noise_level'), nl = obj.sky_pars.noise_level; else, nl = NaN; end
+%                     if isfield(obj.sky_pars, 'limiting_mag'), lm = obj.sky_pars.limiting_mag; else, lm = NaN; end
+% 
+%                     fprintf(fid, ' | seeing: %4.2f" | back: %5.3f | area: %4.2f | zp: %6.4g | lim. mag: %4.2f', ...
+%                         obj.sky_pars.seeing, obj.sky_pars.background, obj.sky_pars.area, zp, lm);
+%                 end
+%                 
+%                 fprintf(fid, ' | Events S/N: [%s], ReadDate: %s\n', ev_str, read_date);
+%             
+%             else
+%                 fprintf(fid, '%s: %s\n', read_date, str);
+%             end
             
             % if there is no object-dump file, create one now! 
             if ~exist(obj.log_obj, 'file')
@@ -551,9 +553,24 @@ classdef Analysis < file.AstroData
             try % save the event finder
 %                 obj.finder.conserveMemory;
 
+                summary = obj.finder.produceSummary;
+                
+                save(fullfile(obj.log_dir, 'summary.mat'), 'summary', '-v7.3'); 
+                
+                try 
+                    util.oop.save(summary, fullfile(obj.log_dir, 'summary.txt')); 
+                catch ME
+                    warning(ME.getReport); 
+                end
+
+                cand = obj.finder.cand; 
+                
+                save(fullfile(obj.log_dir, 'candidates.mat'), 'cand', '-v7.3'); 
+                
                 finder = obj.finder;
 
                 save(fullfile(obj.log_dir, ['finder_' name]), 'finder', '-v7.3');
+                
             catch ME
                 warning(ME.getReport);
             end
@@ -571,39 +588,39 @@ classdef Analysis < file.AstroData
                 mkdir(obj.log_dir); % if we call this function we are ignoring "overwrite analysis folder" mechanism (from start of run() function) and creating a folder if needed!~
             end
             
-            filename = ['summary_' obj.get_obj_name '.txt'];
-            
-            fid = fopen(fullfile(obj.log_dir, filename), 'wt');
-            
-            if fid<0
-                warning('Cannot open file %s', fullfile(obj.log_dir, filename));
-            else
-
-                onc = onCleanup(@() fclose(fid));
-
-                fprintf(fid, 'Summary for run %s, with %d batches.\n', obj.head.OBJECT, obj.batch_counter);
-
-                v = abs(obj.finder.snr_values);
-
-                fprintf(fid, 'S/N for the last %d batches is distrubuted: min= %f median= %f max= %f\n', numel(v), nanmin(v), nanmedian(v), nanmax(v));
-
-                v = abs([obj.finder.cand.snr]);
-
-                fprintf(fid, 'S/N for %d triggered events is distrubuted: min= %f median= %f max= %f\n', numel(v), nanmin(v), nanmedian(v), nanmax(v));
-
-                v = abs([obj.finder.kept.snr]);
-
-                fprintf(fid, 'S/N for %d kept events is distrubuted: min= %f median= %f max= %f\n', numel(v), nanmin(v), nanmedian(v), nanmax(v));
-
-                fprintf(fid, 'Number of events: total= %d | kept= %d\n', length(obj.finder.cand), length(obj.finder.kept));
-            
-%                 fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr, obj.finder.star_hours_total);
+%             filename = ['summary_' obj.get_obj_name '.txt'];
+%             
+%             fid = fopen(fullfile(obj.log_dir, filename), 'wt');
+%             
+%             if fid<0
+%                 warning('Cannot open file %s', fullfile(obj.log_dir, filename));
+%             else
+% 
+%                 onc = onCleanup(@() fclose(fid));
+% 
+%                 fprintf(fid, 'Summary for run %s, with %d batches.\n', obj.head.OBJECT, obj.batch_counter);
+% 
+%                 v = abs(obj.finder.snr_values);
+% 
+%                 fprintf(fid, 'S/N for the last %d batches is distrubuted: min= %f median= %f max= %f\n', numel(v), nanmin(v), nanmedian(v), nanmax(v));
+% 
+%                 v = abs([obj.finder.cand.snr]);
+% 
+%                 fprintf(fid, 'S/N for %d triggered events is distrubuted: min= %f median= %f max= %f\n', numel(v), nanmin(v), nanmedian(v), nanmax(v));
+% 
+%                 v = abs([obj.finder.kept.snr]);
+% 
+%                 fprintf(fid, 'S/N for %d kept events is distrubuted: min= %f median= %f max= %f\n', numel(v), nanmin(v), nanmedian(v), nanmax(v));
+% 
+%                 fprintf(fid, 'Number of events: total= %d | kept= %d\n', length(obj.finder.cand), length(obj.finder.kept));
+%             
+% %                 fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr, obj.finder.star_hours_total);
+% %                 
+% %                 fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr*2, obj.finder.star_hours_total_better);
+% %                 
+% %                 fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr*4, obj.finder.star_hours_total_best);
 %                 
-%                 fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr*2, obj.finder.star_hours_total_better);
-%                 
-%                 fprintf(fid, 'Star hours (above stellar S/N of %4.2f): %4.2f \n', obj.finder.min_star_snr*4, obj.finder.star_hours_total_best);
-                
-            end
+%             end
             
             % if there is no object-dump file, create one now! 
             if ~exist(obj.log_obj, 'file')
@@ -1475,7 +1492,7 @@ classdef Analysis < file.AstroData
 
             t = tic;
 
-            obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps,...
+            obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps, 'filename', obj.reader.this_filename, ...
                 't_start', obj.t_start, 't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp, ...
                 'juldates', obj.juldates, 'positions', obj.positions, 'variance', single(2.5)); % need to add the sky background too
 
