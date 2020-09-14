@@ -375,7 +375,7 @@ classdef Catalog < handle
                     
                     if obj.debug_bit>1, fprintf('Running astrometry on coordinates %s %s\n', head.Ephemeris.deg2hour(list_RA(jj)), head.Ephemeris.deg2sex(list_DE(ii))); end
                     
-                    try 
+                    try % run the photometry! 
                         
                         % turn off some common warnings from astrometry
                         warning('off', 'MATLAB:polyfit:PolyNotUnique')
@@ -384,7 +384,8 @@ classdef Catalog < handle
                         [R,S2] = astrometry(S, 'RA', head.Ephemeris.deg2hour(list_RA(jj)), 'Dec', head.Ephemeris.deg2sex(list_DE(ii)), 'Scale', obj.head.SCALE, ...
                             'RefCatMagRange', [0 obj.mag_limit], 'BlockSize', obj.block_size.*[1 1], 'ApplyPM', false, 'Flip', obj.flip, ...
                             'MinRot', obj.input_rotation-obj.input_rot_range, 'MaxRot', obj.input_rotation+obj.input_rot_range, ...
-                            'CatColMag', 'Mag_G', 'ImSize', [obj.head.NAXIS2, obj.head.NAXIS1], 'Verbose', false, 'RCrad', rc_rad/180*pi);
+                            'CatColMag', 'Mag_G', 'ImSize', [obj.head.NAXIS2, obj.head.NAXIS1], 'Verbose', false, 'RCrad', rc_rad/180*pi, ...
+                            'FitTransformPars', {'RefSelectFun', @(R,Par) R(:,Par)<obj.mag_limit & R(:,Par)>8});
 
                         warning('on', 'MATLAB:polyfit:PolyNotUnique')
                         warning('on', 'MATLAB:lscov:RankDefDesignMat');

@@ -868,7 +868,7 @@ classdef CurveGenerator < handle
             
         end
         
-        function [M, r_axis, a_axis] = makeSourceMatrix(obj, r_axis, R_axis, a_axis, method)
+        function [M, r_axis, a_axis] = makeSourceMatrix(obj, r_axis, R_axis, a_axis)
             % stolen shamelessly from Eran's fresnel_occultation_ps.m
             
             if nargin<2 || isempty(r_axis)
@@ -881,10 +881,6 @@ classdef CurveGenerator < handle
             
             if nargin<4 || isempty(a_axis)
                 a_axis = 0:0.001:10;
-            end
-            
-            if nargin<4 || isempty(method)
-                method = 0;
             end
             
             % verify that r_axis is row vector
@@ -973,6 +969,7 @@ classdef CurveGenerator < handle
                     filename = fullfile(getenv('DATA'), 'WFAST/occultations/source.mat');
                 else
                     warning('cannot find the source matrix. Use loadSourceMatrix(filename) or makeSourceMatrix');
+                    return; 
                 end
             end
             
