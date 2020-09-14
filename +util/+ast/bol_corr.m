@@ -9,6 +9,8 @@ function [corr, T] = bol_corr(temp, mag1, mag2, Filter1, Filter2, FilterSystem, 
 % If you want to run many such calculations (e.g., over a whole catalog) 
 % it is better to use the BolometricCorrections class. 
 
+    addpath(getenv('DATA')); 
+
     if nargin==0, help('util.ast.bol_corr'); return; end
 
     if nargin<4 || isempty(Filter1)

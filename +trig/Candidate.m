@@ -266,8 +266,13 @@ classdef Candidate < handle
         
         function str = printSummary(obj)
             
-            str = sprintf('id: %d | star: %d | frame= %d | time: %d-%ds | event S/N= %4.2f | star S/N= %4.2f', ...
-                    obj.serial, obj.star_index, obj.time_index, round(obj.time_start), round(obj.time_end), obj.snr, obj.star_snr);
+            J = mean(obj.juldates); 
+            
+            t = datetime(J, 'convertFrom', 'juliandate', 'TimeZone', 'UTC'); 
+            
+            str = sprintf('id: %d | star: %d | frame= %d | batch= %d | time: %02d:%02d:%02d | event S/N= %4.2f | star S/N= %4.2f | x/y= %d, %d ', ...
+                    obj.serial, obj.star_index, obj.time_index, obj.batch_number, hour(t), minute(t), round(second(t)), obj.snr, obj.star_snr, ...
+                    round(nanmean(obj.auxiliary(:,obj.aux_indices.centroids_x))), round(nanmean(obj.auxiliary(:,obj.aux_indices.centroids_y))));
             
         end
         
@@ -307,7 +312,7 @@ classdef Candidate < handle
             if isempty(obj.star_props)
                 str = '';
             else
-                str = sprintf('mag= %4.2f | temp= %dK', obj.star_props.Mag_BP, round(obj.star_props.Teff)); 
+                str = sprintf('%4.2fmag %dK %4.1f FSU', obj.star_props.Mag_BP, round(obj.star_props.Teff), obj.getStellarSize); 
             end
             
         end

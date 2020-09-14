@@ -73,7 +73,7 @@ classdef CurveGenerator < handle
     
     properties % switches/controls
         
-        use_source_matrix = 0;
+        use_source_matrix = 1;
         use_single = 1;
         use_binary = 0;
         use_geometric = 0;
@@ -959,14 +959,14 @@ classdef CurveGenerator < handle
         
         function loadSourceMatrix(obj, filename)
             
-            if nargin<2 || isempty(filname)
+            if nargin<2 || isempty(filename)
                 d = fileparts(mfilename('fullpath'));
-                if exist(fullfile(d, 'source.mat'), 'file')
-                    filename = fullfile(d, 'source.mat');
-                elseif exist('source.mat', 'file')
-                    filename = 'source.mat';
-                elseif exist(fullfile(getenv('DATA'), 'WFAST/occultations/source.mat'), 'file')
-                    filename = fullfile(getenv('DATA'), 'WFAST/occultations/source.mat');
+                if exist(fullfile(d, 'source_oort.mat'), 'file')
+                    filename = fullfile(d, 'source_oort.mat');
+                elseif exist('source_oort.mat', 'file')
+                    filename = 'source_oort.mat';
+                elseif exist(fullfile(getenv('DATA'), 'WFAST/occultations/source_oort.mat'), 'file')
+                    filename = fullfile(getenv('DATA'), 'WFAST/occultations/source_oort.mat');
                 else
                     warning('cannot find the source matrix. Use loadSourceMatrix(filename) or makeSourceMatrix');
                     return; 

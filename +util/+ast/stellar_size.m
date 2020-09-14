@@ -1,5 +1,5 @@
 function sizes = stellar_size(bol_mag, temp_eff, varargin)
-% Usage: R_FSU = stellar_size(bol_mag, temp_eff, varargin)
+% Usage: sizes = stellar_size(bol_mag, temp_eff, varargin)
 % Get the estimated size (in radians, micro-arcsec or other units) for all 
 % the stars given their bolometric magnitude and effective temperature. 
 %

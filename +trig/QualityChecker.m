@@ -515,12 +515,14 @@ classdef QualityChecker < handle
             
             %%%%%%%%%%%%% calculate / prepare the data %%%%%%%%%%%%%%%%%%%%
             
+            idx = obj.search_start_idx:obj.search_end_idx; % indices inside the search region
+            
             obj.mean_x = util.vec.weighted_average(x,F.^2,2); % maybe use square of flux instead??
             obj.mean_y = util.vec.weighted_average(y,F.^2,2); % last arg is for dimension 2 (average over stars)
             obj.defocus = util.vec.weighted_average(w,F.^2,2); % get the average PSF width (for focus tests)
             
-            obj.mean_width_values = vertcat(obj.mean_width_values, obj.defocus); % keep a log of the focus for the entire run
-            obj.mean_background_values = vertcat(obj.mean_background_values, nanmedian(b,2)); % keep a log of the sky background level for the entire run
+            obj.mean_width_values = vertcat(obj.mean_width_values, obj.defocus(idx)); % keep a log of the focus for the entire run
+            obj.mean_background_values = vertcat(obj.mean_background_values, nanmedian(b(idx,:),2)); % keep a log of the sky background level for the entire run
             
             if obj.pars.use_subtract_mean_offsets
                 x = x - obj.mean_x; 
@@ -576,9 +578,7 @@ classdef QualityChecker < handle
             obj.linear_motion = sqrt(LX.^2 + LY.^2).*ff; % linear motion is set to be proportional to the filtered flux
             
             obj.background_intensity = b; % just the background level
-            
-            
-            
+           
             aux = zeros(size(f,1),size(f,2),length(obj.pars.corr_types), 'like', f); 
 %             aux(:,:,obj.corr_indices.a) = a;
             aux(:,:,obj.corr_indices.b) = b;

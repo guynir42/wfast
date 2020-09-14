@@ -710,7 +710,9 @@ classdef EventFinder < handle
             c.freq_psd = obj.psd.freq; % frequency axis for the PSD
             
             % store some statistics on this star's raw flux
-            c.flux_mean = nanmean(obj.store.background_flux(:,c.star_index)); 
+            A = obj.store.background_aux(:,c.star_index, obj.store.aux_indices.areas); 
+            B = obj.store.background_aux(:,c.star_index, obj.store.aux_indices.backgrounds); 
+            c.flux_mean = nanmean(obj.store.background_flux(:,c.star_index)-A.*B); 
             c.flux_std = nanstd(obj.store.background_flux(:,c.star_index)); 
             
             % save the auxiliary data (like background and offsets)
@@ -1075,6 +1077,10 @@ classdef EventFinder < handle
         
         function showCandidates(obj, varargin)
             
+            if isempty(obj.cand)
+                return;
+            end
+            
             if ~isempty(obj.gui) && obj.gui.check
                 args = horzcat({'parent', obj.gui.panel_image}, varargin); 
             else
@@ -1086,6 +1092,10 @@ classdef EventFinder < handle
         end
         
         function showLatest(obj) % call this from e.g., the Analysis to update the plot if there is a new candidate
+            
+            if isempty(obj.cand)
+                return;
+            end
             
             if isempty(obj.gui.panel_image.Children) || isempty(obj.gui.panel_image.UserData) || ... 
                     ~isstruct(obj.gui.panel_image.UserData) || ~isfield(obj.gui.panel_image.UserData, 'index') % no proper plotting has been done so far

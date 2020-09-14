@@ -16,7 +16,7 @@ classdef ShuffleBank < handle
 % (This just uses util.vec.convolution() to do the filtering). 
 
 
-    properties(Transient=true, Hidden=true)
+    properties(Transient=true, Hidden=false)
         
         gen@occult.CurveGenerator; % use this to produce the kernels
         prog@util.sys.ProgressBar; % track the time it takes for long calculations

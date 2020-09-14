@@ -617,6 +617,23 @@ classdef Catalog < handle
             
         end
         
+        function addStellarSizes(obj, distance_AU)
+            
+            if nargin<2 || isempty(distance_AU)
+                distance_AU = 40; % Kuiper belt is the default
+            end
+            
+            if ~ismember('BolMag', obj.data.Properties.VariableNames) || ~ismember('BolTemp', obj.data.Properties.VariableNames)
+                obj.addBolometricMags; 
+            end
+            
+            PC2AU = 360/2/pi*3600; 
+            
+            s = util.ast.stellar_size(obj.data.BolMag, obj.data.BolTemp, 'units', 'fsu', 'distance', distance_AU./PC2AU);
+            
+            obj.data.FresnelSize = s; 
+            
+        end
         
         
     end
