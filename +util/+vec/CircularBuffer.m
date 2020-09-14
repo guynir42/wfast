@@ -62,8 +62,8 @@ classdef CircularBuffer < dynamicprops
         function obj = CircularBuffer(varargin) % can give the constructor a new value for "N"
             
             input = util.text.InputVars;
-            input.input_var('N', obj.N, 'number', 'length');
             input.use_ordered_numeric = 1;
+            input.input_var('N', obj.N, 'number', 'length');
             input.scan_vars(varargin{:});
             
             obj.N = input.N;

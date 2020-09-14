@@ -2134,7 +2134,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             if isempty(obj.sched.current)
 
-                obj.print_message(sprintf('Could not find any targets. Going to idle mode...\n'));
+                obj.print_message(sprintf('\nCould not find any targets. Going to idle mode...'));
  
                 if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
                     obj.button_target.String = obj.log.report; 
@@ -2157,7 +2157,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
             else
                 
-                obj.print_message(sprintf('Moving to target %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
+                obj.print_message(sprintf('\nMoving to target %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
                 pause(1); 
                 % actively switch targets and start a new run: 
                 
@@ -2199,7 +2199,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 end
 
                 % do we need this additional log/display? 
-                obj.print_message(sprintf('slewing to target: %s at %s%s\n', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
+                obj.print_message(sprintf('slewing to target: %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
 
                 if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
                     obj.button_target.String = obj.log.report; 

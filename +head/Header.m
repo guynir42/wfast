@@ -176,6 +176,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
     
     properties(Hidden=true) 
        
+        run_identifier = '';  
+        
         DEADTIME = 0; % time lost after each frame, in seconds (needs to be updated someday)
         
         QE = 1; % quantum efficiency (needs to be updated someday)
@@ -190,6 +192,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         
         CAMS_VER; % camera firmware version
         TELS_VER; % telescope firmware version
+        
+        PHOT_PARS; % a structure with the parameters used for photometry
         
         debug_bit = 1; 
         version = 4.00;
@@ -354,7 +358,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         % camera and filter 
         function str = cam_name(obj)
            
-            c = strsplit(obj.INSTR, {' ','_'});
+            c = strsplit(obj.INST, {' ','_'});
             
             str = c{1};
             
@@ -1034,7 +1038,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             if ~isempty(obj.OBSLAT), matlab.io.fits.writeKey(file_ptr, 'SITELAT', obj.OBSLAT, 'degrees'); end
             if ~isempty(obj.JD), matlab.io.fits.writeKey(file_ptr, 'JD', obj.JD); end
             if ~isempty(obj.AIRMASS), matlab.io.fits.writeKey(file_ptr, 'AIRMASS', obj.AIRMASS); end
-            if ~isempty(obj.INSTR), matlab.io.fits.writeKey(file_ptr, 'INSTRUME', obj.INSTR); end
+            if ~isempty(obj.INST), matlab.io.fits.writeKey(file_ptr, 'INSTRUME', obj.INST); end
             matlab.io.fits.writeKey(file_ptr, 'INPUTFMT', 'FITS');
             
         end
@@ -1213,25 +1217,25 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             
         end
         
-        function val = run_identifier(obj) % get the identifier for the current run (date+object name)
-            
-            val = '';
-            
-            if length(obj.STARTTIME)>=10
-                val = obj.STARTTIME(1:10);
-            end
-            
-            if ~isempty(obj.OBJECT)
-                
-                if ~isempty(val)
-                    val = [val '_'];
-                end
-                
-                val = [val obj.OBJECT];
-                
-            end
-            
-        end
+%         function val = run_identifier(obj) % get the identifier for the current run (date+object name)
+%             
+%             val = '';
+%             
+%             if length(obj.STARTTIME)>=10
+%                 val = obj.STARTTIME(1:10);
+%             end
+%             
+%             if ~isempty(obj.OBJECT)
+%                 
+%                 if ~isempty(val)
+%                     val = [val '_'];
+%                 end
+%                 
+%                 val = [val obj.OBJECT];
+%                 
+%             end
+%             
+%         end
         
     end
     

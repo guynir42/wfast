@@ -386,7 +386,7 @@ classdef Event < handle
             
             t = t0 + dt.*(0:length(t)-1)'; % adjust the times to be interpolated from the point we found
             
-            if isempty(timestamps_original)
+            if isempty(obj.timestamps_original)
                 obj.timestamps_original = obj.timestamps;
             end
             
@@ -543,7 +543,7 @@ classdef Event < handle
             corr_std = nanstd(corr_out); % noise outside event
             [~,idx] = nanmax(abs(corr_curve(t))); % peak inside event (location only)
             
-            corr_max = corr_curve(t(idx))./corr_std; % recover the max correlation (position or negative)
+            corr_max = corr_curve(t(idx))./corr_std; % recover the max correlation (positive or negative)
             
             corr_coeff = nansum(corr_curve); 
             

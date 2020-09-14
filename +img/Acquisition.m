@@ -262,7 +262,7 @@ classdef Acquisition < file.AstroData
         slow_mode_frame_rate = 1/3.01; % a little bit lower than 1/3
         slow_mode_batch_size = 1;
         
-        fast_mode_expT = 0.03;
+        fast_mode_expT = 0.0395;
         fast_mode_frame_rate = 25;
         fast_mode_batch_size = 100;
         
@@ -1482,7 +1482,7 @@ classdef Acquisition < file.AstroData
 
                 if N>0
 
-                    obj.cam.record('mode', 'flat', 'num_batches', N, 'batch_size', 100, 'frame_rate', 10, 'expT', 0.03); 
+                    obj.cam.record('mode', 'flat', 'num_batches', N, 'batch_size', 100, 'frame_rate', 10, 'expT', 0.0395); 
 
                 else
                     success = 1;
@@ -2616,7 +2616,15 @@ classdef Acquisition < file.AstroData
                             if ~exist(dirname, 'dir')
                                 mkdir(dirname);
                                 obj.buf.directory_override = dirname;
+                                
+                                % get the date and run name subfolders
+                                [dirname, run_name] = fileparts(dirname); 
+                                [dirname, run_date] = fileparts(dirname); 
+                                
+                                obj.head.run_identifier(fullfile(run_date, run_name));
+                                
                                 break;
+                                
                             end
                             
                         end

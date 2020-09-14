@@ -19,6 +19,8 @@ function val = date_dir(varargin)
         date = varargin{1}; 
     elseif isempty(varargin{1})
         date = datetime('now', 'TimeZone', 'UTC'); 
+    elseif regexp(varargin{1}, '\d+-\d+-\d+T\d+:\d+:\d+.\d+')
+        date = util.text.str2time(varargin{1}); 
     else
         date = datetime(varargin{:});
     end

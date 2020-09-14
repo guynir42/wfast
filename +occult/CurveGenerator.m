@@ -163,8 +163,11 @@ classdef CurveGenerator < handle
             if obj.debug_bit>1, fprintf('CurveGenerator constructor v%4.2f\n', obj.version); end
             
             obj.lc = occult.LightCurve;
-            
-            obj.loadSourceMatrix;
+            try
+                obj.loadSourceMatrix;
+            catch ME
+                warning(ME.getReport); 
+            end
             
         end
         
@@ -962,8 +965,8 @@ classdef CurveGenerator < handle
                     filename = fullfile(d, 'source.mat');
                 elseif exist('source.mat', 'file')
                     filename = 'source.mat';
-                elseif exist(fullfile(getenv('DATA'), 'occultations/source.mat'), 'file')
-                    filename = fullfile(getenv('DATA'), 'occultations/source.mat');
+                elseif exist(fullfile(getenv('DATA'), 'WFAST/occultations/source.mat'), 'file')
+                    filename = fullfile(getenv('DATA'), 'WFAST/occultations/source.mat');
                 else
                     warning('cannot find the source matrix. Use loadSourceMatrix(filename) or makeSourceMatrix');
                     return; 

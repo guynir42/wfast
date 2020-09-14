@@ -37,9 +37,11 @@ classdef ShuffleBank < handle
         
         % input/output data
         fluxes; % the fluxes that were given to input(). Can be 1D or 2D 
-        fluxes_filtered; % the output fluxes after convolution with all kernels (should be 3D)
-        stds; % calculated standard deviation for each filtered flux (dim 1 is scalar)
+        stds; % calculated standard deviation for each flux (dim 1 is scalar)
         timestamps; % timestamps for the fluxes
+        
+        fluxes_filtered; % the output fluxes after convolution with all kernels (should be 3D, dim1 is time, dim2 is kernels, dim3 is stars)
+        % maybe stds_filtered? 
         
         snrs_tested; % test results from runTest()
         
@@ -229,7 +231,7 @@ classdef ShuffleBank < handle
             
         end
         
-        function input(obj, varargin)
+        function flux_out = input(obj, varargin)
             
             input = util.text.InputVars;
             input.use_ordered_numeric = 1;
@@ -261,6 +263,10 @@ classdef ShuffleBank < handle
             obj.timestamps = input.times;
             
             obj.fluxes_filtered = util.vec.convolution(obj.kernels, obj.fluxes)./obj.stds;
+            
+            if nargout>0
+                flux_out = obj.fluxes_filtered;
+            end
             
         end
         

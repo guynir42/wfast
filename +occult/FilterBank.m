@@ -350,6 +350,52 @@ classdef FilterBank < handle
             
         end
         
+        function [lc, pars] = randomLC(obj, fix_R)
+            
+            if nargin<2 || isempty(fix_R)
+                fix_R = [];
+            end
+            
+            S = size(obj.bank); 
+            
+            if isempty(fix_R)
+                
+                idx = randperm(prod(S(2:end)),1); 
+                
+                [sub_R, sub_r, sub_b, sub_v] = ind2sub(S(2:end), idx);
+                
+                lc = obj.bank(:,idx); 
+                    
+            else
+                
+                idx = randperm(prod(S(3:end)),1);
+                
+                sub_R = find(fix_R==obj.R_list);
+                
+                if isempty(sub_R)
+                    error('Wrong value of fix_R. Choose from the R_list= %s', util.text.print_vec(obj.R_list)); 
+                end
+                
+                [sub_r, sub_b, sub_v] = ind2sub(S(3:end), idx);
+                
+                lc = obj.bank(:, sub_R, sub_r, sub_b, sub_v); 
+                
+                idx = idx + prod(S(3:end))*sub_R; 
+                
+            end
+                
+            pars.R = obj.R_list(sub_R); 
+            pars.r = obj.r_list(sub_r); 
+            pars.b = obj.b_list(sub_b); 
+            pars.v = obj.v_list(sub_v); 
+            pars.W = obj.W;
+            pars.T = obj.T;
+            pars.f = obj.f; 
+            
+            pars.bank_index = idx; 
+            
+        end
+        
         function score = calcMinStarSNR(obj, varargin) % need to finish this! 
             
             if isempty(obj.bank)

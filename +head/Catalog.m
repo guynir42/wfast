@@ -49,6 +49,8 @@ classdef Catalog < handle
         head@head.Header; % link back to header object! 
         data; % table with the final info
         
+        bc@util.ast.BolometricCorrections;
+        
     end
     
     properties % inputs/outputs
@@ -594,6 +596,28 @@ classdef Catalog < handle
             end
             
         end
+        
+        function addBolometricMags(obj)
+            
+            if obj.success
+                
+                if isempty(obj.bc)
+                    obj.bc = util.ast.BolometricCorrections;
+                end
+                
+                color = obj.data.Mag_BP - obj.data.Mag_RP;
+                
+                bol_temp = obj.bc.getTemp(color); 
+                bol_corr = obj.bc.getBolCorr(bol_temp);
+                
+                obj.data.BolMag = obj.data.Mag_BP + bol_corr;
+                obj.data.BolTemp = bol_temp;
+                
+            end
+            
+        end
+        
+        
         
     end
     

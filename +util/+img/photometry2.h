@@ -49,6 +49,7 @@ Optional arguments:
                  least threads<5. Default is 1 (no multithreading). 
        *iterations: How many repositions of the gaussians are used on each
                     cutout before settling on the results. Default: 2.
+	   *use_raw: If false, skip doing raw photometery (Default false). 
        *use_centering_aperture: If true, use a an aperture at the position
                                 from the raw photometery, just to get a
                                 little better positioning before going on
@@ -56,11 +57,18 @@ Optional arguments:
        *use_gaussian: If falue, skip gaussians altogether (default true).
        *use_apertures: If false, skip aperture photometery (default true).
        *use_forced: If false, skip doing forced photometry (default true). 
+	   *use_median: If true, use median value of annulus pixels to calculate
+                    the background (instead of mean). Default true. 
+       *use_positives: when calculating the widths (2nd moments), turn any 
+                      negative values in the cutout up to zero, to prevent
+                      unphysical results like negative 2nd moments. 
        *debug_bit: Level of verbosity of the code (default: 0). 
 
 For more information about how to use this function, see photometry2.m
 
 Updates:
+2020-08-04 Guy: added option "use_positives" to make 2nd moment calculation only use non-negative values. 
+
 2020-02-27 Guy: Added multiple objects in global scope, added parseIndex method to find which one to use. 
                 This prevents users that do photometry on multiple data sets of differing size from resetting
 				the whole preallocation mechanisms. 
@@ -68,7 +76,7 @@ Updates:
 				This way no need to reallocate the data twice each batch. 
 				
 				
-Original code by Guy Nir Dec 2019
+Original code by Guy Nir, Dec 2019
 
 Additional developer notes after the header
 
@@ -91,23 +99,36 @@ class Photometry{
 	int num_cutouts=0;  // number of cutouts (dim 3 times dim 4)
 	int N=0; // number of pixels in each cutout (dim 1 times dim 2)
 	
-	double gain=1; // calculate the source noise using the gain
-	double scintillation_fraction=0; // use this to add the estimated scintillation noise (in fractions of the reduced flux)
-	int num_threads=1; // for future use with built-in multithreading
-	int num_iterations=2; // how many iterations of repositioning should we do
-	bool use_centering_aperture=1; // run one level of aperture photometry (centroids only) before the first gaussian iterations
-	bool use_gaussian=1; // decide if you want to use gaussians photometry at all
-	bool use_apertures=1; // decide if you want to use aperture photometry (wedding cake)
-	bool use_forced=1; // decide if you want to use forced photometry after finding the best offsets
-	bool use_median=1; // decide if you want to use median (instead of mean) to get the background value
+	// these are read by varargin
+	struct Parameters {
 	
-	int debug_bit=0;
+		double gain=1; // calculate the source noise using the gain
+		double scintillation_fraction=0; // use this to add the estimated scintillation noise (in fractions of the reduced flux)
+		int num_threads=1; // for future use with built-in multithreading
+		int num_iterations=2; // how many iterations of repositioning should we do
+		bool use_raw=0; // use a raw aperture before everything
+		bool use_centering_aperture=1; // run one level of aperture photometry (centroids only) before the first gaussian iterations
+		bool use_gaussian=1; // decide if you want to use gaussians photometry at all
+		bool use_apertures=1; // decide if you want to use aperture photometry (wedding cake)
+		bool use_forced=1; // decide if you want to use forced photometry after finding the best offsets
+		bool use_median=0; // decide if you want to use median (instead of mean) to get the background value
+		bool use_positives=0; // when true, will ignore any negative values in the cutout when calculating 2nd moments
+		double gauss_sigma=2; // the width of the gaussian (in pixels)
+		double inner_radius=7.5; // of the annulus (pixels)
+		double outer_radius=10; // of the annulus (pixels)
+		int num_radii=3; // how many different aperture arrays do we have for the wedding cake
+		double *ap_radii=new double[3]; // radii of different apertures, given in pixel units (default is 3,5,7, given in the constructor)
+		
+		int resolution=1; // how many different aperture/gaussian shifts we want in each pixel
+		
+		int debug_bit=0;
+		
+	} pars;
 	
 	// these can be shared with all calculations (i.e., they are kept in memory between calls to photometry2!)
 	float *X=0; // grid points not including shifts. 
 	float *Y=0; // grid points not including shifts. 
 	
-	int resolution=1; // how many different aperture/gaussian shifts we want in each pixel
 	mwSize shift_dims[2]={0}; // dimensions of shift matrices dx/dy	
 	int num_shifts=0; // number of shifts we need to cover all possible star positions (i.e., the length of dx and dy, shift_dims[0]*shift_dims[1])
 	float *dx=0; // list of offsets in x for the center of the mask
@@ -119,16 +140,11 @@ class Photometry{
 
 	float *apertures=0; // 4D matrix of aperture+annuli for the wedding cake photometry
 	std::vector<int> *aperture_indices=0; // array of length "num_shifts" of index vectors telling what part of each matrix to sum in wedding cake photometry
-	int num_radii=0; // how many different aperture arrays do we have for the wedding cake
-	double *ap_radii=0; // radii of different apertures, given in pixel units (default is 3,5,7, given in the constructor)
 	
 	float *annulii=0; // 3D matrix of the annulus used for all kinds of photometry, one for each dx/dy shift
 	std::vector<int> *annulus_indices=0; // array of length "num_shifts" of index vectors telling what part of each matrix to sum in annulus calculation
-	double inner_radius=10; // of the annulus (pixels)
-	double outer_radius=0; // of the annulus (pixels)
-
+	
 	float *gaussians=0; // 3D matrix of gaussian weighted apertures for "PSF" photometry, one for each dx/dy shift
-	double gauss_sigma=2; // the width of the gaussian (in pixels)
 	
 	// output arrays are defined here (in C++)
 	mwSize output_size[2]={0}; // the same as dim 3 and dim 4 of cutouts
@@ -147,7 +163,9 @@ class Photometry{
 	// function prototypes (implementation at the end)
 	Photometry();
 	~Photometry();
+	// void reset(); 
 	void parseInputs(int nrhs, const mxArray *prhs[]);
+	void ingestParameters(Parameters new_pars); 
 	mxArray *outputStruct(float **output, int num_fluxes=1); // wrap up the output matrices as a nice matlab style array
 	mxArray *outputAverages(); // add a struct with the average offsets and widths
 	mxArray *outputMetadataStruct(); // add a struct with some of the parameters and the different aperture masks used
@@ -188,31 +206,27 @@ class Photometry{
 	// make averages over the results
 	float getWidthFromMoments(float m2x, float m2y, float mxy); // from the eigenvalues of the 2nd moments
 	void calcFrameAverages(float **output, int num_radii=1); // save the average offset_x, offset_y and width for each frame
-	// these are obsolete
-	float getAverageWidth(float **output); // get the "flux weighted" average width on all non NaN, non flagged cutouts
-	float getAverageOffsetX(float **output); // get the "flux weighted" average offset_x on all non NaN, non flagged cutouts
-	float getAverageOffsetY(float **output); // get the "flux weighted" average offset_y on all non NaN, non flagged cutouts
+	void resetFrameAverages(); // set all offsets/widths to zero
 	
 	// the sum of the product of array1...
 	int countNaNs(const float *array); // count the number of NaNs in the array
 	float countNaNs(const float *array, const float *array2); // count the number of NaNs weighted by a mask in array2
-	float sumArrays(const float *array1);
-	float sumArrays(const float *array1, const float *array2);
-	float sumArrays(const float *array1, float offset1, const float *array2);
-	float sumArrays(const float *array1, const float *array2, const float *array3);
-	float sumArrays(const float *array1, float offset1, const float *array2, const float *array3);
-	float sumArrays(const float *array1, const float *array2, float offset2, const float *array3, float offset3);	
-	float sumArrays(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3);
-	float sumArrays(const float *array1, const float *array2, const float *array3, const float *array4);
-	float sumArrays(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3, const float *array4);
+	float sumArrays(const float *array1); // e.g., raw sum of image, or area of gaussian
+	float sumArrays(const float *array1, float offset1); // raw sum of image, subtracting background, maybe taking only positive pixels
+	float sumArrays(const float *array1, const float *array2); // e.g., I*gaussian (and remove background later)
+	float sumArrays(const float *array1, float offset1, const float *array2); // e.g., (I-B)*X for raw 1st moment
+	float sumArraysPos(const float *array1, float offset1, const float *array2); // e.g., (I-B)*gaussian (this is different than the above func because it can use_positives only)
+	float sumArrays(const float *array1, float offset1, const float *array2, const float *array3); // e.g., (I-B)*X*gaussian
+	float sumArrays(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3); // e.g., (I-B)*(X-mx)*(Y-my) (raw photometry)
+	float sumArrays(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3, const float *array4); // e.g., (I-B)*(X-mx)*(Y-my)*gaussian
 
 	int countNonNaNsIndices(const float *array1, const std::vector<int> *vector, int idx); // sum the number of non-NaN values in array1 on the indices in vector[idx]
-	float sumIndices(const float *array1, const std::vector<int> *vector, int idx); // sum the values of array1 on the indices in vector[idx]
-	float sumIndices(const float *array1, float offset1, const std::vector<int> *vector, int idx); 
+	float sumIndices(const float *array1, const std::vector<int> *vector, int idx); // sum the values of array1 on the indices in vector[idx], e.g., I*aperture or I*annulus
+	float sumIndices(const float *array1, float offset1, const std::vector<int> *vector, int idx); // e.g., calculating the norm for 2nd moments: (I-B)*aperture
 	float sumIndices(const float *array1, const float *array2, const std::vector<int> *vector, int idx);
-	float sumIndices(const float *array1, float offset1, const float *array2, const std::vector<int> *vector, int idx);
-	float sumIndices(const float *array1, float offset1, const float *array2, float offset2, const std::vector<int> *vector, int idx);
-	float sumIndices(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3, const std::vector<int> *vector, int idx);
+	float sumIndices(const float *array1, float offset1, const float *array2, const std::vector<int> *vector, int idx); // e.g., 1st moment=(I-B)*X*aperture
+	float sumIndices(const float *array1, float offset1, const float *array2, float offset2, const std::vector<int> *vector, int idx); // e.g., variance=(I-B)*(I-B)*annulus
+	float sumIndices(const float *array1, float offset1, const float *array2, float offset2, const float *array3, float offset3, const std::vector<int> *vector, int idx); // e.g., 2nd moment=(I-B)*(X-mx)*(Y-my)*aperture
 	float medianIndices(const float *array, const std::vector<int> *vector, int idx); // find the median of the array points indicated by vector[idx]
 	// float medianIndicesDebug(const float *array, const std::vector<int> *vector, int idx); // find the median of the array points indicated by vector[idx]
 	
