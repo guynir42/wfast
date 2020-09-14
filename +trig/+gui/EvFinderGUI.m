@@ -84,8 +84,8 @@ classdef EvFinderGUI < handle
             obj.fig = util.plot.FigHandler('EventFinder');
             obj.fig.clear;
             obj.fig.bottom = 5;
-            obj.fig.height = 16;
-            obj.fig.width = 30;
+            obj.fig.height = 20;
+            obj.fig.width = 40;
             obj.fig.center;
 %             obj.fig.maximize;
             
@@ -142,6 +142,8 @@ classdef EvFinderGUI < handle
             obj.menu_pars.menu_store.addButton('button_threshold', '&Use star threshold', 'toggle', 'store.pars.use_threshold', 'remove events with low S/N after finishing the burn-in', 1);
             obj.menu_pars.menu_store.addButton('input_threshold', 'star &Threshold', 'input', 'store.pars.threshold', 'threshold for removing events');
             
+            obj.menu_pars.menu_store.addButton('input_aperture', 'Aperture radius', 'info', 'store.aperture_radius', '', 1);
+            
             %%%%%%%%%%% checker menu %%%%%%%%%%%%%%%
             
             obj.menu_pars.addButton('menu_checker', '&QualityChecker', 'menu'); 
@@ -187,6 +189,8 @@ classdef EvFinderGUI < handle
             obj.menu_pars.menu_hours.addButton('input_bin_max', '&High S/N edge', 'input', 'store.checker.hours.snr_bin_max', 'high edge of S/N histogram');
             obj.menu_pars.menu_hours.addButton('input_bin_width', 'S/N &Width', 'input', 'store.checker.hours.snr_bin_width', 'edge width of S/N histogram');
             
+            obj.menu_pars.assignJavaObjectsTopLevel; 
+            
             %%%%%%%%%%%%%%%%%%% LEFT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
             N_left = 13; % number of buttons on left side
@@ -205,7 +209,7 @@ classdef EvFinderGUI < handle
             obj.panel_controls.addButton('button_psd', 'pars.use_psd_correction', 'toggle', 'PSD off', 'PSD on', '', 0.5, obj.color_on, 'red', 'use Power Spectra Density correction of flux'); 
             obj.panel_controls.addButton('button_std', 'pars.use_std_filtered', 'toggle', 'filt. std off', 'filt std on', '', 0.5, obj.color_on, 'red', 'use filtered flux STD correction'); 
             obj.panel_controls.addButton('button_cr_remove', 'store.pars.use_remove_cosmic_rays', 'toggle', 'CR remove off', 'CR remove on', '', 0.5, obj.color_on, 'red', 'remove cosmic rays spikes'); 
-            obj.panel_controls.addButton('input_cr_thresh', 'store.pars.cosmic_ray_threshold', 'input', 'thresh= ', '', '', 0.5, [], [], 'threshold for removal of cosmic rays'); 
+            obj.panel_controls.addButton('input_cr_thresh', 'store.pars.cosmic_ray_threshold', 'input', 'CR thresh= ', '', '', 0.5, [], [], 'threshold for removal of cosmic rays'); 
             obj.panel_controls.margin = [0.02 0.02]; 
             obj.panel_controls.make;
             

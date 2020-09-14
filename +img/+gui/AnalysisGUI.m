@@ -101,7 +101,7 @@ classdef AnalysisGUI < handle
             
             obj.menu_options = MenuItem(obj, '&Options', 'menu'); 
             obj.menu_options.addButton('button_astrometry', '&Astrometry', 'toggle', 'use_astrometry'); 
-            obj.menu_options.addButton('button_reset', '&Reset', 'push', 'reset'); 
+            obj.menu_options.addButton('button_reset', '&Reset', 'push', 'reset', 'remove all event candidates and lightcurve data at beginning of new run'); 
             obj.menu_options.addButton('input_num_batches', '&Num batches', 'input', 'num_batches', '', 1); 
             obj.menu_options.addButton('input_num_stars', 'Num &Stars', 'input', 'num_stars'); 
             
@@ -110,6 +110,7 @@ classdef AnalysisGUI < handle
             obj.menu_options.menu_lightcurves.addButton('button_save_full', '&Save full', 'toggle', 'use_save_full_lightcurves'); 
             obj.menu_options.menu_lightcurves.addButton('button_batched', 'Save &Batched', 'toggle', 'use_save_batched_lightcurves'); 
             
+            obj.menu_options.assignJavaObjectsTopLevel; 
             
             %%%%%%%%%%%%%%%%%%% LEFT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%%
             

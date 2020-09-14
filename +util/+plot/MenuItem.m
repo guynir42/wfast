@@ -437,9 +437,15 @@ classdef MenuItem < dynamicprops
             end
             
             obj.jhndl = jMenuBar.getComponent(idx-1); 
-%             obj.jhndl.doClick; 
+            obj.jhndl.doClick; 
+            drawnow;
 
             obj.assignJavaObjects; % recursively assign java objects to all children
+            
+            drawnow;
+            commandwindow;
+            
+            figure(obj.owner.gui.fig.fig); 
             
         end
         
@@ -461,7 +467,7 @@ classdef MenuItem < dynamicprops
                     end
                 end
                 
-                if ~isempty(obj.jhndl)
+                if ~isempty(obj.jhndl) && ~isempty(obj.tooltip) && ischar(obj.tooltip)
                     obj.jhndl.setToolTipText(obj.tooltip); 
                 end
                 
