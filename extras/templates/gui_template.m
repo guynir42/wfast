@@ -92,7 +92,8 @@ classdef objGUI < handle
             % obj.addButton(name, text, type, variable, tooltip, separator)
             % menu types: menu, toggle, push, input, input_text, info, custom
             
-            
+            % NOTE: to enable tooltips, run obj.menu_XXX.assignJavaObjectsTopLevel 
+            %       on each top-level menu object. 
             
             N_left = 10; % number of buttons on left side
             

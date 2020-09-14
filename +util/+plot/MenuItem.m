@@ -5,6 +5,7 @@ classdef MenuItem < dynamicprops
         parent; % can be the GUI or another MenuItem
         gui; % the GUI that contains this object
         owner; % the underlying object for which this GUI is connected (if any)
+        children = {}; 
         
         variable; % if connected to a specific object, variable, or function in the owner
         type; % can choose "menu", "toggle", "push", "input", "info", or "custom" (for your own callback)
@@ -14,6 +15,9 @@ classdef MenuItem < dynamicprops
         color_off = [0 0 0]; % apply this color when off
         
         hndl; % a handle to the underlying uimenu object
+        jhndl; % underlying java handle for doiing undocumented stuff! 
+        
+        tooltip; % must save this property until we can get a java handle
         
     end
     
@@ -131,10 +135,12 @@ classdef MenuItem < dynamicprops
         
         function val = get.Tooltip(obj)
             
-            if isprop(obj.hndl, 'Tooltip')
-                val = obj.hndl.Tooltip;
-            else
-                val = '';
+            val = obj.tooltip;
+            
+            if ~isempty(obj.jhndl)
+                try
+                    val = obj.jhndl.getTooltipText;
+                end 
             end
             
         end
@@ -239,9 +245,11 @@ classdef MenuItem < dynamicprops
         
         function set.Tooltip(obj, val)
             
-            if isprop(obj.hndl, 'Tooltip')
+            obj.tooltip = val;
+            
+            if ~isempty(obj.jhndl)
                 try
-                    obj.hndl.Tooltip = val;
+                    obj.jhndl.Tooltip = val;
                 end
             end
             
@@ -350,6 +358,122 @@ classdef MenuItem < dynamicprops
             
         end
         
+        function val = getJavaMenu(obj) % to be depricated
+            
+%             val = util.plot.findjobj(obj.hndl); 
+            
+            % ref: http://undocumentedmatlab.com/articles/customizing-menu-items-part-2
+            warning('off', 'MATLAB:HandleGraphics:ObsoletedProperty:JavaFrame');
+            
+            jFrame = get(handle(obj.owner.gui.fig.fig),'JavaFrame');
+            jMenuBar = jFrame.fHG2Client.getMenuBar; % this is the menu bar at the top of the window, with File, Edit, etc
+            
+            tree = obj.getMenuTree;
+            h = jMenuBar; % the first handle is the menu bar
+            
+            val = [];
+            
+            for ii = 1:length(tree) % go over the tree from base menu down
+                
+                idx = []; 
+                
+                for jj = 1:length(h.getComponents)
+                    if strcmp(h.getComponent(jj-1).getText, strrep(tree{ii}.Text, '&', ''))
+                        idx = jj;
+                        break;
+                    end
+                end
+                
+                if ~isempty(idx)
+                    h = h.getComponent(idx-1); 
+                else % maybe it is not a component but a menu item? 
+                    
+                    for jj = 1:h.getItemCount
+                        if strcmp(h.getItem(jj-1).getText, strrep(tree{ii}.Text, '&', ''))
+                            idx = jj;
+                            break;
+                        end
+                    end
+                                        
+                    if ~isempty(idx)
+                        h = h.getItem(idx-1); 
+                    end
+                    
+                end
+                
+            end
+            
+            val = h; 
+            
+        end
+        
+        function val = getMenuTree(obj)
+            
+            if isempty(obj.parent)
+                val = {}; 
+                return; 
+            else
+                val = vertcat(obj.parent.getMenuTree, {obj.parent});
+            end
+            
+        end
+        
+        function assignJavaObjectsTopLevel(obj) % call this ONLY on the top-level menu! 
+            
+            % ref: http://undocumentedmatlab.com/articles/customizing-menu-items-part-2
+            warning('off', 'MATLAB:HandleGraphics:ObsoletedProperty:JavaFrame');
+            drawnow; % make sure all the java objects are already fully constructed! 
+            
+            jFrame = get(handle(obj.owner.gui.fig.fig),'JavaFrame');
+            jMenuBar = jFrame.fHG2Client.getMenuBar; % this is the menu bar at the top of the window, with File, Edit, etc
+            
+            % first find the java object of the top-level menu! 
+            idx = []; 
+            for ii = length(jMenuBar.getComponents):-1:1 % go backward from the last bar menu
+                if strcmp(jMenuBar.getComponent(ii-1).getText, strrep(obj.Text, '&', ''))
+                    idx = ii;
+                    break;
+                end
+            end
+            
+            obj.jhndl = jMenuBar.getComponent(idx-1); 
+%             obj.jhndl.doClick; 
+
+            obj.assignJavaObjects; % recursively assign java objects to all children
+            
+        end
+        
+        function assignJavaObjects(obj) % this recursively takes care of the children
+            
+            if isempty(obj.jhndl) % if we haven't gotten this object yet
+                
+                parent_j = obj.parent.jhndl;
+                
+                if parent_j.getItemCount==0
+                    parent_j.doClick; % this clicks the menu and populates the other menu items
+                    drawnow;
+                end
+                
+                for ii = 1:parent_j.getItemCount
+                    if ~isempty(parent_j.getItem(ii-1)) && strcmp(parent_j.getItem(ii-1).getText, strrep(obj.Text, '&', '')) % match the parent's java child text with this object's text
+                        obj.jhndl = parent_j.getItem(ii-1); 
+                        break; 
+                    end
+                end
+                
+                if ~isempty(obj.jhndl)
+                    obj.jhndl.setToolTipText(obj.tooltip); 
+                end
+                
+            end
+            
+            % now search for other objects living inside this menu:
+            for ii = 1:length(obj.children)
+                obj.children{ii}.assignJavaObjects; 
+            end
+            
+        end
+        
         function addButton(obj, name, text, type, variable, tooltip, separator)
             
             if nargin<3
@@ -374,6 +498,7 @@ classdef MenuItem < dynamicprops
             
             addprop(obj, name);
             obj.(name) = util.plot.MenuItem(obj, text, type, variable, tooltip, separator);
+            obj.children{end+1} = obj.(name); 
             
         end
         
