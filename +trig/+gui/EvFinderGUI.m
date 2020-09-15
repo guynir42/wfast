@@ -234,14 +234,16 @@ classdef EvFinderGUI < handle
             pos = pos-num_buttons;
             obj.panel_plots = GraphicPanel(obj.owner, [0 pos/N_left 0.2 num_buttons/N_left], 'plots', 1); % last input is for vertical (default)
             obj.panel_plots.number = num_buttons;
-            obj.panel_plots.addButton('button_cand', 'showCandidates', 'push', 'cand', '', '', 0.5, [], [], 're-render the candidate viewer'); 
-            obj.panel_plots.addButton('button_psd', 'popupPSD', 'push', 'PSD', '', '', 0.5, [], [], 'pop up a window with the PSD plot'); 
+            obj.panel_plots.addButton('button_cand', 'showCandidates', 'push', 'show candidates', '', '', 1, [], [], 're-render the candidate viewer'); 
             obj.panel_plots.addButton('button_stars', 'popupStars', 'push', 'stars', '', '', 0.5, [], [], 'pop up a window with the star S/N plot'); 
+            obj.panel_plots.addButton('button_sizes', 'popupSizes', 'push', 'sizes', '', '', 0.5, [], [], 'pop up a window with the star Fresnel sizes histogram'); 
             obj.panel_plots.addButton('button_snr', 'popupSNR', 'push', 'S/N', '', '', 0.5, [], [], 'pop up a window with a histogram of the best S/N measured in eacj batch'); 
             obj.panel_plots.addButton('button_quality', 'popupRunQuality', 'push', 'quality', '', '', 0.5, [], [], 'pop up a window with a plot of the airmass, background and PSF width over the entire run');
             obj.panel_plots.addButton('button_cuts', 'popupCuts', 'push', 'cuts', '', '', 0.5, [], [], 'pop up a window with the quality cuts viewer'); 
-            obj.panel_plots.addButton('button_sim', 'popupSimulated', 'push', 'sim', '', '', 0.5, [], [], 'pop up a window with the results of injected events processing'); 
-            obj.panel_plots.addButton('button_star_hours', 'popupStarHours', 'push', 'star hours', '', '', 0.5, [], [], 'pop up a window with the star hour viewer'); 
+            obj.panel_plots.addButton('button_star_hours', 'popupHours', 'push', 'star hours', '', '', 0.5, [], [], 'pop up a window with the star hour viewer'); 
+            obj.panel_plots.addButton('button_psd', 'popupPSD', 'push', 'PSD', '', '', 0.5, [], [], 'pop up a window with the PSD plot'); 
+            obj.panel_plots.addButton('button_sim', 'popupSim', 'push', 'sim', '', '', 0.5, [], [], 'pop up a window with the results of injected events processing'); 
+
             
             obj.panel_plots.margin = [0.02 0.02]; 
             obj.panel_plots.make;

@@ -114,8 +114,7 @@ classdef EventFinder < handle
         % been rejected by the system. Note that simulated events are placed
         % outside of the data cuts, so most of them are not rejected by them, 
         % but only by the S/N threshold. 
-        sim_events_passed;
-        sim_events_failed;
+        sim_events; 
     
         total_batches = []; % optionally give the finder the number of files/batches in this run
         
@@ -217,8 +216,7 @@ classdef EventFinder < handle
             obj.snr_values = [];
             obj.var_values = [];
             
-            obj.sim_events_passed = [];
-            obj.sim_events_failed = [];
+            obj.sim_events = [];
             
             obj.total_batches = [];
             
@@ -524,7 +522,7 @@ classdef EventFinder < handle
                     obj.snr_values(end+1) = max(abs([obj.latest_candidates.snr])); 
                 elseif ~isempty(best_snr) % we managed to find a good S/N value from the large filter bank
                     obj.snr_values(end+1) = best_snr; % no candidates, instead just return the best S/N found when searching for candidates
-                elseif obj.pars.use_prefilter && isempty(best_snr) % we used a pre-filter and didn't get any stars that passed
+                elseif obj.pars.use_prefilter % we used a pre-filter and didn't get any stars that passed
                     obj.snr_values(end+1) = max(pre_snr); % take the best S/N from the smaller filter bank
                 else
                     error('This shouldn''t happen!'); 
@@ -580,8 +578,7 @@ classdef EventFinder < handle
             s.finder_pars = obj.pars;
             s.snr_values = obj.snr_values;
             s.total_batches = obj.total_batches; 
-            s.sim_events_passed = obj.sim_events_passed;
-            s.sim_events_failed = obj.sim_events_failed;
+            s.sim_events = obj.sim_events;
             s.black_list_stars = obj.black_list_stars;
             
             % load the content of the store
@@ -980,25 +977,29 @@ classdef EventFinder < handle
             if ~isempty(new_event_sim) % we recovered the injected event! 
                 
                 sim_pars.detect_snr = new_event_sim.snr; % keep track of the detection S/N for this event
+                sim_pars.passed = 1; 
                 
                 new_event_sim.is_simulated = 1; 
                 new_event_sim.sim_pars = sim_pars; 
                 obj.latest_candidates = vertcat(obj.latest_candidates, new_event_sim); % add the simulated events to the list of regular events
                 
                 % add this parameter struct to the list of passed events
-                if isempty(obj.sim_events_passed)
-                    obj.sim_events_passed = sim_pars;
+                if isempty(obj.sim_events)
+                    obj.sim_events = sim_pars;
                 else
-                    obj.sim_events_passed(end+1) = sim_pars;
+                    obj.sim_events(end+1) = sim_pars;
                 end
                 
             else % no events were recovered
                 
+                sim_pars.detect_snr = 0; % event was not detected, so S/N is zero
+                sim_pars.passed = 0; 
+                
                 % add this parameter struct to the list of failed events
-                if isempty(obj.sim_events_failed)
-                    obj.sim_events_failed = sim_pars;
+                if isempty(obj.sim_events)
+                    obj.sim_events = sim_pars;
                 else
-                    obj.sim_events_failed(end+1) = sim_pars;
+                    obj.sim_events(end+1) = sim_pars;
                 end
                 
             end
@@ -1124,7 +1125,495 @@ classdef EventFinder < handle
             
         end
         
-    end    
+        function popupStars(obj)
+            
+            f = util.plot.FigHandler('Star S/N'); 
+            f.width = 26;
+            f.height = 16;
+            f.clear;
+            
+            ax = axes('Parent', f.fig); 
+            
+            obj.showStars('ax', ax, 'mag', 1); 
+            
+        end
+        
+        function showStars(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('threshold', true); % show the threshold used by the DataStore
+            input.input_var('magnitudes', false); % show each star's magnitude
+            input.input_var('axes', [], 'axis'); % which axes to plot to? default is gca()
+            input.input_var('font_size', 20); % fonts on the axes
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.axes)
+                input.axes = gca;
+            end
+            
+            plot(input.axes, obj.store.star_snr, 'DisplayName', 'S/N per sample'); 
+            
+            if input.threshold
+                
+                N = length(obj.store.star_snr); 
+                
+                hold_state = input.axes.NextPlot; 
+                
+                hold(input.axes, 'on'); 
+                
+                plot(input.axes, 1:N, ones(N,1).*obj.store.pars.threshold, '--g', ...
+                    'DisplayName', sprintf('threshold= %4.2f', obj.store.pars.threshold)); 
+                
+                input.axes.NextPlot = hold_state; 
+                
+            end
+            
+            if input.magnitudes && ~isempty(obj.cat) && obj.cat.success
+                
+                yyaxis(input.axes, 'right'); 
+                
+                plot(obj.cat.magnitudes, 'DisplayName', 'GAIA B_p mag'); 
+                
+                input.axes.YDir = 'reverse'; 
+                
+                ylabel(input.axes, 'magnitudes'); 
+                
+                legend(input.axes); 
+                
+                yyaxis(input.axes, 'left'); 
+                
+            end
+            
+            ylabel(input.axes, 'Star S/N per sample');
+            xlabel(input.axes, 'Star index'); 
+            
+            input.axes.YLim = [0 max(obj.store.star_snr).*1.2]; 
+            
+            input.axes.FontSize = input.font_size; 
+            
+        end
+        
+        function popupSizes(obj)
+            
+            f = util.plot.FigHandler('Star sizes'); 
+            f.width = 26;
+            f.height = 16;
+            f.clear;
+            
+            ax = axes('Parent', f.fig); 
+            
+            obj.showSizes('ax', ax, 'lines', [0.5 3]); 
+            
+        end
+        
+        function showSizes(obj, varargin)
+            
+            if isempty(obj.cat) || obj.cat.success==0
+                error('No catalog was matched to this run!'); 
+            end
+            
+            input = util.text.InputVars;
+            input.input_var('distance_au', 40); % the distance at which to calculate the Fresnel scale... 
+            input.input_var('log', true); % show the log10 of the Fresnel sizes. 
+            input.input_var('lines', []); % add vertical lines showing some limits (give a scalar/vector of values)
+            input.input_var('axes', [], 'axis'); % which axes to plot to? default is gca()
+            input.input_var('font_size', 20); % fonts on the axes
+            input.scan_vars(varargin{:}); 
+            
+            obj.cat.addStellarSizes;
+            
+            if isempty(input.axes)
+                input.axes = gca;
+            end
+            
+            S = obj.cat.data.FresnelSize(obj.store.star_indices);
+            
+            if input.log
+                S = log10(S); 
+            end
+            
+            histogram(input.axes, S, 'BinWidth', 0.05); 
+            
+%             input.axes.YScale = 'log'; 
+            
+            if input.log
+                xlabel(input.axes, 'log10(Fresnel size)'); 
+                input.axes.XLim = [-1 1.5]; 
+            else
+                xlabel(input.axes, 'Fresnel size'); 
+                input.axes.XLim = [0 20]; 
+            end
+            
+            [N,E] = histcounts(S, 'BinWidth', 0.05); 
+                
+            input.axes.YLim = [1, max(N)*1.1]; 
+            
+            if ~isempty(input.lines)
+                
+                if input.log
+                    lines = log10(input.lines);
+                else
+                    lines = input.lines;
+                end
+                
+                hold_state = input.axes.NextPlot;
+                hold(input.axes, 'on'); 
+                
+                for ii = 1:length(input.lines)
+                    
+                    h = plot(input.axes, lines(ii).*[1 1], input.axes.YLim, '--r'); 
+                    
+%                     [~, idx] = min(abs(lines(ii)-E)); % find the bin index of this line
+                    
+                    text(input.axes, lines(ii)+0.05, input.axes.YLim(2), ...
+                        sprintf('R= %4.2f ', input.lines(ii)), 'HorizontalAlignment', 'right', ...
+                        'Color', h.Color, 'FontSize', input.font_size-2, 'Rotation', 90); 
+                end
+                
+                hold(input.axes, 'off'); 
+                
+            end
+            
+            ylabel(input.axes, 'Number of stars in analysis'); 
+            
+            input.axes.NextPlot = hold_state; 
+            input.axes.FontSize = input.font_size; 
+            
+        end
+        
+        function popupSNR(obj)
+            
+            f = util.plot.FigHandler('batch maximum S/N'); 
+            f.width = 26;
+            f.height = 16;
+            f.clear;
+            
+            ax = axes('Parent', f.fig); 
+            
+            obj.showSNR('ax', ax); 
+            
+        end
+        
+        function showSNR(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('axes', [], 'axis'); % which axes to plot to? default is gca()
+            input.input_var('font_size', 20); % fonts on the axes
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.axes)
+                input.axes = gca;
+            end
+            
+            h = histogram(input.axes, obj.snr_values, 'BinWidth', 0.5); 
+            
+            hold_state = input.axes.NextPlot; 
+            
+            input.axes.YScale = 'log'; 
+            input.axes.YLim(1) = 0.5; 
+            
+            hold(input.axes, 'on'); 
+            
+            h2 = plot(input.axes, obj.pars.threshold.*[1 1], input.axes.YLim, '--r'); 
+            text(input.axes, obj.pars.threshold+1.5, input.axes.YLim(2), ...
+                sprintf(' threshold= %4.2f', obj.pars.threshold), ...
+                'Color', h2.Color, 'FontSize', input.font_size, 'Rotation', -90); 
+            
+            N_total = numel(obj.snr_values);
+            N_thresh = nnz(obj.snr_values>=obj.pars.threshold);
+            
+            text(input.axes, input.axes.XLim(2)-2, 10, sprintf('Number of batches= %d', N_total), ...
+                'FontSize', input.font_size, 'Color', 'black', 'HorizontalAlignment', 'right'); 
+            
+            text(input.axes, input.axes.XLim(2)-2, 3, sprintf('batches above threshold= %d', N_thresh), ...
+                'FontSize', input.font_size, 'Color', 'black', 'HorizontalAlignment', 'right'); 
+            
+            xlabel(input.axes, 'Best S/N for each batch'); 
+            ylabel(input.axes, 'Number of batches'); 
+            
+            input.axes.NextPlot = hold_state; 
+            input.axes.FontSize = input.font_size; 
+            
+        end
+        
+        function popupRunQuality(obj)
+            
+            f = util.plot.FigHandler('Run Quality'); 
+            f.width = 26;
+            f.height = 16;
+            f.clear;
+            
+            ax = axes('Parent', f.fig); 
+            
+            obj.showRunQuality('ax', ax); 
+            
+        end
+        
+        function showRunQuality(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('line', 3); % line width
+            input.input_var('axes', [], 'axis'); % which axes to plot to? default is gca()
+            input.input_var('font_size', 20); % fonts on the axes
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.axes)
+                input.axes = gca;
+            end
+            
+            j = obj.store.extended_juldates(end) - double(obj.store.timestamps - obj.store.extended_timestamps(end))/24/3600; 
+            a = celestial.coo.airmass(j, obj.head.RA, obj.head.DEC, [obj.head.longitude, obj.head.latitude]./180.*pi);
+            
+            w = obj.store.checker.mean_width_values.*2.355.*obj.head.SCALE;
+            b = obj.store.checker.mean_background_values;
+            
+            t = datetime(j, 'convertFrom', 'juliandate'); 
+            
+            plot(input.axes, t, a, 'DisplayName', 'airmass', 'LineWidth', input.line); 
+            
+            hold_state = input.axes.NextPlot; 
+            
+            hold(input.axes, 'on'); 
+            
+            if ~isempty(w)
+                plot(input.axes, t, w, 'DisplayName', 'seeing ["]', 'LineWidth', input.line); 
+            end
+            
+            if ~isempty(b)
+                plot(input.axes, t, b, 'DisplayName', 'background [count/pix]', 'LineWidth', input.line); 
+            end
+            
+            hl = legend(input.axes, 'Location', 'NorthWest'); 
+            hl.FontSize = input.font_size;
+            
+            ylabel(input.axes, 'airmass / fwhm / background'); 
+            
+            input.axes.NextPlot = hold_state; 
+            input.axes.FontSize = input.font_size; 
+            
+        end
+        
+        function popupCuts(obj)
+            
+            f = util.plot.FigHandler('Quality cuts'); 
+            f.width = 26;
+            f.height = 16;
+            f.clear;
+            
+            ax = axes('Parent', f.fig); 
+            
+            obj.showCuts('ax', ax); 
+            
+        end
+        
+        function showCuts(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('axes', [], 'axis'); % which axes to plot to? default is gca()
+            input.input_var('font_size', 20); % fonts on the axes
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.axes)
+                input.axes = gca;
+            end
+            
+            input.axes.FontSize = input.font_size; 
+            
+        end
+        
+        function popupHours(obj)
+            
+            f = util.plot.FigHandler('Star hours'); 
+            f.width = 26;
+            f.height = 16;
+            f.clear;
+            
+            ax = axes('Parent', f.fig); 
+            
+            obj.showHours('ax', ax); 
+            
+        end
+        
+        function showHours(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('axes', [], 'axis'); % which axes to plot to? default is gca()
+            input.input_var('font_size', 20); % fonts on the axes
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.axes)
+                input.axes = gca;
+            end
+            
+            input.axes.FontSize = input.font_size; 
+            
+        end
+        
+        function popupPSD(obj)
+            
+            f = util.plot.FigHandler('Power Spectral Density'); 
+            f.width = 26;
+            f.height = 16;
+            f.clear;
+            
+            ax = axes('Parent', f.fig); 
+            
+            obj.showPSD('ax', ax); 
+            
+            
+        end
+        
+        function showPSD(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('stars', [1 10 30 100 300 1000]); % which stars are we going to use? 
+            input.input_var('global_index', false); % use a global index (star indices are from the total stars found, not those that passed a threshold)
+            input.input_var('magnitudes', true); % show each star's magnitude
+            input.input_var('sqrt', false); % show the sqrt of the PSD
+            input.input_var('half', true); % show only half the frequencies
+            input.input_var('log_x', true); % show the x-axis on a log-scale (y-axis is always in log!)
+            input.input_var('axes', [], 'axis'); % which axes to plot to? default is gca()
+            input.input_var('font_size', 20); % fonts on the axes
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.axes)
+                input.axes = gca;
+            end
+            
+            %%%%%%%%%%%%%% parse star list %%%%%%%%%%%%%%%%%%%%%%%
+            
+            if input.global_index
+                N_stars = length(obj.store.star_snr); % use all stars, including those that failed to pass
+            else
+                N_stars = length(obj.store.star_indices); % the number of stars are those that passed the threshold
+            end
+            
+            if isempty(input.stars)
+                error('Must input a non-empty "stars" input!'); 
+            elseif ischar(input.stars)
+                if util.text.cs(input.stars, 'first')
+                    stars = 1;
+                elseif util.text.cs(input.stars, 'all', ':')
+                    stars = 1:N_stars; 
+                else
+                    error('Unknown option "%s" to input "stars". Use "first" or "all". ', input.stars); 
+                end
+            elseif isnumeric(input.stars) && isvector(input.stars)
+                stars = input.stars;
+            else
+                error('Must input "stars" argument as numeric vector or string command ("first" or "all"). Instead got "%s" class input...', class(input.stars)); 
+            end
+            
+            stars = stars(stars<N_stars); % remove stars out of range of the total number of stars we have
+            
+            if input.global_index % translate the star global index to the internal star index (those that passed the threshold)
+                
+                internal_stars = []; 
+                
+                for ii = 1:length(stars)
+                    
+                    idx = find(stars(ii)==obj.store.star_indices,1);
+                    
+                    if ~isempty(idx)
+                        internal_stars(end+1) = idx; 
+                    end
+                    
+                end
+                
+                stars = internal_stars; % these stars are the indices inside the PSD that match each one of the stars the user gave, but only if the passed the cut! 
+            
+            end
+
+            %%%%%%%%%%%%%%%% prepare the data %%%%%%%%%%%%%%%%%%%%%%
+            
+            N = length(obj.psd.freq); 
+            
+            if input.half
+                N = ceil(N/2); 
+            end
+            
+            x = obj.psd.freq(1:N); 
+            y = obj.psd.power_spectrum(1:N, stars); 
+            
+            if input.sqrt
+                y = sqrt(y); 
+            end
+            
+            %%%%%%%%%%%%% plot and adjust the settings %%%%%%%%%%%%%%%
+            
+            h = semilogy(input.axes, x, y);
+            
+            xlabel(input.axes, 'Frequency [Hz]'); 
+            ylabel(input.axes, 'Power Spectral Density'); 
+            
+            if input.sqrt
+                ylabel(input.axes, 'sqrt(PSD)'); 
+            end
+            
+            if input.log_x
+                input.axes.XScale = 'log'; 
+            end
+            
+            input.axes.XLim = [x(1), x(end)]; 
+            input.axes.YLim = [1 y(1).*10];
+            
+            input.axes.FontSize = input.font_size; 
+            
+            %%%%%%%%%%%%%% add magnitudes? %%%%%%%%%%%%%%%%%%%%%
+            
+            if input.magnitudes && ~isempty(obj.cat) && obj.cat.success
+                
+                if input.global_index
+                    global_stars = input.stars; % the original input to this function IS the global star index! 
+                else
+                    global_stars = obj.store.star_indices(stars); % translate the internal star index to the global star index
+                end
+                
+                for ii = 1:length(stars)
+                    
+                    y_factor = 2; 
+                    if ii==length(stars)
+                        y_factor = 1/2;
+                    end
+                    
+                    text(input.axes, double(x(2)*2), double(y(1,ii))*y_factor, ...
+                        sprintf('B_p= %4.1f', obj.cat.data.Mag_BP(global_stars(ii))), ...
+                        'Color', h(ii).Color, 'FontSize', input.font_size-2); 
+                end
+                
+            end
+            
+        end
+        
+        function popupSim(obj)
+            
+            f = util.plot.FigHandler('Star hours'); 
+            f.width = 26;
+            f.height = 16;
+            f.clear;
+            
+            ax = axes('Parent', f.fig); 
+            
+            obj.showSim('ax', ax); 
+            
+        end
+        
+        function showSim(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('axes', [], 'axis'); % which axes to plot to? default is gca()
+            input.input_var('font_size', 20); % fonts on the axes
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.axes)
+                input.axes = gca;
+            end
+            
+            input.axes.FontSize = input.font_size; 
+            
+        end
+        
+    end 
     
 end
 

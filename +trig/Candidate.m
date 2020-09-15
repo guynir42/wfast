@@ -98,7 +98,6 @@ classdef Candidate < handle
         notes = {}; % anything added to the event, like failed cuts
         
         cutouts; % cutouts of the selected star, for the duration of the extended region
-        stack; % stack of the images in which this event is detected (optional)
         kernel; % the lightcurve of the matched-filter kernel used 
         
         time_index; % out of the extended region
@@ -183,6 +182,12 @@ classdef Candidate < handle
         star_extra; % any other stars that passed the lower threshold for stars
         
         version = 1.00;
+        
+    end
+    
+    properties(Hidden=true, Transient=true) % lazy loaded heavy stuff like the stack image
+        
+        stack; 
         
     end
     
@@ -1113,6 +1118,86 @@ classdef Candidate < handle
             if ~isempty(rep)
                 obj.classification = classes{rep}; 
             end
+            
+        end
+        
+        function popupPSD(obj)
+            
+            f = figure('Name', 'Power Spectral Density'); 
+            
+            ax = axes('Parent', f); 
+            
+            obj.showPSD('axes', ax); 
+                        
+        end
+        
+        function showPSD(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('sqrt', false); % show the sqrt of the PSD
+            input.input_var('half', true); % show only half the frequencies
+            input.input_var('log_x', true); % show the x-axis on a log-scale (y-axis is always in log!)
+            input.input_var('axes', [], 'axis'); % which axes to plot to? default is gca()
+            input.input_var('font_size', 20); % fonts on the axes
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.axes)
+                input.axes = gca;
+            end
+            
+            N = length(obj.freq_psd); 
+            
+            if input.half
+                N = ceil(N/2); 
+            end
+            
+            x = obj.freq_psd(1:N); 
+            y = obj.psd(1:N); 
+            
+            if input.sqrt
+                y = sqrt(y); 
+            end
+            
+            semilogy(input.axes, x, y);
+            
+            xlabel(input.axes, 'Frequency [Hz]'); 
+            ylabel(input.axes, 'Power Spectral Density'); 
+            
+            if input.sqrt
+                ylabel(input.axes, 'sqrt(PSD)'); 
+            end
+            
+            if input.log_x
+                input.axes.XScale = 'log'; 
+            end
+            
+            input.axes.XLim = [x(1), x(end)]; 
+            
+            input.axes.FontSize = input.font_size; 
+            
+        end
+        
+        function popupStack(obj)
+            
+            if isempty(obj.stack)
+                filename = obj.filenames{obj.time_index}; 
+                obj.stack = h5read(filename, '/stack'); 
+            end
+            
+            f = figure('Name', 'Stack image'); 
+            ax = axes('Parent', f); 
+            
+            util.plot.show(obj.stack, 'auto', 1); 
+            title(ax, ''); 
+            
+            hold(ax, 'on'); 
+            
+            x = obj.auxiliary(:,obj.aux_indices.centroids_x); 
+            y = obj.auxiliary(:,obj.aux_indices.centroids_y); 
+            
+            plot(ax, x, y, 'go', 'MarkerSize', 15); 
+            
+            hold(ax, 'off'); 
             
         end
         

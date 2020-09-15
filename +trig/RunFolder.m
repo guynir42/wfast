@@ -19,6 +19,8 @@ classdef RunFolder < handle
 %                date are considered. Older folders are obsolete and do not
 %                make the run "processed". Default is defined in the static
 %                function default_process_date(). 
+% -catalog: load the catalog file if it exists in the run folder. Default 
+%           is false (this slows down the scan!). 
 % -debug_bit: control the verbosity of printouts. Default 0 is no output. 
 %
 % Thus there are two ways to use this scan. 
@@ -97,6 +99,7 @@ classdef RunFolder < handle
     properties % objects
         
         summary@trig.RunSummary; 
+        cat@head.Catalog; 
         
     end
     
@@ -249,7 +252,7 @@ classdef RunFolder < handle
         
     end
     
-    methods(Static=true)
+    methods(Static=true) % scan method lives here!
             
         function obj_vec = scan(varargin) % go over data folders and return a vector of RunFolder objects
             
@@ -261,6 +264,7 @@ classdef RunFolder < handle
             input.input_var('start_date', []); % scan starting from runs taken on this date (inclusive). Can be string <YYYY-MM-DD> or datetime object
             input.input_var('end_date', []); % scan upto runs taken on this date (inclusive). Can be string <YYYY-MM-DD> or datetime object
             input.input_var('process_date', trig.RunFolder.default_process_date); % only consider as processed runs that were processed on or after this date
+            input.input_var('catalog', false); % pull the catalog file into each found object
             input.input_var('debug_bit', 0); % verbosity of printouts
             input.scan_vars(varargin{:}); 
             
@@ -405,6 +409,17 @@ classdef RunFolder < handle
                                 new_obj.expT = h.EXPTIME; 
                             end
                             
+                        end
+                        
+                        %%%%%%%% load the catalog file
+                        
+                        if input.catalog
+                            
+                            if exist(fullfile(d.pwd,'catalog.mat'), 'file')
+                                new_obj.cat = head.Catalog; 
+                                new_obj.cat.loadMAT(fullfile(d.pwd,'catalog.mat')); 
+                            end
+                                
                         end
                         
                         %%%%%%%% go into the analysis folders %%%%%%%%%

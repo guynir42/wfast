@@ -93,7 +93,7 @@ light.head = header;
 finder.reset;
 finder.store.pars.length_burn_in = 5000; 
 finder.pars.use_sim = 1;
-finder.pars.num_sim_events_per_batch = 0.05;
+finder.pars.num_sim_events_per_batch = 5;
 
 finder.head = header;
 finder.cat = cat; 

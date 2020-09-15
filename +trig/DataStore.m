@@ -548,8 +548,7 @@ classdef DataStore < handle
             obj.background_filenames = obj.filename_buffer(background_start_idx:background_end_idx);
             obj.background_frame_num = obj.frame_num_buffer(background_start_idx:background_end_idx);
             
-            background_end_idx_aux = extended_start_idx_aux-1;
-            obj.background_aux = obj.aux_buffer(1:background_end_idx_aux,:,:,:); % the size of the aux buffer is just big enough to get the background+extended regions
+            obj.background_aux = obj.aux_buffer(background_start_idx:background_end_idx,:,:,:); % the size of the aux buffer is just big enough to get the background+extended regions
             
         end
         
