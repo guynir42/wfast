@@ -977,7 +977,7 @@ classdef EventFinder < handle
             if ~isempty(new_event_sim) % we recovered the injected event! 
                 
                 sim_pars.detect_snr = new_event_sim.snr; % keep track of the detection S/N for this event
-                sim_pars.passed = 1; 
+                sim_pars.passed = true; 
                 
                 new_event_sim.is_simulated = 1; 
                 new_event_sim.sim_pars = sim_pars; 
@@ -993,7 +993,7 @@ classdef EventFinder < handle
             else % no events were recovered
                 
                 sim_pars.detect_snr = 0; % event was not detected, so S/N is zero
-                sim_pars.passed = 0; 
+                sim_pars.passed = false; 
                 
                 % add this parameter struct to the list of failed events
                 if isempty(obj.sim_events)
@@ -1587,29 +1587,22 @@ classdef EventFinder < handle
         
         function popupSim(obj)
             
-            f = util.plot.FigHandler('Star hours'); 
+            f = util.plot.FigHandler('Simulated events'); 
             f.width = 26;
             f.height = 16;
             f.clear;
             
-            ax = axes('Parent', f.fig); 
-            
-            obj.showSim('ax', ax); 
+            obj.showSim('parent', f.fig); 
             
         end
         
         function showSim(obj, varargin)
             
-            input = util.text.InputVars;
-            input.input_var('axes', [], 'axis'); % which axes to plot to? default is gca()
-            input.input_var('font_size', 20); % fonts on the axes
-            input.scan_vars(varargin{:}); 
-            
-            if isempty(input.axes)
-                input.axes = gca;
+            if isempty(obj.summary)
+                obj.summary = obj.produceSummary;
             end
             
-            input.axes.FontSize = input.font_size; 
+            obj.summary.showSimulations(varargin{:}); 
             
         end
         
