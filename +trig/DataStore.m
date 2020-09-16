@@ -325,7 +325,11 @@ classdef DataStore < handle
         
         function val = aperture_radius(obj)
             
-            val = obj.head.PHOT_PARS.aperture_radius(obj.aperture_index); 
+            if isempty(obj.head.PHOT_PARS)
+                val = [];
+            else
+                val = obj.head.PHOT_PARS.aperture_radius(obj.aperture_index); 
+            end
             
         end
         

@@ -1351,7 +1351,10 @@ classdef EventFinder < handle
         
         function showRunQuality(obj, varargin)
             
+            import util.series.binning; 
+            
             input = util.text.InputVars;
+            input.input_var('smooth', 100); % what factor to smooth the data?
             input.input_var('line', 3); % line width
             input.input_var('axes', [], 'axis'); % which axes to plot to? default is gca()
             input.input_var('font_size', 20); % fonts on the axes
@@ -1368,6 +1371,7 @@ classdef EventFinder < handle
             b = obj.store.checker.mean_background_values;
             
             t = datetime(j, 'convertFrom', 'juliandate'); 
+            t2 = t(1+obj.store.pars.length_burn_in:end); 
             
             plot(input.axes, t, a, 'DisplayName', 'airmass', 'LineWidth', input.line); 
             
@@ -1375,18 +1379,34 @@ classdef EventFinder < handle
             
             hold(input.axes, 'on'); 
             
-            if ~isempty(w)
-                plot(input.axes, t, w, 'DisplayName', 'seeing ["]', 'LineWidth', input.line); 
+            if ~isempty(b)
+                plot(input.axes, t2, b, '-', 'DisplayName', 'background [count/pix]', 'LineWidth', input.line); 
+                plot(input.axes, binning(t2, input.smooth), binning(b, input.smooth), '-k',...
+                    'DisplayName', 'background smoothed', 'LineWidth', input.line, 'HandleVisibility', 'off'); 
             end
             
-            if ~isempty(b)
-                plot(input.axes, t, b, 'DisplayName', 'background [count/pix]', 'LineWidth', input.line); 
+            if ~isempty(w)
+                
+                yyaxis(input.axes, 'right');
+                
+                hold(input.axes, 'on'); 
+            
+                plot(input.axes, t2, w, '-', 'DisplayName', 'seeing ["]', 'LineWidth', input.line); 
+                plot(input.axes, binning(t2, input.smooth), binning(w, input.smooth),'-k',...
+                    'DisplayName', 'seeing smoothed', 'LineWidth', input.line, 'HandleVisibility', 'off'); 
+
+                ylabel(input.axes, 'seeing FWHM ["]'); 
+                
+                input.axes.NextPlot = hold_state; 
+                
+                yyaxis(input.axes, 'left'); 
+                
             end
             
             hl = legend(input.axes, 'Location', 'NorthWest'); 
             hl.FontSize = input.font_size;
             
-            ylabel(input.axes, 'airmass / fwhm / background'); 
+            ylabel(input.axes, 'airmass / background'); 
             
             input.axes.NextPlot = hold_state; 
             input.axes.FontSize = input.font_size; 
