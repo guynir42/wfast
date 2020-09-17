@@ -576,6 +576,34 @@ classdef WorkingDirectory < handle
             
         end
         
+        function find_run(obj, folder)
+            
+            if nargin<2 || isempty(folder)
+                folder = obj.pwd;
+            end
+            
+            id = util.text.run_id(folder);
+            
+            if isempty(id)
+                warning('Could not parse the input folder "%s", into a run_id.', folder); 
+            else
+                
+                if exist(fullfile(getenv('DATA'), '2020', id), 'dir')
+                    obj.cd(fullfile(getenv('DATA'), '2020', id)); 
+                elseif exist(fullfile(getenv('DATA_EXTRAS'), id), 'dir')
+                    obj.cd(fullfile(getenv('DATA_EXTRAS'), id)); 
+                elseif exist(fullfile(getenv('DATA_TEMP'), id), 'dir')
+                    obj.cd(fullfile(getenv('DATA_EXTRA'), id));
+                elseif exist(id, 'dir') % look for relative path...
+                    obj.cd(id)
+                else
+                    warning('Could not find the run %s in any data folder.', id); 
+                end
+                
+            end
+            
+        end
+        
     end
      
     methods % display

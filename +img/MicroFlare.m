@@ -168,6 +168,7 @@ classdef MicroFlare < handle
             % how many frames above the threshold
             counter = 1;
             for ii = 1:length(flux_norm)
+                
                 idx = obj.frame_index - ii;
                 
                 if idx<1, break; end

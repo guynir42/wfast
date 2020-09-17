@@ -2621,7 +2621,7 @@ classdef Acquisition < file.AstroData
                                 [dirname, run_name] = fileparts(dirname); 
                                 [dirname, run_date] = fileparts(dirname); 
                                 
-                                obj.head.run_identifier(fullfile(run_date, run_name));
+                                obj.head.run_identifier = fullfile(run_date, run_name);
                                 
                                 break;
                                 

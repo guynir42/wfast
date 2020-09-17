@@ -122,6 +122,8 @@ function convert_to_fits(files, varargin)
             % calibration
             if ~isempty(cal)
                 I = cal.input(I, 'sum', num_sum); 
+            else
+                I = int16(I); 
             end
             
             % calculate the OBSTIME for each frame using the timestamps
