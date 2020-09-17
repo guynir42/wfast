@@ -279,6 +279,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     end
                     
                     obj.ard.update;
+                    pause(1);                    
+                    obj.ard.read_data; % explicitely call this because if the connectArduino() command is sent inside a timer, the timer blocks any BytesAvailableFcn callbacks!
                     
                     if obj.ard.status==0
                         obj.ard.disconnect;
@@ -290,19 +292,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     
                     obj.ard.read_data; % explicitely call this because if the connectArduino() command is sent inside a timer, the timer blocks any BytesAvailableFcn callbacks!
                     
+                    return; % short circuit this, we need to update to the new re-wiring! 
+                    
                     if obj.ard.status==0
                         
                         RA = obj.telRA_deg; 
                         DE = obj.telDec_deg; 
                         side = obj.telHemisphere;
                         
-                        % turn off the power to the Arduinos (more info: https://www.digital-loggers.com/curl.html)
-                        [rc, rv] = system('curl -u admin:kbos http://192.168.1.104:8000/outlet?6=OFF');
+                        % turn off the power to the mount to kill current to the USB hub powering the ScopeAssistant  (more info: https://www.digital-loggers.com/curl.html)
+                        [rc, rv] = system('curl -u admin:kbos http://192.168.1.104:8000/outlet?8=OFF');
                         
                         pause(3); 
                         
                         % turn the power back on
-                        [rc, rv] = system('curl -u admin:kbos http://192.168.1.104:8000/outlet?6=ON');
+                        [rc, rv] = system('curl -u admin:kbos http://192.168.1.104:8000/outlet?8=ON');
 
                         pause(3); 
                         
@@ -1090,15 +1094,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     return;
                 end
 
-                % is it better to rely on the timer for these checks??
-                ok = obj.ard.update;
-                
-                if obj.ard.ALT<obj.ard.alt_limit || ok==0
-                    fprintf('ALT= %f\n', obj.ard.alt); 
-                    return;
+                if obj.use_accelerometer
+                    % is it better to rely on the timer for these checks??
+                    ok = obj.ard.update;
+
+                    if obj.ard.ALT<obj.ard.alt_limit || ok==0
+                        fprintf('ALT= %f\n', obj.ard.alt); 
+                        return;
+                    end
+
+                    obj.ard.read_data; % make sure to call this explicitely so that the timer doesn't block the BytesAvailableFcn callback
                 end
-                
-                obj.ard.read_data; % make sure to call this explicitely so that the timer doesn't block the BytesAvailableFcn callback
                 
                 val = 1;
             

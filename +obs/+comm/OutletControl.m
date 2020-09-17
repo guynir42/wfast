@@ -288,12 +288,14 @@ classdef OutletControl < handle
             
             obj.status = flip(hexToBinaryVector(rv(idx+1:idx+2)));
             
-            for ii = 1:length(obj.sockets)
-                
-                if ~isempty(obj.sockets{ii})
-                    obj.([obj.sockets{ii} '_']) = obj.status(ii); 
+            if length(obj.status)==length(obj.sockets)
+                for ii = 1:length(obj.sockets)
+
+                    if ~isempty(obj.sockets{ii})
+                        obj.([obj.sockets{ii} '_']) = obj.status(ii); 
+                    end
+
                 end
-                
             end
             
         end

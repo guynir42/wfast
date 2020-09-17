@@ -374,7 +374,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function constructOutlets(obj)
             
-            obj.outlets = obs.comm.OutletControl; 
+            try
+                obj.outlets = obs.comm.OutletControl; 
+            catch ME
+                warning(ME.getReport); 
+            end
             
         end
         
@@ -652,7 +656,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             obj.ephem.update;
             
-            val = obj.ephem.sun.Alt<-5 && obj.checker.sensors_ok && obj.checker.light_ok && ...
+            val = obj.ephem.sun.Alt<obj.checker.sun_max_alt && obj.checker.sensors_ok && obj.checker.light_ok && ...
                 obj.dome.is_closed==0 && obj.use_maintenance_mode==0 && obj.use_startup;
             
         end
@@ -1562,9 +1566,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             try % try getting the sun altitude
                 
                 obj.ephem.update;
-                if obj.use_shutdown && obj.ephem.sun.Alt>-5
+                if obj.use_shutdown && obj.ephem.sun.Alt>obj.checker.sun_max_alt
                     if obj.is_shutdown==0 % if already shut down, don't need to do it again
-                        fprintf('%s:Sun elevation %d is above -5 deg... \n', datestr(obj.log.time), round(obj.ephem.sun.Alt)); 
+                        fprintf('%s:Sun elevation %d is above %d deg... \n', datestr(obj.log.time), round(obj.ephem.sun.Alt), obj.checker.sun_max_alt); 
                         obj.shutdown;
                     end
                 end
@@ -2185,7 +2189,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
 %                adjust the dome position
                 obj.ephem.update;
-                if obj.use_adjust_dome && obj.ephem.sun.Alt<0 && obj.checker.sensors_ok && obj.checker.light_ok ... 
+                if obj.use_adjust_dome && obj.ephem.sun.Alt<obj.checker.sun_max_alt && obj.checker.sensors_ok && obj.checker.light_ok ... 
                         && obj.dome.is_closed==0 % only move dome when weather is good, sun is down, and dome is already open
                     
                     obj.print_message(sprintf('Adjusting dome for viewing the %s side', obj.mount.objHemisphere)); 
@@ -2313,7 +2317,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             for ii = 1:length(list)
                 
-                if isobject(obj.(list{ii})) && isprop(obj.(list{ii}), 'brake_bit')
+                if ~isempty(obj.(list{ii})) && isobject(obj.(list{ii})) && isprop(obj.(list{ii}), 'brake_bit')
                     obj.(list{ii}).brake_bit = 1;
                 end
                 

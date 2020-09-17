@@ -70,6 +70,8 @@ classdef SensorChecker < handle
     
     properties % switches/controls
         
+        sun_max_alt = -5; 
+        
         use_wise_data = 1;
         use_wise_safe_flag = 0;
         
@@ -443,7 +445,7 @@ classdef SensorChecker < handle
         
         function val = get.use_twilight_mode(obj)
             
-            if obj.light.max>=700
+            if obj.light.max>=700 && obj.sun_max_alt>-5
                 val = 1;
             else
                 val = 0;
@@ -458,9 +460,11 @@ classdef SensorChecker < handle
         function set.use_twilight_mode(obj, val)
             
             if val
-                obj.light.max = 750; 
+                obj.light.max = 750;
+                obj.sun_max_alt = 0; 
             else
                 obj.light.max = 400; 
+                obj.sun_max_alt = -5; 
             end
             
         end

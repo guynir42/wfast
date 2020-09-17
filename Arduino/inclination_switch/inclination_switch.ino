@@ -13,7 +13,7 @@ It will kill the current as soon as it measures that it is under the horizon.
 #include "Ultrasonic.h"
 #include <SparkFun_ADXL345.h>         // SparkFun ADXL345 Library
 
-Parser parser("inclination", "InclinationSwitch v1.03");
+Parser parser("inclination", "InclinationSwitch v1.04");
 // v1.03 -- invert the relay pin, add indication LED on pin 13 and ground pin on A0
 // v1.02 -- fixed bug with inversion and normally closed. 
 // v1.01 -- removed constant feedback through serial. Added ability to turn off switch for 20 minutes
@@ -117,7 +117,7 @@ void loop() {
     average/=10;
 
     if(timer2.getState()){
-      if(average<0){
+      if(average<-0.05){
         relay1.setState(0); // vector is pointing down, kill the switch
         led.setState(0); 
         snprintf(state,5,"down");
@@ -222,5 +222,3 @@ void turn_on(char *arg){
 //  Serial.println(" Use 'timer' (or other commands) without argument to get the timer interval");
 //  
 //}
-
-
