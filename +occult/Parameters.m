@@ -49,7 +49,7 @@ classdef Parameters < handle
         wavelength;
         spectrum;
         
-        readout_time = 3; % time difference between 1/f and T (ms)
+        readout_time = 1; % time difference between 1/f and T (ms)
         is_updated = 0;
         is_noise_updated = 0;
         

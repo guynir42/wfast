@@ -145,11 +145,17 @@ classdef ShuffleBank < handle
             
             input = util.text.InputVars;
             input.input_var('number', obj.number, 'N');
+            input.input_var('pop_count', obj.test_number); 
             input.input_var('threshold', obj.threshold);
             input.scan_vars(varargin{:});
             
             obj.kernels = [];
             obj.pars = struct([]);
+            
+            obj.gen.f = obj.f;
+            obj.gen.T = obj.T;
+            obj.gen.W = obj.W;
+            
             
             obj.prog.start(input.number);
             
@@ -181,7 +187,7 @@ classdef ShuffleBank < handle
                     end
                 end
                 
-                if counter>obj.test_number % popcorn method
+                if counter>input.pop_count % popcorn method
                     break;
                 end
                 
