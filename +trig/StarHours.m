@@ -280,12 +280,13 @@ classdef StarHours < handle
             obj.histogram = zeros(length(obj.snr_bin_edges)-1, length(obj.star_bin_edges)-1, 'single'); 
             obj.losses_exclusive = zeros(length(obj.snr_bin_edges)-1, length(obj.star_bin_edges)-1, length(obj.cut_names), 'single');
             obj.losses_inclusive = zeros(length(obj.snr_bin_edges)-1, length(obj.star_bin_edges)-1, length(obj.cut_names), 'single'); 
+            obj.losses_bad_stars = zeros(length(obj.snr_bin_edges)-1, length(obj.star_bin_edges)-1, 'single'); 
             
         end
         
         function removeStars(obj, idx)
             
-            obj.losses_bad_stars = sum(obj.histogram(:,idx),2); % store the number of star seconds that were lost when we remove bad stars from the histograms
+            obj.losses_bad_stars(:,idx) = obj.histogram(:,idx); % store the number of star seconds that were lost when we remove bad stars from the histograms
             
             % maybe replace NaN with zero? 
             obj.histogram(:,idx) = NaN;

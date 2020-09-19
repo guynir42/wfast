@@ -1452,6 +1452,54 @@ classdef CurveGenerator < handle
             
         end
         
+        function [lc, pars] = randomLC(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('stellar_size', []); % choose a stellar size or draw from a power law distribution
+            input.input_var('occulter_size', []); % choose a occulter size or draw from a power law distribution
+            input.input_var('impact_parameter', []); % choose an impact parameter or draw from a uniform distribution
+            input.input_var('velocity', []); % choose a velocity projection (in FSU/s) or draw from a uniform distribution
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.stellar_size)
+                obj.R = util.stat.power_law_dist(2, 'min', 0.5, 'max', 3); 
+            else
+                obj.R = input.stellar_size;
+            end
+            
+            if isempty(input.occulter_size)
+                obj.r = util.stat.power_law_dist(3, 'min', 0.5, 'max', 2); 
+            else
+                obj.r = input.occulter_size;
+            end
+            
+            if isempty(input.impact_parameter)
+                obj.b = rand.*2; 
+            else
+                obj.b = input.impact_parameter;
+            end
+            
+            if isempty(input.velocity)
+                obj.v = 5 + rand.*25; 
+            else
+                obj.v = input.velocity;
+            end
+            
+            obj.getLightCurves; 
+            
+            lc = obj.lc.flux;
+            
+            pars = struct;
+            pars.R = obj.R;
+            pars.r = obj.r;
+            pars.b = obj.b;
+            pars.v = obj.v;
+            pars.W = obj.W;
+            pars.T = obj.T;
+            pars.f = obj.f; 
+            
+        end
+        
     end
     
     methods % additional calculations

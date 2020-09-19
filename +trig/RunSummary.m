@@ -6,10 +6,11 @@ classdef RunSummary < handle
 % The parameters for each relevant object are saved as structs, "finder_pars", 
 % "store_pars", and "checker_pars". The header info is save in "head" as usual. 
 % 
-% An important result is the histogram of star-time per S/N bin. 
-% This is stored without separating into bins for each star, but only for 
-% each S/N value. This is done so we can stack the total hours or bin them
-% by e.g., ecliptic latitude later on. 
+% An important result is the histogram of star-time per S/N and R_star. 
+% This is stored without separating into bins for each star, instead we 
+% histogram over each S/N value and each star's Fresnel size. 
+% This is done so we can stack the total hours or bin them by e.g., 
+% ecliptic latitude later on. 
 % 
 % Other interesting results are the "snr_values" saved for each batch in the 
 % run, the cut values (again, histogrammed by values only, not by star), and 
@@ -37,6 +38,8 @@ classdef RunSummary < handle
         total_batches; 
         
         snr_bin_edges; % the edges used in the star_seconds and losses histograms
+        size_bin_edges; % the edges used in the star_seconds and losses histograms
+        
         star_seconds; % the number of useful seconds accumulated each S/N bin (this is saved after subtracting losses)
         star_seconds_with_losses; % the number of seconds accumulated without excluding anything
         losses_exclusive; % same as histogram, only counting the losses due to each cut (exclusive means times where ONLY this cut was responsible)
@@ -60,6 +63,11 @@ classdef RunSummary < handle
     end
     
     properties % switches/controls
+        
+        % these are used to histogram stars into Fresnel scale bins
+        % We use the Fresnel scale calculated at 40 AU (KBOs)
+        R_bin_width = 0.1;
+        R_bin_max = 5; % stars bigger than this are not saved in the summary... 
         
         debug_bit = 1;
         
@@ -125,13 +133,43 @@ classdef RunSummary < handle
     
     methods % calculations
        
-        function val = calcStats(obj, varargin)
+        function inputHours(obj, hours, stellar_sizes)
+            
+            if nargin<2 || isempty(hours) || ~isa(hours, 'trig.StarHours')
+                error('Must supply a StarHours object to this method'); 
+            end
+            
+            if nargin<3 || isempty(stellar_sizes) || length(stellar_sizes)~=size(hours.histogram,2)
+                error('stellar_sizes input must match the number of stars in the star-hour histograms!'); 
+            end
+            
+            obj.snr_bin_edges = hours.snr_bin_edges;
+            obj.size_bin_edges = 0:obj.R_bin_width:obj.R_bin_max; 
+            
+            for ii = 1:length(obj.size_bin_edges)-1
+                
+                % indices of stars in this R bin
+                idx = stellar_sizes>=obj.size_bin_edges(ii) & stellar_sizes<obj.size_bin_edges(ii+1);
+                
+                obj.star_seconds(:,ii) = nansum(hours.histogram(:,idx),2);
+                obj.star_seconds_with_losses(:,ii) = nansum(hours.histogram_with_losses(:,idx),2);
+                obj.losses_exclusive(:,ii,:) = nansum(hours.losses_exclusive(:,idx,:), 2);
+                obj.losses_inclusive(:,ii,:) = nansum(hours.losses_inclusive(:,idx,:), 2);
+                obj.losses_bad_stars(:,ii) = nansum(hours.losses_bad_stars(:,idx), 2);
+                obj.runtime = hours.runtime; 
+            
+
+            end
+            
+        end
+        
+        function val = calcSimStats(obj, varargin) % show the detection statistics for simulated events
             
             import util.text.cs; 
             
             input = util.text.InputVars;
             input.input_var('result', 'fraction'); % can choose "fraction" or "snr"
-            input.input_var('star_size_bin', 0.1); % size of bin for R (star radius)
+            input.input_var('star_size_bin', 0.5); % size of bin for R (star radius)
             input.input_var('radius_bin', 0.1); % size of bin for r (occulter radius)
             input.input_var('impact_bin', 0.2); % size of bin for b (impact parameter)
             input.input_var('velocity_bin', 5); % size of bin for v (velocity)
@@ -178,12 +216,6 @@ classdef RunSummary < handle
             e2 = obj.([dim2 '_edges']); 
             e3 = obj.([dim3 '_edges']); 
             e4 = obj.([dim4 '_edges']); 
-            
-            % add one more bin 
-%             e1 = [e1 2*e1(end)-e1(end-1)];
-%             e2 = [e2 2*e2(end)-e2(end-1)];
-%             e3 = [e3 2*e3(end)-e3(end-1)];
-%             e4 = [e4 2*e4(end)-e4(end-1)];
             
             % adjust the bins just so they don't fall on the uniformly sampled grid:
             e1 = e1 - 0.001;
@@ -262,16 +294,7 @@ classdef RunSummary < handle
         function showSimulations(obj, varargin)
            
             input = util.text.InputVars;
-%             input.input_var('result', 'fraction'); % can choose "fraction" or "snr"
-%             input.input_var('star_size_bin', 0.1); % size of bin for R (star radius)
-%             input.input_var('radius_bin', 0.1); % size of bin for r (occulter radius)
-%             input.input_var('impact_bin', 0.2); % size of bin for b (impact parameter)
-%             input.input_var('velocity_bin', 5); % size of bin for v (velocity)
-%             input.input_var('x_axis', 'r'); % which parameter to put in the x-axis of each subframe (dim 2)
-%             input.input_var('y_axis', 'b'); % which parameter to put in the y-axis of each subframe (dim 1)
-%             input.input_var('horizonatal', 'v'); % which parameter to put in the horizontal spread of frames (dim 3)
-%             input.input_var('vertical', 'R'); % which parameter to put in the vertical spread of frames (dim 4)
-            input.input_var('parent', []); % which axes to plot to? default is gca()
+            input.input_var('parent', []); % parent can be a figure or a panel (default is gcf())
             input.input_var('font_size', 18); % fonts on the axes
             input.scan_vars(varargin{:}); 
             
@@ -281,7 +304,7 @@ classdef RunSummary < handle
             
             delete(input.parent.Children);
             
-            obj.calcStats(varargin{:}); % pass through all the relevant inputs
+            obj.calcSimStats(varargin{:}); % pass through all the relevant inputs
             
             % get shorthands for the edges and names of the variables
             name1 = obj.axes_names{1}; % b
@@ -299,7 +322,7 @@ classdef RunSummary < handle
             % parameters for the axes grid
             gap = 0.01; 
             margin_x = 0.08;
-            margin_y = 0.20;
+            margin_y = 0.1;
             Nx = length(edges3)-1;
             Ny = length(edges4)-1;
             width =  (1 - margin_x)/Nx - gap;
@@ -321,24 +344,27 @@ classdef RunSummary < handle
                         colorbar(ax{ii,jj}, 'off'); 
                         axis(ax{ii,jj}, 'normal'); 
                         ax{ii,jj}.YDir = 'normal';
+                        title(ax{ii,jj}, ''); 
                     elseif strcmp(obj.type_result, 'snr')
                         
                         contour(ax{ii,jj}, edges2(1:end-1),edges1(1:end-1), obj.results(:,:,jj,ii), [7.5 10 12.5 15 17.5 20], 'k', 'ShowText', 'on'); 
                         
                     end
                     
-                    if ii==1
+                    if ii==1 % bottom row of axes
                         
-                    else
-                        
-                    end
-                    
-                    if ii==Ny
-                        [n,u] = obj.getFullName(name2);
-                        xlabel(ax{ii,jj}, sprintf('%s \n[%s]', n,u));
+                        xlabel(ax{ii,jj}, name2); 
                         ax{ii,jj}.XTick = [edges2(2) edges2(floor(length(edges2)/2)) edges2(end-3)]; 
+                        
                     else
                         ax{ii,jj}.XTick = []; 
+                    end
+                    
+                    if ii==Ny % top row of axes
+%                         [n,u] = obj.getFullName(name2);                        
+%                         xlabel(ax{ii,jj}, sprintf('%s \n[%s]', n,u));
+                    else % non-top row
+                        
                         
                         if ~isempty(ax{ii,jj}.YTick)
                             ax{ii,jj}.YTick(end) = [];
@@ -346,14 +372,15 @@ classdef RunSummary < handle
                         
                     end
                     
-                    if jj==1
-                        [n,u] = obj.getFullName(name1);
-                        ylabel(ax{ii,jj}, sprintf('%s [%s]', n,u));
+                    if jj==1 % left-most column of axes
+%                         [n,u] = obj.getFullName(name1);
+%                         ylabel(ax{ii,jj}, sprintf('%s [%s]', n,u));
+                        ylabel(ax{ii,jj}, name1); 
                     else
                         ax{ii,jj}.YTick = [];
                     end
                     
-                    if jj==Nx
+                    if jj==Nx % right-most column of axes
                         
                     else
                         if ~isempty(ax{ii,jj}.XTick)
@@ -364,8 +391,8 @@ classdef RunSummary < handle
                     
                     ax{ii,jj}.FontSize = input.font_size; 
                     
-                    util.plot.inner_title(sprintf('%s= %4.2f \n %s= %4.2f', name4, edges4(ii), name3, edges3(jj)), ...
-                        'Position', 'NorthWest', 'FontSize', input.font_size, 'margin', 0.06); 
+                    util.plot.inner_title(sprintf('%s= %4.2f, %s= %4.2f', name4, edges4(ii), name3, edges3(jj)), ...
+                        'Position', 'NorthWest', 'FontSize', input.font_size-2, 'margin', 0.1); 
                     
                 end % for jj (v)
                 
@@ -396,6 +423,123 @@ classdef RunSummary < handle
                     units = 'FSU/s';
                 end 
             end
+            
+        end
+        
+        function showDetectionRate(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('parent'); % parent can be figure or panel (default is gcf())
+            input.input_var('font_size', 18); % fonts on the axes
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.parent)
+                input.parent = gcf;
+            end
+            
+            delete(input.parent.Children);
+            
+            height = 0.35;
+            width = 0.33;
+            margin = 0.13;
+                        
+            ax_R = axes('Parent', input.parent, 'Position', [margin+(margin+width)*0 margin+(margin+height)*0 width height]); 
+            ax_r = axes('Parent', input.parent, 'Position', [margin+(margin+width)*1 margin+(margin+height)*0 width height]); 
+            ax_b = axes('Parent', input.parent, 'Position', [margin+(margin+width)*0 margin+(margin+height)*1 width height]); 
+            ax_v = axes('Parent', input.parent, 'Position', [margin+(margin+width)*1 margin+(margin+height)*1 width height]); 
+            
+            et = obj.sim_events; % events total
+            ep = obj.sim_events([obj.sim_events.passed]); 
+            
+            %%%%%%%% stellar radius R %%%%%%%%%%%%%%%%%%%%%
+            bin_size = 0.25;
+            [N_R,E_R] = histcounts([et.R], 'BinWidth', bin_size); 
+            bar(ax_R, E_R(1:end-1)+bin_size/2, N_R); 
+            hold(ax_R, 'on'); 
+            N_R_passed = histcounts([ep.R], 'BinEdges', E_R); 
+            bar(ax_R, E_R(1:end-1)+bin_size/2, N_R_passed); 
+            hold(ax_R, 'off'); 
+            xlabel(ax_R, 'stellar radius R [FSU]'); 
+            ylabel(ax_R, 'number of events'); 
+            ax_R.YScale = 'log';
+            
+            yyaxis(ax_R, 'right'); 
+            plot(ax_R, E_R(1:end-1)+bin_size/2, N_R_passed./N_R*100, '-*', 'LineWidth', 2); 
+            ax_R.YLim = [0 100]; 
+            grid(ax_R, 'on'); 
+            ytickformat(ax_R, '%d%%'); 
+            
+            yyaxis(ax_R, 'left'); 
+%             legend(ax_R, {'all events', 'passed events', 'percent'}, 'Location', 'NorthEast'); 
+            ax_R.FontSize = input.font_size;
+            
+            %%%%%%%% occulter radius r %%%%%%%%%%%%%%%%%%%%%
+            bin_size = 0.25;
+            [N_r,E_r] = histcounts([et.r], 'BinWidth', bin_size); 
+            bar(ax_r, E_r(1:end-1)+bin_size/2, N_r); 
+            hold(ax_r, 'on'); 
+            N_r_passed = histcounts([ep.r], 'BinEdges', E_r); 
+            bar(ax_r, E_r(1:end-1)+bin_size/2, N_r_passed); 
+            hold(ax_r, 'off'); 
+            xlabel(ax_r, 'occulter radius r [FSU]'); 
+            ylabel(ax_r, 'number of events'); 
+            ax_r.YScale = 'log';
+            
+            yyaxis(ax_r, 'right'); 
+            plot(ax_r, E_r(1:end-1)+bin_size/2, N_r_passed./N_r*100, '-*', 'LineWidth', 2); 
+            ax_r.YLim = [0 100]; 
+            grid(ax_r, 'on'); 
+            ytickformat(ax_r, '%d%%'); 
+            
+            yyaxis(ax_r, 'left'); 
+%             legend(ax_r, {'all events', 'passed events', 'percent'}, 'Location', 'NorthEast'); 
+            ax_r.FontSize = input.font_size;
+            
+            
+            %%%%%%%% impact parameter b %%%%%%%%%%%%%%%%%%%%%
+            bin_size = 0.25;
+            [N_b,E_b] = histcounts([et.b], 'BinWidth', bin_size); 
+            bar(ax_b, E_b(1:end-1)+bin_size/2, N_b); 
+            hold(ax_b, 'on'); 
+            N_b_passed = histcounts([ep.b], 'BinEdges', E_b); 
+            bar(ax_b, E_b(1:end-1)+bin_size/2, N_b_passed); 
+            hold(ax_b, 'off'); 
+            xlabel(ax_b, 'impact parameter b [FSU]'); 
+            ylabel(ax_b, 'number of events'); 
+            ax_b.YScale = 'log';
+            
+            yyaxis(ax_b, 'right'); 
+            plot(ax_b, E_b(1:end-1)+bin_size/2, N_b_passed./N_b*100, '-*', 'LineWidth', 2); 
+            ax_b.YLim = [0 100]; 
+            grid(ax_b, 'on'); 
+            ytickformat(ax_b, '%d%%'); 
+            
+            yyaxis(ax_b, 'left'); 
+%             legend(ax_b, {'all events', 'passed events', 'percent'}, 'Location', 'NorthEast'); 
+            ax_b.FontSize = input.font_size;
+            
+            
+            %%%%%%%% velocity v %%%%%%%%%%%%%%%%%%%%%
+            bin_size = 2.5;
+            [N_v,E_v] = histcounts([et.v], 'BinWidth', bin_size); 
+            bar(ax_v, E_v(1:end-1)+bin_size/2, N_v); 
+            hold(ax_v, 'on'); 
+            N_v_passed = histcounts([ep.v], 'BinEdges', E_v); 
+            bar(ax_v, E_v(1:end-1)+bin_size/2, N_v_passed); 
+            hold(ax_v, 'off'); 
+            xlabel(ax_v, 'velocity v [FSU/s]'); 
+            ylabel(ax_v, 'number of events'); 
+            ax_v.YScale = 'log';
+            
+            yyaxis(ax_v, 'right'); 
+            plot(ax_v, E_v(1:end-1)+bin_size/2, N_v_passed./N_v*100, '-*', 'LineWidth', 2); 
+            ax_v.YLim = [0 100]; 
+            grid(ax_v, 'on'); 
+            ytickformat(ax_v, '%d%%'); 
+            
+            yyaxis(ax_v, 'left'); 
+%             legend(ax_v, {'all events', 'passed events', 'percent'}, 'Location', 'NorthEast'); 
+            ax_v.FontSize = input.font_size;
             
         end
         

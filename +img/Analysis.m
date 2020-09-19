@@ -260,6 +260,8 @@ classdef Analysis < file.AstroData
             obj.positions_y_all = [];
             obj.stack_all = [];
             
+            obj.finder.store.checker.setupSensor; % make sure the quality checker has the right bad rows/columns
+            
             obj.clear;
             
         end

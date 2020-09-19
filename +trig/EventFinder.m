@@ -36,8 +36,9 @@ classdef EventFinder < handle
 % 3) Feed the corrected fluxes and auxiliary data into a search algorithm. 
 %    This uses a matched-filter search using two filter banks saved as 
 %    occult.ShuffleBank objects called "bank" and "bank_small". 
-%    Another filter bank is used to inject simulations into the data, using
-%    an occult.FilterBank object called "sim_bank". 
+%    Another filter bank called "bank_oort" is used to store wider
+%    templates for finding Oort cloud objects (set use_oort=1). 
+%
 %    Set pars.use_sim = 0 to skip using simulated events (default is 1). 
 %    To determine how often simulated events are injected, set
 %    "pars.num_sim_events_per_batch" which can be a small fraction (the 
@@ -68,9 +69,10 @@ classdef EventFinder < handle
     properties(Transient=true)
 
         gui@trig.gui.EvFinderGUI; % class added later
+        
         bank@occult.ShuffleBank; % randomly picked filter kernels used for matched-filtering (loaded from file when needed)
         bank_small@occult.ShuffleBank; % a smaller filter bank used to weed out only the good stars for full-filtering
-        sim_bank@occult.FilterBank; % simulated occultation templates in predefined intervals for checking detection S/N of injected events
+        bank_oort@occult.ShuffleBank; % a filter bank for Oort cloud occultations
         
     end
     
@@ -84,6 +86,7 @@ classdef EventFinder < handle
         psd@trig.CorrectPSD; % calculates the Power Spectra Density using Welch's method, then dereddens the flux
         
         var_buf@util.vec.CircularBuffer; % circular buffers for each star/kernel, holding a few variance measurements from past batches
+        var_buf_oort@util.vec.CircularBuffer; % another buffer for the Oort cloud templates
         
         cand@trig.Candidate;
         latest_candidates@trig.Candidate; 
@@ -156,6 +159,7 @@ classdef EventFinder < handle
                 obj.store = trig.DataStore;
                 
                 obj.var_buf = util.vec.CircularBuffer; 
+                obj.var_buf_oort = util.vec.CircularBuffer; 
                 
                 obj.resetPars; 
                 
@@ -185,8 +189,12 @@ classdef EventFinder < handle
 
             obj.pars.use_prefilter = 1; % filter all stars on a smaller bank, using a lower threshold, and then only vet the survivors with the full filter bank
             obj.pars.pre_threshold = 5; % threshold for the pre-filter
-            obj.pars.filter_bank_full_filename = '/WFAST/saved/FilterBankShuffle.mat'; % filename where the filter bank was taken from (relative to the DATA folder)
-            obj.pars.filter_bank_small_filename = '/WFAST/saved/FilterBankShuffleSmall.mat'; % filename where the smaller filter bank was taken from (relative to the DATA folder)
+            
+            obj.pars.use_oort = false; % use the Oort cloud template bank as well
+            
+            obj.pars.filter_bank_full_filename = '/WFAST/occultations/TemplateBankKBOs.mat'; % filename where the filter bank was taken from (relative to the DATA folder)
+            obj.pars.filter_bank_small_filename = '/WFAST/occultations/TemplateBankKBOs_small.mat'; % filename where the smaller filter bank was taken from (relative to the DATA folder)
+            obj.pars.filter_bank_oort_filename = '/WFAST/occultations/TemplateBankOort.mat'; % filename where the Oort cloud templates are taken from (relative to the DATA folder)
             
             obj.pars.limit_events_per_batch = 5; % too many events in one batch will mark all events as black listed! 
             obj.pars.limit_events_per_star = 5; % too many events on the same star will mark all events on that star as black listed! 
@@ -195,6 +203,8 @@ classdef EventFinder < handle
 
             obj.pars.use_sim = 1; % add simulated events in a few batches randomly spread out in the whole run
             obj.pars.num_sim_events_per_batch = 0.01; % fractional probability to add a simulated event into each new batch. 
+            obj.pars.use_keep_simulated = true; % if false, the simulated events would not be kept with the list of detected candidates (for running massive amount of simualtions)
+            obj.pars.sim_max_R = 3; % maximum value of stellar size for simulated events
             
             obj.reset;
             
@@ -403,8 +413,8 @@ classdef EventFinder < handle
                 obj.loadFilterBankSmall; 
             end
             
-            if obj.pars.use_sim % internally this lazy generates a occult.FilterBank and fills it up
-                obj.loadSimulationBank;
+            if obj.pars.use_oort && isempty(obj.bank_oort) % lazy load the small filter bank from file
+                obj.loadFilterBankOort; 
             end
             
             if isempty(obj.head) % must have a header to uniquely identify candidates! 
@@ -463,7 +473,7 @@ classdef EventFinder < handle
 
                 best_snr = []; % need to keep track what is the best S/N for this batch, regardless of which filter and regardless of if there were any candidates detected. 
                 
-                if ~isempty(star_indices) % if no stars passed the pre-filter, we will just skip to the next batch
+                if ~isempty(star_indices) % if no stars passed the pre-filter, we will just skip to the next batch (if no pre-filter is used, all stars will pass)
 
                     obj.filtered_fluxes = obj.bank.input(obj.corrected_fluxes(:,star_indices), obj.corrected_stds(1,star_indices)); % filtered flux for each star/kernel
 
@@ -518,6 +528,34 @@ classdef EventFinder < handle
                     
                 end % if no stars passed the pre-filter, we will just skip to the next batch
 
+                if obj.pars.use_oort % run the fluxes through the Oort cloud template bank as well 
+                    
+                    star_indices = 1:size(obj.corrected_fluxes,2); % just list all the stars
+                    
+                    oort_filtered_fluxes = obj.bank.input(obj.corrected_fluxes(:,star_indices), obj.corrected_stds(1,star_indices)); % filtered flux for each star/kernel
+
+                    if obj.pars.use_std_filtered % get the noise in the filtered flux background region
+
+                        obj.var_buf_oort.input(nanvar(oort_filtered_fluxes)); 
+                        oort_background_ff = obj.var_buf_oort.data_ordered; 
+                        oort_bg_filtered_std = sqrt(nanmean(oort_background_ff)); 
+
+                    else
+                        oort_bg_filtered_std = 1; % just assume the filters have unit standard deviation by construction
+                    end
+
+                    oort_filtered_fluxes = oofrt_filtered_fluxes./oort_bg_filtered_std; % normalize the filtered flux by the background std
+
+                    oort_latest_candidates = obj.searchForCandidates(obj.store.extended_flux, obj.corrected_fluxes, oort_filtered_fluxes, star_indices); % loop over the normalized filtered flux and find multiple events
+
+                    for ii = 1:length(oort_latest_candidates)
+                        oort_latest_candidates(ii).oort_filter = true; 
+                    end
+                    
+                    obj.cand = vertcat(obj.cand, oort_latest_candidates);
+                    
+                end
+                
                 if ~isempty(obj.latest_candidates) % if candidates are found, check them for highest S/N
                     obj.snr_values(end+1) = max(abs([obj.latest_candidates.snr])); 
                 elseif ~isempty(best_snr) % we managed to find a good S/N value from the large filter bank
@@ -595,14 +633,21 @@ classdef EventFinder < handle
             s.cut_bin_edges = obj.store.checker.hist_edges;
             
             % load the content of the star hours
-            s.snr_bin_edges = obj.store.checker.hours.snr_bin_edges;
-            s.star_seconds = permute(nansum(obj.store.checker.hours.histogram,2),[1,3,2]);
-            s.star_seconds_with_losses = permute(nansum(obj.store.checker.hours.histogram_with_losses,2),[1,3,2]);
-            s.losses_exclusive = permute(nansum(obj.store.checker.hours.losses_exclusive, 2), [1,3,2]);
-            s.losses_inclusive = permute(nansum(obj.store.checker.hours.losses_inclusive, 2), [1,3,2]);
-            s.losses_bad_stars = permute(nansum(obj.store.checker.hours.losses_bad_stars, 2), [1,3,2]);
-            s.runtime = obj.store.checker.hours.runtime; 
+            if ~ismember('FresnelSize', obj.cat.data.Properties.VariableNames)
+                obj.cat.addStellarSizes;
+            end
             
+            s.inputHours(obj.store.checker.hours, obj.cat.data.FresnelSize(obj.store.star_indices));
+            
+%             s.snr_bin_edges = obj.store.checker.hours.snr_bin_edges;
+%             s.star_seconds = permute(nansum(obj.store.checker.hours.histogram,2),[1,3,2]);
+%             s.star_seconds_with_losses = permute(nansum(obj.store.checker.hours.histogram_with_losses,2),[1,3,2]);
+%             s.losses_exclusive = permute(nansum(obj.store.checker.hours.losses_exclusive, 2), [1,3,2]);
+%             s.losses_inclusive = permute(nansum(obj.store.checker.hours.losses_inclusive, 2), [1,3,2]);
+%             s.losses_bad_stars = permute(nansum(obj.store.checker.hours.losses_bad_stars, 2), [1,3,2]);
+%             s.runtime = obj.store.checker.hours.runtime; 
+            
+            obj.summary = s; 
             
         end
         
@@ -890,15 +935,14 @@ classdef EventFinder < handle
 
         end
         
-        function loadSimulationBank(obj)
+        function loadFilterBankOort(obj)
 
-            if isempty(obj.sim_bank)
-                obj.sim_bank = occult.FilterBank; % simulations require we produce a FilterBank to make injection events
-            end
-
-            if isempty(obj.sim_bank.bank) % simulations require we produce a FilterBank to make injection events
-                disp('making a sim_bank!'); 
-                obj.sim_bank.makeBank;
+            f = fullfile(getenv('DATA'), obj.pars.filter_bank_oort_filename);
+            if exist(f, 'file')
+                load(f, 'bank');
+                obj.bank_oort = bank;
+            else
+                error('Cannot load kernels from ShuffleBank object'); 
             end
 
         end
@@ -1008,9 +1052,28 @@ classdef EventFinder < handle
         
         function [flux, sim_pars] = addSimulatedEvent(obj, flux, star_idx) % take a flux matrix and an index for a star and add a random occultation event on top of it
         
-            obj.loadSimulationBank; % lazy load the sim_bank
-            
-            [lc, sim_pars] = obj.sim_bank.randomLC(0.5); % let's set the stellar radius R=0.5 (Fresnel units)
+            if ~isempty(obj.cat) && obj.cat.success
+                
+                if ~ismember('FresnelSize', obj.cat.data.Properties.VariableNames)
+                    obj.cat.addStellarSizes;
+                end
+                
+                R = obj.cat.data.FresnelSize;
+                if isempty(R)
+                    obj.cat.addStellarSizes;
+                end
+                
+                if isnan(R(star_idx)) % no stellar radius known from GAIA, just randomly pick one (from the distribution of R of other stars)
+                    R_star = util.stat.inverseSampling(R, 'max', 3);  
+                elseif R(star_idx)>3
+                    R_star = 3; 
+                else
+                    R_star = R(star_idx);
+                end
+                
+                [lc, sim_pars] = obj.bank.gen.randomLC('stellar_size', R_star); % let's set the stellar radius R=0.5 (Fresnel units)
+                
+            end
             
             flux = flux(:,star_idx); 
             
@@ -1608,8 +1671,8 @@ classdef EventFinder < handle
         function popupSim(obj)
             
             f = util.plot.FigHandler('Simulated events'); 
-            f.width = 26;
-            f.height = 16;
+            f.width = 30;
+            f.height = 20;
             f.clear;
             
             obj.showSim('parent', f.fig); 
@@ -1619,7 +1682,7 @@ classdef EventFinder < handle
         function showSim(obj, varargin)
             
             if isempty(obj.summary)
-                obj.summary = obj.produceSummary;
+                obj.produceSummary;
             end
             
             obj.summary.showSimulations(varargin{:}); 

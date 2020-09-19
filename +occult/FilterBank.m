@@ -350,7 +350,13 @@ classdef FilterBank < handle
             
         end
         
-        function [lc, pars] = randomLC(obj, fix_R)
+        function [lc, pars] = randomLC(obj, varargin)
+           
+            [lc, pars] = obj.gen.randomLC(varargin{:}); 
+            
+        end
+        
+        function [lc, pars] = randomLC_old(obj, fix_R) % to be depricated
             
             if nargin<2 || isempty(fix_R)
                 fix_R = [];

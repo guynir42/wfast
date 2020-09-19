@@ -43,7 +43,7 @@ function values = power_law_dist(index, varargin)
         
         N = (input.min.^(1-index)-input.max.^(1-index));
         
-        values = input.min + (input.min.^(1-index) - r.*N).^(1./(1-index)); 
+        values = (input.min.^(1-index) - r.*N).^(1./(1-index)); 
         
     end
     

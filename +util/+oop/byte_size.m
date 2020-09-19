@@ -45,6 +45,13 @@ function st = byte_size(obj, varargin)
         
         try 
 
+            if isobject(obj) % objects may have transient properties
+                p = findprop(obj, list{ii}); 
+                if p.Transient
+                    continue; % if this one is transient, skip it
+                end
+            end
+            
             b = length(getByteStreamFromArray(obj.(list{ii})));
 
             b = b.*conversion; 
