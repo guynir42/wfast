@@ -544,7 +544,7 @@ classdef EventFinder < handle
                         oort_bg_filtered_std = 1; % just assume the filters have unit standard deviation by construction
                     end
 
-                    oort_filtered_fluxes = oofrt_filtered_fluxes./oort_bg_filtered_std; % normalize the filtered flux by the background std
+                    oort_filtered_fluxes = oort_filtered_fluxes./oort_bg_filtered_std; % normalize the filtered flux by the background std
 
                     oort_latest_candidates = obj.searchForCandidates(obj.store.extended_flux, obj.corrected_fluxes, oort_filtered_fluxes, star_indices); % loop over the normalized filtered flux and find multiple events
 
