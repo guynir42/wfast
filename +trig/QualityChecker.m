@@ -587,6 +587,8 @@ classdef QualityChecker < handle
             aux(:,:,obj.corr_indices.r) = r;
             aux(:,:,obj.corr_indices.w) = w;
             
+            aux = fillmissing(aux, 'spline'); 
+            
             obj.correlations = zeros(size(aux,1), size(aux,2), size(aux,3), length(obj.pars.corr_timescales), 'like', aux); 
             
             for ii = 1:length(obj.pars.corr_timescales)
@@ -609,7 +611,9 @@ classdef QualityChecker < handle
                             fprintf('The %s have NaN values...\n', obj.aux_names{jj});
                         end
                     end
+                    
                     obj.correlations(:,:,:,ii) = util.series.correlation(f, aux, obj.pars.corr_timescales(ii)).*norm; 
+                    
                 catch ME
                     disp('here'); 
                     rethrow(ME); 
