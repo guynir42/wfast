@@ -989,13 +989,13 @@ classdef EventFinder < handle
                 star_index_sim = star_indices(randperm(length(star_indices),1)); % randomly choose a single star from the list
             end
 
-            f = obj.store.extended_flux; 
+%             f = obj.store.extended_flux; 
 
-            [f_sim, sim_pars] = obj.addSimulatedEvent(f, star_index_sim); % add the simulated occultation to the raw fluxes
+            [f_sim, sim_pars] = obj.addSimulatedEvent(star_index_sim); % add the simulated occultation to the raw fluxes
 
-            f(:,star_index_sim) = f_sim;
+%             f(:,star_index_sim) = f_sim;
 
-            [f_corr, std_corr] = obj.correctFluxes(f); % PSD or linear fit correction (on top of the simulated event!)
+            [f_corr, std_corr] = obj.correctFluxes(f_sim); % PSD or linear fit correction (on top of the simulated event!)
 
             f_filt = obj.bank.input(f_corr(:,star_index_sim), std_corr(star_index_sim)); % filter only the star with the simulated event on it
 
@@ -1050,7 +1050,7 @@ classdef EventFinder < handle
 
         end % we recovered the injected event!
         
-        function [flux, sim_pars] = addSimulatedEvent(obj, flux, star_idx) % take a flux matrix and an index for a star and add a random occultation event on top of it
+        function [flux, sim_pars] = addSimulatedEvent(obj, star_idx) % take a flux matrix and an index for a star and add a random occultation event on top of it
         
             if ~isempty(obj.cat) && obj.cat.success
                 
@@ -1075,7 +1075,12 @@ classdef EventFinder < handle
                 
             end
             
-            flux = flux(:,star_idx); 
+            flux_all = obj.store.extended_flux; 
+            flux = flux_all(:,star_idx); % pick out the one star
+            bg = obj.store.extended_aux(:,star_idx,obj.store.aux_indices.background).*...
+                obj.store.extended_aux(:,star_idx,obj.store.aux_indices.areas);
+            
+            flux = flux - bg; % don't forget to add the background at the end
             
             margin = length(flux) - length(lc); % margins on both sides of the template, combined
             
@@ -1108,14 +1113,14 @@ classdef EventFinder < handle
                 lc2 = circshift(lc2, peak - floor(length(lc)/2) - 1); % shift it until the middle of the template is at "peak"
                 
             elseif margin<0
-                error('need to handle this case at some point...'); 
+                error('need to handle this case at some point...'); % this would be a problem if we inject events with W>=8 seconds
             else
                 error('need to handle this case at some point...'); 
             end
             
             flux_mean = flux_mean.*lc2; % the raw flux is multiplied by the template (that should be 1 outside the occulation region)
             
-            flux = flux_mean + flux_noise; % now we can re-attach the noise we extracted before
+            flux = flux_mean + flux_noise + bg; % now we can re-attach the noise and the background we extracted before
             
             % add some parameters known from the simulation
             sim_pars.time_index = peak; % what was the real peak time of this event
