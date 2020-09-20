@@ -560,7 +560,7 @@ classdef EventFinder < handle
                     obj.snr_values(end+1) = max(abs([obj.latest_candidates.snr])); 
                 elseif ~isempty(best_snr) % we managed to find a good S/N value from the large filter bank
                     obj.snr_values(end+1) = best_snr; % no candidates, instead just return the best S/N found when searching for candidates
-                elseif obj.pars.use_prefilter % we used a pre-filter and didn't get any stars that passed
+                elseif obj.pars.use_prefilter && ~isempty(pre_snr) % we used a pre-filter and didn't get any stars that passed
                     obj.snr_values(end+1) = max(pre_snr); % take the best S/N from the smaller filter bank
                 else
                     error('This shouldn''t happen!'); 

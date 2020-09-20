@@ -100,6 +100,8 @@ classdef Candidate < handle
         cutouts; % cutouts of the selected star, for the duration of the extended region
         kernel; % the lightcurve of the matched-filter kernel used 
         
+        oort_filter = false; % if true, that means this candidate was found using the Oort cloud templaters/filters
+        
         time_index; % out of the extended region
         kern_index; % from the full filter bank
         star_index; % from the stars that passed the initial burn-in (not from the subset that survived the pre-filter

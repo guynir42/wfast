@@ -476,9 +476,12 @@ classdef QualityChecker < handle
             
             if util.text.cs('Balor', camera)
                 obj.pars.bad_columns = [1:20, 1960, 4085:4104]; 
-                obj.pars.bad_rows = [1161 1765 3716]; 
+                obj.pars.bad_rows = [1 1161 1765 3716 4128]; 
             elseif util.text.cs('Zyla', camera)
                 % I am not sure we have any bad rows/columns in the Zyla...
+                % instead just put the first and last row/column. 
+                obj.pars.bad_columns = [1 2156];
+                obj.pars.bad_rows = [1 2560]; 
             else
                 error('Unknown camera "%s". Use "Balor" or "Zyla...', camera);
             end

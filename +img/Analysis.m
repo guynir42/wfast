@@ -1125,7 +1125,7 @@ classdef Analysis < file.AstroData
 
                     if obj.use_event_finding
                         try
-                        obj.analysisEventFinding;
+                            obj.analysisEventFinding;
                         catch ME
                             warning(ME.getReport); 
                         end
