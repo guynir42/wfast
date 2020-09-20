@@ -1080,7 +1080,7 @@ classdef EventFinder < handle
             
             flux_all = obj.store.extended_flux; 
             flux = flux_all(:,star_idx); % pick out the one star
-            bg = obj.store.extended_aux(:,star_idx,obj.store.aux_indices.background).*...
+            bg = obj.store.extended_aux(:,star_idx,obj.store.aux_indices.backgrounds).*...
                 obj.store.extended_aux(:,star_idx,obj.store.aux_indices.areas);
             
             flux = flux - bg; % don't forget to add the background at the end
