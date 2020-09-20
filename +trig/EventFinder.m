@@ -1016,7 +1016,7 @@ classdef EventFinder < handle
 
             end % need to correct the filtered fluxes by their measured noise
 
-            new_event_sim = obj.searchForCandidates(f, f_corr, f_filt, star_index_sim, 1); % try to find a single event on this single star
+            new_event_sim = obj.searchForCandidates(f_sim, f_corr, f_filt, star_index_sim, 1); % try to find a single event on this single star
 
             if ~isempty(new_event_sim) % we recovered the injected event! 
                 
@@ -1053,7 +1053,7 @@ classdef EventFinder < handle
 
         end % we recovered the injected event!
         
-        function [flux, sim_pars] = addSimulatedEvent(obj, star_idx) % take a flux matrix and an index for a star and add a random occultation event on top of it
+        function [flux_all, sim_pars] = addSimulatedEvent(obj, star_idx) % take a flux matrix and an index for a star and add a random occultation event on top of it
         
             if ~isempty(obj.cat) && obj.cat.success
                 
@@ -1124,6 +1124,8 @@ classdef EventFinder < handle
             flux_mean = flux_mean.*lc2; % the raw flux is multiplied by the template (that should be 1 outside the occulation region)
             
             flux = flux_mean + flux_noise + bg; % now we can re-attach the noise and the background we extracted before
+            
+            flux_all(:,star_idx) = flux; 
             
             % add some parameters known from the simulation
             sim_pars.time_index = peak; % what was the real peak time of this event
