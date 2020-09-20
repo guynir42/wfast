@@ -1025,7 +1025,10 @@ classdef EventFinder < handle
                 
                 new_event_sim.is_simulated = 1; 
                 new_event_sim.sim_pars = sim_pars; 
-                obj.latest_candidates = vertcat(obj.latest_candidates, new_event_sim); % add the simulated events to the list of regular events
+                
+                if obj.pars.use_keep_simulated
+                    obj.latest_candidates = vertcat(obj.latest_candidates, new_event_sim); % add the simulated events to the list of regular events
+                end
                 
                 % add this parameter struct to the list of passed events
                 if isempty(obj.sim_events)
@@ -1675,22 +1678,23 @@ classdef EventFinder < handle
         
         function popupSim(obj)
             
+            if isempty(obj.summary)
+                obj.produceSummary;
+            end
+            
             f = util.plot.FigHandler('Simulated events'); 
             f.width = 30;
             f.height = 20;
             f.clear;
             
-            obj.showSim('parent', f.fig); 
+            obj.summary.showSimulations('parent', f.fig); 
             
-        end
-        
-        function showSim(obj, varargin)
+            f2 = util.plot.FigHandler('Simulation detection rate');
+            f2.width = 30;
+            f2.height = 20;
+            f2.clear;
             
-            if isempty(obj.summary)
-                obj.produceSummary;
-            end
-            
-            obj.summary.showSimulations(varargin{:}); 
+            obj.summary.showDetectionRate('parent', f2.fig); 
             
         end
         
