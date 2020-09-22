@@ -540,6 +540,36 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
+        function [ra,dec] = getAntiSolarPoint(obj)
+            
+            if isempty(obj.sun) || isempty(obj.sun.RA) || isempty(obj.sun.Dec)
+                obj.updateSun; 
+            end
+            
+            ra = mod(obj.sun.RA+180,360); 
+            dec = -obj.sun.Dec;
+            
+        end
+        
+        function val = getAntiSolarDistance(obj)
+        
+            [ra,dec] = obj.getAntiSolarPoint;
+            
+            if isempty(obj.RA_deg) || isempty(obj.Dec_deg)|| isempty(ra) || isempty(dec)
+                val = [];
+            else
+                
+                havTheta = sind((obj.Dec_deg-dec)/2).^2 + cosd(obj.Dec_deg).*cosd(dec).*sind((obj.RA_deg-ra)/2).^2;
+                
+                havTheta(havTheta>1) = 1;
+                havTheta(havTheta<-1) = -1;
+                
+                val = 2.*asind(sqrt(havTheta)); 
+                
+            end
+            
+        end
+        
     end
     
     methods % setters
