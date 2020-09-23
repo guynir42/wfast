@@ -60,6 +60,8 @@ classdef RunSummary < handle
         % structs describing simulated events that passed/failed the threshold
         sim_events;
         
+        star_snr; 
+        
     end
     
     properties % switches/controls
@@ -285,6 +287,67 @@ classdef RunSummary < handle
                 clear val;
             end
                                     
+        end
+        
+        function func = getRateFunction(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('R_bin', 0.25); 
+            input.input_var('SNR_bin', 1); 
+            input.input_var('plot', 0); 
+            input.input_var('axes', [], 'axis'); % axes to draw to if plotting is enabled
+            input.input_var('font_size', 18); % fonts on the axes
+            input.scan_vars(varargin{:}); 
+            
+            et = obj.sim_events; % events total
+            ep = obj.sim_events([obj.sim_events.passed]); 
+            
+            [N_total, R_edges, SNR_edges] = histcounts2([et.R], [et.star_snr], 'BinWidth', [input.R_bin, input.SNR_bin]); 
+            
+            N_passed = histcounts2([ep.R], [ep.star_snr], R_edges, SNR_edges);
+            
+            x = R_edges(1:end-1) + 0.5*input.R_bin; 
+            y = SNR_edges(1:end-1) + 0.5*input.SNR_bin; 
+            
+            [X,Y] = meshgrid(x, y);
+            
+            A = [ones(numel(X),1) X(:) Y(:)];
+            
+            B = (N_passed./N_total)'; % the rate is the result we want to fit to (flip the axes to put R on x and SNR on y)
+            B = B(:); 
+            
+            w = N_total'; % weights are proportional to the number of detections
+            w = w(:); 
+            
+            idx = w>0; 
+            
+            B = B(idx); 
+            A = A(idx,:); 
+            w = w(idx); 
+            
+            coeffs = lscov(A, B, w); 
+            
+            func = str2func(sprintf('@(R,S) %10.8f %+10.8f.*R   %+10.8f.*S', coeffs(1), coeffs(2), coeffs(3))); 
+            
+            if input.plot
+                
+                
+                if isempty(input.axes)
+                    input.axes = gca;
+                end
+                
+                util.plot.show(func(X,Y), 'fancy', 'on', 'xvalues', x, 'yvalues', y); 
+                
+                axis(input.axes, 'normal', 'xy'); 
+                
+                hold(input.axes, 'on'); 
+                
+                scatter(input.axes, X(idx), Y(idx), w(:), B(:), 'filled'); 
+                
+                hold(input.axes, 'off'); 
+                
+            end
+            
         end
         
     end
