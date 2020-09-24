@@ -106,6 +106,7 @@ classdef QualityChecker < handle
         near_bad_rows_cols; % flag places where the centroids are too close to a bad row/column
         linear_motion; % are the x/y offsets moving in a linear line across the cutout (like a satellite?)
         background_intensity; % the background per pixel value (remove frames with star in annulus or when the sky is too bright)
+        bad_pixels; % how many bad pixels are in the aperture
         
         mean_x; % the weighted average offset for all stars
         mean_y; % the weighted average offset for all stars
@@ -213,6 +214,7 @@ classdef QualityChecker < handle
             obj.pars.use_nan_flux = false;
             obj.pars.use_nan_offsets = false;
             obj.pars.use_photo_flag = false; 
+            obj.pars.use_bad_pixels = true; 
             obj.pars.use_correlations = true;
 
             obj.pars.corr_types = {'b', 'x', 'y', 'r', 'w'}; % types of auxiliary we will use for correlations (r is derived from x and y)
@@ -331,6 +333,12 @@ classdef QualityChecker < handle
             
             if obj.pars.use_photo_flag 
                 obj.cut_names{end+1} = 'photo_flag'; 
+                obj.cut_thresholds(end+1) = 1;
+                obj.cut_two_sided(end+1) = false;
+            end
+            
+            if obj.pars.use_bad_pixels
+                obj.cut_names{end+1} = 'bad_pixels'; 
                 obj.cut_thresholds(end+1) = 1;
                 obj.cut_two_sided(end+1) = false;
             end
@@ -515,6 +523,7 @@ classdef QualityChecker < handle
             X = obj.extended_aux(:,:,obj.aux_indices.centroids_x); 
             Y = obj.extended_aux(:,:,obj.aux_indices.centroids_y); 
             w = obj.extended_aux(:,:,obj.aux_indices.widths); 
+            p = obj.extended_aux(:,:,obj.aux_indices.bad_pixels); 
             
             %%%%%%%%%%%%% calculate / prepare the data %%%%%%%%%%%%%%%%%%%%
             
@@ -582,6 +591,8 @@ classdef QualityChecker < handle
             
             obj.background_intensity = b; % just the background level
            
+            obj.bad_pixels = p;
+            
             aux = zeros(size(f,1),size(f,2),length(obj.pars.corr_types), 'like', f); 
 %             aux(:,:,obj.corr_indices.a) = a;
             aux(:,:,obj.corr_indices.b) = b;
@@ -591,6 +602,9 @@ classdef QualityChecker < handle
             aux(:,:,obj.corr_indices.w) = w;
             
             aux = fillmissing(aux, 'spline'); 
+            aux(isnan(aux)) = 0; % must make sure to get rid of all NaNs
+            
+            f = fillmissing(f, 'spline'); 
             
             obj.correlations = zeros(size(aux,1), size(aux,2), size(aux,3), length(obj.pars.corr_timescales), 'like', aux); 
             
@@ -621,6 +635,7 @@ classdef QualityChecker < handle
                     disp('here'); 
                     rethrow(ME); 
                 end
+                
             end
             
             %%%%%%%%%%%%% find all the bad frames %%%%%%%%%%%%%%%%%%%%%

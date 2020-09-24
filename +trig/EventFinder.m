@@ -221,6 +221,7 @@ classdef EventFinder < handle
             
             obj.store.reset;
             obj.var_buf.reset;
+            obj.var_buf_oort.reset;
             obj.psd.reset;
             
             obj.snr_values = [];
@@ -400,6 +401,11 @@ classdef EventFinder < handle
         function input(obj, varargin) % provide the photometric data as varargin pairs, or as a util.text.InputVar object, or as an img.Photometry object
             
             obj.clear;
+            
+            if isempty(obj.store.star_sizes) && ~isempty(obj.cat) && obj.cat.success
+                obj.cat.addStellarSizes; 
+                obj.store.star_sizes = obj.cat.data.FresnelSize;
+            end
             
             obj.store.input(varargin{:}); % the store does the actual parsing and organizing of data into buffers
             
@@ -622,6 +628,7 @@ classdef EventFinder < handle
             % load the content of the store
             s.store_pars = obj.store.pars;
             s.good_stars = obj.store.star_indices;
+            s.star_snr = obj.store.star_snr;
             
             % load the content of the checker
             s.checker_pars = obj.store.checker.pars;

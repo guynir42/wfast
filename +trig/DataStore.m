@@ -171,6 +171,8 @@ classdef DataStore < handle
         
         star_indices = []; 
         star_snr = [];
+        star_sizes = []; 
+        star_rates =[]; 
         
         aperture_index = [];
         
@@ -227,7 +229,14 @@ classdef DataStore < handle
 
             obj.pars.use_threshold = true; % use the minimal S/N to keep out bad stars and not even store them
             obj.pars.threshold = 5; % stars with S/N lower than this are disqualified after the burn-in period!
-
+            obj.pars.use_rate_function = true; % also disqualify stars with low detection rate (based on S/N and Fresnel size)
+            obj.pars.minimal_rate = 0.06; % rate threshold
+            obj.pars.minimal_snr = 10; % stars above this S/N are picked regardless of their theoretical rate
+            obj.pars.maximal_size = 5; % stars bigger than this are removed no matter what their rate is (unless they pass the above threshold)
+            obj.pars.rate_function = @(R,S)0.04412770-0.08761978.*R+0.00244621.*R.^2+0.01875690.*S-0.00022921.*S.^2; % detection fraction as function of stellar radius (this is empirically determined from simulations)
+%             obj.pars.rate_function = @(R,S)0.09098123-0.10198061.*R+0.01777770.*S; % detection fraction as function of stellar radius (this is empirically determined from simulations)
+%             obj.pars.rate_function = @(R) 0.265 - 0.143.*R + 0.02666.*R.^2; % detection fraction as function of stellar radius (this is empirically determined from simulations)
+            
             obj.pars.use_remove_cosmic_rays = true; % get rid of intense cosmic rays before even inputting the flux into the buffers
             obj.pars.cosmic_ray_threshold = 8; % in units of S/N
 
@@ -252,6 +261,8 @@ classdef DataStore < handle
             
             obj.star_indices = []; 
             obj.star_snr = [];
+            obj.star_sizes = [];
+            obj.star_rates  =[]; 
             
             obj.aperture_index = []; 
             
@@ -589,7 +600,20 @@ classdef DataStore < handle
             
             passed = passed & ~obj.bad_ratios; 
             
-            obj.star_snr = obj.star_snr(:,obj.aperture_index); 
+            obj.star_snr = obj.star_snr(:,obj.aperture_index); % keep the S/N from the chosen aperture only
+            
+            if obj.pars.use_rate_function
+                
+                obj.star_rates = obj.pars.rate_function(obj.star_sizes, obj.star_snr); % this gives the rate for all stars
+                
+                % the stars in "passed" already qualified to the regular threshold
+                % so we apply additional conditions on top of the previous ones
+                passed2 = obj.star_snr>obj.pars.minimal_snr | (obj.star_rates>obj.pars.minimal_rate & obj.star_sizes<obj.pars.maximal_size );
+                
+                passed = passed & passed2; 
+                
+            end
+            
             obj.star_indices = find(passed)'; 
             
         end
