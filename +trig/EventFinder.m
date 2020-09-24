@@ -1524,28 +1524,11 @@ classdef EventFinder < handle
         function popupHours(obj)
             
             f = util.plot.FigHandler('Star hours'); 
-            f.width = 26;
-            f.height = 16;
+            f.width = 30;
+            f.height = 18;
             f.clear;
             
-            ax = axes('Parent', f.fig); 
-            
-            obj.showHours('ax', ax); 
-            
-        end
-        
-        function showHours(obj, varargin)
-            
-            input = util.text.InputVars;
-            input.input_var('axes', [], 'axis'); % which axes to plot to? default is gca()
-            input.input_var('font_size', 20); % fonts on the axes
-            input.scan_vars(varargin{:}); 
-            
-            if isempty(input.axes)
-                input.axes = gca;
-            end
-            
-            input.axes.FontSize = input.font_size; 
+            obj.store.checker.hours.viewer('Parent', f.fig); 
             
         end
         

@@ -228,7 +228,7 @@ classdef StarHours < handle
             obj.cut_indices = checker.cut_indices;
         
             % calculate some stuff based on that
-            obj.star_snr = nanmean(obj.flux,1)./nanstd(obj.flux); % S/N on the extended region
+            obj.star_snr = nanmean(obj.flux,1)./nanstd(checker.extended_flux); % S/N on the extended region
             obj.time_step = median(diff(obj.timestamps)); 
             obj.batch_length = (obj.idx_end - obj.idx_start + 1).*obj.time_step; 
             
@@ -299,6 +299,274 @@ classdef StarHours < handle
     
     methods % plotting tools / GUI
         
+        function viewer(obj, varargin)
+            
+            import util.stat.sum2; 
+            
+            parent = []; 
+            for ii = 1:2:length(varargin)
+                if util.text.cs(varargin{ii}, 'parent') && length(varargin)>ii
+                    parent = varargin{ii+1};
+                end
+            end
+            
+            if isempty(parent) || ~isvalid(parent) % we did not get a legal figure/panel
+                parent = gcf;
+            end
+            
+            if isempty(parent.UserData) || ~isa(parent.UserData, 'util.text.InputVars')
+                
+                input = util.text.InputVars;
+                input.input_var('good', true); % whether to show the good times
+                input.input_var('types', []); % choose multiple cut types (use the numbers!)
+                input.input_var('exclusive', false); % if false, show inclusive losses
+                input.input_var('max_snr', obj.snr_bin_max); 
+                input.input_var('rebin', []); % to be added later
+                input.input_var('sum', true); % we still need to figure out how to display non-summed multiple histograms...
+                input.input_var('hours', true);             
+                input.input_var('log', true, 'use_log'); 
+                input.input_var('alpha', 0.7); 
+                input.input_var('parent', []); 
+                
+                parent.UserData = input; % save for later
+                
+            else
+                input = parent.UserData; % grab an existing input object
+            end
+            
+            input.scan_vars(varargin{:}); 
+            input.parent = parent; 
+            
+            % done parsing inputs, all is saved in the parent's UserData. 
+            
+            delete(parent.Children); % get rid of existing panels/plots
+            
+            %%%%%%%%%%%%%%% histogram display %%%%%%%%%%%%%%%%%%%%
+            
+            hist_width = 0.8; 
+            
+            panel_image = uipanel(parent, 'title', '', ...
+                'Units', 'Normalized', 'Position', [0 0.1 hist_width 0.8]); 
+            
+            ax = axes('Parent', panel_image); 
+            
+            if input.good
+                obj.showHistogram('type', [], 'max_snr', input.max_snr, ...
+                    'sum', input.sum, 'log', input.log, 'hours', input.hours, ...
+                    'alpha', input.alpha); 
+            end
+            
+            ax.NextPlot = 'add'; 
+            
+            types = unique(input.types); % sorted list, removing redundant entries
+            
+            for ii = 1:length(types)
+                
+                obj.showHistogram('type', types(ii), 'max_snr', input.max_snr, ...
+                    'sum', input.sum, 'log', input.log, 'hours', input.hours, ...
+                    'alpha', input.alpha, 'exclusive', input.exclusive); 
+                
+            end
+            
+            ax.NextPlot = 'replace'; 
+            
+            %%%%%%%%%%%%%%% display controls %%%%%%%%%%%%%%%%%%%%
+            
+            panel_display = uipanel(parent, 'title', 'display', ...
+                'Units', 'Normalized', 'Position', [0 0 hist_width 0.1]); 
+            
+            margin = 0.03; 
+            width = 0.17;
+            bottom = 0.1; 
+            height = 0.8; 
+            
+            color_on = [0.1 0.3 1]; 
+            
+            button.Position = [-margin/2 0 0 0]; % left edge
+            
+            button = uicontrol(panel_display, 'Style', 'pushbutton', 'String', 'log scale', ...
+                'Units', 'Normalized', 'Position', [margin + button.Position(1)+button.Position(3), bottom, width, height], ...
+                'Callback', @obj.callback_log, 'FontSize', 14, 'UserData', input); 
+            
+            if input.log, button.ForegroundColor = color_on; end
+            
+            button = uicontrol(panel_display, 'Style', 'pushbutton', 'String', 'sum', ...
+                'Units', 'Normalized', 'Position', [margin + button.Position(1)+button.Position(3), bottom, width, height], ...
+                'Callback', @obj.callback_sum, 'FontSize', 14, 'UserData', input); 
+            
+            if input.sum, button.ForegroundColor = color_on; end
+            
+            button = uicontrol(panel_display, 'Style', 'pushbutton', 'String', 'seconds', ...
+                'Units', 'Normalized', 'Position', [margin + button.Position(1)+button.Position(3), bottom, width, height], ...
+                'Callback', @obj.callback_hours, 'FontSize', 14, 'UserData', input); 
+            
+            if input.hours, button.String = 'hours'; end
+            
+            button = uicontrol(panel_display, 'Style', 'edit', 'String', sprintf('max S/N= %4.1f', input.max_snr), ...
+                'Units', 'Normalized', 'Position', [margin + button.Position(1)+button.Position(3), bottom, width, height], ...
+                'Callback', @obj.callback_snr, 'FontSize', 14, 'UserData', input); 
+            
+            button = uicontrol(panel_display, 'Style', 'edit', 'String', sprintf('alpha= %4.2f', input.alpha), ...
+                'Units', 'Normalized', 'Position', [margin + button.Position(1)+button.Position(3), bottom, width, height], ...
+                'Callback', @obj.callback_alpha, 'FontSize', 14, 'UserData', input); 
+            
+            %%%%%%%%%%%%%%% info display %%%%%%%%%%%%%%%%%%%%
+            
+            panel_info = uipanel(parent, 'title', 'info', ...
+                'Units', 'Normalized', 'Position', [0 0.9 hist_width 0.1]); 
+            
+            str = sprintf('runtime= %d hours | star-hours= %d/%d', round(obj.runtime/3600), ...
+                round(sum2(obj.histogram)/3600), round(sum2(obj.histogram_with_losses)/3600)); % any other info to show? 
+            
+            uicontrol(panel_info, 'Style', 'pushbutton', 'String', str, 'FontSize', 14, ...
+                'Units', 'Normalized', 'Position', [margin/2 bottom 1-margin height]); 
+            
+            %%%%%%%%%%%%%%% choose types %%%%%%%%%%%%%%%%%%%%
+            
+            panel_types = uipanel(parent, 'title', 'types', ...
+                'Units', 'Normalized', 'Position', [hist_width 0 1-hist_width 1]); 
+            
+            N = length(obj.cut_names); % number of type buttons we need
+            
+            total_seconds = sum2(obj.histogram_with_losses); 
+            good_seconds = sum2(obj.histogram); 
+            
+            margin = 0.1; % left/right margin
+            width = 1-margin;
+            gap = 0.01; 
+            height_total = 1/(2+N); % number of buttons
+            height = height_total - gap; 
+            
+            font_size = 12;
+            
+            button = uicontrol(panel_types, 'Style', 'pushbutton', ...
+                'String', sprintf('%-18s [%d%%]', 'good times', round(100*good_seconds/total_seconds)), ...
+                'Units', 'Normalized', 'Position', [margin/2, 1-(gap/2+height), width, height], ...
+                'Callback', @obj.callback_good, 'FontSize', font_size, 'UserData', input); 
+            
+            if input.good, button.ForegroundColor = color_on; end
+            
+            for ii = 1:N
+                
+                name = obj.cut_names{ii};
+                if length(name)>13
+                    name = [name(1:13) '...']; 
+                end
+                
+                if input.exclusive
+                    cut_seconds = sum2(obj.losses_exclusive(:,:,ii)); 
+                else
+                    cut_seconds = sum2(obj.losses_inclusive(:,:,ii)); 
+                end
+                
+                button = uicontrol(panel_types, 'Style', 'pushbutton', ...
+                    'String', sprintf('%-18s [%d%%]', name, round(100*cut_seconds/total_seconds)), ...
+                    'Units', 'Normalized', 'Position', [margin/2, 1+gap/2-(gap+height)*(ii+1), width, height], ...
+                    'Callback', @obj.callback_types, 'FontSize', font_size, 'UserData', {input, ii});
+                
+                if ismember(ii, input.types), button.ForegroundColor = color_on; end
+            
+                
+            end
+            
+            button = uicontrol(panel_types, 'Style', 'pushbutton', 'String', 'inclusive', ...
+                'Units', 'Normalized', 'Position', [margin/2, gap/2, width, height], ...
+                'Callback', @obj.callback_exclusive, 'FontSize', font_size, 'UserData', input); 
+            
+            if input.exclusive, button.String = 'exclusive'; end
+            
+            
+        end
+        
+        function callback_log(obj, hndl, ~)
+            
+            input = hndl.UserData; 
+            
+            input.log = ~input.log;
+            
+            obj.viewer('parent', input.parent); 
+            
+        end
+        
+        function callback_sum(obj, hndl, ~)
+            
+            input = hndl.UserData; 
+            
+            input.sum = ~input.sum;
+            
+            obj.viewer('parent', input.parent); 
+            
+        end
+        
+        function callback_hours(obj, hndl, ~)
+            
+            input = hndl.UserData; 
+            
+            input.hours = ~input.hours;
+            
+            obj.viewer('parent', input.parent); 
+            
+        end
+        
+        function callback_snr(obj, hndl, ~)
+            
+            input = hndl.UserData; 
+            value = util.text.extract_numbers(hndl.String); 
+            value = value{1};
+            
+            input.max_snr = value; 
+            
+            obj.viewer('parent', input.parent); 
+            
+        end
+        
+        function callback_alpha(obj, hndl, ~)
+            
+            input = hndl.UserData; 
+            value = util.text.extract_numbers(hndl.String); 
+            value = value{1};
+            
+            input.alpha = value; 
+            
+            obj.viewer('parent', input.parent); 
+            
+        end
+        
+        function callback_good(obj, hndl, ~)
+            
+            input = hndl.UserData; 
+            
+            input.good = ~input.good;
+            
+            obj.viewer('parent', input.parent); 
+            
+        end
+        
+        function callback_exclusive(obj, hndl, ~)
+            
+            input = hndl.UserData; 
+            
+            input.exclusive = ~input.exclusive;
+            
+            obj.viewer('parent', input.parent); 
+            
+        end
+        
+        function callback_types(obj, hndl, ~)
+            
+            input = hndl.UserData{1}; 
+            type = hndl.UserData{2}; 
+            
+            if ismember(type, input.types)
+                input.types(input.types==type) = []; % remove from the list
+            else
+                input.types = [input.types type]; % add to list
+            end
+            
+            obj.viewer('parent', input.parent); 
+            
+        end
+        
         function showHistogram(obj, varargin)
             
             input = util.text.InputVars;
@@ -324,10 +592,16 @@ classdef StarHours < handle
                 reset(input.axes); 
             end
             
+            convert = 1;
+            
+            if input.hours
+                convert = 3600; 
+            end
+                
             if isempty(input.type)
                 
                 values = obj.histogram;
-                str = 'Effective star-time'; 
+                str = sprintf('Effective star-time (%4.2f ', util.stat.sum2(values)/convert); 
                 
             else
                 if ischar(input.type)
@@ -343,15 +617,15 @@ classdef StarHours < handle
                     exc = '(inclusively)'; 
                 end
                 
-                str = sprintf('Time lost %s\nto "%s"', exc, strrep(obj.cut_names{input.type}, '_', ' '));
+                str = sprintf('Time lost %s to "%s" (%4.2f ', exc, strrep(obj.cut_names{input.type}, '_', ' '), util.stat.sum2(values)/convert);
                 
             end
             
-            units = '[seconds]'; 
+            units = 'seconds)'; 
             
             if input.hours
                 values = values./3600; % transform to hours instead of seconds!
-                units = '[hours]'; 
+                units = 'hours)'; 
             end
             
             if input.sum
@@ -371,7 +645,9 @@ classdef StarHours < handle
                     mx = mx.*1.1;
                 end
                 
-                input.axes.YLim = [0 mx]; 
+                if strcmp(input.axes.NextPlot, 'replace')
+                    input.axes.YLim = [0 mx]; 
+                end
                 
                 if input.log
                     input.axes.YScale = 'log'; 
