@@ -1493,34 +1493,6 @@ classdef EventFinder < handle
             
         end
         
-        function popupCuts(obj)
-            
-            f = util.plot.FigHandler('Quality cuts'); 
-            f.width = 26;
-            f.height = 16;
-            f.clear;
-            
-            ax = axes('Parent', f.fig); 
-            
-            obj.showCuts('ax', ax); 
-            
-        end
-        
-        function showCuts(obj, varargin)
-            
-            input = util.text.InputVars;
-            input.input_var('axes', [], 'axis'); % which axes to plot to? default is gca()
-            input.input_var('font_size', 20); % fonts on the axes
-            input.scan_vars(varargin{:}); 
-            
-            if isempty(input.axes)
-                input.axes = gca;
-            end
-            
-            input.axes.FontSize = input.font_size; 
-            
-        end
-        
         function popupHours(obj)
             
             f = util.plot.FigHandler('Star hours'); 
@@ -1668,7 +1640,7 @@ classdef EventFinder < handle
             
         end
         
-        function popupSim(obj)
+        function popupSimEvents(obj)
             
             if isempty(obj.summary)
                 obj.produceSummary;
@@ -1681,12 +1653,16 @@ classdef EventFinder < handle
             
             obj.summary.showSimulations('parent', f.fig); 
             
-            f2 = util.plot.FigHandler('Simulation detection rate');
-            f2.width = 30;
-            f2.height = 20;
-            f2.clear;
+        end
+        
+        function popupSimRates(obj)
             
-            obj.summary.showDetectionRate('parent', f2.fig); 
+            f = util.plot.FigHandler('Simulation detection rate');
+            f.width = 30;
+            f.height = 20;
+            f.clear;
+            
+            obj.summary.showDetectionRate('parent', f.fig); 
             
         end
         
