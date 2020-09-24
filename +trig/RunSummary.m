@@ -311,12 +311,13 @@ classdef RunSummary < handle
             
             [X,Y] = meshgrid(x, y);
             
-            A = [ones(numel(X),1) X(:) Y(:)];
+            A = [ones(numel(X),1) X(:) X(:).^2 X(:).*Y(:) Y(:) Y(:).^2];
             
-            B = (N_passed./N_total)'; % the rate is the result we want to fit to (flip the axes to put R on x and SNR on y)
+            R = (N_passed./N_total)'; % the detection rate
+            B = (R); % the rate is the result we want to fit to (flip the axes to put R on x and SNR on y)
             B = B(:); 
             
-            w = N_total'; % weights are proportional to the number of detections
+            w = sqrt(N_total)'; % weights are proportional to the number of detections
             w = w(:); 
             
             idx = w>0; 
@@ -327,7 +328,9 @@ classdef RunSummary < handle
             
             coeffs = lscov(A, B, w); 
             
-            func = str2func(sprintf('@(R,S) %10.8f %+10.8f.*R   %+10.8f.*S', coeffs(1), coeffs(2), coeffs(3))); 
+%             func = str2func(sprintf('@(R,S) (%10.8f %+10.8f.*R   %+10.8f.*S).^2', coeffs(1), coeffs(2), coeffs(3))); 
+            func = str2func(sprintf('@(R,S) %10.8f %+10.8f.*R %+10.8f.*R.^2 %+10.8f.*R.*S %+10.8f.*S %+10.8f.*S.^2', ...
+                coeffs(1), coeffs(2), coeffs(3), coeffs(4), coeffs(5), coeffs(6))); 
             
             if input.plot
                 
@@ -342,7 +345,7 @@ classdef RunSummary < handle
                 
                 hold(input.axes, 'on'); 
                 
-                scatter(input.axes, X(idx), Y(idx), w(:), B(:), 'filled'); 
+                scatter(input.axes, X(idx), Y(idx), w(:), R(idx), 'filled'); % show the measurements as filled circles (color indicates rate, size indicates weight)
                 
                 hold(input.axes, 'off'); 
                 
