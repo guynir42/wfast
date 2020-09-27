@@ -542,7 +542,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         function [ra,dec] = getAntiSolarPoint(obj)
             
-            if isempty(obj.sun) || isempty(obj.sun.RA) || isempty(obj.sun.Dec)
+            if isempty(obj.sun) || ~isfield(obj.sun, 'RA') || ~isfield(obj.sun, 'Dec') || isempty(obj.sun.RA) || isempty(obj.sun.Dec)
                 obj.updateSun; 
             end
             
@@ -567,6 +567,72 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 val = 2.*asind(sqrt(havTheta)); 
                 
             end
+            
+        end
+        
+        function val = getShadowRadius(obj, step_km) % calculate at what radius from Earth's center the line of sight leaves Earth's shadow
+            
+            if nargin<2 || isempty(step_km)
+                step_km = 100;
+            end
+            
+            R = 6378; % Earth's radius in km
+            if ~isempty(obj.elevation)
+                R2 = R + obj.elevation/1000; 
+            end
+            
+            % get the vectors in geocentric equatorial coordinates
+            [RA_asp, DE_asp] = obj.getAntiSolarPoint; % anti-solar point
+            RA_obs = obj.LST_deg; 
+            DE_obs = obj.latitude; 
+            
+            % rotate the coordinate system around the north pole (ASP now has RA=0)
+            RA_new_field = obj.RA_deg - RA_asp; 
+            DE_new_field = obj.DE_deg; 
+            RA_new_obs = RA_obs - RA_asp; 
+            DE_new_obs = DE_obs; 
+            RA_new_asp = 0; 
+            DE_new_asp = DE_asp; 
+            
+            % convert to x,y,z coordinates in this weird intermidiate system
+            X_field = step_km.*cosd(DE_new_field).*cosd(RA_new_field); 
+            Y_field = step_km.*cosd(DE_new_field).*sind(RA_new_field); 
+            Z_field = step_km.*sind(DE_new_field);
+            
+            X_obs = R2.*cosd(DE_new_obs).*cosd(RA_new_obs); 
+            Y_obs = R2.*cosd(DE_new_obs).*sind(RA_new_obs); 
+            Z_obs = R2.*sind(DE_new_obs);
+            
+            X_asp = R.*cosd(DE_new_asp).*cosd(RA_new_asp); 
+            Y_asp = R.*cosd(DE_new_asp).*sind(RA_new_asp);
+            Z_asp = R.*sind(DE_new_asp);
+            
+            % apply a second rotation, along the new X axis
+            M = [-sind(DE_asp) 0 cosd(DE_asp); 0 1 0; cosd(DE_asp) 0 sind(DE_asp)]; 
+            
+            xyz_field = M*[X_field; Y_field; Z_field];
+            xyz_obs = M*[X_obs; Y_obs; Z_obs];
+            xyz_asp = M*[X_asp; Y_asp; Z_asp]; % sanity check, should be only in the z direction
+            
+            % another sanity check:
+            alt = acosd(sum(xyz_field.*xyz_obs)./sqrt(sum(xyz_field.^2).*sum(xyz_obs.^2)));
+            
+            xyz = xyz_obs; 
+            
+            for ii = 1:1e6
+                
+                xyz = xyz + xyz_field; % move the imaginary point in space further out towards the field we are observing
+                
+                if sqrt(sum(xyz(1:2).^2))>R % the newest point is outside the cylinder of Earth's shadow
+                    xyz = xyz - 0.5*xyz_field; % backtrack half-way!
+                    break;
+                end
+                
+            end
+            
+            val = sqrt(sum(xyz.^2)); 
+            
+            val = round(val/step_km).*step_km; 
             
         end
         

@@ -1,4 +1,4 @@
-classdef RunFolder < handle
+classdef RunFolder < dynamicprops
 % Use this class to scan data folders and get a summary of which folders 
 % were analyzed and so on. 
 % The main method to use is the static scan() method:

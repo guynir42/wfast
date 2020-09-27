@@ -26,6 +26,7 @@ function ax = compass(side, varargin)
     
     input = util.text.InputVars;
     input.input_var('angle', -60); % between North and camera top, going clockwise (for telescope East)
+    input.input_var('flip', true, 'invert', 'mirror'); % true: mirror flip the way the sky look (North up, East left); false: normal compass like in maps and when you have a single mirror (North up, East right)
     input.input_var('figure', [], 'parent'); 
     input.input_var('corner', 'SouthEast', 'position'); 
     input.input_var('margin', 0.1); 
@@ -73,10 +74,15 @@ function ax = compass(side, varargin)
     
     ax = axes('Parent', input.figure, 'Position', pos); 
     
-    
+    if input.flip % W-FAST has a single mirror, so the sky is flipped
+        east_rot = 90; 
+    else
+        east_rot = -90; 
+    end
+        
     quiver(ax, [0 0], [0 0],...
-        [sind(input.angle) sind(input.angle+90)], ...
-        [cosd(input.angle) cosd(input.angle+90)], ...
+        [sind(input.angle) sind(input.angle+east_rot)], ...
+        [cosd(input.angle) cosd(input.angle+east_rot)], ...
         '-', 'filled', 'LineWidth', 1.5, 'MaxHeadSize', 1, ...
         'Color', input.color)
     
@@ -85,8 +91,10 @@ function ax = compass(side, varargin)
     offset = 1.2;
     Nx = offset*sind(input.angle); 
     Ny = offset*cosd(input.angle); 
-    Ex = offset*sind(input.angle+90); 
-    Ey = offset*cosd(input.angle+90); 
+    
+    
+    Ex = offset*sind(input.angle+east_rot); 
+    Ey = offset*cosd(input.angle+east_rot); 
     
     text(ax, Nx, Ny, 'N', 'FontUnits', 'Normalized', 'FontSize', input.font_size, 'Color', input.color,...
         'Rotation', 0, 'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle'); 
