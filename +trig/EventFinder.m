@@ -1305,7 +1305,7 @@ classdef EventFinder < handle
             input.input_var('font_size', 20); % fonts on the axes
             input.scan_vars(varargin{:}); 
             
-            obj.cat.addStellarSizes;
+            obj.cat.addStellarSizes(input.distance_au);
             
             if isempty(input.axes)
                 input.axes = gca;

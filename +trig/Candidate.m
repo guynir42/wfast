@@ -329,18 +329,22 @@ classdef Candidate < handle
             if ~isempty(obj.star_props) && ismember('Mag_BP', obj.star_props.Properties.VariableNames) && ~isnan(obj.star_props.Mag_BP) && ...
                     ismember('Teff', obj.star_props.Properties.VariableNames) && ~isnan(obj.star_props.Teff) % catalog entry exists and has non NaN mag/temperature
                 
-                if ~ismember('BolMag', obj.star_props.Properties.VariableNames) || isnan(obj.star_props.BolMag) || ...
-                    ~ismember('BolTemp', obj.star_props.Properties.VariableNames) || ~isnan(obj.star_props.BolTemp) % no bolometric data, need to calculate it now
+                s = util.ast.star_sizes_gaia(obj.star_props); 
                 
-                    [C,T] = util.ast.bol_corr(obj.star_props.Teff, obj.star_props.Mag_BP, obj.star_props.Mag_RP, 'BP', 'RP', 'GAIA', 0);
+                val = util.ast.fresnel_size(s, 40, 500); 
                 
-                    bol_mag = obj.star_props.Mag_BP + C; 
-                
-                    obj.star_props.BolMag = bol_mag;
-                    obj.star_props.BolTemp = T; 
-                end
-                
-                val = util.ast.stellar_size(obj.star_props.BolMag, obj.star_props.BolTemp, 'units', 'FSU', 'dist', 40/206000); % distance is given in parsec (40AU)
+%                 if ~ismember('BolMag', obj.star_props.Properties.VariableNames) || isnan(obj.star_props.BolMag) || ...
+%                     ~ismember('BolTemp', obj.star_props.Properties.VariableNames) || ~isnan(obj.star_props.BolTemp) % no bolometric data, need to calculate it now
+%                 
+%                     [C,T] = util.ast.bol_corr(obj.star_props.Teff, obj.star_props.Mag_BP, obj.star_props.Mag_RP, 'BP', 'RP', 'GAIA', 0);
+%                 
+%                     bol_mag = obj.star_props.Mag_BP + C; 
+%                 
+%                     obj.star_props.BolMag = bol_mag;
+%                     obj.star_props.BolTemp = T; 
+%                 end
+%                 
+%                 val = util.ast.stellar_size(obj.star_props.BolMag, obj.star_props.BolTemp, 'units', 'FSU', 'dist', 40/206000); % distance is given in parsec (40AU)
                 
             else
                 val = NaN; 

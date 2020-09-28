@@ -49,8 +49,6 @@ classdef Catalog < handle
         head@head.Header; % link back to header object! 
         data; % table with the final info
         
-        bc@util.ast.BolometricCorrections;
-        
     end
     
     properties % inputs/outputs
@@ -597,44 +595,24 @@ classdef Catalog < handle
             
         end
         
-        function addBolometricMags(obj)
-            
-            if obj.success
-                
-                if isempty(obj.bc)
-                    obj.bc = util.ast.BolometricCorrections;
-                end
-                
-                color = obj.data.Mag_BP - obj.data.Mag_RP;
-                
-                bol_temp = obj.bc.getTemp(color); 
-                bol_corr = obj.bc.getBolCorr(bol_temp);
-                
-                obj.data.BolMag = obj.data.Mag_BP + bol_corr;
-                obj.data.BolTemp = bol_temp;
-                
-            end
-            
-        end
-        
         function addStellarSizes(obj, distance_AU)
             
             if nargin<2 || isempty(distance_AU)
                 distance_AU = 40; % Kuiper belt is the default
             end
             
-            if ~ismember('BolMag', obj.data.Properties.VariableNames) || ~ismember('BolTemp', obj.data.Properties.VariableNames)
-                obj.addBolometricMags; 
+            if ~ismember('StellarSizesAS', obj.data.Properties.VariableNames)
+                s = util.ast.star_sizes_gaia(obj.data); 
+                obj.data.StellarSizeAS = s;
+            else
+                s = obj.data.StellarSizeAS;
             end
             
-            PC2AU = 360/2/pi*3600; 
+            s_fsu = util.ast.fresnel_size(s, distance_AU); % can add a third input for wavelength in nm
             
-            s = util.ast.stellar_size(obj.data.BolMag, obj.data.BolTemp, 'units', 'fsu', 'distance', distance_AU./PC2AU);
-            
-            obj.data.FresnelSize = s; 
+            obj.data.FresnelSize = s_fsu; 
             
         end
-        
         
     end
     

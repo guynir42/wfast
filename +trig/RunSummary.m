@@ -413,6 +413,8 @@ classdef RunSummary < handle
             
             prog = util.sys.ProgressBar;
             
+            if obj.debug_bit, disp('Calculating coverage!'); end
+            
             coverage = 0; 
             
             for ii = 1:length(v_axis)-1
@@ -459,7 +461,7 @@ classdef RunSummary < handle
                         
                     end % for kk (r)
                     
-                    prog.showif(jj); 
+                    if obj.debug_bit, prog.showif(jj); end
                     
                 end % for jj (b)
                 
