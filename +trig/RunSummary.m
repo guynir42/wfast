@@ -33,9 +33,10 @@ classdef RunSummary < handle
     
     properties % inputs/outputs
         
-        snr_values; 
-        runtime; 
-        total_batches; 
+        snr_values; % best S/N value for each batch
+        runtime; % number of seconds of processed data
+        batch_counter; % number of batches that were processed
+        total_batches; % total batches in the run (optional)
         
         snr_bin_edges; % the edges used in the star_seconds and losses histograms
         size_bin_edges; % the edges used in the star_seconds and losses histograms
@@ -61,6 +62,8 @@ classdef RunSummary < handle
         sim_events;
         
         star_snr; 
+        
+        num_events_expected; % use simulations to estimate this
         
     end
     
@@ -350,6 +353,147 @@ classdef RunSummary < handle
                 hold(input.axes, 'off'); 
                 
             end
+            
+        end
+        
+        function coverage = getCoverageDegSquare(obj, varargin) % how many deg^2 did we cover (multiply this by angular surface density to get detection number)
+        % Some notes: the first value of radius_axis defines the size where
+        % the coverage is normalized, with the assumption the radius goes
+        % down as the power_law input. 
+            
+            input = util.text.InputVars;
+            input.input_var('radius_axis', 0.5:0.1:2); % occulter radius values
+            input.input_var('power_law', 3.5); % index of the occulter radius values
+            input.input_var('impact_axis', 0:0.1:2); % impact parameter values
+            input.input_var('velocity', []); % shadow veclocity in km/sec! If empty, will use the header data
+            input.input_var('range_v', 3); % include values above/below the nominal velocity in this range
+            input.input_var('distance_au', 40);
+            input.input_var('wavelength_nm', 500); 
+            input.input_var('filename', 'sim_results_generic'); 
+            input.scan_vars(varargin{:}); 
+            
+            if ~isempty(input.velocity)
+                v = input.velocity; 
+            else
+                v = obj.head.ephem.getShadowVelocity; 
+                v = sqrt(sum(v.^2)); 
+            end
+            
+            % get the simulation results as a table
+            res = load(fullfile(getenv('DATA'), 'WFAST/occultations', input.filename)); 
+            res = res.results.sim_events; % table! 
+            
+            % Fresnel Scale Units: 
+            FSU = sqrt(input.wavelength_nm.*1e-12*input.distance_au.*150e6./2); % physical Fresnel scale, in km!
+            fsu = sqrt(input.wavelength_nm.*1e-12./(2.*input.distance_au.*150e6))*180/pi; % angular Fresnel scale, in degrees!
+            fsu_default = sqrt(500e-9./(2.*40.*150e9))*180/pi;
+            
+            % this is the only result from the actual run we are summarizing
+            H = obj.star_seconds; % histogram of star-seconds per S/N and R
+            
+            % the S/N axis is defined by the existing histograms
+            S_axis = obj.snr_bin_edges; 
+            dS = median(diff(S_axis)); 
+%             S_axis = S_axis(1:end-1)+dS/2; 
+            
+            % the stellar size is defined by the existing histograms
+            R_correction = fsu./fsu_default; % in the default case this is 1 (assume R was calculated for each star using the defaults)
+            R_axis = R_correction.*obj.size_bin_edges; 
+            dR = median(diff(R_axis)); 
+%             R_axis = R_axis(1:end-1) + dR/2; 
+            
+            % the occulter radius distribution is given by the user
+            r_axis = input.radius_axis; 
+            
+            % the impact parameter distribution is given by the user
+            b_axis = input.impact_axis; 
+            
+            v_axis = (v + [-input.range_v, input.range_v])./FSU;  % velocity range in Fresnel scale units
+            v_deg = v./(input.distance_au.*150e6).*180./pi; % scanning speed, in deg/sec
+            
+            prog = util.sys.ProgressBar;
+            
+            coverage = 0; 
+            
+            for ii = 1:length(v_axis)-1
+                
+                values_v = res(res.v>=v_axis(ii) & res.v<v_axis(ii+1),:); 
+                if isempty(values_v), continue; end
+                
+                prog.start(length(b_axis)-1);
+                
+                for jj = 1:length(b_axis)-1
+                    
+                    values_b = values_v(values_v.b>=b_axis(jj) & values_v.b<b_axis(jj+1),:); 
+                    if isempty(values_b), continue; end
+                    
+                    for kk = 1:length(r_axis)-1
+                        
+                        values_r = values_b(values_b.r>=r_axis(kk) & values_b.r<r_axis(kk+1),:); 
+                        if isempty(values_r), continue; end
+                        
+                        for mm = 1:length(R_axis)-1
+                            
+                            values_R = values_r(values_r.R>=R_axis(mm) & values_r.R<R_axis(mm+1),:); 
+                            if isempty(values_R), continue; end
+                            
+                            for nn = 1:length(S_axis)-1
+                                
+                                values = values_R(values_R.star_snr>=S_axis(nn) & values_R.star_snr<S_axis(nn+1),:); 
+                                if isempty(values), continue; end
+                                
+                                N_total = height(values); 
+                                N_passed = height(values(values.passed,:));
+                                
+                                dt = H(nn,mm); % star-seconds that were observed on this S/N and R
+                                
+                                r_rate = (r_axis(1)./r_axis(kk)).^input.power_law; % occurance rate of occulters of this radius, relative to the minimal size! 
+                                
+                                db = (b_axis(jj+1)-b_axis(jj))*fsu; % size of impact parameter bin, in degrees
+                                
+                                coverage = coverage + N_passed/N_total*r_rate*v_deg*db*dt; % units of deg^2
+                                
+                            end % for nn (S)
+                            
+                        end % for mm (R)
+                        
+                    end % for kk (r)
+                    
+                    prog.showif(jj); 
+                    
+                end % for jj (b)
+                
+            end % for ii (v)
+            
+        end
+            
+        function val = getNumDetections(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('coverage', []); % if this is left empty, will call getCoverageDegSquare with the other parameters
+            input.input_var('density', 1.1e7); % density of objects per deg^2. from ref: https://ui.adsabs.harvard.edu/abs/2012ApJ...761..150S/abstract
+            input.input_var('norm_radius', 0.25); % normalization radius in km
+            input.input_var('radius_axis', 0.5:0.1:2); % occulter radius values
+            input.input_var('power_law', 3.5); % index of the occulter radius values
+            input.input_var('impact_axis', 0:0.1:2); % impact parameter values
+            input.input_var('velocity', []); % shadow veclocity in km/sec! If empty, will use the header data
+            input.input_var('range_v', 3); % include values above/below the nominal velocity in this range
+            input.input_var('distance_au', 40);
+            input.input_var('wavelength_nm', 500); 
+            input.input_var('filename', 'sim_results_generic'); 
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.coverage)
+                input.coverage = obj.getCoverageDegSquare(varargin{:}); 
+            end
+            
+            FSU = sqrt(input.wavelength_nm.*1e-12*input.distance_au.*150e6./2); % physical Fresnel scale, in km!
+
+            r_norm = input.norm_radius./FSU; % translate this size to FSU
+            
+            density = input.density.*(r_norm./input.radius_axis(1)).^(input.power_law-1); % re-normalize the density using the minimal radius in the simulation
+            
+            val = density.*input.coverage; 
             
         end
         

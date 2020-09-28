@@ -407,6 +407,8 @@ classdef EventFinder < handle
                 obj.store.star_sizes = obj.cat.data.FresnelSize;
             end
             
+            obj.store.setupRateFunction(obj.head.is_galactic_center); % choose the rate function based on coordinates being in or out of the galactic center
+            
             obj.store.input(varargin{:}); % the store does the actual parsing and organizing of data into buffers
             
             obj.pars.analysis_time = util.text.time2str('now'); % keep a record of when the analysis was done
@@ -609,6 +611,8 @@ classdef EventFinder < handle
             
             obj.summary = obj.produceSummary; 
             
+            obj.summary.num_events_expected = obj.summary.getNumDetections; % use simulations to estimate the detection rate
+            
         end
         
         function s = produceSummary(obj) % makes a RunSummary with all relevant data on the quality and quantity of star hours, etc
@@ -621,6 +625,7 @@ classdef EventFinder < handle
             % load the content of the finder
             s.finder_pars = obj.pars;
             s.snr_values = obj.snr_values;
+            s.batch_counter = obj.batch_counter; 
             s.total_batches = obj.total_batches; 
             s.sim_events = obj.sim_events;
             s.black_list_stars = obj.black_list_stars;

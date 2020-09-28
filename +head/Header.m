@@ -700,6 +700,18 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             
         end
         
+        function val = is_galactic_center(obj)
+            
+            if isempty(obj.RA_DEG) || isempty(obj.DEC_DEG)
+                val = 0;
+            elseif abs(obj.RA_DEG-270)<25 || abs(obj.DEC_DEG+20)<25
+                val = 1; 
+            else
+                val = 0;
+            end
+            
+        end
+        
     end
            
     methods % setters

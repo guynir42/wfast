@@ -233,7 +233,11 @@ classdef DataStore < handle
             obj.pars.minimal_rate = 0.06; % rate threshold
             obj.pars.minimal_snr = 10; % stars above this S/N are picked regardless of their theoretical rate
             obj.pars.maximal_size = 5; % stars bigger than this are removed no matter what their rate is (unless they pass the above threshold)
-            obj.pars.rate_function = @(R,S)0.04412770-0.08761978.*R+0.00244621.*R.^2+0.01875690.*S-0.00022921.*S.^2; % detection fraction as function of stellar radius (this is empirically determined from simulations)
+            obj.pars.rate_function = []; 
+            obj.pars.rate_function_general = @(R,S)-0.04424300-0.00698388.*R+0.00732601.*R.^2-0.00659104.*R.*S+0.02099799.*S-0.00000820.*S.^2; % off ecliptic results
+            obj.pars.rate_function_center = @(R,S)-0.17472489-0.03477566.*R+0.02088154.*R.^2-0.01280607.*R.*S+0.06250443.*S-0.00135418.*S.^2; % galactic center results
+            
+%             obj.pars.rate_function = @(R,S)0.04412770-0.08761978.*R+0.00244621.*R.^2+0.01875690.*S-0.00022921.*S.^2; % detection fraction as function of stellar radius (this is empirically determined from simulations)
 %             obj.pars.rate_function = @(R,S)0.09098123-0.10198061.*R+0.01777770.*S; % detection fraction as function of stellar radius (this is empirically determined from simulations)
 %             obj.pars.rate_function = @(R) 0.265 - 0.143.*R + 0.02666.*R.^2; % detection fraction as function of stellar radius (this is empirically determined from simulations)
             
@@ -241,6 +245,16 @@ classdef DataStore < handle
             obj.pars.cosmic_ray_threshold = 8; % in units of S/N
 
             obj.reset;
+            
+        end
+        
+        function setupRateFunction(obj, galactic_center)
+            
+            if galactic_center
+                obj.pars.rate_function = obj.pars.rate_function_center; 
+            else
+                obj.pars.rate_function = obj.pars.rate_function_general; 
+            end
             
         end
         

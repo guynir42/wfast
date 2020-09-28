@@ -1468,7 +1468,7 @@ classdef CurveGenerator < handle
             end
             
             if isempty(input.occulter_size)
-                obj.r = util.stat.power_law_dist(3, 'min', 0.5, 'max', 2); 
+                obj.r = util.stat.power_law_dist(3.5, 'min', 0.5, 'max', 2); 
             else
                 obj.r = input.occulter_size;
             end
