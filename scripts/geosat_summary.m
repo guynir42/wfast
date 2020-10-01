@@ -287,6 +287,9 @@ end
 
 N_glints = histcounts(D, 'BinEdges', Dec_edges); 
 
+confidence = 0.95; 
+[N_glints_lower, N_glints_upper] = util.stat.poisson_errors(N_glints, confidence); 
+
 N_hours = zeros(size(N_glints), 'like', N_glints); 
 
 % how many hours we have at each declination
@@ -300,42 +303,60 @@ for ii = 1:length(runs)
     N_hours(idx) = N_hours(idx) + runs(ii).duration/3600; 
 end
 
+rate = N_glints./N_hours/7;
+rate(N_hours==0) = NaN; 
 
-N_hours_ecl = zeros(size(N_glints), 'like', N_glints); 
+rate_u = N_glints_upper./N_hours/7;
+rate_u(N_hours==0) = NaN; 
 
-% how many hours we have at each declination on the ecliptic only
-for ii = 1:length(runs)
-    
-    if runs(ii).shadow_radius>42000, continue; end % skip runs inside Earth's shadow
-    
-    if strcmp(runs(ii).Object, 'ecliptic') || strcmp(runs(ii).Object, 'SGR1806')
-        idx = find(runs(ii).Dec_deg>=Dec_edges, 1, 'last'); 
-        N_hours_ecl(idx) = N_hours_ecl(idx) + runs(ii).duration/3600; 
-    end
-end
+rate_l = N_glints_lower./N_hours/7;
+rate_l(N_hours==0) = NaN; 
+
+% N_hours_ecl = zeros(size(N_glints), 'like', N_glints); 
+% 
+% % how many hours we have at each declination on the ecliptic only
+% for ii = 1:length(runs)
+%     
+%     if runs(ii).shadow_radius>42000, continue; end % skip runs inside Earth's shadow
+%     
+%     if strcmp(runs(ii).Object, 'ecliptic') || strcmp(runs(ii).Object, 'SGR1806')
+%         idx = find(runs(ii).Dec_deg>=Dec_edges, 1, 'last'); 
+%         N_hours_ecl(idx) = N_hours_ecl(idx) + runs(ii).duration/3600; 
+%     end
+% end
 
 bar(ax, Dec_edges(1:end-1)+bin/2, N_glints, 0.6); 
 
 hold(ax, 'on'); 
 
-bar(ax, Dec_edges(1:end-1)+bin/2, N_hours, 0.4, 'FaceAlpha', 0.5); 
+bar(ax, Dec_edges(1:end-1)+bin/2, N_hours, 0.4, 'FaceAlpha', 0.5, 'FaceColor', 'g'); 
 
 % bar(ax, Dec_edges(1:end-1)+bin/2, N_hours_ecl, 0.2, 'FaceAlpha', 0.5); 
 
 ax.YLim = [0 max(N_glints)+2]; 
-
-plot(ax, [30 30], [ax.YLim], '--m'); 
-text(ax, 28, 30, 'ecliptic', 'HorizontalAlignment', 'right', 'Color', 'm', 'FontSize', 18); 
-text(ax, 32, 30, 'off ecliptic', 'HorizontalAlignment', 'left', 'Color', 'm', 'FontSize', 18); 
-
-hl = legend(ax, {'num. geo-sats', 'num. hours'}, 'Location', 'NorthEast'); 
 
 hold(ax, 'off'); 
 
 xlabel(ax, 'Declination [dec]'); 
 ylabel(ax, 'obs. time [hours] / num. geo-sats'); 
 
+yyaxis(ax, 'right');
+
+errorbar(ax, Dec_edges(1:end-1)+bin/2, rate, rate_l, rate_u, 'd', 'LineWidth', 2, 'MarkerSize', 7); 
+
+ylabel(ax, 'geo-sat rate [hour^{-1} deg^{-1}]'); 
+ax.YLim = [0 0.6];
+% plot(ax, [30 30], [ax.YLim], '--m'); 
+% text(ax, 28, 30, 'ecliptic', 'HorizontalAlignment', 'right', 'Color', 'm', 'FontSize', 18); 
+% text(ax, 32, 30, 'off ecliptic', 'HorizontalAlignment', 'left', 'Color', 'm', 'FontSize', 18); 
+
+hl = legend(ax, {'num. geo-sats', 'num. hours', 'geo-sat rate'}, 'Location', 'NorthEast'); 
+
 ax.FontSize = 22; 
+
+for ii = 1:length(rate)
+    fprintf('%4.2f^{+%4.2f}_{-%4.2f}\n', rate(ii), rate_u(ii)-rate(ii), rate(ii)-rate_l(ii));
+end
 
 
 %% save the plot
@@ -488,7 +509,7 @@ ang_size_ratio = sqrt(flux_ratio);
 
 ang_size_mirror = 0.5/180*pi/ang_size_ratio; % radians
 
-r = 35786*1000*100; % geosat height in cm
+r = runs(3).head.ephem.getSlantRange('geo')*1000*100; % geosat height in cm
 
 mirror_size_cm = r.*ang_size_mirror
 

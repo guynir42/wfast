@@ -636,6 +636,29 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
+        function val = getSlantRange(obj, target_elevation_km) % target elevation above Earth's surface
+            
+            if ischar(target_elevation_km)
+                if util.text.cs(target_elevation_km, 'geosat', 'geostationary', 'geosynchronous')
+                    target_elevation_km = 35786;
+                elseif util.text.cs(target_elevation_km, 'gps')
+                    target_elevation_km = 20200; 
+                elseif util.text.cs(target_elevation_km, 'leo', 'low earth orbit')
+                    target_elevation_km = 400; % average value
+                end
+            end
+            
+            a = 6371 + target_elevation_km; % radius of target
+            b = 6371 + obj.elevation/1000; % observer radius
+            
+            a_angle = obj.Alt_deg + 90; % angle opposite of a
+            b_angle = asind(b./a.*sind(a_angle)); % angle opposite of b (law of sines)
+            c_angle = 180 - a_angle - b_angle; % angle opposite of c (which is the range we want)
+            
+            val = a.*sind(c_angle)./sind(a_angle); 
+            
+        end
+        
     end
     
     methods % setters
