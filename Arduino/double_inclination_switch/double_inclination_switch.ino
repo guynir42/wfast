@@ -24,6 +24,7 @@ Parser parser("inclination", "DoubleSwitch v1.00");
 
 bool transmit=0; // do we want a constant serial output with the current data?
 float pause=10; // delay between measurements, in milliseconds
+unsigned long int anti_flip_delay=10; 
 
 // thresholds for inclination (value of z-component of normalized acceleration vector)
 float thresh1=0; // -0.05; 
@@ -123,8 +124,14 @@ void loop() {
   else snprintf(state2,5,"up");
 
   if(average1<thresh1 || average2<thresh2){ // one of the accelerometers is pointing down
+  
+    if(relay.getState()) // only when turning off from the on state
+      anti_flip_delay*=2; // each time we kill the current the delay grows larger, so this doesn't endlessly flip the power to the mount (power-off the arduino to reset)
+
     relay.setState(0); // kill the switch
     led.setState(1); // indicate this on the built-in LED
+    delay(anti_flip_delay); // this delay is to prevent flickering: when the acceleration is borderline for turning off the current it might start fliping the switch on/off very fast
+    
   }
   else{
     relay.setState(1); // everything is ok, switch can turn on
