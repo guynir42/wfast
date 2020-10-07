@@ -794,6 +794,17 @@ classdef MicroFlare < handle
             
         end
         
+        function dumpExtraData(obj_vec)
+            
+            for obj = obj_vec
+                obj.cat = head.Catalog.empty;
+                obj.cal = img.Calibration.empty; 
+                obj.all_cutouts = [];
+                obj.all_positions = []; 
+            end
+            
+        end
+        
     end
     
     methods % plotting tools / GUI

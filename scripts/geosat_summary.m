@@ -25,11 +25,18 @@ for ii = 1:length(all_runs)
         
         fprintf('Folder: %d/%d "%s" \n', ii, length(all_runs), all_runs(ii).identifier); 
         
+        if strcmp(all_runs(ii).identifier, '2020-08-31\test_frame_rate_run1')
+            continue;
+        end
+        
         new_run = struct('folder', all_runs(ii).folder, ...
                          'id', all_runs(ii).identifier, ...
                          'num_files', all_runs(ii).num_files, ...
                          'has_flares', false, ...
                          'num_glints', 0, ...
+                         'all_flares', [], ...
+                         'glints', [], ...
+                         'flares', [], ...
                          'RA', [], ...
                          'Dec', [], ...
                          'Object', [], ...
@@ -60,13 +67,24 @@ for ii = 1:length(all_runs)
                 
                 micro_flares.calcExtras; % do some more serious processing to these flares
                 
+                new_run.all_flares = micro_flares; 
+                
                 geosat_flares = micro_flares.filterGeosats;
                 
-                new_groups = geosat_flares.clusterFlares;
+%                 new_run.glints = geosat_flares.clusterFlares;
+                new_run.glints = geosat_flares.multiVelocityClustering;
                 
-                new_run.num_glints = length(new_groups); 
+                for jj = 1:length(new_run.glints)
+                    new_run.flares = horzcat(new_run.flares, new_run.glints{jj}); 
+                end
                 
-                glint_groups = horzcat(glint_groups, new_groups); 
+                new_run.num_glints = length(new_run.glints); 
+                
+                glint_groups = horzcat(glint_groups, new_run.glints); 
+                
+                if isa(new_run.all_flares, 'img.MicroFlare')
+                    new_run.all_flares.dumpExtraData; 
+                end
                 
             end
             
@@ -78,6 +96,9 @@ for ii = 1:length(all_runs)
         
         new_run.RA = header.RA; 
         new_run.Dec = header.DEC; 
+        new_run.RA_deg = header.RA_DEG; 
+        new_run.Dec_deg = header.DEC_DEG; 
+        
         new_run.Object = header.OBJECT;
         new_run.head = header; 
         
@@ -100,33 +121,34 @@ for ii = 1:length(all_runs)
 end
 
 
+
 %% re-assiciate the glints with each run
 
-for jj = 1:length(runs)
-    runs(jj).glints = {}; 
-    runs(jj).flares = []; 
-end
-
-for ii = 1:length(glint_groups)
-    
-    for jj = 1:length(runs)
-        
-        if strcmp(util.text.run_id(glint_groups{ii}(1).folder), runs(jj).id)
-            runs(jj).glints{end+1} = glint_groups{ii}; 
-            runs(jj).flares = horzcat(runs(jj).flares, glint_groups{ii}); 
-        end
-        
-    end
-    
-end
-
-for jj = 1:length(runs)
-    
-    if ~isempty(runs(jj).flares)
-        runs(jj).glints = runs(jj).flares.multiVelocityClustering; 
-    end
-    
-end
+% for jj = 1:length(runs)
+%     runs(jj).glints = {}; 
+%     runs(jj).flares = []; 
+% end
+% 
+% for ii = 1:length(glint_groups)
+%     
+%     for jj = 1:length(runs)
+%         
+%         if strcmp(util.text.run_id(glint_groups{ii}(1).folder), runs(jj).id)
+%             runs(jj).glints{end+1} = glint_groups{ii}; 
+%             runs(jj).flares = horzcat(runs(jj).flares, glint_groups{ii}); 
+%         end
+%         
+%     end
+%     
+% end
+% 
+% for jj = 1:length(runs)
+%     
+%     if ~isempty(runs(jj).flares)
+%         runs(jj).glints = runs(jj).flares.multiVelocityClustering; 
+%     end
+%     
+% end
 
 
 %% show the clustering
@@ -191,8 +213,8 @@ for ii = 1:length(runs)
         bad_object(end+1) = ii; 
     end
     
-    runs(ii).Dec_deg = head.Ephemeris.sex2deg(runs(ii).Dec); 
-    runs(ii).RA_deg = head.Ephemeris.hour2deg(runs(ii).RA); 
+%     runs(ii).Dec_deg = head.Ephemeris.sex2deg(runs(ii).Dec); 
+%     runs(ii).RA_deg = head.Ephemeris.hour2deg(runs(ii).RA); 
     
 end
 
@@ -219,7 +241,38 @@ for ii = 1:length(runs)
     runs(ii).antisolar_dist = runs(ii).head.ephem.getAntiSolarDistance;
     runs(ii).shadow_radius = runs(ii).head.ephem.getShadowRadius; 
     
+    if strcmp(runs(ii).head.OBJECT, 'SGR1806') && runs(ii).Dec_deg<-30
+        
+        runs(ii).head.RA = '18:08:39.32';
+        runs(ii).head.DEC = '-20:24:39.5';
+
+        runs(ii).RA_deg = runs(ii).head.RA;
+        runs(ii).Dec_deg = runs(ii).head.DEC;
+        runs(ii).RA_deg = runs(ii).head.RA_DEG;
+        runs(ii).Dec_deg = runs(ii).head.DEC_DEG;
+        
+    end
+    
 end
+
+%% short summary of observations
+
+total_hours = 0;
+total_sats = 0;
+total_geosat_flares = 0;
+total_geosat_objects = 0; 
+
+for ii = 1:length(runs)
+    
+    total_hours = total_hours + runs(ii).duration/3600; 
+    total_sats = total_sats + length(runs(ii).all_flares); 
+    total_geosat_flares = total_geosat_flares + length(runs(ii).flares); 
+    total_geosat_objects = total_geosat_objects + length(runs(ii).glints); 
+    
+end
+
+fprintf('Scanned %4.2f hours, found %d LEO satellites, %d geo-sats, %d individual flares from geosats\n', ...
+    total_hours, total_sats-total_geosat_flares, total_geosat_objects, total_geosat_flares); 
 
 %% extract some tables for the paper: observation log
 
@@ -285,16 +338,15 @@ for ii = 1:length(runs)
     end
 end
 
-N_glints = histcounts(D, 'BinEdges', Dec_edges); 
+N_geosats = histcounts(D, 'BinEdges', Dec_edges); 
 
 confidence = 0.95; 
-[N_glints_lower, N_glints_upper] = util.stat.poisson_errors(N_glints, confidence); 
+[N_glints_lower, N_glints_upper] = util.stat.poisson_errors(N_geosats, confidence); 
 
-N_hours = zeros(size(N_glints), 'like', N_glints); 
+N_hours = zeros(size(N_geosats), 'like', N_geosats); 
 
 % how many hours we have at each declination
-for ii = 1:length(runs)
-    
+for ii = 1:length(runs)    
     if runs(ii).shadow_radius>42000, continue; end % skip runs inside Earth's shadow
     
     if strcmp(runs(ii).Object, 'test'), continue; end
@@ -303,7 +355,7 @@ for ii = 1:length(runs)
     N_hours(idx) = N_hours(idx) + runs(ii).duration/3600; 
 end
 
-rate = N_glints./N_hours/7;
+rate = N_geosats./N_hours/7;
 rate(N_hours==0) = NaN; 
 
 rate_u = N_glints_upper./N_hours/7;
@@ -325,7 +377,7 @@ rate_l(N_hours==0) = NaN;
 %     end
 % end
 
-bar(ax, Dec_edges(1:end-1)+bin/2, N_glints, 0.6); 
+bar(ax, Dec_edges(1:end-1)+bin/2, N_geosats, 0.6); 
 
 hold(ax, 'on'); 
 
@@ -333,7 +385,7 @@ bar(ax, Dec_edges(1:end-1)+bin/2, N_hours, 0.4, 'FaceAlpha', 0.5, 'FaceColor', '
 
 % bar(ax, Dec_edges(1:end-1)+bin/2, N_hours_ecl, 0.2, 'FaceAlpha', 0.5); 
 
-ax.YLim = [0 max(N_glints)+2]; 
+ax.YLim = [0 max(N_geosats)+2]; 
 
 hold(ax, 'off'); 
 
@@ -356,6 +408,36 @@ ax.FontSize = 22;
 
 for ii = 1:length(rate)
     fprintf('%4.2f^{+%4.2f}_{-%4.2f}\n', rate(ii), rate_u(ii)-rate(ii), rate(ii)-rate_l(ii));
+end
+
+% number of satellites (glints)
+D2 = []; 
+for ii = 1:length(runs)
+    if runs(ii).shadow_radius>42000, continue; end % skip runs inside Earth's shadow
+    
+    for jj = 1:length(runs(ii).flares)
+        D2(end+1,1) = runs(ii).Dec_deg; 
+    end
+end
+
+N_flares = histcounts(D2, 'BinEdges', Dec_edges); 
+
+[N_flares_lower, N_flares_upper] = util.stat.poisson_errors(N_flares, confidence); 
+
+
+rate2 = N_flares./N_hours/7;
+rate2(N_hours==0) = NaN; 
+
+rate2_u = N_flares_upper./N_hours/7;
+rate2_u(N_hours==0) = NaN; 
+
+rate2_l = N_flares_lower./N_hours/7;
+rate2_l(N_hours==0) = NaN; 
+
+fprintf('Now for the rate of individual flares!\n'); 
+
+for ii = 1:length(rate)
+    fprintf('%4.2f^{+%4.2f}_{-%4.2f}\n', rate2(ii), rate2_u(ii)-rate2(ii), rate2(ii)-rate2_l(ii));
 end
 
 

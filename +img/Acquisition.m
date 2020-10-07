@@ -1791,7 +1791,7 @@ classdef Acquisition < file.AstroData
             delete(timerfind('name', 'acquisition-t1'));
             
             obj.t1 = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'acquisition-t1', ...
-                'Period', 30, 'StartDelay', 30, 'TimerFcn', @obj.callback_t1, 'ErrorFcn', @obj.setup_t1, 'BusyMode', 'drop');
+                'Period', 30, 'StartDelay', 30, 'TimerFcn', @obj.callback_t1, 'ErrorFcn', @obj.setup_t1);
             
             start(obj.t1);
             
