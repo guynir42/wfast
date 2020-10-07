@@ -161,7 +161,7 @@ classdef Candidate < handle
     
     properties(Hidden=true)
         
-        use_show_secrets = true; % this should be turned off at some point
+        use_show_secrets = false; % this should be turned on only when debuggin (on the un-blinded set)
         
         run_identifier = ''; % use this to find the files in the database. Format: <date folder>\<run_name_folder> e.g., 2020-09-07\ecliptic_run1
 

@@ -93,7 +93,7 @@ classdef Analysis < file.AstroData
         use_analysis_dir_log = 0; % do we want analysis log file
         
         use_full_lightcurves = 0; % use the Lightcurves object to hold all the fluxes and other measurements for the entire run
-        use_save_full_lightcurves = 1; % save these full lightcurves for the entire run as a single MAT file (ONLY when use_analysis_dir_save=1)
+        use_save_full_lightcurves = 1; % save these full lightcurves for the entire run as a single MAT file (ONLY when use_full_lightcurves=1 and use_analysis_dir_save=1)
         use_save_batched_lightcurves = 1; % save each batch's photometric result in a separate file (ONLY when use_analysis_dir_save=1)
         
         use_psf_model = 1;
@@ -910,6 +910,52 @@ classdef Analysis < file.AstroData
                 error('Cannot find a free worker to run analysis...');
             end
             
+            
+        end
+        
+        function idx = findWorkerUnread(obj)
+            
+            if isempty(gcp('nocreate'))
+                obj.pool = parpool;
+                obj.pool.IdleTimeout = 360;
+            end
+            
+            N = obj.pool.NumWorkers; 
+            
+            idx = [];
+            
+            for ii = 1:N
+                
+                if length(obj.futures)<ii || ~isa(obj.futures{ii}, 'parallel.Future') || ~isvalid(obj.futures{ii})...
+                        || (strcmp(obj.futures{ii}.State, 'finished') && isempty(obj.futures{ii}.Error))
+                    idx = ii;
+                    return;
+                end
+                
+            end
+            
+        end
+        
+        function clearWorkerErrors(obj, number)
+            
+            if nargin<2
+                number = 1:length(obj.futures);
+            end
+            
+            for ii = number
+                
+                if ii<=length(obj.futures)
+                    
+                    if ~isa(obj.futures{ii}, 'parallel.Future') || isvalid(obj.futures{ii})...
+                        || (strcmp(obj.futures{ii}.State, 'finished') && ~isempty(obj.futures{ii}.Error))
+                    
+                        obj.futures{ii} = []; 
+                    
+                    end
+                    
+                end
+                
+            end
             
         end
         

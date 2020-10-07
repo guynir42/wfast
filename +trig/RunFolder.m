@@ -538,7 +538,7 @@ classdef RunFolder < dynamicprops
         end
         
         function val = default_process_date % the default minimal processing date for the new pipeline
-            val = '2020-09-01'; 
+            val = '2020-10-01'; 
         end
          
     end
