@@ -83,7 +83,7 @@ void setup() {
   relay1.setInverse();
   relay2.setInverse();
   relay3.setInverse();
-  relay4.setInverse();
+  relay4.setInverse(0); // make sure the LED is off by default
 
 }
 

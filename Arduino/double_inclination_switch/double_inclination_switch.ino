@@ -27,8 +27,8 @@ float pause=10; // delay between measurements, in milliseconds
 unsigned long int anti_flip_delay=10; 
 
 // thresholds for inclination (value of z-component of normalized acceleration vector)
-float thresh1=0; // -0.05; 
-float thresh2=0; // -0.05;
+float thresh1=0.05; 
+float thresh2=-0.1;
 
 // defining the accelerometers
 // #define accel_module1 (0x1d)         // SDO-> Vcc
@@ -194,7 +194,7 @@ void statusReport(char *arg){
   Serial.print(average2); 
    
   Serial.print(" | state2= ");
-  Serial.println(state1); 
+  Serial.println(state2); 
 
 }
 
