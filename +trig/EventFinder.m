@@ -95,6 +95,8 @@ classdef EventFinder < handle
         
         summary@trig.RunSummary; 
         
+        monitor@trig.StarMonitor; 
+        
     end
     
     properties % inputs/outputs
@@ -160,6 +162,8 @@ classdef EventFinder < handle
                 
                 obj.var_buf = util.vec.CircularBuffer; 
                 obj.var_buf_oort = util.vec.CircularBuffer; 
+                
+                obj.monitor = trig.StarMonitor; 
                 
                 obj.resetPars; 
                 
@@ -230,6 +234,8 @@ classdef EventFinder < handle
             obj.sim_events = [];
             
             obj.total_batches = [];
+            
+            obj.monitor.reset;
             
             obj.clear;
             
@@ -521,6 +527,8 @@ classdef EventFinder < handle
                     else
                         obj.store.saveHours; % with no arguments it just counts the hours in this batch as good times
                     end
+                    
+                    obj.monitor.input(obj.store.extended_flux, obj.store.extended_aux, obj.store.cutouts, obj.latest_candidates);
                     
                     if obj.pars.use_sim % simulated events are injected into the data and treated like real events
                         

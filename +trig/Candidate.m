@@ -165,6 +165,8 @@ classdef Candidate < handle
         
         run_identifier = ''; % use this to find the files in the database. Format: <date folder>\<run_name_folder> e.g., 2020-09-07\ecliptic_run1
 
+        folder = ''; % use this when loading the candidates from file, so you know where to save them to after classification is done
+        
         is_positive; % if the filtered flux peak is positive. If not, it means the flux is opposite the template (e.g., a flare with an occultation template)
         
         is_simulated = 0; % by default candidates are not simulated. If true, this candidate is an injected simulated event.  
@@ -175,7 +177,8 @@ classdef Candidate < handle
         
         flux_raw_all; % the raw flux (over the extended region) for all stars
         flux_corrected_all; % the corrected flux (over the exteneded region) for all stars
-        auxiliary_all; % the auxiliary data (for the extended region) for all stars. 
+        auxiliary_all; % the auxiliary data (for the extended region) for all stars
+        cutouts_all; % the cutouts for all stars (in the extended region)
         
         search_start_idx; % the frame index inside the extended region, where the search region starts (often this is 51)
         search_end_idx; % the frame index inside the extended region, where the search region ends (often this is 150)
@@ -183,7 +186,7 @@ classdef Candidate < handle
         kern_extra; % any other kernels that passed the lower threshold for kernels
         star_extra; % any other stars that passed the lower threshold for stars
         
-        version = 1.00;
+        version = 1.01;
         
     end
     
@@ -473,6 +476,15 @@ classdef Candidate < handle
                 obj.notes{end+1} = sprintf('Peak outside, frame= %d, S/N= %4.2f', real_peak_idx, mx); 
                 obj.kept = 0;
             end
+            
+        end
+        
+        function clearExtraData(obj)
+            
+            obj.flux_raw_all = [];
+            obj.flux_corrected_all = [];
+            obj.auxiliary_all = [];
+            obj.cutouts_all = [];
             
         end
         
