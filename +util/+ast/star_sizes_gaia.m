@@ -8,6 +8,8 @@ function sizes_arcsec = star_sizes_gaia(varargin)
 
     if nargin==0, help('util.ast.star_sizes_gaia'); return; end
     
+    addpath(getenv('DATA')); % we need to have +cats on the path
+    
     input = util.text.InputVars;
     input.use_ordered_numeric = 1;
     input.input_var('Mag_G', [], 'magnitudes'); 

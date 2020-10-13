@@ -264,6 +264,7 @@ classdef RunFolder < dynamicprops
             input.input_var('start_date', []); % scan starting from runs taken on this date (inclusive). Can be string <YYYY-MM-DD> or datetime object
             input.input_var('end_date', []); % scan upto runs taken on this date (inclusive). Can be string <YYYY-MM-DD> or datetime object
             input.input_var('process_date', trig.RunFolder.default_process_date); % only consider as processed runs that were processed on or after this date
+            input.input_var('files', 100, 'min_files', 'minimal_files', 'min_num_files', 'minimal_number_files', 'num_files', 'number_files'); % must have this many HDF5 files for analysis
             input.input_var('catalog', false); % pull the catalog file into each found object
             input.input_var('debug_bit', 0); % verbosity of printouts
             input.scan_vars(varargin{:}); 
@@ -538,7 +539,7 @@ classdef RunFolder < dynamicprops
         end
         
         function val = default_process_date % the default minimal processing date for the new pipeline
-            val = '2020-10-01'; 
+            val = '2020-10-06'; 
         end
          
     end

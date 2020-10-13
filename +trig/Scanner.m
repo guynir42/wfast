@@ -265,6 +265,7 @@ classdef Scanner < handle
                 report = 'Could not find a free worker!'; 
             else % we can run this folder now! 
                 obj.a.reader.dir.cd(r.folder); 
+                obj.a.reader.loadFiles; 
                 obj.a.async_run('worker', worker_idx, 'reset', 1, 'logging', 1, 'save', 1); 
                 run_id = util.text.run_id(obj.a.reader.current_dir); 
                 report = sprintf('Started new run on worker %d for folder %s', worker_idx, run_id);

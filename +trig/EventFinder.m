@@ -644,11 +644,14 @@ classdef EventFinder < handle
             s.cut_histograms = permute(nansum(obj.store.checker.histograms,2), [1,3,2]);
             s.cut_bin_edges = obj.store.checker.hist_edges;
             
-            % load the content of the star hours
-            if ~ismember('FresnelSize', obj.cat.data.Properties.VariableNames)
-                obj.cat.addStellarSizes;
+            % make sure the catalog has Fresnel sizes
+            if ~isempty(obj.cat) && obj.cat.success
+                if ~ismember('FresnelSize', obj.cat.data.Properties.VariableNames)
+                    obj.cat.addStellarSizes;
+                end
             end
             
+            % load the content of the star hours
             s.inputHours(obj.store.checker.hours, obj.cat.data.FresnelSize(obj.store.star_indices));
             
 %             s.snr_bin_edges = obj.store.checker.hours.snr_bin_edges;

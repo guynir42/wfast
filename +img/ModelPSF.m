@@ -177,6 +177,14 @@ classdef ModelPSF < handle
             
             obj.stack = nansum(nansum(obj.cutouts_shifted,3),4);
             
+            if nnz(obj.stack)==0 || nnz(~isnan(obj.stack))==0
+                obj.angle = NaN;
+                obj.maj_axis = NaN;
+                obj.min_axis = NaN;
+                obj.fwhm = NaN;
+                return; 
+            end
+            
             if obj.use_gaussian
                 obj.stack = obj.stack.*util.img.gaussian2(obj.gauss_sigma, 'size', size(obj.cutouts)); 
             end

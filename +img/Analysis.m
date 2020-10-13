@@ -40,6 +40,8 @@ classdef Analysis < file.AstroData
         
         sky_pars;
         
+        cutout_store@learn.CutoutStorage; 
+        
         prog@util.sys.ProgressBar;
         
         image_mextractor;
@@ -86,6 +88,8 @@ classdef Analysis < file.AstroData
         max_failed_batches = 3; % if star flux is lost for more than this number of batches, quit the run
         
         use_astrometry = 1;
+        use_require_astrometry = 1; % when true, will error if there is no astrometric solution
+        
         use_cutouts = 1;
         use_photometry = 1;
         
@@ -136,9 +140,9 @@ classdef Analysis < file.AstroData
         
         failed_batch_counter = 0;
         
-        
         use_cutouts_all = 0;
         use_cutouts_all_proc = 1;
+        use_cutouts_store = 0; 
         
         cutouts_all;
         positions_x_all;
@@ -164,7 +168,7 @@ classdef Analysis < file.AstroData
         
         num_batches_limit;
         
-        version = 1.03;
+        version = 1.04;
         
     end
     
@@ -208,6 +212,8 @@ classdef Analysis < file.AstroData
                 
                 obj.finder = trig.EventFinder;
 %                 obj.finder.loadFilterBank;
+                
+                obj.cutout_store = learn.CutoutStorage; 
                 
                 obj.prog = util.sys.ProgressBar;
                 obj.audio = util.sys.AudioControl;
@@ -1147,7 +1153,11 @@ classdef Analysis < file.AstroData
                 try
                     obj.analysisAstrometry;
                 catch ME
-                    warning(ME.getReport); % non essential to  successfully running the data analysis
+                    if obj.use_require_astrometry
+                        rethrow(ME); % need to have astrometry to continue
+                    else
+                        warning(ME.getReport); % non essential to  successfully running the data analysis
+                    end
                 end
             end
            
@@ -1176,6 +1186,10 @@ classdef Analysis < file.AstroData
 %                             warning(ME.getReport); 
                             rethrow(ME); 
                         end
+                    end
+                    
+                    if obj.use_cutouts_store
+                        obj.analysisCutoutsStore; % maybe add a try-catch later? 
                     end
 
                 end
@@ -1426,7 +1440,11 @@ classdef Analysis < file.AstroData
                         obj.temperatures = obj.cat.temperatures;
                        
                     elseif obj.cat.success==0
-                        fprintf('Warning: could not find an astrometric solution!\n'); 
+                        if obj.use_require_astrometry
+                            error('Could not find an astrometric solution!'); 
+                        else
+                            fprintf('Warning: could not find an astrometric solution!\n'); 
+                        end
                     end
 
                 end
@@ -1705,28 +1723,28 @@ classdef Analysis < file.AstroData
             
             t = tic;
             
-            f = obj.phot.fluxes;
-            e = obj.phot.errors;
-            a = obj.phot.areas;
-            b = obj.phot.backgrounds;
-            v = obj.phot.variances;
-            x = obj.phot.offsets_x;
-            y = obj.phot.offsets_y;
-            w = obj.phot.widths;
-            p = obj.phot.bad_pixels;
-            F = obj.phot.flags;
-            phot_pars = obj.phot.pars_struct; % maybe also give this to model_psf??
-
-            r = [];
-            g = [];
-
-            if obj.phot.use_gaussian
-                g = obj.phot.gauss_sigma;
-            end
-                
-            if obj.phot.use_aperture
-                r = obj.phot.aperture;
-            end
+%             f = obj.phot.fluxes;
+%             e = obj.phot.errors;
+%             a = obj.phot.areas;
+%             b = obj.phot.backgrounds;
+%             v = obj.phot.variances;
+%             x = obj.phot.offsets_x;
+%             y = obj.phot.offsets_y;
+%             w = obj.phot.widths;
+%             p = obj.phot.bad_pixels;
+%             F = obj.phot.flags;
+%             phot_pars = obj.phot.pars_struct; % maybe also give this to model_psf??
+% 
+%             r = [];
+%             g = [];
+% 
+%             if obj.phot.use_gaussian
+%                 g = obj.phot.gauss_sigma;
+%             end
+%                 
+%             if obj.phot.use_aperture
+%                 r = obj.phot.aperture;
+%             end
 
             obj.finder.input(obj.phot); 
             
@@ -1741,6 +1759,12 @@ classdef Analysis < file.AstroData
             if ~isempty(obj.finder.gui) && obj.finder.gui.check
                 obj.finder.gui.update;
             end
+            
+        end
+        
+        function analysisCutoutsStore(obj)
+        
+            obj.cutout_store.input(obj.phot); 
             
         end
         
