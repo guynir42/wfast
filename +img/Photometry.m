@@ -70,6 +70,7 @@ classdef Photometry < handle
         use_basic = 1;
         use_centering = 1;
         use_gaussian = 1;
+        use_concat_gaussian = 1; % add the gaussian photometry along with the rest
         use_aperture = 0; % no need to do aperture because forced is much better
         use_forced = 1;
         use_best_offsets = 1; % if this is true, keep the offsets from gaussian even if using aperture/forced 
@@ -392,6 +393,7 @@ classdef Photometry < handle
                     'threads', obj.num_threads, 'debug_bit', obj.debug_bit, 'index', obj.index); 
                 
                 obj.pars_struct = s.parameters;
+                obj.pars_struct.types = {}; 
                 
                 if ~isempty(s.raw_photometry)
 
@@ -423,6 +425,12 @@ classdef Photometry < handle
                     obj.bad_pixels = obj.bad_pixels_basic;
                     obj.flags = obj.flags_basic;
                 
+                    obj.pars_struct.types{1} = 'raw'; 
+                    
+                end
+                
+                if obj.use_aperture || obj.use_forced || obj.use_gaussian
+                    obj.pars_struct.types = {}; 
                 end
                 
                 if obj.use_gaussian
@@ -461,6 +469,12 @@ classdef Photometry < handle
                     obj.bad_pixels = obj.bad_pixels_gauss;
                     obj.flags = obj.flags_gauss;
                     
+                    obj.pars_struct.types{1} = sprintf('gaussian %4.2f', obj.gauss_sigma); 
+                    
+                end
+                
+                if obj.use_aperture || obj.use_forced
+                    obj.pars_struct.types = {}; 
                 end
                 
                 if obj.use_aperture
@@ -510,6 +524,10 @@ classdef Photometry < handle
                     
                     obj.bad_pixels = obj.bad_pixels_ap;
                     
+                    for ii = 1:length(obj.aperture)
+                        obj.pars_struct.types{end+1} = sprintf('aperture %4.2f', obj.aperture(ii));
+                    end
+                    
                 end
                 
                 if obj.use_forced
@@ -558,11 +576,32 @@ classdef Photometry < handle
                     end
                     
                     obj.bad_pixels = cat(3, obj.bad_pixels_ap, obj.bad_pixels_forced); 
-                    obj.flags = cat(3, obj.flags_ap, obj.flags_forced);
+%                     obj.flags = cat(3, obj.flags_ap, obj.flags_forced);
+                    
+                    for ii = 1:length(obj.aperture)
+                        obj.pars_struct.types{end+1} = sprintf('forced %4.2f', obj.aperture(ii));
+                    end
                     
                 end
                 
-                if ~isempty(obj.positions)
+                if obj.use_concat_gaussian && obj.use_gaussian && ( obj.use_aperture || obj.use_forced || ~isempty(s.raw_photometry) )
+                    
+                    obj.fluxes = cat(3, obj.fluxes_gauss, obj.fluxes);
+                    obj.areas = cat(3, obj.areas_gauss, obj.areas);
+                    obj.errors = cat(3, obj.errors_gauss, obj.errors);
+                    obj.backgrounds = cat(3, obj.backgrounds_gauss, obj.backgrounds);
+                    obj.variances = cat(3, obj.variances_gauss, obj.variances);
+                    obj.offsets_x = cat(3, obj.offsets_x_gauss, obj.offsets_x);
+                    obj.offsets_y = cat(3, obj.offsets_y_gauss, obj.offsets_y);
+                    obj.widths = cat(3, obj.widths_gauss, obj.widths);
+                    obj.flags = cat(3, obj.flags_gauss, obj.flags); 
+                    obj.bad_pixels = cat(3, obj.bad_pixels_gauss, obj.bad_pixels);
+                    
+                    obj.pars_struct.types = [sprintf('gaussian %4.2f', obj.gauss_sigma) obj.pars_struct.types]; 
+                    
+                end
+                
+                if ~isempty(obj.positions) % should maybe remove this and add centroids alongside the offsets inside the above code?
                     obj.centroids_x = obj.offsets_x + obj.positions(:,1)';
                     obj.centroids_y = obj.offsets_y + obj.positions(:,2)';
                 end
@@ -591,7 +630,6 @@ classdef Photometry < handle
             end
             
             obj.updateAverages;
-            
             
             if ~isempty(obj.gui) && obj.gui.check
                 obj.gui.update;

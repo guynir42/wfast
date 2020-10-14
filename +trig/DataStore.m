@@ -350,12 +350,22 @@ classdef DataStore < handle
             
         end
         
-        function val = aperture_radius(obj)
+        function val = aperture_radius(obj) % to be depricated
             
             if isempty(obj.head.PHOT_PARS)
                 val = [];
             else
                 val = obj.head.PHOT_PARS.aperture_radius(obj.aperture_index); 
+            end
+            
+        end
+        
+        function val = aperture_type(obj)
+            
+            if isempty(obj.head.PHOT_PARS) || ~isfield(obj.head.PHOT_PARS, 'types') ||isempty(obj.head.PHOT_PARS.types) || isempty(obj.aperture_index)
+                val = '';
+            else
+                val = obj.head.PHOT_PARS.types{obj.aperture_index}; 
             end
             
         end

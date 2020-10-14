@@ -10,6 +10,8 @@
 #include <chrono>
 #include <algorithm> 
 
+# define PI 3.14159265358979323846
+
 #define STRLN 64 // maximum string length (for copying)
 #define NUM_DATA_TYPES 10 // flux, area, error, background, variance, offset_x, offset_y, width, bad_pixels, flag
 
@@ -67,6 +69,8 @@ Optional arguments:
 For more information about how to use this function, see photometry2.m
 
 Updates:
+2020-10-14 Guy: fixed normalization of gaussian fluxes, and added forced-gaussian output. 
+
 2020-08-04 Guy: added option "use_positives" to make 2nd moment calculation only use non-negative values. 
 
 2020-02-27 Guy: Added multiple objects in global scope, added parseIndex method to find which one to use. 
@@ -134,13 +138,9 @@ class Photometry{
 	float *dx=0; // list of offsets in x for the center of the mask
 	float *dy=0; // list of offsets in y for the center of the mask
 	
-	float *forced=0; // 3D matrix of apertures used for forced photometry, one for each dx/dy shift
-	std::vector<int> *forced_indices=0; // array of length "num_shifts" of index vectors telling what part of each matrix to sum in forced photometry
-	double forced_radius=5; // the default radius used for forced photometry (pixels)
-
 	float *apertures=0; // 4D matrix of aperture+annuli for the wedding cake photometry
 	std::vector<int> *aperture_indices=0; // array of length "num_shifts" of index vectors telling what part of each matrix to sum in wedding cake photometry
-	
+
 	float *annulii=0; // 3D matrix of the annulus used for all kinds of photometry, one for each dx/dy shift
 	std::vector<int> *annulus_indices=0; // array of length "num_shifts" of index vectors telling what part of each matrix to sum in annulus calculation
 	
@@ -152,6 +152,7 @@ class Photometry{
 	float **output_forced=0;
 	float **output_apertures=0;
 	float **output_gaussian=0;
+	float **output_forced_gaussian=0; 
 	float *best_offset_x=0;
 	float *best_offset_y=0;
 	const static char data_types[NUM_DATA_TYPES][STRLN]; // this holds strings containing: flux, error, area, background, variance, offset_x, offset_y, width, bad_pixels, flag
@@ -163,7 +164,7 @@ class Photometry{
 	// function prototypes (implementation at the end)
 	Photometry();
 	~Photometry();
-	// void reset(); 
+	
 	void parseInputs(int nrhs, const mxArray *prhs[]);
 	void ingestParameters(Parameters new_pars); 
 	mxArray *outputStruct(float **output, int num_fluxes=1); // wrap up the output matrices as a nice matlab style array

@@ -125,14 +125,13 @@ function f_out = binning(f, varargin)
     
     if input.repmat
         f = repmat(f, [input.factor, 1, 1]); 
-        f_out = reshape(f, [N, S(2:end)]);
-        f_out = f_out(1:S(1), :); 
+        f = reshape(f, [N, S(2:end)]);
+        f = f(1:S(1), :); 
     else
         f = permute(f, [2,3,1]); % get rid of dim 1 which we just integrated on
-        f_out = reshape(f, [size(f,1), S(2:end)]);
     end
     
-    
+    f_out = reshape(f, [size(f,1), S(2:end)]); % make sure to reshape the higher dimensions
     
     
     
