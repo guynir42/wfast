@@ -201,7 +201,6 @@ classdef Scanner < handle
         
         function [success, report] = getNextCandidates(obj)
             
-            
             % get the next folder that needs analysis
             r = trig.RunFolder.scan('folder', obj.root_folder, 'start', obj.date_start, ...
                 'end', obj.date_end, 'next', 'unclassified');
@@ -210,7 +209,7 @@ classdef Scanner < handle
                 success = 0; 
                 report = 'Could not find a folder with unclassified candidates'; 
             else
-                load(fullfile(r.folder, 'candidates.mat'))
+                load(fullfile(r.folder, r.analysis_folder, 'candidates.mat'))
                 obj.candidates = cand; 
                 success = 1; 
                 report = sprintf('Found %d candidates in %s', length(obj.candidates), util.text.run_id(r.folder)); 

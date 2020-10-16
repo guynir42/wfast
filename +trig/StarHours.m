@@ -124,7 +124,7 @@ classdef StarHours < handle
     properties % switches/controls
         
         % the following properties are used to build the S/N bin edges
-        snr_bin_min = 5; % stars with lower S/N are not even tested for events (here S/N is calculated on the raw fluxes)
+        snr_bin_min = 2; % stars with lower S/N are not even tested for events (here S/N is calculated on the raw fluxes)
         snr_bin_max = 40; % biggest value we expect to see in the star-hour histogram
         snr_bin_width = 0.5; % for the star-hour histogram
         

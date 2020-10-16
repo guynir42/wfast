@@ -228,7 +228,7 @@ classdef DataStore < handle
             obj.pars.length_search = 100; % the area searched in each batch (ideally equal to each batch so there's no need to search the same region twice)
 
             obj.pars.use_threshold = true; % use the minimal S/N to keep out bad stars and not even store them
-            obj.pars.threshold = 5; % stars with S/N lower than this are disqualified after the burn-in period!
+            obj.pars.threshold = 3; % stars with S/N lower than this are disqualified after the burn-in period!
             obj.pars.use_rate_function = true; % also disqualify stars with low detection rate (based on S/N and Fresnel size)
             obj.pars.minimal_rate = 0.06; % rate threshold
             obj.pars.minimal_snr = 10; % stars above this S/N are picked regardless of their theoretical rate

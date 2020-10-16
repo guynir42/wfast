@@ -559,7 +559,8 @@ classdef Analysis < file.AstroData
             end
             
             try % save the event finder
-%                 obj.finder.conserveMemory;
+                
+                obj.finder.finishup; 
 
                 summary = obj.finder.produceSummary;
                 

@@ -206,7 +206,7 @@ classdef EventFinder < handle
             obj.pars.use_keep_variances = 1; % keep a copy of the variance of each star/kernel for the entire run (this may be a bit heavy on the memory)
 
             obj.pars.use_sim = 1; % add simulated events in a few batches randomly spread out in the whole run
-            obj.pars.num_sim_events_per_batch = 0.01; % fractional probability to add a simulated event into each new batch. 
+            obj.pars.num_sim_events_per_batch = 0.1; % fractional probability to add a simulated event into each new batch. 
             obj.pars.use_keep_simulated = true; % if false, the simulated events would not be kept with the list of detected candidates (for running massive amount of simualtions)
             obj.pars.sim_max_R = 3; % maximum value of stellar size for simulated events
             
@@ -865,7 +865,7 @@ classdef EventFinder < handle
             thresh = obj.getTimeThresh;
             time_range = [];
             
-            kernel_min_spread = ceil(nnz(abs(obj.bank.kernels(:,kern_index)>=0.02))/2); % minimal time range cannot be smaller than "active" part of kernel (i.e., above 2% deviation)
+            kernel_min_spread = ceil(nnz(abs(obj.bank.kernels(:,kern_index))>=0.02)/2); % minimal time range cannot be smaller than "active" part of kernel (i.e., above 2% deviation)
 
             for jj = 0:N % go backward in time
 

@@ -495,7 +495,7 @@ classdef RunFolder < dynamicprops
                             return;
                         end                            
                     elseif cs(input.next, 'unclassified') % only interested in the first instance that has not yet been classified
-                        if new_obj.was_processed && new_obj.has_candidates && new_obj.has_classified
+                        if new_obj.was_processed && new_obj.has_candidates && ~new_obj.has_classified
                             obj_vec = new_obj;
                             return; 
                         end
@@ -539,7 +539,7 @@ classdef RunFolder < dynamicprops
         end
         
         function val = default_process_date % the default minimal processing date for the new pipeline
-            val = '2020-10-06'; 
+            val = '2020-10-15'; 
         end
          
     end

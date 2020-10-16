@@ -216,7 +216,7 @@ classdef Candidate < handle
         
         function classes = getListOfClasses(obj)
             
-            classes = {'occultation certain', 'occultation possible', 'cosmic ray', 'satellite', 'flare', 'edge effect', 'artefact', 'mystery'};
+            classes = {'occultation certain', 'occultation possible', 'cosmic ray', 'satellite', 'flare', 'edge effect',  'bad_pixel', 'tracking error', 'artefact', 'mystery', 'unclassify'};
             
         end
         
@@ -488,6 +488,41 @@ classdef Candidate < handle
             
         end
         
+        function [idx, corr] = findHighestCorrelations(obj, number, frames)
+        % check the correlations to other stars' fluxes, with +-"frames"
+        % around the time_index, and give the indices of the most
+        % correlated stars (find "number" such matches). 
+        
+            if isempty(obj.flux_raw_all)
+                error('Must have "flux_raw_all" to calculate correlation with other star fluxes');
+            end
+        
+            if nargin<2 || isempty(number)
+                number = 3; 
+            end
+            
+            if nargin<3 || isempty(frames)
+                frames = 30; 
+            end
+            
+            idx = (-frames:frames) + obj.time_index; % plus/minus number of frames around peak
+            f = obj.flux_raw(idx);
+            F = obj.flux_raw_all(idx,:); 
+            
+            % normalize both fluxes
+            f = (f-nanmean(f))./nanstd(f); 
+            F = (F-nanmean(F))./nanstd(F); 
+            
+            C = nansum(f.*F)./length(idx); % normalized fluxes just give the correlation (up to number of samples)
+            
+            [~, sort_idx] = sort(C); % sort, and get a list of the sorted indices
+            
+            idx = flip(sort_idx(end-number:end-1));
+            
+            corr = C(:,idx); 
+            
+        end
+        
     end
     
     methods % plotting tools / GUI
@@ -547,6 +582,8 @@ classdef Candidate < handle
                 idx = 1;
             end
             
+            input.parent.UserData.num_kept = nnz([obj_vec.kept]);
+            
             obj = obj_vec(idx); 
             
             delete(input.parent.Children);
@@ -561,6 +598,20 @@ classdef Candidate < handle
             
             ax3 = axes('Parent', input.parent, 'Position', [0.68 0.2 0.3 0.5]);
             obj.showCutouts('ax', ax3);
+            
+            %%%%%%%%%%%%%%%%%%%%%% popup panel %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            popup_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [0.68 0.11 0.3 0.08], 'title', 'popups'); 
+            
+            button = uicontrol(popup_panel, 'Style', 'pushbutton', 'string', 'other stars', ...
+                'Units', 'Normalized', 'Position', [0.0 0.0 0.25 1], 'FontSize', 14, ...
+                'Callback', @obj.popupOtherStars, 'UserData', input.parent, ...
+                'Tooltip', 'Show the flux of other stars with high correlation to this star'); 
+            
+            button = uicontrol(popup_panel, 'Style', 'pushbutton', 'string', 'stack image', ...
+                'Units', 'Normalized', 'Position', [0.25 0.0 0.25 1], 'FontSize', 14, ...
+                'Callback', @obj.popupStack, 'UserData', input.parent, ...
+                'Tooltip', 'Show the stack image for the event'); 
             
             %%%%%%%%%%%%%%%%%%%%%% panel info %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -603,7 +654,7 @@ classdef Candidate < handle
                 'Tooltip', 'go forward to next candidate'); 
             
             if input.parent.UserData.show_kept
-                kept_string = 'kept';
+                kept_string = sprintf('kept (%d)', input.parent.UserData.num_kept);
             else
                 kept_string = 'all'; 
             end
@@ -652,6 +703,7 @@ classdef Candidate < handle
             % TODO: notes section + add note button
             % TODO: popup stack image (+load from file) 
             % TODO: popup cutouts viewer
+            
 
         end
         
@@ -1134,7 +1186,11 @@ classdef Candidate < handle
                 'InitialValue',length(classes), 'SelectionMode','single', 'Name','classification');
             
             if ~isempty(rep)
-                obj.classification = classes{rep}; 
+                if strcmp(classes{rep}, 'unclassify')
+                    obj.classification = '';
+                else
+                    obj.classification = classes{rep}; 
+                end
             end
             
         end
@@ -1195,15 +1251,18 @@ classdef Candidate < handle
             
         end
         
-        function popupStack(obj)
+        function popupStack(obj, ~, ~)
             
             if isempty(obj.stack)
                 filename = obj.filenames{obj.time_index}; 
                 obj.stack = h5read(filename, '/stack'); 
             end
             
-            f = figure('Name', 'Stack image'); 
-            ax = axes('Parent', f); 
+            f = util.plot.FigHandler('Stack image'); 
+            f.width = 18;
+            f.height = 20;
+            f.clear;
+            ax = axes('Parent', f.fig); 
             
             util.plot.show(obj.stack, 'auto', 1); 
             title(ax, ''); 
@@ -1216,6 +1275,66 @@ classdef Candidate < handle
             plot(ax, x, y, 'go', 'MarkerSize', 15); 
             
             hold(ax, 'off'); 
+            
+        end
+        
+        function popupOtherStars(obj, ~, ~)
+            
+            [idx, corr] = obj.findHighestCorrelations; % indices of stars that have highest correlations to this star
+            
+            flux = obj.flux_raw_all(:,idx); 
+            
+            f = util.plot.FigHandler('Other stars, flux and position'); 
+            f.clear;
+            ax1 = axes('Parent', f.fig, 'Position', [0.1 0.2 0.88 0.75]); 
+            
+            mx = nanmax([nanmax(obj.flux_raw), nanmax(flux)]).*2;
+            
+            area(ax1, obj.time_range, ones(length(obj.time_range),1).*mx, 'FaceColor', 'g', ...
+                'EdgeColor', 'none', 'FaceAlpha', 0.25, 'DisplayName', 'Event region'); 
+            
+            hold(ax1, 'on');
+            
+            h1 = plot(ax1, obj.flux_raw, 'LineWidth', 3);
+            h1.DisplayName = sprintf('Candidate star, idx= %d', obj.star_index); 
+            
+            h2 = plot(ax1, flux, 'LineWidth', 1.5); 
+            
+            for ii = 1:length(h2)
+                h2(ii).DisplayName = sprintf('idx= %d | corr= %4.2f | trig= %d', idx(ii), corr(ii), ismember(idx(ii), obj.star_extra)); 
+            end
+            
+            xlabel(ax1, 'Frame index'); 
+            ylabel(ax1, 'Raw flux'); 
+            
+            ax1.FontSize = 14;
+            ax1.YScale = 'log'; 
+            
+            hold(ax1, 'off'); 
+            
+            legend(ax1, 'Location', 'NorthEastOutside'); 
+            
+            ax2 = axes('Parent', f.fig, 'Position', [0.73 0.1 0.25 0.5]); 
+            
+            x = nanmean(obj.auxiliary_all(:,:,obj.aux_indices.centroids_x)); 
+            y = nanmean(obj.auxiliary_all(:,:,obj.aux_indices.centroids_y)); 
+            
+            plot(ax2, x(obj.star_index), y(obj.star_index), 'x', 'Color', h1.Color, 'MarkerSize', 15); 
+            
+            hold(ax2, 'on'); 
+            
+            for ii = 1:length(idx)
+                
+                plot(ax2, x(idx(ii)), y(idx(ii)), 'o', 'Color', h2(ii).Color, 'MarkerSize', 10); 
+                
+            end
+            
+            hold(ax2, 'off'); 
+            
+            ax2.XLim = [1 obj.head.NAXIS1]; 
+            ax2.YLim = [1 obj.head.NAXIS2]; 
+            
+            ax.FontSize = 12;
             
         end
         
@@ -1313,7 +1432,7 @@ classdef Candidate < handle
             hndl.Value = use_kept;
             
             if use_kept
-                hndl.String = 'kept';
+                hndl.String = sprintf('kept (%d)', hndl.UserData.UserData.num_kept);
             else
                 hndl.String = 'all';
             end
