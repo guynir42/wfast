@@ -52,7 +52,7 @@ classdef Scanner < handle
         root_folder = ''; % defaults to $DATA/WFAST
         date_start = ''; % default is Jan 1s of this year
         date_end = ''; % default is Dec 31st of this year
-        
+        date_process = ''; % analysis folders before this date are ignored (defaults to today)
         debug_bit = 1;
         
     end
@@ -245,9 +245,13 @@ classdef Scanner < handle
             
             success = 0; 
             
+            if isempty(obj.date_process)
+                obj.date_process = datestr(t, 'yyyy-mm-dd', datetime('today')); 
+            end
+            
             % get the next folder that needs analysis
             r = trig.RunFolder.scan('folder', obj.root_folder, 'start', obj.date_start, ...
-                'end', obj.date_end, 'next', 'unprocessed');
+                'end', obj.date_end, 'next', 'unprocessed', 'process_date', obj.date_process);
             
             if isempty(r)
                 report = 'Could not find a folder to run'; 

@@ -528,7 +528,8 @@ classdef EventFinder < handle
                         obj.store.saveHours; % with no arguments it just counts the hours in this batch as good times
                     end
                     
-                    obj.monitor.input(obj.store.extended_flux, obj.store.extended_aux, obj.store.cutouts, obj.latest_candidates);
+                    obj.monitor.input(obj.store.extended_timestamps, obj.store.extended_juldates, ...
+                        obj.store.extended_flux, obj.store.extended_aux, obj.store.cutouts, obj.latest_candidates);
                     
                     if obj.pars.use_sim % simulated events are injected into the data and treated like real events
                         

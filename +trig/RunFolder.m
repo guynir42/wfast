@@ -443,7 +443,7 @@ classdef RunFolder < dynamicprops
 
                             new_obj.process_date = input.process_date; % remember the limiting date for considering analysis folders (not the actual date when it was analyized!)
                             
-                            if new_obj.analysis_date<=input.process_date % the processing was done before the minimal processing date, it doesn't count
+                            if new_obj.analysis_date<input.process_date % the processing was done before the minimal processing date, it doesn't count
                                 new_obj.was_processed = 0; 
                             else % there is an analysis folder that is up-to-date enough to use it:
 

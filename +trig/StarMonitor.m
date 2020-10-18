@@ -1,4 +1,17 @@
 classdef StarMonitor < handle
+% Collect some additional info about specific stars during an analysis run.
+% This object is part of trig.EventFinder, and will always get the photometric
+% data + processed cutouts for each batch. If the star_indices prop is
+% empty then it does nothing. 
+% If there are some star indices then it will save the flux and auxiliary
+% data for that star for all batches in the run. 
+% If any events trigger at this star it will also save those Candidate
+% objects but with added "cutouts_all" that includes cutouts for all stars
+% in the time period of the event. 
+%
+% NOTE: the data is only collected after the burn-in period. The star
+%       indices are therefore in the reduced list of stars. Make sure the
+%       index you give is from that list, not from the list of all stars!
 
     properties(Transient=true)
         
@@ -12,14 +25,16 @@ classdef StarMonitor < handle
     
     properties % inputs/outputs
         
-        flux; 
-        aux; 
+        timestamps; % timestamp of each measurement
+        juldates; % julian date of each measurement
+        flux; % flux for each star, for the entire run
+        aux; % additional photometric properties like offsets and width and background
         
     end
     
     properties % switches/controls
         
-        star_indices = []; 
+        star_indices = []; % list the indices of stars you want to monitor, out of the stars passing the threshold after the burn-in
         
         debug_bit = 1;
         
@@ -59,6 +74,8 @@ classdef StarMonitor < handle
             
             obj.cand = trig.Candidate.empty;
             
+            obj.timestamps = [];
+            obj.juldates = []; 
             obj.flux = []; 
             obj.aux = []; 
             
@@ -76,12 +93,15 @@ classdef StarMonitor < handle
     
     methods % calculations
         
-        function input(obj, flux, aux, cutouts, candidates)
+        function input(obj, timestamps, juldates, flux, aux, cutouts, candidates)
             
             if isempty(obj.star_indices)
                 return;
             end
             
+            
+            obj.timestamps = vertcat(obj.timestamps, timestamps); 
+            obj.juldates = vertcat(obj.juldates, juldates); 
             obj.flux = vertcat(obj.flux, flux(:,obj.star_indices)); 
             obj.aux = vertcat(obj.aux, aux(:,obj.star_indices,:)); 
             

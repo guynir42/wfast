@@ -1,4 +1,11 @@
 classdef CutoutStorage < handle
+% Keep a bunch of cutouts for different stars, across a full run, along
+% with the results from the regular photometric pipeline. 
+% This is useful for trying to compare photometric methods to the existing
+% code. E.g., training a deep-network to get more stable photometry. 
+% This object is given to the img.Analysis object which calls the input()
+% method, giving it the img.Photomety object as an input. 
+% To enable this, set the Analysis object's use_cutouts_store=1.
 
     properties(Transient=true)
         
@@ -39,8 +46,8 @@ classdef CutoutStorage < handle
         star_indices = []; % empty vector means save all stars
         aperture_idx = 1; % which flux to take in case of multiple fluxes/apertures
         
-        use_zero_point = 1;
-        use_airmass = 1; 
+        use_zero_point = 1; % also do some processing on the flux, using each frame's zero point 
+        use_airmass = 1; % also make an adjustment based on airmass
         
         debug_bit = 1;
         
@@ -248,7 +255,7 @@ classdef CutoutStorage < handle
             
         end
         
-        function [Xvalues, Yvalues, Xvalidation, Yvalidation] = getData(obj, num_validation)
+        function [Xvalues, Yvalues, Xvalidation, Yvalidation] = getData(obj, num_validation) % output the data as a mapping between cutouts->photometric measurements
             
             if nargin<2 ||isempty(num_validation)
                 num_validation = ceil(size(obj.flux_mean,1)*0.2); % 20% of the data is used as validation
