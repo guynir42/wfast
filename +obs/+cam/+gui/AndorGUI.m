@@ -13,6 +13,8 @@ classdef AndorGUI < handle
         edit_font_size = 12;
         small_font_size = 10;
         
+        color_on = [0 0.3 1];
+        
         debug_bit = 1;
         
     end
@@ -90,7 +92,7 @@ classdef AndorGUI < handle
             
             obj.panel_controls = GraphicPanel(obj.owner, [0 7/15 0.2 8/15], 'controls');
             obj.panel_controls.number = 8;
-            obj.panel_controls.addButton('button_record', 'record', 'push', 'RECORD', '', 'big', 0.6);
+            obj.panel_controls.addButton('button_record', 'record', 'push', 'RECORD', '', 'big', 0.6); 
             obj.panel_controls.addButton('button_mode', 'cycleModes', 'push', 'science', '', 'small', 0.4);
             obj.panel_controls.addButton('button_preview', 'preview', 'push', 'PREVIEW', '', '', 0.8);
             obj.panel_controls.addButton('input_time_deep', 'expT_deep', 'input', ' ', 's','', 0.2);
@@ -108,7 +110,7 @@ classdef AndorGUI < handle
             obj.panel_controls.button_pick_center.Callback = @obj.callback_pick_center;
             
             obj.panel_controls.button_record.Tooltip = 'Start recording full frame images. Takes <number of batches>X<number frames> total';
-            obj.panel_controls.button_mode.Tooltip = 'Clcik to cycle through record modes: science, dark, flat';
+            obj.panel_controls.button_mode.Tooltip = 'Click to cycle through record modes: science, dark, flat';
             obj.panel_controls.button_preview.Tooltip = 'Take a single image with a longer exposure time. Does not save the image';
             obj.panel_controls.input_time_deep.Tooltip = 'Control the time of the PREVIEW exposure.';
             obj.panel_controls.input_num_batches.Tooltip = ['Number of files to save when using RECORD. Each file contains ' num2str(obj.owner.batch_size) ' images'];
@@ -131,15 +133,17 @@ classdef AndorGUI < handle
             
             obj.panel_objects = GraphicPanel(obj.owner, [0.8 7/15 0.2 8/15], 'object'); 
             obj.panel_objects.number = 5;
-            obj.panel_objects.addButton('button_buffers', 'buffers', 'push', 'Buffers');
-            obj.panel_objects.addButton('button_header', 'head', 'push', 'Header');
-            obj.panel_objects.addButton('button_focuser', 'focuser', 'push', 'Focuser');
+            obj.panel_objects.addButton('button_buffers', 'buffers', 'push', 'Buffers GUI', '', '', [], '', '', 'Open the GUI for the BufferWheel');
+            obj.panel_objects.addButton('button_header', 'head', 'push', 'Header GUI', '', '', [], '', '', 'Open the GUI for the Header object');
+            obj.panel_objects.addButton('button_focuser', 'focuser', 'push', 'Focuser GUI', '', '', [], '', '', 'Open the GUI for manual focus control');
             
             obj.panel_objects.make;
             
             %%%%%%%%%%% panel aux %%%%%%%%%%%%%%%%%%%%
             
             obj.panel_aux = GraphicPanel(obj.owner, [0.8 0/15 0.2 7/15], 'auxiliary');
+            obj.panel_aux.addButton('button_corners', 'use_show_corners', 'toggle', 'show corners is off', 'show corners is on', '', 1,  obj.color_on, '', 'Show only the corners of the frame'); 
+            obj.panel_aux.addButton('input_corners', 'corner_size', 'input', 'corner pixels= ', '', '', 1, '', '', 'how many pixels to show from each corner'); 
             obj.panel_aux.number = 5;
             
             obj.panel_aux.make;

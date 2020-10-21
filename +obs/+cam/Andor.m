@@ -152,6 +152,8 @@ classdef Andor < file.AstroData
         
         % display/gui parameters 
         use_show_flipped = 0; % flip the display for North is up after meridian flip
+        use_show_corners = 0; % show only the corners of the images on display 
+        corner_size = 300; % how many pixels to show in each corner?
         
         debug_bit = 1; % level of debugging output on screen
         log_level = 1; % level of output to text file
@@ -425,9 +427,14 @@ classdef Andor < file.AstroData
 %             obj.focuser.pos = 1.5; % updated at 02/03/20 with the Balor installed
 
             % updated at 05/05/20 after fixing the autofocus code
-            obj.focuser.pos = 1.8;
-            obj.focuser.tip = 2;
-            obj.focuser.tilt = 0.9;
+%             obj.focuser.pos = 1.8;
+%             obj.focuser.tip = 2;
+%             obj.focuser.tilt = 0.9;
+            
+            % updated at 20/10/2020 after adding skirt around focusers
+            obj.focuser.pos = 3.3;
+            obj.focuser.tip = 4.6;
+            obj.focuser.tilt = 1.2;
             
         end
         
@@ -1986,6 +1993,16 @@ classdef Andor < file.AstroData
             end
             
             I = obj.images(:,:,end);    
+
+            if obj.use_show_flipped
+                I = rot90(I, 2); % use this when viewing after the meridian flip
+            end
+
+            if obj.use_show_corners
+                N = obj.corner_size;
+                I = [I(1:N,1:N), I(end-N+1:end,1:N); 
+                    I(end-N+1:end,1:N), I(end-N+1:end,end-N+1:end)]; 
+            end
             
             delete(findobj(input.ax, 'type', 'rectangle'));
             
@@ -2009,13 +2026,28 @@ classdef Andor < file.AstroData
             end
 
             if ~isempty(h)
-
-                if obj.use_show_flipped
-                    I = rot90(I, 2); % use this when viewing after the meridian flip
-                end
-
                 h.CData = I;
-
+            end
+            
+            h = findobj(input.ax, 'type', 'line');
+                
+            if obj.use_show_corners
+                
+                if length(h)==2
+                    h(1).XData = [0 2*N]; 
+                    h(1).YData = [N N]; 
+                    h(2).YData = [0 2*N]; 
+                    h(2).XData = [N N]; 
+                else
+                    delete(h);
+                    input.ax.NextPlot = 'add'; 
+                    plot(input.ax, [0 2*N], [N N],  '-g'); 
+                    plot(input.ax, [N N], [0 2*N],  '-g'); 
+                    input.ax.NextPlot = 'replace'; 
+                end
+                
+            else
+                delete(h); 
             end
             
         end

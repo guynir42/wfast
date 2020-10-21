@@ -231,12 +231,12 @@ classdef PcSync < handle
         
         function disconnect(obj)
             
-            if ~isempty(obj.hndl_tx) && isvalid(obj.hndl_tx)
+            if ~isempty(obj.hndl_tx) && ~isa(obj.hndl_tx, 'struct') && isvalid(obj.hndl_tx)
                 delete(obj.hndl_tx);
                 obj.hndl_tx = [];
             end
             
-            if ~isempty(obj.hndl_rx) && isvalid(obj.hndl_rx)
+            if ~isempty(obj.hndl_rx) && ~isa(obj.hndl_rx, 'struct') && isvalid(obj.hndl_rx)
                 delete(obj.hndl_rx);
                 obj.hndl_rx = [];
             end

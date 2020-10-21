@@ -103,7 +103,9 @@ classdef Acquisition < file.AstroData
         num_dynamic_cutouts = 5; % how many additional cutouts we want
         
         use_altitude_focus = 1;  % set an initial focus point based on the altitude 
-        alt_focus_coeffs = [1.15, 0.0255, -0.0001585]; % to improve these coeffs use the scripts/focus_survey.m script
+%         alt_focus_coeffs = [1.15, 0.0255, -0.0001585]; % to improve these coeffs use the scripts/focus_survey.m script
+        alt_focus_coeffs = [2.5, 0.0255, -0.0001585]; % to improve these coeffs use the scripts/focus_survey.m script
+        
         
         use_model_psf = 0;
         
@@ -1261,7 +1263,9 @@ classdef Acquisition < file.AstroData
             obj.use_adjust_cutouts = 0;
             obj.use_autodeflate = 0;
             obj.use_check_positions = 0;
-            obj.use_sync_stop = 0;
+%             obj.use_sync_stop = 0;
+            obj.use_ignore_sync_object_name = 1;
+            obj.head.OBJECT = 'test'; 
                         
         end
         
@@ -1272,6 +1276,7 @@ classdef Acquisition < file.AstroData
             obj.use_adjust_cutouts = 1;
             obj.use_autodeflate = 1;
             obj.use_check_positions = 1;
+            obj.use_ignore_sync_object_name = 0;
 %             obj.use_sync_stop = 1;
             
         end
@@ -1403,7 +1408,7 @@ classdef Acquisition < file.AstroData
                 obj.copyFrom(obj.src); % get the data into this object
 
                 % if src is using ROI, must update the calibration object to do the same
-                if isprop(obj.src, 'use_roi') && obj.src.use_roi 
+                if isprop(obj.src, 'use_roi') && ~isempty(obj.src.use_roi) && obj.src.use_roi 
 
                     obj.cal.use_roi = 1;
 
@@ -1482,7 +1487,7 @@ classdef Acquisition < file.AstroData
 
                 if N>0
 
-                    obj.cam.record('mode', 'flat', 'num_batches', N, 'batch_size', 100, 'frame_rate', 10, 'expT', 0.0395); 
+                    obj.cam.record('mode', 'flat', 'num_batches', N, 'batch_size', 100, 'frame_rate', 10, 'expT', 0.01); 
 
                 else
                     success = 1;
@@ -3017,7 +3022,7 @@ classdef Acquisition < file.AstroData
                     if obj.use_lock_adjust
                         offsets = obj.average_offsets;
                     else
-                        offsets = [obj.phot_stack.offsets_x', obj.phot_stack.offsets_y']; 
+                        offsets = [obj.phot_stack.offsets_x(:,:,1)', obj.phot_stack.offsets_y(:,:,1)']; 
                     end
                     
                     offsets(isnan(offsets)) = 0;
