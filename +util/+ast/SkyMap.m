@@ -36,7 +36,7 @@ classdef SkyMap < handle
     
     properties % objects
         
-        bc@util.ast.BolometricCorrections; % used to calculate the physical size of stars based on color and brightness
+%         bc@util.ast.BolometricCorrections; % used to calculate the physical size of stars based on color and brightness
         dir@util.sys.WorkingDirectory; % to point to the GAIA location and get all the hdf5 files
         prog@util.sys.ProgressBar; 
         

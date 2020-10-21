@@ -1179,6 +1179,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     break;
                 end
                 
+                if isempty(tline)
+                    continue;
+                end
+                
                 c = strsplit(tline, ' '); % split the date and name
                 date_str = strtrim(c{1});
                 this_name = strtrim(c{2}); 

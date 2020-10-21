@@ -1144,7 +1144,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             if ~obj.status || isempty(obj.objRA_deg) || isempty(obj.objDec_deg)
                 val = [];
             else
-                val = abs(obj.telRA_deg-obj.objRA_deg)*3600<threshold &&...
+                dRA = 180 - abs(abs(obj.telRA_deg - obj.objRA_deg) - 180); % https://gamedev.stackexchange.com/questions/4467/comparing-angles-and-working-out-the-difference
+                val = dRA*3600<threshold &&...
                     abs(obj.telDec_deg-obj.objDec_deg)*3600<threshold;
             end
             
@@ -1202,7 +1203,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function [total_var, RA_var, DE_var] = getVibrationStrength(obj, varargin) % variance in RA/DE in units of degrees (run this only when tracking...)
             
-            if isempty(obj.hndl)
+            if isempty(obj.hndl) || obj.status==0
                 total_var = 0;
                 RA_var = 0;
                 DE_var = 0;
@@ -1226,7 +1227,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
             end
             
-            RA_var = nanvar(RA); 
+            RA_var1 = nanvar(RA); 
+            
+            % fix RA wrap around in case where RA is near 0->360 discontinuity
+            RA = mod(RA - 180, 360) + 180;
+            RA_var2 = nanvar(RA); 
+
+            RA_var = nanmin(RA_var1, RA_var2); 
             DE_var = nanvar(DE); 
             
             total_var = RA_var + DE_var;
@@ -1549,7 +1556,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 obj.hndl.SlewToCoordinatesAsync(ra_hours_Jnow, dec_deg_Jnow);
             catch ME
                 if strcmp(ME.identifier, 'MATLAB:COM:E2148734208')
-                    fprintf('Hardware error: "%s". Slewing again (attempt %d)...\n', ME.identifier, ii);
+                    t = datestr(datetime('now', 'TimeZone', 'UTC'), 'HH:MM:SS.FFF'); 
+                    fprintf('%S: Hardware error: "%s". Slewing again (attempt %d)...\n', t, ME.identifier, ii);
                     obj.hndl.ErrorClear; 
 %                     obj.hndl.SlewToCoordinatesAsync(ra_hours_Jnow, dec_deg_Jnow);
                 end

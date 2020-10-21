@@ -407,6 +407,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             if val>180
                 val = val - 360;
+            elseif val<-180
+                val = val + 360;
             end
 
         end
@@ -695,6 +697,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             else
                 error('Input a string RA in HH:MM:SS format or a scalar hour or a 3-vector [H,M,S]!');
             end
+            
+            obj.RA_deg = mod(obj.RA_deg, 360); 
             
             obj.updateSecondaryCoords;
             
@@ -1138,21 +1142,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             input.scan_vars(varargin{:}); 
             
             if isempty(input.side) || util.text.cs(input.side, 'both')
-                min_RA = 6; 
-                range_RA = 12;
+                min_HA = 6; 
+                range_HA = 12;
             elseif util.text.cs(input.side, 'east')
-                min_RA = 6; 
-                range_RA = 6;
+                min_HA = 6; 
+                range_HA = 6;
             elseif util.text.cs(input.side, 'west')
-                min_RA = 0;
-                range_RA = 6;
+                min_HA = 0;
+                range_HA = 6;
             else
                 error('Unknown side/hemisphere option "%s". Choose "east", "west" or "both"', input.side); 
             end
             
             for ii = 1:100
                 
-                obj.RA = obj.LST_deg/15 + rand.*range_RA-min_RA; % random between min_RA and min_RA+range_RA (hours)
+                obj.RA = obj.LST_deg/15 + rand.*range_HA-min_HA; % random between min_RA and min_RA+range_RA (hours)
                 
                 obj.Dec = rand.*(90-input.south_limit)+input.south_limit; % between south_limit and 90
                 
@@ -1573,7 +1577,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         function makeGUI(obj)
             
             if isempty(obj.gui)
-                obj.gui = head.gui.EphemGUI(obj)
+                obj.gui = head.gui.EphemGUI(obj);
             end
             
             obj.gui.make;
