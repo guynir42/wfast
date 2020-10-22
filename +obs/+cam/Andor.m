@@ -938,7 +938,7 @@ classdef Andor < file.AstroData
 %                     widths = phot_struct.apertures_photometry.width;
 
                     t4 = tic;
-                    widths = util.img.fwhm(C-permute(B, [1,3,4,2]), 'method', 'filters', 'min_size', 0.25, 'max_size', 10, 'step', 0.2)/2.355; 
+                    widths = util.img.fwhm(C-permute(B, [1,3,4,2]), 'method', 'filters', 'gauss', 5, 'min_size', 0.25, 'max_size', 15, 'step', 0.2)/2.355; 
                     widths(widths>10 | widths<0.1) = NaN;
                     time_width = toc(t4);
                     

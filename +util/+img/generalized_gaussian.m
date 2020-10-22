@@ -23,7 +23,7 @@ function I = generalized_gaussian(varargin)
 %
 % Parameters can be given in order or as keyword-value pairs...
 
-    if nargin==0, help('util.img.gaussian2'); return; end
+    if nargin==0, help('util.img.generalized_gaussian'); return; end
 
     input = util.text.InputVars;
     input.input_var('power', 2, 'hardness'); 

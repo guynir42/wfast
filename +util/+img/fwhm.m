@@ -20,6 +20,10 @@ function val = fwhm(I, varargin)
 %                space. Default is [] which means no oversampling. 
 %   -method: choose the different methods to calculate FWHM. 
 %            Options: "radial", "moments", "filters". 
+%   -gaussian: what power of the generalized gaussian to use (default=2 for 
+%              normal gaussian). Use bigger values to get flatter top, like
+%              when the telescope is de-focused. This is ONLY used when
+%              setting method=filters! 
 %   -number_interp: minimal number of points along slope. If the number of
 %                   pixels in the image is larger than this, we don't need
 %                   to interpolate. Otherwise it will interpolate to this 
@@ -54,6 +58,7 @@ function val = fwhm(I, varargin)
     input.input_var('max_size', []); 
     input.input_var('min_size', 1);
     input.input_var('fft', false, 'use_fft'); 
+    input.input_var('gaussian', 2); % what power of the generalized gaussian to use (default=2 for normal gaussian)
     input.scan_vars(varargin{:});
     
     % assume image is centered and padded to odd number of pixels
@@ -111,21 +116,14 @@ function val = fwhm(I, varargin)
         I3 = reshape(I2, [size(I,1), size(I,2).*size(I,3).*size(I,4)]); % flatten the array into 2D
         I3 = reshape(regionfill(I3, isnan(I3)), size(I)); % reshape it back after removing NaNs
         
-%         I2 = zeros(size(I), 'like', I);
-%                     
-%         for ii = 1:size(I,3)
-%             for jj = 1:size(I,4)
-%                 I2(:,:,ii,jj) = regionfill(I(:,:,ii,jj), isnan(I(:,:,ii,jj)));
-%             end
-%         end
-        
         sig = input.min_size:input.step_size:input.max_size;
         mx = nan(size(I,3), size(I,4), size(sig,2)); 
         
         for ii = 1:length(sig)
             
-            g = util.img.gaussian2(sig(ii)./2.355, 'size', S, 'norm', 2); % gaussian normalized for matched filtering 
-             
+%             g = util.img.gaussian2(sig(ii)./2.355, 'size', S, 'norm', 2); % gaussian normalized for matched filtering 
+            g = util.img.generalized_gaussian('sigma_x', sig(ii)./2.355, 'size', S, 'norm', 2, 'power', input.gaussian);  
+            
             if input.fft
                 If = util.img.conv_f(g, I3); 
             else
