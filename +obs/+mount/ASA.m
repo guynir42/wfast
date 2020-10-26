@@ -292,6 +292,23 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     
                     obj.ard.read_data; % explicitely call this because if the connectArduino() command is sent inside a timer, the timer blocks any BytesAvailableFcn callbacks!
                     
+                    if obj.ard.status==0 % re-try to connect use DomeAssistant
+                        
+                        if obj.debug_bit, disp('Toggling power to ScopeAssistant'); end
+                        
+                        obj.owner.assist.scope_assistant = 0;
+                        
+                        pause(1);
+                        
+                        obj.owner.assist.scope_assistant = 1;
+                        
+                        pause(3); 
+                        
+                        obj.ard.connect;
+
+                    end
+                    
+                    
                     return; % short circuit this, we need to update to the new re-wiring! 
                     
                     if obj.ard.status==0

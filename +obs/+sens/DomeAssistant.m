@@ -65,15 +65,18 @@ classdef DomeAssistant < handle
         pressure_average;
         
         lights; % dome LED lights using the relays
+        scope_assistant; % other arduino on the telescope (soft stop accelerometer)
         
     end
     
     properties(Hidden=true)
        
-        lights_relay = 'relay1';
+        lights_relay = 1;
         lights_switch = 4; 
         
-        version = 1.01;
+        scope_relay = 8; 
+        
+        version = 1.02;
         
     end
     
@@ -166,7 +169,18 @@ classdef DomeAssistant < handle
             if isempty(obj.relays)
                 val = [];
             else
-                val = obj.relays(1); 
+                val = obj.relays(obj.lights_relay); 
+            end
+            
+        end
+        
+        function val = get.scope_assistant(obj)
+            
+            
+            if isempty(obj.relays)
+                val = [];
+            else
+                val = ~obj.relays(obj.scope_relay); 
             end
             
         end
@@ -180,17 +194,27 @@ classdef DomeAssistant < handle
             if isempty(val)
                 obj.send([obj.lights_relay, ', off']); 
             elseif ischar(val) && util.text.cs(val, 'timer')
-                obj.send([obj.lights_relay, ', watch']); 
-                obj.send([obj.lights_relay, ', mode, expire']); 
+                obj.send(sprintf('relay%d, watch', obj.lights_relay));
+                obj.send(sprintf('relay%d, mode, expire', obj.lights_relay));
             elseif util.text.parse_bool(val)
-                obj.send([obj.lights_relay, ', on']); 
+                obj.send(sprintf('relay%d, on', obj.lights_relay));
             elseif util.text.parse_bool(val)==0
-                obj.send([obj.lights_relay, ', off']); 
+                obj.send(sprintf('relay%d, off', obj.lights_relay));
             else
                 error('Unknown option "%s". Use "on" or "off" or "timer"', val); 
             end
             
             obj.update;
+            
+        end
+        
+        function set.scope_assistant(obj, val)
+            
+            if util.text.parse_bool(val) % note: the relay is inverted! 
+                obj.send(sprintf('relay%d, off', obj.scope_relay));
+            else
+                obj.send(sprintf('relay%d, on', obj.scope_relay));
+            end
             
         end
         

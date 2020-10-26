@@ -179,7 +179,7 @@ classdef SensorChecker < handle
             virtual_devices = {};
             
             % connect to Wise Boltwood 1 and 2
-            for ii = 1:2
+            for ii = 1:1 % 2 I think BWW2 is malfunctioning
             
                 device = obs.sens.VirtualSensor;
                 device.data_path = {'Boltwood', ii, 'SensorData'};
