@@ -209,10 +209,17 @@ classdef Scanner < handle
                 success = 0; 
                 report = 'Could not find a folder with unclassified candidates'; 
             else
+                
                 load(fullfile(r.folder, r.analysis_folder, 'candidates.mat'))
+                
+                for ii = 1:length(cand)
+                    cand(ii).folder = fullfile(r.folder, r.analysis_folder); % make sure to update each candidate to know what folder it was loaded from! 
+                end
+                
                 obj.candidates = cand; 
                 success = 1; 
                 report = sprintf('Found %d candidates in %s', length(obj.candidates), util.text.run_id(r.folder)); 
+                
             end
             
         end
@@ -260,6 +267,10 @@ classdef Scanner < handle
             
             if isempty(obj.a)
                 obj.a = img.Analysis;
+                obj.a.use_save_batched_lightcurves = 0; 
+                
+                % TODO: make sure this object has all the correct
+                % parametrers, e.g., not to save lightcurves... 
             end
             
             worker_idx = obj.a.findWorkerUnread; % get a worker even if it was not read out
@@ -272,6 +283,7 @@ classdef Scanner < handle
                 obj.a.async_run('worker', worker_idx, 'reset', 1, 'logging', 1, 'save', 1); 
                 run_id = util.text.run_id(obj.a.reader.current_dir); 
                 report = sprintf('Started new run on worker %d for folder %s', worker_idx, run_id);
+                if obj.debug_bit, fprintf('%s: %s\n', datetime('now', 'TimeZone', 'UTC'), report); end
                 success = 1; 
             end
             

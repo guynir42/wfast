@@ -130,6 +130,7 @@ classdef QualityChecker < handle
         extended_flux; % cutout of the flux from the flux_buffer extended around the search region
         extended_aux; % cutout of the aux from the aux_buffer extended around the search region 
         extended_timestamps; % timestamps for the extended batch region
+        cutouts; % cutouts for the extended region
         
         search_start_idx; % starting index for the search region out of the EXTENDED BATCH!
         search_end_idx;  % end index for the search region out of the EXTENDED BATCH!
@@ -144,6 +145,7 @@ classdef QualityChecker < handle
         histograms = []; % cut values accumulated over the run, with dim1 the edges defined for each cut type, dim2 the star number and dim3 is the cut type
         hist_edges = []; % edges for each cut (each row is edges for a different cut)
         
+        defocus_log = []; % track the defocus result for each batch
         mean_width_values; % track the mean width for all batches in this run
         mean_background_values;  % track the mean background for all batches in this run
         
@@ -161,7 +163,7 @@ classdef QualityChecker < handle
     
     properties(Hidden=true)
         
-        version = 1.00;
+        version = 1.01;
         
     end
     
@@ -229,6 +231,8 @@ classdef QualityChecker < handle
             obj.pars.thresh_background_intensity = 10; % events where the background per pixel is above this threshold are disqualified
             obj.pars.thresh_correlation = 4; % correlation max/min of flux (with e.g., background) with value above this disqualifies the region
 
+            obj.pars.thresh_tracking_error = 0.9; % for each event, post-detection, check correlation with other stars
+            
             obj.pars.smoothing_slope = 50; % number of frames to average over when calculating slope
             obj.pars.distance_bad_rows_cols = 5; % how many pixels away from a bad row/column would we still disqualify a star? (on either side, inclusive)
             obj.pars.linear_timescale = 25; % timescale for linear_motion cut
@@ -253,6 +257,7 @@ classdef QualityChecker < handle
             obj.hist_edges = [];
             obj.histograms = [];
             
+            obj.defocus_log = [];
             obj.mean_width_values = [];
             obj.mean_background_values = [];
             
@@ -370,7 +375,8 @@ classdef QualityChecker < handle
             obj.extended_flux = [];
             obj.extended_aux = [];
             obj.extended_timestamps = [];
-
+            obj.cutouts = []; 
+            
             obj.search_start_idx = [];
             obj.search_end_idx = [];
 
@@ -531,9 +537,12 @@ classdef QualityChecker < handle
             
             obj.mean_x = util.vec.weighted_average(x,F.^2,2); % maybe use square of flux instead??
             obj.mean_y = util.vec.weighted_average(y,F.^2,2); % last arg is for dimension 2 (average over stars)
-            obj.defocus = util.vec.weighted_average(w,F.^2,2); % get the average PSF width (for focus tests)
+%             obj.defocus =  % get the average PSF width (for focus tests)
+            obj.defocus = obj.calculateDefocus; 
+            obj.defocus_log = vertcat(obj.defocus_log, obj.defocus); 
             
-            obj.mean_width_values = vertcat(obj.mean_width_values, obj.defocus(idx)); % keep a log of the focus for the entire run
+            W = util.vec.weighted_average(w,F.^2,2);
+            obj.mean_width_values = vertcat(obj.mean_width_values, W(idx)); % keep a log of the mean widths for the entire run
             obj.mean_background_values = vertcat(obj.mean_background_values, nanmedian(b(idx,:),2)); % keep a log of the sky background level for the entire run
             
             if obj.pars.use_subtract_mean_offsets
@@ -724,6 +733,34 @@ classdef QualityChecker < handle
             
         end
         
+        function val = calculateDefocus(obj, cutouts, x, y)
+            
+            if nargin<2 || isempty(cutouts)
+                cutouts = obj.cutouts;
+            end
+            
+            if nargin<3 || isempty(x)
+                x = obj.extended_aux(:,:, obj.aux_indices.offsets_x); 
+            end
+            
+            if nargin<4 || isempty(y)
+                y = obj.extended_aux(:,:, obj.aux_indices.offsets_y); 
+            end
+            
+            for ii = 1:size(cutouts,4)
+                for jj = 1:size(cutouts,3)
+                    cutouts(:,:,jj,ii) = regionfill(cutouts(:,:,jj,ii), isnan(cutouts(:,:,jj,ii))); 
+                    cutouts(:,:,jj,ii) = util.img.FourierShift2D(cutouts(:,:,jj,ii),[x(jj,ii),y(jj,ii)]); 
+                end
+            end
+            
+            C = nansum(cutouts,3); 
+            
+            val = util.img.fwhm(C,'method', 'filters', 'gaussian', 5, ...
+                'step_size', 0.25)./2.355; % use generalized gaussian to find the width
+            
+        end
+        
         function ingestStore(obj, store) % parse the data from the store into similar containers in this object
             
             obj.background_flux = store.background_flux;
@@ -733,7 +770,8 @@ classdef QualityChecker < handle
             obj.extended_flux = store.extended_flux;
             obj.extended_aux = store.extended_aux;
             obj.extended_timestamps = store.extended_timestamps;
-
+            obj.cutouts = store.cutouts;
+            
             obj.search_start_idx = store.search_start_idx;
             obj.search_end_idx = store.search_end_idx;
             obj.search_flux = store.search_flux;

@@ -110,5 +110,9 @@ function ax = show_cutouts(C, varargin)
         ax{ii}.ZLim(2) = lim_max; 
     end
     
+    if nargout==0
+        clear ax;
+    end
+    
 end
 

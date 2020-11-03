@@ -223,6 +223,17 @@ classdef RunFolder < dynamicprops
             
         end
         
+        function val = getClassified(obj_vec)
+            
+            val = [];
+            
+            for obj = obj_vec
+                L = load(fullfile(obj.folder, obj.analysis_folder, 'classified.mat')); 
+                val = vertcat(val, L.candidates); 
+            end
+            
+        end
+        
     end
     
     methods % calculations
@@ -438,7 +449,8 @@ classdef RunFolder < dynamicprops
 
                         else % we found an analysis folder! 
 
-                            [~, new_obj.analysis_folder] = fileparts(analysis_folders{end}); 
+                            [~, new_obj.analysis_folder] = fileparts(analysis_folders{end});
+                            
                             new_obj.analysis_date = datetime(new_obj.analysis_folder(10:end)); % chop off the word "analysis_" and turn it into a datetime
 
                             new_obj.process_date = input.process_date; % remember the limiting date for considering analysis folders (not the actual date when it was analyized!)
@@ -490,7 +502,7 @@ classdef RunFolder < dynamicprops
                     if isempty(input.next) % the default is to get back all the run folders
                         obj_vec(end+1) = new_obj; 
                     elseif cs(input.next, 'unprocessed') % only interested in the first instance that is unprocessed
-                        if new_obj.isFastMode && new_obj.was_processed==0
+                        if new_obj.isFastMode && new_obj.was_processed==0 && new_obj.num_files>=input.files
                             obj_vec = new_obj;
                             return;
                         end                            

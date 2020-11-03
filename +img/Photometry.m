@@ -395,7 +395,7 @@ classdef Photometry < handle
                 obj.pars_struct = s.parameters;
                 obj.pars_struct.types = {}; 
                 
-                if ~isempty(s.raw_photometry)
+                if isfield(s, 'raw_photometry')
 
                     obj.fluxes_basic = s.raw_photometry.flux;
                     obj.areas_basic = s.raw_photometry.area;

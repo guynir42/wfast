@@ -34,17 +34,17 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[] ){ 
 	
 	int counter=0;
 	
-	snprintf(field_names[counter++], STRLN, "raw_photometry"); 
-	snprintf(field_names[counter++], STRLN, "forced_photometry"); 
-	snprintf(field_names[counter++], STRLN, "apertures_photometry"); 
-	snprintf(field_names[counter++], STRLN, "gaussian_photometry"); 
-	snprintf(field_names[counter++], STRLN, "forced_gaussian_photometry"); 
+	if(photometry[idx].pars.use_raw) snprintf(field_names[counter++], STRLN, "raw_photometry"); 
+	if(photometry[idx].pars.use_forced) snprintf(field_names[counter++], STRLN, "forced_photometry"); 
+	if(photometry[idx].pars.use_apertures) snprintf(field_names[counter++], STRLN, "apertures_photometry"); 
+	if(photometry[idx].pars.use_gaussian) snprintf(field_names[counter++], STRLN, "gaussian_photometry"); 
+	if(photometry[idx].pars.use_gaussian && photometry[idx].pars.use_forced) snprintf(field_names[counter++], STRLN, "forced_gaussian_photometry"); 
 	snprintf(field_names[counter++], STRLN, "averages"); 
 	snprintf(field_names[counter++], STRLN, "parameters"); 
 	
-	plhs[0]=mxCreateStructMatrix(1,1,7, (const char**) field_names); 
+	plhs[0]=mxCreateStructMatrix(1,1,counter, (const char**) field_names); 
 	
-	counter=1;
+	counter=0;
 	if(photometry[idx].pars.use_raw) mxSetFieldByNumber(plhs[0], 0, counter++, photometry[idx].outputStruct(photometry[idx].output_raw)); 
 	if(photometry[idx].pars.use_forced) mxSetFieldByNumber(plhs[0], 0, counter++, photometry[idx].outputStruct(photometry[idx].output_forced, photometry[idx].pars.num_radii)); 
 	if(photometry[idx].pars.use_apertures) mxSetFieldByNumber(plhs[0], 0, counter++, photometry[idx].outputStruct(photometry[idx].output_apertures, photometry[idx].pars.num_radii)); 

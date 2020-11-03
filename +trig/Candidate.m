@@ -141,6 +141,9 @@ classdef Candidate < handle
         cut_hits = []; % which cuts coincide with the event peak
         cut_value = []; % what is the value that triggered the cut (maximum within range of the peak)
         
+        corr_flux = []; % correlation values, corrected for length of event region (normalized to 100 frames), for a few stars with the highest correlation
+        corr_flux_stars = []; % indices of stars with highest flux correlation
+        
         batch_number;
         
         snr;
@@ -216,7 +219,7 @@ classdef Candidate < handle
         
         function classes = getListOfClasses(obj)
             
-            classes = {'occultation certain', 'occultation possible', 'cosmic ray', 'satellite', 'flare', 'edge effect',  'bad_pixel', 'tracking error', 'artefact', 'mystery', 'unclassify'};
+            classes = {'occultation certain', 'occultation possible', 'satellite', 'flare', 'cosmic ray', 'bad_pixel', 'edge effect', 'tracking error', 'artefact', 'mystery'};
             
         end
         
@@ -395,6 +398,24 @@ classdef Candidate < handle
             
         end
         
+        function dir = findAnalysisFolder(obj)
+            
+            d = util.sys.WorkingDirectory(fullfile(getenv('DATA'), 'WFAST', obj.run_identifier(1:4), obj.run_identifier)); % the run folder
+            
+            if ~exist(d.pwd, 'dir')
+                error('Could not find folder "%s"', d.pwd); 
+            end
+            
+            list = sort(d.match_folders('analysis*'));
+            
+            if isempty(list)
+                error('Could not find any analysis folders in "%s"', d.pwd); 
+            end
+            
+            dir = list{end}; 
+            
+        end
+        
     end
     
     methods % setters
@@ -479,15 +500,6 @@ classdef Candidate < handle
             
         end
         
-        function clearExtraData(obj)
-            
-            obj.flux_raw_all = [];
-            obj.flux_corrected_all = [];
-            obj.auxiliary_all = [];
-            obj.cutouts_all = [];
-            
-        end
-        
         function [idx, corr] = findHighestCorrelations(obj, number, frames)
         % check the correlations to other stars' fluxes, with +-"frames"
         % around the time_index, and give the indices of the most
@@ -506,6 +518,7 @@ classdef Candidate < handle
             end
             
             idx = (-frames:frames) + obj.time_index; % plus/minus number of frames around peak
+            idx(idx<1 | idx>size(obj.flux_raw,1)) = []; 
             f = obj.flux_raw(idx);
             F = obj.flux_raw_all(idx,:); 
             
@@ -523,11 +536,57 @@ classdef Candidate < handle
             
         end
         
+        function val = calcTrackingErrorValue(obj, N_stars)
+            
+            if nargin<2 || isempty(N_stars)
+                N_stars = 3; 
+            end
+            
+            N_frames = 2*length(obj.time_range);
+            
+            if isempty(obj.corr_flux)
+                [obj.corr_flux_stars, corr] = obj.findHighestCorrelations(N_stars, N_frames);
+                obj.corr_flux = corr.*sqrt(N_frames)./10; % normalize by number of frames relative to 100 frames
+            end
+            
+            val = sum(obj.corr_flux); 
+            
+        end
+        
+        function clearExtraData(obj_vec) % remove large arrays (e.g., before saving to disk)
+            
+            for ii = 1:length(obj_vec)
+
+                obj_vec(ii).flux_raw_all = [];
+                obj_vec(ii).flux_corrected_all = [];
+                obj_vec(ii).auxiliary_all = [];
+                obj_vec(ii).cutouts_all = [];
+
+            end
+            
+        end
+        
+        function saveClassified(obj_vec, filename)
+            
+            if nargin<2 || isempty(filename)
+                filename = 'classified.mat';
+            end
+            
+            candidates = obj_vec(~cellfun(@isempty, {obj_vec.classification}));
+            
+            candidates = util.oop.full_copy(candidates); 
+            
+            candidates.clearExtraData;
+            
+            save(filename, 'candidates', '-v7.3'); 
+            
+        end
+        
     end
     
     methods % plotting tools / GUI
         
-        function show(obj_vec, varargin) % generate a GUI-like interface for a vector of Candidate objects
+        function show(obj_vec, varargin) % generate a GUI interface for a vector of Candidate objects
             
             input = util.text.InputVars;
             input.input_var('index', []); % which event in the vector to plot (default is 1 or what was plotted previously)
@@ -588,7 +647,7 @@ classdef Candidate < handle
             
             delete(input.parent.Children);
             
-            margin_left = 0.07;
+            margin_left = 0.05;
             
             ax1 = axes('Parent', input.parent, 'Position', [margin_left 0.55 0.55 0.35]);
             obj.showRawFlux('ax', ax1, 'on_top', 1, 'equal', 0, 'title', 0);
@@ -613,9 +672,19 @@ classdef Candidate < handle
                 'Callback', @obj.popupStack, 'UserData', input.parent, ...
                 'Tooltip', 'Show the stack image for the event'); 
             
+            button = uicontrol(popup_panel, 'Style', 'pushbutton', 'string', 'cutouts', ...
+                'Units', 'Normalized', 'Position', [0.50 0.0 0.25 1], 'FontSize', 14, ...
+                'Callback', @obj.popupCutouts, 'UserData', input.parent, ...
+                'Tooltip', 'show more cutouts around the event center'); 
+            
+            button = uicontrol(popup_panel, 'Style', 'pushbutton', 'string', '', ...
+                'Units', 'Normalized', 'Position', [0.75 0.0 0.25 1], 'FontSize', 14, ...
+                'Callback', '', 'UserData', input.parent, ...
+                'Tooltip', 'placeholder'); 
+            
             %%%%%%%%%%%%%%%%%%%%%% panel info %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
-            info_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [margin_left 0.9 1-margin_left 0.1], 'title', 'info'); 
+            info_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [margin_left 0.9 1-margin_left*2 0.1], 'title', 'info'); 
             
             button = uicontrol(info_panel, 'Style', 'text', 'string', strjoin({obj.printSummary, ['Star: ' obj.printStellarProps ' | Kernel: ' obj.printKernelProps]}, newline), ...
                 'Units', 'Normalized', 'Position', [0.02 0 0.88 1], 'FontSize', 14, 'HorizontalAlignment', 'Left'); 
@@ -632,42 +701,15 @@ classdef Candidate < handle
             notes_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [0.68 0.7 0.3 0.2], 'Title', 'notes'); 
             
             button = uicontrol(notes_panel, 'Style', 'text', 'string', obj.printNotes, ...
-                'Units', 'Normalized', 'Position', [0.05 0 0.9 1], 'FontSize', 14, 'HorizontalAlignment', 'Left'); 
+                'Units', 'Normalized', 'Position', [0.05 0 0.9 1], 'FontSize', 12, 'HorizontalAlignment', 'Left'); 
             
-            %%%%%%%%%%%%%%%%%%%%%% panel controls %%%%%%%%%%%%%%%%%%%%%%%%%
             
-            control_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [margin_left 0.0 1-margin_left*2 0.1], 'title', 'controls'); 
+            %%%%%%%%%%%%%%%%%%%%%% panel cuts %%%%%%%%%%%%%%%%%%%%%%%%%
             
-            button = uicontrol(control_panel, 'Style', 'pushbutton', 'String', '-', 'FontSize', 20, ...
-                'Units', 'Normalized', 'Position', [0.0 0.1 0.1 0.9], ...
-                'Callback', @obj_vec.callback_prev, 'UserData', input.parent, ...
-                'Tooltip', 'go back to previous candidate'); 
+            top_margins = 0.05; 
+            pos = margin_left;
             
-            button = uicontrol(control_panel, 'Style', 'edit', 'String', sprintf('index= %d / %d', input.parent.UserData.index, length(obj_vec)), 'FontSize', 16, ...
-                'Units', 'Normalized', 'Position', [0.1 0.1 0.2 0.9], ...
-                'Callback', @obj_vec.callback_index, 'UserData', input.parent, ...
-                'Tooltip', 'jump to any candidate index'); 
-            
-            button = uicontrol(control_panel, 'Style', 'pushbutton', 'String', '+', 'FontSize', 20, ...
-                'Units', 'Normalized', 'Position', [0.3 0.1 0.1 0.9], ...
-                'Callback', @obj_vec.callback_next, 'UserData', input.parent, ...
-                'Tooltip', 'go forward to next candidate'); 
-            
-            if input.parent.UserData.show_kept
-                kept_string = sprintf('kept (%d)', input.parent.UserData.num_kept);
-            else
-                kept_string = 'all'; 
-            end
-            
-            button = uicontrol(control_panel, 'Style', 'pushbutton', 'String', kept_string, 'FontSize', 20, ...
-                'Units', 'Normalized', 'Position', [0.43 0.1 0.1 0.9], ...
-                'Callback', @obj_vec.callback_kept, 'UserData', input.parent); 
-            
-            if input.parent.UserData.show_kept
-                button.TooltipString = 'Showing only the kept candidates';
-            else
-                button.TooltipString = 'Showing all candidates';
-            end
+            cuts_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [pos 0.0 0.2 0.1], 'title', 'cuts'); 
             
             if input.cuts
                 str = 'with cuts';
@@ -675,8 +717,8 @@ classdef Candidate < handle
                 str = 'no cuts';
             end
             
-            button = uicontrol(control_panel, 'Style', 'pushbutton', 'String', str, ...
-                'Units', 'Normalized', 'Position', [0.55 0.1 0.1 0.9], 'FontSize', 12, ...
+            button = uicontrol(cuts_panel, 'Style', 'pushbutton', 'String', str, ...
+                'Units', 'Normalized', 'Position', [0.05 top_margins 0.25 1-2*top_margins], 'FontSize', 12, ...
                 'Callback', @obj_vec.callback_cuts, 'UserData', input.parent);
             
             if input.cuts
@@ -685,26 +727,83 @@ classdef Candidate < handle
                 button.TooltipString = 'show only the filtered flux without cuts'; 
             end
             
-            button = uicontrol(control_panel, 'Style', 'edit', 'String', ['Cuts= ' util.text.print_vec([obj.cut_hits, obj.display_cuts], ', ')], 'FontSize', 18, ...
-                'Units', 'Normalized', 'Position', [0.67 0.1 0.2 0.9], ...
+            button = uicontrol(cuts_panel, 'Style', 'edit', 'String', ['Cuts= ' util.text.print_vec([obj.cut_hits, obj.display_cuts], ', ')], 'FontSize', 18, ...
+                'Units', 'Normalized', 'Position', [0.35 top_margins 0.6 1-2*top_margins], ...
                 'Callback', @obj_vec.callback_parse_cuts, 'UserData', input.parent);
             
             button.TooltipString = sprintf('Showing the cuts for: %s', strjoin(obj.cut_names([obj.cut_hits, obj.display_cuts]), ', '));  
             
-            button = uicontrol(control_panel, 'Style', 'pushbutton', 'String', 'Classify', 'FontSize', 18, ...
-                'Units', 'Normalized', 'Position', [0.89 0.1 0.1 0.9], ...
+            %%%%%%%%%%%%%%%%%%%%%% panel indexing %%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            pos = pos + 0.05 + cuts_panel.Position(3); 
+            
+            index_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [pos 0.0 0.4 0.1], 'title', 'controls'); 
+            
+            if input.parent.UserData.show_kept
+%                 kept_string = sprintf('kept (%d)', input.parent.UserData.num_kept);
+                kept_string = 'kept'; 
+            else
+                kept_string = 'all'; 
+            end
+            
+            button = uicontrol(index_panel, 'Style', 'pushbutton', 'String', kept_string, 'FontSize', 20, ...
+                'Units', 'Normalized', 'Position', [0.01 top_margins 0.18 1-2*top_margins], ...
+                'Callback', @obj_vec.callback_kept, 'UserData', input.parent); 
+            
+            if input.parent.UserData.show_kept
+                button.TooltipString = 'Showing only the kept candidates';
+            else
+                button.TooltipString = 'Showing all candidates';
+            end
+            
+            button = uicontrol(index_panel, 'Style', 'pushbutton', 'String', '-', 'FontSize', 20, ...
+                'Units', 'Normalized', 'Position', [0.2 top_margins 0.18 1-2*top_margins], ...
+                'Callback', @obj_vec.callback_prev, 'UserData', input.parent, ...
+                'Tooltip', 'go back to previous candidate'); 
+            
+            button = uicontrol(index_panel, 'Style', 'edit', 'String', sprintf('index= %d / %d', input.parent.UserData.index, length(obj_vec)), 'FontSize', 16, ...
+                'Units', 'Normalized', 'Position', [0.39 top_margins 0.4 1-2*top_margins], ...
+                'Callback', @obj_vec.callback_index, 'UserData', input.parent, ...
+                'Tooltip', 'jump to any candidate index'); 
+            
+            button = uicontrol(index_panel, 'Style', 'pushbutton', 'String', '+', 'FontSize', 20, ...
+                'Units', 'Normalized', 'Position', [0.8 top_margins 0.18 1-2*top_margins], ...
+                'Callback', @obj_vec.callback_next, 'UserData', input.parent, ...
+                'Tooltip', 'go forward to next candidate'); 
+            
+            %%%%%%%%%%%%%%%%%%%%%% panel classify %%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            pos = pos + 0.05 + index_panel.Position(3); 
+            
+            classify_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [pos 0.0 0.2 0.1], 'title', 'classify'); 
+            
+            button = uicontrol(classify_panel, 'Style', 'pushbutton', 'String', 'Classify', 'FontSize', 18, ...
+                'Units', 'Normalized', 'Position', [0.025 top_margins 0.45 1-2*top_margins], ...
                 'Callback', @obj_vec.callback_classify, 'UserData', input.parent); 
             
             button.TooltipString = 'choose a classification for this candidate'; 
             
-%             ax4 = axes('Parent', input.parent, 'Position', [0.7 0.3 0.25 0.4]);
-%             obj.showStack('ax', ax4);
-
+            button = uicontrol(classify_panel, 'Style', 'pushbutton', 'String', 'SAVE', 'FontSize', 20, ...
+                'Units', 'Normalized', 'Position', [0.525 top_margins 0.45 1-2*top_margins], ...
+                'Callback', @obj_vec.callback_save, 'UserData', input.parent); 
+            
+            kept = obj_vec(logical([obj_vec.kept])); 
+            
+            N_class = nnz(~cellfun(@isempty, {kept.classification}));
+            N_total = numel(kept); 
+            
+            if N_class==N_total
+                button.String = 'SAVE'; 
+                button.Tooltip = sprintf('Save %d candidates', N_total); 
+            else                
+                button.String = sprintf('%d/%d', N_class, N_total); 
+                button.Tooltip = sprintf('Cannot save. Only %d candidates have been classified out of %d', N_class, N_total); 
+            end
+            
             % TODO: notes section + add note button
             % TODO: popup stack image (+load from file) 
             % TODO: popup cutouts viewer
             
-
         end
         
         function showRawFlux(obj, varargin)
@@ -744,6 +843,8 @@ classdef Candidate < handle
             
             input.ax.FontSize = input.font_size;
             input.ax.YAxis(1).Color = [0 0 0];
+            
+            input.ax.YLim(1) = 0; 
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -1056,6 +1157,8 @@ classdef Candidate < handle
 
                 delete(input.ax);
 
+            elseif ~isempty(input.parent)
+                panel = input.parent;
             end
 
             idx = obj.time_index; 
@@ -1112,6 +1215,10 @@ classdef Candidate < handle
 
                 imagesc(ax{ii}, obj.cutouts(:,:,idx_start+ii-1));
 
+                if dyn(1)>=dyn(2)
+                    dyn(2) = dyn(1)+1;
+                end
+                
                 ax{ii}.CLim = dyn;
                 axis(ax{ii}, 'image');
                 ax{ii}.XTick = [];
@@ -1178,21 +1285,44 @@ classdef Candidate < handle
         
         function popupClassifier(obj)
             
-            str = 'Classify this candidate:';
+%             str = 'Classify this candidate:';
+%             
+%             rep = listdlg('ListString', classes, 'PromptString', str, 'ListSize',[150,250],...
+%                 'InitialValue',length(classes), 'SelectionMode', 'single', 'Name','classification');
+%             
+%             if ~isempty(rep)
+%                 if strcmp(classes{rep}, 'unclassify')
+%                     obj.classification = '';
+%                 else
+%                     obj.classification = classes{rep}; 
+%                 end
+%             end
             
             classes = obj.getListOfClasses;
+            N = ceil(length(classes)/2)+1; % number of rows
             
-            rep = listdlg('ListString', classes, 'PromptString', str, 'ListSize',[150,250],...
-                'InitialValue',length(classes), 'SelectionMode','single', 'Name','classification');
+            f = util.plot.FigHandler('Classifications'); 
+            f.clear;
+            f.fig.WindowStyle = 'modal';
             
-            if ~isempty(rep)
-                if strcmp(classes{rep}, 'unclassify')
-                    obj.classification = '';
-                else
-                    obj.classification = classes{rep}; 
-                end
+            for ii = 1:N-1
+                
+                uicontrol(f.fig, 'Style', 'pushbutton', 'String', classes{ii*2-1}, ...
+                    'Units', 'Normalized', 'Position', [0 (N-ii)/N 0.5 1/N], ...
+                    'Callback', @obj.callback_classification_button, 'FontSize', 18); 
+                
+                uicontrol(f.fig, 'Style', 'pushbutton', 'String', classes{ii*2}, ...
+                    'Units', 'Normalized', 'Position', [0.5 (N-ii)/N 0.5 1/N], ...
+                    'Callback', @obj.callback_classification_button, 'FontSize', 18); 
+                
             end
             
+            uicontrol(f.fig, 'Style', 'pushbutton', 'String', 'Unclassify', ...
+                    'Units', 'Normalized', 'Position', [0 0 1 1/N], ...
+                    'Callback', @obj.callback_unclassify_button, 'FontSize', 18); 
+            
+            uiwait(f.fig); 
+                
         end
         
         function popupPSD(obj)
@@ -1248,33 +1378,6 @@ classdef Candidate < handle
             input.axes.XLim = [x(1), x(end)]; 
             
             input.axes.FontSize = input.font_size; 
-            
-        end
-        
-        function popupStack(obj, ~, ~)
-            
-            if isempty(obj.stack)
-                filename = obj.filenames{obj.time_index}; 
-                obj.stack = h5read(filename, '/stack'); 
-            end
-            
-            f = util.plot.FigHandler('Stack image'); 
-            f.width = 18;
-            f.height = 20;
-            f.clear;
-            ax = axes('Parent', f.fig); 
-            
-            util.plot.show(obj.stack, 'auto', 1); 
-            title(ax, ''); 
-            
-            hold(ax, 'on'); 
-            
-            x = obj.auxiliary(:,obj.aux_indices.centroids_x); 
-            y = obj.auxiliary(:,obj.aux_indices.centroids_y); 
-            
-            plot(ax, x, y, 'go', 'MarkerSize', 15); 
-            
-            hold(ax, 'off'); 
             
         end
         
@@ -1334,7 +1437,51 @@ classdef Candidate < handle
             ax2.XLim = [1 obj.head.NAXIS1]; 
             ax2.YLim = [1 obj.head.NAXIS2]; 
             
-            ax.FontSize = 12;
+            ax2.FontSize = 12;
+            
+            uicontrol(f.fig, 'Style', 'pushbutton', 'String', 'CLOSE WINDOW', ...
+                'Units', 'Normalized', 'Position', [0.5 0.02 0.2 0.08], ...
+                'Callback', @obj.callback_close_window, 'FontSize', 12); 
+            
+        end
+        
+        function popupStack(obj, ~, ~)
+            
+            if isempty(obj.stack)
+                filename = obj.filenames{obj.time_index}; 
+                obj.stack = h5read(filename, '/stack'); 
+            end
+            
+            f = util.plot.FigHandler('Stack image'); 
+            f.width = 18;
+            f.height = 16;
+            f.clear;
+            ax = axes('Parent', f.fig); 
+            
+            util.plot.show(obj.stack, 'auto', 1); 
+            title(ax, ''); 
+            
+            hold(ax, 'on'); 
+            
+            x = obj.auxiliary(:,obj.aux_indices.centroids_x); 
+            y = obj.auxiliary(:,obj.aux_indices.centroids_y); 
+            
+            plot(ax, x, y, 'go', 'MarkerSize', 15); 
+            
+            hold(ax, 'off'); 
+            
+        end
+        
+        function popupCutouts(obj, ~, ~)
+            
+            f = util.plot.FigHandler('Cutout viewer'); 
+            f.width = 25;
+            f.height = 24;
+            f.clear;
+            
+            N = 2*length(obj.time_range); 
+            
+            util.plot.show_cutouts(obj.cutouts, 'frame', obj.frame_index, 'number', N); 
             
         end
         
@@ -1432,7 +1579,8 @@ classdef Candidate < handle
             hndl.Value = use_kept;
             
             if use_kept
-                hndl.String = sprintf('kept (%d)', hndl.UserData.UserData.num_kept);
+%                 hndl.String = sprintf('kept (%d)', hndl.UserData.UserData.num_kept);
+                hndl.String = 'kept'; 
             else
                 hndl.String = 'all';
             end
@@ -1452,16 +1600,6 @@ classdef Candidate < handle
             else
                 hndl.String = 'no cuts';
             end
-            
-            obj.show('parent', hndl.UserData);
-            
-        end
-        
-        function callback_classify(obj, hndl, ~)
-            
-            idx = hndl.UserData.UserData.index;
-            
-            obj(idx).popupClassifier;
             
             obj.show('parent', hndl.UserData);
             
@@ -1509,6 +1647,206 @@ classdef Candidate < handle
             end
             
             obj.show('parent', hndl.UserData); 
+            
+        end
+        
+        function callback_classify(obj, hndl, ~)
+            
+            idx = hndl.UserData.UserData.index;
+            
+            obj(idx).popupClassifier;
+            
+            obj.show('parent', hndl.UserData);
+            
+        end
+        
+        function callback_classification_button(obj, hndl, ~)
+            
+            obj.classification = hndl.String; 
+            
+            delete(hndl.Parent); 
+            
+        end
+        
+        function callback_unclassify_button(obj, hndl, ~)
+            
+            obj.classification = ''; 
+            
+            delete(hndl.Parent); 
+            
+        end
+        
+        function callback_save(obj_vec, ~, ~)
+            
+            dir = obj_vec(1).folder; 
+
+            if isempty(dir)
+                dir = obj_vec(1).findAnalysisFolder;
+            end
+
+            if ~exist(dir, 'dir')
+                dir = obj_vec(1).findAnalysisFolder; % try to re-calculate the folder position
+            end
+
+            filename = fullfile(dir, 'classified.mat'); 
+
+            f = util.plot.FigHandler('saving candidates'); 
+            f.clear;
+            f.width = 20;
+            f.height = 13;
+            
+            f.fig.WindowStyle = 'modal';
+            
+            kept = obj_vec(logical([obj_vec.kept])); 
+            
+            classifications = {kept.classification};
+            
+            % list of classifications, with occultations first
+            classes = unique(classifications);
+            classes(find(strcmp(classes, 'occultation certain'))) = [];
+            classes(find(strcmp(classes, 'occultation possible'))) = [];
+            classes = ['occultation certain', 'occultation possible', classes]; 
+            
+            N_class = nnz(~cellfun(@isempty, classifications));
+            N_kept = numel(kept); 
+            
+            if N_class==N_kept
+                
+                buttons = struct; 
+                
+                candidates = obj_vec(~cellfun(@isempty, {obj_vec.classification}));
+                
+                %%%%%%%%%%% total number of candidates %%%%%%%%%%%%%
+                
+                str = sprintf('A total of %d candidates were classified', length(candidates));
+                
+                if length(candidates)~=N_kept
+                    str = sprintf('%s\nout of %d kept candidates', str, N_kept);
+                end
+                
+                buttons.total = uicontrol(f.fig, 'Style', 'text', 'String', str, ...
+                    'Units', 'Normalized', 'Position', [0 0.8 1 0.2], ...
+                    'HorizontalAlignment', 'Center', 'FontSize', 18, 'UserData', N_kept);
+                
+                %%%%%%%%%%% classification break-down %%%%%%%%%%%%%%%
+                
+                str = ['  *total classifications*  ' newline];
+                
+                for ii = 1:length(classes)
+                    str = sprintf('%s "%s": %d\n', str, classes{ii}, nnz(strcmp(classes{ii}, classifications))); 
+                end
+                
+                buttons.classifications = uicontrol(f.fig, 'Style', 'text', 'String', str, ...
+                    'Units', 'Normalized', 'Position', [0 0.3 0.5 0.5], ...
+                    'HorizontalAlignment', 'Left', 'FontSize', 18);
+                
+                %%%%%%%%%%% Simulation results %%%%%%%%%%%%%%%%%%%
+                
+                str = ''; 
+                alt_str = '';
+                
+                simulated = candidates(logical([candidates.is_simulated])); 
+                N_sim = length(simulated); 
+                
+                if N_sim
+                    
+                    alt_str = ['   *simulated events*  ' newline]; 
+                    
+%                     str = sprintf('%s Total simulated: %d\n', str, N_sim); 
+                    
+                    N_certain = nnz([candidates.is_simulated] & strcmp('occultation certain', {candidates.classification}));
+                    alt_str = sprintf('%s "occultation certain": %d\n', alt_str, N_certain); 
+                    
+                    N_possible = nnz([candidates.is_simulated] & strcmp('occultation possible', {candidates.classification}));
+                    alt_str = sprintf('%s "occultation possible": %d\n', alt_str, N_possible);
+                    
+                    alt_str = sprintf('%s all other classes: %d\n', alt_str, N_sim - N_certain - N_possible); 
+                    
+                    points_certain = 100/N_sim; % only get full points if correctly classify everything! 
+                    points_possible = points_certain/2; % only get half points for possible occultation
+                    points_wrong = -points_possible; % any simulated event missed by classifier gives negative points! 
+                    
+%                     str = sprintf('%s points: %4.2f and %4.2f\n', str, points_certain, points_possible); 
+                    
+                    total_points = points_certain.*N_certain + points_possible.*N_possible - points_wrong*(N_sim - N_certain - N_possible);
+
+                    alt_str = sprintf('%s\n Classifier grade: %d%%\n', alt_str, round(total_points)); 
+                    
+                end
+                
+                buttons.simulations = uicontrol(f.fig, 'Style', 'text', 'String', str, ...
+                    'Units', 'Normalized', 'Position', [0.5 0.3 0.5 0.5], ...
+                    'HorizontalAlignment', 'Left', 'FontSize', 18, 'UserData', alt_str);
+                
+                %%%%%%%%%%%% filename confirmation %%%%%%%%%%%%%%%%
+                
+%                 str = sprintf('Ready to save %d candidates to\n"%s"', N_total, filename); 
+                str = ''; % I don't want to reveal the run name until candidates are saved! 
+                
+                buttons.filename = uicontrol(f.fig, 'Style', 'text', 'String', str, ...
+                    'Units', 'Normalized', 'Position', [0.0 0.1 1 0.2], ...
+                    'HorizontalAlignment', 'Left', 'FontSize', 12, 'UserData', filename);
+                
+                %%%%%%%%%%%%%%%%% Save / Cancel %%%%%%%%%%%%%%%%%%%%%%
+                
+                buttons.save = uicontrol(f.fig, 'Style', 'pushbutton', 'String', 'Save candidates', ...
+                    'Units', 'Normalized', 'Position', [0.0 0.0 0.5 0.1], ...
+                    'HorizontalAlignment', 'Center',  'FontSize', 18, ...
+                    'Callback', @candidates.callback_confirm_save);
+                
+                buttons.cancel = uicontrol(f.fig, 'Style', 'pushbutton', 'String', 'Cancel', ...
+                    'Units', 'Normalized', 'Position', [0.5 0.0 0.5 0.1], ...
+                    'HorizontalAlignment', 'Center',  'FontSize', 18, ...
+                    'Callback', @obj_vec.callback_close_window);
+                
+                uicontrol(buttons.cancel); 
+                
+                buttons.save.UserData = buttons; 
+                
+            else                
+                
+                button = uicontrol(f.fig, 'Style', 'text', 'String', sprintf('\n\nOnly %d out of %d candidates were classified. \n\n Classify all candidates before saving!', N_class, N_kept), ...
+                    'Units', 'Normalized', 'Position', [0 0.1 1 0.9], ...
+                    'HorizontalAlignment', 'Center', 'FontSize', 18);
+                    
+                button = uicontrol(f.fig, 'Style', 'pushbutton', 'String', 'Cancel', ...
+                    'Units', 'Normalized', 'Position', [0 0.0 1 0.1], ...
+                    'HorizontalAlignment', 'Center',  'FontSize', 18, ...
+                    'Callback', @obj_vec.callback_close_window);
+                
+                uicontrol(button); 
+                
+            end
+            
+            uiwait(f.fig); 
+            
+        end
+        
+        function callback_confirm_save(obj_vec, hndl, ~)
+            
+            buttons = hndl.UserData; % recover handles to all buttons
+            
+            filename = buttons.filename.UserData; 
+            
+            fprintf('Saving %d candidates to "%s"\n', length(obj_vec), filename);
+            
+            buttons.filename.String = sprintf(' Successfully saved %d candidates to \n "%s"', buttons.total.UserData, filename); 
+            
+            obj_vec.saveClassified(filename); 
+            
+            buttons.simulations.String = buttons.simulations.UserData; % load the alt-text
+            
+            buttons.save.Callback = @obj_vec.callback_close_window; 
+            buttons.save.String = 'Close figure'; 
+            buttons.save.Position(3) = 1; % stretch it over the "cancel" button
+            
+            delete(buttons.cancel); 
+            
+        end
+        
+        function callback_close_window(~, hndl, ~)
+            
+            delete(hndl.Parent); 
             
         end
         

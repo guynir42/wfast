@@ -826,7 +826,7 @@ classdef EventFinder < handle
             c.cut_thresh = obj.store.checker.cut_thresholds; 
             c.cut_two_sided = obj.store.checker.cut_two_sided; 
             
-            for ii = 1:length(c.cut_names) % go oveer each cut and check if it applies to this event
+            for ii = 1:length(c.cut_names) % go over each cut and check if it applies to this event
             
                 if obj.store.checker.cut_flag_matrix(c.time_index, c.star_index, ii) % the event occurs on one of the flagged frames/stars
                     
@@ -856,6 +856,15 @@ classdef EventFinder < handle
                 end % the event occurs on one of the flagged frames/stars
                 
             end % go oveer each cut and check if it applies to this event
+            
+            if c.calcTrackingErrorValue>obj.store.checker.pars.thresh_tracking_error % too much correlations with other stars
+                str = sprintf('Correlation with other stars is too high: %s=%4.2f', util.text.print_vec(c.corr_flux, '+'), sum(c.corr_flux)); 
+                str_idx = strcmp(str, c.notes);
+                if isempty(str_idx)
+                    c.notes{end+1} = str; 
+                end
+                c.kept = 0;
+            end
             
         end
         

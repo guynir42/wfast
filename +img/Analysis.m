@@ -144,6 +144,9 @@ classdef Analysis < file.AstroData
         use_cutouts_all_proc = 1;
         use_cutouts_store = 0; 
         
+        use_duplicate_filter = 1;
+        duplicate_batches = [];
+        
         cutouts_all;
         positions_x_all;
         positions_y_all;
@@ -168,7 +171,7 @@ classdef Analysis < file.AstroData
         
         num_batches_limit;
         
-        version = 1.04;
+        version = 1.05;
         
     end
     
@@ -265,6 +268,8 @@ classdef Analysis < file.AstroData
             obj.positions_x_all = [];
             obj.positions_y_all = [];
             obj.stack_all = [];
+            
+            obj.duplicate_batches = []; 
             
             obj.finder.store.checker.setupSensor; % make sure the quality checker has the right bad rows/columns
             
@@ -580,6 +585,16 @@ classdef Analysis < file.AstroData
 
                 save(fullfile(obj.log_dir, ['finder_' name]), 'finder', '-v7.3');
                 
+            catch ME
+                warning(ME.getReport);
+            end
+            
+            try % save a text file with any duplicates
+                if ~isempty(obj.duplicate_batches)
+                    fid = fopen(fullfile(obj.log_dir, 'duplicate_batches.txt'), 'wt');
+                    on_cleanup = onCleanup(@() fclose(fid));
+                    fprintf(fid, '%d\n', obj.duplicate_batches);
+                end
             catch ME
                 warning(ME.getReport);
             end
@@ -953,7 +968,7 @@ classdef Analysis < file.AstroData
                 
                 if ii<=length(obj.futures)
                     
-                    if ~isa(obj.futures{ii}, 'parallel.Future') || isvalid(obj.futures{ii})...
+                    if ~isa(obj.futures{ii}, 'parallel.Future') || ~isvalid(obj.futures{ii})...
                         || (strcmp(obj.futures{ii}.State, 'finished') && ~isempty(obj.futures{ii}.Error))
                     
                         obj.futures{ii} = []; 
@@ -1224,6 +1239,8 @@ classdef Analysis < file.AstroData
             
             obj.reader.batch;
             obj.copyFrom(obj.reader); 
+            
+            obj.head.run_identifier = util.text.run_id(obj.thisFilename); 
             
             if isempty(obj.images) && isempty(obj.stack)
                 disp(['empty batch in filename: ' obj.thisFilename]);
@@ -1564,6 +1581,12 @@ classdef Analysis < file.AstroData
                 't_start', obj.t_start, 't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp, ...
                 'juldates', obj.juldates, 'positions', obj.positions, 'variance', single(2.5)); % need to add the sky background too
 
+            if obj.use_duplicate_filter
+                if obj.findDuplicateFrames
+                    obj.duplicate_batches = vertcat(obj.duplicate_batches, obj.batch_counter + 1); 
+                end
+            end
+            
             if obj.use_full_lightcurves
                 
                 obj.lightcurves.getData(obj.phot);
@@ -1588,6 +1611,36 @@ classdef Analysis < file.AstroData
 %             end
             
             if obj.debug_bit>1, fprintf('Time to calculate sky parameters: %f seconds\n', toc(t)); end
+            
+        end
+        
+        function [val, counter] = findDuplicateFrames(obj, star_index, aperture_index)
+            
+            if nargin<2 || isempty(star_index)
+                star_index = 1;
+            end
+            
+            if nargin<3 || isempty(aperture_index)
+                aperture_index = 1;
+            end
+            
+            f = obj.phot.fluxes(:,star_index,aperture_index); % pick any flux you like
+            
+            counter = 0;
+            
+            for ii = 1:size(f,1)-10
+                
+                if f(ii)==f(ii+10)
+                    counter = counter + 1;
+                end
+                
+            end
+            
+            if counter>3
+                val = 1;
+            else
+                val = 0;
+            end
             
         end
         
@@ -1746,6 +1799,8 @@ classdef Analysis < file.AstroData
 %             if obj.phot.use_aperture
 %                 r = obj.phot.aperture;
 %             end
+
+            obj.head.PHOT_PARS = obj.phot.pars_struct; 
 
             obj.finder.input(obj.phot); 
             

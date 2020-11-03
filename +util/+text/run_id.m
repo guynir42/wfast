@@ -15,7 +15,7 @@ function val = run_id(folder)
         val = '';
     else
         
-         val = regexp(folder(idx(end):end), '\d{4}-\d{2}-\d{2}[\\/].+', 'match'); 
+         val = regexp(folder(idx(end):end), '\d{4}-\d{2}-\d{2}[\\/]\w+', 'match'); 
          if iscell(val)
              val = val{1};
          end
