@@ -37,7 +37,7 @@ classdef FocusSpider < handle
         
         min_pos = 0;
         max_pos = 20;
-        max_tip_tilt = 5; % this is absolute tip/tilt        
+        max_tip_tilt = 10; % this is absolute tip/tilt        
         
         step = 0.05;
         step_tip = 0.01;

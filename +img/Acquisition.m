@@ -274,6 +274,7 @@ classdef Acquisition < file.AstroData
         use_remove_saturated_;
         saturation_value_;
         use_mextractor_;
+        use_astrometry_; 
         use_arbitrary_pos_;
         use_cutouts_;
         use_adjust_cutouts_;
@@ -1651,7 +1652,7 @@ classdef Acquisition < file.AstroData
                                 fluxes = obj.cam.af.phot_struct.forced_photometry.flux - A.*B;
                                 %                     widths = phot_struct.apertures_photometry.width;
                                 
-                                widths = util.img.fwhm(C-permute(B, [1,3,4,2]), 'method', 'filters', 'gauss', 5, 'min_size', 0.25, 'max_size', 15, 'step', 0.2)/2.355;
+                                widths = util.img.fwhm(C-permute(B, [1,3,4,2]), 'method', 'filters', 'gauss', 5, 'min_size', 0.25, 'max_size', 25, 'step', 0.5)/2.355;
                                 widths(widths>10 | widths<0.1) = NaN;
                                 
                                 if jj==1
@@ -1760,6 +1761,78 @@ classdef Acquisition < file.AstroData
             if ~isempty(obj.gui) && obj.gui.check
                 obj.gui.update;
             end
+            
+        end
+        
+        function [success, N_stars, positions, tips, tilts] = runBruteForceFocus(obj, varargin)
+            
+            success = 0;
+            
+            input = util.text.InputVars;
+            input.input_var('positions', 3:0.1:6); 
+            input.input_var('tips', 0:10); 
+            input.input_var('tilts', -1:1);
+            input.input_var('batch_size', 10); % how many frames to take in each batch
+            input.input_var('expT', 0.05, 'exposure time'); 
+            
+            input.scan_vars(varargin{:}); 
+            
+            N_stars = zeros(length(input.tilts), length(input.tips), length(input.positions)); 
+            positions = zeros(length(input.tilts), length(input.tips), length(input.positions)); 
+            tips = zeros(length(input.tilts), length(input.tips), length(input.positions)); 
+            tilts = zeros(length(input.tilts), length(input.tips), length(input.positions)); 
+            
+            obj.brake_bit = 0;
+                
+%             obj.cam.startup('reset', 1, 'batch_size', input.batch_size, 'expT', input.expT); 
+            
+            % make sure finishup is called in the end
+%             on_cleanup = onCleanup(@() obj.cam.finish_focus(old_pos));
+                            
+            for ii = 1:length(input.tilts)
+                
+                for jj = 1:length(input.tips)
+                    
+                    for kk = 1:length(input.positions)
+                        
+                        obj.cam.focuser.pos = input.positions(kk); 
+                        obj.cam.focuser.tip = input.tips(jj); 
+                        obj.cam.focuser.tilt = input.tilts(ii); 
+                        
+                        obj.cam.single('frame rate', NaN, 'exp time', input.expT, 'batch size', input.batch_size);
+                        obj.num_sum = size(obj.cam.images,3);
+                        obj.stack = single(sum(obj.cam.images,3));
+                        obj.stack_proc = obj.cal.input(obj.stack, 'num', obj.num_sum); % calibrated sum
+
+                        if obj.use_remove_bad_pixels
+                            obj.stack_proc = util.img.maskBadPixels(obj.stack_proc, NaN); 
+                        end
+
+                        if obj.use_remove_extra_columns
+                            obj.stack_proc(:,1957:1959) = NaN;
+                        end
+                        
+                        obj.show;
+                        
+                        props = util.img.quick_find_stars(obj.stack_proc, 'threshold', 20,...
+                            'saturation', 5e4*obj.num_sum, 'unflagged', 1, 'num_stars', 1000, ...
+                            'psf', 2, 'edges', obj.avoid_edges, 'dilate', obj.cut_size-5);
+                        
+                        N_stars(ii,jj,kk) = height(props); % number of stars
+                        positions(ii,jj,kk) = obj.cam.focuser.pos;
+                        tips(ii,jj,kk) = obj.cam.focuser.tip;
+                        tilts(ii,jj,kk) = obj.cam.focuser.tilt; 
+                        
+                        fprintf('pos= %4.2f | tip= %4.2f | tilt= %4.2f | N_stars= %d \n', ...
+                            obj.cam.focuser.pos, obj.cam.focuser.tip, obj.cam.focuser.tilt, N_stars(ii,jj,kk)); 
+                        
+                    end % for kk (positions)
+                    
+                end % for jj (tips)
+                
+            end % for ii (tilts)
+            
+            success = 1;
             
         end
         
@@ -2208,6 +2281,7 @@ classdef Acquisition < file.AstroData
                 input.input_var('use_remove_saturated', []);
                 input.input_var('saturation_value', []);
                 input.input_var('use_mextractor', []);
+                input.input_var('use_astrometry', []); 
                 input.input_var('use_arbitrary_pos', []);
                 input.input_var('use_cutouts', []);
                 input.input_var('use_adjust_cutouts', []);
@@ -2280,6 +2354,7 @@ classdef Acquisition < file.AstroData
             obj.use_remove_saturated_ = obj.use_remove_saturated;
             obj.saturation_value_ = obj.saturation_value;
             obj.use_mextractor_ = obj.use_mextractor;
+            obj.use_astrometry_ = obj.use_astrometry; 
             obj.use_arbitrary_pos_ = obj.use_arbitrary_pos;
             obj.use_cutouts_ = obj.use_cutouts;
             obj.use_adjust_cutouts_ = obj.use_adjust_cutouts;
@@ -2333,6 +2408,7 @@ classdef Acquisition < file.AstroData
             obj.use_remove_saturated = obj.use_remove_saturated_;
             obj.saturation_value = obj.saturation_value_;
             obj.use_mextractor = obj.use_mextractor_;
+            obj.use_astrometry = obj.use_astrometry_; 
             obj.use_arbitrary_pos = obj.use_arbitrary_pos_;
             obj.use_cutouts = obj.use_cutouts_;
             obj.use_adjust_cutouts = obj.use_adjust_cutouts_;
