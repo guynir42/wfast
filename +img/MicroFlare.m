@@ -403,9 +403,10 @@ classdef MicroFlare < handle
                 
                 s = util.img.photometry2(obj.all_cutouts, 'aperture', [3 8], 'use_aperture', 1, 'use_gaussian', 1); % the big aperture is used to zero-in on the source even on the edges of the cutout
                 
-                f = s.apertures_photometry.flux - s.apertures_photometry.area .* s.apertures_photometry.background;
-                x = s.apertures_photometry.offset_x(:,obj.cut_index); 
-                y = s.apertures_photometry.offset_y(:,obj.cut_index); 
+                B = nanmedian(s.apertures_photometry.background(:,:,1)); % added this change to account for flares on the edge that make a high background
+                f = s.apertures_photometry.flux(:,:,1) - s.apertures_photometry.area(:,:,1) .* B;
+                x = s.apertures_photometry.offset_x(:,obj.cut_index,1); 
+                y = s.apertures_photometry.offset_y(:,obj.cut_index,1); 
                 
                 ff = f(:,obj.cut_index); % flux for this specific micro flare
 
@@ -432,7 +433,7 @@ classdef MicroFlare < handle
                 
                 obj.magnitudes = zp + util.units.flux2lup(f2, 5);
 
-                obj.peak_mag = obj.magnitudes(obj.frame_index); 
+                obj.peak_mag = nanmin(obj.magnitudes); % also made this adjustment to get fluxes that peak not on the exact frame_index
                 obj.mag_error = sqrt(zp_err.^2 + (obj.corrected_std./max(obj.corrected_flux)).^2);
                 
 

@@ -67,7 +67,7 @@ function [lower, upper] = poisson_errors(lambda, p_value, precision_bytes)
 
         % find upper bound
         low = lambda;
-        high = poissinv(1-p_value/2, lambda);
+        high = poissinv(1-p_value/4, lambda);
         p = p_value; 
 
         for ii = 1:precision_bytes

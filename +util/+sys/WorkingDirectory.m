@@ -588,8 +588,8 @@ classdef WorkingDirectory < handle
                 warning('Could not parse the input folder "%s", into a run_id.', folder); 
             else
                 
-                if exist(fullfile(getenv('DATA'), '2020', id), 'dir')
-                    obj.cd(fullfile(getenv('DATA'), '2020', id)); 
+                if exist(fullfile(getenv('DATA'), 'WFAST/2020', id), 'dir')
+                    obj.cd(fullfile(getenv('DATA'), 'WFAST/2020', id)); 
                 elseif exist(fullfile(getenv('DATA_EXTRAS'), id), 'dir')
                     obj.cd(fullfile(getenv('DATA_EXTRAS'), id)); 
                 elseif exist(fullfile(getenv('DATA_TEMP'), id), 'dir')
