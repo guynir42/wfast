@@ -108,6 +108,8 @@ classdef QualityChecker < handle
         background_intensity; % the background per pixel value (remove frames with star in annulus or when the sky is too bright)
         bad_pixels; % how many bad pixels are in the aperture
         
+        flux_corr; % correlations of flux between stars
+        
         mean_x; % the weighted average offset for all stars
         mean_y; % the weighted average offset for all stars
         
@@ -163,7 +165,7 @@ classdef QualityChecker < handle
     
     properties(Hidden=true)
         
-        version = 1.01;
+        version = 1.02;
         
     end
     
@@ -217,6 +219,7 @@ classdef QualityChecker < handle
             obj.pars.use_nan_offsets = false;
             obj.pars.use_photo_flag = false; 
             obj.pars.use_bad_pixels = true; 
+            obj.pars.use_flux_corr = true;
             obj.pars.use_correlations = true;
 
             obj.pars.corr_types = {'b', 'x', 'y', 'r', 'w'}; % types of auxiliary we will use for correlations (r is derived from x and y)
@@ -229,6 +232,7 @@ classdef QualityChecker < handle
             obj.pars.thresh_offset_size = 4; % events with offsets above this number are disqualified (after subtracting mean offsets)
             obj.pars.thresh_linear_motion = 2; % events showing linear motion of the centroids are disqualified
             obj.pars.thresh_background_intensity = 10; % events where the background per pixel is above this threshold are disqualified
+            obj.pars.thresh_flux_corr = 2.5; % events where the flux of one star has 95% percentile higher than this are disqualified
             obj.pars.thresh_correlation = 4; % correlation max/min of flux (with e.g., background) with value above this disqualifies the region
 
             obj.pars.thresh_tracking_error = 0.9; % for each event, post-detection, check correlation with other stars
@@ -346,6 +350,18 @@ classdef QualityChecker < handle
                 obj.cut_names{end+1} = 'bad_pixels'; 
                 obj.cut_thresholds(end+1) = 1;
                 obj.cut_two_sided(end+1) = false;
+            end
+            
+            if obj.pars.use_flux_corr
+                
+                obj.cut_names{end+1} = 'flux_corr_25'; 
+                obj.cut_thresholds(end+1) = obj.pars.thresh_flux_corr;
+                obj.cut_two_sided(end+1) = false;
+                
+                obj.cut_names{end+1} = 'flux_corr_50'; 
+                obj.cut_thresholds(end+1) = obj.pars.thresh_flux_corr;
+                obj.cut_two_sided(end+1) = false;
+                
             end
             
             for ii = 1:length(obj.pars.corr_types)
@@ -602,6 +618,8 @@ classdef QualityChecker < handle
            
             obj.bad_pixels = p;
             
+            obj.flux_corr = obj.calculateFluxCorr(f, [25 50]); % can also give multiple time scales to run the correlation (default is 50)
+            
             aux = zeros(size(f,1),size(f,2),length(obj.pars.corr_types), 'like', f); 
 %             aux(:,:,obj.corr_indices.a) = a;
             aux(:,:,obj.corr_indices.b) = b;
@@ -613,7 +631,7 @@ classdef QualityChecker < handle
             aux = fillmissing(aux, 'spline'); 
             aux(isnan(aux)) = 0; % must make sure to get rid of all NaNs
             
-            f = fillmissing(f, 'spline'); 
+%             f = fillmissing(f, 'spline'); 
             
             obj.correlations = zeros(size(aux,1), size(aux,2), size(aux,3), length(obj.pars.corr_timescales), 'like', aux); 
             
@@ -647,8 +665,18 @@ classdef QualityChecker < handle
                 
             end
             
-            %%%%%%%%%%%%% find all the bad frames %%%%%%%%%%%%%%%%%%%%%
-
+            obj.storeCutValues;
+            
+            obj.fillHistograms; 
+            
+            if obj.pars.use_auto_count_hours
+                obj.hours.input(obj); % count the star hours 
+            end
+            
+        end
+        
+        function storeCutValues(obj)
+        
             obj.cut_flag_matrix = false(obj.num_frames, obj.num_stars, obj.num_cuts); % preallocate the flag matrix with zeros
             obj.cut_values_matrix = zeros(obj.num_frames, obj.num_stars, obj.num_cuts, 'single'); % preallocate the cut values matrix with zeros
             
@@ -670,10 +698,22 @@ classdef QualityChecker < handle
                 obj.cut_values_matrix(:,:,obj.cut_indices.slope) = obj.slope.*all_stars;
             end
             
+            if obj.pars.use_near_bad_rows_cols
+                obj.cut_values_matrix(:,:,obj.cut_indices.near_bad_rows_cols) = obj.near_bad_rows_cols; 
+            end
+            
             if obj.pars.use_offset_size
                 obj.cut_values_matrix(:,:,obj.cut_indices.offset_size) = obj.offset_size;
             end
 
+            if obj.pars.use_linear_motion
+                obj.cut_values_matrix(:,:,obj.cut_indices.linear_motion) = obj.linear_motion; 
+            end
+            
+            if obj.pars.use_background_intensity
+                obj.cut_values_matrix(:,:,obj.cut_indices.background_intensity) = obj.background_intensity; 
+            end
+            
             if obj.pars.use_nan_flux
                 obj.cut_values_matrix(:,:,obj.cut_indices.nan_flux) = obj.nan_flux;
             end
@@ -686,12 +726,9 @@ classdef QualityChecker < handle
                 obj.cut_values_matrix(:,:,obj.cut_indices.photo_flag) = obj.photo_flag; 
             end
             
-            if obj.pars.use_near_bad_rows_cols
-                obj.cut_values_matrix(:,:,obj.cut_indices.near_bad_rows_cols) = obj.near_bad_rows_cols; 
-            end
-            
-            if obj.pars.use_linear_motion
-                obj.cut_values_matrix(:,:,obj.cut_indices.linear_motion) = obj.linear_motion; 
+            if obj.pars.use_flux_corr
+                obj.cut_values_matrix(:,:,obj.cut_indices.flux_corr_25) = obj.flux_corr(:,:,1); 
+                obj.cut_values_matrix(:,:,obj.cut_indices.flux_corr_50) = obj.flux_corr(:,:,2); 
             end
             
             if obj.pars.use_correlations
@@ -721,18 +758,12 @@ classdef QualityChecker < handle
                 
             end
             
-            obj.fillHistograms; 
-            
             if obj.pars.use_dilate
                 obj.cut_flag_matrix = imdilate(obj.cut_flag_matrix, ones(1+2.*obj.pars.dilate_region,1)); 
             end
-
-            if obj.pars.use_auto_count_hours
-                obj.hours.input(obj); % count the star hours 
-            end
             
         end
-        
+            
         function val = calculateDefocus(obj, cutouts, x, y)
             
             if nargin<2 || isempty(cutouts)
@@ -758,6 +789,52 @@ classdef QualityChecker < handle
             
             val = util.img.fwhm(C,'method', 'filters', 'gaussian', 5, ...
                 'step_size', 0.25)./2.355; % use generalized gaussian to find the width
+            
+        end
+        
+        function val = calculateFluxCorr(obj, flux, widths)
+            
+            if nargin<3 || isempty(widths)
+                widths = 50; 
+            end
+            
+            if ndims(flux)>2
+                error('Can only handle 2D fluxes'); 
+            end
+            
+            flux = flux - nanmean(flux); % make sure the flux is normalized to zero
+            
+            f1 = flux;
+            f2 = permute(flux, [1,3,2]); % turn the star index into 3rd dimension
+            
+            F = f1.*f2; % big, 3D matrix
+            F1 = f1.^2;
+            F2 = f2.^2; 
+            
+            val = zeros([size(flux), length(widths)], 'like', flux); % preallocate enough room for multiple widths
+            
+            for ii = 1:length(widths)
+                
+                w = widths(ii); 
+
+                numer = movmean(F, w, 'omitnan'); 
+                sum1 = movmean(F1, w, 'omitnan'); 
+                sum2 = movmean(F2, w, 'omitnan'); 
+                
+                bad_idx = sum1<0 | sum2<0;
+                
+                FC = numer./sqrt(sum1.*sum2).*sqrt(w); 
+                FC(bad_idx) = 0; 
+                
+                for jj = 1:size(flux,2)
+                    FC(:,jj,jj) = 0; % remove auto-correlations (should be all equal to 1 anyway
+                end
+                
+                corr_value = prctile(FC, 95, 3); % should we include anti-correlations (by setting abs() first)?
+                
+                val(:,:,ii) = corr_value; 
+
+            end
             
         end
         

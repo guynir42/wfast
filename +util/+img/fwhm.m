@@ -111,10 +111,10 @@ function val = fwhm(I, varargin)
             input.max_size = ceil(min(S)/1.5); 
         end
         
-        I2 = I-util.stat.mean2(I); 
+%         I2 = I-util.stat.mean2(I); 
         
-        I3 = reshape(I2, [size(I,1), size(I,2).*size(I,3).*size(I,4)]); % flatten the array into 2D
-        I3 = reshape(regionfill(I3, isnan(I3)), size(I)); % reshape it back after removing NaNs
+        I2 = reshape(I, [size(I,1), size(I,2).*size(I,3).*size(I,4)]); % flatten the array into 2D
+        I2 = reshape(regionfill(I2, isnan(I2)), size(I)); % reshape it back after removing NaNs
         
         sig = input.min_size:input.step_size:input.max_size;
         mx = nan(size(I,3), size(I,4), size(sig,2)); 
@@ -125,9 +125,9 @@ function val = fwhm(I, varargin)
             g = util.img.generalized_gaussian('sigma_x', sig(ii)./2.355, 'size', S, 'norm', 2, 'power', input.gaussian);  
             
             if input.fft
-                If = util.img.conv_f(g, I3); 
+                If = util.img.conv_f(g, I2); 
             else
-                If = reshape(filter2(g, reshape(I3, [size(I,1), size(I,2).*size(I,3).*size(I,4)])), size(I)); % reshape back to original size
+                If = reshape(filter2(g, reshape(I2, [size(I,1), size(I,2).*size(I,3).*size(I,4)])), size(I)); % reshape back to original size
             end
             
             mx(:,:,ii) = permute(util.stat.max2(If), [3,4,1,2]); % the maximum in each cutout for each sigma

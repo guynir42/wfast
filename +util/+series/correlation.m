@@ -24,25 +24,31 @@ function corr = correlation(v1, v2, timescale, varargin)
     input = util.text.InputVars;
     input.use_ordered_numeric = 1; 
     input.input_var('indices', []); 
+    input.input_var('movmean', true); % I can probably get rid of the old method with convolutions!
     input.scan_vars(varargin{:}); 
     
     v1 = v1-nanmean(v1);
     v2 = v2-nanmean(v2); 
     
-    kernel = ones(timescale,1);
-    
-    if isa(v1, 'single') && isa(v2, 'single')
-        kernel = single(kernel); 
+    if input.movmean
+        
+        numer = movmean(v1.*v2, timescale, 'omitnan');
+        sum1 = movmean(v1.^2, timescale, 'omitnan');
+        sum2 = movmean(v2.^2, timescale, 'omitnan');
+        
+    else % old method with convolutions... 
+        
+        kernel = ones(timescale,1);
+
+        if isa(v1, 'single') && isa(v2, 'single')
+            kernel = single(kernel); 
+        end
+
+        numer = util.vec.convolution(kernel, v1.*v2); 
+        sum1 = util.vec.convolution(kernel, v1.^2); 
+        sum2 = util.vec.convolution(kernel, v2.^2);
+        
     end
-    
-    % these are replaced with util.vec.convolution because filter2 can't handle 3D inputs properly... 
-%     numer = filter2(kernel,  v1.*v2); 
-%     sum1 = filter2(kernel, v1.^2); 
-%     sum2 = filter2(kernel, v2.^2); 
-    
-    numer = util.vec.convolution(kernel, v1.*v2); 
-    sum1 = util.vec.convolution(kernel, v1.^2); 
-    sum2 = util.vec.convolution(kernel, v2.^2);
     
     bad_idx = sum1<0 | sum2<0;
    
