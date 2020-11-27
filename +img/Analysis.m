@@ -503,6 +503,15 @@ classdef Analysis < file.AstroData
             obs_date = obj.head.STARTTIME;
             read_date = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
             
+            f = [0 0 0];
+            if ~isempty(obj.fluxes), f(1) = obj.fluxes(1,1); end
+            if size(obj.fluxes,2)>=10, f(2) = obj.fluxes(1,10); end
+            if size(obj.fluxes,2)>=100, f(3) = obj.fluxes(1,100); end
+
+            fprintf(fid, '%s: ', read_date);
+            fprintf(fid, 'Batch: %04d, ObsDate: %s, Flux: [% 9.1f % 8.1f % 7.1f]', obj.batch_counter+1, obs_date, f(1), f(2), f(3));
+            fprintf(fid, '%s\n', str); 
+            
 %             if isempty(str)
 %                 ev_str = '';
 % 

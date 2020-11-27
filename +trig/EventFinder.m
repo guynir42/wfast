@@ -210,6 +210,8 @@ classdef EventFinder < handle
             obj.pars.use_keep_simulated = true; % if false, the simulated events would not be kept with the list of detected candidates (for running massive amount of simualtions)
             obj.pars.sim_max_R = 3; % maximum value of stellar size for simulated events
             
+            obj.pars.sim_rescale_noise = true;
+            
             obj.reset;
             
         end
@@ -843,8 +845,10 @@ classdef EventFinder < handle
                         mx = c.cut_matrix(c.time_index,ii); % no dilation, just keep the cut value at peak
                     end
                     
-                    if isfield(obj.store.checker.pars, ['thresh_' c.cut_names{ii}]) || strcmp(c.cut_names{ii}(1:4), 'corr') % this is a "threshold" type test
+                    if isfield(obj.store.checker.pars, ['thresh_' c.cut_names{ii}]) ...
+                            || strcmp(c.cut_names{ii}(1:4), 'corr') || strcmp(c.cut_names{ii}(1:9), 'flux_corr') % this is a "threshold" type test
                         c.cut_string{end+1,1} = sprintf('Cut "%s" failed with value %4.2f', c.cut_names{ii}, mx);
+                    
                     else % this is a pass/fail type cut
                         c.cut_string{end+1,1} = sprintf('Cut "%s" failed', c.cut_names{ii});
                     end
@@ -857,14 +861,20 @@ classdef EventFinder < handle
                 
             end % go oveer each cut and check if it applies to this event
             
-            if c.calcTrackingErrorValue>obj.store.checker.pars.thresh_tracking_error % too much correlations with other stars
-                str = sprintf('Correlation with other stars is too high: %s=%4.2f', util.text.print_vec(c.corr_flux, '+'), sum(c.corr_flux)); 
+            c.calcTrackingErrorValue; % this gives the sum of the first three, I will instead focus on the 3rd star
+            
+%             if c.corr_flux(3)>obj.store.checker.pars.thresh_tracking_error % too much correlations with other stars
+                str = sprintf('Correlation 3rd highest star: %4.2f', c.corr_flux(3)); 
                 str_idx = strcmp(str, c.notes);
                 if isempty(str_idx)
                     c.notes{end+1} = str; 
                 end
-                c.kept = 0;
-            end
+%                 c.kept = 0; % I don't want to disqualify on this, but I
+%                 do want the scanner to see a warning, and judge for
+%                 themselves. 
+%             end
+            
+            c.analysis_time = obj.pars.analysis_time;
             
         end
         
@@ -1097,6 +1107,7 @@ classdef EventFinder < handle
                 R = obj.cat.data.FresnelSize;
                 if isempty(R)
                     obj.cat.addStellarSizes;
+                    R = obj.cat.data.FresnelSize;
                 end
                 
                 if isnan(R(star_idx)) % no stellar radius known from GAIA, just randomly pick one (from the distribution of R of other stars)
@@ -1107,18 +1118,18 @@ classdef EventFinder < handle
                     R_star = R(star_idx);
                 end
                 
-                [lc, sim_pars] = obj.bank.gen.randomLC('stellar_size', R_star); % let's set the stellar radius R=0.5 (Fresnel units)
+                [template, sim_pars] = obj.bank.gen.randomLC('stellar_size', R_star); % let's set the stellar radius R=0.5 (Fresnel units)
                 
             end
             
             flux_all = obj.store.extended_flux; 
-            flux = flux_all(:,star_idx); % pick out the one star
+            raw_flux = flux_all(:,star_idx); % pick out the one star
             bg = obj.store.extended_aux(:,star_idx,obj.store.aux_indices.backgrounds).*...
                 obj.store.extended_aux(:,star_idx,obj.store.aux_indices.areas);
             
-            flux = flux - bg; % don't forget to add the background at the end
+            flux = raw_flux - bg; % don't forget to add the background at the end
             
-            margin = length(flux) - length(lc); % margins on both sides of the template, combined
+            margin = length(flux) - length(template); % margins on both sides of the template, combined
             
             t = (1:length(flux))'; % fake timestamps for the fit
             
@@ -1145,8 +1156,8 @@ classdef EventFinder < handle
                 
                 peak = good_times(peak_idx); % position of the simulated event's center
                 
-                lc2 = vertcat(lc, ones(margin,1)); % make the template long enough to fit the real lightcurve
-                lc2 = circshift(lc2, peak - floor(length(lc)/2) - 1); % shift it until the middle of the template is at "peak"
+                template_shift = vertcat(template, ones(margin,1)); % make the template long enough to fit the real lightcurve
+                template_shift = circshift(template_shift, peak - floor(length(template)/2) - 1); % shift it until the middle of the template is at "peak"
                 
             elseif margin<0
                 error('need to handle this case at some point...'); % this would be a problem if we inject events with W>=8 seconds
@@ -1154,9 +1165,21 @@ classdef EventFinder < handle
                 error('need to handle this case at some point...'); 
             end
             
-            flux_mean = flux_mean.*lc2; % the raw flux is multiplied by the template (that should be 1 outside the occulation region)
+            flux_mean2 = flux_mean.*template_shift; % the raw flux is multiplied by the template (that should be 1 outside the occulation region)
             
-            flux = flux_mean + flux_noise + bg; % now we can re-attach the noise and the background we extracted before
+            if obj.pars.sim_rescale_noise
+                
+                background_var = nanmedian(obj.store.extended_aux(:,star_idx,obj.store.aux_indices.variances).*...
+                    obj.store.extended_aux(:,star_idx,obj.store.aux_indices.areas));
+                
+                v1 = flux_mean + background_var; % variance taking into account only read-noise+bg and source noise before template is added
+                v2 = flux_mean2 + background_var; % variance taking into account only read-noise+bg and source noise after template is added
+                
+                flux_noise_corrected = (flux_noise - nanmean(flux_noise)).*sqrt(v2./v1) + nanmean(flux_noise); 
+                
+            end
+            
+            flux = flux_mean2 + flux_noise_corrected + bg; % now we can re-attach the noise and the background we extracted before
             
             flux_all(:,star_idx) = flux; 
             
@@ -1164,7 +1187,17 @@ classdef EventFinder < handle
             sim_pars.time_index = peak; % what was the real peak time of this event
             sim_pars.star_index = star_idx; % what was the star index
             sim_pars.star_snr = obj.store.star_snr(obj.store.star_indices(star_idx)); % translate to the global star index to get the S/N from the store
-            sim_pars.calc_snr = sqrt(nansum((lc-1).^2)).*sim_pars.star_snr; % estimate the event S/N with analytical formula (and assuming the star has white, gaussian noise)
+            sim_pars.calc_snr = sqrt(nansum((template-1).^2)).*sim_pars.star_snr; % estimate the event S/N with analytical formula (and assuming the star has white, gaussian noise)
+            
+            sim_pars.fluxes.raw_flux = raw_flux;
+            sim_pars.fluxes.mean_flux = flux_mean;
+            sim_pars.fluxes.sim_mean_flux = flux_mean2;
+            sim_pars.fluxes.background_mean = bg;
+            sim_pars.fluxes.background_var = background_var;
+            sim_pars.fluxes.template = template_shift;
+            sim_pars.fluxes.noise_flux = flux_noise;
+            sim_pars.fluxes.noise_flux_corr = flux_noise_corrected; 
+            sim_pars.fluxes.final_flux = flux; 
             
         end
         

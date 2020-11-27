@@ -32,12 +32,17 @@ function sizes_arcsec = star_sizes_gaia(varargin)
         input.A_G = T.A_G; 
     end
 
-    if isempty(input.Mag_G) && isempty(input.Teff) && isempty(input.A_G)
+    if isempty(input.Mag_G) || isempty(input.Temp)
         sizes_arcsec = [];
-    elseif ~isequal(size(input.Mag_G), size(input.Temp)) || ...
-            ~isequal(size(input.Temp), size(input.A_G)) 
-        error('Must give all three inputs (Mag_G, Teff, and A_G) with the same size!'); 
+    elseif ~isequal(size(input.Mag_G), size(input.Temp)) 
+        error('Must give Mag_G and Teff with the same size!'); 
     else
+        
+        if isempty(input.A_G)
+            input.A_G = 0; 
+        end
+        
+        input.A_G(isnan(input.A_G)) = 0; 
         
         G_corr = input.Mag_G - input.A_G; % corrected for extinction
 

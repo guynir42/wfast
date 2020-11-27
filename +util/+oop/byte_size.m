@@ -21,7 +21,9 @@ function st = byte_size(obj, varargin)
     
     if isobject(obj)
         st = struct(obj); % don't care, just turn it into a struct! 
-    elseif ~isstruct(obj)
+    elseif isstruct(obj)
+        st = obj;
+    else
         st = strcut('obj', obj); 
     end
     

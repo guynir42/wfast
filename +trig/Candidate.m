@@ -325,7 +325,7 @@ classdef Candidate < handle
             if isempty(obj.star_props)
                 str = '';
             else
-                str = sprintf('%4.2fmag %dK %4.1f FSU', obj.star_props.Mag_BP, round(obj.star_props.Teff), obj.getStellarSize); 
+                str = sprintf('%4.2fmag, %dK, %3.1f FSU', obj.star_props.Mag_BP, round(obj.star_props.Teff), obj.getStellarSize); 
             end
             
         end
@@ -500,7 +500,7 @@ classdef Candidate < handle
             
         end
         
-        function [idx, corr] = findHighestCorrelations(obj, number, frames)
+        function [star_idx, corr] = findHighestCorrelations(obj, number, frames)
         % check the correlations to other stars' fluxes, with +-"frames"
         % around the time_index, and give the indices of the most
         % correlated stars (find "number" such matches). 
@@ -514,25 +514,27 @@ classdef Candidate < handle
             end
             
             if nargin<3 || isempty(frames)
-                frames = 30; 
+                frames = 2*length(obj.time_range); 
             end
             
-            idx = (-frames:frames) + obj.time_index; % plus/minus number of frames around peak
-            idx(idx<1 | idx>size(obj.flux_raw,1)) = []; 
-            f = obj.flux_raw(idx);
-            F = obj.flux_raw_all(idx,:); 
+            frame_idx = (-frames:frames) + obj.time_index; % plus/minus number of frames around peak
+            frame_idx(frame_idx<1 | frame_idx>size(obj.flux_raw,1)) = []; 
+            f = obj.flux_raw(frame_idx);
+            F = obj.flux_raw_all(frame_idx,:); 
             
             % normalize both fluxes
-            f = (f-nanmean(f))./nanstd(f); 
-            F = (F-nanmean(F))./nanstd(F); 
+            f = (f-nanmean(f)); 
+            F = (F-nanmean(F)); 
+%             
+%             C = nansum(f.*F)./length(idx); % normalized fluxes just give the correlation (up to number of samples)
             
-            C = nansum(f.*F)./length(idx); % normalized fluxes just give the correlation (up to number of samples)
-            
+            C = nansum(f.*F)./sqrt(nansum(f.^2).*nansum(F.^2)).*sqrt(length(frame_idx)); 
+            C(isnan(C)) = 0; 
             [~, sort_idx] = sort(C); % sort, and get a list of the sorted indices
             
-            idx = flip(sort_idx(end-number:end-1));
+            star_idx = flip(sort_idx(end-number:end-1));
             
-            corr = C(:,idx); 
+            corr = C(:,star_idx); 
             
         end
         
@@ -542,11 +544,11 @@ classdef Candidate < handle
                 N_stars = 3; 
             end
             
-            N_frames = 2*length(obj.time_range);
+%             N_frames = 2*length(obj.time_range);
             
             if isempty(obj.corr_flux)
-                [obj.corr_flux_stars, corr] = obj.findHighestCorrelations(N_stars, N_frames);
-                obj.corr_flux = corr.*sqrt(N_frames)./10; % normalize by number of frames relative to 100 frames
+                [obj.corr_flux_stars, obj.corr_flux] = obj.findHighestCorrelations(N_stars);
+%                 obj.corr_flux = corr.*sqrt(N_frames)./10; % normalize by number of frames relative to 100 frames
             end
             
             val = sum(obj.corr_flux); 
@@ -666,6 +668,11 @@ classdef Candidate < handle
                 'Units', 'Normalized', 'Position', [0.0 0.0 0.25 1], 'FontSize', 14, ...
                 'Callback', @obj.popupOtherStars, 'UserData', input.parent, ...
                 'Tooltip', 'Show the flux of other stars with high correlation to this star'); 
+            
+            % turn button red if there are high correlations! 
+            if length(obj.corr_flux)>=3 && obj.corr_flux(3)>obj.checker_pars.thresh_tracking_error-1
+                button.BackgroundColor = 'r'; 
+            end
             
             button = uicontrol(popup_panel, 'Style', 'pushbutton', 'string', 'stack image', ...
                 'Units', 'Normalized', 'Position', [0.25 0.0 0.25 1], 'FontSize', 14, ...

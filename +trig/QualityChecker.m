@@ -232,10 +232,10 @@ classdef QualityChecker < handle
             obj.pars.thresh_offset_size = 4; % events with offsets above this number are disqualified (after subtracting mean offsets)
             obj.pars.thresh_linear_motion = 2; % events showing linear motion of the centroids are disqualified
             obj.pars.thresh_background_intensity = 10; % events where the background per pixel is above this threshold are disqualified
-            obj.pars.thresh_flux_corr = 2.5; % events where the flux of one star has 95% percentile higher than this are disqualified
+            obj.pars.thresh_flux_corr = 3.0; % events where the flux of one star has 95% percentile higher than this are disqualified
             obj.pars.thresh_correlation = 4; % correlation max/min of flux (with e.g., background) with value above this disqualifies the region
 
-            obj.pars.thresh_tracking_error = 0.9; % for each event, post-detection, check correlation with other stars
+            obj.pars.thresh_tracking_error = 4; % for each event, post-detection, check correlation with other stars
             
             obj.pars.smoothing_slope = 50; % number of frames to average over when calculating slope
             obj.pars.distance_bad_rows_cols = 5; % how many pixels away from a bad row/column would we still disqualify a star? (on either side, inclusive)
@@ -353,6 +353,10 @@ classdef QualityChecker < handle
             end
             
             if obj.pars.use_flux_corr
+                
+                obj.cut_names{end+1} = 'flux_corr_10'; 
+                obj.cut_thresholds(end+1) = obj.pars.thresh_flux_corr;
+                obj.cut_two_sided(end+1) = false;
                 
                 obj.cut_names{end+1} = 'flux_corr_25'; 
                 obj.cut_thresholds(end+1) = obj.pars.thresh_flux_corr;
@@ -618,7 +622,7 @@ classdef QualityChecker < handle
            
             obj.bad_pixels = p;
             
-            obj.flux_corr = obj.calculateFluxCorr(f, [25 50]); % can also give multiple time scales to run the correlation (default is 50)
+            obj.flux_corr = obj.calculateFluxCorr(f, [10 25 50]); % can also give multiple time scales to run the correlation (default is 50)
             
             aux = zeros(size(f,1),size(f,2),length(obj.pars.corr_types), 'like', f); 
 %             aux(:,:,obj.corr_indices.a) = a;
@@ -727,8 +731,9 @@ classdef QualityChecker < handle
             end
             
             if obj.pars.use_flux_corr
-                obj.cut_values_matrix(:,:,obj.cut_indices.flux_corr_25) = obj.flux_corr(:,:,1); 
-                obj.cut_values_matrix(:,:,obj.cut_indices.flux_corr_50) = obj.flux_corr(:,:,2); 
+                obj.cut_values_matrix(:,:,obj.cut_indices.flux_corr_10) = obj.flux_corr(:,:,1); 
+                obj.cut_values_matrix(:,:,obj.cut_indices.flux_corr_25) = obj.flux_corr(:,:,2); 
+                obj.cut_values_matrix(:,:,obj.cut_indices.flux_corr_50) = obj.flux_corr(:,:,3); 
             end
             
             if obj.pars.use_correlations
@@ -780,6 +785,9 @@ classdef QualityChecker < handle
             
             for ii = 1:size(cutouts,4)
                 for jj = 1:size(cutouts,3)
+                    if nnz(isnan(cutouts(:,:,jj,ii)))==0
+                        continue; 
+                    end
                     cutouts(:,:,jj,ii) = regionfill(cutouts(:,:,jj,ii), isnan(cutouts(:,:,jj,ii))); 
                     cutouts(:,:,jj,ii) = util.img.FourierShift2D(cutouts(:,:,jj,ii),[x(jj,ii),y(jj,ii)]); 
                 end
@@ -862,7 +870,7 @@ classdef QualityChecker < handle
         
         function makeHistograms(obj) %  make histograms for each cut type, keeping the number of times a cut had such-and-such value for each star
             
-            obj.histograms = zeros(obj.pars.num_hist_edges, obj.num_stars, length(obj.cut_indices), 'single'); 
+            obj.histograms = zeros(obj.pars.num_hist_edges, obj.num_stars, length(obj.cut_names), 'single'); 
             
             for ii = 1:length(obj.cut_names) 
                 
@@ -896,7 +904,7 @@ classdef QualityChecker < handle
                 values = obj.cut_values_matrix(:,:,ii); 
                 
                 values = values(idx,:);
-                obj.histograms(:,:,ii) = histcounts2(values, star_edges_rep, obj.hist_edges(ii,:), star_edges-0.5); 
+                obj.histograms(:,:,ii) = obj.histograms(:,:,ii) + histcounts2(values, star_edges_rep, obj.hist_edges(ii,:), star_edges-0.5); 
                 
             end
             
@@ -936,6 +944,8 @@ classdef QualityChecker < handle
             
                 if util.text.cs(name(1:4), 'corr')
                     thresh = obj.pars.thresh_correlation;
+                elseif length(name)>=9 && util.text.cs(name(1:9), 'flux_corr')
+                    thresh = obj.pars.thresh_flux_corr; 
                 else
                     if isfield(obj.pars, ['thresh_' name])
                         thresh = obj.pars.(['thresh_' name]); 
