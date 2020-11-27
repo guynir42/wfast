@@ -11,7 +11,7 @@ f = L.fluxes_cal;
 F = nanmean(f)'; % mean flux
 M = L.cat.magnitudes;
 
-zp = m + 2.5*log10(F); % zero point for each star
+zp = M + 2.5*log10(F); % zero point for each star
 
 ZP = nanmedian(zp); % average zero point for whole run
 
@@ -61,8 +61,15 @@ T = L.timestamps(end)-L.timestamps(1);
 
 star_indices = 1978;
 
-ps = abs(fft(L.fluxes_cal(:, star_indices))).^2; 
+F = L.fluxes_cal(:, star_indices);
+M_F = nanmean(F); % mean flux
+
+F = F - M_F;
+
+ps = abs(fft(F)).^2; 
 fs = (0:1/T:1/dt)'; 
+
+[ps2, fs2] = plomb(F, 1/dt); 
 
 if length(fs)>size(ps,1)
     fs = fs(1:size(ps,1)); 
@@ -75,14 +82,19 @@ start_idx = 30;
 
 idx = idx + start_idx - 1; 
 
+ps = ps./median(ps).*median(ps2); 
 
-semilogy(ax, fs(1:half_point), ps(1:half_point,:), 'LineWidth', 2); 
+semilogy(ax, fs(2:half_point), ps(2:half_point,:), 'LineWidth', 3); 
 
 text(ax, fs(idx-30), double(ps(idx))*2, sprintf('period: %4.1fs', 1./fs(idx)), 'HorizontalAlignment', 'Left', 'VerticalAlignment', 'bottom', 'FontSize', 24, 'Color', 'red'); 
 
 hold(ax, 'on'); 
-plot(ax, fs(idx), ps(idx), 'or', 'MarkerSize', 15); 
+plot(ax, fs(idx), ps(idx), 'or', 'MarkerSize', 15, 'HandleVisibility', 'off'); 
 % quiver(ax, fs(idx+10), ps(idx), fs(idx)-fs(idx+10), 10)
+
+semilogy(ax, fs2, ps2, ':', 'LineWidth', 1.5); 
+legend(ax, {'power spectrum', 'Lomb Scargle'}); 
+
 hold(ax, 'off'); 
 
 xlabel('Frequency [Hz]');
@@ -93,7 +105,7 @@ ax.FontSize = 24;
 
 %% save the plot
 
-util.sys.print(fullfile(getenv('WFAST'), '/scripts/plots/DQ_Her_PS')); 
+util.sys.print(fullfile(getenv('WFAST'), '/scripts/plots/DQ_Her_PS_LS')); 
 
 
 

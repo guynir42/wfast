@@ -286,7 +286,8 @@ for ii = 1:length(runs)
         
         runs(ii).num_glints = length(r.glints); 
         if runs(ii).num_glints>0
-            runs(ii).num_flares = length(horzcat(r.glints{:}))./runs(ii).num_glints; 
+%             runs(ii).num_flares = length(horzcat(r.glints{:}))./runs(ii).num_glints; 
+            runs(ii).num_flares = length(horzcat(r.glints{:})); 
         else
             runs(ii).num_flares = 0; 
         end
@@ -298,8 +299,10 @@ for ii = 1:length(runs)
         end
         
         
-        fprintf('%10s  &  %03d%+04d  & %4.1f  &  %d  &  %4.2f  &   %d   &  %4.1f &  %s \\\\ \n', ...
-            r.run_start, round(r.RA_deg/15), round(r.Dec_deg), r.duration/3600, round(r.altitude), r.airmass, ...
+        coords = sprintf('%5.2f & %+5.2f', r.RA_deg, r.Dec_deg);
+        
+        fprintf('%10s  & %18s & %4.1f  &  %d  &  %4.2f  &   %d   &  %4.1f &  %s \\\\ \n', ...
+            r.run_start, coords, r.duration/3600, round(r.altitude), r.airmass, ...
             runs(ii).num_glints, runs(ii).num_flares, shadow_str); 
         
             counter = counter + 1; 
@@ -449,7 +452,7 @@ util.sys.print(fullfile(getenv('WFAST'), 'scripts/plots/geosats_declinations'));
 
 f1 = util.plot.FigHandler('example trajectories'); 
 f1.clear;
-f1.width = 20;
+f1.width = 22;
 f1.height = 20; 
 
 ax = axes('Parent', f1.fig); 
@@ -468,7 +471,7 @@ ax = axes('Parent', f1.fig);
 
 g = runs(3).glints{2}; % second glint in the 2020-08-06\ecliptic_run2 
 
-g.plotPositions('ax', ax, 'font_size', 16, 'scale', header.SCALE);
+g.plotPositions('ax', ax, 'font_size', 16, 'scale', 2.2918);
 
 ax.Color=[1 1 1].*0.95;
 ax.FontSize = 20;
@@ -484,7 +487,7 @@ angles = atan2d(-diff(xy(:,2)), -diff(xy(:,1)));
 % The angle is measured from the West towards the north
 % The raw angle is measured from the East, but we add 180 to make it West, 
 % then subtract 60 for the Balor's alignment
-text(ax, 1000, 1250, sprintf('\\alpha= %4.1f\\pm %3.1f (South of East)', mean(angles)-120, std(angles)), 'FontSize', 16);
+text(ax, 1000, 1250, sprintf('\\alpha= %4.1f\\pm %3.1f deg (South of East)', mean(angles)-120, std(angles)), 'FontSize', 16);
 
 ax2 = axes('Parent', f1.fig, 'Position', [0.4 0.55 0.45 0.35]); 
 

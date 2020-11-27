@@ -1,7 +1,7 @@
 %% calculate the RMS of each star 
 
 % example for a set of observations in the galactic center (high airmass)
-d2 = util.sys.WorkingDirectory('D:\Dropbox (Weizmann Institute)\DATA_ALL\WFAST\examples\lightcurves_SGR1935');
+d2 = util.sys.WorkingDirectory(fullfile(getenv('DATA'), 'WFAST\examples\lightcurves_SGR1935'));
 
 files2 = d2.match('*.h5*'); 
 
@@ -73,12 +73,21 @@ ax = axes('Parent', f1.fig);
 ax.NextPlot = 'add'; 
 
 for ii = 1:length(time_bins)
+    
+    ax.ColorOrderIndex = ii; 
+    
     h = errorbar(mag_bins+0.5, rms_mean(:,ii)*100, rms_std(:,ii)*50, rms_std(:,ii)*50, 0.5*ones(length(mag_bins),1), 0.5*ones(length(mag_bins),1), '.', 'LineWidth', 3); 
+    
     if time_bins(ii)<1
         h.DisplayName = sprintf('exp.time= %dms', round(100*time_bins(ii))); 
     else
         h.DisplayName = sprintf('exp.time= %ds', round(time_bins(ii))); 
     end
+    
+    good_idx = m>=8 & m<=14;
+    h2 = plot(m(good_idx), v(good_idx,ii)*100, '.', 'Color', h.Color, 'MarkerSize', 7.5);
+    h2.HandleVisibility = 'off'; 
+    
 end
 
 ax.NextPlot = 'replace'; 

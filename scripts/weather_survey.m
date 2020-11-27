@@ -4,17 +4,18 @@ tic;
 
 d = util.sys.WorkingDirectory(fullfile(getenv('DATA'), 'WFAST/logfiles')); 
 
-t1 = datetime('2019-03-11'); 
-t2 = datetime('2020-03-11'); 
+t1 = datetime('2020-06-01'); 
+t2 = datetime('2020-11-26'); 
 
 dates = {};
 data = struct;
 
 for ii = 1:1e4
     
-    dates{ii} = datestr(t1, 'yyyy-mm-dd');
+    this_date = datestr(t1, 'yyyy-mm-dd')
+    dates{ii} = this_date;
     
-    data(ii).time = t1;
+    data(ii).start_date = t1;
     data(ii).hours = NaN;    
     data(ii).night = NaN;
     data(ii).operational = 0;
@@ -140,6 +141,11 @@ for ii = 1:1e4
             
             fclose(f); 
 
+            % additional calculations
+            lm = movmedian(data(ii).light,20); 
+            dl = data(ii).light-lm; % delta between median and raw lightcurve
+            data(ii).var_light = nanvar(dl(lm>800)); 
+            
         end
         
         d.up;
@@ -165,9 +171,9 @@ f0.clear;
 
 ax1 = axes('parent', f0.fig, 'position', [0.06 0.2 0.62 0.6]); 
 
-bar(ax1, [data.time], [data.hours], 1);
+bar(ax1, [data.start_date], [data.hours], 1);
 hold(ax1, 'on');
-bar(ax1, [data.time], ~[data.operational]*15, 1.2, 'LineStyle', 'none', 'FaceColor', [0.8 0.5 0.5]); 
+bar(ax1, [data.start_date], ~[data.operational]*15, 1.2, 'LineStyle', 'none', 'FaceColor', [0.8 0.5 0.5]); 
 hold(ax1, 'off'); 
 
 ylabel(ax1, 'Hours per night'); 
@@ -196,8 +202,55 @@ dirname = fullfile(getenv('SCRIPTS'), 'plots');
 
 util.sys.print(fullfile(dirname, 'weather_histograms')); 
 
+%% show clouds+humidity vs. light variablility
 
+t = [data.t]; 
+c = [data.clouds]; 
+h = [data.humid];
+l = [data.light]; 
 
+v = []; 
+
+for ii = 1:length(data)
+    
+    v = horzcat(v, repmat(data(ii).var_light, [1, length(data(ii).t)]));
+    
+end
+
+idx = l<400 & c>-200 & v<1000; 
+
+f1 = util.plot.FigHandler('clouds_vs_light'); 
+f1.width = 32;
+f1.height = 18;
+f1.clear;
+
+ax = axes('Parent', f1.fig); 
+
+scatter(ax, c(idx), h(idx), 8, v(idx), 'filled'); 
+colormap(flipud(gray))
+colorbar(ax);
+
+hold(ax, 'on'); 
+
+x = -50:0.1:-15;
+y1 = -3.5.*(x+25) + 45; 
+y2 = real(sqrt(40^2-(x+65).^2)+50); 
+
+plot(ax, x, y1, 'g-', 'LineWidth', 2);
+% plot(ax, x, y2, 'r-', 'LineWidth', 2); 
+
+ax.YLim = [0, 100]; 
+ax.XLim = [-50, 0];
+
+hold(ax, 'off'); 
+
+box(ax, 'on'); 
+
+xlabel(ax, 'sky-ground temperature difference [\circC]');
+ylabel(ax, 'Humidity'); 
+ytickformat(ax, '%d%%'); 
+
+ax.FontSize = 18; 
 
 
 
