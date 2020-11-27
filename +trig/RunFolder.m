@@ -332,6 +332,10 @@ classdef RunFolder < dynamicprops
                     continue; % skip folders that are not date-folders
                 end
                 
+                if length(list{ii})<10
+                    continue;
+                end
+                
                 this_date = datetime(list{ii}(1:10)); % translate the date folder to a datetime object
                 
                 if ~isempty(input.start_date) % limits on the earliest dates

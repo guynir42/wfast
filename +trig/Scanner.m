@@ -39,6 +39,8 @@ classdef Scanner < handle
         
         candidates@trig.Candidate; % candidates loaded when running getNextCandidates() or showNextCandidates()
         
+        overview@trig.Overview;
+        
         timer; % timer used for continuous analysis
         
     end
@@ -193,9 +195,37 @@ classdef Scanner < handle
             
         end
         
-        function getSummary(obj)
+        function r = calcOverview(obj, varargin)
            
-            % to be continued
+            input = util.text.InputVars;
+            input.input_var('classified', false);
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(obj.overview)
+                obj.overview = trig.Overview;
+            end
+            
+            r = trig.RunFolder.scan('folder', obj.root_folder, 'start', obj.date_start, ...
+                'end', obj.date_end, 'next', [], 'process_date', obj.date_process); % get all folders
+            
+            
+            r = r(logical([r.has_summary])); 
+            r = r(logical([r.has_candidates])); 
+            
+            if input.classified
+                r = r(logical([r.has_classifieds])); 
+            end
+            
+            for ii = 1:length(r)
+                
+                try
+                    L = load(fullfile(r(ii).folder, r(ii).analysis_folder, 'summary.mat'));
+                    obj.overview.input(L.summary); 
+                catch ME
+                    warning(ME.getReport); 
+                end
+                
+            end
             
         end
         
@@ -203,7 +233,7 @@ classdef Scanner < handle
             
             % get the next folder that needs analysis
             r = trig.RunFolder.scan('folder', obj.root_folder, 'start', obj.date_start, ...
-                'end', obj.date_end, 'next', 'unclassified');
+                'end', obj.date_end, 'next', 'unclassified', 'process_date', obj.date_process);
             
             if isempty(r) || r.has_candidates==0
                 success = 0; 
