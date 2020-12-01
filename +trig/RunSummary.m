@@ -154,7 +154,11 @@ classdef RunSummary < handle
             for ii = 1:length(obj.size_bin_edges)-1
                 
                 % indices of stars in this R bin
-                idx = stellar_sizes>=obj.size_bin_edges(ii) & stellar_sizes<obj.size_bin_edges(ii+1);
+                if ii==length(obj.size_bin_edges)-1
+                    idx = ~(stellar_sizes<obj.size_bin_edges(ii)); % includes everything in the last bin, everything bigger than that, and all NaN sizes
+                else
+                    idx = stellar_sizes>=obj.size_bin_edges(ii) & stellar_sizes<obj.size_bin_edges(ii+1);
+                end
                 
                 obj.star_seconds(:,ii) = nansum(hours.histogram(:,idx),2);
                 obj.star_seconds_with_losses(:,ii) = nansum(hours.histogram_with_losses(:,idx),2);
@@ -163,7 +167,6 @@ classdef RunSummary < handle
                 obj.losses_bad_stars(:,ii) = nansum(hours.losses_bad_stars(:,idx), 2);
                 obj.runtime = hours.runtime; 
             
-
             end
             
         end

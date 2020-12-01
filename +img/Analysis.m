@@ -592,7 +592,8 @@ classdef Analysis < file.AstroData
                 
                 finder = obj.finder;
 
-                save(fullfile(obj.log_dir, ['finder_' name]), 'finder', '-v7.3');
+%                 save(fullfile(obj.log_dir, ['finder_' name]), 'finder', '-v7.3');
+                save(fullfile(obj.log_dir, 'finder.mat'), 'finder', '-v7.3');
                 
             catch ME
                 warning(ME.getReport);

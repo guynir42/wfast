@@ -195,31 +195,37 @@ classdef Scanner < handle
             
         end
         
-        function r = calcOverview(obj, varargin)
+        function all_runs = calcOverview(obj, varargin)
            
             input = util.text.InputVars;
+            input.input_var('runs', []); % optionally input the runs from previous calculations...
             input.input_var('classified', false);
             input.scan_vars(varargin{:}); 
             
             if isempty(obj.overview)
                 obj.overview = trig.Overview;
+            else
+                obj.overview.reset;
             end
             
-            r = trig.RunFolder.scan('folder', obj.root_folder, 'start', obj.date_start, ...
-                'end', obj.date_end, 'next', [], 'process_date', obj.date_process); % get all folders
+            if isempty(input.runs)            
+                all_runs = trig.RunFolder.scan('folder', obj.root_folder, 'start', obj.date_start, ...
+                    'end', obj.date_end, 'next', [], 'process_date', obj.date_process); % get all folders
+            else
+                all_runs = input.runs; 
+            end
             
-            
-            r = r(logical([r.has_summary])); 
-            r = r(logical([r.has_candidates])); 
+            all_runs = all_runs(logical([all_runs.has_summary])); 
+            all_runs = all_runs(logical([all_runs.has_candidates])); 
             
             if input.classified
-                r = r(logical([r.has_classifieds])); 
+                all_runs = all_runs(logical([all_runs.has_classifieds])); 
             end
             
-            for ii = 1:length(r)
+            for ii = 1:length(all_runs)
                 
                 try
-                    L = load(fullfile(r(ii).folder, r(ii).analysis_folder, 'summary.mat'));
+                    L = load(fullfile(all_runs(ii).folder, all_runs(ii).analysis_folder, 'summary.mat'));
                     obj.overview.input(L.summary); 
                 catch ME
                     warning(ME.getReport); 

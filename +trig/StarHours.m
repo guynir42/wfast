@@ -246,6 +246,7 @@ classdef StarHours < handle
             else
                 obj.histogram_with_losses = obj.histogram_with_losses + obj.star_snr_dist.*obj.batch_length; % add the amount of time for each star in the right bin
             end
+            
             if ~bad_batch % do not include anything in histogram or losses when the batch is bad
                 
                 bad_times = checker.bad_times; % this has "true" in every frame/star that is disqualified for anything
