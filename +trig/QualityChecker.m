@@ -769,7 +769,7 @@ classdef QualityChecker < handle
             
         end
             
-        function val = calculateDefocus(obj, cutouts, x, y)
+        function val = calculateDefocus(obj, cutouts, x, y, f)
             
             if nargin<2 || isempty(cutouts)
                 cutouts = obj.cutouts;
@@ -781,6 +781,10 @@ classdef QualityChecker < handle
             
             if nargin<4 || isempty(y)
                 y = obj.extended_aux(:,:, obj.aux_indices.offsets_y); 
+            end
+            
+            if nargin<5 || isempty(f)
+                f = obj.extended_flux; 
             end
             
             for ii = 1:size(cutouts,4)
@@ -795,8 +799,13 @@ classdef QualityChecker < handle
             
             C = nansum(cutouts,3); 
             
-            val = util.img.fwhm(C,'method', 'filters', 'gaussian', 5, ...
+            F = nanmean(f);
+            
+            
+            w = util.img.fwhm(C,'method', 'filters', 'gaussian', 5, ...
                 'step_size', 0.25)./2.355; % use generalized gaussian to find the width
+            
+            val = util.vec.weighted_average(w, sqrt(F), 2); 
             
         end
         
