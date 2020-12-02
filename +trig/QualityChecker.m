@@ -788,19 +788,21 @@ classdef QualityChecker < handle
             end
             
             for ii = 1:size(cutouts,4)
+                
                 for jj = 1:size(cutouts,3)
-                    if nnz(isnan(cutouts(:,:,jj,ii)))==0
-                        continue; 
+                    
+                    if nnz(isnan(cutouts(:,:,ii,jj)))>0.5*numel(cutouts(:,:,ii,jj)) % more than half the pixels are NaN, just leave it
+                        cutouts(:,:,jj,ii) = regionfill(cutouts(:,:,jj,ii), isnan(cutouts(:,:,jj,ii))); 
+                        cutouts(:,:,jj,ii) = util.img.FourierShift2D(cutouts(:,:,jj,ii),[x(jj,ii),y(jj,ii)]); 
                     end
-                    cutouts(:,:,jj,ii) = regionfill(cutouts(:,:,jj,ii), isnan(cutouts(:,:,jj,ii))); 
-                    cutouts(:,:,jj,ii) = util.img.FourierShift2D(cutouts(:,:,jj,ii),[x(jj,ii),y(jj,ii)]); 
+                    
                 end
+                
             end
             
             C = nansum(cutouts,3); 
             
             F = nanmean(f);
-            
             
             w = util.img.fwhm(C,'method', 'filters', 'gaussian', 5, ...
                 'step_size', 0.25)./2.355; % use generalized gaussian to find the width
