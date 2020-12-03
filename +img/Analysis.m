@@ -111,6 +111,9 @@ classdef Analysis < file.AstroData
         use_fits_roi = 0;
         fits_roi = []; % [top, left, height, width]
         
+        use_max_bad_batches = 1; 
+        max_num_bad_batches = 10; % if more than this number of batches have high background or bad focus, stop the analysis
+        
         use_audio = 0;
         
         use_display_flip = 0;
@@ -155,6 +158,7 @@ classdef Analysis < file.AstroData
         use_stack_all_proc = 1;
         stack_all;
         
+        num_bad_batches = 0; 
         
         % these are used for backward compatibility with older versions of 
         % img.Clipper that made a slightly different cutout based on the 
@@ -171,7 +175,7 @@ classdef Analysis < file.AstroData
         
         num_batches_limit;
         
-        version = 1.05;
+        version = 1.06;
         
     end
     
@@ -1208,6 +1212,21 @@ classdef Analysis < file.AstroData
                     if obj.use_event_finding
                         try
                             obj.analysisEventFinding;
+                            
+                            if obj.use_max_bad_batches
+                                
+                                if obj.finder.checkBatchGood
+                                    obj.num_bad_batches = 0;
+                                else
+                                    obj.num_bad_batches = obj.num_bad_batches + 1;
+                                    if obj.num_bad_batches>obj.max_num_bad_batches
+                                        if obj.debug_bit, fprintf('Found %d bad batches in a row. Quitting run...\n', obj.num_bad_batches); end
+                                        obj.brake_bit = 1; % quit this run after the end of this batch 
+                                    end
+                                end
+                                
+                            end
+                            
                         catch ME
 %                             warning(ME.getReport); 
                             rethrow(ME); 

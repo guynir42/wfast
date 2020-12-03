@@ -677,6 +677,12 @@ classdef EventFinder < handle
             
         end
         
+        function val = checkBatchGood(obj)
+            
+            val = obj.store.checker.checkBatchGood; 
+            
+        end
+        
     end
     
     methods(Hidden=true) % internal methods
@@ -1503,10 +1509,11 @@ classdef EventFinder < handle
                 input.axes = gca;
             end
             
-            j = obj.store.extended_juldates(end) - double(obj.store.timestamps - obj.store.extended_timestamps(end))/24/3600; 
+            j = obj.store.extended_juldates(end) + double(obj.store.timestamps - obj.store.extended_timestamps(end))/24/3600; 
             a = celestial.coo.airmass(j, obj.head.RA, obj.head.DEC, [obj.head.longitude, obj.head.latitude]./180.*pi);
             
-            w = obj.store.checker.mean_width_values.*2.355.*obj.head.SCALE;
+%             w = obj.store.checker.mean_width_values.*2.355.*obj.head.SCALE;
+            w = obj.store.checker.defocus_log.*2.355.*obj.head.SCALE;
             b = obj.store.checker.mean_background_values;
             
             t = datetime(j, 'convertFrom', 'juliandate'); 
@@ -1530,9 +1537,9 @@ classdef EventFinder < handle
                 
                 hold(input.axes, 'on'); 
             
-                plot(input.axes, t2, w, '-', 'DisplayName', 'seeing ["]', 'LineWidth', input.line); 
-                plot(input.axes, binning(t2, input.smooth), binning(w, input.smooth),'-k',...
-                    'DisplayName', 'seeing smoothed', 'LineWidth', input.line, 'HandleVisibility', 'off'); 
+                plot(input.axes, binning(t2,obj.store.pars.length_search), w, '-', 'DisplayName', 'seeing ["]', 'LineWidth', input.line); 
+%                 plot(input.axes, binning(t2, input.smooth*100), binning(w, input.smooth),'-k',...
+%                     'DisplayName', 'seeing smoothed', 'LineWidth', input.line, 'HandleVisibility', 'off'); 
 
                 ylabel(input.axes, 'seeing FWHM ["]'); 
                 

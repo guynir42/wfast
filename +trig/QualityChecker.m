@@ -791,7 +791,7 @@ classdef QualityChecker < handle
                 
                 for jj = 1:size(cutouts,3)
                     
-                    if nnz(isnan(cutouts(:,:,ii,jj)))>0.5*numel(cutouts(:,:,ii,jj)) % more than half the pixels are NaN, just leave it
+                    if nnz(isnan(cutouts(:,:,jj,ii)))>0.5*numel(cutouts(:,:,jj,ii)) % more than half the pixels are NaN, just leave it
                         cutouts(:,:,jj,ii) = regionfill(cutouts(:,:,jj,ii), isnan(cutouts(:,:,jj,ii))); 
                         cutouts(:,:,jj,ii) = util.img.FourierShift2D(cutouts(:,:,jj,ii),[x(jj,ii),y(jj,ii)]); 
                     end
@@ -917,6 +917,24 @@ classdef QualityChecker < handle
                 values = values(idx,:);
                 obj.histograms(:,:,ii) = obj.histograms(:,:,ii) + histcounts2(values, star_edges_rep, obj.hist_edges(ii,:), star_edges-0.5); 
                 
+            end
+            
+        end
+        
+        function val = checkBatchGood(obj)
+            
+            val = 1; 
+            
+            
+            if ~isempty(obj.extended_aux) 
+                B = obj.extended_aux(obj.search_start_idx:obj.search_end_idx,:,obj.aux_indices.backgrounds);
+                if B>5*obj.pars.thresh_background_intensity % this is 5 times higher than the regular threshold (wide margin)
+                    val = 0;
+                end
+            end
+            
+            if ~isempty(obj.defocus) && obj.defocus>1.2*obj.pars.thresh_defocus
+                val = 0; 
             end
             
         end
