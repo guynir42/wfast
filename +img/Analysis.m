@@ -1127,7 +1127,7 @@ classdef Analysis < file.AstroData
                 end
 
                 % Skip this part in case the run is stopped mid way (e.g., by user input, but not by detecting flux is lost)
-                if obj.batch_counter>=obj.num_batches || obj.failed_batch_counter>obj.max_failed_batches
+                if obj.batch_counter>=obj.num_batches || obj.failed_batch_counter>obj.max_failed_batches || obj.num_bad_batches>obj.max_num_bad_batches
 
                     if obj.use_analysis_dir_save
                         obj.saveResults;

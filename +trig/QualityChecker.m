@@ -807,7 +807,7 @@ classdef QualityChecker < handle
             w = util.img.fwhm(C,'method', 'filters', 'gaussian', 5, ...
                 'step_size', 0.25)./2.355; % use generalized gaussian to find the width
             
-            val = util.vec.weighted_average(w, sqrt(F), 2); 
+            val = util.vec.weighted_average(w, sqrt(abs(F)), 2); 
             
         end
         
