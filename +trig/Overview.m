@@ -17,6 +17,9 @@ classdef Overview < handle
         vel_edges; % transverse velocity bin edges used in the star_seconds and losses histograms
         snr_edges; % S/N bin edges used in the star_seconds and losses histograms
         size_edges; % stellar size edges used in the star_seconds and losses histograms
+        r_edges; % occulter radius edges used in efficiency estimates
+        
+        b_max; % the maximumum impact parameter used in simulations. This tells us we can integrate -b_max to b_max to get the coverage
         
         star_seconds; % the number of useful seconds accumulated each S/N bin (this is saved after subtracting losses)
         star_seconds_with_losses; % the number of seconds accumulated without excluding anything
@@ -40,11 +43,21 @@ classdef Overview < handle
     
     properties % switches/controls
         
+        % defining the width and maximal values for the histograms
         ecl_bin_width = 2; % ecliptic latitude bins (from -90 to 90)
         vel_bin_width = 1; % transverse velocity bin width
         vel_max = 31; % transverse velocity bin maximum
         snr_bin_width = 1; % S/N bin width
         size_bin_width = 0.1; % stellar size bin width
+               
+        % these are used to calculate the coverage/number of detections
+        lambda_nm = 500; % to calculate the Fresnel scale
+        distance_au = 40; % to calculate the Fresnel scale
+        
+        num_occulters_above_r = 4.4e6; % objects per deg^2 
+        r_normalization_km = 0.25; % the radius at which the above is given
+        power_law_index = -3.8; % slow of the differential power law
+        
         
         debug_bit = 1;
         
@@ -91,7 +104,10 @@ classdef Overview < handle
             obj.vel_edges = [];
             obj.snr_edges = [];
             obj.size_edges = [];
+            
 
+            obj.b_max = []; 
+            
             obj.star_seconds = single([]);
             obj.star_seconds_with_losses = single([]);
             obj.losses_inclusive = single([]);
@@ -170,6 +186,18 @@ classdef Overview < handle
             
             val = nansum(M2(:)); 
             
+        end
+        
+        function val = km2fsu(obj)
+            
+            val = sqrt(obj.lambda_nm.*1e-12.*obj.distance_au.*1.496e+8/2); 
+            
+        end
+        
+        function val = fsu2deg2(obj)
+
+            val = obj.lambda_nm.*1e-12./(obj.distance_au.*1.496e+8)/2*(180/pi).^2; 
+
         end
         
     end
@@ -312,6 +340,110 @@ classdef Overview < handle
             else
                 obj.sim_events = [obj.sim_events, summary.sim_events]; 
             end
+            
+        end
+        
+        function [N_total, N_passed] = calcEfficiency(obj, r_edges) % a 3D matrix telling what fraction of events we got from injected events
+        % Since we have injected events with the "true" stellar radius 
+        % S/N and impact parameter (b), we can assume the detection 
+        % efficiency already takes into account these distributions.
+        % Thus we can sum all the star seconds over R, b and S/N. 
+        %
+        % The efficiency matrix should have the following dimensions:
+        % 1) transverse velocity (vel): we need to weigh the different star
+        %    hours based on events with different velocities.
+        % 2) occulter radius (r): we want to say what fraction of events
+        %    with r in this range have passed. 
+        % 
+        % The star hours should be summed along R, and S/N, and then
+        % permuted to have the same dimensions, with a singleton 2nd
+        % dimension (star seconds are agnostic to occulter radii) and vel
+        % on the 1st dimension and ecl on the 3rd dimension.         
+        % Then, the product of star-seconds and efficiency can be
+        % integrated to give the effective star-time. 
+        % That will still need to be multiplied by the scanning speed and 
+        % the KBO size distribution, to get the total coverage. 
+        
+        
+            if nargin<2 || isempty(r_edges)
+                
+                if isempty(obj.r_edges)
+                    obj.r_edges = 0:0.1:3;
+                end
+                
+                r_edges = obj.r_edges; 
+                    
+            end
+            
+            obj.b_max = nanmax([obj.sim_events.b]); 
+            
+            obj.r_edges = r_edges; 
+            
+            N_total = zeros(length(obj.vel_edges)-1, length(obj.r_edges)-1, 'like', obj.star_seconds); 
+            
+            N_passed = zeros(size(N_total), 'like', N_total); 
+            
+            for ii = 1:length(obj.sim_events)
+                
+                ev = obj.sim_events(ii); 
+                
+                idx_v = find(ev.v>obj.vel_edges, 1, 'last'); 
+                idx_r = find(ev.r>obj.r_edges, 1, 'last'); 
+                
+                % how many events, in total, were simulated
+                N_total(idx_v, idx_r) = N_total(idx_v, idx_r) + 1;
+                
+                % how many events passed the cut
+                % (we may want to replace these with the full candidates
+                % that passed classification, too)
+                if ev.passed
+                    N_passed(idx_v, idx_r) = N_passed(idx_v, idx_r) + 1;
+                end
+                
+            end
+            
+        end
+        
+        function cov = calcCoverage(obj, r_edges)
+            
+            if isempty(obj.star_seconds)
+                disp('No star seconds have been accumulated yet!'); 
+                cov = []; 
+                return;
+            end
+            
+            if nargin<2 || isempty(r_edges)
+                
+                if isempty(obj.r_edges)
+                    obj.r_edges = 0:0.1:3;
+                end
+                
+                r_edges = obj.r_edges; 
+                    
+            end
+            
+            % the result should have 2D (velocity and occulter radius)
+            [N_total, N_passed] = obj.calcEfficiency(r_edges);
+            
+            E = N_passed./N_total; 
+            E(isnan(E)) = 0; % where there are no events at all, efficiency is zero
+            
+            
+            
+            T = nansum(nansum(obj.star_seconds,1),2); % star-seconds integrated over all S/N and stellar sizes
+            T = permute(T, [4,1,3,2]); % arrange velocity into the 1st dim, leave dim 2 as scalar (for r) and dim 3 for ecl 
+            
+            v_shift = 0; % add a shift for e.g., KBO intrinsic orbital velocity (in km/s)
+            v = obj.km2fsu.*(obj.vel_edges(1:end-1)+obj.vel_bin_width/2 - v_shift); % velocity bin centers, translated from km/s to FSU/s
+            v = abs(util.vec.tocolumn(v)); % put it on the same dimension as the matrices and take the abs() in case we got negative velocities
+            
+            b = 2.*obj.b_max; % the range of impact parameters, integrated from -b_max to +b_max
+            
+            cov = nansum(E.*T.*b.*v); % integral of efficiency and time and impact parameter, for each velocity
+            cov = permute(cov, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
+            cov = cov.*obj.fsu2deg2; 
+            
+            
             
         end
         
@@ -702,7 +834,7 @@ classdef Overview < handle
                 
                 if ~isempty(hours_lost)
                     h3 = bar(input.axes, x, hours_lost, 0.8); 
-                    legend(input.axes, strrep({'star hours', 'without losses', input.cuts{:}}, '_', ' '), 'Location', 'NorthWest'); 
+                    legend(input.axes, strrep({'star hours', 'without losses', input.cuts{:}}, '_', ' '), 'Location', 'NorthEast'); 
                 end
                 
                 input.axes.NextPlot = 'replace'; 

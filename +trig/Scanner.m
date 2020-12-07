@@ -248,13 +248,30 @@ classdef Scanner < handle
                 
                 load(fullfile(r.folder, r.analysis_folder, 'candidates.mat'))
                 
-                for ii = 1:length(cand)
-                    cand(ii).folder = fullfile(r.folder, r.analysis_folder); % make sure to update each candidate to know what folder it was loaded from! 
-                end
+                if isempty(cand)
+                    
+                    obj.candidates = cand;
+                    
+                    candidates = cand; % the variable name needs to match Candidate.saveClassified()
+                    
+                    filename = fullfile(r.folder, r.analysis_folder, 'classified.mat');
+                    
+                    save(filename, 'candidates', '-v7.3');
+                    
+                    success = 1; 
+                    report = sprintf('Found no candidates. Saving empty classified file. '); 
+                    
+                else
                 
-                obj.candidates = cand; 
-                success = 1; 
-                report = sprintf('Found %d candidates in %s', length(obj.candidates), util.text.run_id(r.folder)); 
+                    for ii = 1:length(cand)
+                        cand(ii).folder = fullfile(r.folder, r.analysis_folder); % make sure to update each candidate to know what folder it was loaded from! 
+                    end
+
+                    obj.candidates = cand; 
+                    success = 1; 
+                    report = sprintf('Found %d candidates.', length(obj.candidates)); 
+
+                end
                 
             end
             
