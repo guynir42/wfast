@@ -1,5 +1,5 @@
 function [lower, upper] = poisson_errors(lambda, p_value, precision_bytes)
-% Usage: error_bounds = poisson_errors(lambda, p_value, precision_bytes=16)
+% Usage: error_bounds = poisson_errors(lambda, p_value=0.05, precision_bytes=16)
 % Calculate the upper and lower lambda values that have no more than
 % p_value chance of generating the measured lambda value. 
 % For example: if you measured lambda=10 counts, for all values below 
@@ -67,7 +67,7 @@ function [lower, upper] = poisson_errors(lambda, p_value, precision_bytes)
 
         % find upper bound
         low = lambda;
-        high = poissinv(1-p_value/4, lambda);
+        high = poissinv(1-p_value/4, lambda+1);
         p = p_value; 
 
         for ii = 1:precision_bytes

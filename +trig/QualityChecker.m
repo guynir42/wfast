@@ -933,7 +933,7 @@ classdef QualityChecker < handle
                 end
             end
             
-            if ~isempty(obj.defocus) && obj.defocus>1.2*obj.pars.thresh_defocus
+            if ~isempty(obj.defocus) && obj.defocus>2*obj.pars.thresh_defocus
                 val = 0; 
             end
             

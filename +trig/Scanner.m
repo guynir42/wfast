@@ -208,9 +208,11 @@ classdef Scanner < handle
                 obj.overview.reset;
             end
             
-            if isempty(input.runs)            
+            if isempty(input.runs)  
+                t0 = tic;
                 all_runs = trig.RunFolder.scan('folder', obj.root_folder, 'start', obj.date_start, ...
                     'end', obj.date_end, 'next', [], 'process_date', obj.date_process); % get all folders
+                if obj.debug_bit, fprintf('Time to load run folders is %s\n', util.text.secs2hms(toc(t0))); end
             else
                 all_runs = input.runs; 
             end
@@ -224,9 +226,12 @@ classdef Scanner < handle
             
             for ii = 1:length(all_runs)
                 
+                if obj.debug_bit, fprintf('ii= %d / %d. Loading summary from folder: %s\n', ii, length(all_runs), all_runs(ii).folder); end
+                
                 try
-                    L = load(fullfile(all_runs(ii).folder, all_runs(ii).analysis_folder, 'summary.mat'));
-                    obj.overview.input(L.summary); 
+                    all_runs(ii).loadSummary;
+%                     L = load(fullfile(all_runs(ii).folder, all_runs(ii).analysis_folder, 'summary.mat'));
+                    obj.overview.input(all_runs(ii).summary); 
                 catch ME
                     warning(ME.getReport); 
                 end
@@ -309,6 +314,41 @@ classdef Scanner < handle
                 obj.date_process = datestr(t, 'yyyy-mm-dd', datetime('today')); 
             end
             
+            if isempty(obj.a)
+                obj.a = img.Analysis;
+                obj.a.use_save_batched_lightcurves = 0; 
+                
+                % TODO: make sure this object has all the correct
+                % parametrers, e.g., not to save lightcurves... 
+            end
+            
+            for ii = 1:length(obj.a.futures)
+                
+                if isa(obj.a.futures{ii}, 'parallel.FevalFuture') && ...
+                        strcmp(obj.a.futures{ii}.State, 'finished') && ...
+                        obj.a.futures{ii}.Read==0 && ...
+                        isempty(obj.a.futures{ii}.Error) % unread, finished runs
+                    
+                    if ~isempty(obj.a.futures_analysis_folder{ii}) % we know the analysis folder, we can add a diary file to it
+                        
+                        fid = fopen(fullfile(obj.a.futures_analysis_folder{ii}, 'diary.txt'), 'at');
+                        
+                        if fid>0
+                            on_cleanup = onCleanup(@() fclose(fid));
+                            fprintf(fid, '%s', obj.a.futures{ii}.Diary); 
+                            if ~isempty(obj.a.futures{ii}.Error)
+                                fprintf(fid, '%s', obj.a.futures{ii}.Error.getReport('extended','hyperlinks','off'));
+                            end
+                        end
+                        
+                    end
+
+                    obj.a.futures{ii}.fetchOutputs; % make this unread (we can also dump this into a variable, containing a copy of the Analysis object)
+                    
+                end
+                
+            end
+            
             % get the next folder that needs analysis
             r = trig.RunFolder.scan('folder', obj.root_folder, 'start', obj.date_start, ...
                 'end', obj.date_end, 'next', 'unprocessed', 'process_date', obj.date_process);
@@ -318,15 +358,8 @@ classdef Scanner < handle
                 return;
             end
             
-            if isempty(obj.a)
-                obj.a = img.Analysis;
-                obj.a.use_save_batched_lightcurves = 0; 
-                
-                % TODO: make sure this object has all the correct
-                % parametrers, e.g., not to save lightcurves... 
-            end
-            
             worker_idx = obj.a.findWorkerUnread; % get a worker even if it was not read out
+%             worker_idx = obj.a.findWorker; % get a worker even if it was not read out
             
             if isempty(worker_idx) % if we could find a free worker
                 report = 'Could not find a free worker!'; 

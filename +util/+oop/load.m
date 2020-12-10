@@ -225,7 +225,7 @@ function obj = loadHDF5(filename, input)
                         idx = ~cellfun(@isempty, regexp(group_names, expr));
                         
                         sublocation = group_names(idx);
-                        
+                                                
                         for jj = 1:length(sublocation)
                         
                             try
@@ -243,8 +243,9 @@ function obj = loadHDF5(filename, input)
                         if input.debug_bit, disp(['already loaded object "' att_names{ii} '"... in handle list at ' sublocation]); end
                     end
                     
-%                     obj.(att_names{ii}) = loaded_obj;
-                    obj = assign_value(obj, att_names{ii}, loaded_obj); 
+                    if exist('loaded_obj', 'var')
+                        obj = assign_value(obj, att_names{ii}, loaded_obj); 
+                    end
 
                     clear('loaded_obj');
 

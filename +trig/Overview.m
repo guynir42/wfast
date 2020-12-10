@@ -212,7 +212,7 @@ classdef Overview < handle
             
             %%% ingest either Overview or RunSummary object %%%
             
-            if isa(summary, 'trig.RunSummary')
+            if isa(summary, 'trig.RunSummary') && ~isempty(summary)
                 
                 if isempty(summary.head) || isempty(summary.head.ephem) || isempty(summary.head.ephem.ECL_lat)
                     error('Summary object must have a valid header with an Ephemeris object / ecliptic latitude value!'); 
@@ -226,7 +226,7 @@ classdef Overview < handle
                 inclusive = permute(summary.losses_inclusive, [1,2,5,4,3]); 
                 exclusive = permute(summary.losses_exclusive, [1,2,5,4,3]); 
                 
-            elseif isa(summary, 'trig.Overview')
+            elseif isa(summary, 'trig.Overview') && ~isempty(summary)
                 
                 ecl = summary.ecl_edges;
                 vel = summary.vel_edges; 
@@ -404,11 +404,11 @@ classdef Overview < handle
             
         end
         
-        function cov = calcCoverage(obj, r_edges)
+        function [coverage, cov_lower, cov_upper, E, E_l, E_u, N_total, N_passed] = calcCoverage(obj, r_edges)
             
             if isempty(obj.star_seconds)
                 disp('No star seconds have been accumulated yet!'); 
-                cov = []; 
+                coverage = []; 
                 return;
             end
             
@@ -426,9 +426,15 @@ classdef Overview < handle
             [N_total, N_passed] = obj.calcEfficiency(r_edges);
             
             E = N_passed./N_total; 
-            E(isnan(E)) = 0; % where there are no events at all, efficiency is zero
+            E(N_total==0) = 0; % where there are no events at all, efficiency is zero
             
+            [N_passed_lower, N_passed_upper] = util.stat.poisson_errors(N_passed, .32); 
             
+            E_l = N_passed_lower./N_total; 
+            E_l(N_total==0) = 0; % where there are no events at all, efficiency is zero
+            
+            E_u = N_passed_upper./N_total; 
+            E_u(N_total==0) = 0; % where there are no events at all, efficiency is zero
             
             T = nansum(nansum(obj.star_seconds,1),2); % star-seconds integrated over all S/N and stellar sizes
             T = permute(T, [4,1,3,2]); % arrange velocity into the 1st dim, leave dim 2 as scalar (for r) and dim 3 for ecl 
@@ -439,9 +445,17 @@ classdef Overview < handle
             
             b = 2.*obj.b_max; % the range of impact parameters, integrated from -b_max to +b_max
             
-            cov = nansum(E.*T.*b.*v); % integral of efficiency and time and impact parameter, for each velocity
-            cov = permute(cov, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
-            cov = cov.*obj.fsu2deg2; 
+            coverage = nansum(E.*T.*b.*v); % integral of efficiency and time and impact parameter, for each velocity
+            coverage = permute(coverage, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
+            coverage = coverage.*obj.fsu2deg2; 
+            
+            cov_lower = nansum(E_l.*T.*b.*v); % integral of efficiency and time and impact parameter, for each velocity
+            cov_lower = permute(cov_lower, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
+            cov_lower = cov_lower.*obj.fsu2deg2; 
+            
+            cov_upper = nansum(E_u.*T.*b.*v); % integral of efficiency and time and impact parameter, for each velocity
+            cov_upper = permute(cov_upper, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
+            cov_upper = cov_upper.*obj.fsu2deg2; 
             
             
             

@@ -238,6 +238,18 @@ classdef RunFolder < dynamicprops
     
     methods % calculations
         
+        function loadSummary(obj)
+            
+            if ~obj.has_summary
+                return;
+            end
+            
+            L = load(fullfile(obj.folder, obj.analysis_folder, 'summary.mat'));
+            
+            obj.summary = L.summary; 
+            
+        end
+        
         function str_out = printout(obj)
             
             if obj.was_processed

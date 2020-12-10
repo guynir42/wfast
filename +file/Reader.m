@@ -966,7 +966,7 @@ classdef Reader < file.AstroData
                             loaded_errors = h5read(filename, sa('/', data_name), [frame_start 1 1], [num_frames Inf Inf]); % must check the dimensions on file fit what I think I am saving...
                         end
                         
-                        obj.fluxes = cat(1, obj.fluxes, loaded_errors); % append to the existing errors
+                        obj.errors = cat(1, obj.errors, loaded_errors); % append to the existing errors
                         
                     elseif any(strcmp(data_name, obj.dataset_names.areas)) && data_size(1) % data_names.areas may be a cell array of different optional names
                         

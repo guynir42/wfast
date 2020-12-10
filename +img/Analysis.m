@@ -8,6 +8,7 @@ classdef Analysis < file.AstroData
         pool; 
         futures; 
         futures_dir;
+        futures_analysis_folder;
         futures_batches;
         
         aux_figure;
@@ -899,6 +900,8 @@ classdef Analysis < file.AstroData
             end
             if obj.debug_bit, disp(['Finished run with ' num2str(obj.batch_counter) ' batches.']); end
             
+%             diary('off'); 
+            
         end
         
         function async_run(obj, varargin)
@@ -917,6 +920,7 @@ classdef Analysis < file.AstroData
             
             obj.futures{input.worker} = parfeval(obj.pool, @obj.run, 1, 'reset', input.reset, 'logging', input.logging, 'save', input.save, 'overwrite', input.overwrite); 
             obj.futures_dir{input.worker} = obj.reader.dir.two_tail;
+            obj.futures_analysis_folder{input.worker} = fullfile(obj.reader.dir.pwd, ['analysis_' char(datetime('now', 'TimeZone', 'UTC'), 'yyyy-MM-dd')]);
             obj.futures_batches{input.worker} = obj.num_batches; 
             
         end
@@ -964,6 +968,15 @@ classdef Analysis < file.AstroData
                 
                 if length(obj.futures)<ii || ~isa(obj.futures{ii}, 'parallel.Future') || ~isvalid(obj.futures{ii})...
                         || (strcmp(obj.futures{ii}.State, 'finished') && isempty(obj.futures{ii}.Error))
+                    
+%                     if strcmp(obj.futures{ii}.State, 'finished')
+%                         
+%                         if ~isempty(obj.futures_dir{ii}) % we know the analysis folder, we can add a diary file to it
+%                             
+%                         end
+%                         
+%                     end
+                    
                     idx = ii;
                     return;
                 end
@@ -1000,10 +1013,11 @@ classdef Analysis < file.AstroData
             try
             
                 input = util.text.InputVars;
-                input.input_var('reset', 0); % reset the object before running (i.e., start a new run)
+                input.input_var('reset', false); % reset the object before running (i.e., start a new run)
                 input.input_var('logging', []); % create log files in the analysis folder
                 input.input_var('save', []); % save the events and lightcurves from this run
-                input.input_var('overwrite', 0); % if true, will quietly delete previous analysis folder from current date (otherwise, throws an error)
+                input.input_var('overwrite', false); % if true, will quietly delete previous analysis folder from current date (otherwise, throws an error)
+%                 input.input_var('diary', false); % save standard output to file
                 input.scan_vars(varargin{:});
 
                 if input.reset
@@ -1092,6 +1106,10 @@ classdef Analysis < file.AstroData
 
                 end
 
+%                 if obj.use_analysis_dir_log && input.diary
+%                     diary(fullfile(obj.log_dir, 'diary.txt')); 
+%                 end
+                
                 cleanup = onCleanup(@() obj.finishup);
                 obj.startup;
 
@@ -1141,7 +1159,7 @@ classdef Analysis < file.AstroData
 
             catch ME
                 
-                if obj.use_analysis_dir_log
+                if exist(obj.log_name, 'file') && obj.use_analysis_dir_log
                     obj.write_log(obj.log_name, ME.getReport);
                 end
                 
