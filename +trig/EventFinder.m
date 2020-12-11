@@ -517,19 +517,6 @@ classdef EventFinder < handle
 
                     [obj.latest_candidates, best_snr] = obj.searchForCandidates(obj.store.extended_flux, obj.corrected_fluxes, obj.filtered_fluxes, star_indices); % loop over the normalized filtered flux and find multiple events
 
-                    if length(obj.latest_candidates)>=obj.pars.limit_events_per_batch % this batch has too many events, need to mark them as black-listed! 
-                        
-                        for ii = 1:length(obj.latest_candidates)
-                            obj.latest_candidates(ii).notes{end+1} = sprintf('Batch is black listed with %d events', length(obj.latest_candidates)); 
-                            obj.latest_candidates(ii).kept = 0;
-                        end
-                        
-                        obj.store.saveHours(1); % the parameter 1 is used to mark this as a bad batch...
-                        
-                    else
-                        obj.store.saveHours; % with no arguments it just counts the hours in this batch as good times
-                    end
-                    
                     obj.monitor.input(obj.store.extended_timestamps, obj.store.extended_juldates, ...
                         obj.store.extended_flux, obj.store.extended_aux, obj.store.cutouts, obj.latest_candidates);
                     
@@ -546,7 +533,20 @@ classdef EventFinder < handle
                     obj.cand = vertcat(obj.cand, obj.latest_candidates); % store all the candidates that were found in the last batch
                     
                 end % if no stars passed the pre-filter, we will just skip to the next batch
+                
+                if length(obj.latest_candidates)>=obj.pars.limit_events_per_batch % this batch has too many events, need to mark them as black-listed! 
 
+                    for ii = 1:length(obj.latest_candidates)
+                        obj.latest_candidates(ii).notes{end+1} = sprintf('Batch is black listed with %d events', length(obj.latest_candidates)); 
+                        obj.latest_candidates(ii).kept = 0;
+                    end
+
+                    obj.store.saveHours(1); % the parameter 1 is used to mark this as a bad batch...
+
+                else
+                    obj.store.saveHours; % with no arguments it just counts the hours in this batch as good times
+                end
+                
                 if obj.pars.use_oort % run the fluxes through the Oort cloud template bank as well 
                     
                     star_indices = 1:size(obj.corrected_fluxes,2); % just list all the stars
