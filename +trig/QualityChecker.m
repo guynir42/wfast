@@ -227,7 +227,7 @@ classdef QualityChecker < handle
 
             obj.pars.thresh_delta_t = 0.3; % events where the difference in timestamps, relative to the mean time-step are disqualified
             obj.pars.thresh_shakes = 5; % events where the mean offset r is larger than this are disqualified
-            obj.pars.thresh_defocus = 2; % events with PSF width above this value are disqualified
+            obj.pars.thresh_defocus = 3; % events with PSF width above this value are disqualified
             obj.pars.thresh_slope = 5; % events where the slope is larger than this value (in abs. value) are disqualified
             obj.pars.thresh_offset_size = 4; % events with offsets above this number are disqualified (after subtracting mean offsets)
             obj.pars.thresh_linear_motion = 2; % events showing linear motion of the centroids are disqualified
@@ -792,8 +792,14 @@ classdef QualityChecker < handle
                 for jj = 1:size(cutouts,3)
                     
                     if nnz(isnan(cutouts(:,:,jj,ii)))>0.5*numel(cutouts(:,:,jj,ii)) % more than half the pixels are NaN, just leave it
-                        cutouts(:,:,jj,ii) = regionfill(cutouts(:,:,jj,ii), isnan(cutouts(:,:,jj,ii))); 
-                        cutouts(:,:,jj,ii) = util.img.FourierShift2D(cutouts(:,:,jj,ii),[x(jj,ii),y(jj,ii)]); 
+                        try
+                            cutouts(:,:,jj,ii) = regionfill(cutouts(:,:,jj,ii), isnan(cutouts(:,:,jj,ii))); 
+                            cutouts(:,:,jj,ii) = util.img.FourierShift2D(cutouts(:,:,jj,ii),[x(jj,ii),y(jj,ii)]); 
+                        catch ME
+                            if ~strcmp(ME.identifier, 'MATLAB:regionfill:expectedNonNaN') % ignore these errors silently 
+                                rethrow(ME);
+                            end
+                        end
                     end
                     
                 end

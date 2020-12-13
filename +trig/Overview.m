@@ -6,6 +6,8 @@ classdef Overview < handle
     
     properties % objects
         
+        kbos@trig.KuiperBeltModel; 
+        
     end
     
     properties % inputs/outputs
@@ -388,7 +390,14 @@ classdef Overview < handle
                 ev = obj.sim_events(ii); 
                 
                 idx_v = find(ev.v>obj.vel_edges, 1, 'last'); 
+                if idx_v>=length(obj.vel_edges)
+                    idx_v = length(obj.vel_edges) - 1;
+                end
+                
                 idx_r = find(ev.r>obj.r_edges, 1, 'last'); 
+                if idx_r>=length(obj.r_edges)
+                    idx_r = length(obj.r_edges) - 1;
+                end
                 
                 % how many events, in total, were simulated
                 N_total(idx_v, idx_r) = N_total(idx_v, idx_r) + 1;
@@ -448,7 +457,7 @@ classdef Overview < handle
             coverage = nansum(E.*T.*b.*v); % integral of efficiency and time and impact parameter, for each velocity
             coverage = permute(coverage, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
             coverage = coverage.*obj.fsu2deg2; 
-            
+                        
             cov_lower = nansum(E_l.*T.*b.*v); % integral of efficiency and time and impact parameter, for each velocity
             cov_lower = permute(cov_lower, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
             cov_lower = cov_lower.*obj.fsu2deg2; 
@@ -456,8 +465,6 @@ classdef Overview < handle
             cov_upper = nansum(E_u.*T.*b.*v); % integral of efficiency and time and impact parameter, for each velocity
             cov_upper = permute(cov_upper, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
             cov_upper = cov_upper.*obj.fsu2deg2; 
-            
-            
             
         end
         
@@ -876,6 +883,78 @@ classdef Overview < handle
             end
             
             input.axes.FontSize = input.font_size;
+            
+        end
+        
+        function showKBOs(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('ecl', [-5,5], 'ecliptic latitude', 'ecliptic limits'); 
+            input.input_var('r_edges', []);
+            input.input_var('log', true, 'logarithm'); 
+            input.input_var('axes', [], 'axis'); 
+            input.input_var('font_size', 18); 
+            input.scan_vars(varargin{:}); 
+            
+            if length(input.ecl)~=2
+                error('Give the ecliptic latitude parameter as [min,max] values'); 
+            end
+            
+            ecl_idx1 = find(obj.ecl_edges>=input.ecl(1), 1, 'first');
+            ecl_idx2 = find(obj.ecl_edges<input.ecl(2), 1, 'last') - 1;
+            
+            if isempty(ecl_idx1) || isempty(ecl_idx2) || ecl_idx1>ecl_idx2
+                error('No data for the ecliptic latitude range %s', util.text.print_vec(input.ecl, ' to ')); 
+            end
+            
+            if isempty(input.r_edges)
+
+                if isempty(obj.r_edges)
+                    obj.r_edges = 0:0.1:3;
+                end
+
+                input.r_edges = obj.r_edges; 
+
+            end 
+            
+            r = util.vec.tocolumn(input.r_edges);
+            r = r(1:end-1) + diff(r)/2; 
+            
+            [coverage, cov_lower, cov_upper] = obj.calcCoverage(input.r_edges);
+            
+            C = nansum(coverage(:,ecl_idx1:ecl_idx2),2); 
+            C_l = nansum(cov_lower(:,ecl_idx1:ecl_idx2),2); 
+            C_u = nansum(cov_upper(:,ecl_idx1:ecl_idx2),2); 
+            
+            if isempty(input.axes)
+                input.axes = gca;
+            end
+            
+%             errorbar(input.axes, r, 1./C, 1./C-1./C_l, 1./C_u-1./C); 
+            
+            hold_state = input.axes.NextPlot;
+
+            h_cov = plot(input.axes, r, 1./C, '-', 'LineWidth', 3); 
+            
+            input.axes.NextPlot = 'add';
+            
+            h_c_u = plot(input.axes, r, 1./C_u, '--', 'LineWidth', 1.5); 
+            h_c_l = plot(input.axes, r, 1./C_l, '--', 'LineWidth', 1.5, 'Color', h_c_u.Color); 
+            
+            obj.kbos.show('r_edges', input.r_edges); 
+            
+            input.axes.NextPlot = hold_state;
+            
+            if input.log
+                input.axes.YScale = 'log';
+            else
+                input.axes.YScale = 'linear';
+            end
+            
+            xlabel(input.axes, 'Occulter radius [km]'); 
+            ylabel(input.axes, 'Number density [deg^{-2}]'); 
+            
+            input.axes.FontSize = input.font_size; 
             
         end
         
