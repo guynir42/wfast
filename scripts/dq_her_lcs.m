@@ -84,7 +84,7 @@ idx = idx + start_idx - 1;
 
 ps = ps./median(ps).*median(ps2); 
 
-semilogy(ax, fs(2:half_point), ps(2:half_point,:), 'LineWidth', 3); 
+plot(ax, fs(2:half_point), ps(2:half_point,:), 'LineWidth', 3); 
 
 text(ax, fs(idx-30), double(ps(idx))*2, sprintf('period: %4.1fs', 1./fs(idx)), 'HorizontalAlignment', 'Left', 'VerticalAlignment', 'bottom', 'FontSize', 24, 'Color', 'red'); 
 
@@ -92,20 +92,23 @@ hold(ax, 'on');
 plot(ax, fs(idx), ps(idx), 'or', 'MarkerSize', 15, 'HandleVisibility', 'off'); 
 % quiver(ax, fs(idx+10), ps(idx), fs(idx)-fs(idx+10), 10)
 
-semilogy(ax, fs2, ps2, ':', 'LineWidth', 1.5); 
-legend(ax, {'power spectrum', 'Lomb Scargle'}); 
+% semilogy(ax, fs2, ps2, ':', 'LineWidth', 1.5); 
+% legend(ax, {'power spectrum', 'Lomb Scargle'}); 
 
 hold(ax, 'off'); 
 
 xlabel('Frequency [Hz]');
 ylabel('Power spectrum'); 
 
+ax.YScale = 'log';
+% ax.YLim = [0 5e6]; 
+
 ax.FontSize = 24; 
 
 
 %% save the plot
 
-util.sys.print(fullfile(getenv('WFAST'), '/scripts/plots/DQ_Her_PS_LS')); 
+util.sys.print(fullfile(getenv('WFAST'), '/scripts/plots/DQ_Her_PS')); 
 
 
 

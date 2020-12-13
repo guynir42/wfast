@@ -1,11 +1,25 @@
 %% this script reads all the weather log files from WFAST and builds stats on observability
 
+%% load the data from https://ims.data.gov.il/ims/7
+
+T = readtable(fullfile(getenv('DATA'), '/extras/weather_data_winter_2020.csv')); 
+
+T = T(:,2:4); 
+
+T.Properties.VariableNames = {'date', 'time', 'rain_mm'};
+
+rain_time = datetime(strcat(T{:,1}, {' '}, T{:,2}), 'InputFormat', 'dd-MM-yyyy HH:mm', 'TimeZone', 'Asia/Jerusalem'); % turn it into datetime format
+rain_mm = T{:,3}; 
+
+
+%%
+
 tic;
 
 d = util.sys.WorkingDirectory(fullfile(getenv('DATA'), 'WFAST/logfiles')); 
 
-t1 = datetime('2020-06-01'); 
-t2 = datetime('2020-11-26'); 
+t1 = datetime('2020-09-01'); 
+t2 = datetime('2020-12-06'); 
 
 dates = {};
 data = struct;
@@ -138,6 +152,8 @@ for ii = 1:1e4
             data(ii).wind = wind;
             data(ii).good = good_times;
             data(ii).t = time;
+            data(ii).t.Format = 'dd-MM-uuuu hh:mm:ss.sss';
+            data(ii).t.TimeZone = 'UTC'; 
             
             fclose(f); 
 
@@ -202,7 +218,7 @@ dirname = fullfile(getenv('SCRIPTS'), 'plots');
 
 util.sys.print(fullfile(dirname, 'weather_histograms')); 
 
-%% show clouds+humidity vs. light variablility
+%% match the rain measurements to Boltwood
 
 t = [data.t]; 
 c = [data.clouds]; 
@@ -217,6 +233,20 @@ for ii = 1:length(data)
     
 end
 
+dt = abs(datenum(t)-datenum(rain_time)); % time difference between our Boltwood measurement and the rain measurement
+
+[mn,idx] = min(dt,[],2); % find the nearest matches
+
+rain_c = c(idx); 
+rain_h = h(idx); 
+rain_l = l(idx); 
+
+rain_idx = rain_mm>0; 
+dark_idx = true(size(rain_idx)); 
+% dark_idx = rain_l'<400; % include only dark times 
+
+%% show clouds+humidity vs. light variablility
+
 idx = l<400 & c>-200 & v<1000; 
 
 f1 = util.plot.FigHandler('clouds_vs_light'); 
@@ -226,18 +256,23 @@ f1.clear;
 
 ax = axes('Parent', f1.fig); 
 
-scatter(ax, c(idx), h(idx), 8, v(idx), 'filled'); 
-colormap(flipud(gray))
-colorbar(ax);
+h1 = scatter(ax, c(idx), h(idx), 5, v(idx), 'filled'); 
+h1.DisplayName = 'All measurements';
 
 hold(ax, 'on'); 
 
-x = -50:0.1:-15;
-y1 = -3.5.*(x+25) + 45; 
+h2 = scatter(ax, rain_c(rain_idx & dark_idx),rain_h(rain_idx & dark_idx),1500*rain_mm(rain_idx & dark_idx), rain_v(rain_idx & dark_idx), 'filled', 'p', 'LineWidth',1, 'MarkerEdgeColor', 'm');
+h2.DisplayName = 'Rainy times'; 
+
+colorbar(ax);
+
+
+x = -50:0.1:0;
+y1 = -2.0*(x) + 35; 
 y2 = real(sqrt(40^2-(x+65).^2)+50); 
 
-plot(ax, x, y1, 'g-', 'LineWidth', 2);
-% plot(ax, x, y2, 'r-', 'LineWidth', 2); 
+h3 = plot(ax, x, y1, 'g-', 'LineWidth', 2);
+h3.DisplayName = 'Parameter limit'; 
 
 ax.YLim = [0, 100]; 
 ax.XLim = [-50, 0];
@@ -252,6 +287,12 @@ ytickformat(ax, '%d%%');
 
 ax.FontSize = 18; 
 
+ax.Position(3) = ax.Position(3).*.96;
 
+legend(ax, 'Location', 'SouthWest'); 
+
+%% save the plot
+
+util.sys.print(fullfile(getenv('WFAST'), 'scripts/plots/humidity_clouds_rain'));
 
 

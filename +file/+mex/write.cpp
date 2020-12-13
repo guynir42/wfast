@@ -53,6 +53,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		
 		s->images.printout();
 		s->timestamps.printout();
+		s->juldates.printout(); 
 		s->cutouts.printout();
 		s->positions.printout();
 		s->coordinates.printout();

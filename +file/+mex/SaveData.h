@@ -46,6 +46,7 @@ class SaveData {
 	
 	MyMatrix images;
 	MyMatrix timestamps; // 1D vector of times	
+	MyMatrix juldates; // 1D vector of julian dates 
 	MyMatrix cutouts;
 	MyMatrix positions;
 	MyMatrix coordinates;

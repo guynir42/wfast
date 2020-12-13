@@ -32,7 +32,12 @@ time_indices = 1;
 time_bins = t(time_indices);
 
 v = L2.total_RE(time_indices, :, 4)'; % get the calibrated flux relative error, for the relevant time bins
-m = L2.cat.magnitudes;
+m = L2.cat.magnitudes; % the magnitude based on GAIA
+f = nanmean(L2.fluxes)'; % get the mean flux for each star as well
+mag_offsets = m+2.5.*log10(f); 
+zp = util.vec.weighted_average(mag_offsets, sqrt(f)); % zero point between magnitudes and fluxes! 
+
+f2 = 10.^(0.4.*(zp - m)); % fluxes extrapolated from the magnitudes and the image ZP
 
 mag_step = 1; % can also do fractions of mag; 
 mag_bins = (8:mag_step:13)'; 
@@ -88,18 +93,24 @@ for ii = 1:length(time_bins)
     h2 = plot(m(good_idx), v(good_idx,ii)*100, '.', 'Color', h.Color, 'MarkerSize', 7.5);
     h2.HandleVisibility = 'off'; 
     
+    v2 = 1./sqrt(f2(good_idx)*0.8)./sqrt(time_bins(ii)./time_bins(1))*100;
+    [m_sorted, sorting_idx] = sort(m(good_idx)); 
+    v_sorted = v2(sorting_idx);
+    h3 = plot(m_sorted, v_sorted, '--', 'Color', h.Color, 'LineWidth', 1.5);
+    h3.HandleVisibility = 'off'; 
+    
 end
 
 ax.NextPlot = 'replace'; 
 
 ax.FontSize = 24; 
-xlabel(ax, 'Magnitude bin [GAIA BP]'); 
+xlabel(ax, 'Magnitude bin [GAIA B_P]'); 
 ylabel(ax, 'Relative error'); 
 
 ax.YScale = 'log';
 % ytickformat('%2.0f%%'); 
-ax.YTick = [0.5 1 5 10 50 100]; 
-ax.YTickLabels = {'0.5%', '1%', '5%', '10%', '50%', '100%'}; 
+ax.YTick = [0.1 0.5 1 5 10 50 100]; 
+ax.YTickLabels = {'0.1%', '0.5%', '1%', '5%', '10%', '50%', '100%'}; 
 ax.MinorGridAlpha = 0; 
 
 ax.Box = 'on'; 

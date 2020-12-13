@@ -53,6 +53,7 @@ void SaveData::parseVararginPairs(int N, const mxArray *vars[]){
 		else if(cs(keyword, "t_start", "file_start_datestring", 16)) timestamps.attributes.push_back(MyAttribute("t_start", value));
 		else if(cs(keyword, "t_end", "file_write_datestring", 16)) timestamps.attributes.push_back(MyAttribute("t_end", value));
 		else if(cs(keyword, "t_end_stamp", "file_write_timestamp", 17)) timestamps.attributes.push_back(MyAttribute("t_end_stamp", value));
+		else if(cs(keyword, "juldates")) juldates.input("juldates", value, 0);
 		
 		else if(cs(keyword, "cutouts")) cutouts.input("cutouts", value, 1);
 		
@@ -138,6 +139,8 @@ void SaveData::readStruct(const mxArray *buf){
 	names.push_back("t_start");
 	names.push_back("t_end");
 	names.push_back("t_end_stamp");
+	names.push_back("juldates");
+	
 	
 	names.push_back("cutouts");
 	
@@ -194,7 +197,8 @@ void SaveData::readStruct(const mxArray *buf){
 			else if(cs(keyword, "t_start", "file_start_datestring", 16)) timestamps.attributes.push_back(MyAttribute("t_start", value));
 			else if(cs(keyword, "t_end", "file_write_datestring", 16)) timestamps.attributes.push_back(MyAttribute("t_end", value));
 			else if(cs(keyword, "t_end_stamp", "file_write_timestamp", 17)) timestamps.attributes.push_back(MyAttribute("t_end_stamp", value));
-			
+			else if(cs(keyword, "juldates")) timestamps.input("juldates", value, 0);
+
 			else if(cs(keyword, "cutouts", 8)) cutouts.input("cutouts", value, 1);
 			
 			else if(cs(keyword, "positions", 9)) positions.input("positions", value, 0);
@@ -314,6 +318,7 @@ void SaveData::print_help(){
 	mexPrintf("Data inputs (must be given explicitely): \n");
 	mexPrintf("-images: full frame images.\n");
 	mexPrintf("-timestamps: time of each frame. \n");
+	mexPrintf("-juldates: julian date of each frame. \n");
 	mexPrintf("cutouts: when saving only cutouts around stars. Not calibrated, uint16. \n");
 	mexPrintf("-positions: positions of centers of cutouts (x,y pairs).\n");
 	mexPrintf("-coordinates: positions of centers of cutouts (RA,DE pairs).\n");
