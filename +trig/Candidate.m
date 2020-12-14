@@ -1663,7 +1663,11 @@ classdef Candidate < handle
             
             obj(idx).popupClassifier;
             
-            obj.show('parent', hndl.UserData);
+            if isempty(obj(idx).classification)
+                obj.show('parent', hndl.UserData);
+            else
+                obj.callback_next(hndl);
+            end
             
         end
         

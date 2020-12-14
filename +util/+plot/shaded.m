@@ -1,4 +1,20 @@
 function [line_handle, fill_handle] = shaded(x,y,err,varargin)
+% Usage: [line_handle, fill_handle] = shaded(x,y,err,varargin)
+% Plot a line with errors as a shaded region around the line. 
+%
+% Inputs: The x,y values are plotted as a thick line, while the "err" input
+% is given as the distance from the y values. If "err" is given as a single
+% vector, the error region is plotted symmetrically. 
+% 
+% OPTIONAL ARGUMENTS: 
+%   -axes: plot into this axes object (default is gca()). 
+%   -LineColor: the color of the main line (default is black). 
+%   -LineStyle: the short string to control the line appearance. Default -. 
+%   -LineWidth: the width of the main line (default is 2). 
+%   -FillColor: the color of the shaded area (default is grey=0.8*[1 1 1]).
+%   -positive: replace the area which is negative, with the minimal
+%    non-negative value. 
+
 
     input = util.text.InputVars;
     input.input_var('axes', [], 'axis', 'parent');
