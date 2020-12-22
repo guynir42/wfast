@@ -11,7 +11,8 @@ function [line_handle, fill_handle] = shaded(x,y,err,varargin)
 %   -LineColor: the color of the main line (default is black). 
 %   -LineStyle: the short string to control the line appearance. Default -. 
 %   -LineWidth: the width of the main line (default is 2). 
-%   -FillColor: the color of the shaded area (default is grey=0.8*[1 1 1]).
+%   -FillColor: the color of the shaded area (default is like line).
+%   -alpha: the transparency of shaded area (default is 0.25).
 %   -positive: replace the area which is negative, with the minimal
 %    non-negative value. 
 
@@ -21,12 +22,17 @@ function [line_handle, fill_handle] = shaded(x,y,err,varargin)
     input.input_var('LineColor', [0 0 0], 'Color');
     input.input_var('LineStyle', '-');
     input.input_var('LineWidth', 2);
-    input.input_var('FillColor', 0.8.*[1 1 1]);
+    input.input_var('FillColor',[]);
+    input.input_var('alpha', 0.25); 
     input.input_var('positive', 0);
     input.scan_vars(varargin{:});
     
     if isempty(input.axes)
         input.axes = gca;
+    end
+    
+    if isempty(input.FillColor)
+        input.FillColor = input.LineColor;
     end
     
     x = util.vec.torow(x);
@@ -60,13 +66,12 @@ function [line_handle, fill_handle] = shaded(x,y,err,varargin)
     
     holding_pattern = input.axes.NextPlot;
     
-    fill_handle = fill(outline_x, outline_y, input.FillColor, 'Parent', input.axes, 'EdgeColor', 'none');
-    
-    input.axes.NextPlot = 'add';
-    
     if input.LineWidth>0
         line_handle = plot(input.axes, x, y, 'Color', input.LineColor, 'LineWidth', input.LineWidth, 'LineStyle', input.LineStyle);
+        input.axes.NextPlot = 'add'; 
     end
+    
+    fill_handle = fill(outline_x, outline_y, input.FillColor, 'Parent', input.axes, 'EdgeColor', 'none', 'FaceAlpha', input.alpha);
     
     input.axes.NextPlot = holding_pattern;
     

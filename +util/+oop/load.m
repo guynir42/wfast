@@ -431,7 +431,13 @@ function obj = readPropertyFromList(obj, line, input)
             
     if ~isprop(obj, propname)
         if isa(obj, 'dynamicprops')
-            addprop(obj, propname);
+            try 
+                addprop(obj, propname);
+            catch ME
+                if ~strcmp(ME.identifier, 'MATLAB:ClassUstring:InvalidDynamicPropertyName')
+                    rethrow(ME); 
+                end
+            end
         else
             if input.debug_bit, disp(['Not loading property ' propname ' as it doesnt exist in ' class(obj)]); end
             return;
@@ -439,6 +445,11 @@ function obj = readPropertyFromList(obj, line, input)
     end
     
     mp = findprop(obj, propname);
+    
+    if isempty(mp)
+        return;
+    end
+    
     if mp.Dependent
         if input.debug_bit, disp(['Property ' propname ' is Dependent. Skipping...']); end
         return;
@@ -502,7 +513,9 @@ function obj = readPropertyFromList(obj, line, input)
         
     end % if ~isempty(str)
     
-    eval(['obj.' name ' = value;']); % load the value into the object, including all sorts of weird brackets in the name. 
+    if exist('value', 'var')
+        eval(['obj.' name ' = value;']); % load the value into the object, including all sorts of weird brackets in the name. 
+    end
     
 end
 
