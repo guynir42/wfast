@@ -1038,23 +1038,14 @@ classdef Overview < handle
             import util.text.cs;
             
             input = util.text.InputVars;
-            input.input_var('units', 'hours'); % can also choose "hours" or "percent"
             input.input_var('format', 'text'); % can aso choose "latex"
             input.scan_vars(varargin{:}); 
             
-            if cs(input.units, 'seconds')
-                unit_str = 's'; 
-            elseif cs(input.units, 'hours')
-                unit_str = 'h'; 
-            elseif cs(input.units, 'percent', '%')
-                unit_str = '%'; 
-            else
-                error('Unknown option "%s" to "units" argument. Try using "seconds" or "hours" or "percent"...', input.units); 
-            end
+            fprintf('\n'); 
             
             if cs(input.format, 'text')
                 sep = '|';
-                line = '--------------------------+--------------+------------- \n';
+                line = '-----------------------------+-------------------+------------------- \n';
                 ending = newline;
                 code = @(str) str;
             elseif cs(input.format, 'latex')
@@ -1066,7 +1057,7 @@ classdef Overview < handle
                 error('Unknown "format" option "%s". Use "text" or "latex" instead...', input.format); 
             end
             
-            fprintf('%-25s %s inclusive[%s] %s exclusive[%s] %s', 'Cut name', sep, unit_str, sep, unit_str, ending); 
+            fprintf('%-28s %s   inclusive[h]    %s   exclusive[h]    %s', 'Cut name', sep, sep, ending); 
             fprintf(line); 
             
             M = obj.star_seconds; 
@@ -1081,41 +1072,29 @@ classdef Overview < handle
                 
                 M = obj.losses_inclusive(:,:,:,:,ii);
                 inc = nansum(M(:)); 
-                
-                if unit_str=='h'
-                    inc = inc/3600;
-                elseif unit_str=='%'
-                    inc = inc/total.*100; 
-                end
+                inc_h = inc/3600;
+                inc_p = inc/total*100; 
                 
                 M = obj.losses_exclusive(:,:,:,:,ii);
                 exc = nansum(M(:)); 
+                exc_h = exc/3600;
+                exc_p = exc/total*100; 
                 
-                if unit_str=='h'
-                    exc = exc/3600;
-                elseif unit_str=='%'
-                    exc = exc/total.*100; 
-                end
-                
-                fprintf('%-25s %s %12.2f %s %12.2f %s', code(obj.cut_names{ii}), sep, inc, sep, exc, ending);
+                fprintf('%-28s %s %8.2f (%5.2f%%) %s %8.2f (%5.2f%%) %s', code(obj.cut_names{ii}), sep, inc_h, inc_p, sep, exc_h, exc_p, ending);
                 
                 
             end
             
             M = obj.losses_bad_stars;
             stars = nansum(M(:)); 
+            stars_h = stars/3600;
+            stars_p = stars/total*100;
             
-            if unit_str=='h'
-                stars= stars/3600;
-            elseif unit_str=='%'
-                stars = stars/total.*100; 
-            end
-            
-            fprintf('%-25s %s %12.2f %s         ---  %s', code('Bad stars'), sep, stars, sep, ending); 
+            fprintf('%-28s %s %8.2f (%5.2f%%) %s         ---       %s', code('Bad stars'), sep, stars_h, stars_p, sep, ending); 
             
             fprintf(line); 
             
-            fprintf('%-25s %s %11.1fh %s %11.1fh %s', 'Good / total time', sep, useful/3600, sep, total/3600, ending); % always show it as hours!  
+            fprintf('%-28s %s %8.1fh (%5.2f%%) out of %8.1fh   %s', 'good/total star hours', sep, useful/3600, useful/total.*100, total/3600, ending); % always show it as hours!  
 
             
         end
