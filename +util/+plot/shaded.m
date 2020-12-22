@@ -1,5 +1,5 @@
-function [line_handle, fill_handle] = shaded(x,y,err,varargin)
-% Usage: [line_handle, fill_handle] = shaded(x,y,err,varargin)
+function [line_handle, fill_handle, fill_handle2] = shaded(x,y,err,varargin)
+% Usage: [line_handle, fill_handle, fill_handle2] = shaded(x,y,err,varargin)
 % Plot a line with errors as a shaded region around the line. 
 %
 % Inputs: The x,y values are plotted as a thick line, while the "err" input
@@ -56,6 +56,7 @@ function [line_handle, fill_handle] = shaded(x,y,err,varargin)
     
     outline_x = [x flip(x)];
     outline_y = [y-err(1,:) flip(y+err(2,:))];
+    outline_y = [y-err(1,:) flip(y)];
     
     if input.positive
         outline_temp = outline_y;
@@ -63,6 +64,9 @@ function [line_handle, fill_handle] = shaded(x,y,err,varargin)
         m = min(outline_temp);
         outline_y(outline_y<=0) = m;
     end
+    
+    outline_x2 = [flip(x) x]; 
+    outline_y2 = [flip(y+err(2,:)) y]; 
     
     holding_pattern = input.axes.NextPlot;
     
@@ -72,6 +76,9 @@ function [line_handle, fill_handle] = shaded(x,y,err,varargin)
     end
     
     fill_handle = fill(outline_x, outline_y, input.FillColor, 'Parent', input.axes, 'EdgeColor', 'none', 'FaceAlpha', input.alpha);
+    fill_handle2 = fill(outline_x2, outline_y2, input.FillColor, 'Parent', input.axes, 'EdgeColor', 'none', 'FaceAlpha', input.alpha);
+    
+    fill_handle2.HandleVisibility = 'off'; 
     
     input.axes.NextPlot = holding_pattern;
     
