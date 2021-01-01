@@ -70,6 +70,60 @@ classdef KuiperBeltModel < handle
     
     methods % calculations
         
+        function [N, N_l, N_u] = numDensityCumulative(obj, r_edges, power_law_range) % how many objects per square degree larger or equal to that radius
+            
+            if nargin<3 || isempty(power_law_range)
+                power_law_range = 1;
+            end
+            
+            q = abs(obj.index_power_law); 
+            
+            if power_law_range
+                ql = abs(obj.index_lower);
+                qu = abs(obj.index_upper); 
+            else
+                ql = q;
+                qu = q;
+            end
+            
+            N = (r_edges(1:end-1)./obj.start_radius).^(1-q);
+            N = obj.normalization.*N';
+            
+            N_l = (r_edges(1:end-1)./obj.start_radius).^(1-qu);
+            N_l = obj.norm_lower.*N_l';
+            
+            N_u = (r_edges(1:end-1)./obj.start_radius).^(1-ql);
+            N_u = obj.norm_upper.*N_u';
+            
+        end
+        
+        function [N, N_l, N_u] = numDensityIntervals(obj, r_edges, power_law_range) % how many objects per square degree in each radius bin
+            
+            if nargin<3 || isempty(power_law_range)
+                power_law_range = 1;
+            end
+            
+            q = abs(obj.index_power_law); 
+            
+            if power_law_range
+                ql = abs(obj.index_lower);
+                qu = abs(obj.index_upper); 
+            else
+                ql = q;
+                qu = q;
+            end
+            
+            N = (r_edges(1:end-1)./obj.start_radius).^(1-q) - (r_edges(2:end)./obj.start_radius).^(1-q);
+            N = obj.normalization.*N';
+            
+            N_l = (r_edges(1:end-1)./obj.start_radius).^(1-qu) - (r_edges(2:end)./obj.start_radius).^(1-qu);
+            N_l = obj.norm_lower.*N_l';
+            
+            N_u = (r_edges(1:end-1)./obj.start_radius).^(1-ql) - (r_edges(2:end)./obj.start_radius).^(1-ql);
+            N_u = obj.norm_upper.*N_u';
+            
+        end
+        
     end
     
     methods % plotting tools / GUI
@@ -88,29 +142,26 @@ classdef KuiperBeltModel < handle
                 input.axes = gca;
             end
             
-            q = abs(obj.index_power_law); 
+            [N, N_l, N_u] = obj.numDensityCumulative(input.r_edges, input.power_law_range); 
             
-            if input.power_law_range
-                ql = abs(obj.index_lower);
-                qu = abs(obj.index_upper); 
-            else
-                ql = q;
-                qu = q;
-            end
-            
-            N = (input.r_edges(1:end-1)./obj.start_radius).^(1-q) - (input.r_edges(2:end)./obj.start_radius).^(1-q);
-            N = obj.normalization.*N';
-            
-            N_l = (input.r_edges(1:end-1)./obj.start_radius).^(1-qu) - (input.r_edges(2:end)./obj.start_radius).^(1-qu);
-            N_l = obj.norm_lower.*N_l';
-            
-            N_u = (input.r_edges(1:end-1)./obj.start_radius).^(1-ql) - (input.r_edges(2:end)./obj.start_radius).^(1-ql);
-            N_u = obj.norm_upper.*N_u';
-                        
             r = util.vec.tocolumn(input.r_edges);
             r = r(1:end-1) + diff(r)/2; 
             
-            util.plot.shaded(r, N, [N-N_l, N_u-N], 'axes', input.axes); 
+            [h_line, h_shade] = util.plot.shaded(r, N, [N-N_l, N_u-N], 'axes', input.axes); 
+            
+            h_line.DisplayName = 'KBO model: N(>r)=N_0 r^{-q}';
+            
+            power_of_ten = floor(log10(obj.normalization)); 
+            N_0 = obj.normalization./10.^power_of_ten;
+            N_p = obj.norm_upper./10.^power_of_ten - N_0; 
+            N_m = N_0 - obj.norm_lower./10.^power_of_ten; 
+            
+            if input.power_law_range
+                h_shade.DisplayName = sprintf('N_0= %3.1f_{-%3.1f}^{+%3.1f}x10^{%d} | q= %3.1f_{-%3.1f}^{+%3.1f}', N_0, N_m, N_p, power_of_ten, ...
+                    abs(obj.index_power_law), abs(obj.index_power_law) - abs(obj.index_lower), abs(obj.index_upper) - abs(obj.index_power_law)); 
+            else
+                h_shade.DisplayName = sprintf('%g < N_0 < %g', obj.norm_lower, obj.norm_upper); 
+            end
             
             if input.log
                 input.axes.YScale = 'log';

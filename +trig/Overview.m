@@ -7,6 +7,7 @@ classdef Overview < handle
     properties % objects
         
         kbos@trig.KuiperBeltModel; 
+        folders@trig.RunFolder; 
         
     end
     
@@ -15,11 +16,11 @@ classdef Overview < handle
         runtime; % number of seconds of processed data
         batch_counter; % number of batches that were processed
         
-        ecl_edges; % ecliptic latitude bin edges used in the star_seconds and losses histograms
-        vel_edges; % transverse velocity bin edges used in the star_seconds and losses histograms
+        ecl_edges; % ecliptic latitude bin edges used in the star_seconds and losses histograms (degrees)
+        vel_edges; % transverse velocity bin edges used in the star_seconds and losses histograms (km/s)
         snr_edges; % S/N bin edges used in the star_seconds and losses histograms
-        size_edges; % stellar size edges used in the star_seconds and losses histograms
-        r_edges; % occulter radius edges used in efficiency estimates
+        size_edges; % stellar size edges used in the star_seconds and losses histograms (Fresnel units, estimated at 40 AU)
+        r_edges; % occulter radius edges used in efficiency estimates (km)
         
         b_max; % the maximumum impact parameter used in simulations. This tells us we can integrate -b_max to b_max to get the coverage
         
@@ -99,6 +100,8 @@ classdef Overview < handle
         
         function reset(obj)
             
+            obj.folders = trig.RunFolder.empty;
+            
             obj.runtime = 0;
             obj.batch_counter = 0;
 
@@ -106,7 +109,6 @@ classdef Overview < handle
             obj.vel_edges = [];
             obj.snr_edges = [];
             obj.size_edges = [];
-            
 
             obj.b_max = []; 
             
@@ -213,7 +215,7 @@ classdef Overview < handle
         function input(obj, summary) % accepts a summary or an overview object...
             
             %%% ingest either Overview or RunSummary object %%%
-            
+
             if isa(summary, 'trig.RunSummary') && ~isempty(summary)
                 
                 if isempty(summary.head) || isempty(summary.head.ephem) || isempty(summary.head.ephem.ECL_lat)
@@ -221,7 +223,7 @@ classdef Overview < handle
                 end
                 
                 ecl = summary.head.ephem.ECL_lat; 
-                vel = sqrt(sum(summary.head.ephem.getShadowVelocity.^2));
+                vel = sqrt(sum(summary.head.ephem.getShadowVelocity.^2)); % in km/s
                 snr = summary.snr_bin_edges;
                 sizes = summary.size_bin_edges;
                 
@@ -320,10 +322,10 @@ classdef Overview < handle
                             obj.star_seconds(idx1(ii), idx2(jj), idx3(kk), idx4(mm)) = obj.star_seconds(idx1(ii), idx2(jj), idx3(kk), idx4(mm)) + seconds(ii,jj,kk,mm);
                             obj.star_seconds_with_losses(idx1(ii), idx2(jj), idx3(kk), idx4(mm)) = obj.star_seconds_with_losses(idx1(ii), idx2(jj), idx3(kk), idx4(mm)) + seconds_with_losses(ii,jj,kk,mm);
 
-                            for c = 1:length(obj.cut_names)
-                                obj.losses_inclusive(idx1(ii), idx2(jj), idx3(kk), idx4(mm), c) = obj.losses_inclusive(idx1(ii), idx2(jj), idx3(kk), idx4(mm), c) + inclusive(ii,jj,kk,mm,c);
-                                obj.losses_exclusive(idx1(ii), idx2(jj), idx3(kk), idx4(mm), c) = obj.losses_exclusive(idx1(ii), idx2(jj), idx3(kk), idx4(mm), c) + exclusive(ii,jj,kk,mm,c);
-                            end
+%                             for c = 1:length(obj.cut_names)
+                                obj.losses_inclusive(idx1(ii), idx2(jj), idx3(kk), idx4(mm), :) = obj.losses_inclusive(idx1(ii), idx2(jj), idx3(kk), idx4(mm), :) + inclusive(ii,jj,kk,mm,:);
+                                obj.losses_exclusive(idx1(ii), idx2(jj), idx3(kk), idx4(mm), :) = obj.losses_exclusive(idx1(ii), idx2(jj), idx3(kk), idx4(mm), :) + exclusive(ii,jj,kk,mm,:);
+%                             end
 
                             obj.losses_bad_stars(idx1(ii), idx2(jj), idx3(kk), idx4(mm)) = obj.losses_bad_stars(idx1(ii), idx2(jj), idx3(kk), idx4(mm)) + bad_stars(ii,jj,kk,mm);
 
@@ -366,7 +368,6 @@ classdef Overview < handle
         % That will still need to be multiplied by the scanning speed and 
         % the KBO size distribution, to get the total coverage. 
         
-        
             if nargin<2 || isempty(r_edges)
                 
                 if isempty(obj.r_edges)
@@ -377,11 +378,12 @@ classdef Overview < handle
                     
             end
             
+            r_edges = obj.km2fsu.*r_edges;
+            v_edges = obj.km2fsu.*obj.vel_edges;
+            
             obj.b_max = nanmax([obj.sim_events.b]); 
             
-            obj.r_edges = r_edges; 
-            
-            N_total = zeros(length(obj.vel_edges)-1, length(obj.r_edges)-1, 'like', obj.star_seconds); 
+            N_total = zeros(length(v_edges)-1, length(r_edges)-1, 'like', obj.star_seconds); 
             
             N_passed = zeros(size(N_total), 'like', N_total); 
             
@@ -389,14 +391,14 @@ classdef Overview < handle
                 
                 ev = obj.sim_events(ii); 
                 
-                idx_v = find(ev.v>obj.vel_edges, 1, 'last'); 
-                if idx_v>=length(obj.vel_edges)
-                    idx_v = length(obj.vel_edges) - 1;
+                idx_v = find(ev.v>v_edges, 1, 'last'); 
+                if idx_v>=length(v_edges)
+                    idx_v = length(v_edges) - 1;
                 end
                 
-                idx_r = find(ev.r>obj.r_edges, 1, 'last'); 
-                if idx_r>=length(obj.r_edges)
-                    idx_r = length(obj.r_edges) - 1;
+                idx_r = find(ev.r>r_edges, 1, 'last'); 
+                if idx_r>=length(r_edges)
+                    idx_r = length(r_edges) - 1;
                 end
                 
                 % how many events, in total, were simulated
@@ -431,7 +433,7 @@ classdef Overview < handle
                     
             end
             
-            % the result should have 2D (velocity and occulter radius)
+            % the result should have 2D (dim1 velocity and dim2 occulter radius)
             [N_total, N_passed] = obj.calcEfficiency(r_edges);
             
             E = N_passed./N_total; 
@@ -454,20 +456,84 @@ classdef Overview < handle
             
             b = 2.*obj.b_max; % the range of impact parameters, integrated from -b_max to +b_max
             
-            coverage = nansum(E.*T.*b.*v); % integral of efficiency and time and impact parameter, for each velocity
+            coverage = nansum(E.*T.*b.*v, 1); % integral of efficiency and time and impact parameter, for each velocity
             coverage = permute(coverage, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
             coverage = coverage.*obj.fsu2deg2; 
-                        
-            cov_lower = nansum(E_l.*T.*b.*v); % integral of efficiency and time and impact parameter, for each velocity
+            
+            cov_lower = nansum(E_l.*T.*b.*v, 1); % integral of efficiency and time and impact parameter, for each velocity
             cov_lower = permute(cov_lower, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
             cov_lower = cov_lower.*obj.fsu2deg2; 
             
-            cov_upper = nansum(E_u.*T.*b.*v); % integral of efficiency and time and impact parameter, for each velocity
+            cov_upper = nansum(E_u.*T.*b.*v, 1); % integral of efficiency and time and impact parameter, for each velocity
             cov_upper = permute(cov_upper, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
             cov_upper = cov_upper.*obj.fsu2deg2; 
             
         end
         
+        function [N, N_err] = numDetections(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('ecl', [-5,5], 'ecliptic latitude', 'ecliptic limits'); 
+            input.input_var('r_edges', []);
+            input.scan_vars(varargin{:}); 
+            
+            if length(input.ecl)~=2
+                error('Give the ecliptic latitude parameter as [min,max] values'); 
+            end
+            
+            ecl_idx1 = find(obj.ecl_edges>=input.ecl(1), 1, 'first');
+            ecl_idx2 = find(obj.ecl_edges<input.ecl(2), 1, 'last') - 1;
+            
+            if isempty(ecl_idx1) || isempty(ecl_idx2) || ecl_idx1>ecl_idx2
+                error('No data for the ecliptic latitude range %s', util.text.print_vec(input.ecl, ' to ')); 
+            end
+            
+            if isempty(input.r_edges)
+
+                if isempty(obj.r_edges)
+                    obj.r_edges = 0:0.1:3;
+                end
+
+                input.r_edges = obj.r_edges; 
+
+            end 
+            
+            r = util.vec.tocolumn(input.r_edges);
+            r = r(1:end-1) + diff(r)/2; 
+            
+            [coverage, cov_lower, cov_upper] = obj.calcCoverage(input.r_edges);
+            
+            % integrate over the relevant ecliptic latitudes
+            C = nansum(coverage(:,ecl_idx1:ecl_idx2),2);
+            C_l = nansum(cov_lower(:,ecl_idx1:ecl_idx2),2);
+            C_u = nansum(cov_upper(:,ecl_idx1:ecl_idx2),2); 
+            
+            [C_l,C,C_u]
+            
+%             C_p = C_u - C; % coverage plus 
+%             C_m = C - C_l; % coverage minus
+            
+            % get the KBO abundance in each r interval
+            [n, n_l, n_u] = obj.kbos.numDensityIntervals(input.r_edges);
+            
+%             n_p = n_u - n; % number density plus
+%             n_m = n - n_l; % number density minus
+            
+            N = nansum(C.*n, 1); 
+            
+            N_err = [nansum(C_l.*n_l,1), nansum(C.*n_l,1), nansum(C_u.*n_l,1);
+                     nansum(C_l.*n,1), nansum(C.*n,1), nansum(C_u.*n,1);
+                     nansum(C_l.*n_u,1), nansum(C.*n_u,1), nansum(C_u.*n_u,1)];
+            
+            
+%             N_p = sqrt(nansum(C_p.*n).^2 + nansum(C.*n_p).^2);
+%             N_m = sqrt(nansum(C_m.*n).^2 + nansum(C.*n_m).^2);
+%             
+%             N_l = N - N_m; 
+%             N_u = N + N_p;
+            
+        end
+            
     end
     
     methods (Hidden=false) % internal calculations
@@ -922,6 +988,9 @@ classdef Overview < handle
             
             [coverage, cov_lower, cov_upper] = obj.calcCoverage(input.r_edges);
             
+            star_hours = obj.star_seconds(:,:,ecl_idx1:ecl_idx2,:); 
+            star_hours = nansum(star_hours(:))./3600; 
+            
             C = nansum(coverage(:,ecl_idx1:ecl_idx2),2); 
             C_l = nansum(cov_lower(:,ecl_idx1:ecl_idx2),2); 
             C_u = nansum(cov_upper(:,ecl_idx1:ecl_idx2),2); 
@@ -935,11 +1004,15 @@ classdef Overview < handle
             hold_state = input.axes.NextPlot;
 
             h_cov = plot(input.axes, r, 1./C, '-', 'LineWidth', 3); 
+            h_cov.DisplayName = sprintf('Inverse coverage (%d star hours)', round(star_hours));
             
             input.axes.NextPlot = 'add';
             
             h_c_u = plot(input.axes, r, 1./C_u, '--', 'LineWidth', 1.5); 
+            h_c_u.DisplayName = '1\sigma confidence interval'; 
+            
             h_c_l = plot(input.axes, r, 1./C_l, '--', 'LineWidth', 1.5, 'Color', h_c_u.Color); 
+            h_c_l.HandleVisibility = 'off'; 
             
             obj.kbos.show('r_edges', input.r_edges); 
             
@@ -956,6 +1029,8 @@ classdef Overview < handle
             
             input.axes.FontSize = input.font_size; 
             
+            legend(input.axes, 'Location', 'NorthEast'); 
+            
         end
         
         function printReport(obj, varargin)
@@ -963,23 +1038,14 @@ classdef Overview < handle
             import util.text.cs;
             
             input = util.text.InputVars;
-            input.input_var('units', 'hours'); % can also choose "hours" or "percent"
             input.input_var('format', 'text'); % can aso choose "latex"
             input.scan_vars(varargin{:}); 
             
-            if cs(input.units, 'seconds')
-                unit_str = 's'; 
-            elseif cs(input.units, 'hours')
-                unit_str = 'h'; 
-            elseif cs(input.units, 'percent', '%')
-                unit_str = '%'; 
-            else
-                error('Unknown option "%s" to "units" argument. Try using "seconds" or "hours" or "percent"...', input.units); 
-            end
+            fprintf('\n'); 
             
             if cs(input.format, 'text')
                 sep = '|';
-                line = '--------------------------+--------------+------------- \n';
+                line = '-----------------------------+-------------------+------------------- \n';
                 ending = newline;
                 code = @(str) str;
             elseif cs(input.format, 'latex')
@@ -991,7 +1057,7 @@ classdef Overview < handle
                 error('Unknown "format" option "%s". Use "text" or "latex" instead...', input.format); 
             end
             
-            fprintf('%-25s %s inclusive[%s] %s exclusive[%s] %s', 'Cut name', sep, unit_str, sep, unit_str, ending); 
+            fprintf('%-28s %s   inclusive[h]    %s   exclusive[h]    %s', 'Cut name', sep, sep, ending); 
             fprintf(line); 
             
             M = obj.star_seconds; 
@@ -1006,41 +1072,29 @@ classdef Overview < handle
                 
                 M = obj.losses_inclusive(:,:,:,:,ii);
                 inc = nansum(M(:)); 
-                
-                if unit_str=='h'
-                    inc = inc/3600;
-                elseif unit_str=='%'
-                    inc = inc/total.*100; 
-                end
+                inc_h = inc/3600;
+                inc_p = inc/total*100; 
                 
                 M = obj.losses_exclusive(:,:,:,:,ii);
                 exc = nansum(M(:)); 
+                exc_h = exc/3600;
+                exc_p = exc/total*100; 
                 
-                if unit_str=='h'
-                    exc = exc/3600;
-                elseif unit_str=='%'
-                    exc = exc/total.*100; 
-                end
-                
-                fprintf('%-25s %s %12.2f %s %12.2f %s', code(obj.cut_names{ii}), sep, inc, sep, exc, ending);
+                fprintf('%-28s %s %8.2f (%5.2f%%) %s %8.2f (%5.2f%%) %s', code(obj.cut_names{ii}), sep, inc_h, inc_p, sep, exc_h, exc_p, ending);
                 
                 
             end
             
             M = obj.losses_bad_stars;
             stars = nansum(M(:)); 
+            stars_h = stars/3600;
+            stars_p = stars/total*100;
             
-            if unit_str=='h'
-                stars= stars/3600;
-            elseif unit_str=='%'
-                stars = stars/total.*100; 
-            end
-            
-            fprintf('%-25s %s %12.2f %s         ---  %s', code('Bad stars'), sep, stars, sep, ending); 
+            fprintf('%-28s %s %8.2f (%5.2f%%) %s         ---       %s', code('Bad stars'), sep, stars_h, stars_p, sep, ending); 
             
             fprintf(line); 
             
-            fprintf('%-25s %s %11.1fh %s %11.1fh %s', 'Good / total time', sep, useful/3600, sep, total/3600, ending); % always show it as hours!  
+            fprintf('%-28s %s %8.1fh (%5.2f%%) out of %8.1fh   %s', 'good/total star hours', sep, useful/3600, useful/total.*100, total/3600, ending); % always show it as hours!  
 
             
         end

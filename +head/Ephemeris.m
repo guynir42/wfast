@@ -1632,47 +1632,55 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 end
             elseif ischar(val) % got string, must parse it for date and time
                 
-                if cs(val, 'now')
-                    time = datetime('now', 'TimeZone', 'UTC'); 
-                    return;
-                end
+                try
                 
-                idx = strfind(val, 'T'); 
-                c = strsplit(strip(val)); 
-                
-                if length(c)==1 && isempty(idx) % no date is given, use today's date
-                    
-                    try 
-                        time = datetime(val);
-                    catch
-                        time = NaT;
+                    if cs(val, 'now')
+                        time = datetime('now', 'TimeZone', 'UTC'); 
                         return;
                     end
+
+                    idx = strfind(val, 'T'); 
+                    c = strsplit(strip(val)); 
+
+                    if length(c)==1 && isempty(idx) % no date is given, use today's date
+
+                        time = datetime(val);
                     
-                elseif ~isempty(idx) % split using the 'T' separator
-                    time = datetime(val(1:idx-1), 'TimeZone', 'UTC'); % get the date
-                    val = val(idx+1:end); % get the hours from the rest of the string
-                elseif length(c)==2 % we can split on white space
-                    time = datetime(c{1}, 'TimeZone', 'UTC'); % get the day
-                    val = c{2}; % get the time
-                end
-                
-                c = strsplit(val, ':'); 
-                
-                h = str2double(c{1}); % just get the hours from the first number
-                if length(c)>1, h = h + str2double(c{2})/60; end % we also got minutes
-                if length(c)>2, h = h + str2double(c{3})/3600; end % we also got seconds
-                
-                if isempty(time) % automatically choose the time based on the hour of day
-                    if h>=12
-                        time = datetime('today', 'TimeZone', 'UTC'); 
-                    else
-                        time = datetime('today', 'TimeZone', 'UTC') + days(1);  
+                    elseif ~isempty(idx) % split using the 'T' separator
+
+                        time = datetime(val(1:idx-1), 'TimeZone', 'UTC'); % get the date
+                        val = val(idx+1:end); % get the hours from the rest of the string
+
+                    elseif length(c)==2 % we can split on white space
+                        time = datetime(c{1}, 'TimeZone', 'UTC'); % get the day
+                        val = c{2}; % get the time
                     end
-                end
+
+                    c = strsplit(val, ':'); 
+
+                    h = str2double(c{1}); % just get the hours from the first number
+                    if length(c)>1, h = h + str2double(c{2})/60; end % we also got minutes
+                    if length(c)>2, h = h + str2double(c{3})/3600; end % we also got seconds
+
+                    if isempty(time) % automatically choose the time based on the hour of day
+                        if h>=12
+                            time = datetime('today', 'TimeZone', 'UTC'); 
+                        else
+                            time = datetime('today', 'TimeZone', 'UTC') + days(1);  
+                        end
+                    end
+
+                    if ~isempty(h) && ~isnan(h)
+                        time = time + hours(h); % add the hours to the required date. 
+                    end
                 
-                if ~isempty(h) && ~isnan(h)
-                    time = time + hours(h); % add the hours to the required date. 
+                catch ME
+                    if strcmp(ME.identifier, 'MATLAB:datetime:UnrecognizedDateStringSuggestLocale') && contains(ME.message, 'NaN')
+                        time = NaT;
+                        return;
+                    else
+                        rethrow(ME); 
+                    end
                 end
                 
             elseif isa(val, 'datetime')

@@ -55,6 +55,9 @@ classdef RunFolder < dynamicprops
 %          for fast mode files (that we can process for KBOs) or it will be 
 %          longer exposures (typically 3 seconds) that are skipped by the 
 %          KBO pipeline. 
+%   -frame_rate: the frame rate, also from the README or header. This is
+%                usually 25 Hz. 
+%   -batch_size: how many frames per file. This is usually either 1 or 100.
 %   -is_calibration: mark calibration folders (dark/flat). 
 %   -is_full_frame: mark folders where full images were taken (not stack+
 %                   cutouts, which are used for the KBO pipeline). 
@@ -111,7 +114,9 @@ classdef RunFolder < dynamicprops
         analysis_date = []; % datetime object for the time when the analysis was done (date only)
         
         num_files = 0; % how many HDF5 files are in this folder
-        expT = []; % exposure time loaded from the text file
+        expT = []; % exposure time loaded from the text file [s]
+        frame_rate = []; % frame rate loaded from the text file [Hz]
+        batch_size = []; % how many frames in each batch/file
         
         is_calibration = 0; % this is true if the run folder starts with "dark" or "flat"
         is_full_frame = 0; % this is true if the individual files are larger than 100 MB, meaning there are multiple full-frame images saved (not stack+cutout, not single image)
@@ -134,7 +139,7 @@ classdef RunFolder < dynamicprops
     
     properties(Dependent=true)
         
-        
+        obs_hours; 
         
     end
     
@@ -162,6 +167,16 @@ classdef RunFolder < dynamicprops
     end
     
     methods % getters
+        
+        function val = get.obs_hours(obj)
+            
+            if isempty(obj.frame_rate) || isempty(obj.batch_size) || isempty(obj.num_files)
+                val = [];
+            else
+                val = obj.num_files.*obj.batch_size./obj.frame_rate./3600; 
+            end
+            
+        end
         
         function val = isFastMode(obj_vec)
             
@@ -402,9 +417,9 @@ classdef RunFolder < dynamicprops
                     
                         if exist(fullfile(d.pwd, 'A_README.txt'), 'file') % if there is a text file at all... 
                             
-                            new_obj.expT = new_obj.getExposureTime(fullfile(d.pwd, 'A_README.txt')); 
+                            [new_obj.expT, new_obj.frame_rate, new_obj.batch_size] = new_obj.getExposureTime(fullfile(d.pwd, 'A_README.txt')); 
 
-                            if isempty(new_obj.expT) % no result, try getting the expT by loading the header
+                            if isempty(new_obj.expT) || isempty(new_obj.frame_rate) || isempty(new_obj.batch_size) % no result, try getting the expT by loading the header
 
                                 h = []; 
                                 locations = {'/acquisition/head', '/acquisition/pars', '/camera/head', '/camera/pars'}; 
@@ -416,14 +431,16 @@ classdef RunFolder < dynamicprops
                                 end
 
                                 if ~isempty(h)
-                                    new_obj.expT = h.EXPTIME; 
+                                    new_obj.expT = h.EXPTIME;
+                                    new_obj.frame_rate = h.FRAMERATE;
+                                    new_obj.batch_size = h.NAXIS3;  
                                 end
                                 
                             end
                         
                         end
                             
-                        if isempty(new_obj.expT) % no result, try getting the expT by loading the header from HDF5
+                        if isempty(new_obj.expT) || isempty(new_obj.frame_rate) || isempty(new_obj.batch_size) % no result, try getting the expT by loading the header from HDF5
 
                             if input.debug_bit, disp('Failed to load header from text file!'); end
                             
@@ -435,6 +452,8 @@ classdef RunFolder < dynamicprops
 
                             if ~isempty(h)
                                 new_obj.expT = h.EXPTIME; 
+                                new_obj.frame_rate = h.FRAMERATE;
+                                new_obj.batch_size = h.NAXIS3; 
                             end
                             
                         end
@@ -535,9 +554,11 @@ classdef RunFolder < dynamicprops
             
         end
         
-        function val = getExposureTime(filename) % scan a text file until finding expT or EXPTIME and read the value
+        function [expT, frame_rate, batch_size] = getExposureTime(filename) % scan a text file until finding expT or EXPTIME and read the value
             
-            val = []; % if we can't find the exposure time, return empty
+            expT = []; % if we can't find the exposure time, return empty
+            frame_rate = [];
+            batch_size = [];
             
             try 
                 
@@ -555,12 +576,30 @@ classdef RunFolder < dynamicprops
                     idx = regexp(line, '(expT|EXPTIME)', 'end');
 
                     if ~isempty(idx)
-                        val = util.text.parse_value(line(idx+2:end));
-                        break;
+                        expT = util.text.parse_value(line(idx+2:end));       
+                        continue;
+                    end
+                    
+                    idx = regexp(line, 'NAXIS3', 'end');
+
+                    if ~isempty(idx)
+                        batch_size = util.text.parse_value(line(idx+2:end));  
+                        continue;
+                    end
+                    
+                    idx = regexp(line, 'FRAMERATE', 'end');
+
+                    if ~isempty(idx)
+                        frame_rate = util.text.parse_value(line(idx+2:end));   
+                        continue;
                     end
 
+                    if ~isempty(expT) && ~isempty(frame_rate) && ~isempty(batch_size) 
+                        break;
+                    end
+                        
                 end
-
+                
             catch ME
                 warning(ME.getReport); 
             end

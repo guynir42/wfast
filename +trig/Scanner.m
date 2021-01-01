@@ -224,6 +224,8 @@ classdef Scanner < handle
                 all_runs = all_runs(logical([all_runs.has_classifieds])); 
             end
             
+            obj.overview.folders = all_runs; 
+            
             for ii = 1:length(all_runs)
                 
                 if obj.debug_bit, fprintf('ii= %d / %d. Loading summary from folder: %s\n', ii, length(all_runs), all_runs(ii).folder); end

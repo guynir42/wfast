@@ -1,5 +1,5 @@
-function [line_handle, fill_handle] = shaded(x,y,err,varargin)
-% Usage: [line_handle, fill_handle] = shaded(x,y,err,varargin)
+function [line_handle, fill_handle, fill_handle2] = shaded(x,y,err,varargin)
+% Usage: [line_handle, fill_handle, fill_handle2] = shaded(x,y,err,varargin)
 % Plot a line with errors as a shaded region around the line. 
 %
 % Inputs: The x,y values are plotted as a thick line, while the "err" input
@@ -11,7 +11,8 @@ function [line_handle, fill_handle] = shaded(x,y,err,varargin)
 %   -LineColor: the color of the main line (default is black). 
 %   -LineStyle: the short string to control the line appearance. Default -. 
 %   -LineWidth: the width of the main line (default is 2). 
-%   -FillColor: the color of the shaded area (default is grey=0.8*[1 1 1]).
+%   -FillColor: the color of the shaded area (default is like line).
+%   -alpha: the transparency of shaded area (default is 0.25).
 %   -positive: replace the area which is negative, with the minimal
 %    non-negative value. 
 
@@ -21,12 +22,17 @@ function [line_handle, fill_handle] = shaded(x,y,err,varargin)
     input.input_var('LineColor', [0 0 0], 'Color');
     input.input_var('LineStyle', '-');
     input.input_var('LineWidth', 2);
-    input.input_var('FillColor', 0.8.*[1 1 1]);
+    input.input_var('FillColor',[]);
+    input.input_var('alpha', 0.25); 
     input.input_var('positive', 0);
     input.scan_vars(varargin{:});
     
     if isempty(input.axes)
         input.axes = gca;
+    end
+    
+    if isempty(input.FillColor)
+        input.FillColor = input.LineColor;
     end
     
     x = util.vec.torow(x);
@@ -50,6 +56,7 @@ function [line_handle, fill_handle] = shaded(x,y,err,varargin)
     
     outline_x = [x flip(x)];
     outline_y = [y-err(1,:) flip(y+err(2,:))];
+    outline_y = [y-err(1,:) flip(y)];
     
     if input.positive
         outline_temp = outline_y;
@@ -58,15 +65,20 @@ function [line_handle, fill_handle] = shaded(x,y,err,varargin)
         outline_y(outline_y<=0) = m;
     end
     
+    outline_x2 = [flip(x) x]; 
+    outline_y2 = [flip(y+err(2,:)) y]; 
+    
     holding_pattern = input.axes.NextPlot;
-    
-    fill_handle = fill(outline_x, outline_y, input.FillColor, 'Parent', input.axes, 'EdgeColor', 'none');
-    
-    input.axes.NextPlot = 'add';
     
     if input.LineWidth>0
         line_handle = plot(input.axes, x, y, 'Color', input.LineColor, 'LineWidth', input.LineWidth, 'LineStyle', input.LineStyle);
+        input.axes.NextPlot = 'add'; 
     end
+    
+    fill_handle = fill(outline_x, outline_y, input.FillColor, 'Parent', input.axes, 'EdgeColor', 'none', 'FaceAlpha', input.alpha);
+    fill_handle2 = fill(outline_x2, outline_y2, input.FillColor, 'Parent', input.axes, 'EdgeColor', 'none', 'FaceAlpha', input.alpha);
+    
+    fill_handle2.HandleVisibility = 'off'; 
     
     input.axes.NextPlot = holding_pattern;
     
