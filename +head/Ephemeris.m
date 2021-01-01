@@ -638,6 +638,25 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
+        function val = getShadowAngle(obj, target_elevation_km) % Earth's shadow, angular radius (degrees), directly overhead
+            
+            if ischar(target_elevation_km)
+                if util.text.cs(target_elevation_km, 'geosat', 'geostationary', 'geosynchronous')
+                    target_elevation_km = 35786;
+                elseif util.text.cs(target_elevation_km, 'gps')
+                    target_elevation_km = 20200; 
+                elseif util.text.cs(target_elevation_km, 'moon')
+                    target_elevation_km = 384000;
+                end
+            end
+            
+            R = 6371;
+            D = target_elevation_km - obj.elevation/1000; % distance from observer to shadow's height
+            
+            val = R./D.*180./pi; 
+            
+        end
+        
         function val = getSlantRange(obj, target_elevation_km) % target elevation above Earth's surface
             
             if ischar(target_elevation_km)

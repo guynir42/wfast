@@ -585,6 +585,7 @@ dt = seconds(diff(t))
 sun_mag = -26.74;
 
 mean_mag = mean([g.peak_mag]); 
+% mean_mag = 9.5; 
 
 delta = mean_mag-sun_mag;
 
@@ -595,6 +596,7 @@ ang_size_ratio = sqrt(flux_ratio);
 ang_size_mirror = 0.5/180*pi/ang_size_ratio; % radians
 
 r = runs(3).head.ephem.getSlantRange('geo')*1000*100; % geosat height in cm
+% r = 3720000000; 
 
 mirror_size_cm = r.*ang_size_mirror
 

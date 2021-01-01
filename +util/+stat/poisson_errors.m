@@ -8,6 +8,8 @@ function [lower, upper] = poisson_errors(lambda, p_value, precision_bytes)
 % The input "precision_bytes" controls how many iterations the scan goes
 % through before settling on a number. This roughly represents factors of 2
 % in precision (relative to the input lambda!). 
+%
+% ref: https://ui.adsabs.harvard.edu/abs/1986ApJ...303..336G/abstract
 
     if nargin==0, help('util.stat.poisson_errors'); return; end
     
