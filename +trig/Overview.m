@@ -215,7 +215,7 @@ classdef Overview < handle
         function input(obj, summary) % accepts a summary or an overview object...
             
             %%% ingest either Overview or RunSummary object %%%
-            
+
             if isa(summary, 'trig.RunSummary') && ~isempty(summary)
                 
                 if isempty(summary.head) || isempty(summary.head.ephem) || isempty(summary.head.ephem.ECL_lat)
@@ -322,10 +322,10 @@ classdef Overview < handle
                             obj.star_seconds(idx1(ii), idx2(jj), idx3(kk), idx4(mm)) = obj.star_seconds(idx1(ii), idx2(jj), idx3(kk), idx4(mm)) + seconds(ii,jj,kk,mm);
                             obj.star_seconds_with_losses(idx1(ii), idx2(jj), idx3(kk), idx4(mm)) = obj.star_seconds_with_losses(idx1(ii), idx2(jj), idx3(kk), idx4(mm)) + seconds_with_losses(ii,jj,kk,mm);
 
-                            for c = 1:length(obj.cut_names)
-                                obj.losses_inclusive(idx1(ii), idx2(jj), idx3(kk), idx4(mm), c) = obj.losses_inclusive(idx1(ii), idx2(jj), idx3(kk), idx4(mm), c) + inclusive(ii,jj,kk,mm,c);
-                                obj.losses_exclusive(idx1(ii), idx2(jj), idx3(kk), idx4(mm), c) = obj.losses_exclusive(idx1(ii), idx2(jj), idx3(kk), idx4(mm), c) + exclusive(ii,jj,kk,mm,c);
-                            end
+%                             for c = 1:length(obj.cut_names)
+                                obj.losses_inclusive(idx1(ii), idx2(jj), idx3(kk), idx4(mm), :) = obj.losses_inclusive(idx1(ii), idx2(jj), idx3(kk), idx4(mm), :) + inclusive(ii,jj,kk,mm,:);
+                                obj.losses_exclusive(idx1(ii), idx2(jj), idx3(kk), idx4(mm), :) = obj.losses_exclusive(idx1(ii), idx2(jj), idx3(kk), idx4(mm), :) + exclusive(ii,jj,kk,mm,:);
+%                             end
 
                             obj.losses_bad_stars(idx1(ii), idx2(jj), idx3(kk), idx4(mm)) = obj.losses_bad_stars(idx1(ii), idx2(jj), idx3(kk), idx4(mm)) + bad_stars(ii,jj,kk,mm);
 
@@ -459,7 +459,7 @@ classdef Overview < handle
             coverage = nansum(E.*T.*b.*v, 1); % integral of efficiency and time and impact parameter, for each velocity
             coverage = permute(coverage, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
             coverage = coverage.*obj.fsu2deg2; 
-                        
+            
             cov_lower = nansum(E_l.*T.*b.*v, 1); % integral of efficiency and time and impact parameter, for each velocity
             cov_lower = permute(cov_lower, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
             cov_lower = cov_lower.*obj.fsu2deg2; 

@@ -70,6 +70,33 @@ classdef KuiperBeltModel < handle
     
     methods % calculations
         
+        function [N, N_l, N_u] = numDensityCumulative(obj, r_edges, power_law_range) % how many objects per square degree larger or equal to that radius
+            
+            if nargin<3 || isempty(power_law_range)
+                power_law_range = 1;
+            end
+            
+            q = abs(obj.index_power_law); 
+            
+            if power_law_range
+                ql = abs(obj.index_lower);
+                qu = abs(obj.index_upper); 
+            else
+                ql = q;
+                qu = q;
+            end
+            
+            N = (r_edges(1:end-1)./obj.start_radius).^(1-q);
+            N = obj.normalization.*N';
+            
+            N_l = (r_edges(1:end-1)./obj.start_radius).^(1-qu);
+            N_l = obj.norm_lower.*N_l';
+            
+            N_u = (r_edges(1:end-1)./obj.start_radius).^(1-ql);
+            N_u = obj.norm_upper.*N_u';
+            
+        end
+        
         function [N, N_l, N_u] = numDensityIntervals(obj, r_edges, power_law_range) % how many objects per square degree in each radius bin
             
             if nargin<3 || isempty(power_law_range)
@@ -115,7 +142,7 @@ classdef KuiperBeltModel < handle
                 input.axes = gca;
             end
             
-            [N, N_l, N_u] = obj.numDensityIntervals(input.r_edges, input.power_law_range); 
+            [N, N_l, N_u] = obj.numDensityCumulative(input.r_edges, input.power_law_range); 
             
             r = util.vec.tocolumn(input.r_edges);
             r = r(1:end-1) + diff(r)/2; 

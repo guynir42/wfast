@@ -219,7 +219,7 @@ classdef Candidate < handle
         
         function classes = getListOfClasses(obj)
             
-            classes = {'occultation certain', 'occultation possible', 'satellite', 'flare', 'cosmic ray', 'bad_pixel', 'edge effect', 'tracking error', 'artefact', 'mystery'};
+            classes = {'occultation certain', 'occultation possible', 'satellite', 'flare', 'cosmic ray', 'bad pixel', 'edge effect', 'tracking error', 'artefact', 'mystery'};
             
         end
         
@@ -851,7 +851,9 @@ classdef Candidate < handle
             input.ax.FontSize = input.font_size;
             input.ax.YAxis(1).Color = [0 0 0];
             
-            input.ax.YLim(1) = 0; 
+            if input.ax.YLim(2)>0
+                input.ax.YLim(1) = 0;                 
+            end
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
