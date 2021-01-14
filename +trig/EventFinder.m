@@ -410,7 +410,7 @@ classdef EventFinder < handle
             
             obj.clear;
             
-            if isempty(obj.store.star_sizes) && ~isempty(obj.cat) && obj.cat.success
+            if isempty(obj.store.star_sizes) && ~isempty(obj.cat) && ~isempty(obj.cat.success) && obj.cat.success
                 obj.cat.addStellarSizes; 
                 obj.store.star_sizes = obj.cat.data.FresnelSize;
             end
