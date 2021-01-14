@@ -90,6 +90,7 @@ classdef Analysis < file.AstroData
         max_failed_batches = 3; % if star flux is lost for more than this number of batches, quit the run
         
         use_astrometry = 1;
+        use_save_astrometry = 1; % save the new astrometry, updating the catalog file
         use_require_astrometry = 1; % when true, will error if there is no astrometric solution
         
         use_cutouts = 1;
@@ -1505,12 +1506,14 @@ classdef Analysis < file.AstroData
 
                         filename = fullfile(obj.reader.dir.pwd, 'catalog.mat');
 
-                        if isempty(obj.use_astrometry)
-                            if ~exist(filename, 'file') % in auto-mode, only save if there was no catalog file
+                        if obj.use_save_astrometry
+                            if isempty(obj.use_astrometry)
+                                if ~exist(filename, 'file') % in auto-mode, only save if there was no catalog file
+                                    obj.cat.saveMAT(filename);
+                                end
+                            elseif obj.use_astrometry % in force-astrometry mode must update the catalog file
                                 obj.cat.saveMAT(filename);
                             end
-                        elseif obj.use_astrometry % in force-astrometry mode must update the catalog file
-                            obj.cat.saveMAT(filename);
                         end
                         
                         obj.head.THRESH_DETECTION = obj.cat.detection_threshold;

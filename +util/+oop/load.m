@@ -102,7 +102,11 @@ function obj = load(filename, varargin)
             end
         
         catch ME
-            if ~strcmp(ME.identifier, 'MATLAB:imagesci:h5info:unableToFind') % if we couldn't find this object in that location, try others
+            if strcmp(ME.identifier, 'MATLAB:imagesci:h5info:unableToFind') % if we couldn't find this object in that location, try others
+                % pass
+            elseif strcmp(ME.identifier, 'MATLAB:imagesci:h5info:libraryError')
+                % pass
+            else
                 rethrow(ME); 
             end
         end
@@ -127,8 +131,13 @@ function obj = loadHDF5(filename, input)
         input.location = ['/' input.location];
     end
     
-    info = h5info(filename, input.location); % lists sub-groups, datasets and attributes...
-        
+    try
+        info = h5info(filename, input.location); % lists sub-groups, datasets and attributes...
+    catch ME
+        if input.debug_bit>0,  fprintf('Could not load info for "%s"\n', input.location); end
+        rethrow(ME);
+    end
+    
     if isempty(info.Attributes) % no attributes here, go to lower groups...
        if ~isfield(info, 'Groups') || isempty(info.Groups)
            error(['No objects found in location: ' input.location']);

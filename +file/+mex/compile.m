@@ -8,11 +8,19 @@ function compile
     dirname = fullfile(getenv('WFAST'), '+file/+mex');
     
     % str = 'mex CXXFLAGS="$CXXFLAGS -std=c++11 -static"';
-    str = 'mex CXXFLAGS="$CXXFLAGS -std=c++11"';
+    str = 'mex CXXFLAGS="$CXXFLAGS -std=c++11 -fpermissive -w"';
     str = [str ' -I' getenv('HDF5') '/include'];
-    str = [str ' ' getenv('HDF5') '/lib/libhdf5.lib'];
-    str = [str ' ' getenv('HDF5') '/lib/szip.lib'];
-    str = [str ' ' getenv('HDF5') '/lib/zlib.lib'];
+    
+    if ispc
+        str = [str ' ' getenv('HDF5') '/lib/libhdf5.lib'];
+        str = [str ' ' getenv('HDF5') '/lib/szip.lib'];
+        str = [str ' ' getenv('HDF5') '/lib/zlib.lib'];
+    else
+        str = [str ' ' getenv('HDF5') '/lib/libhdf5.so'];
+        str = [str ' ' getenv('HDF5') '/lib/libsz.so'];
+        str = [str ' ' getenv('HDF5') '/lib/libz.so'];
+    end
+    
     str = [str ' ' fullfile(dirname, filename) ' -outdir ' dirname];
     str = [str ' ' fullfile(dirname, 'MyMatrix.cpp')];
     str = [str ' ' fullfile(dirname, 'MyAttribute.cpp')];
