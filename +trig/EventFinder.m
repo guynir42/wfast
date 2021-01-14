@@ -1117,7 +1117,7 @@ classdef EventFinder < handle
                 end
                 
                 if isnan(R(star_idx)) % no stellar radius known from GAIA, just randomly pick one (from the distribution of R of other stars)
-                    R_star = util.stat.inverseSampling(R, 'max', 3);  
+                    R_star = obj.estimateR(star_idx); 
                 elseif R(star_idx)>3
                     R_star = 3; 
                 else
@@ -1205,6 +1205,19 @@ classdef EventFinder < handle
             sim_pars.fluxes.noise_flux_corr = flux_noise_corrected; 
             sim_pars.fluxes.final_flux = flux; 
             
+        end
+        
+        function val = estimateR(obj, idx) % get the star index and return an estimate for the star size (in FSU)
+            
+            if isempty(obj.store.size_snr_coeffs)
+                val = util.stat.inverseSampling(obj.store.star_sizes, 'max', 3);  
+            else
+                val = 0;
+                for ii = 1:length(obj.store.size_snr_coeffs)
+                    val = obj.store.size_snr_coeffs(ii).*obj.store.star_snr(idx).^(ii-1); 
+                end
+            end
+
         end
         
     end

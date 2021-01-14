@@ -188,6 +188,8 @@ classdef DataStore < handle
     
     properties(Hidden=true)
         
+        size_snr_coeffs; % coefficients for a fit of stellar size to the stellar S/N (R = C(0) + C(1).*S + C(2).*S.^2 ...
+        
         bad_ratios; % if there is a big difference between the flux in different apertures we disqualify those stars too (e.g., binaries)
         
         version = 1.00;
@@ -641,6 +643,16 @@ classdef DataStore < handle
             end
             
             obj.star_indices = find(passed)'; 
+            
+            % also get the fit of stellar S/N to size
+            s = obj.star_snr;
+            R = obj.star_sizes; 
+            R(s<0) = [];
+            s(s<0) = []; 
+            
+            fr = util.fit.polyfit(s, R, 'order', 1, 'sigma', 3); 
+            
+            obj.size_snr_coeffs = fr.coeffs; 
             
         end
         

@@ -33,6 +33,7 @@ classdef Analysis < file.AstroData
         width_buf@util.vec.CircularBuffer;
         
         lightcurves@img.Lightcurves;
+        light_stack@img.Lightcurves; 
         buf@file.BufferWheel; 
         
         model_psf@img.ModelPSF;
@@ -100,6 +101,7 @@ classdef Analysis < file.AstroData
         use_full_lightcurves = 0; % use the Lightcurves object to hold all the fluxes and other measurements for the entire run
         use_save_full_lightcurves = 1; % save these full lightcurves for the entire run as a single MAT file (ONLY when use_full_lightcurves=1 and use_analysis_dir_save=1)
         use_save_batched_lightcurves = 1; % save each batch's photometric result in a separate file (ONLY when use_analysis_dir_save=1)
+        use_stack_lightcurves = 1; % keep a lightcurves object for the stack images
         
         use_psf_model = 1;
         
@@ -201,6 +203,8 @@ classdef Analysis < file.AstroData
                 obj.phot = img.Photometry;
                 obj.phot.aperture = [3 5 7]; 
                 obj.phot.index = 1;
+                obj.phot_stack.aperture = 3; 
+                obj.phot_stack.saturation_value = 5e6; 
                 
                 obj.phot_stack = img.Photometry;
                 obj.phot_stack.index = 2;
@@ -212,6 +216,7 @@ classdef Analysis < file.AstroData
                 obj.width_buf = util.vec.CircularBuffer;
                 
                 obj.lightcurves = img.Lightcurves; 
+                obj.light_stack = img.Lightcurves;
                 obj.buf = file.BufferWheel;
                 obj.buf.use_async = 0;
                 obj.buf.use_deflate = 1;
@@ -572,6 +577,14 @@ classdef Analysis < file.AstroData
             try % save the full lightcurves
                 if obj.use_full_lightcurves && obj.use_save_full_lightcurves
                     obj.lightcurves.saveAsMAT(fullfile(obj.log_dir, ['lightcurves_' name]));
+                end
+            catch ME
+                warning(ME.getReport);
+            end
+            
+            try % save the stack lightcurves
+                if obj.use_stack_lightcurves 
+                    obj.light_stack.saveAsMAT(fullfile(obj.log_dir, ['light_stack_' name]));
                 end
             catch ME
                 warning(ME.getReport);
@@ -1415,8 +1428,11 @@ classdef Analysis < file.AstroData
                 obj.ref_positions = obj.positions;
             end
             
-            obj.phot_stack.input(obj.stack_cutouts_sub, 'positions', obj.clip.positions); % run photometry on the stack to verify flux and adjust positions
-            
+            obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.positions, ...
+                'timestamps', mean(obj.timestamps), 'filename', obj.reader.this_filename, ...
+                't_start', obj.t_start, 't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp, ...
+                'juldates', mean(obj.juldates), 'variance', single(2.5)); % run photometry on the stack to verify flux and adjust positions
+
             if isempty(obj.cutouts) && ~isempty(obj.images) % only if we have images and not pre-cut cutouts
                 obj.adjustPositions; % got a chance to realign the positions before making cutouts from raw images
             end
@@ -1639,6 +1655,14 @@ classdef Analysis < file.AstroData
                 obj.lightcurves.getData(obj.phot);
 
                 if obj.lightcurves.gui.check, obj.lightcurves.gui.update; end
+                
+            end
+            
+            if obj.use_stack_lightcurves
+                
+                obj.light_stack.getData(obj.phot_stack); 
+                
+                if obj.light_stack.gui.check, obj.light_stack.gui.update; end
                 
             end
             
@@ -1987,7 +2011,11 @@ classdef Analysis < file.AstroData
 
                 obj.stack_cutouts = obj.clip.input(obj.stack_proc);
 
-                obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.positions); % run photometry on the stack to verify flux and adjust positions
+                obj.phot_stack.input(obj.stack_cutouts, 'positions', obj.positions, ...
+                    'timestamps', mean(obj.timestamps), 'filename', obj.reader.this_filename, ...
+                    't_start', obj.t_start, 't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp, ...
+                    'juldates', mean(obj.juldates), 'variance', single(2.5)); % run photometry on the stack to verify flux and adjust positions
+                
                 if ~isempty(obj.phot_stack.gui) && obj.phot_stack.gui.check, obj.phot_stack.gui.update; end
 
             end
