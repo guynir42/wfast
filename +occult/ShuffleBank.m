@@ -224,7 +224,6 @@ classdef ShuffleBank < handle
             input.scan_vars(varargin{:});
             
             obj.kernels = [];
-            obj.pars = struct([]);
             
             obj.gen.f = obj.f;
             obj.gen.T = obj.T;
@@ -245,7 +244,7 @@ classdef ShuffleBank < handle
                 
                 if isempty(obj.kernels)
                     obj.kernels = single(obj.gen.lc.flux - 1);
-                    obj.pars = struct('R', obj.gen.R, 'r', obj.gen.r, 'b', obj.gen.b, 'v', obj.gen.v, 'norm', sqrt(sum(obj.kernels(:,1).^2)));
+                    obj.pars = struct('D', obj.D_au, 'R', obj.gen.R, 'r', obj.gen.r, 'b', obj.gen.b, 'v', obj.gen.v, 'norm', sqrt(sum(obj.kernels(:,1).^2)));
                     obj.kernels = obj.kernels./obj.pars.norm;
                     obj.time_axis = obj.gen.lc.time;
                 else
@@ -255,7 +254,7 @@ classdef ShuffleBank < handle
                     if max(snr)<obj.threshold
                         if obj.debug_bit>1, fprintf('Adding new kernel with R= %4.2f | r= %4.2f | b= %4.2f | v= %5.3f\n', obj.gen.R, obj.gen.r, obj.gen.b, obj.gen.v); end
                         obj.kernels = horzcat(obj.kernels, single(obj.gen.lc.flux - 1));
-                        obj.pars = horzcat(obj.pars, struct('R', obj.gen.R, 'r', obj.gen.r, 'b', obj.gen.b, 'v', obj.gen.v, 'norm', sqrt(sum(obj.kernels(:,end).^2)))); 
+                        obj.pars = horzcat(obj.pars, struct('D', obj.D_au, 'R', obj.gen.R, 'r', obj.gen.r, 'b', obj.gen.b, 'v', obj.gen.v, 'norm', sqrt(sum(obj.kernels(:,end).^2)))); 
                         obj.kernels(:,end) = obj.kernels(:,end)./obj.pars(end).norm;
                         counter = 0; % popcorn method
                     end

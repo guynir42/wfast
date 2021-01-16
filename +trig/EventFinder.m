@@ -650,10 +650,11 @@ classdef EventFinder < handle
             s.store_pars = obj.store.pars;
             s.good_stars = obj.store.star_indices;
             s.star_snr = obj.store.star_snr;
-            s.fwhm_hist = histcounts(obj.store.checker.defocus_log,...
-                'BinEdges', 0:0.1:round(nanmax(obj.store.checker.defocus_log)*10)/10); 
+            FWHM = obj.store.checker.defocus_log*2.355*obj.head.SCALE; 
+            s.fwhm_edges = 0:0.1:round(nanmax(FWHM)*10)/10;
+            s.fwhm_hist = histcounts(FWHM, 'BinEdges', s.fwhm_edges); 
             
-            s.fwhm_hist = s.fwhm_hist.*nanmedian(diff(obj.store.checker.juldate_log))/24/3600;
+            s.fwhm_hist = s.fwhm_hist.*nanmedian(diff(obj.store.checker.juldate_log))*24*3600;
             
             % load the content of the checker
             s.checker_pars = obj.store.checker.pars;

@@ -800,7 +800,7 @@ classdef QualityChecker < handle
 %                             cutouts(:,:,jj,ii) = regionfill(cutouts(:,:,jj,ii), isnan(cutouts(:,:,jj,ii))); 
                             I = cutouts(:,:,jj,ii); 
                             I(isnan(I)) = 0; 
-                            I = util.img.FourierShift2D(I,[x(jj,ii),y(jj,ii)]); 
+                            I = util.img.FourierShift2D(I,-[x(jj,ii),y(jj,ii)]); 
                             cutouts(:,:,jj,ii) = I; 
                         catch ME
                             if ~strcmp(ME.identifier, 'MATLAB:regionfill:expectedNonNaN') % ignore these errors silently 
@@ -815,7 +815,7 @@ classdef QualityChecker < handle
             
             C = nansum(cutouts,3); 
             
-            F = nanmean(f);
+            F = nanmean(f,1);
             
             w = util.img.fwhm(C,'method', 'filters', 'gaussian', 5, ...
                 'step_size', 0.25)./2.355; % use generalized gaussian to find the width
