@@ -196,9 +196,9 @@ classdef EventFinder < handle
             
             obj.pars.use_oort = false; % use the Oort cloud template bank as well
             
-            obj.pars.filter_bank_full_filename = '/WFAST/occultations/TemplateBankKBOs.mat'; % filename where the filter bank was taken from (relative to the DATA folder)
-            obj.pars.filter_bank_small_filename = '/WFAST/occultations/TemplateBankKBOs_small.mat'; % filename where the smaller filter bank was taken from (relative to the DATA folder)
-            obj.pars.filter_bank_oort_filename = '/WFAST/occultations/TemplateBankOort.mat'; % filename where the Oort cloud templates are taken from (relative to the DATA folder)
+%             obj.pars.filter_bank_full_filename = '/WFAST/occultations/TemplateBankKBOs.mat'; % filename where the filter bank was taken from (relative to the DATA folder)
+%             obj.pars.filter_bank_small_filename = '/WFAST/occultations/TemplateBankKBOs_small.mat'; % filename where the smaller filter bank was taken from (relative to the DATA folder)
+%             obj.pars.filter_bank_oort_filename = '/WFAST/occultations/TemplateBankOort.mat'; % filename where the Oort cloud templates are taken from (relative to the DATA folder)
             
             obj.pars.limit_events_per_batch = 5; % too many events in one batch will mark all events as black listed! 
             obj.pars.limit_events_per_star = 5; % too many events on the same star will mark all events on that star as black listed! 
@@ -630,6 +630,11 @@ classdef EventFinder < handle
             
             % add varargin? 
             
+            if ~obj.store.is_done_burn
+                s = trig.RunSummary.empty;
+                return;
+            end
+            
             s = trig.RunSummary; % generate a new object
             s.head = util.oop.full_copy(obj.head); % I want to make sure this summary is distinct from the original finder
             
@@ -645,6 +650,10 @@ classdef EventFinder < handle
             s.store_pars = obj.store.pars;
             s.good_stars = obj.store.star_indices;
             s.star_snr = obj.store.star_snr;
+            s.fwhm_hist = histcounts(obj.store.checker.defocus_log,...
+                'BinEdges', 0:0.1:round(nanmax(obj.store.checker.defocus_log)*10)/10); 
+            
+            s.fwhm_hist = s.fwhm_hist.*nanmedian(diff(obj.store.checker.juldate_log))/24/3600;
             
             % load the content of the checker
             s.checker_pars = obj.store.checker.pars;
@@ -961,37 +970,43 @@ classdef EventFinder < handle
         end
         
         function loadFilterBank(obj)
-
-            f = fullfile(getenv('DATA'), obj.pars.filter_bank_full_filename);
+            
+            frame_rate = floor(obj.head.FRAME_RATE); 
+            
+            f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_KBOs_%dHz.mat', frame_rate));
             if exist(f, 'file')
                 load(f, 'bank');
                 obj.bank = bank;
             else
-                error('Cannot load kernels from ShuffleBank object'); 
+                error('Cannot load template bank from file "%s"', f); 
             end
 
         end
         
         function loadFilterBankSmall(obj)
-
-            f = fullfile(getenv('DATA'), obj.pars.filter_bank_small_filename);
+            
+            frame_rate = floor(obj.head.FRAME_RATE); 
+            
+            f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_KBOs_%dHz_small.mat', frame_rate));
             if exist(f, 'file')
                 load(f, 'bank');
                 obj.bank_small = bank;
             else
-                error('Cannot load kernels from ShuffleBank object'); 
+                error('Cannot load template bank from file "%s"', f); 
             end
 
         end
         
         function loadFilterBankOort(obj)
 
-            f = fullfile(getenv('DATA'), obj.pars.filter_bank_oort_filename);
+            frame_rate = floor(obj.head.FRAME_RATE); 
+            
+            f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_oort_%dHz.mat', frame_rate));            
             if exist(f, 'file')
                 load(f, 'bank');
                 obj.bank_oort = bank;
             else
-                error('Cannot load kernels from ShuffleBank object'); 
+                error('Cannot load template bank from file "%s"', f); 
             end
 
         end

@@ -40,6 +40,7 @@ classdef RunSummary < handle
         
         snr_bin_edges; % the edges used in the star_seconds and losses histograms
         size_bin_edges; % the edges used in the star_seconds and losses histograms
+        fwhm_hist; % histogram of the number of seconds spent at each FWHM value (in steps of 0.1") 
         
         star_seconds; % the number of useful seconds accumulated each S/N bin (this is saved after subtracting losses)
         star_seconds_with_losses; % the number of seconds accumulated without excluding anything

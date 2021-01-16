@@ -49,14 +49,22 @@ classdef ShuffleBank < handle
     
     properties % switches/controls
         
-        R_range = [0 0.5]; % star radius, FSU
+        % physical units, where applicable
+        D_au = 40; % distance of occulters, in AU
+        R_uas = [10 120]; % stellar size range, in micro-arcsec
+        r_km = [0.25 2.5]; % occulter radius in km
+        b_fsu = [0 2]; % impact parameter in FSU (there are no physical units for this...)
+        v_km = [5 35]; % transverse velocity in km
+        lambda_nm = 550; % central wavelength
+        
+        R_range = [0 2]; % star radius, FSU
         r_range = [0.3 2]; % occulter radius, FSU
         b_range = [0 2]; % impact parameter, FSU
         v_range = [5 30]; % crossing velocity (projected), FSU/second
         % lets assume t=0 for all!
         
-        W = 4; % time window, seconds
-        T = 30; % integration time, ms
+        W = 8; % time window, seconds
+        T = 39; % integration time, ms
         f = 25; % frame rate, Hz
         
         number = 1e6;
@@ -91,6 +99,8 @@ classdef ShuffleBank < handle
             
                 obj.gen = occult.CurveGenerator;
                 obj.prog = util.sys.ProgressBar;
+                
+                obj.setupParameterRange; 
                 
             end
             
@@ -140,6 +150,70 @@ classdef ShuffleBank < handle
     end
     
     methods % calculations
+        
+        function setupParameterRange(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.use_ordered_numeric = 1;
+            input.input_var('dist', obj.D_au, 'distance_au'); 
+            input.input_var('stellar_sizes', obj.R_uas); % in micro-arcsec
+            input.input_var('occulter_radius', obj.r_km, 'occulter_radii'); % in km
+            input.input_var('impact_parameter', obj.b_fsu); 
+            input.input_var('velocity', obj.v_km); % in km/s
+            input.input_var('lambda', obj.lambda_nm, 'wavelength'); % in nm
+            input.input_var('frame_rate', obj.f); % in Hz
+            input.input_var('exposure_time', obj.T); % in milli seconds
+            input.input_var('window', obj.W); % time window (in seconds)
+            input.scan_vars(varargin{:}); 
+            
+            if ischar(input.dist)
+                
+                if util.text.cs(input.dist, 'kbos')
+                    input.dist = 40; 
+                elseif util.text.cs(input.dist, 'oort')
+                    input.dist = 1e4;
+                elseif util.text.cs(input.dist, 'hills', 'inner_oort')
+                    input.dist = 3000;
+                else
+                    error('Unkown "dist" option "%s". Use a numeric value, or "KBOs", "Oort" or "Hills". ', input.dist); 
+                end
+                
+            end
+            
+            obj.verifyInputs(input);
+            
+            fsu2uas = sqrt(input.lambda*1e-12/(2*input.dist*150e6))*180/pi*3600*1e6; % convert angular FSU to micro-arcsec
+            fsu2km = sqrt(input.lambda*1e-12*input.dist*150e6/2); % convert linear FSU to km
+            
+            obj.R_range = input.stellar_sizes./fsu2uas; 
+            obj.r_range = input.occulter_radius./fsu2km; 
+            obj.b_range = input.impact_parameter; 
+            obj.v_range = input.velocity./fsu2km; 
+            
+            obj.f = input.frame_rate;
+            obj.T = input.exposure_time;
+            obj.W = input.window;
+            
+            obj.D_au = input.dist;
+            obj.lambda_nm = input.lambda;
+            
+        end
+        
+        function verifyInputs(obj, input)
+            
+            assert(isnumeric(input.dist) && isscalar(input.dist), 'Must input a numeric scalar for "distance"'); 
+            
+            assert(isnumeric(input.stellar_sizes) && length(input.stellar_sizes)==2, 'Must input a two-element numeric vector range for "stellar sizes"'); 
+            assert(isnumeric(input.occulter_radius) && length(input.occulter_radius)==2, 'Must input a two-element numeric vector range for "occulter radius"'); 
+            assert(isnumeric(input.impact_parameter) && length(input.impact_parameter)==2, 'Must input a two-element numeric vector range for "impact parameter"'); 
+            assert(isnumeric(input.velocity) && length(input.velocity)==2, 'Must input a two-element numeric vector range for "velocity"'); 
+            
+            assert(isnumeric(input.lambda) && isscalar(input.lambda), 'Must input a numeric scalar for "lambda"'); 
+            assert(isnumeric(input.frame_rate) && isscalar(input.frame_rate), 'Must input a numeric scalar for "frame_rate"'); 
+            assert(isnumeric(input.exposure_time) && isscalar(input.exposure_time), 'Must input a numeric scalar for "exposure_time"'); 
+            assert(isnumeric(input.window) && isscalar(input.window), 'Must input a numeric scalar for "window"'); 
+            
+        end
         
         function makeKernels(obj, varargin)
             

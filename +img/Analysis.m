@@ -204,10 +204,10 @@ classdef Analysis < file.AstroData
                 obj.phot = img.Photometry;
                 obj.phot.aperture = [3 5 7]; 
                 obj.phot.index = 1;
-                obj.phot_stack.aperture = 3; 
-                obj.phot_stack.saturation_value = 5e6; 
                 
                 obj.phot_stack = img.Photometry;
+                obj.phot_stack.aperture = 3; 
+                obj.phot_stack.saturation_value = 5e6; 
                 obj.phot_stack.index = 2;
                 
                 obj.flux_buf = util.vec.CircularBuffer;

@@ -140,6 +140,7 @@ classdef QualityChecker < handle
         search_flux; % the flux in the search region
         search_aux; % the aux in the search region
         search_timestamps;  % timestamps for the search region
+        search_juldates; % julian dates for each timestamp in the search region
         
         aux_names; % get the names (and indices below) from DataStore
         aux_indices; % struct with field=number for each of the above aux names
@@ -147,6 +148,7 @@ classdef QualityChecker < handle
         histograms = []; % cut values accumulated over the run, with dim1 the edges defined for each cut type, dim2 the star number and dim3 is the cut type
         hist_edges = []; % edges for each cut (each row is edges for a different cut)
         
+        juldate_log = []; % keep the julian date for each of the defocus log measurements
         defocus_log = []; % track the defocus result for each batch
         mean_width_values; % track the mean width for all batches in this run
         mean_background_values;  % track the mean background for all batches in this run
@@ -403,7 +405,8 @@ classdef QualityChecker < handle
             obj.search_flux = [];
             obj.search_aux = [];
             obj.search_timestamps = [];
-
+            obj.search_juldates = [];
+            
             obj.aux_names = [];
             obj.aux_indices = [];
             
@@ -560,6 +563,7 @@ classdef QualityChecker < handle
 %             obj.defocus =  % get the average PSF width (for focus tests)
             obj.defocus = obj.calculateDefocus; 
             obj.defocus_log = vertcat(obj.defocus_log, obj.defocus); 
+            obj.juldate_log = vertcat(obj.juldate_log, nanmean(obj.search_juldates)); 
             
             W = util.vec.weighted_average(w,F.^2,2);
             obj.mean_width_values = vertcat(obj.mean_width_values, W(idx)); % keep a log of the mean widths for the entire run
@@ -791,10 +795,13 @@ classdef QualityChecker < handle
                 
                 for jj = 1:size(cutouts,3)
                     
-                    if nnz(isnan(cutouts(:,:,jj,ii)))>0.5*numel(cutouts(:,:,jj,ii)) % more than half the pixels are NaN, just leave it
+                    if nnz(isnan(cutouts(:,:,jj,ii)) | cutouts(:,:,jj,ii)==0)<0.2*numel(cutouts(:,:,jj,ii)) % less than 20% of the pixels are NaN or zero
                         try
-                            cutouts(:,:,jj,ii) = regionfill(cutouts(:,:,jj,ii), isnan(cutouts(:,:,jj,ii))); 
-                            cutouts(:,:,jj,ii) = util.img.FourierShift2D(cutouts(:,:,jj,ii),[x(jj,ii),y(jj,ii)]); 
+%                             cutouts(:,:,jj,ii) = regionfill(cutouts(:,:,jj,ii), isnan(cutouts(:,:,jj,ii))); 
+                            I = cutouts(:,:,jj,ii); 
+                            I(isnan(I)) = 0; 
+                            I = util.img.FourierShift2D(I,[x(jj,ii),y(jj,ii)]); 
+                            cutouts(:,:,jj,ii) = I; 
                         catch ME
                             if ~strcmp(ME.identifier, 'MATLAB:regionfill:expectedNonNaN') % ignore these errors silently 
                                 rethrow(ME);
@@ -879,7 +886,8 @@ classdef QualityChecker < handle
             obj.search_flux = store.search_flux;
             obj.search_aux = store.search_aux;
             obj.search_timestamps = store.search_timestamps;
-
+            obj.search_juldates = store.search_juldates;
+            
             obj.aux_names = store.aux_names;
             obj.aux_indices = store.aux_indices;
             
