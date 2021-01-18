@@ -196,9 +196,9 @@ classdef EventFinder < handle
             
             obj.pars.use_oort = false; % use the Oort cloud template bank as well
             
-            obj.pars.filter_bank_full_filename = '/WFAST/occultations/TemplateBankKBOs.mat'; % filename where the filter bank was taken from (relative to the DATA folder)
-            obj.pars.filter_bank_small_filename = '/WFAST/occultations/TemplateBankKBOs_small.mat'; % filename where the smaller filter bank was taken from (relative to the DATA folder)
-            obj.pars.filter_bank_oort_filename = '/WFAST/occultations/TemplateBankOort.mat'; % filename where the Oort cloud templates are taken from (relative to the DATA folder)
+%             obj.pars.filter_bank_full_filename = '/WFAST/occultations/TemplateBankKBOs.mat'; % filename where the filter bank was taken from (relative to the DATA folder)
+%             obj.pars.filter_bank_small_filename = '/WFAST/occultations/TemplateBankKBOs_small.mat'; % filename where the smaller filter bank was taken from (relative to the DATA folder)
+%             obj.pars.filter_bank_oort_filename = '/WFAST/occultations/TemplateBankOort.mat'; % filename where the Oort cloud templates are taken from (relative to the DATA folder)
             
             obj.pars.limit_events_per_batch = 5; % too many events in one batch will mark all events as black listed! 
             obj.pars.limit_events_per_star = 5; % too many events on the same star will mark all events on that star as black listed! 
@@ -410,7 +410,7 @@ classdef EventFinder < handle
             
             obj.clear;
             
-            if isempty(obj.store.star_sizes) && ~isempty(obj.cat) && obj.cat.success
+            if isempty(obj.store.star_sizes) && ~isempty(obj.cat) && ~isempty(obj.cat.success) && obj.cat.success
                 obj.cat.addStellarSizes; 
                 obj.store.star_sizes = obj.cat.data.FresnelSize;
             end
@@ -630,6 +630,11 @@ classdef EventFinder < handle
             
             % add varargin? 
             
+            if ~obj.store.is_done_burn
+                s = trig.RunSummary.empty;
+                return;
+            end
+            
             s = trig.RunSummary; % generate a new object
             s.head = util.oop.full_copy(obj.head); % I want to make sure this summary is distinct from the original finder
             
@@ -645,6 +650,11 @@ classdef EventFinder < handle
             s.store_pars = obj.store.pars;
             s.good_stars = obj.store.star_indices;
             s.star_snr = obj.store.star_snr;
+            FWHM = obj.store.checker.defocus_log*2.355*obj.head.SCALE; 
+            s.fwhm_edges = 0:0.1:round(nanmax(FWHM)*10)/10;
+            s.fwhm_hist = histcounts(FWHM, 'BinEdges', s.fwhm_edges); 
+            
+            s.fwhm_hist = s.fwhm_hist.*nanmedian(diff(obj.store.checker.juldate_log))*24*3600;
             
             % load the content of the checker
             s.checker_pars = obj.store.checker.pars;
@@ -961,37 +971,43 @@ classdef EventFinder < handle
         end
         
         function loadFilterBank(obj)
-
-            f = fullfile(getenv('DATA'), obj.pars.filter_bank_full_filename);
+            
+            frame_rate = floor(obj.head.FRAME_RATE); 
+            
+            f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_KBOs_%dHz.mat', frame_rate));
             if exist(f, 'file')
                 load(f, 'bank');
                 obj.bank = bank;
             else
-                error('Cannot load kernels from ShuffleBank object'); 
+                error('Cannot load template bank from file "%s"', f); 
             end
 
         end
         
         function loadFilterBankSmall(obj)
-
-            f = fullfile(getenv('DATA'), obj.pars.filter_bank_small_filename);
+            
+            frame_rate = floor(obj.head.FRAME_RATE); 
+            
+            f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_KBOs_%dHz_small.mat', frame_rate));
             if exist(f, 'file')
                 load(f, 'bank');
                 obj.bank_small = bank;
             else
-                error('Cannot load kernels from ShuffleBank object'); 
+                error('Cannot load template bank from file "%s"', f); 
             end
 
         end
         
         function loadFilterBankOort(obj)
 
-            f = fullfile(getenv('DATA'), obj.pars.filter_bank_oort_filename);
+            frame_rate = floor(obj.head.FRAME_RATE); 
+            
+            f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_oort_%dHz.mat', frame_rate));            
             if exist(f, 'file')
                 load(f, 'bank');
                 obj.bank_oort = bank;
             else
-                error('Cannot load kernels from ShuffleBank object'); 
+                error('Cannot load template bank from file "%s"', f); 
             end
 
         end
@@ -1117,7 +1133,7 @@ classdef EventFinder < handle
                 end
                 
                 if isnan(R(star_idx)) % no stellar radius known from GAIA, just randomly pick one (from the distribution of R of other stars)
-                    R_star = util.stat.inverseSampling(R, 'max', 3);  
+                    R_star = obj.estimateR(star_idx); 
                 elseif R(star_idx)>3
                     R_star = 3; 
                 else
@@ -1205,6 +1221,19 @@ classdef EventFinder < handle
             sim_pars.fluxes.noise_flux_corr = flux_noise_corrected; 
             sim_pars.fluxes.final_flux = flux; 
             
+        end
+        
+        function val = estimateR(obj, idx) % get the star index and return an estimate for the star size (in FSU)
+            
+            if isempty(obj.store.size_snr_coeffs)
+                val = util.stat.inverseSampling(obj.store.star_sizes, 'max', 3);  
+            else
+                val = 0;
+                for ii = 1:length(obj.store.size_snr_coeffs)
+                    val = obj.store.size_snr_coeffs(ii).*obj.store.star_snr(idx).^(ii-1); 
+                end
+            end
+
         end
         
     end
