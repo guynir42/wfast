@@ -61,10 +61,15 @@ T = L.timestamps(end)-L.timestamps(1);
 
 star_indices = 1978;
 
-F = L.fluxes_cal(:, star_indices);
-M_F = nanmean(F); % mean flux
+t = L.timestamps; 
+f = L.fluxes_cal(:, star_indices);
 
-F = F - M_F;
+% fr = util.fit.polyfit(t,f, 'double', 1, 'order', 7); 
+% F = f - fr.ym; 
+F = f - nanmean(f); 
+
+% M_F = nanmean(F); % mean flux
+% F = F - M_F;
 
 ps = abs(fft(F)).^2; 
 fs = (0:1/T:1/dt)'; 
@@ -82,14 +87,17 @@ start_idx = 30;
 
 idx = idx + start_idx - 1; 
 
-ps = ps./median(ps).*median(ps2); 
+% ps = ps./median(ps).*median(ps2); 
 
-plot(ax, fs(2:half_point), ps(2:half_point,:), 'LineWidth', 3); 
+noise = std(ps(77:half_point)); 
+
+plot(ax, fs(2:half_point), ps(2:half_point,:)./noise, 'LineWidth', 3); 
 
 text(ax, fs(idx-30), double(ps(idx))*2, sprintf('period: %4.1fs', 1./fs(idx)), 'HorizontalAlignment', 'Left', 'VerticalAlignment', 'bottom', 'FontSize', 24, 'Color', 'red'); 
 
 hold(ax, 'on'); 
-plot(ax, fs(idx), ps(idx), 'or', 'MarkerSize', 15, 'HandleVisibility', 'off'); 
+plot(ax, fs(idx), ps(idx)./noise, 'or', 'MarkerSize', 15, 'HandleVisibility', 'off'); 
+% plot(ax, fs(2:half_point), ones(1,half_point-1), '--');
 % quiver(ax, fs(idx+10), ps(idx), fs(idx)-fs(idx+10), 10)
 
 % semilogy(ax, fs2, ps2, ':', 'LineWidth', 1.5); 
@@ -100,15 +108,17 @@ hold(ax, 'off');
 xlabel('Frequency [Hz]');
 ylabel('Power spectrum'); 
 
-ax.YScale = 'log';
+% ax.YScale = 'log';
 % ax.YLim = [0 5e6]; 
+
+ax.YLim = [0 30]; 
 
 ax.FontSize = 24; 
 
 
 %% save the plot
 
-util.sys.print(fullfile(getenv('WFAST'), '/scripts/plots/DQ_Her_PS')); 
+util.sys.print(fullfile(getenv('WFAST'), '/scripts/plots/DQ_Her_PS_linear')); 
 
 
 
