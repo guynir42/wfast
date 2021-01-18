@@ -19,6 +19,10 @@ classdef RunFolder < dynamicprops
 %                date are considered. Older folders are obsolete and do not
 %                make the run "processed". Default is defined in the static
 %                function default_process_date(). 
+% -num_files: only load runs that have at least this many imaging files. 
+% -name: only load runs that match this run name exactly. 
+% -regexp: only load runs with run names that match this regexp. 
+% -glob: only load runs with run names that match this glob expression. 
 % -catalog: load the catalog file if it exists in the run folder. Default 
 %           is false (this slows down the scan!). 
 % -debug_bit: control the verbosity of printouts. Default 0 is no output. 
@@ -297,15 +301,26 @@ classdef RunFolder < dynamicprops
             import util.text.cs;
             
             input = util.text.InputVars;
-            input.input_var('folder', ''); % root folder to scan (must have date folders inside)
+            input.input_var('folder', '', 'root'); % root folder to scan (must have date folders inside)
             input.input_var('next', []); % leave empty for all folders, use "unprocessed" or "unclassified" to get the next folder that needs processing or classification (respectively)
             input.input_var('start_date', []); % scan starting from runs taken on this date (inclusive). Can be string <YYYY-MM-DD> or datetime object
             input.input_var('end_date', []); % scan upto runs taken on this date (inclusive). Can be string <YYYY-MM-DD> or datetime object
             input.input_var('process_date', trig.RunFolder.default_process_date); % only consider as processed runs that were processed on or after this date
             input.input_var('files', 100, 'min_files', 'minimal_files', 'min_num_files', 'minimal_number_files', 'num_files', 'number_files'); % must have this many HDF5 files for analysis
+            input.input_var('name', '', 'run_name'); % match only run names that are equal to this
+            input.input_var('regexp', '', 'regular_expression'); % match run names to this regular expression
+            input.input_var('glob', '', 'glob_expression', 'wildcard'); % match run names to this wildcard (glob) expression
             input.input_var('catalog', false); % pull the catalog file into each found object
             input.input_var('debug_bit', 0); % verbosity of printouts
             input.scan_vars(varargin{:}); 
+            
+            % use only one of the run-name matches 
+            if (~isempty(input.name) && ~isempty(input.regexp)) ||...
+                    (~isempty(input.name) && ~isempty(input.glob)) || ... 
+                    (~isempty(input.regexp) && ~isempty(input.glob))
+                
+                error('Must supply only one of these optional arguments: "name", "regexp", "glob". ');                 
+            end
             
             if ischar(input.start_date)
                 input.start_date = datetime(input.start_date); % convert to datetime
@@ -319,10 +334,15 @@ classdef RunFolder < dynamicprops
                 input.process_date = datetime(input.process_date); % convert to datetime
             end
             
+            % make sure start and end date are compatible
+            if ~isempty(input.start_date) && ~isempty(input.end_date) && input.start_date>input.end_date
+                error('Start date %s is after end date %s', input.start_date, input.end_date); 
+            end
+            
             %%%%%%%%%%%%%%%% get the root folder %%%%%%%%%%%%%%%%%%%%%
             
             if isempty(input.folder) % default is to load this year's folder from the dropbox (must define environmental DATA). 
-                y = year(datetime('now')); 
+                y = trig.RunFolder.guess_year(input.start_date, input.end_date); 
                 d = util.sys.WorkingDirectory(fullfile(getenv('DATA'), sprintf('WFAST/%d',y))); 
             elseif ischar(input.folder) % a string input can mean a few things:
 
@@ -335,7 +355,9 @@ classdef RunFolder < dynamicprops
                 end
 
                 d = util.sys.WorkingDirectory(d); 
-        
+                y = trig.RunFolder.guess_year(input.start_date, input.end_date); 
+                d.cd(sprintf('%d', y))
+                
             elseif isa(input.folder, 'util.sys.WorkingDirectory') % give the folder in the form of a WorkingDirectory object
                 d = input.folder;
             else
@@ -389,6 +411,22 @@ classdef RunFolder < dynamicprops
                     d.cd(root); % go back to root (this makes sure we don't lose our place if there is an error in one loop iteration)
                     d.cd(list{ii}); 
                     d.cd(run_folders{jj}); 
+                    
+                    idx = regexp(run_folders{jj}, '_run\d+$'); 
+                    
+                    if isempty(idx)
+                        run_name = run_folders{jj};
+                    else
+                        run_name = run_folders{jj}(1:idx-1); 
+                    end
+                    
+                    if ~isempty(input.name)
+                        if ~strcmp(input.name, run_name), continue; end
+                    elseif ~isempty(input.regexp)
+                        if isempty(regexp(run_name, input.regexp, 'once')), continue; end
+                    elseif ~isempty(input.glob)
+                        if isempty(regexp(run_name, regexptranslate('wildcard', input.glob), 'once')), continue; end
+                    end
                     
                     new_obj = trig.RunFolder; % new object added to the list, for this specific run
                     
@@ -551,6 +589,25 @@ classdef RunFolder < dynamicprops
                 end % go over run folders
                 
             end % go over date folders
+            
+        end
+        
+        function val = guess_year(start_date, end_date)
+            
+            if isempty(start_date) && isempty(end_date)
+                val = year(datetime('now'));
+            elseif isempty(start_date) % end date is NOT empty
+                val = year(end_date);
+            elseif isempty(end_date) % start date is NOT empty
+                val = year(start_date);
+            else % both dates are given! 
+                y1 = year(start_date);
+                y2 = year(end_date);
+                if y1~=y2
+                    warning('Start year (%d) and end year (%d) are not the same!', y1, y2); 
+                end
+                val = y1; % prefer start year
+            end
             
         end
         
