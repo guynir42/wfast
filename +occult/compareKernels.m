@@ -25,14 +25,18 @@ function snr_frac = compareKernels(this_kernel, that_kernel, full_xcorr)
     f2 = that_kernel;
 
     % now the normalized kernels
-    k1 = f1./sqrt(sum(f1.^2));
-    k2 = f2./sqrt(sum(f2.^2));
-
+    norm1 = sqrt(nansum(f1.^2));
+    k1 = f1./norm1;
+    k1(:,norm1==0) = 0; 
+    
+    norm2 = sqrt(nansum(f2.^2));
+    k2 = f2./norm2;
+    k2(:,norm2==0) = 0; 
+    
     if full_xcorr==0
         self_signal = sum(k1.*f1);
         cross_signal = sum(k2.*f1);
     else
-%         self_signal = max(util.vec.convolution(k1, k1, 'conj',1));
         self_signal = 1; % by definition of k
         cross_signal = max(util.vec.convolution(k1, k2, 'conj', 1));
     end
