@@ -46,20 +46,20 @@ function I = gaussian2(varargin)
     
     [x,y] = meshgrid(-floor((input.S(2))/2):floor((input.S(2)-1)/2), -floor((input.S(1))/2):floor((input.S(1)-1)/2));
     
+    if ~isempty(input.x_shift)
+        x = x - input.x_shift;
+    end
+    
+    if ~isempty(input.y_shift)
+        y = y - input.y_shift;
+    end
+    
     if isempty(input.rot_frac)
         x2 = x;
         y2 = y;
     else
         x2 = +x*cos(pi/2*input.rot_frac)+y*sin(pi/2*input.rot_frac);
         y2 = -x*sin(pi/2*input.rot_frac)+y*cos(pi/2*input.rot_frac);
-    end
-    
-    if ~isempty(input.x_shift)
-        x2 = x2 - input.x_shift;
-    end
-    
-    if ~isempty(input.y_shift)
-        y2 = y2 - input.y_shift;
     end
     
     I = exp(-0.5*((x2./input.sigma_x).^2 + (y2./input.sigma_y).^2));
