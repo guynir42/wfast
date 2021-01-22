@@ -76,7 +76,7 @@ end
 
 function [coeffs, model_im] = linearFitGaussian(Im)
 % Some algebra: we want to fit Im to a gaussian in 2D:
-%  f(x,y | amp,mu_x,mu_y,sig_x,sig_y,sig_xy) = amp*exp[-0.5*(L_xx*(x-mu_x)^2 ...
+%  f(x,y | amp,mu_x,mu_y,L_x,L_y,L_xy) = amp*exp[-0.5*(L_xx*(x-mu_x)^2 ...
 %     + L_yy*(y-mu_y)^2 + 2*L_xy*(x-mu_x)(y-mu_x)
 %
 % Taking the log of this function we get:
@@ -99,35 +99,35 @@ function [coeffs, model_im] = linearFitGaussian(Im)
     IL = log(Im); 
     idx = ~isnan(IL); % good indices from this matrix
     measurements = IL(idx); 
-    weights = Im(idx); % set the weights to the flux values? 
+    weights = (Im(idx)).^2; % set the weights to the flux values? 
     
     X = X(idx); % only keep X values of good pixels
     Y = Y(idx); % only keep Y values of good pixels
     
     A = [ones(length(measurements),1), X, Y, X.*Y, X.^2, Y.^2]; % design matrix
     
-    C = lscov(A, measurements, weights);
+    C = lscov(A, measurements, weights); % solve for the coefficients C
     
     % solve for physical parameters:
     L_xx = -2*C(5);
     L_yy = -2*C(6);
-    L_xy = -C(4);
-    
+    L_xy = -C(4);    
     mu_y = (C(3)/L_yy - C(2)*L_xy/L_xx/L_yy)/(1-L_xy^2/L_xx/L_yy); 
-    mu_x = (C(2) - L_xy*mu_y)/L_xx; 
-    
+    mu_x = (C(2) - L_xy*mu_y)/L_xx;     
     amp = exp( C(1) + 0.5*L_xx*mu_x^2 + 0.5*L_yy*mu_y^2 + L_xy*mu_x*mu_y );
-        
+    
+    % find the rotation and major/minor axes of L (the inverse covariance)
     L = [L_xx, L_xy; L_xy, L_yy]; 
     [R, E] = eig(L); % get the rotation matrix and eigenvector matrix for L
     
     coeffs.amplitude = amp;
     coeffs.x_offset = mu_x;
     coeffs.y_offset = mu_y;
-    coeffs.sigma_x = 1./sqrt(E(4));
-    coeffs.sigma_y = 1./sqrt(E(1)); 
+    coeffs.sigma_x = 1./sqrt(E(4)); % inverse covariance eigenvalue
+    coeffs.sigma_y = 1./sqrt(E(1)); % inverse covariance eigenvalue
     coeffs.angle = 180 + atan2d(R(4), R(2)); 
     
+    % now recreate the gaussian based on the parameters found
     model_im = amp.*util.img.gaussian2('sigma_x', coeffs.sigma_x, 'sigma_y', coeffs.sigma_y, ...
         'x_shift', coeffs.x_offset, 'y_shift', coeffs.y_offset, 'rot_frac', coeffs.angle/90, 'size', size(Im)); 
     
