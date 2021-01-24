@@ -51,6 +51,8 @@ function I = ellipse(varargin)
         input.S = input.S+mod(input.S+1,2); % make sure it is an odd number
     end
     
+    input.S = util.vec.imsize(input.S); 
+    
     if input.oversampling
         S = input.oversampling.*input.S;
         a = input.oversampling.*input.a;
@@ -65,28 +67,7 @@ function I = ellipse(varargin)
         r = input.hole;
     end
     
-    input.S = util.vec.imsize(input.S); 
-    
-%     [x,y] = meshgrid(-floor((S)/2):floor((S-1)/2));
-    [x,y] = meshgrid(-floor((input.S(2))/2):floor((input.S(2)-1)/2), -floor((input.S(1))/2):floor((input.S(1)-1)/2));
-    
-    % rotate the coordinates
-    if isempty(input.rot_frac)
-        x2 = x;
-        y2 = y;
-    else
-        x2 = +x*cos(pi/2*input.rot_frac)+y*sin(pi/2*input.rot_frac);
-        y2 = -x*sin(pi/2*input.rot_frac)+y*cos(pi/2*input.rot_frac);
-    end
-    
-    % shift the coordinates
-    if ~isempty(input.dx)
-        x2 = x2 - dx;
-    end
-    
-    if ~isempty(input.dy)
-        y2 = y2 - dy;
-    end
+    [x,y] = util.shapes.make_grid(input.S, input.dx, input.dy, input.rot_frac); 
     
     b = a*sqrt(1-input.e.^2);
     

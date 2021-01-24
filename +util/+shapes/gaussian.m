@@ -1,5 +1,5 @@
-function I = gaussian2(varargin)
-% usage: gaussian2(sigma_x,sigma_y=sigma_x,rot_frac=0,S=auto, norm=0)
+function I = gaussian(varargin)
+% usage: gaussian(sigma_x,sigma_y=sigma_x,rot_frac=0,S=auto, norm=0)
 % Generates an image of a 2D Gaussian at the center. 
 % PARAMETERS:
 %   -sigma_x: the width sigma parameter in the X direction. 
@@ -43,26 +43,9 @@ function I = gaussian2(varargin)
     end
     
     input.S = util.vec.imsize(input.S); 
+    [x,y] = util.shapes.make_grid(input.S, input.dx, input.dy, input.rot_frac); 
     
-    [x,y] = meshgrid(-floor((input.S(2))/2):floor((input.S(2)-1)/2), -floor((input.S(1))/2):floor((input.S(1)-1)/2));
-    
-    if ~isempty(input.x_shift)
-        x = x - input.x_shift;
-    end
-    
-    if ~isempty(input.y_shift)
-        y = y - input.y_shift;
-    end
-    
-    if isempty(input.rot_frac)
-        x2 = x;
-        y2 = y;
-    else
-        x2 = +x*cos(pi/2*input.rot_frac)+y*sin(pi/2*input.rot_frac);
-        y2 = -x*sin(pi/2*input.rot_frac)+y*cos(pi/2*input.rot_frac);
-    end
-    
-    I = exp(-0.5*((x2./input.sigma_x).^2 + (y2./input.sigma_y).^2));
+    I = exp(-0.5*((x./input.sigma_x).^2 + (y./input.sigma_y).^2));
     
     if input.norm==1
         I = I./util.stat.sum2(I);

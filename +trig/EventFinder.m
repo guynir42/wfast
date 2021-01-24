@@ -622,7 +622,9 @@ classdef EventFinder < handle
             
             obj.summary = obj.produceSummary; 
             
-            obj.summary.num_events_expected = obj.summary.getNumDetections; % use simulations to estimate the detection rate
+            if obj.store.is_done_burn
+                obj.summary.num_events_expected = obj.summary.getNumDetections; % use simulations to estimate the detection rate
+            end
             
         end
         

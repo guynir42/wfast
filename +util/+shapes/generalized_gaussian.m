@@ -52,29 +52,13 @@ function I = generalized_gaussian(varargin)
     
     input.S = util.vec.imsize(input.S); 
     
-    [x,y] = meshgrid(-floor((input.S(2))/2):floor((input.S(2)-1)/2), -floor((input.S(1))/2):floor((input.S(1)-1)/2));
-    
-    if isempty(input.rot_frac)
-        x2 = x;
-        y2 = y;
-    else
-        x2 = +x*cos(pi/2*input.rot_frac)+y*sin(pi/2*input.rot_frac);
-        y2 = -x*sin(pi/2*input.rot_frac)+y*cos(pi/2*input.rot_frac);
-    end
-    
-    if ~isempty(input.x_shift)
-        x2 = x2 - input.x_shift;
-    end
-    
-    if ~isempty(input.y_shift)
-        y2 = y2 - input.y_shift;
-    end
+    [x,y] = util.shapes.make_grid(input.S, input.dx, input.dy, input.rot_frac); 
     
 %     I = exp(-0.5*((x2./input.sigma_x).^2 + (y2./input.sigma_y).^2)); % simple gaussian... 
     
 %   ( p^(1-1/p) ) / (2 sigma Gamma(1/p) ) * exp (-1/p * |x-mu|^p / sigma^p)
 %     I = input.power^(1-1/input.power)./(2*input.sigma.*gamma(1/input.power)).*exp(-1/input.power*(abs(x2./input.sigma_x).^input.power + abs(y2./input.sigma_y).^input.power));
-    I = exp(-1/input.power*(abs( (x2./input.sigma_x).^2 + (y2./input.sigma_y).^2 ).^(input.power/2))); % no need for normalizations! 
+    I = exp(-1/input.power*(abs( (x./input.sigma_x).^2 + (y./input.sigma_y).^2 ).^(input.power/2))); % no need for normalizations! 
     
     if input.norm==1
         I = I./util.stat.sum2(I);
