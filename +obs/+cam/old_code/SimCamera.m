@@ -390,7 +390,7 @@ classdef SimCamera < handle
 
                 if ~dark_mode && ~flat_mode
                     
-                    psf = util.img.gaussian2(3);
+                    psf = util.shapes.gaussian(3);
             
                     psf = poissrnd(psf);
                     

@@ -148,7 +148,7 @@ classdef Simulator < file.AstroData
             
             I(center(1),center(2)) = obj.flux; % replace flux and coordinates with something smarter
             
-            obj.psfs = util.img.gaussian2(obj.psf_sigma, 'norm', 1);
+            obj.psfs = util.shapes.gaussian(obj.psf_sigma, 'norm', 1);
             
             if obj.use_focus_simulator && ~isempty(obj.focus) && isa(obj.focus, 'obs.focus.Simulator')
                 obj.psfs = filter2(obj.focus.makePSF, obj.psfs);

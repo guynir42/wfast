@@ -835,7 +835,7 @@ classdef CurveGenerator < handle
                     if input.limb_darkening
 
                     else
-                        star = util.img.ellipse(star_pix_radius(ii), 'norm', 1); 
+                        star = util.shapes.ellipse(star_pix_radius(ii), 'norm', 1); 
                     end
 
                     flux_map_conv = util.img.conv_f(star, flux_map, 'crop', 'same', 'conj', 1);
@@ -1307,7 +1307,7 @@ classdef CurveGenerator < handle
 
                 if R>0
 
-                    S = util.img.ellipse(R./obj.rho_step, 'norm', 1); % circle the size of the star
+                    S = util.shapes.ellipse(R./obj.rho_step, 'norm', 1); % circle the size of the star
                     % add limb darkening here...
 
 %                     I = util.img.conv_f(S, I, 'crop', 'same', 'conj', 1); 

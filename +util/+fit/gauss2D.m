@@ -45,7 +45,7 @@ function results = gauss2D(Im, varargin)
         
         Im(Im<input.threshold) = NaN;
         if ~isempty(input.aperture)
-            circ = util.img.ellipse(input.aperture, 'size', size(Im)); 
+            circ = util.shapes.ellipse(input.aperture, 'size', size(Im)); 
             Im(~circ) = NaN; 
         end
         
@@ -128,7 +128,7 @@ function [coeffs, model_im] = linearFitGaussian(Im)
     coeffs.angle = 180 + atan2d(R(4), R(2)); 
     
     % now recreate the gaussian based on the parameters found
-    model_im = amp.*util.img.gaussian2('sigma_x', coeffs.sigma_x, 'sigma_y', coeffs.sigma_y, ...
+    model_im = amp.*util.shapes.gaussian('sigma_x', coeffs.sigma_x, 'sigma_y', coeffs.sigma_y, ...
         'x_shift', coeffs.x_offset, 'y_shift', coeffs.y_offset, 'rot_frac', coeffs.angle/90, 'size', size(Im)); 
     
 end

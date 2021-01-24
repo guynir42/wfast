@@ -1334,7 +1334,7 @@ classdef Photometry < handle
             if sigma<0
                 M = realmax;
             else
-                M = util.img.gaussian2('sigma', sigma, 'x_shift', x_shift, 'y_shift', y_shift, 'size', obj.cut_size, 'norm', 1)*flux;
+                M = util.shapes.gaussian('sigma', sigma, 'x_shift', x_shift, 'y_shift', y_shift, 'size', obj.cut_size, 'norm', 1)*flux;
             end
             
         end

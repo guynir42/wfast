@@ -19,7 +19,7 @@ function I = ellipse(varargin)
 %
 % Parameters can be given in order or as keyword-value pairs...
 
-    if nargin==0, help('util.img.ellipse'); return; end
+    if nargin==0, help('util.shapes.ellipse'); return; end
 
     input = util.text.InputVars;
     input.input_var('a', [], 'R', 'radius', 'semi major axis');

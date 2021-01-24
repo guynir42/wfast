@@ -282,7 +282,7 @@ classdef LoupeMagnifier < handle
             end
             
             if obj.use_smooth_filter
-                k = util.img.gaussian2(obj.filter_size);
+                k = util.shapes.gaussian(obj.filter_size);
                 I = util.fft.conv_f(k, I);
             end
             

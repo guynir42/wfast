@@ -186,10 +186,10 @@ classdef ModelPSF < handle
             end
             
             if obj.use_gaussian
-                obj.stack = obj.stack.*util.img.gaussian2(obj.gauss_sigma, 'size', size(obj.cutouts)); 
+                obj.stack = obj.stack.*util.shapes.gaussian(obj.gauss_sigma, 'size', size(obj.cutouts)); 
             end
             
-            obj.mask = util.img.ellipse('radius', obj.radius, 'size', size(obj.cutouts));
+            obj.mask = util.shapes.ellipse('radius', obj.radius, 'size', size(obj.cutouts));
             
             c = util.vec.imsize(obj.cutouts); 
             [X, Y] = meshgrid((1:c(2))-floor(c(2)/2)-1, (1:c(1))-floor(c(1)/2)-1); 

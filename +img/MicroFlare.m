@@ -577,7 +577,7 @@ classdef MicroFlare < handle
 
             I = util.img.centering(obj.image); 
             I(isnan(I)) = util.stat.median2(obj.image); 
-            I = filter2(util.img.gaussian2(1, 'norm', 2), I); % match filter with a plausible sized PSF
+            I = filter2(util.shapes.gaussian(1, 'norm', 2), I); % match filter with a plausible sized PSF
             I = util.img.crop2size(I, 7); % get the middle only
             
             ps_max = util.stat.max2(I); 

@@ -16,7 +16,7 @@ function I = gaussian2(varargin)
 %
 % Parameters can be given in order or as keyword-value pairs...
 
-    if nargin==0, help('util.img.gaussian2'); return; end
+    if nargin==0, help('util.shapes.gaussian'); return; end
 
     input = util.text.InputVars;
     input.input_var('sigma_x', [], 'CX');

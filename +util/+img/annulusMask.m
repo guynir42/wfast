@@ -10,7 +10,7 @@ function M = annulusMask(ImSize, varargin)
 %                 means no feathering. 
 
     import util.text.cs;
-    import util.img.gaussian2;
+    import util.shapes.gaussian;
     import util.stat.sum2;
 
     if nargin==0

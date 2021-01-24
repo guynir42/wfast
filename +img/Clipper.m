@@ -482,7 +482,7 @@ classdef Clipper < handle
             
             import util.stat.sum2;
             import util.stat.max2;
-            import util.img.gaussian2;
+            import util.shapes.gaussian;
             
             csize = obj.cut_size; % cut size
             if isscalar(csize)
@@ -700,7 +700,7 @@ classdef Clipper < handle
         function success = findStars(obj, images_full) % can work on calibrated or non calibrated images...
             
             import util.img.maskBadPixels;
-            import util.img.gaussian2;
+            import util.shapes.gaussian;
             import util.stat.max2;
             import util.stat.var2;
                         

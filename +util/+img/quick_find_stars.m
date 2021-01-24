@@ -82,9 +82,9 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     
     thresholds = input.sigma + [5 3 0];
     
-    k = util.img.gaussian2(input.psf_sigma, 'norm', 2);
-    k_half = util.img.gaussian2(input.psf_sigma./2, 'norm', 2, 'size', size(k));
-    k_twice = util.img.gaussian2(input.psf_sigma.*2, 'norm', 2, 'size', size(k));
+    k = util.shapes.gaussian(input.psf_sigma, 'norm', 2);
+    k_half = util.shapes.gaussian(input.psf_sigma./2, 'norm', 2, 'size', size(k));
+    k_twice = util.shapes.gaussian(input.psf_sigma.*2, 'norm', 2, 'size', size(k));
 
     for ii = 1:length(thresholds)
         

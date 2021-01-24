@@ -121,8 +121,8 @@ function val = fwhm(I, varargin)
         
         for ii = 1:length(sig)
             
-%             g = util.img.gaussian2(sig(ii)./2.355, 'size', S, 'norm', 2); % gaussian normalized for matched filtering 
-            g = util.img.generalized_gaussian('sigma_x', sig(ii)./2.355, 'size', S, 'norm', 2, 'power', input.gaussian);  
+%             g = util.shapes.gaussian(sig(ii)./2.355, 'size', S, 'norm', 2); % gaussian normalized for matched filtering 
+            g = util.shapes.generalized_gaussian('sigma_x', sig(ii)./2.355, 'size', S, 'norm', 2, 'power', input.gaussian);  
             
             if input.fft
                 If = util.img.conv_f(g, I2); 
