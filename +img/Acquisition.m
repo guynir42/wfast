@@ -1652,7 +1652,9 @@ classdef Acquisition < file.AstroData
                                 fluxes = obj.cam.af.phot_struct.forced_photometry.flux - A.*B;
                                 %                     widths = phot_struct.apertures_photometry.width;
                                 
-                                widths = util.img.fwhm(C-permute(B, [1,3,4,2]), 'method', 'filters', 'gauss', 5, 'min_size', 0.25, 'max_size', 25, 'step', 0.5)/2.355;
+%                                 widths = util.img.fwhm(C-permute(B, [1,3,4,2]), 'method', 'filters', 'gauss', 5, 'min_size', 0.25, 'max_size', 25, 'step', 0.5)/2.355;
+                                widths = util.img.fwhm(C-permute(B, [1,3,4,2]), 'method', 'filters', 'defocus', 1, 'min_size', 0.25, 'max_size', 25, 'step', 0.5)/2.355;
+
                                 widths(widths>10 | widths<0.1) = NaN;
                                 
                                 if jj==1

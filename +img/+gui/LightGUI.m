@@ -230,6 +230,12 @@ classdef LightGUI < handle
             
         end
         
+        function adjustAxes(obj, ~, ~)
+            
+            axis(obj.axes_image, 'normal'); 
+            
+        end
+        
         function update(obj,~,~)
                         
             if ~obj.check

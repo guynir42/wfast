@@ -54,7 +54,11 @@ function I = defocus_annulus(varargin)
     r = input.r;
     r2 = input.minor_axis;
     
-    R = sqrt(x.^2./r.^2 + y.^2./r2.^2)*r;
+    if r>0
+        R = sqrt(x.^2./r.^2 + y.^2./r2.^2)*r;
+    else
+        R = sqrt(x.^2+y.^2); 
+    end
     
     I = exp( -0.5*(R-r).^2./input.sigma.^2);
     

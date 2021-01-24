@@ -1665,7 +1665,7 @@ classdef Analysis < file.AstroData
                 
                 obj.light_stack.getData(obj.phot_stack); 
                 
-                if obj.light_stack.gui.check, obj.light_stack.gui.update; end
+                if obj.light_stack.gui.check, obj.light_stack.gui.update; obj.light_stack.gui.adjustAxes; end
                 
             end
             

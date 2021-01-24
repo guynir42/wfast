@@ -52,7 +52,7 @@ function I = generalized_gaussian(varargin)
     
     input.S = util.vec.imsize(input.S); 
     
-    [x,y] = util.shapes.make_grid(input.S, input.dx, input.dy, input.rot_frac); 
+    [x,y] = util.shapes.make_grid(input.S, input.x_shift, input.y_shift, input.rot_frac); 
     
 %     I = exp(-0.5*((x2./input.sigma_x).^2 + (y2./input.sigma_y).^2)); % simple gaussian... 
     

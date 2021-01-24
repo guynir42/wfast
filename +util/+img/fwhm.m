@@ -24,6 +24,10 @@ function val = fwhm(I, varargin)
 %              normal gaussian). Use bigger values to get flatter top, like
 %              when the telescope is de-focused. This is ONLY used when
 %              setting method=filters! 
+%   -defocus: when non empty, this replaces the generalized gaussian when
+%             using the "filters" method. 
+%             The parameter value gives the sigma of the defocus_annulus. 
+%             Default is [] (use gaussian instead). 
 %   -number_interp: minimal number of points along slope. If the number of
 %                   pixels in the image is larger than this, we don't need
 %                   to interpolate. Otherwise it will interpolate to this 
@@ -59,6 +63,7 @@ function val = fwhm(I, varargin)
     input.input_var('min_size', 1);
     input.input_var('fft', false, 'use_fft'); 
     input.input_var('gaussian', 2); % what power of the generalized gaussian to use (default=2 for normal gaussian)
+    input.input_var('defocus', []); % use this instead of a generalized gaussian. The parameter gives the sigma of the defocus_annulus. Default is do not use. 
     input.scan_vars(varargin{:});
     
     % assume image is centered and padded to odd number of pixels
@@ -116,13 +121,28 @@ function val = fwhm(I, varargin)
         I2 = reshape(I, [size(I,1), size(I,2).*size(I,3).*size(I,4)]); % flatten the array into 2D
         I2 = reshape(regionfill(I2, isnan(I2)), size(I)); % reshape it back after removing NaNs
         
-        sig = input.min_size:input.step_size:input.max_size;
-        mx = nan(size(I,3), size(I,4), size(sig,2)); 
+        width = input.min_size:input.step_size:input.max_size;
+        mx = nan(size(I,3), size(I,4), size(width,2)); 
         
-        for ii = 1:length(sig)
+        for ii = 1:length(width)
             
 %             g = util.shapes.gaussian(sig(ii)./2.355, 'size', S, 'norm', 2); % gaussian normalized for matched filtering 
-            g = util.shapes.generalized_gaussian('sigma_x', sig(ii)./2.355, 'size', S, 'norm', 2, 'power', input.gaussian);  
+            
+            if isempty(input.defocus) || input.defocus==0
+                g = util.shapes.generalized_gaussian('sigma_x', width(ii)./2.355, 'size', S, 'norm', 2, 'power', input.gaussian);  
+            else
+                
+                sig = input.defocus;
+                r = width(ii)/2 - sig*2.355/2; % note the FWHM parameter "width" is equal to 2*r + 2.355*sigma
+                
+                if r<=0
+                    r = 0;
+                    sig = width(ii)./2.355;
+                end
+                
+                g = util.shapes.defocus_annulus('r', r, 'sigma', sig, 'size', S, 'norm', 2); 
+                
+            end
             
             if input.fft
                 If = util.img.conv_f(g, I2); 
@@ -136,7 +156,7 @@ function val = fwhm(I, varargin)
         
         [~, idx] = nanmax(mx,[], 3); % find the maximum sigma for each ii and jj
         
-        val = sig(idx); 
+        val = width(idx); 
         
     else
         error('Unknown method "%s". Choose "radial" or "moments" or "filters". ', input.method); 

@@ -71,10 +71,10 @@ function I = ellipse(varargin)
     
     b = a*sqrt(1-input.e.^2);
     
-    I = double((x2./a).^2 + (y2./b).^2 < 1);
+    I = double((x./a).^2 + (y./b).^2 < 1);
     
     if input.hole>0
-        I(x2.^2+dy.^2<r) = 0;
+        I(x.^2+dy.^2<r) = 0;
     end
     
     if input.oversampling
