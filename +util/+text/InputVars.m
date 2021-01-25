@@ -63,11 +63,11 @@ classdef InputVars < dynamicprops
         
         function obj = InputVars(varargin)
             
-            obj.alias_dictionary = containers.Map;
-            obj.default_dictionary = containers.Map;
-            obj.logical_dictionary = containers.Map;
-            obj.number_dictionary = containers.Map;
-            obj.comment_dictionary = containers.Map;
+            obj.alias_dictionary = struct;
+            obj.default_dictionary = struct;
+            obj.logical_dictionary = struct;
+            obj.number_dictionary = struct;
+            obj.comment_dictionary = struct;
             
         end
         
@@ -95,7 +95,7 @@ classdef InputVars < dynamicprops
                 error('Cannot have a new property called "%s", it already exists in the class!', name);
             end
             
-            if obj.alias_dictionary.isKey(name)
+            if isfield(obj.alias_dictionary, name)
                 error(['the "' name '" parameter is already in the "InputVar" object']);
             end
             
@@ -108,33 +108,33 @@ classdef InputVars < dynamicprops
             
             obj.(name) = default_value;
             
-            obj.default_dictionary(name) = default_value;
+            obj.default_dictionary.(name) = default_value;
             
             if isa(default_value, 'logical')
-                obj.logical_dictionary(name) = 1;
+                obj.logical_dictionary.(name) = 1;
             else
-                obj.logical_dictionary(name) = 0;
+                obj.logical_dictionary.(name) = 0;
             end
 
             if nargin<4 || isempty(varargin)
-                obj.alias_dictionary(name) = {};
-                obj.number_dictionary(name) = []; % no restriction on the number of letters required for a match
+                obj.alias_dictionary.(name) = {};
+                obj.number_dictionary.(name) = []; % no restriction on the number of letters required for a match
             else
                 
                 idx_num = find(~cellfun(@ischar, varargin));
                 
                 if isempty(idx_num)
-                    obj.number_dictionary(name) = []; % no restriction on the number of letters required for a match
+                    obj.number_dictionary.(name) = []; % no restriction on the number of letters required for a match
                 else
-                    obj.number_dictionary(name) = varargin{idx_num(end)}; % keep track of how many characters we need for cs to match
+                    obj.number_dictionary.(name) = varargin{idx_num(end)}; % keep track of how many characters we need for cs to match
                     varargin(idx_num) = []; % get rid of numeric values
                 end
                 
-                obj.alias_dictionary(name) = varargin;
+                obj.alias_dictionary.(name) = varargin;
                 
             end
             
-            obj.comment_dictionary(name) = ''; 
+            obj.comment_dictionary.(name) = ''; 
                 
         end
         
@@ -147,7 +147,7 @@ classdef InputVars < dynamicprops
                 name = obj.list_added_properties{end};
             end
             
-            obj.comment_dictionary(name) = comment; 
+            obj.comment_dictionary.(name) = comment; 
             
         end
         
@@ -178,7 +178,7 @@ classdef InputVars < dynamicprops
                 varargin{end+1} = 1; % positive approach
             end
             
-            all_keys = obj.alias_dictionary.keys; % every parameter on the list 
+            all_keys = fields(obj.alias_dictionary); % every parameter on the list 
             
             for ii = 1:2:length(varargin)
                 
@@ -196,10 +196,10 @@ classdef InputVars < dynamicprops
                     return;
                 end
                 
-                for jj = 1:obj.alias_dictionary.length % go over all parameters
+                for jj = 1:length(fields(obj.alias_dictionary)) % go over all parameters
                     
-                    if util.text.cs(key, [all_keys{jj}, obj.alias_dictionary(all_keys{jj}), obj.number_dictionary(all_keys{jj})])
-                        if obj.logical_dictionary(all_keys{jj})
+                    if util.text.cs(key, [all_keys{jj}, obj.alias_dictionary.(all_keys{jj}), obj.number_dictionary.(all_keys{jj})])
+                        if obj.logical_dictionary.(all_keys{jj})
                             obj.(all_keys{jj}) = util.text.parse_bool(val);
                         else
                             obj.(all_keys{jj}) = val;
@@ -232,13 +232,14 @@ classdef InputVars < dynamicprops
         
         function printout(obj) % show the keywords and the current values
             
-            keys = obj.alias_dictionary.keys;
-            vals = obj.alias_dictionary.values;
+            keys = fields(obj.alias_dictionary);
             
             fprintf('PARAMETERS (key = val [aliases,...])\n');
             fprintf('------------------------------------\n');
             
             for ii = 1:length(keys)
+                
+                val = obj.alias_dictionary.(keys(ii));
                 
                 fprintf('%15s', keys{ii});
                 if isprop(obj, keys{ii})
@@ -253,16 +254,16 @@ classdef InputVars < dynamicprops
                     end
                 end
                 
-                if ~isempty(vals{ii})
-                    fprintf(' [%s]', strjoin(vals{ii}, ', '));
+                if ~isempty(val)
+                    fprintf(' [%s]', strjoin(val, ', '));
                 end
                 
-                if ~isempty(obj.number_dictionary(keys{ii}))
-                    fprintf(' (match number= %d)', obj.number_dictionary(keys{ii}));
+                if ~isempty(obj.number_dictionary.(keys{ii}))
+                    fprintf(' (match number= %d)', obj.number_dictionary.(keys{ii}));
                 end
                 
-                if ~isempty(obj.comment_dictionary(keys{ii}))
-                    fprintf('     %% %s', obj.comment_dictionary(keys{ii}));
+                if ~isempty(obj.comment_dictionary.(keys{ii}))
+                    fprintf('     %% %s', obj.comment_dictionary.(keys{ii}));
                 end
                 
                 fprintf('\n');
@@ -273,7 +274,7 @@ classdef InputVars < dynamicprops
         
         function vars = output_vars(obj) % make a cell array with varargin pairs as they are parsed (to pass to other functions)
             
-            keys = obj.alias_dictionary.keys;
+            keys = fields(obj.alias_dictionary);
             
             vars = {};
             jj = 1;
@@ -290,11 +291,11 @@ classdef InputVars < dynamicprops
         
         function return_to_defaults(obj) % this replaces "reset" but allows us to use that parameter name
         
-            keys = obj.default_dictionary.keys;
+            keys = fields(obj.default_dictionary);
             
             for ii = 1:length(keys)
                 
-                obj.(keys{ii}) = obj.default_dictionary(keys{ii}); 
+                obj.(keys{ii}) = obj.default_dictionary.(keys{ii}); 
                 
             end
             
@@ -331,6 +332,28 @@ classdef InputVars < dynamicprops
             obj.number_dictionary('positions_bg') = 10;            
             obj.number_dictionary('t_end') = 6;
             obj.number_dictionary('t_end_stamp') = 6;
+            
+        end
+
+        function setupPlotting(obj, varargin)
+
+            ax = [];
+            
+            if nargin>1
+                for ii = 1:length(varargin)
+                    if util.text.cs(varargin{ii}, 'ax', 'axis', 'axes') && ...
+                            isa(varargin{ii+1}, 'matlab.graphics.axis.Axes') && isvalid(varargin{ii+1})
+                        ax = varargin{ii+1}; % if the axes are given and it is valid, use it
+                    end
+                end
+            end
+            
+            if isempty(ax) % if there were no axes given, use the default
+                ax = gca;
+            end
+            
+            obj.input_var('ax', ax, 'axis', 'axes');
+            obj.input_var('font_size', 18); 
             
         end
         

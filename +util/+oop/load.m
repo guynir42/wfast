@@ -425,57 +425,68 @@ end
 
 function obj = readPropertyFromList(obj, line, input)
     
-    idx = regexp(line, ':', 'once');
+    % locate the colon seprating the name from the value
+    idx1 = regexp(line, ':', 'once');
     
-    name = strip(line(1:idx-1));
-    str = strip(line(idx+1:end));
+    name = strip(line(1:idx1-1));
+    str = strip(line(idx1+1:end));
     
-    idx = regexp(name, '[\(|\{]\d+[\)|\}]', 'once'); % check if the name contains brackets
+    % check if the name contains brackets
+    idx2 = regexp(name, '[\(|\{]\d+[\)|\}]', 'once'); 
         
-    if ~isempty(idx)
-        propname = name(1:idx-1);
+    if ~isempty(idx2)
+        propname = name(1:idx2-1);
     else
         propname = name;
     end
             
-    if ~isprop(obj, propname)
-        if isa(obj, 'dynamicprops')
-            try 
-                addprop(obj, propname);
-            catch ME
-                if ~strcmp(ME.identifier, 'MATLAB:ClassUstring:InvalidDynamicPropertyName')
-                    rethrow(ME); 
+    
+    if isobject(obj) % make sure this property name exists in the object
+        
+        if ~isprop(obj, propname) % what to do if this property doesn't exist in the class?
+            if isa(obj, 'dynamicprops') % one option is to add it, if the class is dynamic
+                try 
+                    addprop(obj, propname);
+                catch ME
+                    if ~strcmp(ME.identifier, 'MATLAB:ClassUstring:InvalidDynamicPropertyName')
+                        rethrow(ME); 
+                    end
                 end
+            else
+                if input.debug_bit, disp(['Not loading property ' propname ' as it doesnt exist in ' class(obj)]); end
+                return;
             end
-        else
-            if input.debug_bit, disp(['Not loading property ' propname ' as it doesnt exist in ' class(obj)]); end
+        end
+
+        mp = findprop(obj, propname);
+
+        if isempty(mp) % could not find the property in this object
             return;
         end
-    end
-    
-    mp = findprop(obj, propname);
-    
-    if isempty(mp)
-        return;
-    end
-    
-    if mp.Dependent
-        if input.debug_bit, disp(['Property ' propname ' is Dependent. Skipping...']); end
-        return;
+
+        if mp.Dependent % dependent properties should not be assigned to... 
+            if input.debug_bit, disp(['Property ' propname ' is Dependent. Skipping...']); end
+            return;
+        end
+
+    end 
+        
+    if isstruct(obj) && ~isfield(obj, propname)
+        obj.(propname) = []; % initialize this struct's field         
     end
     
     if isa(obj.(propname), 'datetime')
         if input.debug_bit, disp(['Property ' propname ' is "datetime". Reading using util.text.str2time...']); end
         value = util.text.str2time(str);            
-    elseif ( isobject(obj.(propname)) ||isstruct(obj.(propname)) ) && (isempty(str) || strcmp(str, '[]'))
+    elseif ( isobject(obj.(propname)) || isstruct(obj.(propname)) ) && (isempty(str) || strcmp(str, '[]'))
         if input.debug_bit, disp(['Property ' propname ' is an empty object of type ' class(obj.(propname)) '...']); end
         value = feval([class(obj.(propname)) '.empty']);
     elseif isempty(str)
         if input.debug_bit, disp(['Property ' propname ' is empty. Setting to [].']); end
         value = [];
-    else
+    else % all other cases we simply load the value from the string and assign it, or recursively load sub-objects or sub-structs
         
-        num = str2num(str);
+        num = str2num(str); % try to convert to number
         
         if strcmp(str, '[]') % empty double
             if input.debug_bit, disp(['Property ' propname ' is empty double. Setting [].']); end
