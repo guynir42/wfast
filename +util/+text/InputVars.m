@@ -71,6 +71,33 @@ classdef InputVars < dynamicprops
             
         end
         
+        function convertDictionariesToStructs(obj)
+            
+            dictionaries = {'alias_dictionary', 'default_dictionary', 'logical_dictionary', 'number_dictionary', 'comment_dictionary'}; 
+            
+            for ii = 1:length(dictionaries)
+                
+                d = obj.(dictionaries{ii}); 
+                
+                if isa(d, 'containers.Map')
+                
+                    s = struct; 
+
+                    keys = d.keys;
+                    vals = d.values;
+
+                    for jj = 1:length(keys)
+                        s.(keys{jj}) = vals{jj}; 
+                    end
+                
+                end
+                
+                obj.(dictionaries{ii}) = s; 
+                
+            end
+            
+        end
+        
     end
     
     methods % input and scan
