@@ -52,7 +52,7 @@ classdef ShuffleBank < handle
         % physical units, where applicable
         D_au = 40; % distance of occulters, in AU
         R_uas = [10 120]; % stellar size range, in micro-arcsec
-        r_km = [0.25 2.5]; % occulter radius in km
+        r_km = [0.5 2.5]; % occulter radius in km
         b_fsu = [0 2]; % impact parameter in FSU (there are no physical units for this...)
         v_km = [5 35]; % transverse velocity in km
         lambda_nm = 550; % central wavelength
@@ -182,6 +182,18 @@ classdef ShuffleBank < handle
             
             obj.verifyInputs(input);
             
+            obj.R_uas = input.stellar_sizes; 
+            obj.r_km = input.occulter_radius;
+            obj.b_fsu = input.impact_parameter;
+            obj.v_km = input.velocity;
+            
+            obj.f = input.frame_rate;
+            obj.T = input.exposure_time;
+            obj.W = input.window;
+            
+            obj.D_au = input.dist;
+            obj.lambda_nm = input.lambda;
+            
             fsu2uas = sqrt(input.lambda*1e-12/(2*input.dist*150e6))*180/pi*3600*1e6; % convert angular FSU to micro-arcsec
             fsu2km = sqrt(input.lambda*1e-12*input.dist*150e6/2); % convert linear FSU to km
             
@@ -190,12 +202,6 @@ classdef ShuffleBank < handle
             obj.b_range = input.impact_parameter; 
             obj.v_range = input.velocity./fsu2km; 
             
-            obj.f = input.frame_rate;
-            obj.T = input.exposure_time;
-            obj.W = input.window;
-            
-            obj.D_au = input.dist;
-            obj.lambda_nm = input.lambda;
             
         end
         
@@ -241,6 +247,10 @@ classdef ShuffleBank < handle
                 obj.gen.b = obj.b_range(1) + rand.*(obj.b_range(2)-obj.b_range(1));
                 obj.gen.v = obj.v_range(1) + rand.*(obj.v_range(2)-obj.v_range(1));
                 obj.gen.getLightCurves;
+                
+                if all(obj.gen.lc.flux==0) % make sure there are no empty kernels (they will never trigger above threshold!)
+                    continue;
+                end
                 
                 if isempty(obj.kernels)
                     obj.kernels = single(obj.gen.lc.flux - 1);
