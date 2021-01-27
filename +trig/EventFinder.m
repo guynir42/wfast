@@ -164,7 +164,8 @@ classdef EventFinder < handle
             
                 obj.store = trig.DataStore;
                 
-                obj.var_buf = util.vec.CircularBuffer; 
+                obj.var_buf_kbos = util.vec.CircularBuffer; 
+                obj.var_buf_hills = util.vec.CircularBuffer; 
                 obj.var_buf_oort = util.vec.CircularBuffer; 
                 
                 obj.monitor = trig.StarMonitor; 
