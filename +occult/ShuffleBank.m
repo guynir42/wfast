@@ -320,7 +320,7 @@ classdef ShuffleBank < handle
             
         end
         
-        function flux_out = input(obj, varargin)
+        function flux_out = input(obj, varargin) % output is 3D: dim 1 is time, dim 2 is kernel, dim 3 is stars
             
             input = util.text.InputVars;
             input.use_ordered_numeric = 1;
@@ -351,7 +351,7 @@ classdef ShuffleBank < handle
             
             obj.timestamps = input.times;
             
-            obj.fluxes_filtered = util.vec.convolution(obj.kernels, obj.fluxes)./obj.stds;
+            obj.fluxes_filtered = util.vec.convolution(obj.kernels, obj.fluxes, 'cross', 1)./obj.stds;
             
             if nargout>0
                 flux_out = obj.fluxes_filtered;

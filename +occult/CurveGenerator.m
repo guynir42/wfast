@@ -1496,7 +1496,7 @@ classdef CurveGenerator < handle
             pars.v = obj.v;
             pars.W = obj.W;
             pars.T = obj.T;
-            pars.f = obj.f; 
+            pars.f = obj.f;  
             
         end
         

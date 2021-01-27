@@ -70,9 +70,12 @@ classdef EventFinder < handle
 
         gui@trig.gui.EvFinderGUI; % class added later
         
-        bank@occult.ShuffleBank; % randomly picked filter kernels used for matched-filtering (loaded from file when needed)
-        bank_small@occult.ShuffleBank; % a smaller filter bank used to weed out only the good stars for full-filtering
+        bank_kbos@occult.ShuffleBank; % randomly picked filter kernels used for matched-filtering (loaded from file when needed)
+        bank_kbos_small@occult.ShuffleBank; % a smaller filter bank used to weed out only the good stars for full-filtering
+        bank_hills@occult.ShuffleBank; % a filter bank for inner Oort cloud (Hills cloud)
+        bank_hills_small@occult.ShuffleBank; % a filter bank for inner Oort cloud (Hills cloud)
         bank_oort@occult.ShuffleBank; % a filter bank for Oort cloud occultations
+        bank_oort_small@occult.ShuffleBank; % a filter bank for Oort cloud occultations
         
     end
     
@@ -85,7 +88,8 @@ classdef EventFinder < handle
         
         psd@trig.CorrectPSD; % calculates the Power Spectra Density using Welch's method, then dereddens the flux
         
-        var_buf@util.vec.CircularBuffer; % circular buffers for each star/kernel, holding a few variance measurements from past batches
+        var_buf_kbos@util.vec.CircularBuffer; % circular buffers for each star/kernel, holding a few variance measurements from past batches
+        var_buf_hills@util.vec.CircularBuffer; % another buffer for the inner Oort cloud (Hills cloud) templates 
         var_buf_oort@util.vec.CircularBuffer; % another buffer for the Oort cloud templates
         
         cand@trig.Candidate;
@@ -108,8 +112,8 @@ classdef EventFinder < handle
         corrected_fluxes; % extended flux after correction (by PSD or by removing linear fit)
         corrected_stds; % standard deviation of the corrected fluxes
         
-        filtered_fluxes; % fluxes after matched-filtering with the bank of templates
-        bg_filtered_std; % measured background standard deviation after filtering
+%         filtered_fluxes; % fluxes after matched-filtering with the bank of templates
+%         bg_filtered_std; % measured background standard deviation after filtering
         
         black_list_stars; % a slowly growing list of stars that display too many events, so that all their events are marked as false
 %         black_list_batches; % a slowly growing list of batches that display too many events, so that all their events are marked as false
@@ -135,13 +139,13 @@ classdef EventFinder < handle
     
     properties(Hidden=true)
         
-        background_ff; % filtered flux background data (either flux values or the variance from the var_buf)
+%         background_ff; % filtered flux background data (either flux values or the variance from the var_buf)
         
         display_candidate_idx = []; % GUI parameter, which event is to be shown now
         use_display_kept_candidates = 0; % GUI parameter, to show only kept events or all events (default)
         use_show_truth = 0; % if true, will show the field name/coords and for each candidate will reveal if it is simulated
         
-        version = 1.00;
+        version = 1.01;
         
     end
     
@@ -194,6 +198,7 @@ classdef EventFinder < handle
             obj.pars.use_prefilter = 1; % filter all stars on a smaller bank, using a lower threshold, and then only vet the survivors with the full filter bank
             obj.pars.pre_threshold = 5; % threshold for the pre-filter
             
+            obj.pars.use_hills = true; % use the inner Oort cloud template bank as well
             obj.pars.use_oort = false; % use the Oort cloud template bank as well
             
 %             obj.pars.filter_bank_full_filename = '/WFAST/occultations/TemplateBankKBOs.mat'; % filename where the filter bank was taken from (relative to the DATA folder)
@@ -226,7 +231,8 @@ classdef EventFinder < handle
             obj.display_candidate_idx = [];
             
             obj.store.reset;
-            obj.var_buf.reset;
+            obj.var_buf_kbos.reset;
+            obj.var_buf_hills.reset; 
             obj.var_buf_oort.reset;
             obj.psd.reset;
             
@@ -251,8 +257,8 @@ classdef EventFinder < handle
             obj.corrected_fluxes = [];
             obj.corrected_stds = [];
             
-            obj.filtered_fluxes = [];
-            obj.bg_filtered_std = [];
+%             obj.filtered_fluxes = [];
+%             obj.bg_filtered_std = [];
             
             obj.latest_candidates = trig.Candidate.empty;
             
@@ -421,16 +427,8 @@ classdef EventFinder < handle
             
             obj.pars.analysis_time = util.text.time2str('now'); % keep a record of when the analysis was done
             
-            if isempty(obj.bank) % lazy load the filter bank from file
-                obj.loadFilterBank; 
-            end
-            
-            if obj.pars.use_prefilter && isempty(obj.bank_small) % lazy load the small filter bank from file
-                obj.loadFilterBankSmall; 
-            end
-            
-            if obj.pars.use_oort && isempty(obj.bank_oort) % lazy load the small filter bank from file
-                obj.loadFilterBankOort; 
+            if isempty(obj.bank_kbos) % lazy load the KBOs filter bank from file
+                obj.loadFilterBankKBOs; 
             end
             
             if isempty(obj.head) % must have a header to uniquely identify candidates! 
@@ -446,94 +444,25 @@ classdef EventFinder < handle
             
             if obj.store.is_done_burn % do not do any more calculations until done with "burn-in" period
                 
+                %%%%%%%%%%%%%% PSD CORRECTION %%%%%%%%%%%%%%%
+                
                 if obj.pars.use_psd_correction
                     obj.psd.calcPSD(obj.store.flux_buffer, obj.store.timestamps_buffer, obj.store.pars.length_extended, obj.store.pars.length_background*2); % first off, make the PSD correction for the current batch
                 end
-                                
-                if obj.var_buf.is_empty % check if we haven't used this since the last reset() call
-                    N = ceil(obj.store.pars.length_background./obj.store.pars.length_search); % how many batches we want to keep as "background" sample 
-                    obj.var_buf.reset(N); 
-                end
- 
-                [obj.corrected_fluxes, obj.corrected_stds] = obj.correctFluxes(obj.store.extended_flux, 1); % runs either PSD correction or simple removal of linear fit to each lightcurve
-
-                if obj.pars.use_prefilter % use a small filter bank and only send the best stars to the big bank
-
-                    obj.bank_small.input(obj.corrected_fluxes, obj.corrected_stds); % matched-filtering produces a 3D matrix inside bank_small.fluxes_filtered
-
-                    if obj.pars.use_std_filtered % if true, will apply a correction based on the STD of each filtered flux individually
-
-                        V = nanvar(obj.bank_small.fluxes_filtered);
-
-                        obj.var_buf.input(V); % variance buffer saves the variance of several batches in the past
-
-                        if obj.pars.use_keep_variances % keep a log of the variance of each star and each filter (this accumulates to a big chunk of memory)
-                            obj.var_values = vertcat(obj.var_values, V); 
-                        end
-
-                        bg_filtered_std = sqrt(obj.var_buf.mean); % get the STD of the filtered flux (from previous batches - i.e., background region)
-
-                    else
-                        bg_filtered_std = 1; % do not correct for filtered flux background noise
-                    end
-
-                    pre_snr = squeeze(util.stat.max2(obj.bank_small.fluxes_filtered./bg_filtered_std)); % signal to noise peak for each star at any time and any filter kernel
-
-                    star_indices = find(pre_snr>=obj.pars.pre_threshold); % only stars that have shown promising response to the small filter bank are on this list 
-
-                else % do not prefilter, just put all stars into the big filter bank
-
-                    star_indices = 1:size(obj.corrected_fluxes,2); % just list all the stars
-
-                end
-
-                best_snr = []; % need to keep track what is the best S/N for this batch, regardless of which filter and regardless of if there were any candidates detected. 
                 
-                if ~isempty(star_indices) % if no stars passed the pre-filter, we will just skip to the next batch (if no pre-filter is used, all stars will pass)
+                [obj.corrected_fluxes, obj.corrected_stds] = obj.correctFluxes(obj.store.extended_flux); % runs either PSD correction or simple removal of linear fit to each lightcurve
 
-                    obj.filtered_fluxes = obj.bank.input(obj.corrected_fluxes(:,star_indices), obj.corrected_stds(1,star_indices)); % filtered flux for each star/kernel
-
-                    if obj.pars.use_std_filtered % get the noise in the filtered flux background region
-
-                        if obj.pars.use_prefilter % if we used a pre-filter we must also get the background noise for each chosen star, and we don't have var_buf for this!
-
-                            [background_flux, background_std] = obj.correctFluxes(obj.store.background_flux(:,star_indices), star_indices); % run the PSD or linear fit removal, but this time on the background area
-
-                            obj.background_ff = obj.bank.input(background_flux, background_std); % filter these background fluxes also
-
-                            obj.bg_filtered_std = nanstd(obj.background_ff); % this reflects the noise in a few previous batches, on the filtered fluxes, including only the chosen stars
-
-                        else % not using pre-filter, means we have a var_buf with background variance for each star/filter
-                            obj.var_buf.input(nanvar(obj.filtered_fluxes)); 
-                            obj.background_ff = obj.var_buf.data_ordered; 
-                            obj.bg_filtered_std = sqrt(nanmean(obj.background_ff)); 
-                        end
-
-                    else
-                        obj.bg_filtered_std = 1; % just assume the filters have unit standard deviation by construction
-                    end
-
-                    obj.filtered_fluxes = obj.filtered_fluxes./obj.bg_filtered_std; % normalize the filtered flux by the background std
-
-                    [obj.latest_candidates, best_snr] = obj.searchForCandidates(obj.store.extended_flux, obj.corrected_fluxes, obj.filtered_fluxes, star_indices); % loop over the normalized filtered flux and find multiple events
-
-                    obj.monitor.input(obj.store.extended_timestamps, obj.store.extended_juldates, ...
-                        obj.store.extended_flux, obj.store.extended_aux, obj.store.cutouts, obj.latest_candidates);
-                    
-                    if obj.pars.use_sim % simulated events are injected into the data and treated like real events
-                        
-                        star_indices = obj.findStarsForSim(star_indices); % get stars that do not include any possible real candidates
-                        
-                        for ii = 1:obj.getNumSimulations % this number can be more than one, or less (then we randomly decide if to include a simulated event in this batch)
-                            obj.simulate(star_indices); % each call to this function tries to add a single simulated event to a random star from the list                            
-                        end
-                        
-                    end
-                    
-                    obj.cand = vertcat(obj.cand, obj.latest_candidates); % store all the candidates that were found in the last batch
-                    
-                end % if no stars passed the pre-filter, we will just skip to the next batch
+                %%%%%%%%%%% FILTER FOR KBOS %%%%%%%%%%%%%%
                 
+                [obj.latest_candidates, star_indices, best_snr] = obj.applyTemplateBank('kbos'); % by default use corrected_fluxes and correctd_stds given above
+                
+                obj.cand = vertcat(obj.cand, obj.latest_candidates); % store all the candidates that were found in the last batch
+                
+                obj.snr_values(end+1) = best_snr; 
+                
+                %%%%%%%%%%%%%% STAR HOURS %%%%%%%%%%%%%%
+                
+                % save the star hours, but also check if this batch is black-listed
                 if length(obj.latest_candidates(~[obj.latest_candidates.is_simulated]))>=obj.pars.limit_events_per_batch % this batch has too many events, need to mark them as black-listed! 
 
                     for ii = 1:length(obj.latest_candidates)
@@ -546,45 +475,100 @@ classdef EventFinder < handle
                 else
                     obj.store.saveHours; % with no arguments it just counts the hours in this batch as good times
                 end
+
                 
-                if obj.pars.use_oort % run the fluxes through the Oort cloud template bank as well 
-                    
-                    star_indices = 1:size(obj.corrected_fluxes,2); % just list all the stars
-                    
-                    oort_filtered_fluxes = obj.bank.input(obj.corrected_fluxes(:,star_indices), obj.corrected_stds(1,star_indices)); % filtered flux for each star/kernel
+                %%%%%%%% MONITOR SPECIFIC STARS %%%%%%%%%%%%
+                
+                obj.monitor.input(obj.store.extended_timestamps, obj.store.extended_juldates, ... % track additional data on specific star indices
+                    obj.store.extended_flux, obj.store.extended_aux, obj.store.cutouts, obj.latest_candidates);
+                
+                %%%%%%%%% KEEP TRACK OF VARIANCE VALUES %%%%%%%%
+                
+                if obj.pars.use_keep_variances && ~obj.var_buf_kbos.is_empty % just like the var buffer, onlt for entire run (this accumulates to a big chunk of memory)
+                    obj.var_values = vertcat(obj.var_values, obj.var_buf_kbos.data(obj.var_buf_kbos.idx,:)); 
+                end
+                
+                %%%%%%%%%%%% SIMULATIONS %%%%%%%%%%%%%%%
+                
+                if obj.pars.use_sim % simulated events are injected into the data and treated like real events
 
-                    if obj.pars.use_std_filtered % get the noise in the filtered flux background region
+                    star_indices_sim = obj.findStarsForSim(star_indices, obj.latest_candidates); % get stars that do not include any possible real candidates
 
-                        obj.var_buf_oort.input(nanvar(oort_filtered_fluxes)); 
-                        oort_background_ff = obj.var_buf_oort.data_ordered; 
-                        oort_bg_filtered_std = sqrt(nanmean(oort_background_ff)); 
-
-                    else
-                        oort_bg_filtered_std = 1; % just assume the filters have unit standard deviation by construction
+                    for ii = 1:obj.getNumSimulations % this number can be more than one, or less (then we randomly decide if to include a simulated event in this batch)
+                        
+                        sim_cand = obj.simulateSingleEvent(star_indices_sim, 'kbos'); % each call to this function tries to add a single simulated event to a random star from the list                            
+                        
+                        if obj.pars.use_keep_simulated
+                            obj.cand = vertcat(obj.cand, sim_cand); % add the simulated events to the list of regular events
+                        end
+                        
                     end
 
-                    oort_filtered_fluxes = oort_filtered_fluxes./oort_bg_filtered_std; % normalize the filtered flux by the background std
+                end
+                
+                %%%%%%%% INNER OORT CLOUD %%%%%%%%%%%%%
+                
+                if obj.pars.use_hills && isempty(obj.bank_hills) % try to load the inner Oort filter bank from file
+                    obj.loadFilterBankHills; 
+                end
 
-                    oort_latest_candidates = obj.searchForCandidates(obj.store.extended_flux, obj.corrected_fluxes, oort_filtered_fluxes, star_indices); % loop over the normalized filtered flux and find multiple events
+                if obj.pars.use_hills && ~isempty(obj.bank_hills_small) % run the fluxes through the Oort cloud template bank as well 
+                    
+                    [hills_candidates, hills_star_indices] = obj.applyTemplateBank('hills'); % by default use corrected_fluxes and correctd_stds given above
+                    
+                    star_indices = unique([star_indices; hills_star_indices]); 
+                    
+                    obj.cand = vertcat(obj.cand, hills_candidates); % store all the candidates that were found in the last batch
+                    
+                    if obj.pars.use_sim % simulated events are injected into the data and treated like real events
 
-                    for ii = 1:length(oort_latest_candidates)
-                        oort_latest_candidates(ii).oort_filter = true; 
+                        star_indices_sim = obj.findStarsForSim(star_indices, hills_candidates); % get stars that do not include any possible real candidates
+
+                        for ii = 1:obj.getNumSimulations % this number can be more than one, or less (then we randomly decide if to include a simulated event in this batch)
+                            
+                            sim_cand = obj.simulateSingleEvent(star_indices_sim, 'kbos'); % each call to this function tries to add a single simulated event to a random star from the list                            
+                            
+                            if obj.pars.use_keep_simulated
+                                obj.cand = vertcat(obj.cand, sim_cand); % add the simulated events to the list of regular events
+                            end
+
+                        end
+
                     end
                     
-                    obj.cand = vertcat(obj.cand, oort_latest_candidates);
+                end
+
+                if  isempty(obj.bank_oort) % lazy load the Oort filter bank from file
+                    obj.loadFilterBankOort; 
+                end
+
+                if obj.pars.use_oort && ~isempty(obj.bank_oort_small)
+                
+                    oort_candidates = obj.applyTemplateBank('oort'); % by default use corrected_fluxes and correctd_stds given above
+                                        
+                    star_indices = unique([star_indices, oort_star_indices]); 
+
+                    obj.cand = vertcat(obj.cand, oort_candidates);
+                    
+                    if obj.pars.use_sim % simulated events are injected into the data and treated like real events
+
+                        star_indices_sim = obj.findStarsForSim(star_indices, oort_candidates); % get stars that do not include any possible real candidates
+
+                        for ii = 1:obj.getNumSimulations % this number can be more than one, or less (then we randomly decide if to include a simulated event in this batch)
+                            
+                            sim_cand = obj.simulateSingleEvent(star_indices_sim, 'kbos'); % each call to this function tries to add a single simulated event to a random star from the list                            
+                        
+                            if obj.pars.use_keep_simulated
+                                obj.cand = vertcat(obj.cand, sim_cand); % add the simulated events to the list of regular events
+                            end
+                        
+                        end
+
+                    end
                     
                 end
                 
-                if ~isempty(obj.latest_candidates) % if candidates are found, check them for highest S/N
-                    obj.snr_values(end+1) = max(abs([obj.latest_candidates.snr])); 
-                elseif ~isempty(best_snr) % we managed to find a good S/N value from the large filter bank
-                    obj.snr_values(end+1) = best_snr; % no candidates, instead just return the best S/N found when searching for candidates
-                elseif obj.pars.use_prefilter && ~isempty(pre_snr) % we used a pre-filter and didn't get any stars that passed
-                    obj.snr_values(end+1) = max(pre_snr); % take the best S/N from the smaller filter bank
-                else
-                    error('This shouldn''t happen!'); 
-                end
-                
+
             end % do not do any more calculations until done with "burn-in" period
             
         end
@@ -699,9 +683,163 @@ classdef EventFinder < handle
     
     methods(Hidden=true) % internal methods
         
-        function [new_candidates, best_snr] = searchForCandidates(obj, fluxes_raw, fluxes_corrected, fluxes_filtered, star_indices, max_num_events) % loop over filtered fluxes, find above-threshold peaks, remove that area, then repeat
+        function [flux_out, std_out] = correctFluxes(obj, fluxes, star_indices) % star indices tells the PSD which stars were given in fluxes (default is all stars)
+            
+            if nargin<3 || isempty(star_indices) % by default run the correction for all stars
+                star_indices = 1:size(fluxes,2);
+            end
+            
+            if obj.pars.use_psd_correction
+                flux_out = obj.psd.input(fluxes, 1, star_indices); 
+            else
+                flux_out = obj.removeLinearFit(fluxes, obj.store.extended_timestamps); 
+                flux_out = fillmissing(flux_out, 'linear'); 
+            end
 
-            if nargin<6 || isempty(max_num_events)
+            std_out = nanstd(flux_out); 
+
+        end
+        
+        function flux_rem = removeLinearFit(obj, flux, timestamps)
+            
+            s = @(x) nansum(x);
+            f = flux;
+            t = timestamps;
+            n = size(f,1);
+            
+            denom = n.*s(t.^2)-s(t).^2;
+            
+            a = (n.*s(t.*f)-s(t).*s(f))./denom;
+            b = (s(f).*s(t.^2)-s(t).*s(t.*f))./denom;
+            
+            flux_rem = flux - (a.*t + b); 
+            
+        end
+        
+        function [candidates, star_indices, best_snr] = applyTemplateBank(obj, bank_name, fluxes, stds)
+            
+            candidates = trig.Candidate.empty;
+            
+            if nargin<3 || isempty(fluxes)
+                fluxes = obj.corrected_fluxes;
+            end
+            
+            if nargin<4 || isempty(stds)
+                stds = obj.corrected_stds;
+            end
+            
+            bank_small = obj.(['bank_' bank_name '_small']); 
+            bank = obj.(['bank_' bank_name]); 
+            var_buf = obj.(['var_buf_' bank_name]); 
+            
+            if obj.pars.use_prefilter % use a small filter bank and only send the best stars to the big bank
+
+                fluxes_filtered_small = obj.filterFluxes(fluxes, stds, bank_small, [], var_buf); 
+
+                pre_snr = squeeze(util.stat.max2(fluxes_filtered_small)); % signal to noise peak for each star at any time and any filter kernel
+
+                star_indices = find(pre_snr>=obj.pars.pre_threshold); % only stars that have shown promising response to the small filter bank are on this list 
+
+            else % do not prefilter, just put all stars into the big filter bank
+
+                star_indices = util.vec.tocolumn(1:size(obj.corrected_fluxes,2)); % just list all the stars
+
+            end
+
+            best_snr = nanmax(pre_snr); % need to keep track what is the best S/N for this batch, regardless of which filter and regardless of if there were any candidates detected. 
+
+            if ~isempty(star_indices) % if no stars passed the pre-filter, we will just skip to the next batch (if no pre-filter is used, all stars will pass)
+
+                if obj.pars.use_prefilter
+                    var_buf_large_filter = []; % each batch we will have different stars at this stage, cannot use var_buf
+                else
+                    var_buf_large_filter = var_buf; % always use all stars, no problem applying the var buffer
+                end
+
+                filtered_fluxes = obj.filterFluxes(fluxes, stds, bank, star_indices, var_buf_large_filter); 
+
+                [candidates, best_snr] = obj.searchForCandidates(obj.store.extended_flux, fluxes, filtered_fluxes, star_indices, bank_name); % loop over the normalized filtered flux and find multiple events
+
+            end % if no stars passed the pre-filter, we will just skip to the next batch
+            
+        end
+        
+        function ff = filterFluxes(obj, fluxes, stds, bank, star_indices, var_buf, bg_fluxes) % filter the fluxes with the template bank
+        % Run the input fluxes through the template bank. 
+        % If given a var buffer, it will also update it with the latest
+        % variance values measured from the filtered fluxes. 
+        %
+        % INPUTS:
+        %   -fluxes: should be corrected (for PSD etc). Can include all
+        %            stars or a subset given by star_indices. 
+        %            2D matrix, dim 1 is time, dim 2 is star index. 
+        %   -stds: standard deviations for the fluxes as given. 
+        %          Row vector, one value per star. 
+        %   -bank: an occult.ShuffleBank object with templates. 
+        %   -star_indices: optional argument, specifying which stars were
+        %                  chosen (e.g., by prefilter). Default is all stars. 
+        %   -var_buf: a util.vec.CircularBuffer object with variance per
+        %             star from the previous batches. If not given, or if
+        %             it is empty, the STD correction will be calculated by
+        %             filtering the background flux. 
+        %   -bg_fluxes: optionally give the flux of the background region.
+        %               If not given, will just take the background_flux
+        %               from the data store. 
+        % 
+        
+            if nargin<4 || isempty(bank) || ~isa(bank, 'occult.ShuffleBank')
+                error('Must supply a valid ShuffleBank object!');  
+            end
+            
+            if nargin<5 || isempty(star_indices)
+                star_indices = 1:size(fluxes,2); % just use all stars
+            end
+            
+            if nargin<6 || isempty(var_buf)
+                var_buf = []; % not buffer is given, must calculate variance on background fluxes
+            else
+                if var_buf.is_empty % we haven't used this since the last reset() call
+                    N = ceil(obj.store.pars.length_background./obj.store.pars.length_search); % how many batches we want to keep as "background" sample 
+                    var_buf.reset(N); 
+                end
+            end
+            
+            % first calculate the STD correction for the filtered flux
+            if obj.pars.use_std_filtered
+                
+                if isempty(var_buf) || var_buf.is_empty  % no buffer (or still empty buffer), must calculate its own variance on the background
+                    
+                    if nargin<7 || isempty(bg_fluxes) % if we were not given a background flux, use the store
+                        [bg_fluxes, bg_stds] = obj.correctFluxes(obj.store.background_flux(:,star_indices), star_indices); 
+                    end
+                    
+                    bg_filtered_fluxes = bank.input(bg_fluxes, bg_stds); 
+                    
+                    ff_std = nanstd(bg_filtered_fluxes); % STD correction from filtered background fluxes
+                    
+                else
+                    ff_std = sqrt(var_buf.mean); % STD correction from var buffer
+                end
+                
+            else
+                ff_std = 1; % no STD correction
+            end
+            
+            ff = bank.input(fluxes(:,star_indices), stds(1,star_indices));
+            
+            if ~isempty(var_buf) % if we are using a var buffer, load the new results into it
+                
+                var_buf.input(nanvar(ff)); 
+                
+            end
+            
+            ff = ff./ff_std; % apply the STD correction
+            
+        end
+            
+        function [new_candidates, best_snr] = searchForCandidates(obj, fluxes_raw, fluxes_corrected, fluxes_filtered, star_indices, bank_name, max_num_events) % loop over filtered fluxes, find above-threshold peaks, remove that area, then repeat
+
+            if nargin<7 || isempty(max_num_events)
                 max_num_events = obj.pars.max_events;
             end
             
@@ -723,7 +861,7 @@ classdef EventFinder < handle
                 
                 if mx>=obj.pars.threshold % at least one part of the filtered lightcurves passed the threshold
 
-                    c = obj.makeNewCandidate(fluxes_raw, fluxes_corrected, fluxes_filtered, idx, star_indices); 
+                    c = obj.makeNewCandidate(fluxes_raw, fluxes_corrected, fluxes_filtered, idx, star_indices, bank_name); 
 
                     c.serial = length(obj.cand) + length(obj.latest_candidates) + 1; % new event gets a serial number
                     new_candidates = vertcat(new_candidates, c); % add this event to the list of new candidates
@@ -739,9 +877,10 @@ classdef EventFinder < handle
             
         end
         
-        function c = makeNewCandidate(obj, fluxes_raw, fluxes_corrected, fluxes_filtered, idx, star_indices) % generate a Candidate object and fill it with data
+        function c = makeNewCandidate(obj, fluxes_raw, fluxes_corrected, fluxes_filtered, idx, star_indices, bank_name) % generate a Candidate object and fill it with data
 
             c = trig.Candidate;
+            bank = obj.(['bank_' bank_name]); % shorthand for the template bank used
             
             c.snr = abs(fluxes_filtered(idx(1),idx(2),idx(3))); % note this is positive even for negative filter responses! 
             c.is_positive = fluxes_filtered(idx(1),idx(2),idx(3))>0; % negative events are this where the filter response is large negative (e.g., flares)
@@ -751,12 +890,13 @@ classdef EventFinder < handle
             c.star_index = star_indices(idx(3)); % which star (out of all stars that passed the burn-in)
             c.star_index_global = obj.store.star_indices(star_indices(idx(3))); % get the star index in the original list of stars before pre-filter and before burn-in
 
-            c.kernel = obj.bank.kernels(:,c.kern_index); % the lightcurve of the kernel used (zero centered and normalized)
-            c.kern_props = obj.bank.pars(c.kern_index); % properties of the occultation that would generate this kernel
+            c.template_bank = bank_name; % keep a record of which template bank was used
+            c.kernel = bank.kernels(:,c.kern_index); % the lightcurve of the kernel used (zero centered and normalized)
+            c.kern_props = bank.pars(c.kern_index); % properties of the occultation that would generate this kernel
             c.kern_props.inverted = ~c.is_positive; % if the filtered flux was negative, it means we had to invert the kernel
             
             % find continuous area (in the extended region) that is above time_range_thresh 
-            c.time_range = obj.findTimeRange(fluxes_filtered, idx(1), idx(2), idx(3)); 
+            c.time_range = obj.findTimeRange(fluxes_filtered, idx(1), idx(2), idx(3), bank); 
             
             % find (non-continuous) list of kernels that also show some response at the same time/star
             c.kern_extra = find(max(abs(fluxes_filtered(c.time_range, :, idx(3))))>obj.getKernThresh); 
@@ -789,7 +929,7 @@ classdef EventFinder < handle
             c.auxiliary_all = obj.store.extended_aux; 
             
             idx = find(star_indices==c.star_index); % the index of the star inside the list of stars that passed the pre-filter
-            c.filtered_flux_past_values = obj.background_ff(:,idx); % because we only have this background_ff for the subset of stars
+%             c.filtered_flux_past_values = obj.background_ff(:,idx); % because we only have this background_ff for the subset of stars
             c.flux_buffer = obj.store.flux_buffer(:,c.star_index); % flux history for this star
             c.timestamps_buffer = obj.store.timestamps_buffer; % timestamps for that duration
             c.psd = obj.psd.power_spectrum(:,c.star_index); % the Power Spectral Density (PSD) for this star
@@ -896,14 +1036,14 @@ classdef EventFinder < handle
             
         end
         
-        function time_range = findTimeRange(obj, ff, time_index, kern_index, star_index) % find all continuous time frames around peak that have surpassed a (lower) threshold, or just mark a minimal event region
+        function time_range = findTimeRange(obj, ff, time_index, kern_index, star_index, bank) % find all continuous time frames around peak that have surpassed a (lower) threshold, or just mark a minimal event region
             
             N = size(ff,1); % time length
             
             thresh = obj.getTimeThresh;
             time_range = [];
             
-            kernel_min_spread = ceil(nnz(abs(obj.bank.kernels(:,kern_index))>=0.02)/2); % minimal time range cannot be smaller than "active" part of kernel (i.e., above 2% deviation)
+            kernel_min_spread = ceil(nnz(abs(bank.kernels(:,kern_index))>=0.02)/2); % minimal time range cannot be smaller than "active" part of kernel (i.e., above 2% deviation)
 
             for jj = 0:N % go backward in time
 
@@ -939,76 +1079,88 @@ classdef EventFinder < handle
 
         end
         
-        function [flux_out, std_out] = correctFluxes(obj, fluxes, star_indices) % only supply the star_indices if you are running large matrices like the b/g calculation after a pre-filter
+        function loadFilterBankKBOs(obj, throw_error)
             
-            if nargin<3 || isempty(star_indices) % by default run the correction for all stars
-                star_indices = 1:size(fluxes,2);
+            if nargin<2 || isempty(throw_error)
+                throw_error = 1;
             end
-            
-            if obj.pars.use_psd_correction
-                flux_out = obj.psd.input(fluxes, 1, star_indices); 
-            else
-                flux_out = obj.removeLinearFit(fluxes, obj.store.extended_timestamps); 
-                flux_out = fillmissing(flux_out, 'linear'); 
-            end
-
-            std_out = nanstd(flux_out); 
-
-        end
-        
-        function flux_rem = removeLinearFit(obj, flux, timestamps)
-            
-            s = @(x) nansum(x);
-            f = flux;
-            t = timestamps;
-            n = size(f,1);
-            
-            denom = n.*s(t.^2)-s(t).^2;
-            
-            a = (n.*s(t.*f)-s(t).*s(f))./denom;
-            b = (s(f).*s(t.^2)-s(t).*s(t.*f))./denom;
-            
-            flux_rem = flux - (a.*t + b); 
-            
-        end
-        
-        function loadFilterBank(obj)
             
             frame_rate = floor(obj.head.FRAME_RATE); 
+            
+            obj.bank_kbos = occult.ShuffleBank.empty; 
+            obj.bank_kbos_small = occult.ShuffleBank.empty; 
             
             f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_KBOs_%dHz.mat', frame_rate));
             if exist(f, 'file')
                 load(f, 'bank');
-                obj.bank = bank;
-            else
+                obj.bank_kbos = bank;
+            elseif throw_error
                 error('Cannot load template bank from file "%s"', f); 
             end
 
-        end
-        
-        function loadFilterBankSmall(obj)
-            
-            frame_rate = floor(obj.head.FRAME_RATE); 
-            
             f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_KBOs_%dHz_small.mat', frame_rate));
             if exist(f, 'file')
                 load(f, 'bank');
-                obj.bank_small = bank;
-            else
+                obj.bank_kbos_small = bank;
+            elseif throw_error
                 error('Cannot load template bank from file "%s"', f); 
             end
 
         end
         
-        function loadFilterBankOort(obj)
+        function loadFilterBankHills(obj, throw_error)
 
+            if nargin<2 || isempty(throw_error)
+                throw_error = 0;
+            end
+            
             frame_rate = floor(obj.head.FRAME_RATE); 
             
-            f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_oort_%dHz.mat', frame_rate));            
+            obj.bank_hills = occult.ShuffleBank.empty; 
+            obj.bank_hills_small = occult.ShuffleBank.empty; 
+            
+            f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_Hills_%dHz.mat', frame_rate));            
+            if exist(f, 'file')
+                load(f, 'bank');
+                obj.bank_hills = bank;
+            elseif throw_error
+                error('Cannot load template bank from file "%s"', f); 
+            end
+
+            f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_Hills_%dHz_small.mat', frame_rate));
+            if exist(f, 'file')
+                load(f, 'bank');
+                obj.bank_hills_small = bank;                
+            elseif throw_error
+                error('Cannot load template bank from file "%s"', f); 
+            end
+
+        end
+        
+        function loadFilterBankOort(obj, throw_error)
+
+            if nargin<2 || isempty(throw_error)
+                throw_error = 0;
+            end
+            
+            frame_rate = floor(obj.head.FRAME_RATE); 
+            
+            obj.bank_oort = occult.ShuffleBank.empty; 
+            obj.bank_oort_small = occult.ShuffleBank.empty; 
+            
+            f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_Oort_%dHz.mat', frame_rate));            
             if exist(f, 'file')
                 load(f, 'bank');
                 obj.bank_oort = bank;
-            else
+            elseif throw_error
+                error('Cannot load template bank from file "%s"', f); 
+            end
+
+            f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_Oort_%dHz_small.mat', frame_rate));
+            if exist(f, 'file')
+                load(f, 'bank');
+                obj.bank_oort_small = bank;
+            elseif throw_error
                 error('Cannot load template bank from file "%s"', f); 
             end
 
@@ -1018,12 +1170,12 @@ classdef EventFinder < handle
     
     methods (Hidden=true) % simulations
         
-        function star_indices = findStarsForSim(obj, star_indices) % take a list of stars from the prefilter (or all stars) and get a list of good stars for a simulated event
+        function star_indices = findStarsForSim(obj, star_indices, candidates) % take a list of stars from the prefilter (or all stars) and get a list of good stars for a simulated event
            
             stars_not_for_sim = false(1,size(obj.corrected_fluxes,2)); % logical vector with 1s where any star has a chance of already having an event
 
             if length(star_indices)==size(obj.corrected_fluxes,2) % when not using pre-filter, or if by some coincidence the pre-filter triggered all stars! 
-                stars_not_for_sim([obj.latest_candidates.star_index]) = true; % choose only stars that have a recent candidate
+                stars_not_for_sim([candidates.star_index]) = true; % choose only stars that have a recent candidate
             else
                 stars_not_for_sim(star_indices) = true; % just mark all the stars chosen by the pre-filter
             end
@@ -1046,7 +1198,9 @@ classdef EventFinder < handle
             
         end
         
-        function simulate(obj, star_indices) % choose a star from the list of star_indices and add a randomly chosen occultation to it, then search for that event
+        function candidate = simulateSingleEvent(obj, star_indices, bank_name) % choose a star from the list of star_indices and add a randomly chosen occultation to it, then search for that event
+            
+            candidate = trig.Candidate.empty;
             
             if isempty(star_indices) % no stars, no simulation! 
                 return;
@@ -1056,46 +1210,34 @@ classdef EventFinder < handle
                 star_index_sim = star_indices(randperm(length(star_indices),1)); % randomly choose a single star from the list
             end
 
-%             f = obj.store.extended_flux; 
+            bank = obj.(['bank_' bank_name]);
+            
+            [f_sim, sim_pars] = obj.getFluxWithSimulatedLightcurve(star_index_sim, bank); % add the simulated occultation to the raw fluxes
 
-            [f_sim, sim_pars] = obj.addSimulatedEvent(star_index_sim); % add the simulated occultation to the raw fluxes
+            [f_corr, std_corr] = obj.correctFluxes(f_sim, star_index_sim); % PSD or linear fit correction (on top of the simulated event!)
 
-%             f(:,star_index_sim) = f_sim;
-
-            [f_corr, std_corr] = obj.correctFluxes(f_sim); % PSD or linear fit correction (on top of the simulated event!)
-
-            f_filt = obj.bank.input(f_corr(:,star_index_sim), std_corr(star_index_sim)); % filter only the star with the simulated event on it
+            f_filt = bank.input(f_corr(:,star_index_sim), std_corr(1,star_index_sim)); % filter only the star with the simulated event on it
 
             % get an estimate for the background of this flux:
             if obj.pars.use_std_filtered % need to correct the filtered fluxes by their measured noise
 
-                if obj.pars.use_prefilter % need to draw from the background region and calculate the filtered flux noise
-                    [bg_flux, bg_std] = obj.correctFluxes(obj.store.background_flux(:,star_index_sim), star_index_sim); % run correction on the background region
-                    obj.background_ff = obj.bank.input(bg_flux, bg_std); % filter these background fluxes also
-                    bg_ff_std = nanstd(obj.background_ff); 
-                else % we have a var_buf for every star, we can just get the noise from that
-                    obj.background_ff = obj.var_buf.data_ordered; 
-                    bg_ff_std = sqrt(nanmean(obj.background_ff));
-                    bg_ff_std = bg_ff_std(star_index_sim); 
-                end
+                [bg_flux, bg_std] = obj.correctFluxes(obj.store.background_flux(:,star_index_sim), star_index_sim); % run correction on the background region
+                background_ff = bank.input(bg_flux, bg_std); % filter the background flux also
+                bg_ff_std = nanstd(background_ff); 
 
                 f_filt = f_filt./bg_ff_std; 
 
             end % need to correct the filtered fluxes by their measured noise
 
-            new_event_sim = obj.searchForCandidates(f_sim, f_corr, f_filt, star_index_sim, 1); % try to find a single event on this single star
+            candidate = obj.searchForCandidates(f_sim, f_corr, f_filt, star_index_sim, bank_name, 1); % try to find a single event on this single star
 
-            if ~isempty(new_event_sim) % we recovered the injected event! 
+            if ~isempty(candidate) % we recovered the injected event! 
                 
-                sim_pars.detect_snr = new_event_sim.snr; % keep track of the detection S/N for this event
+                sim_pars.detect_snr = candidate.snr; % keep track of the detection S/N for this event
                 sim_pars.passed = true; 
                 
-                new_event_sim.is_simulated = 1; 
-                new_event_sim.sim_pars = sim_pars; 
-                
-                if obj.pars.use_keep_simulated
-                    obj.latest_candidates = vertcat(obj.latest_candidates, new_event_sim); % add the simulated events to the list of regular events
-                end
+                candidate.is_simulated = 1; 
+                candidate.sim_pars = sim_pars; 
                 
                 % add this parameter struct to the list of passed events
                 if isempty(obj.sim_events)
@@ -1120,7 +1262,7 @@ classdef EventFinder < handle
 
         end % we recovered the injected event!
         
-        function [flux_all, sim_pars] = addSimulatedEvent(obj, star_idx) % take a flux matrix and an index for a star and add a random occultation event on top of it
+        function [flux_all, sim_pars] = getFluxWithSimulatedLightcurve(obj, star_idx, bank) % take a flux matrix and an index for a star and add a random occultation event on top of it
         
             if ~isempty(obj.cat) && obj.cat.success
                 
@@ -1134,15 +1276,16 @@ classdef EventFinder < handle
                     R = obj.cat.data.FresnelSize;
                 end
                 
-                if isnan(R(star_idx)) % no stellar radius known from GAIA, just randomly pick one (from the distribution of R of other stars)
+                if isnan(R(star_idx)) % no stellar radius known from GAIA, try to estimate it 
                     R_star = obj.estimateR(star_idx); 
-                elseif R(star_idx)>3
+                elseif R(star_idx)>3 % do not simulate stars bigger than this 
                     R_star = 3; 
                 else
                     R_star = R(star_idx);
                 end
                 
-                [template, sim_pars] = obj.bank.gen.randomLC('stellar_size', R_star); % let's set the stellar radius R=0.5 (Fresnel units)
+                [template, sim_pars] = bank.gen.randomLC('stellar_size', R_star); % let's set the stellar radius R=0.5 (Fresnel units)
+                sim_pars.D = bank.D_au; 
                 
             end
             

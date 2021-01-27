@@ -100,7 +100,7 @@ classdef Candidate < handle
         cutouts; % cutouts of the selected star, for the duration of the extended region
         kernel; % the lightcurve of the matched-filter kernel used 
         
-        oort_filter = false; % if true, that means this candidate was found using the Oort cloud templaters/filters
+        template_bank = ''; % note which template bank was used to trigger this event
         
         time_index; % out of the extended region
         kern_index; % from the full filter bank
@@ -314,8 +314,8 @@ classdef Candidate < handle
             if isempty(obj.kern_props)
                 str = '';
             else
-                str = sprintf('R= %4.2f | r= %4.2f | b= %4.2f | v= %4.1f | invert= %d', ...
-                    obj.kern_props.R, obj.kern_props.r, obj.kern_props.b, obj.kern_props.v, ~obj.is_positive);
+                str = sprintf('R= %4.2f | r= %4.2f | b= %4.2f | v= %4.1f | D= %d | invert= %d', ...
+                    obj.kern_props.R, obj.kern_props.r, obj.kern_props.b, obj.kern_props.v, obj.kern_props.D, ~obj.is_positive);
             end 
             
         end
