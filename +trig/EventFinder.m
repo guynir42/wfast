@@ -534,7 +534,7 @@ classdef EventFinder < handle
                     
                 end % if no stars passed the pre-filter, we will just skip to the next batch
                 
-                if length(obj.latest_candidates)>=obj.pars.limit_events_per_batch % this batch has too many events, need to mark them as black-listed! 
+                if length(obj.latest_candidates(~[obj.latest_candidates.is_simulated]))>=obj.pars.limit_events_per_batch % this batch has too many events, need to mark them as black-listed! 
 
                     for ii = 1:length(obj.latest_candidates)
                         obj.latest_candidates(ii).notes{end+1} = sprintf('Batch is black listed with %d events', length(obj.latest_candidates)); 

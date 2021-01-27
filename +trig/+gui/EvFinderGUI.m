@@ -122,12 +122,12 @@ classdef EvFinderGUI < handle
             
             obj.menu_pars.addButton('menu_filters', '&Filters', 'menu'); 
             obj.menu_pars.menu_filters.addButton('button_prefilter', '&Prefilter', 'toggle', 'pars.use_prefilter', 'filter on a small template-bank with lower threshold and only use the full bank on passing stars');
-            obj.menu_pars.menu_filters.addButton('input_prefilter', '&Threshold', 'input', 'pars.pre_threshold', 'threshold for the smaller template bank');
+%             obj.menu_pars.menu_filters.addButton('input_prefilter', '&Threshold', 'input', 'pars.pre_threshold', 'threshold for the smaller template bank');
             obj.menu_pars.menu_filters.addButton('button_oort', '&Oort filters', 'toggle', 'pars.use_oort', 'use the Oort cloud templates');
             
-            obj.menu_pars.menu_filters.addButton('input_bank', '&Filter bank', 'input_text', 'pars.filter_bank_full_filename', 'path and name of the full filter bank MAT-file, relative to DATA', 1);
-            obj.menu_pars.menu_filters.addButton('input_small_bank', '&Small bank', 'input_text', 'pars.filter_bank_small_filename', 'path and name of the small filter bank MAT-file, relative to DATA');
-            obj.menu_pars.menu_filters.addButton('input_oort_bank', 'Oort &Bank', 'input_text', 'pars.filter_bank_oort_filename', 'path and name of the Oort cloud filter bank MAT-file, relative to DATA');
+%             obj.menu_pars.menu_filters.addButton('input_bank', '&Filter bank', 'input_text', 'pars.filter_bank_full_filename', 'path and name of the full filter bank MAT-file, relative to DATA', 1);
+%             obj.menu_pars.menu_filters.addButton('input_small_bank', '&Small bank', 'input_text', 'pars.filter_bank_small_filename', 'path and name of the small filter bank MAT-file, relative to DATA');
+%             obj.menu_pars.menu_filters.addButton('input_oort_bank', 'Oort &Bank', 'input_text', 'pars.filter_bank_oort_filename', 'path and name of the Oort cloud filter bank MAT-file, relative to DATA');
             
             
             obj.menu_pars.addButton('menu_simulations', '&Simulations', 'menu');

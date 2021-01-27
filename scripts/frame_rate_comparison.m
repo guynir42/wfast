@@ -97,7 +97,7 @@ hold(ax, 'off');
 
 ax.XLim = [-1 1.25];
 
-xlabel(ax, 'Stellar size R [FSU]'); 
+xlabel(ax, 'log10(Stellar size R [FSU])'); 
 ylabel(ax, 'Number of stars'); 
 
 ax.FontSize = 18; 
@@ -121,13 +121,13 @@ et_fast = an_fast.finder.sim_events; % events total
 ep_fast = an_fast.finder.sim_events([an_fast.finder.sim_events.passed]); 
 
 bin_size = 0.25;
-[N_r,E_r] = histcounts([et_fast.r], 'BinWidth', bin_size); 
-bar(ax1, E_r(1:end-1)+bin_size/2, N_r); 
+[N_r1,E_r1] = histcounts([et_fast.r], 'BinWidth', bin_size); 
+bar(ax1, E_r1(1:end-1)+bin_size/2, N_r1); 
 
 hold(ax1, 'on'); 
 
-N_r_passed = histcounts([ep_fast.r], 'BinEdges', E_r); 
-bar(ax1, E_r(1:end-1)+bin_size/2, N_r_passed); 
+N_r_passed1 = histcounts([ep_fast.r], 'BinEdges', E_r1); 
+bar(ax1, E_r1(1:end-1)+bin_size/2, N_r_passed1); 
 
 hold(ax1, 'off'); 
 
@@ -138,7 +138,7 @@ ax1.YScale = 'log';
 
 yyaxis(ax1, 'right'); 
 
-plot(ax1, E_r(1:end-1)+bin_size/2, N_r_passed./N_r*100, '-*', 'LineWidth', 2); 
+plot(ax1, E_r1(1:end-1)+bin_size/2, N_r_passed1./N_r1*100, '-*', 'LineWidth', 2); 
 
 ax1.YLim = [0 100]; 
 
@@ -160,13 +160,13 @@ et_slow = an_slow.finder.sim_events; % events total
 ep_slow = an_slow.finder.sim_events([an_slow.finder.sim_events.passed]); 
 
 bin_size = 0.25;
-[N_r,E_r] = histcounts([et_slow.r], 'BinWidth', bin_size); 
-bar(ax2, E_r(1:end-1)+bin_size/2, N_r); 
+[N_r2,E_r2] = histcounts([et_slow.r], 'BinWidth', bin_size); 
+bar(ax2, E_r2(1:end-1)+bin_size/2, N_r2); 
 
 hold(ax2, 'on'); 
 
-N_r_passed = histcounts([ep_fast.r], 'BinEdges', E_r); 
-bar(ax2, E_r(1:end-1)+bin_size/2, N_r_passed); 
+N_r_passed2 = histcounts([ep_fast.r], 'BinEdges', E_r2); 
+bar(ax2, E_r2(1:end-1)+bin_size/2, N_r_passed2); 
 
 hold(ax2, 'off'); 
 
@@ -179,7 +179,7 @@ ax2.YTickLabels = {};
 
 yyaxis(ax2, 'right'); 
 
-plot(ax2, E_r(1:end-1)+bin_size/2, N_r_passed./N_r*100, '-*', 'LineWidth', 2); 
+plot(ax2, E_r2(1:end-1)+bin_size/2, N_r_passed2./N_r2*100, '-*', 'LineWidth', 2); 
 
 ax2.YLim = [0 100]; 
 
@@ -197,3 +197,39 @@ util.plot.inner_title('12.5Hz', 'Position', 'NorthEast', 'ax', ax2);
 %% save the plot
 
 util.sys.print(fullfile(getenv('WFAST'), 'scripts/plots/frame_rate_compared_efficiency'));
+
+
+%% compare the efficiency
+
+f4 = util.plot.FigHandler('compare efficiency');
+f4.clear;
+
+ax = axes('Parent', f4.fig); 
+
+
+
+plot(ax, E_r1(1:end-1)+bin_size/2, N_r_passed1./N_r1*100, E_r2(1:end-1)+bin_size/2, N_r_passed2./N_r2*100);
+
+ax.FontSize = 18; 
+
+xlabel(ax, 'occulter radius r [FSU]'); 
+ylabel(ax, 'Detection efficiency'); 
+ytickformat(ax, '%d%%'); 
+
+ax.YTick = 0:20:100;
+
+legend(ax, {'25 Hz', '12.5 Hz'}, 'Location', 'SouthEast'); 
+
+grid(ax, 'on'); 
+
+
+
+%% save the plot
+
+util.sys.print(fullfile(getenv('WFAST'), 'scripts/plots/frame_rate_compared_efficiency_percentage'));
+
+
+
+
+
+
