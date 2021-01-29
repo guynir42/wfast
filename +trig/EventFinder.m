@@ -489,24 +489,6 @@ classdef EventFinder < handle
                     obj.var_values = vertcat(obj.var_values, obj.var_buf_kbos.data(obj.var_buf_kbos.idx,:)); 
                 end
                 
-                %%%%%%%%%%%% SIMULATIONS %%%%%%%%%%%%%%%
-                
-                if obj.pars.use_sim % simulated events are injected into the data and treated like real events
-
-                    star_indices_sim = obj.findStarsForSim(star_indices, obj.latest_candidates); % get stars that do not include any possible real candidates
-
-                    for ii = 1:obj.getNumSimulations % this number can be more than one, or less (then we randomly decide if to include a simulated event in this batch)
-                        
-                        sim_cand = obj.simulateSingleEvent(star_indices_sim, 'kbos'); % each call to this function tries to add a single simulated event to a random star from the list                            
-                        
-                        if obj.pars.use_keep_simulated
-                            obj.cand = vertcat(obj.cand, sim_cand); % add the simulated events to the list of regular events
-                        end
-                        
-                    end
-
-                end
-                
                 %%%%%%%% INNER OORT CLOUD %%%%%%%%%%%%%
                 
                 if obj.pars.use_hills && isempty(obj.bank_hills) % try to load the inner Oort filter bank from file
@@ -517,25 +499,25 @@ classdef EventFinder < handle
                     
                     [hills_candidates, hills_star_indices] = obj.applyTemplateBank('hills'); % by default use corrected_fluxes and correctd_stds given above
                     
-                    star_indices = unique([star_indices; hills_star_indices]); 
+                    star_indices = unique([star_indices; hills_star_indices]);  % add the stars selected by the Hills prefilter / filter
                     
                     obj.cand = vertcat(obj.cand, hills_candidates); % store all the candidates that were found in the last batch
                     
-                    if obj.pars.use_sim % simulated events are injected into the data and treated like real events
-
-                        star_indices_sim = obj.findStarsForSim(star_indices, hills_candidates); % get stars that do not include any possible real candidates
-
-                        for ii = 1:obj.getNumSimulations % this number can be more than one, or less (then we randomly decide if to include a simulated event in this batch)
-                            
-                            sim_cand = obj.simulateSingleEvent(star_indices_sim, 'kbos'); % each call to this function tries to add a single simulated event to a random star from the list                            
-                            
-                            if obj.pars.use_keep_simulated
-                                obj.cand = vertcat(obj.cand, sim_cand); % add the simulated events to the list of regular events
-                            end
-
-                        end
-
-                    end
+%                     if obj.pars.use_sim % simulated events are injected into the data and treated like real events
+% 
+%                         star_indices_sim = obj.findStarsForSim(star_indices, hills_candidates); % get stars that do not include any possible real candidates
+% 
+%                         for ii = 1:obj.getNumSimulations % this number can be more than one, or less (then we randomly decide if to include a simulated event in this batch)
+%                             
+%                             sim_cand = obj.simulateSingleEvent(star_indices_sim, 'hills'); % each call to this function tries to add a single simulated event to a random star from the list                            
+%                             
+%                             if obj.pars.use_keep_simulated
+%                                 obj.cand = vertcat(obj.cand, sim_cand); % add the simulated events to the list of regular events
+%                             end
+% 
+%                         end
+% 
+%                     end
                     
                 end
 
@@ -545,31 +527,48 @@ classdef EventFinder < handle
 
                 if obj.pars.use_oort && ~isempty(obj.bank_oort_small)
                 
-                    oort_candidates = obj.applyTemplateBank('oort'); % by default use corrected_fluxes and correctd_stds given above
+                    [oort_candidates, oort_star_indices] = obj.applyTemplateBank('oort'); % by default use corrected_fluxes and correctd_stds given above
                                         
-                    star_indices = unique([star_indices, oort_star_indices]); 
+                    star_indices = unique([star_indices, oort_star_indices]); % add the stars selected by the Oort prefilter / filter
 
                     obj.cand = vertcat(obj.cand, oort_candidates);
                     
-                    if obj.pars.use_sim % simulated events are injected into the data and treated like real events
-
-                        star_indices_sim = obj.findStarsForSim(star_indices, oort_candidates); % get stars that do not include any possible real candidates
-
-                        for ii = 1:obj.getNumSimulations % this number can be more than one, or less (then we randomly decide if to include a simulated event in this batch)
-                            
-                            sim_cand = obj.simulateSingleEvent(star_indices_sim, 'kbos'); % each call to this function tries to add a single simulated event to a random star from the list                            
-                        
-                            if obj.pars.use_keep_simulated
-                                obj.cand = vertcat(obj.cand, sim_cand); % add the simulated events to the list of regular events
-                            end
-                        
-                        end
-
-                    end
+%                     if obj.pars.use_sim % simulated events are injected into the data and treated like real events
+% 
+%                         star_indices_sim = obj.findStarsForSim(star_indices, oort_candidates); % get stars that do not include any possible real candidates
+% 
+%                         for ii = 1:obj.getNumSimulations % this number can be more than one, or less (then we randomly decide if to include a simulated event in this batch)
+%                             
+%                             sim_cand = obj.simulateSingleEvent(star_indices_sim, 'oort'); % each call to this function tries to add a single simulated event to a random star from the list                            
+%                         
+%                             if obj.pars.use_keep_simulated
+%                                 obj.cand = vertcat(obj.cand, sim_cand); % add the simulated events to the list of regular events
+%                             end
+%                         
+%                         end
+% 
+%                     end
                     
                 end
                 
+                %%%%%%%%%%%% SIMULATIONS %%%%%%%%%%%%%%%
+                
+                if obj.pars.use_sim % simulated events are injected into the data and treated like real events
 
+                    star_indices_sim = obj.findStarsForSim(star_indices); % get stars that do not include any possible real candidates
+
+                    for ii = 1:obj.getNumSimulations % this number can be more than one, or less (then we randomly decide if to include a simulated event in this batch)
+                        
+                        sim_cand = obj.simulateSingleEvent(star_indices_sim); % each call to this function tries to add a single simulated event to a random star from the list                            
+                        
+                        if obj.pars.use_keep_simulated
+                            obj.cand = vertcat(obj.cand, sim_cand); % add the simulated events to the list of regular events
+                        end
+                        
+                    end
+
+                end % use sim
+                
             end % do not do any more calculations until done with "burn-in" period
             
         end
@@ -718,7 +717,25 @@ classdef EventFinder < handle
         end
         
         function [candidates, star_indices, best_snr] = applyTemplateBank(obj, bank_name, fluxes, stds)
-            
+        % do a prefilter (optional) and then a filter and then find candidates. 
+        % INPUTS: 
+        %   -bank_name: a string like "kbos" or "hills" or "oort". 
+        %   -fluxes: the corrected flux (after removing linear fit or PSD
+        %            correction. Default is obj.corrected_fluxes. 
+        %   -std: the standard deviation of the fluxes. Default is 
+        %         obj.corrected_stds. 
+        %
+        % OUTPUTS: 
+        %   -candidates: a vector of trig.Candidate objects, containing all
+        %                successfull triggers. If none are found, returns
+        %                an empty vector. 
+        % 
+        %   -star_indices: a vector containing all the stars that passed
+        %                  either the pre-filter or (if all stars passed)
+        %                  only the stars that triggered the full filter. 
+        %   -best_snr: maximal S/N value measured from the filtered fluxes.
+        %   
+        
             candidates = trig.Candidate.empty;
             
             if nargin<3 || isempty(fluxes)
@@ -743,7 +760,7 @@ classdef EventFinder < handle
 
             else % do not prefilter, just put all stars into the big filter bank
 
-                star_indices = util.vec.tocolumn(1:size(obj.corrected_fluxes,2)); % just list all the stars
+                star_indices = util.vec.tocolumn(1:size(fluxes,2)); % just list all the stars
 
             end
 
@@ -761,6 +778,10 @@ classdef EventFinder < handle
 
                 [candidates, best_snr] = obj.searchForCandidates(obj.store.extended_flux, fluxes, filtered_fluxes, star_indices, bank_name); % loop over the normalized filtered flux and find multiple events
 
+                if length(star_indices)==size(fluxes,2) % if all stars passed prefilter (or when skipping pre-filter)
+                    star_indices = [candidates.star_index]; % only keep stars that triggered
+                end
+                
             end % if no stars passed the pre-filter, we will just skip to the next batch
             
         end
@@ -787,7 +808,9 @@ classdef EventFinder < handle
         %               If not given, will just take the background_flux
         %               from the data store. 
         % 
-        
+            
+            N = ceil(obj.store.pars.length_background./obj.store.pars.length_search); % how many batches we want to keep as "background" sample in the var_buf
+
             if nargin<4 || isempty(bank) || ~isa(bank, 'occult.ShuffleBank')
                 error('Must supply a valid ShuffleBank object!');  
             end
@@ -800,7 +823,6 @@ classdef EventFinder < handle
                 var_buf = []; % not buffer is given, must calculate variance on background fluxes
             else
                 if var_buf.is_empty % we haven't used this since the last reset() call
-                    N = ceil(obj.store.pars.length_background./obj.store.pars.length_search); % how many batches we want to keep as "background" sample 
                     var_buf.reset(N); 
                 end
             end
@@ -808,7 +830,7 @@ classdef EventFinder < handle
             % first calculate the STD correction for the filtered flux
             if obj.pars.use_std_filtered
                 
-                if isempty(var_buf) || var_buf.is_empty  % no buffer (or still empty buffer), must calculate its own variance on the background
+                if isempty(var_buf) || var_buf.counter<N  % no buffer (or the buffer is not yet full), must calculate its own variance on the background
                     
                     if nargin<7 || isempty(bg_fluxes) % if we were not given a background flux, use the store
                         [bg_fluxes, bg_stds] = obj.correctFluxes(obj.store.background_flux(:,star_indices), star_indices); 
@@ -1171,16 +1193,11 @@ classdef EventFinder < handle
     
     methods (Hidden=true) % simulations
         
-        function star_indices = findStarsForSim(obj, star_indices, candidates) % take a list of stars from the prefilter (or all stars) and get a list of good stars for a simulated event
+        function star_indices = findStarsForSim(obj, star_indices) % take a list of stars from the prefilter (or all stars) and get a list of good stars for a simulated event
            
             stars_not_for_sim = false(1,size(obj.corrected_fluxes,2)); % logical vector with 1s where any star has a chance of already having an event
-
-            if length(star_indices)==size(obj.corrected_fluxes,2) % when not using pre-filter, or if by some coincidence the pre-filter triggered all stars! 
-                stars_not_for_sim([candidates.star_index]) = true; % choose only stars that have a recent candidate
-            else
-                stars_not_for_sim(star_indices) = true; % just mark all the stars chosen by the pre-filter
-            end
-
+            stars_not_for_sim(star_indices) = true; % choose only stars that have a recent candidate
+            
             % make sure to take only stars with good frames! 
             B = obj.store.checker.bad_times;                            
             stars_not_for_sim = stars_not_for_sim | all(B(obj.store.search_start_idx:obj.store.search_end_idx,:)); % also disqualify stars that are completely ruled out by the checker
@@ -1199,7 +1216,7 @@ classdef EventFinder < handle
             
         end
         
-        function candidate = simulateSingleEvent(obj, star_indices, bank_name) % choose a star from the list of star_indices and add a randomly chosen occultation to it, then search for that event
+        function candidate = simulateSingleEvent(obj, star_indices) % choose a star from the list of star_indices and add a randomly chosen occultation to it, then search for that event
             
             candidate = trig.Candidate.empty;
             
@@ -1211,31 +1228,62 @@ classdef EventFinder < handle
                 star_index_sim = star_indices(randperm(length(star_indices),1)); % randomly choose a single star from the list
             end
 
-            bank = obj.(['bank_' bank_name]);
+            bank_names = {'kbos'}; % always use the default kbo bank
+            
+            if obj.pars.use_hills
+                bank_names{end+1} = 'hills'; 
+            end
+            
+            if obj.pars.use_oort
+                bank_names{end+1} = 'oort'; 
+            end
+            
+            bank = obj.(['bank_' bank_names{randi(length(bank_names))}]); % choose a random bank to simulate from
             
             [f_sim, sim_pars] = obj.getFluxWithSimulatedLightcurve(star_index_sim, bank); % add the simulated occultation to the raw fluxes
 
-            [f_corr, std_corr] = obj.correctFluxes(f_sim, star_index_sim); % PSD or linear fit correction (on top of the simulated event!)
+            all_cand = trig.Candidate.empty;
+            
+            for ii = 1:length(bank_names) % check if event triggers on all filter banks
+            
+                bank = obj.(['bank_' bank_names{ii}]); % which bank is used to filter
+            
+                [f_corr, std_corr] = obj.correctFluxes(f_sim, star_index_sim); % PSD or linear fit correction (on top of the simulated event!)
 
-            f_filt = bank.input(f_corr(:,star_index_sim), std_corr(1,star_index_sim)); % filter only the star with the simulated event on it
+                f_filt = bank.input(f_corr(:,star_index_sim), std_corr(1,star_index_sim)); % filter only the star with the simulated event on it
 
-            % get an estimate for the background of this flux:
-            if obj.pars.use_std_filtered % need to correct the filtered fluxes by their measured noise
+                % get an estimate for the background of this flux:
+                if obj.pars.use_std_filtered % need to correct the filtered fluxes by their measured noise
 
-                [bg_flux, bg_std] = obj.correctFluxes(obj.store.background_flux(:,star_index_sim), star_index_sim); % run correction on the background region
-                background_ff = bank.input(bg_flux, bg_std); % filter the background flux also
-                bg_ff_std = nanstd(background_ff); 
+                    [bg_flux, bg_std] = obj.correctFluxes(obj.store.background_flux(:,star_index_sim), star_index_sim); % run correction on the background region
+                    background_ff = bank.input(bg_flux, bg_std); % filter the background flux also
+                    bg_ff_std = nanstd(background_ff); 
 
-                f_filt = f_filt./bg_ff_std; 
+                    f_filt = f_filt./bg_ff_std; 
 
-            end % need to correct the filtered fluxes by their measured noise
+                end % need to correct the filtered fluxes by their measured noise
 
-            candidate = obj.searchForCandidates(f_sim, f_corr, f_filt, star_index_sim, bank_name, 1); % try to find a single event on this single star
+                candidate = obj.searchForCandidates(f_sim, f_corr, f_filt, star_index_sim, bank_names{ii}, 1); % try to find a single event on this single star
 
-            if ~isempty(candidate) % we recovered the injected event! 
+                all_cand = vertcat(all_cand, candidate);
+                
+            end
+            
+            N_triggers = length(all_cand); 
+            
+            trig_names = {all_cand.template_bank}; % append all the bank names that triggered
+            
+            
+            if N_triggers>0 % we recovered the injected event! 
+            
+                [~,idx] = max([all_cand.snr]); % find the best candidate (highest S/N)    
+                candidate = all_cand(idx); % keep only one candidate per simualtion
                 
                 sim_pars.detect_snr = candidate.snr; % keep track of the detection S/N for this event
                 sim_pars.passed = true; 
+                
+                sim_pars.num_triggers = N_triggers; % how many template banks triggered
+                sim_pars.bank_names = trig_names; % what the names of those banks were
                 
                 candidate.is_simulated = 1; 
                 candidate.sim_pars = sim_pars; 
@@ -1251,6 +1299,9 @@ classdef EventFinder < handle
                 
                 sim_pars.detect_snr = 0; % event was not detected, so S/N is zero
                 sim_pars.passed = false; 
+                
+                sim_pars.num_triggers = 0; % how many template banks triggered
+                sim_pars.bank_names = {}; % what the names of those banks were
                 
                 % add this parameter struct to the list of failed events
                 if isempty(obj.sim_events)
@@ -1285,7 +1336,12 @@ classdef EventFinder < handle
                     R_star = R(star_idx);
                 end
                 
-                [template, sim_pars] = bank.gen.randomLC('stellar_size', R_star); % let's set the stellar radius R=0.5 (Fresnel units)
+                r_occulter = util.stat.power_law_dist(3.5, 'min', bank.r_range(1), 'max', bank.r_range(2)); % occulter radius drawn from power law distribution
+                b_par = bank.b_range(1) + rand*(diff(bank.b_range)); % impact parameter drawn from uniform distribution
+                vel = bank.v_range(1) + rand*(diff(bank.v_range)); % velocity drawn from uniform distribution
+                
+                [template, sim_pars] = bank.gen.randomLC('stellar_size', R_star, ...
+                    'occulter', r_occulter, 'impact', b_par, 'velocity', vel); % get a random occultation
                 sim_pars.D = bank.D_au; 
                 
             end
