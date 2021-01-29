@@ -179,6 +179,7 @@ classdef RunSummary < handle
             
             input = util.text.InputVars;
             input.input_var('result', 'fraction'); % can choose "fraction" or "snr"
+            input.input_var('distance', 'kbos'); % which population we want to probe? KBOs? Hills (inner Oort) or Oort?
             input.input_var('star_size_bin', 0.5); % size of bin for R (star radius)
             input.input_var('radius_bin', 0.1); % size of bin for r (occulter radius)
             input.input_var('impact_bin', 0.2); % size of bin for b (impact parameter)
@@ -189,14 +190,31 @@ classdef RunSummary < handle
             input.input_var('vertical', 'R'); % which parameter to put in the vertical spread of frames (dim 4)
             input.scan_vars(varargin{:}); 
             
+            if ischar(input.distance)
+                
+                if cs(input.distance, 'kbos', 'kuiper belt objects')
+                    input.distance = 40; 
+                elseif cs(input.distance, 'hills cloud', 'inner oort')
+                    input.distance = 3000; 
+                elseif cs(input.distance, 'oort cloud')
+                    input.distance = 10000; 
+                else
+                    error('Unknown "distance" option "%s". Use a numeric value in AU, or "KBOs", "Hills" or "Oort"', input.distance); 
+                end
+                
+            end
+            
             val = ''; 
             
             %%%%%%%%%%% find the bin edges and distributions of each variable %%%%%%%%%%%%%%%%%
+            events = obj.sim_events;
+            events = events([events.D]==input.distance); 
+            
             if cs(input.result, 'fraction')
-                events = obj.sim_events; % mix the two together (the failed events have detect_snr = []); 
+                events = events; % mix the two together (the failed events have detect_snr = []); 
                 mode = 1; 
             elseif cs(input.result, 'snr')
-                events = obj.sim_events(logical([obj.sim_events.passed])); % take only the passing events for S/N calculation 
+                events = events(logical([events.passed])); % take only the passing events for S/N calculation 
                 mode = 2; 
             else
                 error('Unkown option "%s" to input "result". Try using "fraction" or "snr". ', input.result); 
@@ -511,6 +529,7 @@ classdef RunSummary < handle
         function showSimulations(obj, varargin)
            
             input = util.text.InputVars;
+            input.input_var('distance', 'kbos'); % which population we want to probe? KBOs? Hills (inner Oort) or Oort?
             input.input_var('parent', []); % parent can be a figure or a panel (default is gcf())
             input.input_var('font_size', 18); % fonts on the axes
             input.scan_vars(varargin{:}); 
@@ -645,10 +664,27 @@ classdef RunSummary < handle
         
         function showDetectionRate(obj, varargin)
             
+            import util.text.cs;
+            
             input = util.text.InputVars;
+            input.input_var('distance', 'kbos'); % which population we want to probe? KBOs? Hills (inner Oort) or Oort?
             input.input_var('parent'); % parent can be figure or panel (default is gcf())
             input.input_var('font_size', 18); % fonts on the axes
             input.scan_vars(varargin{:}); 
+            
+            if ischar(input.distance)
+                
+                if cs(input.distance, 'kbos', 'kuiper belt objects')
+                    input.distance = 40; 
+                elseif cs(input.distance, 'hills cloud', 'inner oort')
+                    input.distance = 3000; 
+                elseif cs(input.distance, 'oort cloud')
+                    input.distance = 10000; 
+                else
+                    error('Unknown "distance" option "%s". Use a numeric value in AU, or "KBOs", "Hills" or "Oort"', input.distance); 
+                end
+                
+            end
             
             if isempty(input.parent)
                 input.parent = gcf;
@@ -665,11 +701,11 @@ classdef RunSummary < handle
             ax_b = axes('Parent', input.parent, 'Position', [margin+(margin+width)*0 margin+(margin+height)*1 width height]); 
             ax_v = axes('Parent', input.parent, 'Position', [margin+(margin+width)*1 margin+(margin+height)*1 width height]); 
             
-            et = obj.sim_events; % events total
-            ep = obj.sim_events([obj.sim_events.passed]); 
+            et = obj.sim_events([obj.sim_events.D]==input.distance); % events total
+            ep = obj.sim_events([obj.sim_events.D]==input.distance & [obj.sim_events.passed]); 
             
             %%%%%%%% stellar radius R %%%%%%%%%%%%%%%%%%%%%
-            bin_size = 0.25;
+            bin_size = max([et.R])/25;
             [N_R,E_R] = histcounts([et.R], 'BinWidth', bin_size); 
             bar(ax_R, E_R(1:end-1)+bin_size/2, N_R); 
             hold(ax_R, 'on'); 
@@ -682,7 +718,7 @@ classdef RunSummary < handle
             
             yyaxis(ax_R, 'right'); 
             plot(ax_R, E_R(1:end-1)+bin_size/2, N_R_passed./N_R*100, '-*', 'LineWidth', 2); 
-            ax_R.YLim = [0 100]; 
+            ax_R.YLim = [0.1 100]; 
             grid(ax_R, 'on'); 
             ytickformat(ax_R, '%d%%'); 
             
@@ -704,7 +740,7 @@ classdef RunSummary < handle
             
             yyaxis(ax_r, 'right'); 
             plot(ax_r, E_r(1:end-1)+bin_size/2, N_r_passed./N_r*100, '-*', 'LineWidth', 2); 
-            ax_r.YLim = [0 100]; 
+            ax_r.YLim = [0.1 100]; 
             grid(ax_r, 'on'); 
             ytickformat(ax_r, '%d%%'); 
             
@@ -737,7 +773,8 @@ classdef RunSummary < handle
             
             
             %%%%%%%% velocity v %%%%%%%%%%%%%%%%%%%%%
-            bin_size = 2.5;
+%             bin_size = 2.5;
+            bin_size = max([et.v])/15;
             [N_v,E_v] = histcounts([et.v], 'BinWidth', bin_size); 
             bar(ax_v, E_v(1:end-1)+bin_size/2, N_v); 
             hold(ax_v, 'on'); 

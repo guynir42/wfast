@@ -650,7 +650,7 @@ classdef DataStore < handle
             R(s<0) = [];
             s(s<0) = []; 
             
-            fr = util.fit.polyfit(s, R, 'order', 1, 'sigma', 3); 
+            fr = util.fit.polyfit(s, R, 'order', 2, 'sigma', 3); 
             
             obj.size_snr_coeffs = fr.coeffs; 
             

@@ -503,22 +503,6 @@ classdef EventFinder < handle
                     
                     obj.cand = vertcat(obj.cand, hills_candidates); % store all the candidates that were found in the last batch
                     
-%                     if obj.pars.use_sim % simulated events are injected into the data and treated like real events
-% 
-%                         star_indices_sim = obj.findStarsForSim(star_indices, hills_candidates); % get stars that do not include any possible real candidates
-% 
-%                         for ii = 1:obj.getNumSimulations % this number can be more than one, or less (then we randomly decide if to include a simulated event in this batch)
-%                             
-%                             sim_cand = obj.simulateSingleEvent(star_indices_sim, 'hills'); % each call to this function tries to add a single simulated event to a random star from the list                            
-%                             
-%                             if obj.pars.use_keep_simulated
-%                                 obj.cand = vertcat(obj.cand, sim_cand); % add the simulated events to the list of regular events
-%                             end
-% 
-%                         end
-% 
-%                     end
-                    
                 end
 
                 if  isempty(obj.bank_oort) % lazy load the Oort filter bank from file
@@ -529,25 +513,9 @@ classdef EventFinder < handle
                 
                     [oort_candidates, oort_star_indices] = obj.applyTemplateBank('oort'); % by default use corrected_fluxes and correctd_stds given above
                                         
-                    star_indices = unique([star_indices, oort_star_indices]); % add the stars selected by the Oort prefilter / filter
+                    star_indices = unique([star_indices; oort_star_indices]); % add the stars selected by the Oort prefilter / filter
 
                     obj.cand = vertcat(obj.cand, oort_candidates);
-                    
-%                     if obj.pars.use_sim % simulated events are injected into the data and treated like real events
-% 
-%                         star_indices_sim = obj.findStarsForSim(star_indices, oort_candidates); % get stars that do not include any possible real candidates
-% 
-%                         for ii = 1:obj.getNumSimulations % this number can be more than one, or less (then we randomly decide if to include a simulated event in this batch)
-%                             
-%                             sim_cand = obj.simulateSingleEvent(star_indices_sim, 'oort'); % each call to this function tries to add a single simulated event to a random star from the list                            
-%                         
-%                             if obj.pars.use_keep_simulated
-%                                 obj.cand = vertcat(obj.cand, sim_cand); % add the simulated events to the list of regular events
-%                             end
-%                         
-%                         end
-% 
-%                     end
                     
                 end
                 
@@ -1336,6 +1304,8 @@ classdef EventFinder < handle
                     R_star = R(star_idx);
                 end
                 
+                R_star = R_star*sqrt(bank.D_au./40); % adjust the stellar size in case the bank is for Hills/Oort cloud
+                
                 r_occulter = util.stat.power_law_dist(3.5, 'min', bank.r_range(1), 'max', bank.r_range(2)); % occulter radius drawn from power law distribution
                 b_par = bank.b_range(1) + rand*(diff(bank.b_range)); % impact parameter drawn from uniform distribution
                 vel = bank.v_range(1) + rand*(diff(bank.v_range)); % velocity drawn from uniform distribution
@@ -1427,10 +1397,11 @@ classdef EventFinder < handle
         
         function val = estimateR(obj, idx) % get the star index and return an estimate for the star size (in FSU)
             
-            if isempty(obj.store.size_snr_coeffs)
-                val = util.stat.inverseSampling(obj.store.star_sizes, 'max', 3);  
+            if isempty(obj.store.size_snr_coeffs) || obj.store.star_snr(idx)<obj.store.pars.threshold
+                val = util.stat.inverseSampling(obj.store.star_sizes, 'max', 3, 'width', 0.02);  
             else
                 val = 0;
+                
                 for ii = 1:length(obj.store.size_snr_coeffs)
                     val = obj.store.size_snr_coeffs(ii).*obj.store.star_snr(idx).^(ii-1); 
                 end
