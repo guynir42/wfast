@@ -122,7 +122,8 @@ classdef EvFinderGUI < handle
             
             obj.menu_pars.addButton('menu_filters', '&Filters', 'menu'); 
             obj.menu_pars.menu_filters.addButton('button_prefilter', '&Prefilter', 'toggle', 'pars.use_prefilter', 'filter on a small template-bank with lower threshold and only use the full bank on passing stars');
-%             obj.menu_pars.menu_filters.addButton('input_prefilter', '&Threshold', 'input', 'pars.pre_threshold', 'threshold for the smaller template bank');
+            obj.menu_pars.menu_filters.addButton('input_prefilter', '&Threshold', 'input', 'pars.pre_threshold', 'threshold for the smaller template bank');
+            obj.menu_pars.menu_filters.addButton('button_hills', '&Hills filters', 'toggle', 'pars.use_oort', 'use the inner Oort cloud (Hills) templates');
             obj.menu_pars.menu_filters.addButton('button_oort', '&Oort filters', 'toggle', 'pars.use_oort', 'use the Oort cloud templates');
             
 %             obj.menu_pars.menu_filters.addButton('input_bank', '&Filter bank', 'input_text', 'pars.filter_bank_full_filename', 'path and name of the full filter bank MAT-file, relative to DATA', 1);

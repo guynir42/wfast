@@ -527,10 +527,21 @@ classdef EventFinder < handle
 
                     for ii = 1:obj.getNumSimulations % this number can be more than one, or less (then we randomly decide if to include a simulated event in this batch)
                         
-                        sim_cand = obj.simulateSingleEvent(star_indices_sim); % each call to this function tries to add a single simulated event to a random star from the list                            
+                        [sim_cand, sim_ev] = obj.simulateSingleEvent(star_indices_sim); % each call to this function tries to add a single simulated event to a random star from the list                            
                         
                         if obj.pars.use_keep_simulated
                             obj.cand = vertcat(obj.cand, sim_cand); % add the simulated events to the list of regular events
+                        end
+                        
+                        if ~isempty(sim_ev)
+                            
+                            % add this sim event struct to the list of events
+                            if isempty(obj.sim_events)
+                                obj.sim_events = sim_pars;
+                            else
+                                obj.sim_events(end+1) = sim_pars;
+                            end
+
                         end
                         
                     end
@@ -880,7 +891,8 @@ classdef EventFinder < handle
             c.kern_index = idx(2); % which kernel triggered
             c.star_index = star_indices(idx(3)); % which star (out of all stars that passed the burn-in)
             c.star_index_global = obj.store.star_indices(star_indices(idx(3))); % get the star index in the original list of stars before pre-filter and before burn-in
-
+            c.star_snr = obj.store.star_snr(c.star_index_global); % get the S/N that was recorded at end of burn in
+            
             c.template_bank = bank_name; % keep a record of which template bank was used
             c.kernel = bank.kernels(:,c.kern_index); % the lightcurve of the kernel used (zero centered and normalized)
             c.kern_props = bank.pars(c.kern_index); % properties of the occultation that would generate this kernel
@@ -949,7 +961,7 @@ classdef EventFinder < handle
             % get the observational parameters and the star parameters from astrometry/GAIA
             c.head = obj.head;
             if ~isempty(obj.cat) && obj.cat.success
-                c.star_props = obj.cat.data(c.star_index,:); % copy a table row from the catalog
+                c.star_props = obj.cat.data(c.star_index_global,:); % copy a table row from the catalog
             end
 
             % save the parameters used by the finder, store and quality-checker
@@ -1184,9 +1196,10 @@ classdef EventFinder < handle
             
         end
         
-        function candidate = simulateSingleEvent(obj, star_indices) % choose a star from the list of star_indices and add a randomly chosen occultation to it, then search for that event
+        function [candidate, sim_pars] = simulateSingleEvent(obj, star_indices) % choose a star from the list of star_indices and add a randomly chosen occultation to it, then search for that event
             
             candidate = trig.Candidate.empty;
+            sim_pars = []; 
             
             if isempty(star_indices) % no stars, no simulation! 
                 return;
@@ -1256,13 +1269,6 @@ classdef EventFinder < handle
                 candidate.is_simulated = 1; 
                 candidate.sim_pars = sim_pars; 
                 
-                % add this parameter struct to the list of passed events
-                if isempty(obj.sim_events)
-                    obj.sim_events = sim_pars;
-                else
-                    obj.sim_events(end+1) = sim_pars;
-                end
-                
             else % no events were recovered
                 
                 sim_pars.detect_snr = 0; % event was not detected, so S/N is zero
@@ -1270,13 +1276,6 @@ classdef EventFinder < handle
                 
                 sim_pars.num_triggers = 0; % how many template banks triggered
                 sim_pars.bank_names = {}; % what the names of those banks were
-                
-                % add this parameter struct to the list of failed events
-                if isempty(obj.sim_events)
-                    obj.sim_events = sim_pars;
-                else
-                    obj.sim_events(end+1) = sim_pars;
-                end
                 
             end
 
@@ -1296,12 +1295,14 @@ classdef EventFinder < handle
                     R = obj.cat.data.FresnelSize;
                 end
                 
-                if isnan(R(star_idx)) % no stellar radius known from GAIA, try to estimate it 
-                    R_star = obj.estimateR(star_idx); 
-                elseif R(star_idx)>3 % do not simulate stars bigger than this 
+                star_idx_global = obj.store.star_indices(star_idx);
+                
+                if isnan(R(star_idx_global)) % no stellar radius known from GAIA, try to estimate it 
+                    R_star = obj.estimateR(star_idx_global); 
+                elseif R(star_idx_global)>3 % do not simulate stars bigger than this 
                     R_star = 3; 
                 else
-                    R_star = R(star_idx);
+                    R_star = R(star_idx_global);
                 end
                 
                 R_star = R_star*sqrt(bank.D_au./40); % adjust the stellar size in case the bank is for Hills/Oort cloud
@@ -1397,14 +1398,18 @@ classdef EventFinder < handle
         
         function val = estimateR(obj, idx) % get the star index and return an estimate for the star size (in FSU)
             
-            if isempty(obj.store.size_snr_coeffs) || obj.store.star_snr(idx)<obj.store.pars.threshold
+            S = obj.store.star_snr(idx); % the index must be given from the global list of stars! 
+            
+            if isempty(obj.store.size_snr_coeffs) || S<obj.store.pars.threshold % the second conditions should not occur... 
                 val = util.stat.inverseSampling(obj.store.star_sizes, 'max', 3, 'width', 0.02);  
             else
+                
                 val = 0;
                 
                 for ii = 1:length(obj.store.size_snr_coeffs)
-                    val = obj.store.size_snr_coeffs(ii).*obj.store.star_snr(idx).^(ii-1); 
+                    val = val + obj.store.size_snr_coeffs(ii).*S.^(ii-1); 
                 end
+                
             end
 
         end

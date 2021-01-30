@@ -1,4 +1,4 @@
-classdef KuiperBeltModel < handle
+classdef CometModel < handle
 
     properties(Transient=true)
         
@@ -42,13 +42,13 @@ classdef KuiperBeltModel < handle
     
     methods % constructor
         
-        function obj = KuiperBeltModel(varargin)
+        function obj = CometModel(varargin)
             
-            if ~isempty(varargin) && isa(varargin{1}, 'trig.KuiperBeltModel')
-                if obj.debug_bit>1, fprintf('KuiperBeltModel copy-constructor v%4.2f\n', obj.version); end
+            if ~isempty(varargin) && isa(varargin{1}, 'trig.CometModel')
+                if obj.debug_bit>1, fprintf('CometModel copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
             else
-                if obj.debug_bit>1, fprintf('KuiperBeltModel constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('CometModel constructor v%4.2f\n', obj.version); end
             
             end
             

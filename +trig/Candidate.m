@@ -106,6 +106,7 @@ classdef Candidate < handle
         kern_index; % from the full filter bank
         star_index; % from the stars that passed the initial burn-in (not from the subset that survived the pre-filter
         star_index_global; % from all the stars in this run (compare this to the catalog, cutouts, etc)
+        star_snr; % from the store's burn in period
         frame_index; % the frame of the peak inside the original batch/file
         
         time_range; % time indices around time_index that are considered "part of the event"
@@ -245,7 +246,7 @@ classdef Candidate < handle
             
         end
         
-        function val = star_snr(obj)
+        function val = star_current_snr(obj)
             
             if isempty(obj.flux_mean) || isempty(obj.flux_std)
                 val = [];
@@ -283,8 +284,8 @@ classdef Candidate < handle
             
             t = datetime(J, 'convertFrom', 'juliandate', 'TimeZone', 'UTC'); 
             
-            str = sprintf('id: %d | star: %d | frame= %d | batch= %d | time: %02d:%02d:%02d | event S/N= %4.2f | star S/N= %4.2f | x/y= %d, %d ', ...
-                    obj.serial, obj.star_index, obj.time_index, obj.batch_number, hour(t), minute(t), round(second(t)), obj.snr, obj.star_snr, ...
+            str = sprintf('id: %d | star: %d | frame= %d | batch= %d | time: %02d:%02d:%02d | event S/N= %4.2f | star S/N= %4.2f (%4.2f) | x/y= %d, %d ', ...
+                    obj.serial, obj.star_index, obj.time_index, obj.batch_number, hour(t), minute(t), round(second(t)), obj.snr, obj.star_current_snr, obj.star_snr, ...
                     round(nanmean(obj.auxiliary(:,obj.aux_indices.centroids_x))), round(nanmean(obj.auxiliary(:,obj.aux_indices.centroids_y))));
             
         end

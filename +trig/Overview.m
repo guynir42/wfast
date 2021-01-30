@@ -6,7 +6,9 @@ classdef Overview < handle
     
     properties % objects
         
-        kbos@trig.KuiperBeltModel; 
+        kbos@trig.CometModel; 
+        hills@trig.CometModel; 
+        oort@trig.CometModel; 
         folders@trig.RunFolder; 
         
     end
@@ -87,6 +89,12 @@ classdef Overview < handle
                 obj = util.oop.full_copy(varargin{1});
             else
                 if obj.debug_bit>1, fprintf('Overview constructor v%4.2f\n', obj.version); end
+                
+                obj.kbos = trig.CometModel; 
+                
+                obj.hills = trig.CometModel('hills'); 
+                
+                obj.oort = trig.CometModel('oort'); 
                 
                 obj.reset; 
                 
@@ -347,7 +355,7 @@ classdef Overview < handle
             
         end
         
-        function [N_total, N_passed] = calcEfficiency(obj, r_edges) % a 3D matrix telling what fraction of events we got from injected events
+        function [N_total, N_passed] = calcEfficiency(obj, r_edges, distance_au) % a 3D matrix telling what fraction of events we got from injected events
         % Since we have injected events with the "true" stellar radius 
         % S/N and impact parameter (b), we can assume the detection 
         % efficiency already takes into account these distributions.
@@ -368,6 +376,8 @@ classdef Overview < handle
         % That will still need to be multiplied by the scanning speed and 
         % the KBO size distribution, to get the total coverage. 
         
+            import util.text.cs;
+        
             if nargin<2 || isempty(r_edges)
                 
                 if isempty(obj.r_edges)
@@ -376,6 +386,32 @@ classdef Overview < handle
                 
                 r_edges = obj.r_edges; 
                     
+            end
+            
+            if nargin<3 || isempty(distance_au)
+                distance_au = 40; 
+            end
+            
+            if ischar(distance_au)
+                
+                if cs(distance_au, 'kbos', 'kuiper belt objects')
+                    distance_au = 40; 
+                elseif cs(distance_au, 'hills cloud', 'inner oort')
+                    distance_au = 3000; 
+                elseif cs(distance_au, 'oort cloud')
+                    distance_au = 10000; 
+                else
+                    error('Unknown "distance" option "%s". Use a numeric value in AU, or "KBOs", "Hills" or "Oort"', input.distance); 
+                end
+                
+            end
+            
+            if distance_au<100
+                comets = obj.kbos; 
+            elseif distance_au<5000
+                comets = obj.hills;
+            else
+                comets = obj.oort; 
             end
             
             r_edges = obj.km2fsu.*r_edges;

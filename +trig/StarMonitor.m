@@ -107,7 +107,7 @@ classdef StarMonitor < handle
             
             for ii = 1:length(obj.star_indices)
                 for jj = 1:length(candidates)
-                    if candidates(jj).star_index==obj.star_indices(ii)
+                    if candidates(jj).star_index==obj.star_indices(ii) % note: this index is on the stars that passed the threshold after the burn in
                         c = util.oop.full_copy(candidates(jj));
                         c.cutouts_all = cutouts;
                         obj.cand = vertcat(obj.cand, c);
