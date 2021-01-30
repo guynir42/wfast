@@ -10,6 +10,8 @@ classdef CometModel < handle
     
     properties % inputs/outputs
         
+        name = 'KBOs'; % by default, create a KBO model
+        
         index_power_law = -3.8;
         index_lower = -4.0;
         index_upper = -3.6;
@@ -44,9 +46,31 @@ classdef CometModel < handle
         
         function obj = CometModel(varargin)
             
+            import util.text.cs;
+            
             if ~isempty(varargin) && isa(varargin{1}, 'trig.CometModel')
                 if obj.debug_bit>1, fprintf('CometModel copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
+            elseif ~isempty(varargin) && ischar(varargin{1})
+                
+                if cs(varargin{1}, 'kbos', 'kuiper belt model')
+                    % leave all defaults
+                elseif cs(varargin{1}, 'hills cloud', 'inner oort cloud')
+                    obj.name = 'Hills'; 
+                    obj.start_radius = 5; 
+                    obj.normalization = 1e12/(4*180^2/pi); % total number of comets, over entire sky
+                    obj.norm_lower = obj.normalization/10; 
+                    obj.norm_upper = obj.normalization*10; 
+                elseif cs(varargin{1}, 'oort cloud')
+                    obj.name = 'Oort'; 
+                    obj.start_radius = 5; 
+                    obj.normalization = 1e12/(4*180^2/pi); % total number of comets, over entire sky
+                    obj.norm_lower = obj.normalization/10; 
+                    obj.norm_upper = obj.normalization*10; 
+                else
+                    error('Unknown comet model: "%s". Use "KBOs" or "Hills" or "Oort"', varargin{1}); 
+                end
+                
             else
                 if obj.debug_bit>1, fprintf('CometModel constructor v%4.2f\n', obj.version); end
             

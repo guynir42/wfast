@@ -22,11 +22,11 @@ classdef Overview < handle
         vel_edges; % transverse velocity bin edges used in the star_seconds and losses histograms (km/s)
         snr_edges; % S/N bin edges used in the star_seconds and losses histograms
         size_edges; % stellar size edges used in the star_seconds and losses histograms (Fresnel units, estimated at 40 AU)
-        r_edges; % occulter radius edges used in efficiency estimates (km)
+%         r_edges; % occulter radius edges used in efficiency estimates (km)
         
         b_max; % the maximumum impact parameter used in simulations. This tells us we can integrate -b_max to b_max to get the coverage
         
-        star_seconds; % the number of useful seconds accumulated each S/N bin (this is saved after subtracting losses)
+        star_seconds; % the number of useful seconds. Dims 1- S/N, 2- R, 3- ECL 4- vel
         star_seconds_with_losses; % the number of seconds accumulated without excluding anything
         losses_exclusive; % same as histogram, only counting the losses due to each cut (exclusive means times where ONLY this cut was responsible)
         losses_inclusive; % same as histogram, only counting the losses due to each cut (inclusive means times where this cut was ALSO responsible)
@@ -54,7 +54,7 @@ classdef Overview < handle
         vel_max = 31; % transverse velocity bin maximum
         snr_bin_width = 1; % S/N bin width
         size_bin_width = 0.1; % stellar size bin width
-               
+           
         % these are used to calculate the coverage/number of detections
         lambda_nm = 500; % to calculate the Fresnel scale
         distance_au = 40; % to calculate the Fresnel scale
@@ -75,8 +75,9 @@ classdef Overview < handle
     end
     
     properties(Hidden=true)
-       
-        version = 1.00;
+        
+        default_r_edges_fsu = 0.2:0.1:2;
+        version = 1.01;
         
     end
     
@@ -200,15 +201,23 @@ classdef Overview < handle
             
         end
         
-        function val = km2fsu(obj)
+        function val = km2fsu(obj, dist_au)
             
-            val = sqrt(obj.lambda_nm.*1e-12.*obj.distance_au.*1.496e+8/2); 
+            if nargin<2 || isempty(dist_au)
+                dist_au = obj.distance_au; 
+            end
+           
+            val = 1./sqrt(obj.lambda_nm.*1e-12.*dist_au.*1.496e+8/2); 
             
         end
         
-        function val = fsu2deg2(obj)
+        function val = fsu2deg2(obj, dist_au)
 
-            val = obj.lambda_nm.*1e-12./(obj.distance_au.*1.496e+8)/2*(180/pi).^2; 
+            if nargin<2 || isempty(dist_au)
+                dist_au = obj.distance_au; 
+            end
+            
+            val = obj.lambda_nm.*1e-12./(dist_au.*1.496e+8)/2*(180/pi).^2; 
 
         end
         
@@ -378,16 +387,6 @@ classdef Overview < handle
         
             import util.text.cs;
         
-            if nargin<2 || isempty(r_edges)
-                
-                if isempty(obj.r_edges)
-                    obj.r_edges = 0:0.1:3;
-                end
-                
-                r_edges = obj.r_edges; 
-                    
-            end
-            
             if nargin<3 || isempty(distance_au)
                 distance_au = 40; 
             end
@@ -401,21 +400,17 @@ classdef Overview < handle
                 elseif cs(distance_au, 'oort cloud')
                     distance_au = 10000; 
                 else
-                    error('Unknown "distance" option "%s". Use a numeric value in AU, or "KBOs", "Hills" or "Oort"', input.distance); 
+                    error('Unknown "distance" option "%s". Use a numeric value in AU, or "KBOs", "Hills" or "Oort"', distance_au); 
                 end
                 
             end
             
-            if distance_au<100
-                comets = obj.kbos; 
-            elseif distance_au<5000
-                comets = obj.hills;
-            else
-                comets = obj.oort; 
+            if nargin<2 || isempty(r_edges)                
+                r_edges = obj.default_r_edges_fsu./obj.km2fsu(distance_au); 
             end
             
-            r_edges = obj.km2fsu.*r_edges;
-            v_edges = obj.km2fsu.*obj.vel_edges;
+            r_edges = obj.km2fsu(distance_au).*r_edges;
+            v_edges = obj.km2fsu(distance_au).*obj.vel_edges;
             
             obj.b_max = nanmax([obj.sim_events.b]); 
             
@@ -451,7 +446,7 @@ classdef Overview < handle
             
         end
         
-        function [coverage, cov_lower, cov_upper, E, E_l, E_u, N_total, N_passed] = calcCoverage(obj, r_edges)
+        function [coverage, cov_lower, cov_upper, E, E_l, E_u, N_total, N_passed] = calcCoverage(obj, r_edges, distance_au)
             
             if isempty(obj.star_seconds)
                 disp('No star seconds have been accumulated yet!'); 
@@ -459,18 +454,30 @@ classdef Overview < handle
                 return;
             end
             
-            if nargin<2 || isempty(r_edges)
+            if nargin<3 || isempty(distance_au)
+                distance_au = 40; 
+            end
+            
+            if ischar(distance_au)
                 
-                if isempty(obj.r_edges)
-                    obj.r_edges = 0:0.1:3;
+                if cs(distance_au, 'kbos', 'kuiper belt objects')
+                    distance_au = 40; 
+                elseif cs(distance_au, 'hills cloud', 'inner oort')
+                    distance_au = 3000; 
+                elseif cs(distance_au, 'oort cloud')
+                    distance_au = 10000; 
+                else
+                    error('Unknown "distance" option "%s". Use a numeric value in AU, or "KBOs", "Hills" or "Oort"', distance_au); 
                 end
                 
-                r_edges = obj.r_edges; 
-                    
+            end
+            
+            if nargin<2 || isempty(r_edges)                
+                r_edges = obj.default_r_edges_fsu./obj.km2fsu(distance_au); 
             end
             
             % the result should have 2D (dim1 velocity and dim2 occulter radius)
-            [N_total, N_passed] = obj.calcEfficiency(r_edges);
+            [N_total, N_passed] = obj.calcEfficiency(r_edges, distance_au);
             
             E = N_passed./N_total; 
             E(N_total==0) = 0; % where there are no events at all, efficiency is zero
@@ -487,22 +494,22 @@ classdef Overview < handle
             T = permute(T, [4,1,3,2]); % arrange velocity into the 1st dim, leave dim 2 as scalar (for r) and dim 3 for ecl 
             
             v_shift = 0; % add a shift for e.g., KBO intrinsic orbital velocity (in km/s)
-            v = obj.km2fsu.*(obj.vel_edges(1:end-1)+obj.vel_bin_width/2 - v_shift); % velocity bin centers, translated from km/s to FSU/s
+            v = obj.km2fsu(distance_au).*(obj.vel_edges(1:end-1)+obj.vel_bin_width/2 - v_shift); % velocity bin centers, translated from km/s to FSU/s
             v = abs(util.vec.tocolumn(v)); % put it on the same dimension as the matrices and take the abs() in case we got negative velocities
             
             b = 2.*obj.b_max; % the range of impact parameters, integrated from -b_max to +b_max
             
             coverage = nansum(E.*T.*b.*v, 1); % integral of efficiency and time and impact parameter, for each velocity
             coverage = permute(coverage, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
-            coverage = coverage.*obj.fsu2deg2; 
+            coverage = coverage.*obj.fsu2deg2(distance_au); 
             
             cov_lower = nansum(E_l.*T.*b.*v, 1); % integral of efficiency and time and impact parameter, for each velocity
             cov_lower = permute(cov_lower, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
-            cov_lower = cov_lower.*obj.fsu2deg2; 
+            cov_lower = cov_lower.*obj.fsu2deg2(distance_au); 
             
             cov_upper = nansum(E_u.*T.*b.*v, 1); % integral of efficiency and time and impact parameter, for each velocity
             cov_upper = permute(cov_upper, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
-            cov_upper = cov_upper.*obj.fsu2deg2; 
+            cov_upper = cov_upper.*obj.fsu2deg2(distance_au); 
             
         end
         
@@ -511,6 +518,7 @@ classdef Overview < handle
             input = util.text.InputVars;
             input.input_var('ecl', [-5,5], 'ecliptic latitude', 'ecliptic limits'); 
             input.input_var('r_edges', []);
+            input.input_var('distance', 40, 'distance_au', 'dist_au'); 
             input.scan_vars(varargin{:}); 
             
             if length(input.ecl)~=2
@@ -524,20 +532,36 @@ classdef Overview < handle
                 error('No data for the ecliptic latitude range %s', util.text.print_vec(input.ecl, ' to ')); 
             end
             
-            if isempty(input.r_edges)
-
-                if isempty(obj.r_edges)
-                    obj.r_edges = 0:0.1:3;
-                end
-
-                input.r_edges = obj.r_edges; 
-
-            end 
-            
             r = util.vec.tocolumn(input.r_edges);
             r = r(1:end-1) + diff(r)/2; 
             
-            [coverage, cov_lower, cov_upper] = obj.calcCoverage(input.r_edges);
+            if ischar(input.distance)
+                
+                if cs(input.distance, 'kbos', 'kuiper belt objects')
+                    input.distance = 40; 
+                elseif cs(input.distance, 'hills cloud', 'inner oort')
+                    input.distance = 3000; 
+                elseif cs(input.distance, 'oort cloud')
+                    input.distance = 10000; 
+                else
+                    error('Unknown "distance" option "%s". Use a numeric value in AU, or "KBOs", "Hills" or "Oort"', input.distance); 
+                end
+                
+            end
+            
+            if input.distance<=200
+                comets = obj.kbos; 
+            elseif input.distance<=5000
+                comets = obj.hills;
+            else
+                comets = obj.oort; 
+            end
+            
+            if isempty(input.r_edges)                
+                input.r_edges = obj.default_r_edges_fsu./obj.km2fsu(input.distance); 
+            end
+            
+            [coverage, cov_lower, cov_upper] = obj.calcCoverage(input.r_edges, input.distance);
             
             % integrate over the relevant ecliptic latitudes
             C = nansum(coverage(:,ecl_idx1:ecl_idx2),2);
@@ -550,7 +574,7 @@ classdef Overview < handle
 %             C_m = C - C_l; % coverage minus
             
             % get the KBO abundance in each r interval
-            [n, n_l, n_u] = obj.kbos.numDensityIntervals(input.r_edges);
+            [n, n_l, n_u] = comets.numDensityIntervals(input.r_edges);
             
 %             n_p = n_u - n; % number density plus
 %             n_m = n - n_l; % number density minus
@@ -988,11 +1012,12 @@ classdef Overview < handle
             
         end
         
-        function showKBOs(obj, varargin)
+        function showCoverage(obj, varargin)
             
             input = util.text.InputVars;
             input.input_var('ecl', [-5,5], 'ecliptic latitude', 'ecliptic limits'); 
             input.input_var('r_edges', []);
+            input.input_var('distance', 40, 'distance_au', 'dist_au'); 
             input.input_var('log', true, 'logarithm'); 
             input.input_var('axes', [], 'axis'); 
             input.input_var('font_size', 18); 
@@ -1009,20 +1034,36 @@ classdef Overview < handle
                 error('No data for the ecliptic latitude range %s', util.text.print_vec(input.ecl, ' to ')); 
             end
             
-            if isempty(input.r_edges)
-
-                if isempty(obj.r_edges)
-                    obj.r_edges = 0:0.1:3;
+            if ischar(input.distance)
+                
+                if cs(input.distance, 'kbos', 'kuiper belt objects')
+                    input.distance = 40; 
+                elseif cs(input.distance, 'hills cloud', 'inner oort')
+                    input.distance = 3000; 
+                elseif cs(input.distance, 'oort cloud')
+                    input.distance = 10000; 
+                else
+                    error('Unknown "distance" option "%s". Use a numeric value in AU, or "KBOs", "Hills" or "Oort"', input.distance); 
                 end
-
-                input.r_edges = obj.r_edges; 
-
-            end 
+                
+            end
+            
+            if input.distance<=200
+                comets = obj.kbos; 
+            elseif input.distance<=5000
+                comets = obj.hills;
+            else
+                comets = obj.oort; 
+            end
+            
+            if isempty(input.r_edges)
+                input.r_edges = obj.default_r_edges_fsu./obj.km2fsu(input.distance); 
+            end
             
             r = util.vec.tocolumn(input.r_edges);
             r = r(1:end-1) + diff(r)/2; 
             
-            [coverage, cov_lower, cov_upper] = obj.calcCoverage(input.r_edges);
+            [coverage, cov_lower, cov_upper] = obj.calcCoverage(input.r_edges, input.distance);
             
             star_hours = obj.star_seconds(:,:,ecl_idx1:ecl_idx2,:); 
             star_hours = nansum(star_hours(:))./3600; 
@@ -1050,7 +1091,7 @@ classdef Overview < handle
             h_c_l = plot(input.axes, r, 1./C_l, '--', 'LineWidth', 1.5, 'Color', h_c_u.Color); 
             h_c_l.HandleVisibility = 'off'; 
             
-            obj.kbos.show('r_edges', input.r_edges); 
+            comets.show('r_edges', input.r_edges); 
             
             input.axes.NextPlot = hold_state;
             
