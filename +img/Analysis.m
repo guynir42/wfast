@@ -206,7 +206,7 @@ classdef Analysis < file.AstroData
                 obj.phot.index = 1;
                 
                 obj.phot_stack = img.Photometry;
-                obj.phot_stack.aperture = 3; 
+                obj.phot_stack.aperture = [3 5 7]; 
                 obj.phot_stack.saturation_value = 5e6; 
                 obj.phot_stack.index = 2;
                 
@@ -451,6 +451,7 @@ classdef Analysis < file.AstroData
                     warning(ME.getReport);
                     
                 end
+                
             end
             
         end
@@ -1990,7 +1991,7 @@ classdef Analysis < file.AstroData
                 mean_fluxes = obj.flux_buf.mean;
                 mean_fluxes(mean_fluxes<=0) = NaN;
 
-                new_fluxes = obj.phot_stack.fluxes;
+                new_fluxes = obj.phot_stack.fluxes(:,:,end);
                 new_fluxes(isnan(mean_fluxes)) = [];
                 mean_fluxes(isnan(mean_fluxes)) = [];
 

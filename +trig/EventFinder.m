@@ -537,9 +537,9 @@ classdef EventFinder < handle
                             
                             % add this sim event struct to the list of events
                             if isempty(obj.sim_events)
-                                obj.sim_events = sim_pars;
+                                obj.sim_events = sim_ev;
                             else
-                                obj.sim_events(end+1) = sim_pars;
+                                obj.sim_events(end+1) = sim_ev;
                             end
 
                         end

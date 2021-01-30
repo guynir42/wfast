@@ -75,6 +75,7 @@ classdef Photometry < handle
         use_forced = 1;
         use_best_offsets = 1; % if this is true, keep the offsets from gaussian even if using aperture/forced 
         use_best_widths = 1; % if this is true, keep the widths from gaussian even if using aperture/forced BUT correct them for the use of an added gaussian! 
+        resolution = 2; % how many shifts can we do inside one pixel when positioning the aperture/gaussian? 
         use_positive = 0; % only take positive values when calculating 2nd moments
         
         corner_size = 0.15; % fraction of the cut_size or pixel value (must be smaller than cut_size!)
@@ -388,7 +389,7 @@ classdef Photometry < handle
                 
                 s = util.img.photometry2(single(obj.cutouts), 'iterations', obj.iterations, ...
                     'radii', obj.aperture, 'annulus', [obj.annulus, obj.annulus_outer], 'sigma', obj.gauss_sigma, ...
-                    'use_gaussian', obj.use_gaussian, 'use_centering', obj.use_centering, ...
+                    'use_gaussian', obj.use_gaussian, 'use_centering', obj.use_centering, 'resolution', obj.resolution, ...
                     'use_apertures', obj.use_aperture, 'use_forced', obj.use_forced, 'use_positive', obj.use_positive, ...
                     'threads', obj.num_threads, 'debug_bit', obj.debug_bit, 'index', obj.index); 
                 

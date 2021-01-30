@@ -2109,7 +2109,9 @@ classdef Lightcurves < handle
             
             phot_pars = obj.phot_pars;
             
-            header = obj.head;
+            header = util.oop.full_copy(obj.head);
+            header.phot_pars = phot_pars; 
+            
             if ~isempty(obj.cat)
                 cat = obj.cat.data;
             end
