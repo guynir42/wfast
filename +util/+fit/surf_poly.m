@@ -23,6 +23,8 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
 %           Default is one second. 
 %   -axes: the graphic axes to plot into. Default is gca(). 
 %   -font_size: the axes font size when plotting. 
+%   -marker_size: the size of the little circles for the measurements, on 
+%                 the scatter plot (when plot=1). Default is 40. 
 %           
 
 
@@ -42,6 +44,7 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
     input.input_var('pause', 1, 'duration'); 
     input.input_var('ax', [], 'axes', 'axis'); 
     input.input_var('font_size', 18); 
+    input.input_var('marker_size', 40); 
     input.scan_vars(varargin{:}); 
     
     if input.plot && isempty(input.ax)
@@ -168,6 +171,15 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
         
         bad_indices = nan_indices; % indices of outlier measurements or NaNs
         
+        X(bad_indices) = [];
+        Y(bad_indices) = [];
+        V(bad_indices) = [];
+
+        if ~isempty(w)
+            W = w(:,ii);                    
+            W(bad_indices) = [];
+        end
+        
         for jj = 1:input.iterations
 
             A = []; % the design matrix is built up from powers of x and y
@@ -236,13 +248,13 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
                 hold(input.ax, 'on'); 
                 
                 if isempty(W)
-                    marker_sizes = 25;
+                    marker_sizes = input.marker_size;
                 else
-                    marker_sizes = 10.*w(:,ii)./nanmean(w(:,ii)); 
+                    marker_sizes = input.marker_size.*w(:,ii)./nanmean(w(:,ii)); 
                 end
                 
-                scatter(input.ax, x(:,ii), y(:,ii), marker_sizes, v(:,ii), 'o', 'filled'); 
-                scatter(input.ax, x(bad_indices,ii), y(bad_indices,ii), 25, 'r', 'x'); 
+                scatter(input.ax, x(:,ii), y(:,ii), marker_sizes, v(:,ii), 'o', 'filled','MarkerEdgeColor','k'); 
+                scatter(input.ax, x(bad_indices,ii), y(bad_indices,ii), input.marker_size, 'r', 'x'); 
                 hold(input.ax, 'off'); 
                 
                 colorbar(input.ax); 
@@ -252,7 +264,12 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
             
             end
             
-            idx = find(abs(new_result.residuals./w(:,ii)) > input.sigma.*sqrt(new_result.var));
+            if isempty(w)
+                idx = find(abs(new_result.residuals) > input.sigma.*sqrt(new_result.var));
+            else
+                idx = find(abs(new_result.residuals./w(:,ii)) > input.sigma.*sqrt(new_result.var));
+            end
+            
             idx = unique([nan_indices; idx]); % add the measurements where we found NaN values
             
             if isequal(idx, bad_indices)
