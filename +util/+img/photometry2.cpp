@@ -580,6 +580,7 @@ void Photometry::ingestParameters(Photometry::Parameters new_pars){ // for each 
 	// update the aperture/forced radii
 	if(new_pars.num_radii!=pars.num_radii){ // different number of radii, must recreate the radii array
 		deleteOutputArray(output_apertures); 
+		deleteOutputArray(output_forced); 
 		deleteApertureMasks();
 		pars.num_radii=new_pars.num_radii;
 		if(pars.ap_radii) delete(pars.ap_radii); 

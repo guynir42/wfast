@@ -97,7 +97,7 @@ classdef LightGUI < handle
 %             obj.panel_methods.make;
             
             
-            N = 17;
+            N = 18;
             pos = N;
 
             %%%%%%%%%%% panel control %%%%%%%%%%%%%%%
@@ -144,9 +144,10 @@ classdef LightGUI < handle
 
             %%%%%%%%%%% panel display %%%%%%%%%%%%%%%%
             
-            pos = pos - 5;
-            obj.panel_display = GraphicPanel(obj.owner, [0 pos/N 0.2 5/N], 'display');
-            obj.panel_display.number = 5;
+            pos = pos - 6;
+            obj.panel_display = GraphicPanel(obj.owner, [0 pos/N 0.2 6/N], 'display');
+            obj.panel_display.number = 6;
+            obj.panel_display.addButton('button_index', 'index_flux', 'input', 'idx= ','', '', 0.5, '', '', 'which aperture type to display'); 
             obj.panel_display.addButton('button_show_what', 'show_what', 'picker', obj.owner.show_what, '', '', 0.7); 
             obj.panel_display.addButton('button_flux_type', 'show_flux_type', 'picker', obj.owner.show_flux_type, '', '', 0.3); 
             obj.panel_display.addButton('input_num_stars', 'show_num_stars', 'input', 'Nstars= ');

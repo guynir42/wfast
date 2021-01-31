@@ -158,7 +158,15 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
             W = [];
         end
         
-        bad_indices = []; % indices of outlier measurements
+        nan_indices = isnan(x(:,ii)) | isnan(y(:,ii)) | isnan(v(:,ii)); 
+        
+        if ~isempty(W)
+            nan_indices = nan_indices | isnan(w(:,ii)); 
+        end
+        
+        nan_indices = find(nan_indices); 
+        
+        bad_indices = nan_indices; % indices of outlier measurements or NaNs
         
         for jj = 1:input.iterations
 
@@ -245,6 +253,7 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
             end
             
             idx = find(abs(new_result.residuals./w(:,ii)) > input.sigma.*sqrt(new_result.var));
+            idx = unique([nan_indices; idx]); % add the measurements where we found NaN values
             
             if isequal(idx, bad_indices)
                 break;

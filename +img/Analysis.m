@@ -1451,7 +1451,7 @@ classdef Analysis < file.AstroData
                 end
             end
             
-            obj.flux_buf.input(obj.phot_stack.fluxes);% store the latest fluxes from the stack cutouts (to verify we didn't lose the stars)
+            obj.flux_buf.input(obj.phot_stack.fluxes(:,:,end));% store the latest fluxes from the stack cutouts (to verify we didn't lose the stars)
             
             if obj.use_stack_all
                 if obj.use_stack_all_proc

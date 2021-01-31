@@ -2291,7 +2291,7 @@ classdef Lightcurves < handle
             if cs(obj.show_what, 'fluxes')
                 
                 if cs(obj.show_flux_type, 'raw')
-                    obj.addPlots(input.ax, obj.fluxes);
+                    obj.addPlots(input.ax, obj.fluxes(:,:,obj.index_flux_number));
                 elseif cs(obj.show_flux_type, 'sub')
                     obj.addPlots(input.ax, obj.fluxes_sub);
                 elseif cs(obj.show_flux_type, 'rem')
