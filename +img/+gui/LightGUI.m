@@ -97,7 +97,7 @@ classdef LightGUI < handle
 %             obj.panel_methods.make;
             
             
-            N = 18;
+            N = 19;
             pos = N;
 
             %%%%%%%%%%% panel control %%%%%%%%%%%%%%%
@@ -112,8 +112,8 @@ classdef LightGUI < handle
             
             %%%%%%%%%%% panel process %%%%%%%%%%%%%%%%
             
-            pos = pos - 7;
-            obj.panel_process = GraphicPanel(obj.owner, [0 pos/N 0.2 7/N], 'process');
+            pos = pos - 8;
+            obj.panel_process = GraphicPanel(obj.owner, [0 pos/N 0.2 8/N], 'process');
             obj.panel_process.number = 5;
             obj.panel_process.addButton('button_background', 'use_subtract_backgrounds', 'toggle', 'sub b/g', 'sub b/g', '', 0.5, obj.color_on);
             obj.panel_process.addButton('button_back_median', 'use_background_median', 'toggle', 'b/g median', 'b/g median', '', 0.5, obj.color_on);
@@ -123,9 +123,11 @@ classdef LightGUI < handle
             obj.panel_process.addButton('button_bad_times', 'use_skip_bad_times', 'toggle', 'bad times', 'bad times', '', 0.5, obj.color_on);
             obj.panel_process.addButton('input_fraction', 'bad_times_fraction', 'input', 'frac= ', '', '', 0.5);
             obj.panel_process.addButton('button_airmass', 'use_airmass_correction', 'toggle', 'airmass', 'airmass', '', 0.5, obj.color_on);
-            obj.panel_process.addButton('button_width', 'use_psf_correction', 'toggle', 'PSF width', 'PSF width', '', 0.5, obj.color_on);
-            obj.panel_process.addButton('button_zero_point', 'use_zero_point', 'toggle', 'zero point', 'zero point', '', 0.5, obj.color_on);
             obj.panel_process.addButton('button_placeholder', '', 'custom', ' ', ' ', '', 0.5, obj.color_on);
+            obj.panel_process.addButton('button_width', 'use_psf_correction', 'toggle', 'PSF width', 'PSF width', '', 0.5, obj.color_on);
+            obj.panel_process.addButton('button_offset_fit', 'use_offset_fit', 'toggle', 'offsets', 'offsets', '', 0.5, obj.color_on);
+            obj.panel_process.addButton('button_zero_point', 'use_zero_point', 'toggle', 'zero point', 'zero point', '', 0.5, obj.color_on);
+            obj.panel_process.addButton('button_zp_order', 'zero_point_spatial_order', 'input', 'zp order= ', '', '', 0.5);
             obj.panel_process.addButton('button_sysrem', 'use_sysrem', 'toggle', 'sysrem', 'sysrem', '', 0.5, obj.color_on);
             obj.panel_process.addButton('input_sysrem_iter', 'sysrem_iterations', 'input', 'iter= ', '', '', 0.5);
             obj.panel_process.addButton('button_self_exclude', 'use_self_exclude', 'toggle', 'self', 'self', '', 0.5, obj.color_on); 
@@ -139,7 +141,7 @@ classdef LightGUI < handle
 %             obj.panel_process.addButton('button_psf_correction', 'use_psf_correction', 'toggle', 'PSF width', 'PSF width', '', 0.5, obj.color_on);
 %             obj.panel_process.addButton('button_polynomial', 'use_polynomial', 'toggle', 'polynomial', 'polynomial', '', 0.5, obj.color_on);
             
-            obj.panel_process.margin = [0.01 0.02];
+            obj.panel_process.margin = [0.01 0.01];
             obj.panel_process.make;
 
             %%%%%%%%%%% panel display %%%%%%%%%%%%%%%%
@@ -203,9 +205,9 @@ classdef LightGUI < handle
             
             obj.button_log_scale = GraphicButton(obj.panel_image, [0.0 0.95 0.1 0.05], obj.owner, 'use_show_log', 'toggle', 'linear', 'log', 'small');
             
-            obj.button_cut_number = GraphicButton(obj.panel_image, [0.0 0.0 0.1 0.05], obj.owner, '', 'custom', 'star: '); 
+            obj.button_cut_number = GraphicButton(obj.panel_image, [0.0 0.0 0.2 0.05], obj.owner, '', 'custom', 'star: '); 
             
-            obj.button_datetime = GraphicButton(obj.panel_image, [0.9 0.0 0.1 0.05], obj.owner, 'use_show_datetime', 'toggle', 'seconds', 'datetime'); 
+            obj.button_datetime = GraphicButton(obj.panel_image, [0.8 0.0 0.2 0.05], obj.owner, 'use_show_datetime', 'toggle', 'seconds', 'datetime'); 
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
                         

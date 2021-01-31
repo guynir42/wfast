@@ -92,6 +92,9 @@ classdef Lightcurves < handle
         
         magnitudes; % keep a copy of the star magnitudes for doing statistics
         
+        zp_fit_results; % the fit results for the spatial fit to the zero point
+        mean_zp; % the average ZP for each frame
+        
     end
     
     properties % switches/controls
@@ -116,6 +119,8 @@ classdef Lightcurves < handle
         use_airmass_correction = 1;
         use_psf_correction = 1;
         use_zero_point = 1;
+        zero_point_spatial_order = 2; % fit a polynomial to the ZP
+        use_offset_fit = 1; 
         use_sysrem = 0;
         sysrem_iterations = 1;
         use_self_exclude = 0;
@@ -1189,10 +1194,32 @@ classdef Lightcurves < handle
             
         end
         
+        function set.use_offset_fit(obj, val)
+            
+            if ~isequal(obj.use_offset_fit, val)
+                obj.use_offset_fit = val;
+                obj.fluxes_cal_ = [];
+                obj.clearPSD;
+                obj.clearRE;
+            end
+            
+        end
+        
         function set.use_zero_point(obj, val)
             
             if ~isequal(obj.use_zero_point, val)
                 obj.use_zero_point = val;
+                obj.fluxes_cal_ = [];
+                obj.clearPSD;
+                obj.clearRE;
+            end
+            
+        end
+        
+        function set.zero_point_spatial_order(obj, val)
+            
+            if ~isequal(obj.zero_point_spatial_order, val)
+                obj.zero_point_spatial_order = val;
                 obj.fluxes_cal_ = [];
                 obj.clearPSD;
                 obj.clearRE;
@@ -1683,14 +1710,66 @@ classdef Lightcurves < handle
             
             if obj.use_zero_point
                 
-                w = nanmean(flux); % weights are given by the average flux of each star
-                w = sqrt(abs(w)); 
-                
-%                 f_average = nanmean(flux.*w,2); % weighted average of each frame
-                f_average = nanmean(flux.*w,2); % simple average of each frame
-                f_average_norm = f_average./nanmean(f_average); % normalize by the average of averages
+                if obj.zero_point_spatial_order==0
 
-                flux = flux./f_average_norm;
+                    w = nanmean(flux); % weights are given by the average flux of each star
+                    w = sqrt(abs(w)); 
+
+                    f_average = nanmean(flux.*w,2); % weighted average of each frame
+                    f_average_norm = f_average./nanmean(f_average); % normalize by the average of averages
+
+                    flux = flux./f_average_norm;
+
+                    % need to keep a record of the ZP for each frame here as well
+                    
+                else
+                    
+                    if isempty(obj.cat) || obj.cat.success==0
+                        error('Must have a catalog with magnitudes to calculate the ZP fit!'); 
+                    end
+                    
+                    M = obj.cat.magnitudes; 
+                    f = flux; 
+                    f(f<=0) = NaN; % get rid of all negative flux values (complex magnitudes are no good)
+                    zp = M + 2.5*log10(f)'; 
+                    
+                    x = obj.centroids_x(:,:,obj.index_flux_number)';                    
+                    y = obj.centroids_y(:,:,obj.index_flux_number)';
+                
+                    if ~isempty(obj.head)
+                        xc = floor(obj.head.NAXIS2/2)+1;
+                        yc = floor(obj.head.NAXIS1/2)+1;
+                    else
+                        xc = nanmean(x(:));
+                        yc = nanmean(y(:));
+                    end
+                    
+                    e = ones(1, size(flux,1)).*(nanstd(flux)./nanmean(flux))'; 
+                    
+                    obj.zp_fit_results = util.fit.surf_poly(x-xc,y-xc,zp,'errors', e, 'order', obj.zero_point_spatial_order, ...
+                        'double', 1, 'warning', 0); 
+                    
+                    ZP = [obj.zp_fit_results.vm]; % the zero point we found for each star and each frame
+                    C = [obj.zp_fit_results.coeffs]; 
+                    ZP0 = C(1,:); % the average zero point per image
+                    
+                    obj.mean_zp = ZP0'; 
+                    
+                    flux = flux.*10.^(-0.4.*(ZP-ZP0)'); 
+                    
+                end
+                
+            end
+            
+            if obj.use_offset_fit
+                
+                x = obj.offsets_x(:,:,obj.index_flux_number); 
+                y = obj.offsets_y(:,:,obj.index_flux_number); 
+                
+                fr = util.fit.surf_poly(x, y, flux, 'order', 2, 'warning', false, 'iter', 3, 'sigma', 3, 'double', 1); 
+                
+                c = [fr.coeffs]; % coefficients: the first is a constant term that we don't want to subtract
+                flux = flux - [fr.vm] + c(1,:); 
                 
             end
             
@@ -1726,6 +1805,41 @@ classdef Lightcurves < handle
                 c_vec(ii,:) = c;
 
             end
+            
+        end
+        
+        function Im = getZeroPointImages(obj, im_size)
+            
+            if nargin<2 || isempty(im_size)
+                im_size = 400;
+            end
+            
+            im_size = util.vec.imsize(im_size); 
+            
+            x = linspace(-obj.head.NAXIS2/2, obj.head.NAXIS2, im_size(2)); 
+            y = linspace(-obj.head.NAXIS1/2, obj.head.NAXIS1, im_size(1)); 
+            [X,Y] = meshgrid(x,y); 
+            
+            C = [obj.zp_fit_results.coeffs]; 
+            px = obj.zp_fit_results(1).coeff_powers_x;
+            py = obj.zp_fit_results(1).coeff_powers_y;
+            
+            N = size(C,2); 
+            
+            Im = zeros([im_size, N]); 
+            
+            for ii = 1:N
+                
+                new_image = zeros(im_size); 
+                
+                for jj = 1:size(C,1)
+                     new_image = new_image + C(jj,ii).*X.^px(jj).*Y.^py(jj);
+                end
+                
+                Im(:,:,ii) = new_image;
+                
+            end
+            
             
         end
         

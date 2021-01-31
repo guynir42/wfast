@@ -237,8 +237,9 @@ classdef Analysis < file.AstroData
                 obj.finder.cat = obj.cat;
                 obj.finder.head = obj.head;
                 obj.finder.store.checker.setupSensor; 
-                obj.lightcurves.head = obj.head;
+%                 obj.lightcurves.head = obj.head;
                 obj.lightcurves.cat = obj.cat;
+                obj.light_stack.cat = obj.cat;
                 
                 util.oop.save_defaults(obj); % make sure each default_XXX property is updated with the current XXX property value. 
                 

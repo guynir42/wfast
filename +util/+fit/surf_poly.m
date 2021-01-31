@@ -8,9 +8,14 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
 %          -surf_image: a map of the surface using the fit results. 
 %
 % OPTIONAL PARAMETERS:
-%   -weights: give the error estimate for each measurement, or a single
+%   -weights: give the relative weight foreach measurement, or a single
 %             value for all measurements. Will be used as weights for the
 %             fit and also for scaling the chi2 result. 
+%             The weights are treated as the inverse errors, and are
+%             ignored if the errors are given.
+%   -errors: give the standard deviation for each measurement. 
+%            This is used to scale the chi2 and weigh the fit. 
+%            This input overrides the "weights" input. 
 %   -order: highest polynomial order in both x and y. Default is 2. 
 %   -iterations: how many iterations (to remove outliers). Default is 1. 
 %   -sigma: remove outliers above this threshold. Default is 5. 
@@ -18,6 +23,7 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
 %                           surface map output and for plotting. 
 %                           Default is min/max of x and y values. 
 %   -size: the number of pixels in the surface map output. Default 1000. 
+%   -double: force the data to be in double-precision. Default is false. 
 %   -plot: show the fit and the data points. Default is false. 
 %   -pause: when plotting, how many seconds to wait between iterations.
 %           Default is one second. 
@@ -25,7 +31,10 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
 %   -font_size: the axes font size when plotting. 
 %   -marker_size: the size of the little circles for the measurements, on 
 %                 the scatter plot (when plot=1). Default is 40. 
-%           
+%   -scale: set the contrast limits (CLim) or scale of the plot. Default is
+%           to set the limits automatically. 
+%   -warnings: When true, will show Rand Deficient Matrix warnings. 
+%              Default is false (warnings are ignored). 
 
 
 
@@ -33,19 +42,31 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
 
     input = util.text.InputVars;
     input.use_ordered_numeric = 1; 
-    input.input_var('weights', [], 'errors'); 
+    input.input_var('weights', []); 
+    input.input_var('errors', []); 
     input.input_var('order', 2); 
     input.input_var('iterations', 1); 
     input.input_var('sigma', 5); 
     input.input_var('x_values', []); 
     input.input_var('y_values', []); 
     input.input_var('size', 1000, 'im_size', 'image_size'); 
+    input.input_var('double', false); 
     input.input_var('plot', false); 
     input.input_var('pause', 1, 'duration'); 
     input.input_var('ax', [], 'axes', 'axis'); 
     input.input_var('font_size', 18); 
     input.input_var('marker_size', 40); 
+    input.input_var('scale', [], 'CLim'); 
+    input.input_var('warnings', false); % if turned on, will show warnings like Rand Deficient Matrix
     input.scan_vars(varargin{:}); 
+    
+    
+    warn = warning('query', 'MATLAB:lscov:RankDefDesignMat'); % check the current state of the warning
+    prev_state = warn.state; 
+    new_state = 'off'; 
+    if input.warnings, new_state = 'on'; end
+    warning(new_state, 'MATLAB:lscov:RankDefDesignMat')
+    on_cleanup = onCleanup(@() warning(prev_state, 'MATLAB:lscov:RankDefDesignMat')); 
     
     if input.plot && isempty(input.ax)
         input.ax = gca;
@@ -79,24 +100,41 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
         v = util.vec.tocolumn(v);
     end
     
+    w = [];
+    
     if ~isempty(input.weights) 
+        w = input.weights;
+    end
+    
+    if ~isempty(input.errors)
+        w = 1./input.errors;
+    end
+    
+    if ~isempty(w)
         
-        if isscalar(input.weights)
-            input.weights = ones(size(x)).*input.weights;
+        if isscalar(w)
+            w = ones(size(x)).*w;
         end
         
         % maybe later we will add a case where the same weights are replicated for all columns in x, y, and v
-        if ~isequal(size(x), size(input.weights))
+        if ~isequal(size(x), size(w))
             error('Must input weights with the same size as x,y, and v!');
         end
         
-        if isvector(input.weights)
-            input.weights = util.vec.tocolumn(input.weights); 
+        if isvector(w)
+            w = util.vec.tocolumn(w); 
         end
+        
+        w(w<0) = 0; 
         
     end
     
-    w = input.weights; 
+    if input.double
+        x = double(x); 
+        y = double(y); 
+        v = double(v); 
+        w = double(w); 
+    end
     
     S = size(x); % keep track of the original size (unless given a row vector, but then it doesn't matter)
     
@@ -186,7 +224,7 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
             for kk = 1:length(coeff_powers_x)
                 A = [A, X.^coeff_powers_x(kk).*Y.^coeff_powers_y(kk)]; 
             end
-
+            
             if isempty(input.weights)
                 coeffs = lscov(A,V); 
             else
@@ -194,6 +232,8 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
             end
 
             new_result.coeff_names = coeff_names;
+            new_result.coeff_powers_x = coeff_powers_x;
+            new_result.coeff_powers_y = coeff_powers_y;
             new_result.coeffs = coeffs;
 
             new_result.model = ''; 
@@ -206,10 +246,12 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
 
             new_result.func = str2func(['@(x,y) ' new_result.model]); 
 
-            new_result.x = x;
-            new_result.y = y;
-            new_result.v = v;
-            new_result.w = w;
+            new_result.x = x(:,ii);
+            new_result.y = y(:,ii);
+            new_result.v = v(:,ii);
+            if ~isempty(w)
+                new_result.w = w(:,ii);
+            end
             
             % produce the values at all x,y points based on the model
             B = 0;
@@ -232,7 +274,7 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
             if isempty(W)
                 new_result.chi2 = nansum(reduced_residuals.^2); 
             else
-                new_result.chi2 = nansum((reduced_residuals./W).^2); 
+                new_result.chi2 = nansum((reduced_residuals.*W).^2); 
             end
             
             new_result.ndof = length(V) - length(coeffs); 
@@ -250,7 +292,7 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
                 if isempty(W)
                     marker_sizes = input.marker_size;
                 else
-                    marker_sizes = input.marker_size.*w(:,ii)./nanmean(w(:,ii)); 
+                    marker_sizes = input.marker_size.*w(:,ii)./nanmean(w(:,ii)) + 1;
                 end
                 
                 scatter(input.ax, x(:,ii), y(:,ii), marker_sizes, v(:,ii), 'o', 'filled','MarkerEdgeColor','k'); 
@@ -260,6 +302,10 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
                 colorbar(input.ax); 
                 input.ax.FontSize = input.font_size;
                 
+                if ~isempty(input.scale)
+                    input.ax.CLim = input.scale; 
+                end
+                
                 pause(input.pause); 
             
             end
@@ -267,7 +313,7 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
             if isempty(w)
                 idx = find(abs(new_result.residuals) > input.sigma.*sqrt(new_result.var));
             else
-                idx = find(abs(new_result.residuals./w(:,ii)) > input.sigma.*sqrt(new_result.var));
+                idx = find(abs(new_result.residuals.*w(:,ii)) > input.sigma.*sqrt(new_result.var));
             end
             
             idx = unique([nan_indices; idx]); % add the measurements where we found NaN values
