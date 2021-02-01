@@ -105,8 +105,8 @@ classdef LightGUI < handle
             pos = pos - 1;
             obj.panel_control = GraphicPanel(obj.owner, [0 pos/N 0.2 1/N], 'control'); 
             obj.panel_control.number = 1;
-            obj.panel_control.addButton('button_preallocate', 'use_preallocate', 'toggle', 'preallocate', 'preallocate', '', 0.5, obj.color_on);
-            obj.panel_control.addButton('button_double_up', 'use_double_up', 'toggle', 'double up', 'double up', '', 0.5, obj.color_on);
+            obj.panel_control.addButton('button_preallocate', 'use_preallocate', 'toggle', 'preallocate', 'preallocate', '', 0.5, obj.color_on, '', 'when resetting object, make large matrices for incoming data');
+            obj.panel_control.addButton('button_double_up', 'use_double_up', 'toggle', 'double up', 'double up', '', 0.5, obj.color_on, '', 'when adding data, double-up allocated data to make room for more');
             obj.panel_control.margin = [0.01 0.02];
             obj.panel_control.make;
             
@@ -115,22 +115,22 @@ classdef LightGUI < handle
             pos = pos - 8;
             obj.panel_process = GraphicPanel(obj.owner, [0 pos/N 0.2 8/N], 'process');
             obj.panel_process.number = 5;
-            obj.panel_process.addButton('button_background', 'use_subtract_backgrounds', 'toggle', 'sub b/g', 'sub b/g', '', 0.5, obj.color_on);
-            obj.panel_process.addButton('button_back_median', 'use_background_median', 'toggle', 'b/g median', 'b/g median', '', 0.5, obj.color_on);
+            obj.panel_process.addButton('button_background', 'use_subtract_backgrounds', 'toggle', 'sub b/g', 'sub b/g', '', 0.5, obj.color_on, '', 'calculate fluxes_sub by subtracting the background measurements');
+            obj.panel_process.addButton('button_back_median', 'use_background_median', 'toggle', 'b/g median', 'b/g median', '', 0.5, obj.color_on, '', 'remove the median background value of all stars in each frame');
 %             obj.panel_process.addButton('button_flagged', 'use_skip_flagged', 'toggle', 'skip flag', 'skip flag', '', 0.5, obj.color_on);
-            obj.panel_process.addButton('button_outliers', 'use_remove_outliers', 'toggle', 'outliers', 'outliers', '', 0.5, obj.color_on);
-            obj.panel_process.addButton('input_outlier_sigma', 'outlier_sigma', 'input', 'sig= ', '', '', 0.5);
-            obj.panel_process.addButton('button_bad_times', 'use_skip_bad_times', 'toggle', 'bad times', 'bad times', '', 0.5, obj.color_on);
-            obj.panel_process.addButton('input_fraction', 'bad_times_fraction', 'input', 'frac= ', '', '', 0.5);
-            obj.panel_process.addButton('button_airmass', 'use_airmass_correction', 'toggle', 'airmass', 'airmass', '', 0.5, obj.color_on);
+            obj.panel_process.addButton('button_outliers', 'use_remove_outliers', 'toggle', 'outliers', 'outliers', '', 0.5, obj.color_on, '', 'remove outliers in fluxes_rem');
+            obj.panel_process.addButton('input_outlier_sigma', 'outlier_sigma', 'input', 'sig= ', '', '', 0.5, '', '', 'how many sigmas (noise level) away from average is considered an outlier');
+            obj.panel_process.addButton('button_bad_times', 'use_skip_bad_times', 'toggle', 'bad times', 'bad times', '', 0.5, obj.color_on, '', 'remove all frames where many values are flagged as NaN');
+            obj.panel_process.addButton('input_fraction', 'bad_times_fraction', 'input', 'frac= ', '', '', 0.5, '', '', 'what fraction of values should be NaN to denote a frame as bad');
+            obj.panel_process.addButton('button_airmass', 'use_airmass_correction', 'toggle', 'airmass', 'airmass', '', 0.5, obj.color_on, '', 'adjust fluxes_cal using the airmass fit');
             obj.panel_process.addButton('button_placeholder', '', 'custom', ' ', ' ', '', 0.5, obj.color_on);
-            obj.panel_process.addButton('button_width', 'use_psf_correction', 'toggle', 'PSF width', 'PSF width', '', 0.5, obj.color_on);
-            obj.panel_process.addButton('button_offset_fit', 'use_offset_fit', 'toggle', 'offsets', 'offsets', '', 0.5, obj.color_on);
-            obj.panel_process.addButton('button_zero_point', 'use_zero_point', 'toggle', 'zero point', 'zero point', '', 0.5, obj.color_on);
-            obj.panel_process.addButton('button_zp_order', 'zero_point_spatial_order', 'input', 'zp order= ', '', '', 0.5);
-            obj.panel_process.addButton('button_sysrem', 'use_sysrem', 'toggle', 'sysrem', 'sysrem', '', 0.5, obj.color_on);
-            obj.panel_process.addButton('input_sysrem_iter', 'sysrem_iterations', 'input', 'iter= ', '', '', 0.5);
-            obj.panel_process.addButton('button_self_exclude', 'use_self_exclude', 'toggle', 'self', 'self', '', 0.5, obj.color_on); 
+            obj.panel_process.addButton('button_width', 'use_psf_correction', 'toggle', 'PSF width', 'PSF width', '', 0.5, obj.color_on, '', 'correct fluxes_cal using the width of the PSF');
+            obj.panel_process.addButton('button_offset_fit', 'use_offset_fit', 'toggle', 'offsets', 'offsets', '', 0.5, obj.color_on, '', 'correct fluxes_cal using a fit to the offset positions for each star');
+            obj.panel_process.addButton('button_zero_point', 'use_zero_point', 'toggle', 'zero point', 'zero point', '', 0.5, obj.color_on, '', 'correct fluxes_cal using a zero point correction');
+            obj.panel_process.addButton('button_zp_order', 'zero_point_spatial_order', 'input', 'zp order= ', '', '', 0.5, '', '', 'spatial fit polynomial order for the zero point (set 0 for global value)');
+            obj.panel_process.addButton('button_sysrem', 'use_sysrem', 'toggle', 'sysrem', 'sysrem', '', 0.5, obj.color_on, '', 'correct fluxes_cal using the SysRem method');
+            obj.panel_process.addButton('input_sysrem_iter', 'sysrem_iterations', 'input', 'iter= ', '', '', 0.5, '', '', 'apply SysRem this many times');
+            obj.panel_process.addButton('button_self_exclude', 'use_self_exclude', 'toggle', 'self', 'self', '', 0.5, obj.color_on, '', 'set this to exclude each star''s flux from its own SysRem calculation'); 
             
             
 %             obj.panel_process.addButton('button_zavitzky_golay', 'use_savitzky_golay', 'toggle', 'savitzky golay', 'savitzky golay', '', 0.5, obj.color_on); 
@@ -151,12 +151,12 @@ classdef LightGUI < handle
             obj.panel_display.number = 6;
             obj.panel_display.addButton('button_index', 'index_flux', 'input', 'idx= ','', '', 0.5, '', '', 'which aperture type to display'); 
             obj.panel_display.addButton('button_show_what', 'show_what', 'picker', obj.owner.show_what, '', '', 0.7); 
-            obj.panel_display.addButton('button_flux_type', 'show_flux_type', 'picker', obj.owner.show_flux_type, '', '', 0.3); 
-            obj.panel_display.addButton('input_num_stars', 'show_num_stars', 'input', 'Nstars= ');
-            obj.panel_display.addButton('input_show_indices', 'show_indices', 'input', 'idx= '); 
-            obj.panel_display.addButton('button_smooth', 'use_smooth', 'toggle', 'smooth', 'smooth', '', 0.5, obj.color_on);
-            obj.panel_display.addButton('input_smooth', 'smooth_interval', 'input', ' ', '', '', 0.5);
-            obj.panel_display.addButton('button_spawn', 'spawnFigure', 'push', 'spawn', '', '', 0.5); 
+            obj.panel_display.addButton('button_flux_type', 'show_flux_type', 'picker', obj.owner.show_flux_type, '', '', 0.3, '', '', 'sub: background subtractet, rem: outliers removed, cal: full calibration'); 
+            obj.panel_display.addButton('input_num_stars', 'show_num_stars', 'input', 'Nstars= ', '', [], '', '', 'how many stars to show on the plot');
+            obj.panel_display.addButton('input_show_indices', 'show_indices', 'input', 'idx= ', '', [], '', '', 'give specific indices of stars to show (overrides Nstars)'); 
+            obj.panel_display.addButton('button_smooth', 'use_smooth', 'toggle', 'smooth', 'smooth', '', 0.5, obj.color_on, '', 'smooth the output fluxes with a rolling average');
+            obj.panel_display.addButton('input_smooth', 'smooth_interval', 'input', ' ', '', '', 0.5, '', '', 'how many frames to take into the rolling average');
+            obj.panel_display.addButton('button_spawn', 'spawnFigure', 'push', 'spawn', '', '', 0.5, '', '', 'make a new figure with the data statically displayed'); 
             obj.panel_display.margin = [0.01 0.02];
             obj.panel_display.make;
             
@@ -171,7 +171,7 @@ classdef LightGUI < handle
             pos = pos - 1;
             obj.panel_psd = GraphicPanel(obj.owner, [0 pos/N 0.2 1/N], 'display');
             obj.panel_psd.number = 1;
-            obj.panel_psd.addButton('button_welch', 'use_welch', 'toggle', 'welch', 'welch', '', 0.5, obj.color_on);
+            obj.panel_psd.addButton('button_welch', 'use_welch', 'toggle', 'welch', 'welch', '', 0.5, obj.color_on, '', 'use Welch''s method instead of classical power spectrum');
             obj.panel_psd.make;
             
             %%%%%%%%%%% panel statistics %%%%%%%%%%%%%
@@ -179,11 +179,11 @@ classdef LightGUI < handle
             pos = pos - 2;
             obj.panel_stats = GraphicPanel(obj.owner, [0 pos/N 0.2 2/N], 'statistics');
             obj.panel_stats.number = 2;
-            obj.panel_stats.addButton('input_jump', 'sampling_jump', 'input', 'jump= ', '', '', 0.5);
-            obj.panel_stats.addButton('input_rms_points', 'num_points_rms', 'input', 'rms pts= ', '', '', 0.5); 
+            obj.panel_stats.addButton('input_jump', 'sampling_jump', 'input', 'jump= ', '', '', 0.5, '', '', 'how many frames to add together in each step of the binning');
+            obj.panel_stats.addButton('input_rms_points', 'num_points_rms', 'input', 'rms pts= ', '', '', 0.5, '', '', 'how many points to use to calculate the RMS'); 
 %             obj.panel_stats.addButton('button_bins', 'use_show_re_bins', 'toggle', 'show mag', 'show bin', '', 0.5);
-            obj.panel_stats.addButton('input_mag_limit', 'show_mag_limit', 'input', 'mag lim= ', '', '', 0.5);
-            obj.panel_stats.addButton('button_fits', 'use_show_bin_fits', 'toggle', 'show fits', 'show fits', '', 0.5, obj.color_on);
+            obj.panel_stats.addButton('input_mag_limit', 'show_mag_limit', 'input', 'mag lim= ', '', '', 0.5, '', '', 'do not show stars with fainter mag on the relative error display');
+            obj.panel_stats.addButton('button_fits', 'use_show_bin_fits', 'toggle', 'show fits', 'show fits', '', 0.5, obj.color_on, '', 'show the fit to the relative RMS');
             obj.panel_stats.make;
             
             %%%%%%%%%%% panel info %%%%%%%%%%%%%%%%%%%

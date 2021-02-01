@@ -143,6 +143,12 @@ classdef ShuffleBank < handle
             
         end
         
+        function val = getBankName(obj)
+            
+             val = sprintf('templates_%dAU_%dHz', floor(obj.D_au), floor(obj.f));
+            
+        end
+        
     end
     
     methods % setters
@@ -369,7 +375,7 @@ classdef ShuffleBank < handle
             input.scan_vars(varargin{:}); 
             
             if isempty(input.filename)
-                f = sprintf('templates_%dAU_%dHz', floor(obj.D_au), floor(obj.f)); 
+                f = obj.getBankName; 
             else
                 f = input.filename;
             end
