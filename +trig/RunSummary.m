@@ -64,6 +64,8 @@ classdef RunSummary < handle
         sim_events;
         
         star_snr; 
+        star_sizes;
+        size_snr_coeffs;
         
         num_events_expected; % use simulations to estimate this
         

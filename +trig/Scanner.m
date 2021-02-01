@@ -96,8 +96,9 @@ classdef Scanner < handle
         function val = get.root_folder(obj)
             
             if isempty(obj.root_folder)
-                t = datetime('now', 'TimeZone', 'UTC'); 
-                val = fullfile(getenv('DATA'), sprintf('/WFAST/%04d', t.Year)); 
+                y = trig.RunFolder.guess_year(obj.date_start, obj.date_end);
+%                 t = datetime('now', 'TimeZone', 'UTC'); 
+                val = fullfile(getenv('DATA'), sprintf('/WFAST/%04d', y)); 
             else
                 val = obj.root_folder; 
             end

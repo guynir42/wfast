@@ -341,23 +341,22 @@ classdef RunFolder < dynamicprops
             
             %%%%%%%%%%%%%%%% get the root folder %%%%%%%%%%%%%%%%%%%%%
             
-            if isempty(input.folder) % default is to load this year's folder from the dropbox (must define environmental DATA). 
+            if isempty(input.folder) % default is to load the relevant year folder from the dropbox (must define environmental DATA)
                 y = trig.RunFolder.guess_year(input.start_date, input.end_date); 
                 d = util.sys.WorkingDirectory(fullfile(getenv('DATA'), sprintf('WFAST/%d',y))); 
             elseif ischar(input.folder) % a string input can mean a few things:
 
                 if ismember(input.folder, {'DATA', 'DATA_TEMP', 'DATA_EXTRA'}) % must define a year also! 
                     d = getenv(folder); 
+                    d = util.sys.WorkingDirectory(d); 
+                    y = trig.RunFolder.guess_year(input.start_date, input.end_date); 
+                    d.cd(sprintf('%d', y));                
                 elseif exist(input.folder, 'dir') % just get the full path to the folder
-                    d = input.folder;
+                    d = util.sys.WorkingDirectory(input.folder);
                 else
                     error('Could not find the folder "%s". ', input.folder); 
                 end
 
-                d = util.sys.WorkingDirectory(d); 
-                y = trig.RunFolder.guess_year(input.start_date, input.end_date); 
-                d.cd(sprintf('%d', y))
-                
             elseif isa(input.folder, 'util.sys.WorkingDirectory') % give the folder in the form of a WorkingDirectory object
                 d = input.folder;
             else

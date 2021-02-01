@@ -625,6 +625,8 @@ classdef EventFinder < handle
             s.store_pars = obj.store.pars;
             s.good_stars = obj.store.star_indices;
             s.star_snr = obj.store.star_snr;
+            s.star_sizes = obj.store.star_sizs;
+            s.size_snr_coeffs = obj.store.size_snr_coeffs;
             FWHM = obj.store.checker.defocus_log*2.355*obj.head.SCALE; 
             s.fwhm_edges = 0:0.1:round(nanmax(FWHM)*10)/10;
             s.fwhm_hist = histcounts(FWHM, 'BinEdges', s.fwhm_edges); 
