@@ -148,6 +148,8 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
     coeff_powers_x = 0;
     coeff_powers_y = 0;
     
+    N = length(coeff_names);
+    
     for ord = 1:input.order
         
         for ii = 0:ord
@@ -220,6 +222,11 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
         
         for jj = 1:input.iterations
 
+            if length(nan_indices) + N >= size(x,2)
+                new_result = make_empty_result(coeff_names);
+                break;
+            end
+            
             A = []; % the design matrix is built up from powers of x and y
             for kk = 1:length(coeff_powers_x)
                 A = [A, X.^coeff_powers_x(kk).*Y.^coeff_powers_y(kk)]; 
@@ -230,7 +237,7 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
             else
                 coeffs = lscov(A,V,W); 
             end
-
+            
             new_result.coeff_names = coeff_names;
             new_result.coeff_powers_x = coeff_powers_x;
             new_result.coeff_powers_y = coeff_powers_y;
@@ -277,7 +284,7 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
                 new_result.chi2 = nansum((reduced_residuals.*W).^2); 
             end
             
-            new_result.ndof = length(V) - length(coeffs); 
+            new_result.ndof = length(V) - N; 
             
             new_result.var = new_result.chi2./new_result.ndof; % the measurement error estimate
             
@@ -318,7 +325,7 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
             
             idx = unique([nan_indices; idx]); % add the measurements where we found NaN values
             
-            if isequal(idx, bad_indices)
+            if isequal(idx, bad_indices) || length(idx)==size(x,1)
                 break;
             else
                 
@@ -374,7 +381,37 @@ function I = make_image(coeff_values, coeffs_x, coeffs_y, x_values, y_values)
 
 end
 
+function new_result = make_empty_result(coeff_names)
+    
+    coeffs = NaN(length(coeff_names),1); 
+    new_result.coeff_names = coeff_names;
+    new_result.coeff_powers_x = coeff_powers_x;
+    new_result.coeff_powers_y = coeff_powers_y;
+    new_result.coeffs = coeffs;
+    new_result.model = ''; 
+    for kk = 1:length(coeff_names)
+        new_result.model = sprintf('%s%+f', new_result.model, coeffs(kk)); 
+        if ~isempty(coeff_names{kk})
+            new_result.model = sprintf('%s.*%s', new_result.model, coeff_names{kk});
+        end
+    end
 
+    new_result.func = str2func(['@(x,y) ' new_result.model]); 
+
+    new_result.x = x(:,ii);
+    new_result.y = y(:,ii);
+    new_result.v = v(:,ii);
+    if ~isempty(w)
+        new_result.w = w(:,ii);
+    end
+    new_result.vm = NaN(size(v,1),1); 
+
+    new_result.residuals = NaN(size(v,1),1);
+    new_result.chi2 = NaN;
+    new_result.ndof = length(V) - length(coeffs); 
+    new_result.var = NaN;
+    
+end
 
 
 

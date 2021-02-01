@@ -117,7 +117,7 @@ classdef Lightcurves < handle
         
         % processing steps for fluxes_cal:
         use_airmass_correction = 1;
-        use_psf_correction = 1;
+        use_psf_correction = 0;
         use_zero_point = 1;
         zero_point_spatial_order = 2; % fit a polynomial to the ZP
         use_offset_fit = 1; 
@@ -1744,18 +1744,19 @@ classdef Lightcurves < handle
                         yc = nanmean(y(:));
                     end
                     
-                    e = ones(1, size(flux,1)).*(nanstd(flux)./nanmean(flux))'; 
+                    e = ones(size(flux,1),1).*(nanstd(flux)./nanmean(flux)); 
                     
-                    obj.zp_fit_results = util.fit.surf_poly(x-xc,y-xc,zp,'errors', e, 'order', obj.zero_point_spatial_order, ...
+                    obj.zp_fit_results = util.fit.surf_poly(x-xc,y-xc,zp,'errors', e', 'order', obj.zero_point_spatial_order, ...
                         'double', 1, 'warning', 0); 
                     
-                    ZP = [obj.zp_fit_results.vm]; % the zero point we found for each star and each frame
-                    C = [obj.zp_fit_results.coeffs]; 
-                    ZP0 = C(1,:); % the average zero point per image
+                    ZP = [obj.zp_fit_results.vm]'; % the zero point we found for each star and each frame
+                    C = [obj.zp_fit_results.coeffs]'; 
                     
-                    obj.mean_zp = ZP0'; 
+                    obj.mean_zp = C(:,1); % the average zero point per image
                     
-                    flux = flux.*10.^(-0.4.*(ZP-ZP0)'); 
+%                     M_inst = (nanmean(C(:,1),1) - 2.5.*log10(abs(nanmean(flux,1))));
+                    
+                    flux = flux.*10.^(0.4.*(nanmean(ZP(:))-ZP)); 
                     
                 end
                 
