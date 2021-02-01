@@ -359,6 +359,47 @@ classdef ShuffleBank < handle
             
         end
         
+        function save(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('filename', ''); % override the default filename: e.g., "templates_40AU_25Hz"
+            input.input_var('appendage', ''); % add another comment on the default filename: e.g., add "_small" for low-threshold banks
+            input.input_var('path', pwd, 'directory'); % add a path before the filename (default is pwd())
+            input.input_var('debug_bit', 1); % display the file name before saving
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.filename)
+                f = sprintf('templates_%dAU_%dHz', floor(obj.D_au), floor(obj.f)); 
+            else
+                f = input.filename;
+            end
+            
+            [d,f,e] = fileparts(f); 
+            
+            if ~isempty(input.appendage)
+                f = [f '_' input.appendage]; 
+            end
+            
+            if isempty(d)
+                d = input.path;
+            end
+            
+            if isempty(e)
+                e = '.mat';
+            end
+            
+            f = [fullfile(d,f), e]; 
+            
+            if input.debug_bit
+                fprintf('Saving template bank to "%s"\n', f); 
+            end
+            
+            bank = obj;
+            
+            save(f,'bank', '-v7.3'); 
+            
+        end
+        
     end
     
     methods % plotting tools / GUI
