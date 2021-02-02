@@ -7,9 +7,31 @@ classdef ShuffleBank < handle
 %
 % The parameter range is determined by "R_range", "r_range", "b_range" and 
 % "v_range" (assuming t=0 for all kernels). 
-% 
+%
+% To quickly set the simulation parameters using realistic (physical)
+% values, use the setupParameterRange(...) method. 
+% Optional arguments to that function are:
+%   -distance (sets obj.D_au): distance to occulter population, in AU. 
+%   -stellar_sizes (sets obj.R_uas): the range of stellar sizes, given in
+%        physical units of micro-arcsec. 
+%   -occulter_radius (sets obj.r_km): size range for the occulters (in km).
+%   -impact_parameter (sets obj.b_fsu): set the range of impact parameter
+%        in Fresnel Scale Units (FSU). There is no appropriate physical
+%        scale for this parameter, but the default 0-2 is reasonable. 
+%   -velocity (sets obj.v_km): the physical transverse velocity range, in
+%        km/s, the range 5-35 covers the Earth's motion well. 
+%   -lambda (sets obj.lambda_nm): the wavelength used to calculate the
+%        Fresnel scale, in nm. 
+%   -frame_rate (sets obj.f): the camera frame rate in Hz. 
+%   -exposure_time (sets obj.T): the camera exposure time in milli-seconds.
+%   -window (sets obj.W): the time window for templates, in seconds. 
+%
 % Use makeKernels() to produce the bank (this takes several hours) or load
 % an existing object. 
+% The save() function will automatically produce a formatted name for the
+% template bank, using getBankName(). The format is:
+% "templates_[distance]AU_[frame rate]Hz" with optional appended "_small" 
+% for low-threshold banks. 
 %
 % Use input(fluxes) to filter the input fluxes with all kernels in the bank, 
 % and read out the results from "fluxes_filtered". 

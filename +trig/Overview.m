@@ -365,6 +365,17 @@ classdef Overview < handle
         end
         
         function [N_total, N_passed] = calcEfficiency(obj, r_edges, distance_au) % a 3D matrix telling what fraction of events we got from injected events
+        % Get the total number of simulated events and those that passed.
+        % INPUTS: 
+        %   -r_edges: bin edges for occulter radius in km. 
+        %   -distance_au: the distance to the occulters, in AU. 
+        %
+        % OUTPUTS:
+        %   -N_total: number of simulated events. 
+        %   -N_passed: number of events the were detected. 
+        %
+        % NOTE: output dim1 is velocity and dim2 is occulter radius. 
+        %
         % Since we have injected events with the "true" stellar radius 
         % S/N and impact parameter (b), we can assume the detection 
         % efficiency already takes into account these distributions.
@@ -409,8 +420,8 @@ classdef Overview < handle
                 r_edges = obj.default_r_edges_fsu./obj.km2fsu(distance_au); 
             end
             
-            r_edges = obj.km2fsu(distance_au).*r_edges;
-            v_edges = obj.km2fsu(distance_au).*obj.vel_edges;
+            r_edges = obj.km2fsu(distance_au).*r_edges; % convert to FSU
+            v_edges = obj.km2fsu(distance_au).*obj.vel_edges; % convert to FSU
             
             obj.b_max = nanmax([obj.sim_events.b]); 
             
@@ -447,7 +458,25 @@ classdef Overview < handle
         end
         
         function [coverage, cov_lower, cov_upper, E, E_l, E_u, N_total, N_passed] = calcCoverage(obj, r_edges, distance_au)
-            
+        % Get the coverage: the number of square degrees scanned out of the 
+        % entire sky, for a given occulter radius and ecliptic latitude. 
+        % 
+        % INPUTS: 
+        %   -r_edges: bin edges for occulter radius in km. 
+        %   -distance_au: the distance to the occulters, in AU. 
+        %
+        % OUTPUTS: 
+        %   -coverage: the number of scanned square degrees, reciprocal  
+        %              of the number of objects per square degree. 
+        %   -cov_lower and cov_upper: limits based on the Poisson errors in
+        %                             the efficiency estimate. 
+        %   -E, E_l and E_u: efficiency and lower/upper limits. 
+        %   -N_total and N_passed: outputs of calcEfficiency. 
+        % 
+        % NOTE: the coverage has 2 dimensions: dim1 is occulter radius and 
+        %       dim2 is ecliptic latitude. 
+        
+        
             if isempty(obj.star_seconds)
                 disp('No star seconds have been accumulated yet!'); 
                 coverage = []; 
