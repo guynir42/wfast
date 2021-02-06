@@ -833,6 +833,10 @@ classdef Catalog < handle
                 obj.data = data;
             end
             
+            if ~isempty(obj.data)
+                obj.success = 1;
+            end
+            
             % add positions, magnitudes, coordinates and temperatures from the table
             obj.positions = [obj.data.X obj.data.Y];
             obj.magnitudes = obj.data.Mag_BP;

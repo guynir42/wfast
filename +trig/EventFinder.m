@@ -515,9 +515,9 @@ classdef EventFinder < handle
 %                     
 %                 end
 % 
-%                 if  isempty(obj.bank_oort) % lazy load the Oort filter bank from file
-%                     obj.loadFilterBankOort; 
-%                 end
+                if isempty(obj.bank_oort) || isempty(obj.bank_oort_small) || isempty(obj.var_buf_oort) 
+                    obj.loadFilterBankOort; % lazy load the Oort filter bank from file
+                end
 
                 if obj.pars.use_oort && ~isempty(obj.bank_oort)
                 
@@ -625,7 +625,7 @@ classdef EventFinder < handle
             s.store_pars = obj.store.pars;
             s.good_stars = obj.store.star_indices;
             s.star_snr = obj.store.star_snr;
-            s.star_sizes = obj.store.star_sizs;
+            s.star_sizes = obj.store.star_sizes;
             s.size_snr_coeffs = obj.store.size_snr_coeffs;
             FWHM = obj.store.checker.defocus_log*2.355*obj.head.SCALE; 
             s.fwhm_edges = 0:0.1:round(nanmax(FWHM)*10)/10;
@@ -1295,7 +1295,7 @@ classdef EventFinder < handle
             if N_triggers>0 % we recovered the injected event! 
             
                 [~,idx] = max([all_cand.snr]); % find the best candidate (highest S/N)    
-                candidate = all_cand(idx); % keep only one candidate per simualtion
+                candidate = all_cand(idx); % get the detection S/N from the best candidate/template bank
                 
                 sim_pars.detect_snr = candidate.snr; % keep track of the detection S/N for this event
                 sim_pars.passed = true; 
@@ -1303,8 +1303,10 @@ classdef EventFinder < handle
                 sim_pars.num_triggers = N_triggers; % how many template banks triggered
                 sim_pars.bank_names = trig_names; % what the names of those banks were
                 
-                candidate.is_simulated = 1; 
-                candidate.sim_pars = sim_pars; 
+                for ii = 1:length(all_cand)
+                    all_cand(ii).is_simulated = 1; 
+                    all_cand(ii).sim_pars = sim_pars; 
+                end
                 
             else % no events were recovered
                 

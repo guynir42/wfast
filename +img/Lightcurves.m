@@ -1724,7 +1724,7 @@ classdef Lightcurves < handle
                     
                 else
                     
-                    if isempty(obj.cat) || obj.cat.success==0
+                    if isempty(obj.cat) || isempty(obj.cat.success) || obj.cat.success==0
                         error('Must have a catalog with magnitudes to calculate the ZP fit!'); 
                     end
                     
@@ -2359,6 +2359,43 @@ classdef Lightcurves < handle
             
             for ii = 1:length(obj.figures_spawned)
                 savefig(fullfile(d, [strrep(obj.figures_spawned{ii}.UserData, {':','.'}, '_') '.fig']));
+            end
+            
+        end
+        
+    end
+    
+    methods (Static=true)
+        
+        function obj = load(filename_or_folder, varargin)
+            
+            folder = [];
+            filename = []; 
+            
+            if ischar(filename_or_folder) && exist(filename_or_folder, 'file')
+                filename = filename_or_folder; 
+            elseif isa(filename_or_folder, 'util.sys.WorkingDirectory')
+                folder = filename_or_folder;
+            elseif ischar(filename_or_folder) && exist(filename_or_folder, 'dir')
+                folder = util.sys.WorkingDirectory(filename_or_folder); 
+            else
+                error('Must input a valid file or folder name or a WorkingDirectory object'); 
+            end
+            
+            if isempty(filename) && isempty(folder)
+                error('Must input a valid file or folder name or a WorkingDirectory object'); 
+            end
+            
+            obj = img.Lightcurves; 
+            
+            if isempty(filename)
+                obj.loadFromMAT(filename); 
+            elseif isempty(folder)
+                obj.loadHDF5(folder); 
+            end
+            
+            if nargout==0
+                assignin('base', 'lightcurves',obj)
             end
             
         end

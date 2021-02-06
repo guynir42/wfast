@@ -316,6 +316,7 @@ classdef ShuffleBank < handle
             input.use_ordered_numeric = 1;
             input.input_var('number', obj.test_number, 'N');
             input.input_var('threshold', obj.threshold);
+            input.input_var('bank', []); 
             input.scan_vars(varargin{:});
             
             if isempty(obj.kernels)
@@ -326,20 +327,26 @@ classdef ShuffleBank < handle
             
             obj.prog.start(input.number);
             
+            if isempty(input.bank)
+                bank = obj; 
+            else
+                bank = input.bank;
+            end
+            
             for ii = 1:input.number
                 
-                obj.gen.R = obj.R_range(1) + rand.*(obj.R_range(2)-obj.R_range(1));
-                obj.gen.r = obj.r_range(1) + rand.*(obj.r_range(2)-obj.r_range(1));
-                obj.gen.b = obj.b_range(1) + rand.*(obj.b_range(2)-obj.b_range(1));
-                obj.gen.v = obj.v_range(1) + rand.*(obj.v_range(2)-obj.v_range(1));
-                obj.gen.getLightCurves;
+                bank.gen.R = bank.R_range(1) + rand.*(bank.R_range(2)-bank.R_range(1));
+                bank.gen.r = bank.r_range(1) + rand.*(bank.r_range(2)-bank.r_range(1));
+                bank.gen.b = bank.b_range(1) + rand.*(bank.b_range(2)-bank.b_range(1));
+                bank.gen.v = bank.v_range(1) + rand.*(bank.v_range(2)-bank.v_range(1));
+                bank.gen.getLightCurves;
                 
-                snr = occult.compareKernels(obj.kernels, single(obj.gen.lc.flux-1));
+                snr = occult.compareKernels(obj.kernels, single(bank.gen.lc.flux-1));
                 
                 obj.snrs_tested(ii) = max(snr);
                 
                 if max(snr)<obj.threshold
-                    if obj.debug_bit, fprintf('Kernel test failed with S/N= %4.2f | R= %4.2f | r= %4.2f | b= %4.2f | v= %5.3f\n', max(snr), obj.gen.R, obj.gen.r, obj.gen.b, obj.gen.v); end
+                    if obj.debug_bit, fprintf('Kernel test failed with S/N= %4.2f | R= %4.2f | r= %4.2f | b= %4.2f | v= %5.3f\n', max(snr), bank.gen.R, bank.gen.r, bank.gen.b, bank.gen.v); end
                 end
 
                 obj.prog.showif(ii);
