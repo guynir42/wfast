@@ -184,7 +184,7 @@ classdef EventFinder < handle
             
             obj.pars = struct;
             
-            obj.pars.threshold = 7.5; % threshold (in units of S/N) for peak of event 
+            obj.pars.threshold = 7.0; % threshold (in units of S/N) for peak of event 
             obj.pars.time_range_thresh = -2.5; % threshold for including area around peak (in continuous time)
             obj.pars.kern_range_thresh = -1; % area threshold (in kernels, discontinuous) NOTE: if negative this will be relative to "threshold"
             obj.pars.star_range_thresh = -1; % area threshold (in stars, discontinuous) NOTE: if this is higher than "threshold" there will be no area around peak
@@ -197,15 +197,10 @@ classdef EventFinder < handle
             obj.pars.use_std_filtered = 1; % normalize variance of filtered flux of each kernel to the average of previous batches (averaging size is set by length_background in the store)
 
             obj.pars.use_prefilter = 1; % filter all stars on a smaller bank, using a lower threshold, and then only vet the survivors with the full filter bank
-            obj.pars.pre_threshold = 5; % threshold for the pre-filter
+            obj.pars.pre_threshold = 4.5; % threshold for the pre-filter
             
-%             obj.pars.use_hills = true; % use the inner Oort cloud template bank as well
             obj.pars.use_oort = true; % use the Oort cloud template bank as well
-            obj.pars.oort_distances = [1000 3000]; % maybe add 10,000 AU as well? 
-            
-%             obj.pars.filter_bank_full_filename = '/WFAST/occultations/TemplateBankKBOs.mat'; % filename where the filter bank was taken from (relative to the DATA folder)
-%             obj.pars.filter_bank_small_filename = '/WFAST/occultations/TemplateBankKBOs_small.mat'; % filename where the smaller filter bank was taken from (relative to the DATA folder)
-%             obj.pars.filter_bank_oort_filename = '/WFAST/occultations/TemplateBankOort.mat'; % filename where the Oort cloud templates are taken from (relative to the DATA folder)
+            obj.pars.oort_distances = [3000]; % maybe add 1000 or 10,000 AU as well? 
             
             obj.pars.limit_events_per_batch = 5; % too many events in one batch will mark all events as black listed! 
             obj.pars.limit_events_per_star = 5; % too many events on the same star will mark all events on that star as black listed! 
@@ -243,7 +238,6 @@ classdef EventFinder < handle
             
             obj.store.reset;
             obj.var_buf.reset;
-%             obj.var_buf_hills.reset; 
             obj.var_buf_oort = util.vec.CircularBuffer.empty; % this is initialized after loading the Oort template banks
             obj.psd.reset;
             
@@ -267,9 +261,6 @@ classdef EventFinder < handle
             
             obj.corrected_fluxes = [];
             obj.corrected_stds = [];
-            
-%             obj.filtered_fluxes = [];
-%             obj.bg_filtered_std = [];
             
             obj.latest_candidates = trig.Candidate.empty;
             
@@ -501,20 +492,6 @@ classdef EventFinder < handle
                 
                 %%%%%%%% OORT CLOUD %%%%%%%%%%%%%
                 
-%                 if obj.pars.use_hills && isempty(obj.bank_hills) % try to load the inner Oort filter bank from file
-%                     obj.loadFilterBankHills; 
-%                 end
-% 
-%                 if obj.pars.use_hills && ~isempty(obj.bank_hills_small) % run the fluxes through the Oort cloud template bank as well 
-%                     
-%                     [hills_candidates, hills_star_indices] = obj.applyTemplateBank('hills'); % by default use corrected_fluxes and correctd_stds given above
-%                     
-%                     star_indices = unique([star_indices; hills_star_indices]);  % add the stars selected by the Hills prefilter / filter
-%                     
-%                     obj.cand = vertcat(obj.cand, hills_candidates); % store all the candidates that were found in the last batch
-%                     
-%                 end
-% 
                 if isempty(obj.bank_oort) || isempty(obj.bank_oort_small) || isempty(obj.var_buf_oort) 
                     obj.loadFilterBankOort; % lazy load the Oort filter bank from file
                 end
@@ -651,14 +628,6 @@ classdef EventFinder < handle
             
             % load the content of the star hours
             s.inputHours(obj.store.checker.hours, obj.cat.data.FresnelSize(obj.store.star_indices));
-            
-%             s.snr_bin_edges = obj.store.checker.hours.snr_bin_edges;
-%             s.star_seconds = permute(nansum(obj.store.checker.hours.histogram,2),[1,3,2]);
-%             s.star_seconds_with_losses = permute(nansum(obj.store.checker.hours.histogram_with_losses,2),[1,3,2]);
-%             s.losses_exclusive = permute(nansum(obj.store.checker.hours.losses_exclusive, 2), [1,3,2]);
-%             s.losses_inclusive = permute(nansum(obj.store.checker.hours.losses_inclusive, 2), [1,3,2]);
-%             s.losses_bad_stars = permute(nansum(obj.store.checker.hours.losses_bad_stars, 2), [1,3,2]);
-%             s.runtime = obj.store.checker.hours.runtime; 
             
             obj.summary = s; 
             
@@ -1148,35 +1117,6 @@ classdef EventFinder < handle
             end
 
         end
-        
-%         function loadFilterBankHills(obj, throw_error)
-% 
-%             if nargin<2 || isempty(throw_error)
-%                 throw_error = 0;
-%             end
-%             
-%             frame_rate = floor(obj.head.FRAME_RATE); 
-%             
-%             obj.bank_hills = occult.ShuffleBank.empty; 
-%             obj.bank_hills_small = occult.ShuffleBank.empty; 
-%             
-%             f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_Hills_%dHz.mat', frame_rate));            
-%             if exist(f, 'file')
-%                 load(f, 'bank');
-%                 obj.bank_hills = bank;
-%             elseif throw_error
-%                 error('Cannot load template bank from file "%s"', f); 
-%             end
-% 
-%             f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_Hills_%dHz_small.mat', frame_rate));
-%             if exist(f, 'file')
-%                 load(f, 'bank');
-%                 obj.bank_hills_small = bank;                
-%             elseif throw_error
-%                 error('Cannot load template bank from file "%s"', f); 
-%             end
-% 
-%         end
         
         function loadFilterBankOort(obj, throw_error)
 
