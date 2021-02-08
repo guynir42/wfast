@@ -1551,7 +1551,11 @@ classdef Candidate < handle
             
         end
         
-        function callback_next(obj, hndl, ~)
+        function idx = getNextIndex(obj, hndl, num_steps)
+            
+            if narginnnn<3 || isempty(num_steps)
+                num_steps = 1;
+            end
             
             num = hndl.UserData.UserData.number;
             idx = hndl.UserData.UserData.index;
@@ -1563,19 +1567,28 @@ classdef Candidate < handle
                 N = 1;
             end
             
-            for ii = 1:N
-                
-                idx = idx + 1; 
-                if idx>num
-                    idx = 1;
+            for s = 1:num_steps
+
+                for ii = 1:N
+
+                    idx = idx + 1; 
+                    if idx>num
+                        idx = 1;
+                    end
+
+                    if use_kept && obj(idx).kept % when we stumble on a kept event
+                        break;
+                    end
+
                 end
-                
-                if use_kept && obj(idx).kept % when we stumble on a kept event
-                    break;
-                end
-                
+
             end
             
+        end
+        
+        function callback_next(obj, hndl, ~)
+            
+            idx = obj.getNextIndex(hndl); 
             obj.show('parent', hndl.UserData, 'index', idx); 
             
         end
@@ -1666,10 +1679,18 @@ classdef Candidate < handle
             
             obj(idx).popupClassifier;
             
-            if isempty(obj(idx).classification)
+            if isempty(obj(idx).classification) % no classification, leave the same index
                 obj.show('parent', hndl.UserData);
             else
-                obj.callback_next(hndl);
+                
+                idx_new = obj.getNextIndex(hndl); 
+                
+                if obj(idx).isSameEvent(obj(idx_new))
+                    idx_new = obj.getNextIndex(hndl, 2);
+                end
+                
+                obj.show('parent', hndl.UserData, 'index', idx_new);
+                
             end
             
         end
