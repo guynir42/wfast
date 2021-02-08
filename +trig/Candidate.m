@@ -585,6 +585,20 @@ classdef Candidate < handle
             
         end
         
+        function val = isSameEvent(obj, other)
+            
+            val = 0; % assume the candidates are not the same underlying event
+            
+            if obj.star_index~=other.star_index, return; end % must be on the same star
+            
+            if obj.batch_number~=other.batch_number, return; end % must be in the same batch
+            
+            if abs(obj.frame_index-other.frame_index)>10, return; end % must have peaks at least 10 frames from each other (allow for kernel shape to move the peak)
+            
+            val =1; % if we didn't short circuit anywhere, the events are the same
+            
+        end
+        
     end
     
     methods % plotting tools / GUI
