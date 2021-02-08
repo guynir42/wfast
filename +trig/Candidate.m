@@ -1709,7 +1709,8 @@ classdef Candidate < handle
                 idx_new = obj.getNextIndex(hndl); 
                 
                 if hndl.UserData.UserData.skip_duplicates && obj(idx).isSameEvent(obj(idx_new))
-                    idx_new = obj.getNextIndex(hndl, 2);
+                    obj(idx_new).classification = obj(idx).classification; % copy the same classification as this candidate
+                    idx_new = obj.getNextIndex(hndl, 2); % skip to the next one after that
                 end
                 
                 obj.show('parent', hndl.UserData, 'index', idx_new);
