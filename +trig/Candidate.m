@@ -585,20 +585,6 @@ classdef Candidate < handle
             
         end
         
-        function val = isSameEvent(obj, other)
-            
-            val = 0; % assume the candidates are not the same underlying event
-            
-            if obj.star_index~=other.star_index, return; end % must be on the same star
-            
-            if obj.batch_number~=other.batch_number, return; end % must be in the same batch
-            
-            if abs(obj.frame_index-other.frame_index)>10, return; end % must have peaks at least 10 frames from each other (allow for kernel shape to move the peak)
-            
-            val =1; % if we didn't short circuit anywhere, the events are the same
-            
-        end
-        
     end
     
     methods % plotting tools / GUI
@@ -609,6 +595,7 @@ classdef Candidate < handle
             input.input_var('index', []); % which event in the vector to plot (default is 1 or what was plotted previously)
             input.input_var('kept', [], 'show_kept'); % if true, filter only the kept events when pressing the prev/next buttons
             input.input_var('cuts', []); % additional cut types to show on the flux plot
+            input.input_var('duplicates', []); % skip duplicate events when classifying
             input.input_var('parent', []); % parent graphic object to plot to (figure or panel, default is gcf())
             input.input_var('font_size', 18);
             input.scan_vars(varargin{:});
@@ -641,9 +628,17 @@ classdef Candidate < handle
                 end
             end
             
+            if isempty(input.duplicates) % default value
+                if ~isempty(input.parent.UserData) && isfield(input.parent.UserData, 'skip_duplicates')
+                    input.duplicates = input.parent.UserData.skip_duplicates; 
+                else
+                    input.duplicates = true;
+                end
+            end
+            
             if isempty(input.parent.UserData)
                 input.parent.UserData = struct('number', length(obj_vec), 'index', input.index, ...
-                    'show_kept', input.kept, 'show_cuts', input.cuts); % add other state variables here
+                    'show_kept', input.kept, 'show_cuts', input.cuts, 'skip_duplicates', input.duplicates); % add other state variables here
             else
                 input.parent.UserData.number = length(obj_vec); 
                 input.parent.UserData.index = input.index;
@@ -1567,7 +1562,7 @@ classdef Candidate < handle
         
         function idx = getNextIndex(obj, hndl, num_steps)
             
-            if narginnnn<3 || isempty(num_steps)
+            if nargin<3 || isempty(num_steps)
                 num_steps = 1;
             end
             
