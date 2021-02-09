@@ -231,19 +231,13 @@ classdef DataStore < handle
 
             obj.pars.use_threshold = true; % use the minimal S/N to keep out bad stars and not even store them
             obj.pars.threshold = 3; % stars with S/N lower than this are disqualified after the burn-in period!
-            obj.pars.use_rate_function = true; % also disqualify stars with low detection rate (based on S/N and Fresnel size)
+            obj.pars.use_rate_function = false; % also disqualify stars with low detection rate (based on S/N and Fresnel size)
             obj.pars.minimal_rate = 0.06; % rate threshold
             obj.pars.minimal_snr = 10; % stars above this S/N are picked regardless of their theoretical rate
             obj.pars.maximal_size = 5; % stars bigger than this are removed no matter what their rate is (unless they pass the above threshold)
             obj.pars.rate_function = []; 
             obj.pars.rate_function_general = @(R,S)-0.01885323-0.08533139.*R+0.02857720.*R.^2-0.00751534.*R.*S+0.02843841.*S-0.00019672.*S.^2; % off ecliptic results
             obj.pars.rate_function_center = @(R,S)-0.11843204-0.05204881.*R+0.02322934.*R.^2-0.01009914.*R.*S+0.04771756.*S-0.00088827.*S.^2; % galactic center results
-            
-%             obj.pars.rate_function_general = @(R,S)-0.04424300-0.00698388.*R+0.00732601.*R.^2-0.00659104.*R.*S+0.02099799.*S-0.00000820.*S.^2; % off ecliptic results
-%             obj.pars.rate_function_center = @(R,S)-0.17472489-0.03477566.*R+0.02088154.*R.^2-0.01280607.*R.*S+0.06250443.*S-0.00135418.*S.^2; % galactic center results
-%             obj.pars.rate_function = @(R,S)0.04412770-0.08761978.*R+0.00244621.*R.^2+0.01875690.*S-0.00022921.*S.^2; % detection fraction as function of stellar radius (this is empirically determined from simulations)
-%             obj.pars.rate_function = @(R,S)0.09098123-0.10198061.*R+0.01777770.*S; % detection fraction as function of stellar radius (this is empirically determined from simulations)
-%             obj.pars.rate_function = @(R) 0.265 - 0.143.*R + 0.02666.*R.^2; % detection fraction as function of stellar radius (this is empirically determined from simulations)
             
             obj.pars.use_remove_cosmic_rays = true; % get rid of intense cosmic rays before even inputting the flux into the buffers
             obj.pars.cosmic_ray_threshold = 8; % in units of S/N
