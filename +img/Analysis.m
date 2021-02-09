@@ -1,5 +1,51 @@
 classdef Analysis < file.AstroData
-
+% Analyze existing HDF5 files, searching for KBOs, and creating lightcurves. 
+% 
+% Choose a folder with some raw cutouts/stacks using chooseDir() function 
+% or using the "browse" button on the GUI. 
+% 
+% Start a new analysis run using run(...), optionally with a call to reset()
+% before you start. This will clear all data in case the object was already
+% used in a different analysis run. Without this, it will continue the same
+% analysis run from where it left off (this is a little buggy still). 
+% 
+% The run() command accepts some arguments:
+%   -reset: equivalent to calling reset() at the start of the run. 
+%   -logging: create an analysis folder with a text file loggint the progress
+%             of the analysis run. 
+%   -save: create an analysis folder and save the results of the run. 
+%   -overwrite: if false, will raise an error if trying to create an 
+%               analysis folder with the same date as an existing one. 
+%               This prevents running the same analysis in the same day. 
+%               If a previous run was cut short and you want to restart it, 
+%               use this option. Make sure the previous run was stopped!
+%
+% NOTE: all these arguments are false by default. 
+%
+% There are actually a lot more parameters that can be changed in this 
+% object. They are specified in the "switches/controls" block. 
+% Many other parameters for specific searches are saved inside the relevant
+% objects, e.g., the trig.EventFinder object "finder" defines many parameters
+% for the KBO/Oort cloud search. 
+% 
+% The run starts with a call to startup() and ends with finishup(). 
+% Each batch in the run is called by batch() which loads a file or other
+% dataset (see the "reader" object) and then runs all sorts of analysis 
+% functions (all named analysisXXX). This includes making stacks and cutouts, 
+% calibrating them, running photometry on the cutouts, finding KBOs, etc. 
+%
+% Another option is to use async_run(). This is the same as run() only it
+% creates a copy of the Analysis object and sends it to a parallel worker. 
+% This function accepts the same arguments as run() but also lets you choose
+% the "worker" option, for specifying which worker to use out of the pool. 
+% The GUI button for "run async" also pops up a window for choosing these
+% parameters, and it automatically finds an available worker. 
+%
+% This class inherits from file.AstroData which defines all the basic data
+% properties such as "images", "cutouts", etc. It also defines the copyFrom()
+% that copies all these data from the reader. 
+%
+    
     properties(Transient=true)
         
         gui;

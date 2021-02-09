@@ -1,5 +1,53 @@
 classdef Overview < handle
+% Calculate some statistics on data collected from multiple runs. 
+% To generate this data, use the input() method, which accepts either 
+% Overview or RunSummary objects. It aggregates the star hours and simulated
+% events saved in such objects and builds multi-dimensional histograms. 
+%
+% To use these data, the following functions are most useful: 
+%   -showHours: show the total star hours as function of some of the parameters
+%               they were observed at, such as stellar size, ecliptic latitude, 
+%               transverse velocity, etc. 
+%   -numDetections: get an estimate for the number of occultations that would
+%                   be seen, based on the model, the efficiency, and the 
+%                   number of star hours that were collected. 
+%   -showCoverage: plot the occulter model and the coverage as a function 
+%                  of the occulter radius. 
+% The last two functions use calcCoverage() which uses calcEfficiency(). 
+%
+% calcEfficiency() compares the number of simulated (injected) events that
+% passed the threshold with the total number of simulated events, as a 
+% function of the occultation parameters. 
+% The results are summed over some parameters, such as stellar radius, as we 
+% can assume their distributions are fairly similar across runs. 
+% The output is an efficiency fraction as function of velocity and occulter
+% radius, which are not integrated as they are connected to the star hours 
+% and the occulter size model. 
+% 
+% calcCoverage() takes the efficiency and multiplies it by the star hours 
+% taken at different runs, summing over velocities (with different efficiency
+% for each velocity bin) and returns a matrix of coverage. 
+% Coverage is the number of square degress that were "scanned" by the survey, 
+% and is the reciprocal of the number of objects per square degree. 
+% This is given as a function of occulter radius and ecliptic latitude, 
+% because different star hours are collected at different latitudes, 
+% and because the coverage is higher for larger occulters. 
+% The coverage can be compared to the number of objects per square degree
+% as predicted by the occulter model. 
+%
+% EXAMPLES: 
+% % ecliptic latitude range in degrees, distance to occulters, in AU:
+% >> numDetections('ecliptic latitude', [-5 5], 'distance', 40); 
+% >> showCoverage('ecliptic latitude', [-5 5], 'distance', 40, 'log', 1, 'ax', gca); 
+% 
+% 
+% This object also contains a couple of CometModel objects to describe the 
+% size distribution of KBOs or Oort cloud objects. 
+% The "folders" object contains a vector of the RunFolder objects used to 
+% build up the Overview (if created using Scanner's calcOverview()). 
+% Two Overview objects can be combined using the input() method on one of them. 
 
+    
     properties(Transient=true)
         
     end
@@ -364,7 +412,7 @@ classdef Overview < handle
             
         end
         
-        function [N_total, N_passed] = calcEfficiency(obj, r_edges, distance_au) % a 3D matrix telling what fraction of events we got from injected events
+        function [N_total, N_passed] = calcEfficiency(obj, r_edges, distance_au) % a 2D matrix telling what fraction of events we got from injected events
         % Get the total number of simulated events and those that passed.
         % INPUTS: 
         %   -r_edges: bin edges for occulter radius in km. 

@@ -1,4 +1,46 @@
 classdef CometModel < handle
+% Display a comet population model, as a function of radius. 
+% Given some power law parameters (index, normalization, lower/upper limits)
+% it can display the size distribution and confidence intervals. 
+% 
+% This is useful for comparing the expected number of occulters with the 
+% coverage we get from a survey. 
+%
+% Define the distribution by tweaking the parameters in the "inputs"
+% properties block. Each property is explained there. Another option is to 
+% call the constructor with a string argument, that can be one of these:
+%   -KBOs: the default behavior, use the properties as they are. 
+%   -Hills: inner Oort cloud, where we use some guess of the density of objects, 
+%           in this case 1e12 objects larger than 5km across the entire sky. 
+%           The distance is defined to be 3000 AU. 
+%   -Oort: the same as Hills, but for a larger distance of 10,000 AU. 
+%
+% The outputs from this object can be calculated using the two functions, 
+% numDensityCumulative() and numDensityIntervals(). 
+% The cumulative gives the number density of objects larger than each radius, 
+% while the intervals gives the number density in each radius bin. 
+% Give the radius bin edges (in km) where the number density is to be 
+% calculated. The second, optional argument is for calculating wider margins
+% based on the error in the power law index (default is true). 
+% 
+% The output number density is given in objects per square degree. 
+%
+% Use the show() method with the following parameters:
+%   -r_edges: the radius bin edges (in km). 
+%             Default is 0.3:0.1:3 in FSU translated to km. 
+%   -power_law_range: use wider confidence intervals based on the power law
+%                     index uncertainties. Default is true. 
+%   -log: show the y-axis in log-scale. Default is true. 
+%   -axes: which graphic axes to plot into. Default is gca(). 
+%   -font_size: axes font size. Default is 18. 
+% The show() method displays the number of objects (per square degree) that
+% are larger than each radius. 
+%
+% NOTE: the distance (and wavelength) are used to estimate the Fresnel scale
+%       which is used to guess useful intervals for the radius r (in km). 
+%       The default is to plot r = 0.3:0.1:3 in Fresnel units and convert it 
+%       to km, which is usually the interesting range. You can override this
+%       by inputting the "r_edges" parameter to show(). 
 
     properties(Transient=true)
         
@@ -8,15 +50,15 @@ classdef CometModel < handle
         
     end
     
-    properties % inputs/outputs
+    properties % inputs
         
         name = 'KBOs'; % by default, create a KBO model
         
-        index_power_law = 3.8;
+        index_power_law = 3.8; % differential power law
         index_lower = 3.6;
         index_upper = 4.0;
         
-        start_radius = 0.25; % km
+        start_radius = 0.25; % km (this is where the normalization is defined)
         
         normalization = 1.1e7; % number of objects above "start_radius"
         norm_lower = 0.4e7; % lower limit on normalization

@@ -1,5 +1,16 @@
 classdef CorrectPSD < handle
-
+% Calculate the Power Spectral Density of lightcurves, and apply a correction
+% to new lightcurves that are given to it. 
+% 
+% Use calcPSD() by giving it a long baseline flux matrix and timestamps. 
+% Use input() with the new, short flux interval to get corrected fluxes. 
+% Handles 2D matrices where each column is a lightcurve for a different star. 
+% 
+% The object parameters, "window_size", "overlap" and "num_points" are passed
+% to the pwelch() function used to calculate the PSD. 
+% 
+    
+    
     properties(Transient=true)
         
     end
