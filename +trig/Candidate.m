@@ -417,6 +417,20 @@ classdef Candidate < handle
             
         end
         
+        function summary = getSummary(obj)
+            
+            d = obj.findAnalysisFolder; 
+            
+            load(fullfile(d, 'summary.mat')); 
+            
+            if ~exist('summary', 'var')
+                summary = [];
+            end
+            
+        end
+        
+        
+        
     end
     
     methods % setters

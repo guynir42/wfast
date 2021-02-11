@@ -248,6 +248,8 @@ classdef QualityChecker < handle
             obj.pars.bad_columns = []; % which columns are considered bad
             obj.pars.bad_rows = []; % which rows are considered bad
 
+            obj.pars.num_stars_defocus = 100; % how many stars (max) to use for calculating defocus
+            
             obj.setupSensor;
             
             obj.reset; 
@@ -791,7 +793,9 @@ classdef QualityChecker < handle
                 f = obj.extended_flux; 
             end
             
-            for ii = 1:size(cutouts,4)
+            N = min(obj.pars.num_stars_defocus,size(cutouts,4)); % use only 100 stars, or less if there are not enough stars
+            
+            for ii = 1:N
                 
                 for jj = 1:size(cutouts,3)
                     
@@ -813,9 +817,9 @@ classdef QualityChecker < handle
                 
             end
             
-            C = nansum(cutouts,3); 
+            C = nansum(cutouts(:,:,:,1:N),3); 
             
-            F = nanmean(f,1);
+            F = nanmean(f(:,1:N),1);
             
 %             w = util.img.fwhm(C,'method', 'filters', 'gaussian', 5, 'step_size', 0.25)./2.355; % use generalized gaussian to find the width
             w = util.img.fwhm(C,'method', 'filters', 'defocus', 1, 'step_size', 0.25)./2.355; % use generalized gaussian to find the width
