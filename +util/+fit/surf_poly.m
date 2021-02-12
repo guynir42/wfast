@@ -23,7 +23,7 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
 %                           surface map output and for plotting. 
 %                           Default is min/max of x and y values. 
 %   -size: the number of pixels in the surface map output. Default 1000. 
-%   -double: force the data to be in double-precision. Default is false. 
+%   -double: force the data to be in double-precision. Default is true. 
 %   -plot: show the fit and the data points. Default is false. 
 %   -pause: when plotting, how many seconds to wait between iterations.
 %           Default is one second. 
@@ -50,7 +50,7 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
     input.input_var('x_values', []); 
     input.input_var('y_values', []); 
     input.input_var('size', 1000, 'im_size', 'image_size'); 
-    input.input_var('double', false); 
+    input.input_var('double', true); 
     input.input_var('plot', false); 
     input.input_var('pause', 1, 'duration'); 
     input.input_var('ax', [], 'axes', 'axis'); 
@@ -148,8 +148,6 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
     coeff_powers_x = 0;
     coeff_powers_y = 0;
     
-    N = length(coeff_names);
-    
     for ord = 1:input.order
         
         for ii = 0:ord
@@ -189,6 +187,8 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
         
     end
     
+    N = length(coeff_names);
+    
     for ii = 1:size(x,2)
         
         % we can exclude some of these
@@ -222,8 +222,8 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
         
         for jj = 1:input.iterations
 
-            if length(nan_indices) + N >= size(x,2)
-                new_result = make_empty_result(coeff_names);
+            if length(nan_indices) + N >= size(x,1)
+                new_result = make_empty_result(coeff_names, coeff_powers_x, coeff_powers_y, x(:,ii), y(:,ii), v(:,ii), w(:,ii));
                 break;
             end
             
@@ -381,7 +381,7 @@ function I = make_image(coeff_values, coeffs_x, coeffs_y, x_values, y_values)
 
 end
 
-function new_result = make_empty_result(coeff_names)
+function new_result = make_empty_result(coeff_names, coeff_powers_x, coeff_powers_y,x,y,v,w)
     
     coeffs = NaN(length(coeff_names),1); 
     new_result.coeff_names = coeff_names;
@@ -396,19 +396,19 @@ function new_result = make_empty_result(coeff_names)
         end
     end
 
-    new_result.func = str2func(['@(x,y) ' new_result.model]); 
+    new_result.func = @(x,y) NaN; 
 
-    new_result.x = x(:,ii);
-    new_result.y = y(:,ii);
-    new_result.v = v(:,ii);
+    new_result.x = x;
+    new_result.y = y;
+    new_result.v = v;
     if ~isempty(w)
-        new_result.w = w(:,ii);
+        new_result.w = w;
     end
     new_result.vm = NaN(size(v,1),1); 
 
     new_result.residuals = NaN(size(v,1),1);
     new_result.chi2 = NaN;
-    new_result.ndof = length(V) - length(coeffs); 
+    new_result.ndof = length(v) - length(coeffs); 
     new_result.var = NaN;
     
 end

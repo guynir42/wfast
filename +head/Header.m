@@ -712,6 +712,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             
         end
         
+        function val = get_juldates(obj, timestamps)
+            
+            if isempty(obj.END_STAMP) || isempty(obj.ENDTIME) 
+                val = [];
+            else
+                val = juliandate(util.text.str2time(obj.ENDTIME) + seconds(timestamps - obj.END_STAMP));
+            end
+            
+        end
+        
     end
            
     methods % setters

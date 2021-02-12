@@ -153,6 +153,8 @@ classdef QualityChecker < handle
         mean_width_values; % track the mean width for all batches in this run
         mean_background_values;  % track the mean background for all batches in this run
         
+        fwhm; % from the ModelPSF (in arcsec)
+        
         debug_bit = 1;
         
     end
@@ -212,6 +214,7 @@ classdef QualityChecker < handle
             obj.pars.use_delta_t = true;
             obj.pars.use_shakes = true;
             obj.pars.use_defocus = true;
+            obj.pars.use_fwhm = true; 
             obj.pars.use_slope = true;
             obj.pars.use_near_bad_rows_cols = true;            
             obj.pars.use_offset_size = true;
@@ -230,6 +233,7 @@ classdef QualityChecker < handle
             obj.pars.thresh_delta_t = 0.3; % events where the difference in timestamps, relative to the mean time-step are disqualified
             obj.pars.thresh_shakes = 5; % events where the mean offset r is larger than this are disqualified
             obj.pars.thresh_defocus = 3; % events with PSF width above this value are disqualified
+            obj.pars.thresh_fwhm = 10; % batches with too big FWHM (from ModelPSF, in arcsec) are disqualified
             obj.pars.thresh_slope = 5; % events where the slope is larger than this value (in abs. value) are disqualified
             obj.pars.thresh_offset_size = 4; % events with offsets above this number are disqualified (after subtracting mean offsets)
             obj.pars.thresh_linear_motion = 2; % events showing linear motion of the centroids are disqualified
@@ -299,6 +303,12 @@ classdef QualityChecker < handle
             if obj.pars.use_defocus 
                 obj.cut_names{end+1} = 'defocus'; 
                 obj.cut_thresholds(end+1) = obj.pars.thresh_defocus;
+                obj.cut_two_sided(end+1) = false;
+            end
+            
+            if obj.pars.use_fwhm
+                obj.cut_names{end+1} = 'fwhm'; 
+                obj.cut_thresholds(end+1) = obj.pars.thresh_fwhm;
                 obj.cut_two_sided(end+1) = false;
             end
             
@@ -704,6 +714,10 @@ classdef QualityChecker < handle
                 obj.cut_values_matrix(:,:,obj.cut_indices.defocus) = obj.defocus.*all_stars; 
             end
             
+            if obj.pars.use_fwhm && ~isempty(obj.fwhm)
+                obj.cut_values_matrix(:,:,obj.cut_indices.fwhm) = obj.fwhm.*all_stars; 
+            end
+            
             if obj.pars.use_slope
                 obj.cut_values_matrix(:,:,obj.cut_indices.slope) = obj.slope.*all_stars;
             end
@@ -793,36 +807,20 @@ classdef QualityChecker < handle
                 f = obj.extended_flux; 
             end
             
-            N = min(obj.pars.num_stars_defocus,size(cutouts,4)); % use only 100 stars, or less if there are not enough stars
+            N = min(obj.pars.num_stars_defocus,size(cutouts,4)); % use only 100 stars, or less if there are not enough stars            
+            cutouts = cutouts(:,:,:,1:N);
+            x = x(:,1:N); 
+            y = y(:,1:N); 
+            f = f(:,1:N); 
             
-            for ii = 1:N
-                
-                for jj = 1:size(cutouts,3)
-                    
-                    if nnz(isnan(cutouts(:,:,jj,ii)) | cutouts(:,:,jj,ii)==0)<0.2*numel(cutouts(:,:,jj,ii)) % less than 20% of the pixels are NaN or zero
-                        try
-%                             cutouts(:,:,jj,ii) = regionfill(cutouts(:,:,jj,ii), isnan(cutouts(:,:,jj,ii))); 
-                            I = cutouts(:,:,jj,ii); 
-                            I(isnan(I)) = 0; 
-                            I = util.img.FourierShift2D(I,-[x(jj,ii),y(jj,ii)]); 
-                            cutouts(:,:,jj,ii) = I; 
-                        catch ME
-                            if ~strcmp(ME.identifier, 'MATLAB:regionfill:expectedNonNaN') % ignore these errors silently 
-                                rethrow(ME);
-                            end
-                        end
-                    end
-                    
-                end
-                
-            end
+            cutouts = util.img.align(cutouts, -x, -y); % re-center all cutouts according to the x,y offsets
             
-            C = nansum(cutouts(:,:,:,1:N),3); 
+            C = nansum(cutouts,3); % sum up all frames for each star
             
-            F = nanmean(f(:,1:N),1);
+%             w = util.img.fwhm(C,'method', 'filters', 'generaized', 5, 'step_size', 0.25)./2.355; % use generalized gaussian to find the width
+            w = util.img.fwhm(C,'method', 'filters', 'defocus', 1, 'step_size', 0.25)./2.355; % use defocus annulus to find the width
             
-%             w = util.img.fwhm(C,'method', 'filters', 'gaussian', 5, 'step_size', 0.25)./2.355; % use generalized gaussian to find the width
-            w = util.img.fwhm(C,'method', 'filters', 'defocus', 1, 'step_size', 0.25)./2.355; % use generalized gaussian to find the width
+            F = nanmean(f,1); % the mean flux is used as a weight
             
             val = util.vec.weighted_average(w, sqrt(abs(F)), 2); 
             

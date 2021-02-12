@@ -116,7 +116,10 @@ classdef Analysis < file.AstroData
         
         prev_stack;
         
-        FWHM; % latest measured full width half maximum
+        FWHM; % latest measured full width half maximum (in arcsec)
+        
+        FWHM_log; % keep track of the FWHM over entire run
+        juldates_full; % keep a record of the juldates across entire run
         
         batch_counter = 0;
         
@@ -168,6 +171,9 @@ classdef Analysis < file.AstroData
         
         use_display_flip = 0;
         display_num_rect_stars = 30;
+        
+        use_fwhm_stop = false;
+        max_fwhm_stop = 10; % if seeing is worse than this number (in arcsec) quit the run
         
         brake_bit = 1;
         debug_bit = 1;
@@ -331,6 +337,9 @@ classdef Analysis < file.AstroData
             
             obj.finder.store.checker.setupSensor; % make sure the quality checker has the right bad rows/columns
             
+            obj.FWHM_log = []; 
+            obj.juldates_full = [];
+            
             obj.clear;
             
         end
@@ -358,6 +367,8 @@ classdef Analysis < file.AstroData
             obj.stack_proc = [];
             
             obj.sky_pars = [];
+            
+            obj.FWHM = []; 
             
         end
         
@@ -1885,10 +1896,33 @@ classdef Analysis < file.AstroData
             
             t = tic;
 
-            obj.model_psf.input(obj.cutouts_sub, obj.phot.offsets_x, obj.phot.offsets_y);
+            obj.model_psf.input(obj.cutouts_sub, obj.phot.offsets_x(:,:,end), ...
+                obj.phot.offsets_y(:,:,end), obj.phot.fluxes(:,:,end), obj.positions);
 
-            obj.FWHM = util.img.fwhm(obj.model_psf.stack);
-
+            obj.FWHM = obj.model_psf.fwhm;
+            obj.FWHM_log = [obj.FWHM_log; obj.FWHM]; 
+            
+            T_mid = mean(obj.timestamps);
+            N_frames = length(obj.timestamps); % number of frames per batch
+            
+            obj.juldates_full = [obj.juldates_full; obj.head.get_juldates(T_mid)];
+            
+            if obj.use_full_lightcurves
+                obj.lightcurves.batch_timestamps(end+1,1) = T_mid; 
+                obj.lightcurves.batch_midframe(end+1,1) = length(obj.lightcurves.timestamps) + N_frames/2; % add half the frame number to the number of existing frames
+                obj.lightcurves.fwhm_coeffs_pix(end+1,:) = obj.model_psf.surf_coeffs;
+                obj.lightcurves.fwhm_x_center = obj.model_psf.surf_fit.xc;
+                obj.lightcurves.fwhm_y_center = obj.model_psf.surf_fit.yc;
+            end
+            
+            if obj.use_stack_lightcurves
+                obj.light_stack.batch_timestamps(end+1,1) = T_mid; 
+                obj.light_stack.batch_midframe(end+1,1) = length(obj.light_stack.timestamps); % add half the frame number to the number of existing frames
+                obj.light_stack.fwhm_coeffs_pix(end+1,:) = obj.model_psf.surf_coeffs;
+                obj.light_stack.fwhm_x_center = obj.model_psf.surf_fit.xc;
+                obj.light_stack.fwhm_y_center = obj.model_psf.surf_fit.yc;
+            end
+            
             if obj.debug_bit>1, fprintf('Time for PSF model: %f seconds\n', toc(t)); end
             
         end
@@ -1899,41 +1933,12 @@ classdef Analysis < file.AstroData
             
             t = tic;
             
-%             f = obj.phot.fluxes;
-%             e = obj.phot.errors;
-%             a = obj.phot.areas;
-%             b = obj.phot.backgrounds;
-%             v = obj.phot.variances;
-%             x = obj.phot.offsets_x;
-%             y = obj.phot.offsets_y;
-%             w = obj.phot.widths;
-%             p = obj.phot.bad_pixels;
-%             F = obj.phot.flags;
-%             phot_pars = obj.phot.pars_struct; % maybe also give this to model_psf??
-% 
-%             r = [];
-%             g = [];
-% 
-%             if obj.phot.use_gaussian
-%                 g = obj.phot.gauss_sigma;
-%             end
-%                 
-%             if obj.phot.use_aperture
-%                 r = obj.phot.aperture;
-%             end
-
             obj.head.PHOT_PARS = obj.phot.pars_struct; 
 
-            obj.finder.input(obj.phot); 
+            obj.finder.input(obj.phot, obj.model_psf); 
             
             obj.finder.total_batches = obj.batch_counter; % keep track of all batches, not just those that were processed
             
-%             obj.finder.input(f, e, a, b, v, x, y, w, p, F, r, g, ...
-%                 obj.timestamps, obj.cutouts, obj.positions, obj.stack, ...
-%                 obj.batch_counter+1, 'filename', obj.thisFilename, ...
-%                 't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp,...
-%                 'used_background', obj.phot.use_backgrounds, 'pars', phot_pars);
-
             if obj.debug_bit>1, fprintf('Time to find events: %f seconds\n', toc(t)); end
 
             if ~isempty(obj.finder.gui) && obj.finder.gui.check

@@ -90,6 +90,12 @@ classdef Lightcurves < handle
         
         frame_index = 1;
         
+        batch_timestamps; % timestamp for the middle of each batch
+        batch_midframe; % frame number for the central frame of each batch (for interpolating back onto the full frame rate)
+        fwhm_coeffs_pix; % coefficients needed to calculate the FWHM (in pixels!)
+        fwhm_x_center; % must subtract this from the x positions when using the polynomial coeffs
+        fwhm_y_center; % must subtract this from the y positions when using the polynomial coeffs
+        
         magnitudes; % keep a copy of the star magnitudes for doing statistics
         
         zp_fit_results; % the fit results for the spatial fit to the zero point

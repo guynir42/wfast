@@ -1,10 +1,33 @@
 classdef ModelPSF < handle
-
+% Calculate some properties of the PSF using the cutouts and the photometry. 
+% Use input(cutouts, dx, dy, flux, positions) to provide all necessary data
+% for calculating the stacked PSF (which is only good if the PSF is fairly 
+% uniform across the field) and the FWHM as a function of cutout position. 
+% 
+% Use num_stars to determine how many cutouts (from the brightest first)
+% to use in the FWHM calculation. Too many cutouts take a long time to 
+% process and will contain faint stars where the width is un-measurable. 
+%
+% The surf_fit and surf_coeffs contain data on the FWHM (in arcsec) as a 
+% function of star position. surf_fit.xc and .yc are the x and y centers. 
+% Use x-xc and y-yc when inputting the star position into the polynomial 
+% fit result to get the correct FWHM. 
+% Take the 1st coefficient to get the seeing at the center of the field. 
+%
+% The calculation uses util.img.align based on the photometric centroids, 
+% then sums all frames for each star to increase S/N and reduce runtime, 
+% then calculates the width using util.img.fwhm with three different filter
+% types: gaussian, generalized gaussian, and defocus annulus. 
+% 
+% 
+    
     properties(Transient=true)
         
     end
     
     properties % objects
+        
+        head@head.Header; 
         
     end
     
@@ -12,13 +35,16 @@ classdef ModelPSF < handle
         
         offsets_x;
         offsets_y;
+        fluxes;
+        positions;
         cutouts;
-        
+               
         cutouts_shifted;
         stack; 
         mask;
         
-        fwhm;
+        fwhm; % arcsec
+        fwhm_pix; % pixels
         
         m2x;
         m2y;
@@ -26,6 +52,9 @@ classdef ModelPSF < handle
         maj_axis;
         min_axis;
         angle;
+        
+        surf_fit; 
+        surf_coeffs;
         
     end
     
@@ -36,6 +65,8 @@ classdef ModelPSF < handle
         
         use_gaussian = 0;
         gauss_sigma = 5;
+        
+        num_stars = 100; 
         
         debug_bit = 1;
         
@@ -49,7 +80,7 @@ classdef ModelPSF < handle
     
     properties(Hidden=true)
        
-        version = 1.00;
+        version = 1.01;
         
     end
     
@@ -116,6 +147,8 @@ classdef ModelPSF < handle
             input.input_var('cutouts', [], 'images');
             input.input_var('offsets_x', [], 'dx', 9);
             input.input_var('offsets_y', [], 'dx', 9);
+            input.input_var('fluxes', []); 
+            input.input_var('positions', []); 
             input.input_var('radius', [], 'aperture'); 
             input.scan_vars(varargin{:});
             
@@ -123,9 +156,13 @@ classdef ModelPSF < handle
                 return;
             end
             
-            obj.cutouts = input.cutouts;
-            obj.offsets_x = input.offsets_x;
-            obj.offsets_y = input.offsets_y;
+            N = min(obj.num_stars, size(input.cutouts,4)); 
+            
+            obj.cutouts = input.cutouts(:,:,:,1:N);
+            obj.offsets_x = input.offsets_x(:,1:N);
+            obj.offsets_y = input.offsets_y(:,1:N);
+            obj.fluxes = input.fluxes(:,1:N); 
+            obj.positions = input.positions(1:N,:); 
             
             S = util.vec.imsize(obj.cutouts);
             
@@ -145,29 +182,15 @@ classdef ModelPSF < handle
             
             if isempty(dx) || isempty(dy)
                 obj.cutouts_shifted = obj.cutouts;
-            end
-            
-            if obj.use_mex
-                obj.cutouts_shifted = util.img.shift(obj.cutouts, -dx, -dy);
             else
-                
-                obj.cutouts_shifted = zeros(size(obj.cutouts), 'like', obj.cutouts); % preallocate
-                
-                for ii = 1:size(obj.cutouts,3)
-                    
-                    for jj = 1:size(obj.cutouts,4)
-                        if isnan(dx(ii,jj)) || isnan(dy(ii,jj))
-                            obj.cutouts_shifted(:,:,ii,jj) = NaN(size(cutouts,1),size(cutouts,2), 'like', cutouts);
-                        else
-                            obj.cutouts_shifted(:,:,ii,jj) = util.img.imshift(obj.cutouts(:,:,ii,jj), -dy(ii,jj), -dx(ii,jj));
-                        end
-                    end
-                    
-                end
-                
+                obj.cutouts_shifted = util.img.align(obj.cutouts, dx, dy); 
             end
             
             obj.calcStack;
+            
+            if ~isempty(obj.positions)
+                obj.calcSurfaceFit; 
+            end
             
         end
         
@@ -182,6 +205,7 @@ classdef ModelPSF < handle
                 obj.maj_axis = NaN;
                 obj.min_axis = NaN;
                 obj.fwhm = NaN;
+                obj.fwhm_pix = NaN;
                 return; 
             end
             
@@ -211,7 +235,47 @@ classdef ModelPSF < handle
             obj.min_axis = min(sqrt(diag(E)));
             
 %             obj.fwhm = sqrt(mean([obj.m2x,obj.m2y])).*2.355;
-            obj.fwhm = util.img.fwhm(I, 'method', 'filters');
+            obj.fwhm_pix = util.img.fwhm(I, 'method', 'filters');
+            
+            if ~isempty(obj.head) && ~isempty(obj.head.SCALE)
+                obj.fwhm = obj.fwhm_pix.*obj.head.SCALE;
+            end
+            
+        end
+        
+        function calcSurfaceFit(obj)
+            
+            C = nansum(obj.cutouts_shifted,3); % stack the individual frames
+            
+            C = C - util.stat.corner_median(C); % can we figure out a better way to remove the background? 
+            
+            w = util.img.fwhm(C, 'method', 'filters', 'defocus', 1, 'generalized', 5, 'step', 0.25, 'min_size', 1);
+            w = util.vec.tocolumn(w); 
+            
+            x = obj.positions(:,1); 
+            y = obj.positions(:,2); 
+            
+            if ~isempty(obj.head)
+                xc = floor(obj.head.NAXIS2/2)+1; 
+                yc = floor(obj.head.NAXIS1/2)+1;                 
+            else
+                xc = nanmean(x);
+                yc = nanmean(y); 
+            end
+            
+            F = util.vec.tocolumn(nansum(obj.fluxes,1)); % average flux is used as weight
+            
+            obj.surf_fit = util.fit.surf_poly(x-xc, y-yc, w, 'weights', sqrt(abs(F)), 'order', 2, 'sigma', 3, 'iterations', 2, 'plot', 0); 
+            obj.surf_fit.xc = xc;
+            obj.surf_fit.yc = yc;
+            
+            obj.surf_coeffs = obj.surf_fit.coeffs;
+            
+            obj.fwhm_pix = obj.surf_coeffs(1);
+            
+            if ~isempty(obj.head) && ~isempty(obj.head.SCALE)
+                obj.fwhm = obj.fwhm_pix.*obj.head.SCALE;
+            end
             
         end
         

@@ -442,6 +442,10 @@ classdef DataStore < handle
                 obj.this_input.scan_vars(varargin{:}); 
             end
             
+            if length(varargin)>1 && isa(varargin{2}, 'img.ModelPSF') % can also pick up the FWHM from the ModelPSF
+                obj.checker.fwhm = varargin{2}.fwhm; 
+            end
+            
             % make sure we got fluxes, timestamps and all the aux data
             if isempty(obj.this_input.timestamps) || isempty(obj.this_input.fluxes) || ...
                     isempty(obj.this_input.errors) || isempty(obj.this_input.areas) ||...
