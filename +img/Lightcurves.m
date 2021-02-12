@@ -326,6 +326,12 @@ classdef Lightcurves < handle
             
             obj.frame_index = 1;
             
+            obj.batch_timestamps = [];
+            obj.batch_midframe = [];
+            obj.fwhm_coeffs_pix = [];
+            obj.fwhm_x_center = [];
+            obj.fwhm_y_center = [];
+        
             obj.clearIntermidiate;
             obj.clearFits;
             obj.clearFluxes;
