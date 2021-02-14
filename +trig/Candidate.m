@@ -837,12 +837,18 @@ classdef Candidate < handle
             N_class = nnz(~cellfun(@isempty, {kept.classification}));
             N_total = numel(kept); 
             
+            if isprop(button, 'Tooltip')
+                tool_tip_name = 'Tooltip';
+            elseif isprop(button, 'TooltipString')
+                tool_tip_name = 'TooltipString';
+            end
+            
             if N_class==N_total
                 button.String = 'SAVE'; 
-                button.Tooltip = sprintf('Save %d candidates', N_total); 
+                button.(tool_tip_name)= sprintf('Save %d candidates', N_total); 
             else                
                 button.String = sprintf('%d/%d', N_class, N_total); 
-                button.Tooltip = sprintf('Cannot save. Only %d candidates have been classified out of %d', N_class, N_total); 
+                button.(tool_tip_name) = sprintf('Cannot save. Only %d candidates have been classified out of %d', N_class, N_total); 
             end
             
             % TODO: notes section + add note button

@@ -604,11 +604,17 @@ classdef EventFinder < handle
             s.star_snr = obj.store.star_snr;
             s.star_sizes = obj.store.star_sizes;
             s.size_snr_coeffs = obj.store.size_snr_coeffs;
-            FWHM = obj.store.checker.defocus_log*2.355*obj.head.SCALE; 
-            s.fwhm_edges = 0:0.1:round(nanmax(FWHM)*10)/10;
-            s.fwhm_hist = histcounts(FWHM, 'BinEdges', s.fwhm_edges); 
             
-            s.fwhm_hist = s.fwhm_hist.*nanmedian(diff(obj.store.checker.juldate_log))*24*3600;
+            
+            FWHM = obj.store.checker.defocus_log*2.355*obj.head.SCALE; 
+            if ~isempty(FWHM)
+                s.fwhm_edges = 0:0.1:round(nanmax(FWHM)*10)/10;
+                s.fwhm_hist = histcounts(FWHM, 'BinEdges', s.fwhm_edges);             
+                s.fwhm_hist = s.fwhm_hist.*nanmedian(diff(obj.store.checker.juldate_log))*24*3600;
+            end
+            
+            s.seeing_log = obj.store.fwhm_log; 
+            s.juldates_log = obj.store.juldates_log; 
             
             % load the content of the checker
             s.checker_pars = obj.store.checker.pars;
@@ -1286,7 +1292,7 @@ classdef EventFinder < handle
                 
                 R_star = R_star*sqrt(bank.D_au./40); % adjust the stellar size in case the bank is for Hills/Oort cloud
                 
-                r_occulter = util.stat.power_law_dist(3.5, 'min', bank.r_range(1), 'max', bank.r_range(2)); % occulter radius drawn from power law distribution
+                r_occulter = util.stat.power_law_dist(3.0, 'min', bank.r_range(1), 'max', bank.r_range(2)); % occulter radius drawn from power law distribution
                 b_par = bank.b_range(1) + rand*(diff(bank.b_range)); % impact parameter drawn from uniform distribution
                 vel = bank.v_range(1) + rand*(diff(bank.v_range)); % velocity drawn from uniform distribution
                 

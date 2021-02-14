@@ -176,6 +176,9 @@ classdef DataStore < handle
         
         aperture_index = [];
         
+        fwhm_log; % in arcsec!
+        juldates_log; % the julian dates for the middle of each batch
+        
         debug_bit = 1;
         
     end
@@ -442,10 +445,6 @@ classdef DataStore < handle
                 obj.this_input.scan_vars(varargin{:}); 
             end
             
-            if length(varargin)>1 && isa(varargin{2}, 'img.ModelPSF') % can also pick up the FWHM from the ModelPSF
-                obj.checker.fwhm = varargin{2}.fwhm; 
-            end
-            
             % make sure we got fluxes, timestamps and all the aux data
             if isempty(obj.this_input.timestamps) || isempty(obj.this_input.fluxes) || ...
                     isempty(obj.this_input.errors) || isempty(obj.this_input.areas) ||...
@@ -457,6 +456,12 @@ classdef DataStore < handle
 
                 error('Some photometric products are empty!'); 
 
+            end
+            
+            if length(varargin)>1 && isa(varargin{2}, 'img.ModelPSF') % can also pick up the FWHM from the ModelPSF
+                obj.checker.fwhm = varargin{2}.fwhm; 
+                obj.fwhm_log = vertcat(obj.fwhm_log, varargin{2}.fwhm); 
+                obj.juldates_log = vertcat(obj.juldates_log, obj.head.get_juldates(mean(obj.this_input.timestamps))); % keep a log of the julian dates of the middle of each batch as well
             end
             
             if ~isempty(obj.head) && ~isempty(obj.this_input.pars_struct)
@@ -604,7 +609,7 @@ classdef DataStore < handle
             N = permute(nanmedian(util.series.binning(f, obj.pars.length_extended ,'func', 'std')), [2,3,1]); % for noise calculations we don't subtract background. 
             % This is the same as calculating the RMS of each extended region (the median ignores outlier batches)
             
-            obj.star_snr = S./N;  
+            obj.star_snr = S./N; % dim1 is star index, dim2 is aperture index
             
             passed = obj.star_snr >= obj.pars.threshold; 
             
@@ -614,11 +619,13 @@ classdef DataStore < handle
             
             obj.bad_ratios = false(size(S,1),1); 
             
+            % compare the flux signal for the picked aperture and the smallest aperture, get rid of stars with large ratios
             if obj.aperture_index>1
                 r = S(:,obj.aperture_index)./S(:,1);
                 obj.bad_ratios = obj.bad_ratios | (r-nanmedian(r))./nanstd(r) > 3;
             end
             
+            % compare the flux signal for the picked aperture and the biggest aperture, get rid of stars with large ratios
             if obj.aperture_index<size(S,2)
                 r = S(:,end)./S(:,obj.aperture_index);
                 obj.bad_ratios = obj.bad_ratios | (r-nanmedian(r))./nanstd(r) > 3;

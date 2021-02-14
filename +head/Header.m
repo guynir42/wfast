@@ -722,6 +722,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             
         end
         
+        function val = get_datetimes(obj, timestamps)
+            
+            if isempty(obj.END_STAMP) || isempty(obj.ENDTIME) 
+                val = [];
+            else
+                val = util.text.str2time(obj.ENDTIME) + seconds(timestamps - obj.END_STAMP);
+            end
+            
+        end
+        
     end
            
     methods % setters

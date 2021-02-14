@@ -572,9 +572,12 @@ classdef QualityChecker < handle
             
             obj.mean_x = util.vec.weighted_average(x,F.^2,2); % maybe use square of flux instead??
             obj.mean_y = util.vec.weighted_average(y,F.^2,2); % last arg is for dimension 2 (average over stars)
-%             obj.defocus =  % get the average PSF width (for focus tests)
-            obj.defocus = obj.calculateDefocus; 
-            obj.defocus_log = vertcat(obj.defocus_log, obj.defocus); 
+
+            if obj.pars.use_defocus
+                obj.defocus = obj.calculateDefocus; 
+                obj.defocus_log = vertcat(obj.defocus_log, obj.defocus); 
+            end
+            
             obj.juldate_log = vertcat(obj.juldate_log, nanmean(obj.search_juldates)); 
             
             W = util.vec.weighted_average(w,F.^2,2);
@@ -941,7 +944,6 @@ classdef QualityChecker < handle
             
             val = 1; 
             
-            
             if ~isempty(obj.extended_aux) 
                 B = obj.extended_aux(obj.search_start_idx:obj.search_end_idx,:,obj.aux_indices.backgrounds);
                 if B>5*obj.pars.thresh_background_intensity % this is 5 times higher than the regular threshold (wide margin)
@@ -949,7 +951,11 @@ classdef QualityChecker < handle
                 end
             end
             
-            if ~isempty(obj.defocus) && obj.defocus>2*obj.pars.thresh_defocus
+            if obj.pars.use_defocus && ~isempty(obj.defocus) && obj.defocus>2*obj.pars.thresh_defocus
+                val = 0; 
+            end
+            
+            if obj.pars.use_fwhm && ~isempty(obj.fwhm) && obj.fwhm>2*obj.pars.thresh_fwhm
                 val = 0; 
             end
             

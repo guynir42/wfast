@@ -1469,6 +1469,10 @@ classdef Lightcurves < handle
             
             obj.frame_index = obj.frame_index + N;
             
+            if ~isempty(obj.cat) && ~isempty(obj.cat.success)
+                obj.magnitudes = obj.cat.magnitudes;
+            end
+            
             if ~isempty(input.pars_struct)
                 obj.phot_pars = input.pars_struct;
             end

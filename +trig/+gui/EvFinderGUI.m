@@ -161,7 +161,8 @@ classdef EvFinderGUI < handle
             obj.menu_pars.menu_checker.menu_apply.addButton('button_delta_t', 'delta &T', 'toggle', 'store.checker.pars.use_delta_t', 'disqualify based on irregular jumps in the timestamps'); 
             obj.menu_pars.menu_checker.menu_apply.addButton('button_shakes', '&Shakes', 'toggle', 'store.checker.pars.use_shakes', 'disqualify based on flux-weighted mean offset size'); 
             obj.menu_pars.menu_checker.menu_apply.addButton('button_defocus', '&Defocus', 'toggle', 'store.checker.pars.use_defocus', 'disqualify based on the flux-weighted mean PSF width'); 
-            obj.menu_pars.menu_checker.menu_apply.addButton('button_slope', '&Flux slope', 'toggle', 'store.checker.pars.use_slope', 'disqualify based on global linear changes in the average flux'); 
+            obj.menu_pars.menu_checker.menu_apply.addButton('button_fwhm', '&FWHM', 'toggle', 'store.checker.pars.use_fwhm', 'disqualify based on the model PSF seeing FWHM'); 
+            obj.menu_pars.menu_checker.menu_apply.addButton('button_slope', 'Flu&X slope', 'toggle', 'store.checker.pars.use_slope', 'disqualify based on global linear changes in the average flux'); 
             obj.menu_pars.menu_checker.menu_apply.addButton('button_bad_rows', '&Bad rows/cols', 'toggle', 'store.checker.pars.use_near_bad_rows_cols', 'disqualify based on proximity to bad rows/columns'); 
             obj.menu_pars.menu_checker.menu_apply.addButton('button_offset_size', '&Offset size', 'toggle', 'store.checker.pars.use_offset_size', 'disqualify based on large offset size'); 
             obj.menu_pars.menu_checker.menu_apply.addButton('button_linear_motion', '&Linear motion', 'toggle', 'store.checker.pars.use_linear_motion', 'disqualify based on linear changes in the x/y offsets'); 
@@ -178,7 +179,8 @@ classdef EvFinderGUI < handle
             obj.menu_pars.menu_checker.menu_thresh.addButton('input_delta_t', 'delta &T', 'input', 'store.checker.pars.thresh_delta_t', 'threshold for irregular jumps in the timestamps'); 
             obj.menu_pars.menu_checker.menu_thresh.addButton('input_shakes', '&Shakes', 'input', 'store.checker.pars.thresh_shakes', 'threshold for flux-weighted mean offset size'); 
             obj.menu_pars.menu_checker.menu_thresh.addButton('input_defocus', '&Defocus', 'input', 'store.checker.pars.thresh_defocus', 'threshold for the flux-weighted mean PSF width'); 
-            obj.menu_pars.menu_checker.menu_thresh.addButton('input_slope', '&Flux slope', 'input', 'store.checker.pars.thresh_slope', 'threshold for global linear changes in the average flux'); 
+            obj.menu_pars.menu_checker.menu_thresh.addButton('input_fwhm', '&FWHM', 'input', 'store.checker.pars.thresh_fwhm', 'threshold for the model PSF seeing FWHM (in arcsec)'); 
+            obj.menu_pars.menu_checker.menu_thresh.addButton('input_slope', 'Flu&X slope', 'input', 'store.checker.pars.thresh_slope', 'threshold for global linear changes in the average flux'); 
             obj.menu_pars.menu_checker.menu_thresh.addButton('input_offset_size', '&Offset size', 'input', 'store.checker.pars.thresh_offset_size', 'threshold for large offset size'); 
             obj.menu_pars.menu_checker.menu_thresh.addButton('input_linear_motion', '&Linear motion', 'input', 'store.checker.pars.thresh_linear_motion', 'threshold for linear changes in the x/y offsets'); 
             obj.menu_pars.menu_checker.menu_thresh.addButton('input_bg', '&Background', 'input', 'store.checker.pars.thresh_background_intensity', 'threshold for background count');          
