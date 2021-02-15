@@ -243,7 +243,7 @@ function val = fwhm(I, varargin)
                     [mx,idx] = nanmax(s); 
                     
                     if mx==util.stat.max2(snr(:,:,ii))
-                        plot(input.ax, r(idx), s(idx), 'o', 'Color', color, 'MarkerSize', 10);
+                        plot(input.ax, r(idx), s(idx), 'o', 'Color', color, 'MarkerSize', 10, 'HandleVisibility', 'off');
                         text(input.ax, r(idx), s(idx)+0.05*highest_point, sprintf('%4.2f', r(idx)), ...
                             'Color', color, 'HorizontalAlignment', 'center', 'FontSize', input.font_size-2); 
                     end
@@ -284,6 +284,7 @@ function val = fwhm(I, varargin)
         end
         
         input.ax.FontSize = input.font_size; 
+        box(input.ax, 'on'); 
         
     end
     
