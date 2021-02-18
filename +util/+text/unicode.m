@@ -43,6 +43,8 @@ function C = unicode(name, number)
         H = '263A';
     elseif cs(name, 'triangle')
         H = '26DB';
+    elseif cs(name, 'trash')
+        H = '1F5D1'; 
     else
         C = '';
         return;

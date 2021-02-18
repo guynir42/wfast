@@ -101,6 +101,7 @@ classdef Candidate < handle
         kernel; % the lightcurve of the matched-filter kernel used 
         
         template_bank = ''; % note which template bank was used to trigger this event
+        oort_template = 0; % was this candidate produced using an oort cloud template? 
         
         time_index; % out of the extended region
         kern_index; % from the full filter bank

@@ -104,14 +104,16 @@ classdef CometModel < handle
                     % leave all defaults
                 elseif cs(varargin{1}, 'hills cloud', 'inner oort cloud')
                     obj.name = 'Hills'; 
-                    obj.start_radius = 5; 
+                    obj.index_power_law = 3;
+                    obj.start_radius = 1.7; % see page 44 of https://arxiv.org/abs/astro-ph/0512256
                     obj.normalization = 1e12/(4*180^2/pi); % total number of comets, over entire sky
                     obj.norm_lower = obj.normalization/10; 
                     obj.norm_upper = obj.normalization*10; 
                     obj.distance = 3000;
                 elseif cs(varargin{1}, 'oort cloud')
                     obj.name = 'Oort'; 
-                    obj.start_radius = 5; 
+                    obj.index_power_law = 3; 
+                    obj.start_radius = 1.7; 
                     obj.normalization = 1e12/(4*180^2/pi); % total number of comets, over entire sky
                     obj.norm_lower = obj.normalization/10; 
                     obj.norm_upper = obj.normalization*10; 

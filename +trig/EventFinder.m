@@ -184,20 +184,20 @@ classdef EventFinder < handle
             
             obj.pars = struct;
             
-            obj.pars.threshold = 7.0; % threshold (in units of S/N) for peak of event 
+            obj.pars.threshold = 7.5; % threshold (in units of S/N) for peak of event 
             obj.pars.time_range_thresh = -2.5; % threshold for including area around peak (in continuous time)
             obj.pars.kern_range_thresh = -1; % area threshold (in kernels, discontinuous) NOTE: if negative this will be relative to "threshold"
             obj.pars.star_range_thresh = -1; % area threshold (in stars, discontinuous) NOTE: if this is higher than "threshold" there will be no area around peak
             obj.pars.min_time_spread = 4; % how many frames around the peak to keep, in both directions, even if the flux drops below threshold 
-            % (min event duration is 1+2*min_time_spread, unless at the edge) 
-
+            obj.pars.max_time_spread = 40; % maximal filter cannot be larger than 30 frames in either direction (to prevent edge effects leaking into search region)
+            
             obj.pars.max_events = 5; % we will search iteratively up to this many times for new candidates in each batch
             
             obj.pars.use_psd_correction = 1; % use welch on a flux buffer to correct red noise
             obj.pars.use_std_filtered = 1; % normalize variance of filtered flux of each kernel to the average of previous batches (averaging size is set by length_background in the store)
 
             obj.pars.use_prefilter = 1; % filter all stars on a smaller bank, using a lower threshold, and then only vet the survivors with the full filter bank
-            obj.pars.pre_threshold = 4.5; % threshold for the pre-filter
+            obj.pars.pre_threshold = 5.0; % threshold for the pre-filter
             
             obj.pars.use_oort = true; % use the Oort cloud template bank as well
             obj.pars.oort_distances = [3000]; % maybe add 1000 or 10,000 AU as well? 
@@ -543,7 +543,7 @@ classdef EventFinder < handle
             
             if obj.pars.limit_events_per_star % check if any stars need to be black listed
                 
-                real_events = ~[obj.cand.is_simulated]; % don't include simulated events in the black list! 
+                real_events = ~[obj.cand.is_simulated] & ~[obj.cand.oort_template]; % don't include simulated events or Oort cloud triggers in the black list! 
 
                 N = histcounts([obj.cand(real_events).star_index], 'BinEdges', 1:size(obj.store.extended_flux,2)+1);
 
@@ -560,7 +560,7 @@ classdef EventFinder < handle
                     if ismember(star, obj.black_list_stars)
                         str = sprintf('Star %d blacklisted with %d events', star, N(star)); 
                         str_idx = strcmp(str, obj.cand(ii).notes);
-                        if isempty(str_idx)
+                        if nnz(str_idx)==0 % none of the notes includes this black list note
                             obj.cand(ii).notes{end+1} = str; 
                         end
                         obj.cand(ii).kept = 0; 
@@ -907,6 +907,7 @@ classdef EventFinder < handle
             c.star_snr = obj.store.star_snr(c.star_index_global); % get the S/N that was recorded at end of burn in
             
             c.template_bank = bank.getBankName; % keep a record of which template bank was used
+            c.oort_template = bank.D_au>=300; % arbitrary cutoff to include template banks for the oort cloud
             c.kernel = bank.kernels(:,c.kern_index); % the lightcurve of the kernel used (zero centered and normalized)
             c.kern_props = bank.pars(c.kern_index); % properties of the occultation that would generate this kernel
             c.kern_props.inverted = ~c.is_positive; % if the filtered flux was negative, it means we had to invert the kernel
@@ -1060,14 +1061,13 @@ classdef EventFinder < handle
             time_range = [];
             
             kernel_min_spread = ceil(nnz(abs(bank.kernels(:,kern_index))>=0.02)/2); % minimal time range cannot be smaller than "active" part of kernel (i.e., above 2% deviation)
-
-            for jj = 0:N % go backward in time
+            
+            for jj = 0:obj.pars.max_time_spread % go backward in time
 
                 idx = time_index - jj;
 
                 if idx<1, break; end
 
-%                 if any(abs(ff(idx, :, star_index))>=thresh)
                 if abs(ff(idx, kern_index, star_index))>=thresh || jj<=obj.pars.min_time_spread || jj<=kernel_min_spread
                     time_range = [time_range, idx];
                 else
@@ -1078,7 +1078,7 @@ classdef EventFinder < handle
 
             time_range = flip(time_range);
 
-            for jj = 1:N % go forward in time
+            for jj = 1:obj.pars.max_time_spread % go forward in time
 
                 idx = time_index + jj;
 

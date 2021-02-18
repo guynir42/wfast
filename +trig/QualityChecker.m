@@ -829,7 +829,7 @@ classdef QualityChecker < handle
             
         end
         
-        function val = calculateFluxCorr(obj, flux, widths)
+        function val = calculateFluxCorrOldVersion(obj, flux, widths)
             
             if nargin<3 || isempty(widths)
                 widths = 50; 
@@ -841,12 +841,12 @@ classdef QualityChecker < handle
             
             flux = flux - nanmean(flux); % make sure the flux is normalized to zero
             
-            f1 = flux;
+            f1 = flux; % 2D matrix 
             f2 = permute(flux, [1,3,2]); % turn the star index into 3rd dimension
             
             F = f1.*f2; % big, 3D matrix
-            F1 = f1.^2;
-            F2 = f2.^2; 
+            F1 = f1.^2; % this should still be 2D
+            F2 = f2.^2; % this has only dim1 and dim3 (dim2 is singleton!)
             
             val = zeros([size(flux), length(widths)], 'like', flux); % preallocate enough room for multiple widths
             
@@ -860,17 +860,87 @@ classdef QualityChecker < handle
                 
                 bad_idx = sum1<0 | sum2<0;
                 
-                FC = numer./sqrt(sum1.*sum2).*sqrt(w); 
+                try 
+                    FC = numer./sqrt(sum1.*sum2).*sqrt(w); % flux correlations
+                catch ME
+                    
+                    if strcmp(ME.identifier, 'MATLAB:nomem')
+                        
+                        disp('Out of memory error... Using a loop instead!');
+                        
+                        FC = zeros(size(numer), 'like', numer); 
+                        
+                        for jj = 1:size(numer,3)
+                            FC(:,:,jj) = numer(:,:,jj)./sqrt(sum1.*sum2(:,:,jj)); 
+                        end
+                        
+                    else
+                        rethrow(ME);
+                    end
+                    
+                end
+                
+                
                 FC(bad_idx) = 0; 
                 
                 for jj = 1:size(flux,2)
                     FC(:,jj,jj) = 0; % remove auto-correlations (should be all equal to 1 anyway
                 end
                 
-                corr_value = prctile(FC, 95, 3); % should we include anti-correlations (by setting abs() first)?
+                corr_value = zeros(size(FC,1), size(FC,2), 'like', FC); 
+                
+                for jj = 1:size(FC,3)
+                    corr_value(:,jj) = prctile(FC(:,jj,:), 95, 3); % should we include anti-correlations (by setting abs() first)?
+                end
                 
                 val(:,:,ii) = corr_value; 
 
+            end
+            
+        end
+        
+        function val = calculateFluxCorr(obj, flux, widths)
+            
+            if nargin<3 || isempty(widths)
+                widths = 50; 
+            end
+            
+            if ndims(flux)>2
+                error('Can only handle 2D fluxes'); 
+            end
+            
+            flux = flux - nanmean(flux); % make sure the flux is normalized to zero
+            
+            F2 = flux.^2; % this should still be 2D
+            
+            val = zeros([size(flux), length(widths)], 'like', flux); % preallocate enough room for multiple widths
+            
+            for ii = 1:size(flux,2)
+            
+                f = flux(:,ii).*flux; % multiply one column in "flux" with all others
+
+                for jj = 1:length(widths)
+
+                    w = widths(jj); 
+
+                    numer = movmean(f, w, 'omitnan'); 
+                    S = movmean(F2, w, 'omitnan'); % sum of the flux^2 
+                    
+                    bad_idx = S<0;
+
+                    FC = numer./sqrt(S(:,ii).*S).*sqrt(w); % flux correlations
+                    
+                    FC(bad_idx) = 0; 
+
+                    FC(:,ii) = 0; % ignore self correlations
+                    
+                    % should we include anti-correlations (by setting abs() first)?
+                    corr_value = prctile(FC, 95, 2); % get the points with the 95th percentile correlation 
+
+                    val(:,ii,jj) = corr_value; 
+
+                end
+                
             end
             
         end
