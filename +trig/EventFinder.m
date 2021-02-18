@@ -449,10 +449,10 @@ classdef EventFinder < handle
                 %%%%%%%%%%%%%% PSD CORRECTION %%%%%%%%%%%%%%%
                 
                 if obj.pars.use_psd_correction
-                    obj.psd.calcPSD(obj.store.flux_buffer, obj.store.timestamps_buffer, obj.store.pars.length_extended, obj.store.pars.length_background*2); % first off, make the PSD correction for the current batch
+                    obj.psd.calcPSD(obj.store.detrend_buffer, obj.store.timestamps_buffer, obj.store.pars.length_extended, obj.store.pars.length_background*2); % first off, make the PSD correction for the current batch
                 end
                 
-                [obj.corrected_fluxes, obj.corrected_stds] = obj.correctFluxes(obj.store.extended_flux); % runs either PSD correction or simple removal of linear fit to each lightcurve
+                [obj.corrected_fluxes, obj.corrected_stds] = obj.correctFluxes(obj.store.extended_detrend); % runs either PSD correction or simple removal of linear fit to each lightcurve
 
                 %%%%%%%%%%% FILTER FOR KBOS %%%%%%%%%%%%%%
                 
@@ -657,9 +657,9 @@ classdef EventFinder < handle
             
             if obj.pars.use_psd_correction
                 flux_out = obj.psd.input(fluxes, 1, star_indices); 
-            else
-                flux_out = obj.removeLinearFit(fluxes, obj.store.extended_timestamps); 
-                flux_out = fillmissing(flux_out, 'linear'); 
+%             else
+%                 flux_out = obj.removeLinearFit(fluxes, obj.store.extended_timestamps); 
+%                 flux_out = fillmissing(flux_out, 'linear'); 
             end
 
             std_out = nanstd(flux_out); 
@@ -826,7 +826,7 @@ classdef EventFinder < handle
                 if isempty(var_buf) || var_buf.counter<N  % no buffer (or the buffer is not yet full), must calculate its own variance on the background
                     
                     if nargin<7 || isempty(bg_fluxes) % if we were not given a background flux, use the store
-                        [bg_fluxes, bg_stds] = obj.correctFluxes(obj.store.background_flux(:,star_indices), star_indices); 
+                        [bg_fluxes, bg_stds] = obj.correctFluxes(obj.store.background_detrend(:,star_indices), star_indices); 
                     end
                     
                     bg_filtered_fluxes = bank.input(bg_fluxes, bg_stds); 
@@ -1220,7 +1220,7 @@ classdef EventFinder < handle
                 % get an estimate for the background of this flux:
                 if obj.pars.use_std_filtered % need to correct the filtered fluxes by their measured noise
 
-                    [bg_flux, bg_std] = obj.correctFluxes(obj.store.background_flux(:,star_index_sim), star_index_sim); % run correction on the background region
+                    [bg_flux, bg_std] = obj.correctFluxes(obj.store.background_detrend(:,star_index_sim), star_index_sim); % run correction on the background region
                     background_ff = bank.input(bg_flux, bg_std); % filter the background flux also
                     bg_ff_std = nanstd(background_ff); 
 
@@ -1266,57 +1266,60 @@ classdef EventFinder < handle
 
         end % we recovered the injected event!
         
-        function [flux_all, sim_pars] = getFluxWithSimulatedLightcurve(obj, star_idx, bank) % take a flux matrix and an index for a star and add a random occultation event on top of it
+        function [detrend_all, sim_pars] = getFluxWithSimulatedLightcurve(obj, star_idx, bank) % take a flux matrix and an index for a star and add a random occultation event on top of it
         
-            if ~isempty(obj.cat) && obj.cat.success
-                
-                if ~ismember('FresnelSize', obj.cat.data.Properties.VariableNames)
-                    obj.cat.addStellarSizes;
-                end
-                
-                R = obj.cat.data.FresnelSize;
-                if isempty(R)
-                    obj.cat.addStellarSizes;
-                    R = obj.cat.data.FresnelSize;
-                end
-                
-                star_idx_global = obj.store.star_indices(star_idx);
-                
-                if isnan(R(star_idx_global)) % no stellar radius known from GAIA, try to estimate it 
-                    R_star = obj.estimateR(star_idx_global); 
-                elseif R(star_idx_global)>3 % do not simulate stars bigger than this 
-                    R_star = 3; 
-                else
-                    R_star = R(star_idx_global);
-                end
-                
-                R_star = R_star*sqrt(bank.D_au./40); % adjust the stellar size in case the bank is for Hills/Oort cloud
-                
-                r_occulter = util.stat.power_law_dist(3.0, 'min', bank.r_range(1), 'max', bank.r_range(2)); % occulter radius drawn from power law distribution
-                b_par = bank.b_range(1) + rand*(diff(bank.b_range)); % impact parameter drawn from uniform distribution
-                vel = bank.v_range(1) + rand*(diff(bank.v_range)); % velocity drawn from uniform distribution
-                
-                [template, sim_pars] = bank.gen.randomLC('stellar_size', R_star, ...
-                    'occulter', r_occulter, 'impact', b_par, 'velocity', vel); % get a random occultation
-                sim_pars.D = bank.D_au; 
-                
+            if isempty(obj.cat) || isempty(obj.cat.success) || obj.cat.success==0
+                error('Cannot simulate events without stellar sizes in the catalog!'); 
             end
+
+            %%%% get the occultation parameters %%%%
             
-            flux_all = obj.store.extended_flux; 
-            raw_flux = flux_all(:,star_idx); % pick out the one star
+            R = obj.cat.data.FresnelSize;
+
+            star_idx_global = obj.store.star_indices(star_idx);
+
+            if isnan(R(star_idx_global)) % no stellar radius known from GAIA, try to estimate it 
+                R_star = obj.estimateR(star_idx_global); 
+            elseif R(star_idx_global)>3 % do not simulate stars bigger than this 
+                R_star = 3; 
+            else
+                R_star = R(star_idx_global);
+            end
+
+            R_star = R_star*sqrt(bank.D_au./40); % adjust the stellar size in case the bank is for Hills/Oort cloud
+
+            r_occulter = util.stat.power_law_dist(3.0, 'min', bank.r_range(1), 'max', bank.r_range(2)); % occulter radius drawn from power law distribution
+            b_par = bank.b_range(1) + rand*(diff(bank.b_range)); % impact parameter drawn from uniform distribution
+            vel = bank.v_range(1) + rand*(diff(bank.v_range)); % velocity drawn from uniform distribution
+
+            %%%% make the template %%%%
+            
+            [template, sim_pars] = bank.gen.randomLC('stellar_size', R_star, ...
+                'occulter', r_occulter, 'impact', b_par, 'velocity', vel); % get a random occultation
+            sim_pars.D = bank.D_au; 
+
+            %%%% clean up the flux %%%% 
+            
+%             flux_all = obj.store.extended_flux; 
+            detrend_all = obj.store.extended_detrend; 
+            
+            raw_flux = obj.store.extended_flux(:,star_idx); % pick out the one star
             bg = obj.store.extended_aux(:,star_idx,obj.store.aux_indices.backgrounds).*...
                 obj.store.extended_aux(:,star_idx,obj.store.aux_indices.areas);
             
-            flux = raw_flux - bg; % don't forget to add the background at the end
+            flux_final = raw_flux - bg; % this is used to calculate the mean flux
+            F = nanmean(flux_final,1); % the mean flux
             
-            margin = length(flux) - length(template); % margins on both sides of the template, combined
+            margin = length(flux_final) - length(template); % margins on both sides of the template, combined
             
-            t = (1:length(flux))'; % fake timestamps for the fit
+            t = (1:length(flux_final))'; % fake timestamps for the fit
             
-            fr = util.fit.polyfit(t, flux, 'order', 2); % fit the original lightcurve to a second order polynomial
+            fr = util.fit.polyfit(t, detrend_all(:,star_idx), 'order', 2); % fit the detrended flux to a second order polynomial
             
-            flux_mean = fr.ym; 
-            flux_noise = flux - flux_mean; % separate the noise from the mean flux
+            flux_mean = fr.ym + F; % any residual 2nd order polynomial from the detrended flux, added to the mean flux level
+            flux_noise = detrend_all(:,star_idx) - fr.ym; % separate the noise from the polynomial fit
+            
+            %%%% choose a good point to put the peak of the template %%%%
             
             B = obj.store.checker.bad_times; % bad times matrix
             
@@ -1345,23 +1348,26 @@ classdef EventFinder < handle
                 error('need to handle this case at some point...'); 
             end
             
-            flux_mean2 = flux_mean.*template_shift; % the raw flux is multiplied by the template (that should be 1 outside the occulation region)
+            %%%% add the template on the flux %%%%
+            
+            flux_mean_sim = flux_mean.*template_shift; % the mean flux is multiplied by the template (that should be 1 outside the occulation region)
             
             if obj.pars.sim_rescale_noise
                 
                 background_var = nanmedian(obj.store.extended_aux(:,star_idx,obj.store.aux_indices.variances).*...
-                    obj.store.extended_aux(:,star_idx,obj.store.aux_indices.areas));
+                    obj.store.extended_aux(:,star_idx,obj.store.aux_indices.areas)); % the read noise etc, which is independent of the source flux
                 
                 v1 = flux_mean + background_var; % variance taking into account only read-noise+bg and source noise before template is added
-                v2 = flux_mean2 + background_var; % variance taking into account only read-noise+bg and source noise after template is added
+                v2 = flux_mean_sim + background_var; % variance taking into account only read-noise+bg and source noise after template is added
                 
                 flux_noise_corrected = (flux_noise - nanmean(flux_noise)).*sqrt(v2./v1) + nanmean(flux_noise); 
                 
             end
             
-            flux = flux_mean2 + flux_noise_corrected + bg; % now we can re-attach the noise and the background we extracted before
+            flux_final = flux_mean_sim + flux_noise_corrected + bg; % now we can re-attach the noise and the background we extracted before
             
-            flux_all(:,star_idx) = flux; 
+%             flux_all(:,star_idx) = flux; 
+            detrend_all(:,star_idx) = flux_final - F; % the detrended flux does not include the mean flux level!  
             
             % add some parameters known from the simulation
             sim_pars.time_index = peak; % what was the real peak time of this event
@@ -1371,13 +1377,13 @@ classdef EventFinder < handle
             
             sim_pars.fluxes.raw_flux = raw_flux;
             sim_pars.fluxes.mean_flux = flux_mean;
-            sim_pars.fluxes.sim_mean_flux = flux_mean2;
+            sim_pars.fluxes.sim_mean_flux = flux_mean_sim;
             sim_pars.fluxes.background_mean = bg;
             sim_pars.fluxes.background_var = background_var;
             sim_pars.fluxes.template = template_shift;
             sim_pars.fluxes.noise_flux = flux_noise;
             sim_pars.fluxes.noise_flux_corr = flux_noise_corrected; 
-            sim_pars.fluxes.final_flux = flux; 
+            sim_pars.fluxes.final_flux = flux_final; 
             
         end
         

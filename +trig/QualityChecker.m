@@ -126,11 +126,13 @@ classdef QualityChecker < handle
         
         % these we get from the DataStore
         background_flux; % cut out the background flux for calculating the variance outside the search region
+        background_detrend; % same flux, with a linear fit subtracted from each batch individually
         background_aux; % cut out the background aux for calculating the variance outside the search region
         background_timestamps; % timestamps for the background region
         
         extended_flux; % cutout of the flux from the flux_buffer extended around the search region
         extended_aux; % cutout of the aux from the aux_buffer extended around the search region 
+        extended_detrend; % same flux, with a linear fit subtracted from each batch individually
         extended_timestamps; % timestamps for the extended batch region
         cutouts; % cutouts for the extended region
         
@@ -138,6 +140,7 @@ classdef QualityChecker < handle
         search_end_idx;  % end index for the search region out of the EXTENDED BATCH!
         
         search_flux; % the flux in the search region
+        search_detrend; % same flux, with a linear fit subtracted from each batch individually
         search_aux; % the aux in the search region
         search_timestamps;  % timestamps for the search region
         search_juldates; % julian dates for each timestamp in the search region
@@ -403,10 +406,12 @@ classdef QualityChecker < handle
         function clear(obj)
             
             obj.background_flux = [];
+            obj.background_detrend = [];
             obj.background_aux = [];
             obj.background_timestamps = [];
 
             obj.extended_flux = [];
+            obj.extended_detrend = [];
             obj.extended_aux = [];
             obj.extended_timestamps = [];
             obj.cutouts = []; 
@@ -415,6 +420,7 @@ classdef QualityChecker < handle
             obj.search_end_idx = [];
 
             obj.search_flux = [];
+            obj.search_detrend = [];
             obj.search_aux = [];
             obj.search_timestamps = [];
             obj.search_juldates = [];
@@ -555,9 +561,8 @@ classdef QualityChecker < handle
             
             t = obj.extended_timestamps; 
             f = obj.extended_flux; 
-            F = nanmean(f,1); 
             
-%             a = obj.extended_aux(:,:,obj.aux_indices.areas); 
+            a = obj.extended_aux(:,:,obj.aux_indices.areas); 
             b = obj.extended_aux(:,:,obj.aux_indices.backgrounds); 
             x = obj.extended_aux(:,:,obj.aux_indices.offsets_x); 
             y = obj.extended_aux(:,:,obj.aux_indices.offsets_y); 
@@ -565,6 +570,8 @@ classdef QualityChecker < handle
             Y = obj.extended_aux(:,:,obj.aux_indices.centroids_y); 
             w = obj.extended_aux(:,:,obj.aux_indices.widths); 
             p = obj.extended_aux(:,:,obj.aux_indices.bad_pixels); 
+            
+            F = nanmean(f - a.*b,1); % mean flux, after subtracting the background
             
             %%%%%%%%%%%%% calculate / prepare the data %%%%%%%%%%%%%%%%%%%%
             
@@ -578,7 +585,7 @@ classdef QualityChecker < handle
                 obj.defocus_log = vertcat(obj.defocus_log, obj.defocus); 
             end
             
-            obj.juldate_log = vertcat(obj.juldate_log, nanmean(obj.search_juldates)); 
+            obj.juldate_log = vertcat(obj.juldate_log, nanmean(obj.search_juldates)); % keep track of the julian date of each batch
             
             W = util.vec.weighted_average(w,F.^2,2);
             obj.mean_width_values = vertcat(obj.mean_width_values, W(idx)); % keep a log of the mean widths for the entire run
@@ -602,9 +609,6 @@ classdef QualityChecker < handle
             dt_vector = [mean_dt; diff(t)]; % add one mean_dt in the first place to make dt_vector the same size as t
             
             obj.delta_t = (dt_vector - mean_dt)./mean_dt;
-            
-%             df = diff(nanmean(f,2)./nanmean(F)); % rate of change of the mean flux
-%             obj.slope = filter2(ones(obj.smoothing_slope,1), [df(1); df]); % repeat the first df position because it needs to be the same length
             
             k = (-obj.pars.smoothing_slope/2:obj.pars.smoothing_slope/2)'; 
             k = k./sqrt(sum(k.^2)); 
@@ -633,7 +637,7 @@ classdef QualityChecker < handle
             LX = filter2(k, x - nanmean(x)); 
             LY = filter2(k, y - nanmean(y)); 
             
-            ff = filter2(ones(obj.pars.linear_timescale,1)./obj.pars.linear_timescale, (f-F)./std(f)); % filter the normalized flux with a smoothing window
+            ff = filter2(ones(obj.pars.linear_timescale,1)./obj.pars.linear_timescale, (f-nanmean(f))./std(f)); % filter the normalized flux with a smoothing window
             
             obj.linear_motion = sqrt(LX.^2 + LY.^2).*ff; % linear motion is set to be proportional to the filtered flux
             
@@ -641,7 +645,7 @@ classdef QualityChecker < handle
            
             obj.bad_pixels = p;
             
-            obj.flux_corr = obj.calculateFluxCorr(f, [10 25 50]); % can also give multiple time scales to run the correlation (default is 50)
+            obj.flux_corr = obj.calculateFluxCorr(obj.extended_detrend, [10 25 50]); % can also give multiple time scales to run the correlation (default is 50)
             
             aux = zeros(size(f,1),size(f,2),length(obj.pars.corr_types), 'like', f); 
 %             aux(:,:,obj.corr_indices.a) = a;
@@ -653,8 +657,6 @@ classdef QualityChecker < handle
             
             aux = fillmissing(aux, 'spline'); 
             aux(isnan(aux)) = 0; % must make sure to get rid of all NaNs
-            
-%             f = fillmissing(f, 'spline'); 
             
             obj.correlations = zeros(size(aux,1), size(aux,2), size(aux,3), length(obj.pars.corr_timescales), 'like', aux); 
             
@@ -679,7 +681,7 @@ classdef QualityChecker < handle
                         end
                     end
                     
-                    obj.correlations(:,:,:,ii) = util.series.correlation(f, aux, obj.pars.corr_timescales(ii)).*norm; 
+                    obj.correlations(:,:,:,ii) = util.series.correlation(obj.extended_detrend, aux, obj.pars.corr_timescales(ii)).*norm; 
                     
                 catch ME
                     disp('here'); 
@@ -829,7 +831,7 @@ classdef QualityChecker < handle
             
         end
         
-        function val = calculateFluxCorrOldVersion(obj, flux, widths)
+        function val = calculateFluxCorrOldVersion(obj, flux, widths) % to be deprecated
             
             if nargin<3 || isempty(widths)
                 widths = 50; 
@@ -948,10 +950,12 @@ classdef QualityChecker < handle
         function ingestStore(obj, store) % parse the data from the store into similar containers in this object
             
             obj.background_flux = store.background_flux;
+            obj.background_detrend = store.background_detrend; 
             obj.background_aux = store.background_aux;
             obj.background_timestamps = store.background_timestamps;
 
             obj.extended_flux = store.extended_flux;
+            obj.extended_detrend = store.extended_detrend; 
             obj.extended_aux = store.extended_aux;
             obj.extended_timestamps = store.extended_timestamps;
             obj.cutouts = store.cutouts;
@@ -959,6 +963,7 @@ classdef QualityChecker < handle
             obj.search_start_idx = store.search_start_idx;
             obj.search_end_idx = store.search_end_idx;
             obj.search_flux = store.search_flux;
+            obj.search_detrend = store.search_detrend; 
             obj.search_aux = store.search_aux;
             obj.search_timestamps = store.search_timestamps;
             obj.search_juldates = store.search_juldates;

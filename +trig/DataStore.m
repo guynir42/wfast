@@ -134,6 +134,7 @@ classdef DataStore < handle
         cutouts; % keep cutouts ONLY for the extended region
         
         flux_buffer; % biggest flux buffer used for PSD (we cut from it smaller buffers)
+        detrend_buffer; % fluxes after removing a linear fit to each batch
         aux_buffer; % derive all other aux buffers from this (by default this buffer is just equal to the background_aux buffer, but we may change that in the future)
         timestamps_buffer; % timestamps for the flux buffer
         juldates_buffer; % julian dates for each flux measurement
@@ -141,6 +142,7 @@ classdef DataStore < handle
         frame_num_buffer = []; % frame inside each file
         
         background_flux; % cut out the background flux for calculating the variance outside the search region
+        background_detrend; % flux without the linear fit
         background_aux; % cut out the background aux for calculating the variance outside the search region
         background_timestamps; % timestamps for the background region
         background_juldates; % for each timestamp calculate the julian date
@@ -148,6 +150,7 @@ classdef DataStore < handle
         background_frame_num = []; % frame inside each file
         
         extended_flux; % cutout of the flux from the flux_buffer extended around the search region
+        extended_detrend; % flux without the linear fit
         extended_aux; % cutout of the aux from the aux_buffer extended around the search region 
         extended_timestamps; % timestamps for the extended batch region
         extended_juldates; % for each timestamp calculate the julian date
@@ -158,6 +161,7 @@ classdef DataStore < handle
         search_end_idx;  % end index for the search region out of the EXTENDED BATCH!
         
         search_flux; % the flux in the search region
+        search_detrend; % flux without the linear fit
         search_aux; % the aux in the search region
         search_timestamps;  % timestamps for the search region
         search_juldates; % juldates for the search region
@@ -265,6 +269,7 @@ classdef DataStore < handle
             
             obj.timestamps = [];
             obj.flux_buffer = [];
+            obj.detrend_buffer = [];
             obj.aux_buffer = [];
             obj.timestamps_buffer = [];
             obj.juldates_buffer = [];
@@ -290,6 +295,7 @@ classdef DataStore < handle
         function clear(obj)
         
             obj.background_flux = [];
+            obj.background_detrend = [];
             obj.background_aux = [];
             obj.background_timestamps = [];
             obj.background_juldates = []; 
@@ -297,6 +303,7 @@ classdef DataStore < handle
             obj.background_frame_num = [];
             
             obj.extended_flux = [];
+            obj.extended_detrend = [];
             obj.extended_aux = [];
             obj.extended_timestamps = [];
             obj.extended_juldates = [];
@@ -307,6 +314,7 @@ classdef DataStore < handle
             obj.search_end_idx = [];
             
             obj.search_flux = [];
+            obj.search_detrend = [];
             obj.search_aux = []; 
             obj.search_timestamps = [];
             obj.search_juldates = [];
@@ -393,6 +401,7 @@ classdef DataStore < handle
             % these inputs are used for explicitely giving the photometric products
             val.input_var('timestamps', []); 
             val.input_var('fluxes', []);
+            val.input_var('detrend', []); 
             val.input_var('cutouts', []); 
             
             for ii = 1:length(obj.aux_names)
@@ -437,7 +446,9 @@ classdef DataStore < handle
                 list = obj.this_input.list_added_properties;
 
                 for ii = 1:length(list)
-                    obj.this_input.(list{ii}) = varargin{1}.(list{ii}); 
+                    if isprop(varargin{1}, list{ii})
+                        obj.this_input.(list{ii}) = varargin{1}.(list{ii}); 
+                    end
                 end
                
             else % just make an input object and parse the varargin pairs
@@ -514,8 +525,11 @@ classdef DataStore < handle
             % we may as well interpolate the NaNs right here...
             obj.this_input.fluxes = fillmissing(obj.this_input.fluxes, 'spline'); 
             
+            obj.removeLinearFit; % put the detrended fluxes in this_input
+            
             % store the new fluxes and timestamps
             obj.flux_buffer = vertcat(obj.flux_buffer, single(obj.this_input.fluxes));
+            obj.detrend_buffer = vertcat(obj.detrend_buffer, single(obj.this_input.detrend)); 
             obj.timestamps = vertcat(obj.timestamps, single(obj.this_input.timestamps)); % this tracks timestamps for the entire run
             obj.timestamps_buffer = vertcat(obj.timestamps_buffer, single(obj.this_input.timestamps));
             obj.juldates_buffer = vertcat(obj.juldates_buffer, obj.this_input.juldates); 
@@ -524,6 +538,7 @@ classdef DataStore < handle
             
             if size(obj.flux_buffer,1)>obj.pars.length_psd % only save the recent data
                 obj.flux_buffer = obj.flux_buffer(end-obj.pars.length_psd+1:end,:,:); 
+                obj.detrend_buffer = obj.detrend_buffer(end-obj.pars.length_psd+1:end,:,:); 
                 obj.timestamps_buffer = obj.timestamps_buffer(end-obj.pars.length_psd+1:end); 
                 obj.juldates_buffer = obj.juldates_buffer(end-obj.pars.length_psd+1:end); 
                 obj.filename_buffer = obj.filename_buffer(end-obj.pars.length_psd+1:end); 
@@ -564,6 +579,7 @@ classdef DataStore < handle
             extended_start_idx = max(1, size(obj.flux_buffer,1)-obj.pars.length_extended+1);
             extended_start_idx_aux = max(1, size(obj.aux_buffer,1)-obj.pars.length_extended+1);
             obj.extended_flux = obj.flux_buffer(extended_start_idx:end,:,:); 
+            obj.extended_detrend = obj.detrend_buffer(extended_start_idx:end,:,:); 
             obj.extended_aux = obj.aux_buffer(extended_start_idx_aux:end,:,:,:);
             obj.extended_timestamps = obj.timestamps_buffer(extended_start_idx:end); 
             obj.extended_juldates = obj.juldates_buffer(extended_start_idx:end); 
@@ -576,6 +592,7 @@ classdef DataStore < handle
             obj.search_start_idx = margins + 1; 
             obj.search_end_idx = size(obj.extended_flux,1) - margins; 
             obj.search_flux = obj.extended_flux(obj.search_start_idx:obj.search_end_idx,:,:); % cut the search region out of the extended batch
+            obj.search_detrend = obj.extended_detrend(obj.search_start_idx:obj.search_end_idx,:,:); % cut the search region out of the extended batch
             
             obj.search_timestamps = obj.extended_timestamps(obj.search_start_idx:obj.search_end_idx);
             obj.search_juldates = obj.extended_juldates(obj.search_start_idx:obj.search_end_idx);
@@ -588,6 +605,7 @@ classdef DataStore < handle
             background_start_idx = max(1, extended_start_idx-obj.pars.length_background);
             background_end_idx = extended_start_idx-1;
             obj.background_flux = obj.flux_buffer(background_start_idx:background_end_idx,:,:);
+            obj.background_detrend = obj.detrend_buffer(background_start_idx:background_end_idx,:,:);
 
             obj.background_timestamps = obj.timestamps_buffer(background_start_idx:background_end_idx);
             obj.background_juldates = obj.juldates_buffer(background_start_idx:background_end_idx);
@@ -606,7 +624,7 @@ classdef DataStore < handle
             
             % permute puts star number in dim1 and aperture number in dim2
             S = permute(nanmean(f - a.*b), [2,3,1]); % the mean flux is taken minus the background
-            N = permute(nanmedian(util.series.binning(f, obj.pars.length_extended ,'func', 'std')), [2,3,1]); % for noise calculations we don't subtract background. 
+            N = permute(nanmedian(util.series.binning(obj.detrend_buffer, obj.pars.length_extended ,'func', 'std')), [2,3,1]); % for noise calculations we don't subtract background, instead we remove the trends
             % This is the same as calculating the RMS of each extended region (the median ignores outlier batches)
             
             obj.star_snr = S./N; % dim1 is star index, dim2 is aperture index
@@ -665,6 +683,7 @@ classdef DataStore < handle
             
             obj.clear;
             obj.flux_buffer = obj.flux_buffer(:,obj.star_indices,obj.aperture_index); 
+            obj.detrend_buffer = obj.detrend_buffer(:,obj.star_indices,obj.aperture_index); 
             obj.aux_buffer = obj.aux_buffer(:,obj.star_indices,:,obj.aperture_index); 
             obj.cutouts = obj.cutouts(:,:,:,obj.star_indices); 
             
@@ -705,6 +724,22 @@ classdef DataStore < handle
             end % for ii in list
 
             obj.this_input.fluxes(idx) = NaN; % replace the cosmic rays frames with NaNs 
+            
+        end
+        
+        function removeLinearFit(obj)
+            
+            f = obj.this_input.fluxes; 
+            
+            for ii = 1:size(f,3)
+
+                fit_result = util.fit.polyfit(1:size(f,1), f(:,:,ii), 'order', 1, 'double', 1, 'sigma', 3, 'iterations', 2); 
+
+                f2 = f(:,:,ii) - [fit_result.ym]; % remove the fit
+
+                obj.this_input.detrend(:,:,ii) = f2; 
+
+            end
             
         end
         
