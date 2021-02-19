@@ -231,7 +231,7 @@ classdef DataStore < handle
             
             % number of frames to keep for each type of calculation
             obj.pars.length_burn_in = 5e3; % this mininal number of frames is needed to start event finding! 
-            obj.pars.length_psd = 2e4; % this many flux measurements used for calculating the PSD
+            obj.pars.length_psd = 1e4; % this many flux measurements used for calculating the PSD
             obj.pars.length_background = 2000; % this many flux/aux measurements used for calculating the variance of the background (outside the search region)
             obj.pars.length_extended = 200; % extended region around the search region, used for overlap, filter edges, etc. 
             obj.pars.length_search = 100; % the area searched in each batch (ideally equal to each batch so there's no need to search the same region twice)

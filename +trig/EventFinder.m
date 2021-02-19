@@ -208,7 +208,7 @@ classdef EventFinder < handle
             obj.pars.use_keep_variances = 1; % keep a copy of the variance of each star/kernel for the entire run (this may be a bit heavy on the memory)
 
             obj.pars.use_sim = 1; % add simulated events in a few batches randomly spread out in the whole run
-            obj.pars.num_sim_events_per_batch = 0.1; % fractional probability to add a simulated event into each new batch. 
+            obj.pars.num_sim_events_per_batch = 0.5; % fractional probability to add a simulated event into each new batch. 
             obj.pars.use_keep_simulated = true; % if false, the simulated events would not be kept with the list of detected candidates (for running massive amount of simualtions)
             obj.pars.sim_max_R = 3; % maximum value of stellar size for simulated events
             
@@ -1041,7 +1041,7 @@ classdef EventFinder < handle
 %             if c.corr_flux(3)>obj.store.checker.pars.thresh_tracking_error % too much correlations with other stars
                 str = sprintf('Correlation 3rd highest star: %4.2f', c.corr_flux(3)); 
                 str_idx = strcmp(str, c.notes);
-                if isempty(str_idx)
+                if nnz(str_idx)==0
                     c.notes{end+1} = str; 
                 end
 %                 c.kept = 0; % I don't want to disqualify on this, but I
@@ -1207,13 +1207,13 @@ classdef EventFinder < handle
             
             bank = all_banks(randi(length(all_banks))); % choose a random bank to simulate from
             
-            [f_sim, sim_pars] = obj.getFluxWithSimulatedLightcurve(star_index_sim, bank); % add the simulated occultation to the raw fluxes
+            [flux_sim, detrend_sim, sim_pars] = obj.getFluxWithSimulatedLightcurve(star_index_sim, bank); % add the simulated occultation to the raw fluxes
 
             for ii = 1:length(all_banks) % check if event triggers on all filter banks
             
                 bank = all_banks(ii); % which bank is used to filter
             
-                [f_corr, std_corr] = obj.correctFluxes(f_sim, star_index_sim); % PSD or linear fit correction (on top of the simulated event!)
+                [f_corr, std_corr] = obj.correctFluxes(detrend_sim, star_index_sim); % PSD or linear fit correction (on top of the simulated event!)
 
                 f_filt = bank.input(f_corr(:,star_index_sim), std_corr(1,star_index_sim)); % filter only the star with the simulated event on it
 
@@ -1228,7 +1228,7 @@ classdef EventFinder < handle
 
                 end % need to correct the filtered fluxes by their measured noise
 
-                candidate = obj.searchForCandidates(f_sim, f_corr, f_filt, star_index_sim, all_banks(ii), 1); % try to find a single event on this single star
+                candidate = obj.searchForCandidates(flux_sim, f_corr, f_filt, star_index_sim, all_banks(ii), 1); % try to find a single event on this single star
 
                 all_cand = vertcat(all_cand, candidate);
                 
@@ -1266,7 +1266,7 @@ classdef EventFinder < handle
 
         end % we recovered the injected event!
         
-        function [detrend_all, sim_pars] = getFluxWithSimulatedLightcurve(obj, star_idx, bank) % take a flux matrix and an index for a star and add a random occultation event on top of it
+        function [flux_all, detrend_all, sim_pars] = getFluxWithSimulatedLightcurve(obj, star_idx, bank) % take a flux matrix and an index for a star and add a random occultation event on top of it
         
             if isempty(obj.cat) || isempty(obj.cat.success) || obj.cat.success==0
                 error('Cannot simulate events without stellar sizes in the catalog!'); 
@@ -1300,23 +1300,20 @@ classdef EventFinder < handle
 
             %%%% clean up the flux %%%% 
             
-%             flux_all = obj.store.extended_flux; 
-            detrend_all = obj.store.extended_detrend; 
+            flux_all = obj.store.extended_flux; % flux as it was measured
+            detrend_all = obj.store.extended_detrend; % flux after removing linear trend
             
-            raw_flux = obj.store.extended_flux(:,star_idx); % pick out the one star
+            flux_raw = flux_all(:,star_idx); % pick out the one star
             bg = obj.store.extended_aux(:,star_idx,obj.store.aux_indices.backgrounds).*...
                 obj.store.extended_aux(:,star_idx,obj.store.aux_indices.areas);
             
-            flux_final = raw_flux - bg; % this is used to calculate the mean flux
+            flux_final = flux_raw - bg; % this is used to calculate the mean flux
             F = nanmean(flux_final,1); % the mean flux
             
-            margin = length(flux_final) - length(template); % margins on both sides of the template, combined
-            
-            t = (1:length(flux_final))'; % fake timestamps for the fit
-            
+            t = (1:length(flux_final))'; % fake timestamps for the fit            
             fr = util.fit.polyfit(t, detrend_all(:,star_idx), 'order', 2); % fit the detrended flux to a second order polynomial
             
-            flux_mean = fr.ym + F; % any residual 2nd order polynomial from the detrended flux, added to the mean flux level
+            flux_smoothed = fr.ym + F; % any residual 2nd order polynomial from the detrended flux, added to the mean flux level
             flux_noise = detrend_all(:,star_idx) - fr.ym; % separate the noise from the polynomial fit
             
             %%%% choose a good point to put the peak of the template %%%%
@@ -1328,6 +1325,8 @@ classdef EventFinder < handle
             if isempty(good_times) 
                 error('this shouldn''t happen!'); % we chose a star that has good times in its lightcurve! 
             end
+            
+            margin = length(flux_final) - length(template); % margins on both sides of the template, combined
             
             if margin>0
                 
@@ -1350,23 +1349,23 @@ classdef EventFinder < handle
             
             %%%% add the template on the flux %%%%
             
-            flux_mean_sim = flux_mean.*template_shift; % the mean flux is multiplied by the template (that should be 1 outside the occulation region)
+            flux_smoothed_sim = flux_smoothed.*template_shift; % the mean flux is multiplied by the template (that should be 1 outside the occulation region)
             
             if obj.pars.sim_rescale_noise
                 
                 background_var = nanmedian(obj.store.extended_aux(:,star_idx,obj.store.aux_indices.variances).*...
                     obj.store.extended_aux(:,star_idx,obj.store.aux_indices.areas)); % the read noise etc, which is independent of the source flux
                 
-                v1 = flux_mean + background_var; % variance taking into account only read-noise+bg and source noise before template is added
-                v2 = flux_mean_sim + background_var; % variance taking into account only read-noise+bg and source noise after template is added
+                v1 = flux_smoothed + background_var; % variance taking into account only read-noise+bg and source noise before template is added
+                v2 = flux_smoothed_sim + background_var; % variance taking into account only read-noise+bg and source noise after template is added
                 
                 flux_noise_corrected = (flux_noise - nanmean(flux_noise)).*sqrt(v2./v1) + nanmean(flux_noise); 
                 
             end
             
-            flux_final = flux_mean_sim + flux_noise_corrected + bg; % now we can re-attach the noise and the background we extracted before
+            flux_final = flux_smoothed_sim + flux_noise_corrected + bg; % now we can re-attach the noise and the background we extracted before
             
-%             flux_all(:,star_idx) = flux; 
+            flux_all(:,star_idx) = flux_final; 
             detrend_all(:,star_idx) = flux_final - F; % the detrended flux does not include the mean flux level!  
             
             % add some parameters known from the simulation
@@ -1375,9 +1374,9 @@ classdef EventFinder < handle
             sim_pars.star_snr = obj.store.star_snr(obj.store.star_indices(star_idx)); % translate to the global star index to get the S/N from the store
             sim_pars.calc_snr = sqrt(nansum((template-1).^2)).*sim_pars.star_snr; % estimate the event S/N with analytical formula (and assuming the star has white, gaussian noise)
             
-            sim_pars.fluxes.raw_flux = raw_flux;
-            sim_pars.fluxes.mean_flux = flux_mean;
-            sim_pars.fluxes.sim_mean_flux = flux_mean_sim;
+            sim_pars.fluxes.raw_flux = flux_raw;
+            sim_pars.fluxes.smoothed_flux = flux_smoothed;
+            sim_pars.fluxes.sim_smoothed_flux = flux_smoothed_sim;
             sim_pars.fluxes.background_mean = bg;
             sim_pars.fluxes.background_var = background_var;
             sim_pars.fluxes.template = template_shift;
@@ -1710,12 +1709,18 @@ classdef EventFinder < handle
             j = obj.store.extended_juldates(end) + double(obj.store.timestamps - obj.store.extended_timestamps(end))/24/3600; 
             a = celestial.coo.airmass(j, obj.head.RA, obj.head.DEC, [obj.head.longitude, obj.head.latitude]./180.*pi);
             
+            t = datetime(j, 'convertFrom', 'juliandate'); 
+            
+            t2 = t(1+obj.store.pars.length_burn_in:end); 
+            
 %             w = obj.store.checker.mean_width_values.*2.355.*obj.head.SCALE;
-            w = obj.store.checker.defocus_log.*2.355.*obj.head.SCALE;
+%             w = obj.store.checker.defocus_log.*2.355.*obj.head.SCALE;
+            
             b = obj.store.checker.mean_background_values;
             
-            t = datetime(j, 'convertFrom', 'juliandate'); 
-            t2 = t(1+obj.store.pars.length_burn_in:end); 
+            w = obj.store.fwhm_log;
+            t3 = datetime(obj.store.juldates_log, 'ConvertFrom', 'JulianDate');
+            
             
             plot(input.axes, t, a, 'DisplayName', 'airmass', 'LineWidth', input.line); 
             
@@ -1735,7 +1740,10 @@ classdef EventFinder < handle
                 
                 hold(input.axes, 'on'); 
             
-                plot(input.axes, binning(t2,obj.store.pars.length_search), w, '-', 'DisplayName', 'seeing ["]', 'LineWidth', input.line); 
+                plot(input.axes, t3, w, '-', 'DisplayName', 'seeing ["]', 'LineWidth', input.line); 
+                
+%                 plot(input.axes, binning(t2,obj.store.pars.length_search), w, '-', 'DisplayName', 'seeing ["]', 'LineWidth', input.line); 
+                
 %                 plot(input.axes, binning(t2, input.smooth*100), binning(w, input.smooth),'-k',...
 %                     'DisplayName', 'seeing smoothed', 'LineWidth', input.line, 'HandleVisibility', 'off'); 
 
@@ -1874,7 +1882,7 @@ classdef EventFinder < handle
             end
             
             input.axes.XLim = [x(1), x(end)]; 
-            input.axes.YLim = [1 y(1).*10];
+            input.axes.YLim = [util.stat.min2(y)/2 util.stat.max2(y).*2];
             
             input.axes.FontSize = input.font_size; 
             

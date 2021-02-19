@@ -209,14 +209,14 @@ classdef QualityChecker < handle
             obj.pars.use_auto_count_hours = false; 
 
             obj.pars.use_dilate = true; % do we want to spread out bad regions a few frames in either direction? 
-            obj.pars.dilate_region = 5; % how many frames, on either side, do we flag next to each bad point? 
+            obj.pars.dilate_region = 10; % how many frames, on either side, do we flag next to each bad point? 
             
             obj.pars.use_subtract_mean_offsets = true; % before doing any calculations on the offsets, remove the mean offsets that also affect the forced photometry centroids
 
             % do we want to apply all these cuts? 
             obj.pars.use_delta_t = true;
             obj.pars.use_shakes = true;
-            obj.pars.use_defocus = true;
+            obj.pars.use_defocus = false;
             obj.pars.use_fwhm = true; 
             obj.pars.use_slope = true;
             obj.pars.use_near_bad_rows_cols = true;            
