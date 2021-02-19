@@ -16,6 +16,7 @@ function [line_handle, fill_handle, fill_handle2] = shaded(x,y,err,varargin)
 %   -positive: replace the area which is negative, with the minimal
 %    non-negative value. 
 
+    if nargin==0, help('util.plot.shaded'); return; end
 
     input = util.text.InputVars;
     input.input_var('axes', [], 'axis', 'parent');

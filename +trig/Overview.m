@@ -481,19 +481,25 @@ classdef Overview < handle
                 
                 ev = obj.sim_events(ii); 
                 
+                if ev.D~=distance_au
+                    continue;
+                end
+
                 idx_v = find(ev.v>v_edges, 1, 'last'); 
                 if idx_v>=length(v_edges)
-                    idx_v = length(v_edges) - 1;
+%                         idx_v = length(v_edges) - 1;
+                    continue;
                 end
-                
+
                 idx_r = find(ev.r>r_edges, 1, 'last'); 
                 if idx_r>=length(r_edges)
-                    idx_r = length(r_edges) - 1;
+%                         idx_r = length(r_edges) - 1;
+                    continue;
                 end
-                
+
                 % how many events, in total, were simulated
                 N_total(idx_v, idx_r) = N_total(idx_v, idx_r) + 1;
-                
+
                 % how many events passed the cut
                 % (we may want to replace these with the full candidates
                 % that passed classification, too)
@@ -505,7 +511,7 @@ classdef Overview < handle
             
         end
         
-        function [coverage, cov_lower, cov_upper, E, E_l, E_u, N_total, N_passed] = calcCoverage(obj, r_edges, distance_au)
+        function [coverage, cov_lower, cov_upper, E, E_l, E_u, N_total, N_passed, v_weights] = calcCoverage(obj, r_edges, distance_au)
         % Get the coverage: the number of square degrees scanned out of the 
         % entire sky, for a given occulter radius and ecliptic latitude. 
         % 
@@ -519,7 +525,10 @@ classdef Overview < handle
         %   -cov_lower and cov_upper: limits based on the Poisson errors in
         %                             the efficiency estimate. 
         %   -E, E_l and E_u: efficiency and lower/upper limits. 
+        %                    dim1 velocity and dim2 occulter radius.
         %   -N_total and N_passed: outputs of calcEfficiency. 
+        %   -v_weights: the number of seconds in each velocity bin. 
+        %               dim 1 is velocity, dim2 is ecliptic latitude. 
         % 
         % NOTE: the coverage has 2 dimensions: dim1 is occulter radius and 
         %       dim2 is ecliptic latitude. 
@@ -557,15 +566,21 @@ classdef Overview < handle
             [N_total, N_passed] = obj.calcEfficiency(r_edges, distance_au);
             
             E = N_passed./N_total; 
-            E(N_total==0) = 0; % where there are no events at all, efficiency is zero
+            E(N_total==0) = NaN; % where there are no events at all, efficiency is NaN
+%             E = fillmissing(E, 'next'); 
+            
             
             [N_passed_lower, N_passed_upper] = util.stat.poisson_errors(N_passed, .32); 
             
             E_l = N_passed_lower./N_total; 
-            E_l(N_total==0) = 0; % where there are no events at all, efficiency is zero
+            E_l(N_total==0) = NaN; % where there are no events at all, efficiency is NaN
+%             E_l = fillmissing(E_l, 'next'); 
+            
             
             E_u = N_passed_upper./N_total; 
-            E_u(N_total==0) = 0; % where there are no events at all, efficiency is zero
+            E_u(N_total==0) = NaN; % where there are no events at all, efficiency is NaN
+%             E_u = fillmissing(E_u, 'next'); 
+            
             
             T = nansum(nansum(obj.star_seconds,1),2); % star-seconds integrated over all S/N and stellar sizes
             T = permute(T, [4,1,3,2]); % arrange velocity into the 1st dim, leave dim 2 as scalar (for r) and dim 3 for ecl 
@@ -576,17 +591,19 @@ classdef Overview < handle
             
             b = 2.*obj.b_max; % the range of impact parameters, integrated from -b_max to +b_max
             
-            coverage = nansum(E.*T.*b.*v, 1); % integral of efficiency and time and impact parameter, for each velocity
+            coverage = nansum(fillmissing(E, 'next').*T.*b.*v, 1); % integral of efficiency and time and impact parameter, for each velocity
             coverage = permute(coverage, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
             coverage = coverage.*obj.fsu2deg2(distance_au); 
             
-            cov_lower = nansum(E_l.*T.*b.*v, 1); % integral of efficiency and time and impact parameter, for each velocity
+            cov_lower = nansum(fillmissing(E_l, 'next').*T.*b.*v, 1); % integral of efficiency and time and impact parameter, for each velocity
             cov_lower = permute(cov_lower, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
             cov_lower = cov_lower.*obj.fsu2deg2(distance_au); 
             
-            cov_upper = nansum(E_u.*T.*b.*v, 1); % integral of efficiency and time and impact parameter, for each velocity
+            cov_upper = nansum(fillmissing(E_u, 'next').*T.*b.*v, 1); % integral of efficiency and time and impact parameter, for each velocity
             cov_upper = permute(cov_upper, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
             cov_upper = cov_upper.*obj.fsu2deg2(distance_au); 
+            
+            v_weights = permute(T.*v, [1,3,2]); % dim 1 is velocity, dim 2 is ecliptic latitude
             
         end
         
@@ -1086,6 +1103,128 @@ classdef Overview < handle
             end
             
             input.axes.FontSize = input.font_size;
+            
+        end
+        
+        function showEfficiency(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('ecl', [-5,5], 'ecliptic latitude', 'ecliptic limits'); 
+            input.input_var('r_edges', []);
+            input.input_var('distance', 40, 'distance_au', 'dist_au'); 
+            input.input_var('parent', [], 'figure'); 
+            input.input_var('font_size', 18); 
+            input.scan_vars(varargin{:}); 
+            
+            if length(input.ecl)~=2
+                error('Give the ecliptic latitude parameter as [min,max] values'); 
+            end
+            
+            ecl_idx1 = find(obj.ecl_edges>=input.ecl(1), 1, 'first');
+            ecl_idx2 = find(obj.ecl_edges<input.ecl(2), 1, 'last') - 1;
+            
+            if isempty(ecl_idx1) || isempty(ecl_idx2) || ecl_idx1>ecl_idx2
+                error('No data for the ecliptic latitude range %s', util.text.print_vec(input.ecl, ' to ')); 
+            end
+            
+            if ischar(input.distance)
+                
+                if cs(input.distance, 'kbos', 'kuiper belt objects')
+                    input.distance = 40; 
+                elseif cs(input.distance, 'hills cloud', 'inner oort')
+                    input.distance = 3000; 
+                elseif cs(input.distance, 'oort cloud')
+                    input.distance = 10000; 
+                else
+                    error('Unknown "distance" option "%s". Use a numeric value in AU, or "KBOs", "Hills" or "Oort"', input.distance); 
+                end
+                
+            end
+            
+            if isempty(input.r_edges)
+                input.r_edges = obj.default_r_edges_fsu./obj.km2fsu(input.distance); 
+            end
+            
+            r = util.vec.tocolumn(input.r_edges);
+            r = r(1:end-1) + diff(r)/2; 
+            
+            [~,~,~,E, E_l, E_u, N_total, N_passed, v_weights] = obj.calcCoverage(input.r_edges, input.distance);
+            
+            v_weights = nansum(v_weights(:,ecl_idx1:ecl_idx2),2); % sum over all runs in the ecliptic range
+            
+            E1 = nansum(N_passed)./nansum(N_total); % simple sum over all velocities
+            E1 = fillmissing(E1, 'constant', 0);
+            
+            E2 = util.vec.weighted_average(fillmissing(E, 'next'),v_weights,1); % sum according to how many hours were spent in each velocity
+            
+            [N_lower, N_upper] = util.stat.poisson_errors(nansum(N_passed), 0.32); 
+            
+            E1_l = N_lower./nansum(N_total); % simple sum over all velocities
+            E1_l = fillmissing(E1_l, 'constant', 0);
+            
+%             E2_l = util.vec.weighted_average(fillmissing(E_l, 'next'),v_weights,1); % sum according to how many hours were spent in each velocity
+            
+            E1_u = N_upper./nansum(N_total); % simple sum over all velocities
+            E1_u = fillmissing(E1_u, 'constant', 0);
+            E1_u(isinf(E1_u)) = 0; 
+            
+%             E2_u = util.vec.weighted_average(fillmissing(E_u, 'next'),v_weights,1); % sum according to how many hours were spent in each velocity
+            
+            if isempty(input.parent)
+                input.parent = gcf;
+            end
+            
+            delete(input.parent.Children); 
+            
+            ax1 = axes('Parent', input.parent); 
+            
+%             errorbar(ax1, r, E1*100, (E1-E1_l)*100, (E1_u-E1)*100, '+-', 'LineWidth', 2, 'DisplayName', 'average efficiency'); 
+            [h_line, h_fill] = util.plot.shaded(r, E1'*100, [(E1-E1_l)'*100, (E1_u-E1)'*100], 'ax', ax1, 'positive', 1); 
+
+            hold(ax1, 'on'); 
+            
+            h_line.DisplayName = 'average efficiency';
+            h_fill.DisplayName = '68% confidence'; 
+            
+            plot(ax1, r, E2*100, 'go', 'LineWidth', 2, 'DisplayName', 'weighted by velocities'); 
+            
+            for ii = 1:length(E1)
+                text(ax1, mean([r(ii),input.r_edges(ii)]), double(E1(ii)*100), sprintf('%d/%d', sum(N_passed(:,ii),1), sum(N_total(:,ii),1)), ...
+                    'FontSize', 14, 'Rotation', 90, 'HorizontalAlignment', 'left', 'Color', 'r'); 
+            end
+            
+            hold(ax1, 'off'); 
+            
+            box(ax1, 'on'); 
+            
+            ytickformat(ax1, '%d%%'); 
+            xtickformat(ax1, '%3.1f km'); 
+            
+            xlabel(ax1, 'Occulter radius'); 
+            ylabel(ax1, 'Detection efficiency'); 
+            
+            if ax1.XTick(1)==0
+                ax1.XTick = ax1.XTick(2:end);
+            end
+            
+            ax1.YLim = [0 100]; 
+            grid(ax1, 'on'); 
+            
+            ax1.FontSize = input.font_size; 
+            
+            legend(ax1, 'Location', 'SouthEast'); 
+            
+            
+            %%%%% velocity distribution %%%%%
+            
+            ax2 = axes('Parent', input.parent, 'Position', [0.175 0.55 0.3 0.3]); 
+            
+            bar(ax2, obj.vel_edges(1:end-1)-obj.vel_bin_width/2, v_weights/3600); 
+            
+            ylabel('Star hours'); 
+            xlabel('Velocity [km/s]'); 
+            
+            ax2.FontSize = input.font_size - 2;
             
         end
         
