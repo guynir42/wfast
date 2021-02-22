@@ -36,6 +36,8 @@ classdef ProgressBar < handle
     
     properties(Hidden=true)
         
+        dividor_; % internal override value
+        
     end
     
     properties(Dependent=true)
@@ -59,15 +61,25 @@ classdef ProgressBar < handle
         
     end
     
-    methods % getters
+    methods % getters / setters
        
         function d = get.dividor(obj) % the dividor is rounded to 10's or 100's or more, so there are only a small number of outputs (<32) in the whole loop
            
-            d = 10^round(log10(obj.total_number)-1); % round to the nearest power of 10 
-            
+            if isempty(obj.dividor_)            
+                d = 10^round(log10(obj.total_number)-1); % round to the nearest power of 10 
+            else
+                d = obj.dividor_;
+            end
+                
 %             if d<10
 %                 d = 10;
 %             end
+            
+        end
+        
+        function set.dividor(obj, val)
+            
+            obj.dividor_ = val; 
             
         end
         
