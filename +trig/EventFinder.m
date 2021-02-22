@@ -615,6 +615,10 @@ classdef EventFinder < handle
             
             s.seeing_log = obj.store.fwhm_log; 
             s.juldates_log = obj.store.juldates_log; 
+            s.airmass_log = celestial.coo.airmass(s.juldates_log, obj.head.RA, obj.head.DEC, [obj.head.longitude, obj.head.latitude]./180.*pi);
+            b = obj.store.checker.mean_background_values;
+            b = [NaN(obj.store.pars.length_burn_in,1); b]; 
+            s.background_log = util.series.binning(b, obj.store.pars.length_search); % should be the same size as the other logs, with some NaNs in the beginning for the burn in
             
             % load the content of the checker
             s.checker_pars = obj.store.checker.pars;

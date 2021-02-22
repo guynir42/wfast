@@ -218,7 +218,7 @@ classdef FutureMonitor < handle
                 if strcmp(rep, 'Yes')
                     cancel(f);                     
                 end
-            elseif is_error
+            else
                 rep = questdlg('Delete this future?', sprintf('Delete future number %d?', idx), 'Yes', 'No', 'No'); 
                 if strcmp(rep, 'Yes')                    
                     cancel(f); 

@@ -288,6 +288,9 @@ classdef DataStore < handle
             
             obj.cutouts = [];
             
+            obj.juldates_log = [];
+            obj.fwhm_log = [];
+            
             obj.clear;
             
         end

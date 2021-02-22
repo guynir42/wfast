@@ -43,6 +43,8 @@ classdef RunSummary < handle
         fwhm_hist; % histogram of the number of seconds spent at each FWHM value (in steps of 0.1") 
         fwhm_edges; % histogram edges
         seeing_log; % FWHM measurements from the model PSF, in arcsec, for each batch
+        airmass_log; % calculate the airmass based on header data and julian dates
+        background_log; % get the average background value for each batch
         juldates_log; % julian date of the middle of each batch
         
         star_seconds; % the number of useful seconds accumulated each S/N bin (this is saved after subtracting losses)

@@ -709,7 +709,7 @@ classdef Candidate < handle
                 'Tooltip', 'Show the flux of other stars with high correlation to this star'); 
             
             % turn button red if there are high correlations! 
-            if length(obj.corr_flux)>=3 && obj.corr_flux(3)>obj.checker_pars.thresh_tracking_error-1
+            if length(obj.corr_flux)>=3 && obj.corr_flux(3)>obj.checker_pars.thresh_tracking_error
                 button.BackgroundColor = 'r'; 
             end
             
