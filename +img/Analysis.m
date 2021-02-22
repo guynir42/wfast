@@ -194,6 +194,8 @@ classdef Analysis < file.AstroData
     
     properties(Hidden=true)
        
+        max_num_workers = 10; 
+        
         ref_stack; % for quick align
         ref_positions; 
         
@@ -1007,6 +1009,10 @@ classdef Analysis < file.AstroData
             
             N = obj.pool.NumWorkers; 
             
+            if ~isempty(obj.max_num_workers) && obj.max_num_workers<N
+                N = obj.max_num_workers; 
+            end
+            
             idx = [];
             
             for ii = 1:N
@@ -1034,6 +1040,10 @@ classdef Analysis < file.AstroData
             end
             
             N = obj.pool.NumWorkers; 
+            
+            if ~isempty(obj.max_num_workers) && obj.max_num_workers<N
+                N = obj.max_num_workers; 
+            end
             
             idx = [];
             
