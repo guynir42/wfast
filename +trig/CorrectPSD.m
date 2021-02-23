@@ -121,6 +121,11 @@ classdef CorrectPSD < handle
         
         function calcPSD(obj, flux_buffer, timestamps, window, number)
             
+            M = nanmedian(flux_buffer); 
+            S = mad(flux_buffer); 
+            
+            flux_buffer(abs(flux_buffer-M)./S > 5) = NaN; % remove outliers
+            
             obj.flux_buffer = flux_buffer - nanmean(flux_buffer);
             obj.flux_buffer = fillmissing(obj.flux_buffer, 'linear'); 
             
