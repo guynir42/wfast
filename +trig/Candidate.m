@@ -884,7 +884,12 @@ classdef Candidate < handle
             
             input.ax.NextPlot = 'replace';
             
-            h1 = plot(input.ax, x, obj.flux_raw, '-', 'LineWidth', 2, 'Color', [0.929 0.694 0.125]);
+            f = obj.flux_raw;
+            a = obj.auxiliary(:,obj.aux_indices.areas); 
+            b = obj.auxiliary(:,obj.aux_indices.backgrounds); 
+            f2 = f - nanmedian(a.*b);
+            
+            h1 = plot(input.ax, x, f2, '-', 'LineWidth', 2, 'Color', [0.929 0.694 0.125]);
             h1.DisplayName = 'raw flux';
             
             input.ax.NextPlot = 'add';
@@ -897,7 +902,11 @@ classdef Candidate < handle
             input.ax.YAxis(1).Color = [0 0 0];
             
             if input.ax.YLim(2)>0
-                input.ax.YLim(1) = 0;                 
+                if nanmin(f2)<0
+                    input.ax.YLim(1) = nanmin(f2).*1.1;
+                else
+                    input.ax.YLim(1) = 0;
+                end
             end
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1517,8 +1526,8 @@ classdef Candidate < handle
             
             hold(ax, 'on'); 
             
-            x = obj.auxiliary(:,obj.aux_indices.centroids_x); 
-            y = obj.auxiliary(:,obj.aux_indices.centroids_y); 
+            x = nanmedian(obj.auxiliary(:,obj.aux_indices.centroids_x)); 
+            y = nanmedian(obj.auxiliary(:,obj.aux_indices.centroids_y)); 
             
             plot(ax, x, y, 'go', 'MarkerSize', 15); 
             

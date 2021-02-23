@@ -517,7 +517,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			
 		}
 		else if(cs(key, "use_median", "median")){
-			if(val==0 || mxIsEmpty(val)) pars.use_median=1; // if no input, assume positive
+			if(val==0 || mxIsEmpty(val)) pars.use_median=1; // if no second input, assume positive
 			else{
 				
 				bool value=0;
@@ -1085,7 +1085,8 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 			
 			annulus_pixels=countNonNaNsIndices(image, annulus_indices, idx); // how many non-NaN do we have in this annulus?
 			
-			area[j]=1.0/sumArrays(&gaussians[idx*N],&gaussians[idx*N]); 
+			// area[j]=1.0/sumArrays(&gaussians[idx*N],&gaussians[idx*N]); 
+			area[j]=sumArrays(&gaussians[idx*N])/sumArrays(&gaussians[idx*N],&gaussians[idx*N]); 
 			
 			flux[j]=sumArrays(image, &gaussians[idx*N])*area[j]; // we must multiply this and all moments by area to compensate for the gaussian tapering
 			
@@ -1406,7 +1407,8 @@ void Photometry::calculateForced(int j){
 		
 		annulus_pixels=countNonNaNsIndices(image, annulus_indices, idx); // how many non-NaN do we have in this annulus?
 		
-		area[j]=1.0/sumArrays(&gaussians[idx*N],&gaussians[idx*N]); 
+		// area[j]=1.0/sumArrays(&gaussians[idx*N],&gaussians[idx*N]); 
+		area[j]=sumArrays(&gaussians[idx*N])/sumArrays(&gaussians[idx*N],&gaussians[idx*N]); 
 		
 		flux[j]=sumArrays(image, &gaussians[idx*N])*area[j]; // we must multiply this and all moments by area to compensate for the gaussian tapering
 		

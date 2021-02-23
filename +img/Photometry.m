@@ -127,6 +127,9 @@ classdef Photometry < handle
         default_seeing = 1;
         default_ap_multiplier = 3.5;
         
+        phot_struct; % raw output from photometry2 
+        phot_apertures; % aperture masks in a struct
+        
         X; % output from meshgrid
         Y; % output from meshgrid
         
@@ -387,12 +390,14 @@ classdef Photometry < handle
             
             if obj.use_new_method 
                 
-                s = util.img.photometry2(single(obj.cutouts), 'iterations', obj.iterations, ...
+                [s, a] = util.img.photometry2(single(obj.cutouts), 'iterations', obj.iterations, ...
                     'radii', obj.aperture, 'annulus', [obj.annulus, obj.annulus_outer], 'sigma', obj.gauss_sigma, ...
                     'use_gaussian', obj.use_gaussian, 'use_centering', obj.use_centering, 'resolution', obj.resolution, ...
                     'use_apertures', obj.use_aperture, 'use_forced', obj.use_forced, 'use_positive', obj.use_positive, ...
                     'threads', obj.num_threads, 'debug_bit', obj.debug_bit, 'index', obj.index); 
                 
+                obj.phot_struct = s; % keep a reference structure for debugging
+                obj.phot_apertures = a; % keep the aperture masks as well
                 obj.pars_struct = s.parameters;
                 obj.pars_struct.types = {}; 
                 

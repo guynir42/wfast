@@ -208,7 +208,7 @@ classdef EventFinder < handle
             obj.pars.use_keep_variances = 1; % keep a copy of the variance of each star/kernel for the entire run (this may be a bit heavy on the memory)
 
             obj.pars.use_sim = 1; % add simulated events in a few batches randomly spread out in the whole run
-            obj.pars.num_sim_events_per_batch = 0.5; % fractional probability to add a simulated event into each new batch. 
+            obj.pars.num_sim_events_per_batch = 0.25; % fractional probability to add a simulated event into each new batch. 
             obj.pars.use_keep_simulated = true; % if false, the simulated events would not be kept with the list of detected candidates (for running massive amount of simualtions)
             obj.pars.sim_max_R = 3; % maximum value of stellar size for simulated events
             
@@ -985,6 +985,10 @@ classdef EventFinder < handle
             % save the parameters used by the finder, store and quality-checker
             c.finder_pars = obj.pars; 
             c.store_pars = obj.store.pars;
+            c.store_pars = obj.store.aperture_index; 
+            c.store_pars = obj.store.star_indices; 
+            c.store_pars = obj.store.star_sizes;
+            c.store_pars = obj.store.star_snr; 
             c.checker_pars = obj.store.checker.pars;
             % add StarHours parameters?? 
             
@@ -1310,6 +1314,8 @@ classdef EventFinder < handle
             flux_raw = flux_all(:,star_idx); % pick out the one star
             bg = obj.store.extended_aux(:,star_idx,obj.store.aux_indices.backgrounds).*...
                 obj.store.extended_aux(:,star_idx,obj.store.aux_indices.areas);
+            
+            bg = nanmedian(bg); % prefer the median value to individual measurements, that could be outliers
             
             flux_final = flux_raw - bg; % this is used to calculate the mean flux
             F = nanmean(flux_final,1); % the mean flux

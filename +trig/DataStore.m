@@ -249,6 +249,8 @@ classdef DataStore < handle
             obj.pars.use_remove_cosmic_rays = true; % get rid of intense cosmic rays before even inputting the flux into the buffers
             obj.pars.cosmic_ray_threshold = 8; % in units of S/N
 
+            obj.pars.use_reject_gaussian_photometry = true; 
+            
             obj.reset;
             
         end
@@ -634,7 +636,14 @@ classdef DataStore < handle
             
             passed = obj.star_snr >= obj.pars.threshold; 
             
-            [~,obj.aperture_index] = max(sum(passed,1), [], 2); % count how many stars are above threshold in each aperture number, pick the best one
+            num_passed = sum(passed,1); % count how many stars are above threshold in each aperture number
+            
+            if obj.pars.use_reject_gaussian_photometry
+                not_gaussian = cellfun(@isempty, regexp(obj.head.PHOT_PARS.types, 'gaussian.*')); % which aperture indices refer to gaussian photometry
+                num_passed = num_passed.*not_gaussian; % get rid of these apertures
+            end
+            
+            [~,obj.aperture_index] = max(num_passed, [], 2); % pick the best aperture
             
             passed = passed(:,obj.aperture_index); % keep only the stars on the column of the best aperture
             
