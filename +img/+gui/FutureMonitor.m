@@ -97,9 +97,9 @@ classdef FutureMonitor < handle
             d = obj.owner.futures_dir; 
             b = obj.owner.futures_batches; 
             
-            N = length(f); 
+            N = max(10, length(f)); 
             
-            for ii = 1:N
+            for ii = 1:length(f)
                 
                 if ~isempty(f{ii}) && isa(f{ii}, 'parallel.Future') && isvalid(f{ii})
                 

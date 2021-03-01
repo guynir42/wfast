@@ -952,6 +952,7 @@ classdef EventFinder < handle
             idx = find(star_indices==c.star_index); % the index of the star inside the list of stars that passed the pre-filter
 %             c.filtered_flux_past_values = obj.background_ff(:,idx); % because we only have this background_ff for the subset of stars
             c.flux_buffer = obj.store.flux_buffer(:,c.star_index); % flux history for this star
+            c.detrend_buffer = obj.store.detrend_buffer(:,c.star_index); % detrended flux history for this star
             c.timestamps_buffer = obj.store.timestamps_buffer; % timestamps for that duration
             c.psd = obj.psd.power_spectrum(:,c.star_index); % the Power Spectral Density (PSD) for this star
             c.freq_psd = obj.psd.freq; % frequency axis for the PSD

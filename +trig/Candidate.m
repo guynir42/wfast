@@ -177,6 +177,7 @@ classdef Candidate < handle
         is_simulated = 0; % by default candidates are not simulated. If true, this candidate is an injected simulated event.  
 
         flux_buffer; % flux buffer going back as far as possible, for this star only
+        detrend_buffer; % flux after removing a linear fit from each batch
         timestamps_buffer; % timestamps for the above
         filtered_flux_past_values; % normalization data for this star and this kernel only. Can be either raw filtered_flux values for the last "backround" period, or the variance values from the var_buf
         
