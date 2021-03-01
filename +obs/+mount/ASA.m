@@ -1934,7 +1934,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
             input = util.text.InputVars;
             input.input_var('number', 10, 'iterations');
-            input.input_var('pause', 10, 'delay_time'); 
+            input.input_var('pause', 5, 'delay_time'); 
             input.scan_vars(varargin{:});
             
             for ii = 1:input.number

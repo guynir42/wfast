@@ -125,6 +125,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     
     properties(Hidden=true)
        
+        use_check_cam_connection = 1; % if true, will alert users if cam PC is offline more than 30 minutes
+        
         latest_email_report_date = ''; % keep track of the last time we sent this, so we don't send multiple emails each day
         
         prompt_fig; % figure handle to the user-prompt
@@ -977,23 +979,27 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             try % check that cam-PC is responsive
                 
-                t = datetime('now', 'TimeZone', 'UTC'); 
+                if obj.use_check_cam_connection
                 
-                if ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'time') && ~isempty(obj.cam_pc.incoming.time)
-                    dt = minutes(t-util.text.str2time(obj.cam_pc.incoming.time)); 
-                else % we don't know from cam_pc object when we last heard from the cam-PC
-                    
-                    if isempty(obj.latest_response_cam_pc)
-                        dt = 0; % we don't have any record at all of when we last contacted cam-PC 
-                    else
-                        dt = minutes(t - util.text.str2time(obj.latest_response_cam_pc));
+                    t = datetime('now', 'TimeZone', 'UTC'); 
+
+                    if ~isempty(obj.cam_pc.incoming) && isfield(obj.cam_pc.incoming, 'time') && ~isempty(obj.cam_pc.incoming.time)
+                        dt = minutes(t-util.text.str2time(obj.cam_pc.incoming.time)); 
+                    else % we don't know from cam_pc object when we last heard from the cam-PC
+
+                        if isempty(obj.latest_response_cam_pc)
+                            dt = 0; % we don't have any record at all of when we last contacted cam-PC 
+                        else
+                            dt = minutes(t - util.text.str2time(obj.latest_response_cam_pc));
+                        end
+
                     end
-                    
-                end
-                
-                if isempty(obj.latest_error_response) && dt>30 % minutes
-                    obj.latest_error_response = util.text.time2str(t); 
-                    obj.sendError(MException('Manager:cannotContactCamPC', 'It has been over 30 minutes without contact with cam-PC!')); 
+
+                    if isempty(obj.latest_error_response) && dt>30 % minutes
+                        obj.latest_error_response = util.text.time2str(t); 
+                        obj.sendError(MException('Manager:cannotContactCamPC', 'It has been over 30 minutes without contact with cam-PC!')); 
+                    end
+
                 end
                 
             catch ME
