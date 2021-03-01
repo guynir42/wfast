@@ -1135,7 +1135,7 @@ classdef Acquisition < file.AstroData
                     obj.src = obj.cam;
                     
                 elseif cs(source, 'Dhyana')
-                    error('This camera is no longer supported...');
+                    error('cam_pc:acquisition:choose_source:unsupported_camera', 'This camera is no longer supported...');
                     if isempty(obj.cam) || ~isa(obj.cam.cam, 'obs.DhyanaControl')
                         obj.cam = obs.CameraControl('dhyana');
                         obj.cam.head = obj.head;
@@ -1144,7 +1144,7 @@ classdef Acquisition < file.AstroData
                     obj.src = obj.cam;
                     
                 elseif cs(source, 'simcamera')
-                    error('This camera is no longer supported...');
+                    error('cam_pc:acquisition:choose_source:unsupported_camera', 'This camera is no longer supported...');
                     if isempty(obj.cam) || ~isa(obj.cam.cam, 'obs.cam.SimCamera')
                         obj.cam = obs.cam.CameraControl('sim');
                         obj.cam.head = obj.head;
@@ -1202,7 +1202,7 @@ classdef Acquisition < file.AstroData
         function chooseDir(obj, dirname) % do I need this?
             
             if isempty(obj.src)
-                error('Cannot chooseDir with an empty source');
+                error('cam_pc:acquisition:choose_dir:empty_source', 'Cannot chooseDir with an empty source');
             end
             
             if nargin<2 || isempty(dirname)
@@ -1210,14 +1210,14 @@ classdef Acquisition < file.AstroData
             end
             
             if ~isa(obj.src, 'file.Reader')
-                error('Cannot chooseDir for a source of type %s', class(obj.src));
+                error('cam_pc:acquisition:choose_dir:wrong_source', 'Cannot chooseDir for a source of type %s', class(obj.src));
             end
             
             if isempty(dirname)
                 obj.reader.browseDir;
             else
                 if ~obj.reader.dir.cd(dirname)
-                    error('cannot find directory %s', dirname);
+                    error('cam_pc:acquisition:choose_dir:no_directory', 'Cannot find directory %s', dirname);
                 end
             end
             
@@ -1306,7 +1306,7 @@ classdef Acquisition < file.AstroData
             end
             
             if ~isfield(s, 'RA') || ~isfield(s, 'Dec')
-                error('Must input a target with RA and Dec'); 
+                error('cam_pc:acquisition:create_forced:no_coordinates', 'Must input a target with RA and Dec'); 
             end
             
             if ischar(s.RA)
@@ -1519,7 +1519,7 @@ classdef Acquisition < file.AstroData
                 success = 0;
                 
                 if isempty(obj.cam.focuser)
-                    error('must be connected to camera and focuser!');
+                    error('cam_pc:acquisition:focus:no_focuser', 'Must be connected to camera and focuser!');
                 end
                 
                 for ii = 1:obj.num_focus_iterations
@@ -1613,13 +1613,13 @@ classdef Acquisition < file.AstroData
                                 util.plot.inner_title(sprintf('Focus failed after %d iterations!', 0),...
                                     'ax', obj.cam.af.gui.axes_image, 'FontSize', 26, 'Position', 'North');
                                 pause(1); 
-                                error('Found only %d stars when starting focus run!', height(obj.star_props)); 
+                                error('cam_pc:acquisition:focus:few_stars', 'Found only %d stars when starting focus run!', height(obj.star_props)); 
                             end
                             
                             if obj.brake_bit, return; end
                             
                             if isempty(obj.star_props)
-                                error('Could not find any stars for doing focus!');
+                                error('cam_pc:acquisition:focus:no_stars', 'Could not find any stars for doing focus!');
                             end
                             
                             obj.cam.focuser.pos = p(1);
@@ -2189,7 +2189,7 @@ classdef Acquisition < file.AstroData
                             
                             success = obj.runFocus;
                             if success==0
-                                error('Could not find a good focus point!'); 
+                                error('cam_pc:acquisition:focus:no_good_point', 'Could not find a good focus point!'); 
                             end
                         end
                         
@@ -2235,7 +2235,7 @@ classdef Acquisition < file.AstroData
                         disp(obj.log.report); 
                         
                     else
-                        error('Unknown command: %s! Use "start" or "stop", etc...', obj.dome_pc.incoming.command_str); 
+                        error('cam_pc:acquisition:parse:unknown_command','Unknown command: %s! Use "start" or "stop", etc...', obj.dome_pc.incoming.command_str); 
                     end
 
                     % careful: there is a "return" statement in there
@@ -2640,7 +2640,7 @@ classdef Acquisition < file.AstroData
                         obj.runAstrometry;
                         
                         if obj.use_require_astrometric_solution && obj.cat.success==0
-                            error('Could not find astrometric solution!'); 
+                            error('cam_pc:acquisition:astrometry:no_solution', 'Could not find astrometric solution!'); 
                         end
                         
                         % add forced cutouts
@@ -3167,11 +3167,11 @@ classdef Acquisition < file.AstroData
                     'dilate', obj.cut_size-5, 'saturation', obj.saturation_value.*obj.num_sum, 'edges', obj.avoid_edges, 'unflagged', 1); 
                 
                 if isempty(T)
-                    error('Could not find any stars using quick_find_stars!');
+                    error('cam_pc:acquisition:find_stars:no_stars', 'Could not find any stars using quick_find_stars!');
                 end
                 
                 if ~isempty(obj.min_stars) && height(T)<obj.min_stars
-                    error('Found only %d stars, aborting run!', height(T)); 
+                    error('cam_pc:acquisition:find_stars:few_stars', 'Found only %d stars, aborting run!', height(T)); 
                 end
                 
                 obj.head.THRESH_DETECTION = obj.detect_thresh; 
@@ -3344,7 +3344,7 @@ classdef Acquisition < file.AstroData
         function findStarsMAAT(obj)
             
             if isempty(which('mextractor'))
-                error('Cannot load the MAAT package. Make sure it is on the path...');
+                error('cam_pc:acquisition:find_stars:no_maat', 'Cannot load the MAAT package. Make sure it is on the path...');
             end
              
             % add additional tests to remove irrelvant stars
@@ -3778,7 +3778,7 @@ classdef Acquisition < file.AstroData
             elseif cs(obj.runtime_units, 'frames')
                 val = 1./obj.getFrameRateEstimate;
             else
-                error('Unknown runtime units "%s". Use seconds, minutes, hours, batches or frames', obj.runtime_units);
+                error('cam_pc:acquisition:startup:unknown_time_units', 'Unknown runtime units "%s". Use seconds, minutes, hours, batches or frames', obj.runtime_units);
             end
             
         end
@@ -3852,7 +3852,7 @@ classdef Acquisition < file.AstroData
                 elseif cs(obj.show_what, 'stack_proc')
                     I = obj.stack_proc;
                 else
-                    error('Unknown option for "display_what". Use "images", "raw", or "stack"');
+                    error('cam_pc:acquisition:display:unknown_display_what', 'Unknown option for "display_what". Use "images", "raw", or "stack"');
                 end
 
                 if obj.use_flip
