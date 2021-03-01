@@ -275,7 +275,7 @@ classdef (CaseInsensitiveProperties) Target < handle
             end
             
             if isempty(str)
-                error('Must give a non-empty string');
+                error('dome_pc:scheduler:target:parse:empty_string', 'Must give a non-empty string');
             end
             
             % remove all quotes
@@ -292,7 +292,7 @@ classdef (CaseInsensitiveProperties) Target < handle
             
             % read the target name
             if isempty(c{1})
-                error('Must give an object name in the first field of the string');
+                error('dome_pc:scheduler:target:parse:no_name', 'Must give an object name in the first field of the string');
             else
                 obj.name = c{1};
             end
@@ -303,7 +303,7 @@ classdef (CaseInsensitiveProperties) Target < handle
                 idx = strfind(c{2}, '+'); % try to find a + separator
                 if isempty(idx), idx = strfind(c{2}, '-'); end % try instead to find a - separator
                 if isempty(idx)
-                    error('Must provide a coordinates field with a + or - separating the RA and Dec!\n Instead got: %s', c{2}); 
+                    error('dome_pc:shceduler:target:parse:no_coordinates', 'Must provide a coordinates field with a + or - separating the RA and Dec!\n Instead got: %s', c{2}); 
                 end
                 
                 new_RA = strtrim(c{2}(1:idx-1));
@@ -324,7 +324,7 @@ classdef (CaseInsensitiveProperties) Target < handle
                 
                 idx = strfind(c{ii}, '='); 
                 if isempty(idx)
-                    error('Must provide optional arguments in "keyword=value" format.\n Instead got: %s', c{ii}); 
+                    error('dome_pc:scheduler:target:parse:key_val_bad_format', 'Must provide optional arguments in "keyword=value" format.\n Instead got: %s', c{ii}); 
                 end
                 
                 key = strtrim(c{ii}(1:idx-1));
@@ -373,7 +373,7 @@ classdef (CaseInsensitiveProperties) Target < handle
         function copy_pars(obj, other) % get the parameters from another Target object, without reseting observation history
             
             if nargin<2 || isempty(other) || ~isa(other, 'obs.sched.Target')
-                error('Must supply a valid Target object!'); 
+                error('dome_pc:scheduler:target:copy_pars:bad_input', 'Must supply a valid Target object!'); 
             end
             
             % copy only the constraints
@@ -545,14 +545,14 @@ classdef (CaseInsensitiveProperties) Target < handle
             end
 
             if ~exist(filename, 'file')
-                error('Could not find the file "%s". ', filename);
+                error('dome_pc:scheduler:target:read_file:bad_filename', 'Could not find the file "%s". ', filename);
             end
 
             if nargin<2 || isempty(constraints)
                 constraints = [];
             else
                 if ~isa(constraints, 'util.text.InputVars')
-                    error('Second argument (constraints) to readFile must be a util.text.InputVars setup using a head.Ephemeris object! Instead got a %s', class(constraints)); 
+                    error('dome_pc:scheduler:target:read_file:bad_constraints', 'Second argument (constraints) to readFile must be a util.text.InputVars setup using a head.Ephemeris object! Instead got a %s', class(constraints)); 
                 end
             end
             

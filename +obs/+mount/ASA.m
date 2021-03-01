@@ -238,7 +238,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     obj.update;
                     
                     if obj.status==0
-                        error('Mount connected but status is 0...'); 
+                        error('dome_pc:mount:connect:status_zero', 'Mount connected but status is 0...'); 
                     end
                     
                     obj.reco.inputSuccess;
@@ -333,7 +333,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                         pause(2); 
                         
                         if abs(RA - obj.telRA_deg)>1 || abs(DE - obj.telDec_deg)>1 || ~strcmp(side, obj.telHemisphere)
-                            error('Mount restart error: coordinates before: %s%s (%s) do not match coordinates after: %s%s (%s)', ...
+                            error('dome_pc:mount:connect_arduino:coordinates_mismatch', 'Mount restart error: coordinates before: %s%s (%s) do not match coordinates after: %s%s (%s)', ...
                                 head.Ephemeris.deg2hour(RA), head.Ephemeris.deg2sex(DE), side, ...
                                 head.Ephemeris.deg2hour(obj.telRA_deg), head.Ephemeris.deg2sex(obj.telDec_deg), obj.telHemisphere); 
                         end
@@ -404,7 +404,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             end
             
             obj.killServer;
-            error('Timeout while waiting for AstroOptikServer.exe to load for %f seconds!', toc); 
+            error('cam_pc:mount:load_server:timeout', 'Timeout while waiting for AstroOptikServer.exe to load for %f seconds!', toc); 
             
         end
         
@@ -868,7 +868,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 
                     end
 
-                    error('Timeout after %f seconds waiting for mount to set tracking to %d.', toc, val);
+                    error('dome_pc:mount:tracking:timeout', 'Timeout after %f seconds waiting for mount to set tracking to %d.', toc, val);
 
                 end
                 
@@ -902,7 +902,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function inputTarget(obj, varargin) % pass the arguments to the Ephemeris object (give RA and Dec or object name)
             
             if isempty(varargin) && isempty(obj.objName)
-                error('Must supply an object name or coordinates (or fill objName field)');
+                error('dome_pc:mount:input_target:no_name', 'Must supply an object name or coordinates (or fill objName field)');
             elseif isempty(varargin)
                 varargin{1} = obj.objName;
             end
@@ -918,7 +918,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function C_out = scanTargetList(obj, filename) % read list of targets from text file
             
             if ~exist(filename, 'file')
-                error('Cannot find filename "%s".', filename);
+                error('dome_pc:mount:target_list:bad_filename', 'Cannot find filename "%s".', filename);
             end
             
             f = fopen(filename, 'r'); 
@@ -1080,7 +1080,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 end
                 
                 if isempty(obj.ard) || obj.ard.status==0
-                    error('Cannot slew without a responsive ScopeAssistant (arduino)');
+                    error('dome_pc:mount:check_before_slew:no_assistant', 'Cannot slew without a responsive ScopeAssistant (arduino)');
                 end
                 
             end
@@ -1260,7 +1260,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         function val = check_need_flip(obj) % check if target is on the other side of the pier
             
             if strcmp(obj.obj_pier_side, 'pierUnknown')
-                error('Mount cannot find PierSide for this object!');
+                error('dome_pc:mount:check_need_flip:no_pier_side', 'Mount cannot find PierSide for this object!');
             end
             
             val = ~strcmp(obj.pier_side, obj.obj_pier_side);
@@ -1305,7 +1305,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             end
             
             if isempty(obj.object.RA) || isempty(obj.object.Dec) 
-                error('Please provide a target with viable RA/DE');
+                error('dome_pc:mount:slew:bad_coordinates', 'Please provide a target with viable RA/DE');
             end
             
             if input.ask_flip && obj.check_need_flip && obj.use_ask_flip
@@ -1320,7 +1320,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             try % do the actual slews
                 
                 if ~obj.check_before_slew
-                    error('Prechecks failed, aborting slew');
+                    error('dome_pc:mount:slew:prechecks_failed', 'Prechecks failed, aborting slew');
                 end
                 
                 on_cleanup = onCleanup(@() obj.after_slew(input)); % make sure these things happen in any way the function is finished (error, return statement, ctrl+C, or normaly done)
@@ -1437,7 +1437,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             try 
 
                 if input.altitude<obj.limit_alt
-                    error('Input altitude is below limit of %f degress', obj.limit_alt);
+                    error('dome_pc:mount:engineering_slew:low_altitude', 'Input altitude is below limit of %f degress', obj.limit_alt);
                 end
                 
                 on_cleanup = onCleanup(@() obj.after_slew(input));
@@ -1798,7 +1798,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     delete(obj.owner.gui.fig.fig)
                 end
                 
-                error('Critical error: new pier_side "%s" is different than pier side before sync ("%s"). This can cause a telescope crash!', new_side, current_side); 
+                error('dome_pc:mount:sync:pier_flip', 'Critical error: new pier_side "%s" is different than pier side before sync ("%s"). This can cause a telescope crash!', new_side, current_side); 
                 
             end
             

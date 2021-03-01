@@ -132,7 +132,7 @@ classdef SensorChecker < handle
                 
             else
                 
-                error('Must supply a "Manager" object to StatusChecker constructor...');
+                error('dome_pc:checker:constructor:no_manager', 'Must supply a "Manager" object to StatusChecker constructor...');
 
             end
             
@@ -141,7 +141,7 @@ classdef SensorChecker < handle
         function connect(obj)
             
             if isempty(obj.owner)
-                error('Must supply a top-level object as owner of StatusChecker!');
+                error('dome_pc:checker:connect:no_manager', 'Must supply a top-level object as owner of StatusChecker!');
             end
             
             obj.reset;
@@ -588,7 +588,7 @@ classdef SensorChecker < handle
                 end
                 
             else
-                error('Cannot find "%s" struct in SensorChecker!', type); 
+                error('dome_pc:checker:collect:missing_struct', 'Cannot find "%s" struct in SensorChecker!', type); 
             end
             
         end
@@ -666,7 +666,7 @@ classdef SensorChecker < handle
                 end
                 
             else
-                error('Cannot find "%s" struct in SensorChecker!', type); 
+                error('dome_pc:checker:check_value:missing_struct', 'Cannot find "%s" struct in SensorChecker!', type); 
             end
             
         end

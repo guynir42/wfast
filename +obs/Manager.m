@@ -146,7 +146,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         need_full_open_dome = 0; % this is marked true when cam_pc is unable to find stars. When true, Manager skips adjusting the dome and just fully opens it. 
         
-        version = 1.06;
+        error_buffer; % a struct with info on recent errors from the timers, to decide if an email is needed
+        
+        version = 1.07;
         
     end
     
@@ -997,7 +999,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 
                     if isempty(obj.latest_error_response) && dt>30 % minutes
                         obj.latest_error_response = util.text.time2str(t); 
-                        obj.sendError(MException('Manager:cannotContactCamPC', 'It has been over 30 minutes without contact with cam-PC!')); 
+                        obj.inputToErrorBuffer(MException('Manager:cannotContactCamPC', 'It has been over 30 minutes without contact with cam-PC!')); 
                     end
 
                 end
@@ -1453,32 +1455,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function sendError(obj, ME, time)
-            
-            if nargin<3 || isempty(time)
-                time = util.text.time2str('now'); 
-            end
-            
-            if isa(time, 'datetime')
-                time = util.text.time2str(time); 
-            end
-            
-            if ischar(ME)
-                subject = ME; 
-                str = ME; 
-            else
-                subject = [ME.getReport('basic', 'hyperlinks', 'off') ' at ' time];
-                str = ME.getReport('extended', 'hyperlinks', 'off');
-            end
-            
-            c = strsplit(subject, newline); 
-            subject = strjoin(c, '... '); 
-%             subject = c{end}; % only get the last line as subject...
-
-            obj.sendToObserver(subject, str, true); % last argument is to also send a telegram
-            
-        end
-        
         function sendTelegram(obj, name, subject)
             
             if obj.debug_bit, fprintf('Sending telegram to %s with subject: %s\n', name, subject); end
@@ -1521,6 +1497,103 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 
             if ~isempty(id)
                 util.sys.telegram(token, id, subject); % maybe send another message with the full text?? 
+            end
+            
+        end
+        
+        function sendError(obj, ME, time)
+            
+            if nargin<3 || isempty(time)
+                time = util.text.time2str('now'); 
+            end
+            
+            if isa(time, 'datetime')
+                time = util.text.time2str(time); 
+            end
+            
+            if ischar(ME)
+                subject = ME; 
+                str = ME; 
+            else
+                subject = [ME.getReport('basic', 'hyperlinks', 'off') ' at ' time];
+                str = ME.getReport('extended', 'hyperlinks', 'off');
+            end
+            
+            c = strsplit(subject, newline); 
+            subject = strjoin(c, '... '); 
+
+            obj.sendToObserver(subject, str, true); % last argument is to also send a telegram
+            
+        end
+        
+        function inputToErrorBuffer(obj, ME, time)
+            
+            if nargin<3 || isempty(time)
+                time = datetime('now', 'TimeZone', 'UTC'); 
+            end
+            
+            if isempty(ME.identifier) % there's not much we can do without an identifier! 
+                fprintf('Cannot buffer this error, without an identifier: %s\n', ME.getReport('extended', 'hyperlinks', 'off')); 
+                obj.sendError(ME, time); 
+                return; % don't add this error to the buffer, without an identifier it is meaningless! 
+            end
+            
+            if strcmp(ME.identifier, 'example:some:exception:with:three:tries')
+                N = 3; % give this error three tries in each 12 hour period, before sending an email/telegram
+            elseif strcmp(ME.identifier, 'cam_pc:acquisition:astrometry:no_solution')
+                N = 2;
+            elseif strcmp(ME.identifier, 'cam_pc:acquisition:focus:no_stars')
+                N = 2;
+            elseif strcmp(ME.identifier, 'cam_pc:acquisition:focus:few_stars')
+                N = 2;
+            elseif strcmp(ME.identifier, 'cam_pc:acquisition:find_stars:no_stars')
+                N = 1;
+            elseif strcmp(ME.identifier, 'cam_pc:acquisition:find_stars:few_stars')
+                N = 2;
+            elseif strcmp(ME.identifier, 'cam_pc:acquisition:focus:no_good_point')
+                N = 2;
+            else
+                N = 1; % it only takes a single error to trigger an email/telegram for most error types
+            end
+            
+            idx = []; 
+            if ~isempty(obj.error_buffer) % check if this error was already recorded
+                idx = find(strcmp(ME.identifier, {obj.error_buffer.identifier}),1,'first'); 
+            end
+            
+            if isempty(idx) % this error has not yet been logged
+                
+                new_err.identifier = ME.identifier;
+                new_err.time = time;
+                new_err.text = ME.getReport('extended', 'hyperlinks', 'off');
+                new_err.count = 1;
+                new_err.total = 1; 
+                
+                if isempty(obj.error_buffer)
+                    obj.error_buffer = new_err; 
+                    idx = 1;
+                else
+                    obj.error_buffer = vertcat(obj.error_buffer, new_err); 
+                    idx = length(obj.error_buffer); 
+                end
+                
+            else % error exists, must decide what to do about it
+                
+                dt = hours(time - obj.error_buffer(idx).time); 
+                if dt>12
+                    obj.error_buffer(idx).count = 0; % forget about any errors raised more than 12 hours ago! 
+                end
+                
+                obj.error_buffer(idx).time = time; 
+                obj.error_buffer(idx).text = ME.getReport('extended', 'hyperlinks', 'off');
+                obj.error_buffer(idx).count = obj.error_buffer(idx).count + 1;
+                obj.error_buffer(idx).total = obj.error_buffer(idx).total + 1; 
+                
+            end
+            
+            if obj.error_buffer(idx).count>=N % there were enough recent errors to trigger an email/telegram
+                obj.sendError(ME, time); 
+                obj.error_buffer(idx).count = 0; % once an email is sent, reset the counter
             end
             
         end
@@ -1862,7 +1935,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                         obj.print_message(sprintf('Reporting error from cam-PC: %s. Sending email is %d...', obj.error_report, ~skip_report_error), 1); % report this as an error...
 
                         if skip_report_error==0
-                            obj.sendError(obj.cam_pc.incoming.error, obj.cam_pc.incoming.err_time); 
+                            obj.inputToErrorBuffer(obj.cam_pc.incoming.error, obj.cam_pc.incoming.err_time); 
                         end
                         
                         % If we sent a report or not, we must log this time
@@ -2044,9 +2117,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
             catch ME
                 obj.print_message(ME.getReport('extended', 'hyperlinks', 'off'), 1); % log the error to text file, show it in terminal and GUI
-%                 obj.log.error(ME.getReport('extended', 'hyperlinks', 'off')); 
-%                 if obj.gui.check, obj.gui.button_info.String = obj.log.report; end
-                obj.sendError(ME); % send email and telegram
+                obj.inputToErrorBuffer(ME); % send email and telegram
                 rethrow(ME); 
             end
             
@@ -2223,7 +2294,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 success = obj.mount.slew;
 
                 if success==0
-                    error('Could not successfully slew to target...'); 
+                    error('dome_pc:manager:slew:unsuccessful', 'Could not successfully slew to target...'); 
                 end
 
                 % see if this target requires tracking to be on

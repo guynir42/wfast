@@ -388,7 +388,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 EquationOfEquinox = 3600.*nut_long.*cosd(Obl)./15; % convert to time seconds
                 val = val + EquationOfEquinox./86400; % convert to fractions of day
             else
-                error('Unknown sidereal_time_type. Use "mean" or "apparent"'); 
+                error('head:ephemeris:lst:unknown_type', 'Unknown sidereal_time_type. Use "mean" or "apparent"'); 
             end
 
             val = val.*360; % convert to degrees
@@ -714,7 +714,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             elseif ischar(val)
                 obj.RA_deg = obj.hour2deg(val);
             else
-                error('Input a string RA in HH:MM:SS format or a scalar hour or a 3-vector [H,M,S]!');
+                error('head:ephemeris:set_ra:wrong_input', 'Input a string RA in HH:MM:SS format or a scalar hour or a 3-vector [H,M,S]!');
             end
             
             obj.RA_deg = mod(obj.RA_deg, 360); 
@@ -734,7 +734,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             elseif ischar(val)
                 obj.Dec_deg = obj.sex2deg(val);
             else
-                error('Input a string DEC in DD:MM:SS format or a scalar in degrees or a 3-vector [d,m,s]!');
+                error('head:ephemeris:set_dec:wrong_input', 'Input a string DEC in DD:MM:SS format or a scalar in degrees or a 3-vector [d,m,s]!');
             end
             
             obj.updateSecondaryCoords;
@@ -1052,7 +1052,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                     obj.Dec = DEC;
                     
                 else
-                    error('no name resolver has been found... try adding MAAT to the path.');
+                    error('head:ephemeris:resolve:no_name_resolver', 'No name resolver has been found... try adding MAAT to the path.');
                 end
             end
             
@@ -1170,7 +1170,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 min_HA = 0;
                 range_HA = 6;
             else
-                error('Unknown side/hemisphere option "%s". Choose "east", "west" or "both"', input.side); 
+                error('head:ephemeris:random:unknown_side', 'Unknown side/hemisphere option "%s". Choose "east", "west" or "both"', input.side); 
             end
             
             for ii = 1:100
@@ -1187,7 +1187,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 
             end
             
-            error('Could not find a random pointing inside observational bounds!'); 
+            error('head:ephemeris:random:no_available_point', 'Could not find a random pointing inside observational bounds!'); 
             
         end
         
@@ -1277,7 +1277,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             input.scan_vars(varargin{:}); 
             
             if isempty(other) || ~isa(other, 'head.Ephemeris') || obj==other
-                error('Must supply another Ephemeris object to this function!'); 
+                error('head:ephemeris:better_than:wrong_input', 'Must supply another Ephemeris object to this function!'); 
             end
             
             if obj==other
@@ -1300,7 +1300,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             end
             
             if obj.now_observing && other.now_observing
-                error('Cannot have two different Ephemeris objects with "now_observing" set to true!'); 
+                error('head:ephemeris:better_than:two_observing_objects', 'Cannot have two different Ephemeris objects with "now_observing" set to true!'); 
             elseif obj.now_observing % this object is now being observed, make it harder to switch
                 val = obj.AIRMASS<=other.AIRMASS + obj.constraints.threshold; 
             elseif other.now_observing % other object is now begin observed, make it easier to switch
@@ -1384,7 +1384,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 if cs(input.number, 'best')
                     input.number=[];
                 else
-                    error('Wrong input for number: "%s". Use "best" or a numeric value.', input.number);
+                    error('head:ephemeris:default_field:wrong_input', 'Wrong input for number: "%s". Use "best" or a numeric value.', input.number);
                 end
             end
             
@@ -1393,7 +1393,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             end
             
             if ~isempty(input.number) && (input.number<1 || input.number>obj.numberDefaultFields(type))
-                error('Requested field number %d is out of bounds for type %s (limited to %d fields).', input.number, type, obj.numberDefaultFields(type)); 
+                error('head:ephemeris:default_field:number_out_of_bounds', 'Requested field number %d is out of bounds for type %s (limited to %d fields).', input.number, type, obj.numberDefaultFields(type)); 
             end
             
             if cs(type, 'kbos', 'kuiper belt objects', 'ecliptic')
@@ -1404,7 +1404,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 s = obj.default_fields(strcmp({obj.default_fields.type}, 'galactic')); % get all the structs that fit this type of field
             % add other default field types...
             else
-                error('Unknown default field type "%s". Try "ecliptic"... ', type); 
+                error('head:ephemeris:default_field:unknown_name', 'Unknown default field type "%s". Try "ecliptic"... ', type); 
             end
             
             if isempty(input.number) % automatically choose the best field
@@ -1470,7 +1470,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 val = nnz(strcmp({obj.default_fields.type}, 'galactic'));
             % add other default field types...
             else
-                error('Unknown default field type "%s". Try "ecliptic"... ', type); 
+                error('head:ephemeris:num_default_fields:unknown_name', 'Unknown default field type "%s". Try "ecliptic"... ', type); 
             end
             
         end
@@ -1567,7 +1567,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             elseif cs(type, 'galactic')
                 type = 'galactic';
             else
-                error('Unknown default field type "%s". Try "ecliptic" or "galactic".', type);
+                error('head:ephemeris:print_default_fields:unknown_name', 'Unknown default field type "%s". Try "ecliptic" or "galactic".', type);
             end
             
             s = obj.default_fields;
@@ -1686,7 +1686,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             elseif isa(val, 'datetime')
                 time = val;
             else
-                error('Wrong type of input, class(val)= %s. Use string, numeric, or datetime values. ', class(val)); 
+                error('head:ephemeris:parse_time:wrong_input', 'Wrong type of input, class(val)= %s. Use string, numeric, or datetime values. ', class(val)); 
             end
             
         end
@@ -1882,7 +1882,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             end
             
             if minutes<0 || seconds<0
-                error('Why did we get negative minutes/seconds??');
+                error('head:ephemeris:numbers_sex:negative_time', 'Why did we get negative minutes/seconds??');
             end
             
             s = sign(degrees);
@@ -1931,7 +1931,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                         + 2.45.*U.^10)./3600;
 
                 otherwise
-                    error('Unknown calculation type in obliquity.m');
+                    error('head:ephemeris:obliquity:unknown_calculation', 'Unknown calculation type in obliquity.m');
             end
             
         end
