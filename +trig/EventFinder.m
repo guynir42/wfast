@@ -1289,8 +1289,8 @@ classdef EventFinder < handle
 
             if isnan(R(star_idx_global)) % no stellar radius known from GAIA, try to estimate it 
                 R_star = obj.estimateR(star_idx_global); 
-            elseif R(star_idx_global)>3 % do not simulate stars bigger than this 
-                R_star = 3; 
+            elseif R(star_idx_global)>obj.pars.sim_max_R % do not simulate stars bigger than this 
+                R_star = obj.pars.sim_max_R; 
             else
                 R_star = R(star_idx_global);
             end

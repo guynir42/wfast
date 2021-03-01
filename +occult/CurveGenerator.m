@@ -1109,7 +1109,7 @@ classdef CurveGenerator < handle
             
             t_run = tic;
             
-            obj.lc.pars.parse(varargin{:});
+%             obj.lc.pars.parse(varargin{:});
             
             obj.makeCoreCurves(obj.lc.pars.r, obj.lc.pars.R, true); % the last input is for "pairwise". We need to improve this to be "unique" also
             
@@ -1328,13 +1328,15 @@ classdef CurveGenerator < handle
             
             t_run = tic;
             
-            if obj.use_source_matrix
+            obj.lc.pars.parse(varargin{:});
+            
+            if obj.use_source_matrix && all(obj.R<=max(obj.source_R_axis)) &&  all(obj.r<=max(obj.source_r_axis))
                 
                 obj.getLightCurvesFromSource(varargin{:});
                 
             else
             
-                obj.lc.pars.parse(varargin{:});
+%                 obj.lc.pars.parse(varargin{:});
                 
                 % time axis, start & end points:
                 t_start = (-obj.W/2:1/obj.f:obj.W/2); % row vector
@@ -1359,7 +1361,7 @@ classdef CurveGenerator < handle
                         
                         high_res_lc = high_res_lc2 - high_res_lc + 1;
                         
-                    elseif obj.use_geometric && obj.R(ii)>obj.geometric_limit_R && obj.r(ii)>=obj.geometric_limit_r
+                    elseif obj.use_geometric && obj.R(ii)>obj.geometric_limit_R && obj.r(ii)>obj.geometric_limit_r
                         
                         high_res_lc = obj.geometricLightcurve(obj.r(ii), obj.R(ii), obj.b(ii)); 
                         high_res_lc = [flip(high_res_lc); high_res_lc(2:end)];
