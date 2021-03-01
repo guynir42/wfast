@@ -102,7 +102,7 @@ classdef Acquisition < file.AstroData
         use_dynamic_cutouts = 1; % use find_cosmic_rays to detect bleeps in the full data cube and assign cutouts to them
         num_dynamic_cutouts = 5; % how many additional cutouts we want
         
-        use_altitude_focus = 1;  % set an initial focus point based on the altitude 
+        use_altitude_focus = 0;  % set an initial focus point based on the altitude 
 %         alt_focus_coeffs = [1.15, 0.0255, -0.0001585]; % to improve these coeffs use the scripts/focus_survey.m script
         alt_focus_coeffs = [2.5, 0.0255, -0.0001585]; % to improve these coeffs use the scripts/focus_survey.m script
         
@@ -1488,7 +1488,7 @@ classdef Acquisition < file.AstroData
 
                 if N>0
 
-                    obj.cam.record('mode', 'flat', 'num_batches', N, 'batch_size', 100, 'frame_rate', 10, 'expT', 0.01); 
+                    obj.cam.record('mode', 'flat', 'num_batches', N, 'batch_size', 100, 'frame_rate', 10); 
 
                 else
                     success = 1;
@@ -1653,7 +1653,7 @@ classdef Acquisition < file.AstroData
                                 %                     widths = phot_struct.apertures_photometry.width;
                                 
 %                                 widths = util.img.fwhm(C-permute(B, [1,3,4,2]), 'method', 'filters', 'gauss', 5, 'min_size', 0.25, 'max_size', 25, 'step', 0.5)/2.355;
-                                widths = util.img.fwhm(C-permute(B, [1,3,4,2]), 'method', 'filters', 'defocus', 1, 'min_size', 0.25, 'max_size', 25, 'step', 0.25)/2.355;
+                                widths = util.img.fwhm(C-permute(B, [1,3,4,2]), 'method', 'filters', 'defocus', 1, 'generalized', 5, 'min_size', 0.25, 'max_size', 25, 'step', 0.25)/2.355;
 
                                 widths(widths>10 | widths<0.1) = NaN;
                                 

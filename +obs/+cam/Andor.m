@@ -432,9 +432,19 @@ classdef Andor < file.AstroData
 %             obj.focuser.tilt = 0.9;
             
             % updated at 20/10/2020 after adding skirt around focusers
-            obj.focuser.pos = 3.3;
-            obj.focuser.tip = 4.6;
-            obj.focuser.tilt = 1.2;
+%             obj.focuser.pos = 3.3;
+%             obj.focuser.tip = 4.6;
+%             obj.focuser.tilt = 1.2;
+
+            % updated at 25/02/2021 after replacing the focus system
+            obj.focuser.pos = 1.0;
+            obj.focuser.tip = 0.0;
+            obj.focuser.tilt = 0.0;
+            
+            % update at 26/02/2021 after focus system was fixed and ran some manual tests 
+            obj.focuser.pos = 1.25;
+            obj.focuser.tip = 0.8;
+            obj.focuser.tilt = -1.3;
             
         end
         
