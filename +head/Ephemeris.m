@@ -1211,7 +1211,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             if isempty(obj.RA) || isempty(obj.Dec), obj.unobservable_reason = 'No coordinates'; return; end
             
             t_start = obj.parseTime(input.earliest);
-            if ~isempty(input.earliest) && obj.time<t_start-minutes(input.fudge_time), obj.unobservable_reason = sprintf('Can''t observe before %2d:%2d', t_start.Hour, t_start.Minute); return; end % current time is too early
+            if ~isempty(input.earliest) 
+                if obj.time<t_start-minutes(input.fudge_time), obj.unobservable_reason = sprintf('Can''t observe before %2d:%2d', t_start.Hour, t_start.Minute); return; end
+            end % current time is too early
             
             t_end = obj.parseTime(input.latest);
             if ~isempty(input.latest) && obj.time>t_end+minutes(input.fudge_time), obj.unobservable_reason = sprintf('Can''t observe after %2d:%2d', t_end.Hour, t_end.Minute); return; end % current time is too late
@@ -1644,8 +1646,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
 
                     if length(c)==1 && isempty(idx) % no date is given, use today's date
 
-                        time = datetime(val);
-                    
+%                         time = datetime(val, 'TimeZone', 'UTC');
+                        time = []; 
                     elseif ~isempty(idx) % split using the 'T' separator
 
                         time = datetime(val(1:idx-1), 'TimeZone', 'UTC'); % get the date
@@ -1663,17 +1665,19 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                     if length(c)>2, h = h + str2double(c{3})/3600; end % we also got seconds
 
                     if isempty(time) % automatically choose the time based on the hour of day
+                        
                         if h>=12
                             time = datetime('today', 'TimeZone', 'UTC'); 
                         else
                             time = datetime('today', 'TimeZone', 'UTC') + days(1);  
                         end
+                        
                     end
 
                     if ~isempty(h) && ~isnan(h)
                         time = time + hours(h); % add the hours to the required date. 
                     end
-                
+
                 catch ME
                     if strcmp(ME.identifier, 'MATLAB:datetime:UnrecognizedDateStringSuggestLocale') && contains(ME.message, 'NaN')
                         time = NaT;
