@@ -261,8 +261,12 @@ classdef Acquisition < file.AstroData
         default_cut_size_bg;
         
         slow_mode_expT = 3;
-        slow_mode_frame_rate = 1/3.01; % a little bit lower than 1/3
+        slow_mode_frame_rate = 1/3.0005; % a little bit lower than 1/3
         slow_mode_batch_size = 1;
+        
+        medium_mode_expT = 0.0995; 
+        medium_mode_frame_rate = 10;
+        medium_mode_batch_size = 100; 
         
         fast_mode_expT = 0.0395;
         fast_mode_frame_rate = 25;
@@ -1247,6 +1251,16 @@ classdef Acquisition < file.AstroData
             
         end
         
+        function setupMediumMode(obj)
+            
+            obj.expT = obj.medium_mode_expT;
+            obj.frame_rate = obj.medium_mode_frame_rate;
+            obj.batch_size = obj.medium_mode_batch_size;
+            
+            obj.total_runtime = obj.total_runtime; % this triggers the setter and updates num_batches
+            
+        end
+        
         function setupFastMode(obj)
             
             obj.expT = obj.fast_mode_expT;
@@ -1675,6 +1689,7 @@ classdef Acquisition < file.AstroData
                             obj.cam.af.fitSurface;
                             obj.cam.af.findPosTipTilt;
                             obj.cam.af.plot;
+                            obj.cam.af.showCutout;
                             
                             if ~isempty(obj.cam.af.gui)
                                 obj.cam.af.gui.update;
@@ -2198,8 +2213,12 @@ classdef Acquisition < file.AstroData
                         
                         if cs(input.mode, 'fast')
                             obj.setupFastMode;
+                        elseif cs(input.mode, 'medium')
+                            obj.setupMediumMode; 
                         elseif cs(input.mode, 'slow')
                             obj.setupSlowMode;
+                        elseif regexpi(input.mode, '\d+\s?[Hz|s]')
+                            obj.parseExposureMode(input.mode); 
                         end
                         
                         if ~isempty(input.exp_time)
@@ -2252,6 +2271,23 @@ classdef Acquisition < file.AstroData
                 rethrow(ME); 
             end
 
+            
+        end
+        
+        function parseExposureMode(obj, str)
+            
+            if regexpi(str, '\d+\s?[Hz]')
+                f = sscanf(str, '%f'); 
+                T = 1./f - 0.0005; 
+            elseif regexpi(str, '\d+\s?[s]')
+                T = sscanf(str, '%f'); 
+                f = 1./(T + 0.0005); 
+            else
+                T = 0;
+                f = 0;
+            end
+            
+            fprintf('T= %f | f= %f\n', T, f); 
             
         end
         
@@ -3789,6 +3825,15 @@ classdef Acquisition < file.AstroData
             val = val && ~isempty(obj.expT) && obj.expT==obj.slow_mode_expT;
             val = val && ~isempty(obj.frame_rate) && obj.frame_rate==obj.slow_mode_frame_rate;
             val = val && ~isempty(obj.batch_size) && obj.batch_size==obj.slow_mode_batch_size;
+            
+        end
+        
+        function val = is_medium_mode(obj)
+            
+            val = true;
+            val = val && ~isempty(obj.expT) && obj.expT==obj.medium_mode_expT;
+            val = val && ~isempty(obj.frame_rate) && obj.frame_rate==obj.medium_mode_frame_rate;
+            val = val && ~isempty(obj.batch_size) && obj.batch_size==obj.medium_mode_batch_size;
             
         end
         

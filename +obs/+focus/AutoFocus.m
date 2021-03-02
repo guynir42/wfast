@@ -86,7 +86,7 @@ classdef AutoFocus < handle
     
     properties(Dependent=true)
         
-        
+        best_index; % index of best position (closest to found_pos)
         
     end
     
@@ -160,6 +160,16 @@ classdef AutoFocus < handle
             if obj.use_fit_curves && ~isempty(obj.fit_results)
                 coeffs = [obj.fit_results.coeffs];
                 val = val | coeffs(3,:)'<0; % add fits for parabolas without a minimum
+            end
+            
+        end
+        
+        function val = get.best_index(obj)
+            
+            if isempty(obj.found_pos)
+                val = [];
+            else
+                [~, val] = nanmin(abs(obj.found_pos - obj.pos)); 
             end
             
         end
@@ -500,6 +510,7 @@ classdef AutoFocus < handle
         function showCutout(obj, varargin)
             
             input = util.text.InputVars;
+            input.input_var('position', []); % which position to show (default is best, if it doesn't exist, shows the latest)
             input.input_var('font_size', 20); 
             input.input_var('ax', [], 'axes', 'axis'); 
             input.scan_vars(varargin{:}); 
@@ -516,10 +527,38 @@ classdef AutoFocus < handle
                 end
             end
             
-            util.plot.show(obj.cutouts(:,:,obj.index,obj.star_idx), 'ax', input.ax, 'autodyn', 1, 'fancy', 'off'); 
+            if ~isempty(obj.found_pos) % default is best position, if it exists
+                idx = obj.best_index; 
+            else
+                idx = obj.index; % otherwise take latest position 
+            end
             
-            util.plot.inner_title(sprintf('weight= %4.2f', nanmean(obj.weights(obj.star_idx,:),2)), 'Position', 'Top', 'Color', 'white', 'ax', input.ax); 
+            if ~isempty(input.position) % override the default position with user input
+                
+                if ischar(input.position) 
+                    if util.text.cs(input.position, 'best')
+                        idx = obj.best_index;                         
+                    elseif util.text.cs(input.position, 'latest')
+                        idx = obj.index;
+                    else
+                        error('cam_pc:autofocus:show_cutouts:wrong_position_name', ...
+                            'Unknown position option "%s". Use "best" or "latest" or a numeric value.', input.position); 
+                    end
+                else
+                    [~,idx] = nanmin(abs(obj.pos - input.position)); % find the index closest to the required position
+                end
+                
+            end
             
+            if ~isempty(idx)
+            
+                util.plot.show(obj.cutouts(:,:,idx,obj.star_idx), 'ax', input.ax, 'autodyn', 1, 'fancy', 'off'); 
+                util.plot.inner_title(sprintf('pos= %4.2f idx= %d', obj.pos(idx), idx), 'Position', 'Top', 'Color', 'white', 'ax', input.ax, 'FontSize', 12); 
+                util.plot.inner_title(sprintf('weight= %4.2f', nanmean(obj.weights(obj.star_idx,:),2)), 'Position', 'Bottom', 'Color', 'white', 'ax', input.ax, 'FontSize', 12); 
+                
+                
+            end
+                
         end
         
         function show(obj, varargin)

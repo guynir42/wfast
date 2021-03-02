@@ -208,8 +208,9 @@ classdef AcqGUI < handle
             
             obj.panel_controls.addButton('input_runtime', 'total_runtime', 'input', 'run time= ', '', '', 0.6, '', '', 'Total time for the next run (in minutes)');
             obj.panel_controls.addButton('chooser_units', '', 'custom', '', '', 'small', 0.4); 
-            obj.panel_controls.addButton('button_slow_mode', 'setupSlowMode', 'push', 'Slow mode', '', '', 0.5, '', '', 'Setup low-cadence observations with T=3s, single image files, 500 stars max');
-            obj.panel_controls.addButton('button_fast_mode', 'setupFastMode', 'push', 'Fast mode', '', '', 0.5, '', '', 'Setup high-cadence observations with T=30ms, f=25Hz, 100 images per batch/file');
+            obj.panel_controls.addButton('button_slow_mode', 'setupSlowMode', 'push', 'Slow', '', '', 1/3, '', '', 'Setup low-cadence observations with T=3s, single image files, 500 stars max');
+            obj.panel_controls.addButton('button_medium_mode', 'setupMediumMode', 'push', 'Medium', '', '', 1/3, '', '', 'Setup medium-cadence observations with T=98ms, f=10Hz, 100 images per batch/file');
+            obj.panel_controls.addButton('button_fast_mode', 'setupFastMode', 'push', 'Fast', '', '', 1/3, '', '', 'Setup high-cadence observations with T=30ms, f=25Hz, 100 images per batch/file');
             obj.panel_controls.addButton('button_single', 'single', 'push', 'Take single batch', '', '', [], '', '', 'Take a single image and show it on screen. Does not save the image to file');
             obj.panel_controls.addButton('button_live', 'startLiveView', 'push', 'Camera GUI: Live view', '', '', [], '', '', 'Open the camera GUI and start the live-view video mode. Does not save any images to file');
             obj.panel_controls.addButton('button_auto_focus', 'runFocus', 'push', 'Autofocus iterations', '', '', 0.7, '', '', 'Start am iterative focus-run. Will stop when good focus is reached');
@@ -342,19 +343,41 @@ classdef AcqGUI < handle
             obj.panel_contrast.update;
             
             if obj.owner.is_slow_mode
+                
                 obj.panel_controls.button_slow_mode.ForegroundColor = obj.color_on;
-                obj.panel_controls.button_fast_mode.ForegroundColor = 'black';                
+                obj.panel_controls.button_medium_mode.ForegroundColor = 'black';
+                obj.panel_controls.button_fast_mode.ForegroundColor = 'black';
+                
                 obj.panel_controls.button_slow_mode.BackgroundColor = obj.panel_controls.button_slow_mode.default_color;
+                obj.panel_controls.button_medium_mode.BackgroundColor = obj.panel_controls.button_fast_mode.default_color;
                 obj.panel_controls.button_fast_mode.BackgroundColor = obj.panel_controls.button_fast_mode.default_color;
-            elseif obj.owner.is_fast_mode
-                obj.panel_controls.button_fast_mode.ForegroundColor = obj.color_on;
-                obj.panel_controls.button_slow_mode.ForegroundColor = 'black';
-                obj.panel_controls.button_slow_mode.BackgroundColor = obj.panel_controls.button_slow_mode.default_color;
-                obj.panel_controls.button_fast_mode.BackgroundColor = obj.panel_controls.button_fast_mode.default_color;
-            else
+                
+            elseif obj.owner.is_medium_mode
+                
+                obj.panel_controls.button_medium_mode.ForegroundColor = obj.color_on;
                 obj.panel_controls.button_slow_mode.ForegroundColor = 'black';
                 obj.panel_controls.button_fast_mode.ForegroundColor = 'black';
+                
+                obj.panel_controls.button_slow_mode.BackgroundColor = obj.panel_controls.button_slow_mode.default_color;
+                obj.panel_controls.button_medium_mode.BackgroundColor = obj.panel_controls.button_fast_mode.default_color;
+                obj.panel_controls.button_fast_mode.BackgroundColor = obj.panel_controls.button_fast_mode.default_color;
+                
+            elseif obj.owner.is_fast_mode
+                
+                obj.panel_controls.button_fast_mode.ForegroundColor = obj.color_on;
+                obj.panel_controls.button_slow_mode.ForegroundColor = 'black';
+                obj.panel_controls.button_medium_mode.ForegroundColor = 'black';
+                
+                obj.panel_controls.button_slow_mode.BackgroundColor = obj.panel_controls.button_slow_mode.default_color;
+                obj.panel_controls.button_medium_mode.BackgroundColor = obj.panel_controls.button_fast_mode.default_color;
+                obj.panel_controls.button_fast_mode.BackgroundColor = obj.panel_controls.button_fast_mode.default_color;
+                
+            else
+                obj.panel_controls.button_slow_mode.ForegroundColor = 'black';
+                obj.panel_controls.button_medium_mode.ForegroundColor = 'black';
+                obj.panel_controls.button_fast_mode.ForegroundColor = 'black';
                 obj.panel_controls.button_slow_mode.BackgroundColor = 'red';
+                obj.panel_controls.button_medium_mode.BackgroundColor = 'red';
                 obj.panel_controls.button_fast_mode.BackgroundColor = 'red';
             end
             
