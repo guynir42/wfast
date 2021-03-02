@@ -27,6 +27,13 @@ end
 %% % make an HR diagram
 % ref: https://gea.esac.esa.int/archive/documentation/GDR2/Gaia_archive/chap_datamodel/sec_dm_main_tables/ssec_dm_gaia_source.html
 
+f1 = util.plot.FigHandler('HR diagram'); 
+f1.clear;
+f1.width = 16;
+f1.height = 16; 
+
+ax = axes('Parent', f1.fig); 
+
 N = length(files);
 % N = 100; 
 
@@ -43,6 +50,10 @@ edges_c = linspace(-5, 10, nbins_c+1);
 
 HR = zeros(nbins_g, nbins_c); 
 
+catalog = table.empty; 
+
+e = head.Ephemeris; 
+
 for ii = 1:N 
         
     info = h5info(files{ii}); 
@@ -57,6 +68,17 @@ for ii = 1:N
         
         D = h5read(files{ii}, ['/' name]); 
         
+        RA = D(:,1).*180/pi; 
+        Dec = D(:,2).*180/pi; 
+        
+        e.RA_deg = RA(1); 
+        e.Dec_deg = Dec(1); 
+        e.update;
+        
+        if abs(e.GAL_lat) < 10 && abs(e.GAL_lon)<10
+            break; % don't load any files with datasets close to galactic bulge
+        end
+        
         plx = D(:,cols_names.Plx); 
         plx_err = D(:,cols_names.ErrPlx);
         color = D(:,cols_names.Mag_BP) - D(:,cols_names.Mag_RP); 
@@ -64,7 +86,7 @@ for ii = 1:N
         A_G = D(:, cols_names.A_G); 
         exc_noise = D(:,cols_names.ExcessNoiseSig); 
         
-        plx(plx<=plx_err) = NaN; % must see a significantly positive parallax 
+        plx(plx<=plx_err | plx<20) = NaN; % must see a significantly positive parallax 
         plx(exc_noise>2) = NaN; % remove bad measurements
         
         A_G(isnan(A_G)) = 0; % if no extinction is given, assume zero
@@ -77,9 +99,25 @@ for ii = 1:N
         
         HR = HR + counts; 
         
+        new_array = [RA, Dec, plx, plx_err, exc_noise, A_G, mag, color, abs_mag]; 
+        new_array(isnan(new_array(:,end)),:) = []; % remove NaN values
+        
+        new_table = array2table(new_array); 
+        new_table.Properties.VariableNames = {'RA', 'Dec', 'plx', 'plx_err', 'exc_noise', 'A_G', 'mag', 'color', 'abs_mag'}; 
+        
+        catalog = vertcat(catalog, new_table); 
+        
     end
     
     if N>100, prog.showif(ii); end
+    
+    util.plot.show(HR, 'ax', ax, 'xvalues', edges_c(1:end-1), edges_g(1:end-1)); 
+
+    xlabel(ax, 'Color (Bp-Rp)'); 
+    ylabel(ax, 'Abs. Mag G'); 
+    title(ax, sprintf('file num= %d/%d', ii, N)); 
+    axis square;
+    drawnow; 
     
 end
 
@@ -125,7 +163,7 @@ end
 
 %% Try a regional max approach
 
-b = 5; % bin size 
+b = 10; % bin size 
 threshold = 10; 
 
 S = struct; 
@@ -158,12 +196,12 @@ end
 
 %% plot the diagram 
 
-f1 = util.plot.FigHandler('HR diagram'); 
-f1.clear;
-f1.width = 16;
-f1.height = 22; 
+f2 = util.plot.FigHandler('HR density'); 
+f2.clear;
+f2.width = 16;
+f2.height = 22; 
 
-ax = axes('Parent', f1.fig); 
+ax = axes('Parent', f2.fig); 
 
 % util.plot.show(HR_sig, 'yvalues', mag_ax(rows), 'xvalues', col_ax(cols), 'ax', ax, 'auto', 1);
 

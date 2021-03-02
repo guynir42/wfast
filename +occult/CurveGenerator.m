@@ -805,7 +805,9 @@ classdef CurveGenerator < handle
             input.input_var('limb_darkening', false, 'dark');
             input.input_var('show', false);
             input.input_var('ax', [], 'axis', 'axes');
+            input.input_var('radius', []); 
             input.input_var('delay', 0.3);
+            input.input_var('font_size', 18); 
             input.input_var('width', []);
             input.scan_vars(varargin{:});
             
@@ -838,9 +840,13 @@ classdef CurveGenerator < handle
                         star = util.shapes.ellipse(star_pix_radius(ii), 'norm', 1); 
                     end
 
-                    flux_map_conv = util.img.conv_f(star, flux_map, 'crop', 'same', 'conj', 1);
+                    flux_map_conv = util.img.conv_f(star, ...
+                        util.img.pad2size(flux_map, size(flux_map)+star_pix_radius(ii), 1), ...
+                        'crop', 'same', 'conj', 1);
+                    
+                    flux_map_conv = util.img.crop2size(flux_map_conv, size(flux_map)); 
 
-                    flux_conv = flux_map_conv(y_c:end-y_c,x_c); 
+                    flux_conv = flux_map_conv(y_c:end-floor(star_pix_radius(ii)/2),x_c); 
                     
                 else
                     flux_conv = flux;
@@ -855,11 +861,23 @@ classdef CurveGenerator < handle
                         input.ax = gca;
                     end
                     
-                    plot(input.ax, flux);
+                    h_r = plot(input.ax, flux);
+                    if isempty(input.radius)
+                        h_r.DisplayName = sprintf('point source'); 
+                    else
+                        h_r.DisplayName = sprintf('point source, r= %4.2f', input.radius); 
+                    end
+                    
                     hold(input.ax, 'on');
-                    plot(input.ax, flux_out(:,:,ii));
+                    h_R = plot(input.ax, flux_out(:,:,ii));
+                    h_R.DisplayName = sprintf('convolved R= %4.2f', star_R(ii)); 
+                    
                     hold(input.ax, 'off');
 
+                    input.ax.FontSize = input.font_size; 
+                    
+                    legend(input.ax); 
+                    
                     pause(input.delay);
                     
                 end
@@ -868,19 +886,19 @@ classdef CurveGenerator < handle
             
         end
         
-        function [M, r_axis, a_axis] = makeSourceMatrix(obj, r_axis, R_axis, a_axis)
+        function [M, r_axis, a_axis] = makeSourceMatrix(obj, r_axis, R_axis, a_axis, varargin)
             % stolen shamelessly from Eran's fresnel_occultation_ps.m
             
             if nargin<2 || isempty(r_axis)
-                r_axis = 0.1:0.01:3;
+                r_axis = 0.1:0.1:3;
             end
             
             if nargin<3 || isempty(R_axis)
-                R_axis = 0:0.01:2;
+                R_axis = 0:0.25:10;
             end
             
             if nargin<4 || isempty(a_axis)
-                a_axis = 0:0.001:10;
+                a_axis = 0:0.0025:35;
             end
             
             % verify that r_axis is row vector
@@ -922,7 +940,7 @@ classdef CurveGenerator < handle
                 
                 M(:,ii,1) = M_temp;
                                    
-                M(:,ii,2:NR) = obj.makeNonPointSource(M_temp, R_axis(2:NR));
+                M(:,ii,2:NR) = obj.makeNonPointSource(M_temp, R_axis(2:NR), 'radius', r_axis(ii), varargin{:});
                 
                 if obj.debug_bit
                     prog.showif(ii); 
@@ -961,12 +979,12 @@ classdef CurveGenerator < handle
             
             if nargin<2 || isempty(filename)
                 d = fileparts(mfilename('fullpath'));
-                if exist(fullfile(d, 'source_oort.mat'), 'file')
-                    filename = fullfile(d, 'source_oort.mat');
-                elseif exist('source_oort.mat', 'file')
-                    filename = 'source_oort.mat';
-                elseif exist(fullfile(getenv('DATA'), 'WFAST/occultations/source_oort.mat'), 'file')
-                    filename = fullfile(getenv('DATA'), 'WFAST/occultations/source_oort.mat');
+                if exist(fullfile(d, 'source_full.mat'), 'file')
+                    filename = fullfile(d, 'source_full.mat');
+                elseif exist('source_full.mat', 'file')
+                    filename = 'source_full.mat';
+                elseif exist(fullfile(getenv('DATA'), 'WFAST/occultations/source_full.mat'), 'file')
+                    filename = fullfile(getenv('DATA'), 'WFAST/occultations/source_full.mat');
                 else
                     warning('cannot find the source matrix. Use loadSourceMatrix(filename) or makeSourceMatrix');
                     return; 
@@ -975,15 +993,10 @@ classdef CurveGenerator < handle
             
             load_obj = load(filename);
             
-            M = load_obj.matrix;
-            r_axis = load_obj.r_axis;
-            a_axis = load_obj.a_axis;
-            R_axis = load_obj.R_axis;
-                      
-            obj.source_matrix = M;
-            obj.source_r_axis = r_axis;
-            obj.source_a_axis = a_axis;     
-            obj.source_R_axis = R_axis;
+            obj.source_matrix = load_obj.matrix;
+            obj.source_a_axis = load_obj.a_axis;
+            obj.source_r_axis = load_obj.r_axis;
+            obj.source_R_axis = load_obj.R_axis;
                         
         end
            
@@ -1330,7 +1343,7 @@ classdef CurveGenerator < handle
             
             obj.lc.pars.parse(varargin{:});
             
-            if obj.use_source_matrix && all(obj.R<=max(obj.source_R_axis)) &&  all(obj.r<=max(obj.source_r_axis))
+            if obj.use_source_matrix && all(obj.R<=max(obj.source_R_axis)) && all(obj.r<=max(obj.source_r_axis))
                 
                 obj.getLightCurvesFromSource(varargin{:});
                 
