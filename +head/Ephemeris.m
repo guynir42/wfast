@@ -981,6 +981,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         % Usage: resolve(obj, [name])
         % Resolve the name given (default is obj.keyword) to find the RA/Dec.
         % If name is one of the following keywords: "ecliptic", "galactic",
+        % "moon", "antisolar", ... 
         % then the field is chosen using internal functions. 
         % (typically the best observable field is chosen based on the given
         % constraints of the object). 
@@ -1007,6 +1008,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 obj.updateMoon;
                 obj.RA = obj.moon.RA;
                 obj.Dec = obj.moon.Dec;
+            elseif cs(keyword, 'antisolar', 'anti-solar', 'earth shadow', 'earths shadow')
+                obj.keyword = 'antisolar';
+                obj.updateSun;
+                [obj.RA_deg, obj.Dec_deg] = obj.getAntiSolarPoint; 
             else
                 
                 obj.keyword = keyword;
@@ -1227,7 +1232,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             if obj.ALT_deg<input.altitude, obj.unobservable_reason = sprintf('Alt= %d<%d', round(obj.ALT_deg), round(input.altitude)); return; end % altitude is below defined limit
             
-            if isempty(obj.AIRMASS) || isnan(obj.AIRMASS) || obj.AIRMASS>input.airmass, obj.unobservable_reason = 'Undefined airmass'; return; end % airmass is undefined or above limit
+            if isempty(obj.AIRMASS) || isnan(obj.AIRMASS), obj.unobservable_reason = 'Undefined airmass'; return; end % airmass is undefined 
+            
+            if obj.AIRMASS>input.airmass, obj.unobservable_reason = sprintf('airmass=%4.2f>%4.2f', obj.AIRMASS, input.airmass); return; end % airmass is undefined
             
             % south limit!
             

@@ -550,7 +550,7 @@ classdef Scheduler < handle
                     
                     if e.getRuntimeMinutes + e.constraints.fudge_time < e.constraints.continuous*60
                         new_target = target_list(ii); % this target must be observed for some time before a new target can be observed... 
-                        obj.rationale = sprintf('%s: Target %s has been observed for only %d minutes! Continuing observations... ', time, new_target.name, floor(e.getRuntimeMinutes)); 
+                        obj.rationale = sprintf('%s: Target "%s" has been observed for only %d minutes! Continuing observations... ', time, new_target.name, floor(e.getRuntimeMinutes)); 
                         obj.continue_run = 1; % by default we do not need to continue the run, and will instead start a new one
                         break; % skip the other targets (assume there is only one target being observed at each time)
                     end
@@ -846,7 +846,12 @@ classdef Scheduler < handle
             
             obj.brake_bit = 0; % start running
             
-            if use_reset % only start a new simulation if requested specifically to do so... 
+            if ~isempty(obj.gui)
+                obj.gui.update(1); % the argument is for use_sim=1 
+                obj.show('use_sim', 1); 
+            end
+            
+            if use_reset % only start a new simulation if requested specifically to do so...
                 
                 obj.sim_time = start_time; % this is the virtual clock we will use throughout
                 obj.reset(1); % start a new night (the argument is for use_sim=1)
@@ -875,6 +880,11 @@ classdef Scheduler < handle
                 if obj.debug_bit>1, disp(obj.report); end
 
                 obj.current_side_sim = obj.sim_starting_side; % simulations will start with telescope on this side
+
+                if ~isempty(obj.gui)
+                    obj.gui.update(1); % the argument is for use_sim=1 
+                    obj.show('use_sim', 1); 
+                end
 
             end
             
