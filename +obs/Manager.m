@@ -753,6 +753,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.stop_t1; 
             obj.stop_t0;
             
+            stop(obj.mount.timer);
+            stop(obj.dome.timer); 
+            
         end
         
         function start_timers(obj) % start all timers

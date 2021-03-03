@@ -379,10 +379,14 @@ classdef Scheduler < handle
             
         end
         
-        function record_rationale(obj, time, target_list, new_target, dur_flag)
+        function record_rationale(obj, time, target_list, new_target, dur_flag, spd_flag)
             
             if nargin<5 || isempty(dur_flag)
                 dur_flag = true(length(target_list),1); 
+            end
+            
+            if nargin<6 || isempty(spd_flag)
+                spd_flag = true(length(target_list),1); 
             end
             
             if isa(time, 'datetime')
@@ -397,6 +401,8 @@ classdef Scheduler < handle
 
                 if ~dur_flag(ii) 
                     new_str = sprintf('%s (Duration exceeded)', new_str);
+                elseif ~spd_flag(ii)
+                    new_str = sprintf('%s (Spread too soon)', new_str);
                 elseif ~isempty(target_list(ii).ephem.unobservable_reason) % ephem object already recorded why we can't observe this
                     new_str = sprintf('%s (%s)', new_str, target_list(ii).ephem.unobservable_reason);
                 else % target is observable, should choose it based on priority and airmass
@@ -566,7 +572,8 @@ classdef Scheduler < handle
                 end
 
                 dur_flag = true(length(target_list),1); % indices of the targets that meet the duration prerequisite
-
+                spd_flag = true(length(target_list),1); % indices of the targets that meet the spread prerequisite
+                
                 for ii = 1:length(target_list)
                     
                     e = target_list(ii).ephem; % shorthand
@@ -575,19 +582,26 @@ classdef Scheduler < handle
                         dur_flag(ii) = false; % flag as false targets that have been observed more than "duration"
                     end
                     
+                    if ~isempty(e.constraints.spread) && ~isempty(e.start_time) && ~isnat(e.start_time) && ...
+                            e.start_time + hours(e.constraints.spread) > e.time + minutes(e.constraints.fudge_time) 
+                        
+                        spd_flag(ii) = false; % flag as false targets that have been observed too recently to pass the "spread constraint
+                        
+                    end
+                    
                 end
 
-                target_list_duration = target_list(dur_flag); % narrow down to a subset of legal targets...
+                target_list_duration = target_list(dur_flag & spd_flag); % narrow down to a subset of legal targets...
                 
 %                 new_target = best_target(target_list_duration, 'time', time, arguments{:}); % try to find a good target under the "duration" constraint
                 new_target = best_target(target_list_duration, 'time', time); % try to find a good target under the "duration" constraint
 
-                if ~isempty(new_target) % we managed to find a good target below "duration" condition
-                    obj.record_rationale(time, target_list, new_target, dur_flag); % keep a record for each target why it was or wasn't picked
-                else % this happens if we didn't find any targets that haven't been observed "duration" hours -> choose a target that has surpassed the "duration" condition
+                if ~isempty(new_target) % we managed to find a good target under the "duration" and "spread" conditions
+                    obj.record_rationale(time, target_list, new_target, dur_flag, spd_flag); % keep a record for each target why it was or wasn't picked
+                else % this happens if we didn't find any targets that haven't passed both "duration" and "spread" -> choose a target while ignoring those conditions
                     
 %                     new_target = best_target(target_list(~dur_flag), 'time', time, arguments{:}); % run only the targets that have longer than duration
-                    new_target = best_target(target_list(~dur_flag), 'time', time); % run only the targets that have longer than duration
+                    new_target = best_target(target_list(~(dur_flag & spd_flag)), 'time', time); % run only the targets that failed the "duration" and "spread" conditions
 
                     if ~isempty(new_target) % we tried again to find a target, so maybe now "new_target" is no longer empty
                         obj.record_rationale(time, target_list, new_target); % keep a record for each target why it was or wasn't picked
@@ -609,7 +623,8 @@ classdef Scheduler < handle
             %%%%%% now we have made the selection of the best target, lets see what we can do with it %%%%%%% 
             if isempty(new_target) % no targets are currently observable! 
                 
-                obj.record_rationale(time, target_list, new_target); % keep a record for each target why it was or wasn't picked
+                obj.record_rationale(time, target_list, new_target); % keep a record for each target why it was or wasn't picked 
+                % (we don't need to record "duration" or "spread", they can't be the only reason all targets were rejected anyway!)
                 
                 obj.report = sprintf('%s: No available targets. Going to idle mode...', time); 
                 

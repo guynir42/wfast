@@ -167,7 +167,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         default_fields; % save a few default places to goto when no explicite targets are given
         star_density; % an estimate for the number of stars (right now this is only available for default fields)
         
-        version = 2.00;
+        version = 2.01;
         
     end
     
@@ -209,6 +209,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             obj.constraints.input_var('duration', Inf, 'max_duration', 'maximal_duration', 'max_time', 'maximum_time'); 
             obj.constraints.add_comment('duration', 'how much time do we want to observe this target at most (hours)'); 
+            
+            obj.constraints.input_var('spread', []); 
+            obj.constraints.add_comment('spread', 'do not observe this target unless this many hours have gone by since last time it started observations'); 
             
             obj.constraints.input_var('earliest', [], 'start time'); 
             obj.constraints.add_comment('earliest', 'observation must start after this time (UTC)'); 
