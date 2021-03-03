@@ -554,7 +554,11 @@ end
 
 function val = get_obj_attribute(obj, att_name)
 
-    if regexp(att_name, '\{\d+\}')
+    if isobject(obj) && ~isprop(obj, att_name)
+        val = [];
+    elseif isstruct(obj) && ~isfield(obj, att_name)
+        val = []; 
+    elseif regexp(att_name, '\{\d+\}')
         
         [idx1, idx2] = regexp(att_name, '\{\d+\}');
         S(1).type = '.';

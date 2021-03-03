@@ -197,7 +197,7 @@ void SaveData::readStruct(const mxArray *buf){
 			else if(cs(keyword, "t_start", "file_start_datestring", 16)) timestamps.attributes.push_back(MyAttribute("t_start", value));
 			else if(cs(keyword, "t_end", "file_write_datestring", 16)) timestamps.attributes.push_back(MyAttribute("t_end", value));
 			else if(cs(keyword, "t_end_stamp", "file_write_timestamp", 17)) timestamps.attributes.push_back(MyAttribute("t_end_stamp", value));
-			else if(cs(keyword, "juldates")) timestamps.input("juldates", value, 0);
+			else if(cs(keyword, "juldates")) juldates.input("juldates", value, 0);
 
 			else if(cs(keyword, "cutouts", 8)) cutouts.input("cutouts", value, 1);
 			
