@@ -297,7 +297,44 @@ classdef RunFolder < dynamicprops
     methods(Static=true) % scan method lives here!
             
         function obj_vec = scan(varargin) % go over data folders and return a vector of RunFolder objects
-            
+        % Usage: obj_vec = trig.RunFolder.scan(varargin)
+        % Goes over all folders in a root data folder and extracts the directory
+        % and some additional info on all the relevant folders. 
+        %
+        % 
+        %
+        % OPTIONAL ARGUMENTS:
+        % -folder: specify which folder to scan. This must be a root folder with 
+        %          subfolders for each date. See default above. 
+        % -next: Specify if you want all folders to be returned (leave empty, default)
+        %        or if you want only the next folder that is "unprocessed" or the 
+        %        next folder that is "unclassified". 
+        % -start_date and end_date: these define the start and end date (inclusive)
+        %                           for the scan. Give as string <YYYY-MM-DD> or as
+        %                           datetime objects. Leave empty to not limit. 
+        % -process_date: only analysis folders that were generated at or after this
+        %                date are considered. Older folders are obsolete and do not
+        %                make the run "processed". Default is defined in the static
+        %                function default_process_date(). 
+        % -num_files: only load runs that have at least this many imaging files. 
+        % -name: only load runs that match this run name exactly. 
+        % -regexp: only load runs with run names that match this regexp. 
+        % -glob: only load runs with run names that match this glob expression. 
+        % -catalog: load the catalog file if it exists in the run folder. Default 
+        %           is false (this slows down the scan!). 
+        % -debug_bit: control the verbosity of printouts. Default 0 is no output. 
+        %
+        % There are two ways to use this scan. 
+        % (1) get all the folders with their properties and run summaries. To get 
+        %     this information leave the "next" argument empty (or don't give it). 
+        %     This is useful for e.g., summing the total star hours in a given time
+        %     range/observing season. 
+        % (2) get the next folder that need to be processed or the next folder that
+        %     needs to have its candidates classified. Use the "unprocessed" or 
+        %     "unclassified" options to the "next" argument. 
+        %     This is useful for automatically processing all folders or for pulling
+        %     the unclassified candidates up for scanning. 
+        
             import util.text.cs;
             
             input = util.text.InputVars;

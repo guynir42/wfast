@@ -1,20 +1,39 @@
 function hndl = show(M, varargin)
+% Usage: hndl = show(M, varargin)
+% Display the first image from a 3D (or higher) matrix. 
+% 
+% Input: a matrix with some images. 
+%
+% Output: the handle of the graphics image object. 
+% 
+% OPTIONAL ARGUMENTS:
+%   -num_pix_corner: how many pixels to take in the corners for calculating
+%                    statistics on the image. Default is 10% image size. 
+%   -frame_number: which image to show (default is 1). 
+%   -bias/dyn: control dynamic range. Bias is lower edge, dynamic range upper. 
+%   -autodyn: automatically set the dynamic range using util.img.autodyn. 
+%             Default is false. 
+%   -play: show a video of all images on the 3rd dimension of the  matrix. 
+%          Default is false. 
+%   -delay: control the delay between frames when using "play". Default 0.3s. 
+%   -fancy: show title with statistics and colorbar. Default true. 
+%   -monochrome: display in inverted grey-scale. Default false. 
+%   -log: apply log10 before showing the image. Default false. 
+%   -xvalues/yvalues: set the axis coordinates using a vector of values. 
+%   -aspect: give a 3-element vector that sets the axes DataAspectRatio 
+%            property. The default is [1 1 1]. 
+%   -fftshift: apply fft-shift on the image. Default is false. 
+%   -axes: set the containing axes object.
+%   -parent: set the parent figure/panel. 
+%   -font_size: control the size of font on the axes. Default is 18. 
 
     import util.text.*;
     import util.stat.*;
     import util.plot.*;
     import util.fft.*;
     import util.img.*;
-    
-    if nargin<1
-        disp('SHOW will display an image from a 3D matrix');
-        fprintf('options: \n num_pix_corner (statistics) \n frame_number (which image to show) \n');
-        fprintf(' bias/dyn (dynamic range) or use autodyn \n play (video) and delay (video rate) \n fancy (titles and all) or simple (fancy=0) \n');
-        fprintf(' zoom (using util.plot.zoomcenter) input(1): factor, input(2): x, input(3):y \n log (for log scale of the absolute value) \n ');
-        fprintf(' xvalues / yvalues (set the axis), aspect(vector), fftshift ("on"/"off") \n ');
-        fprintf(' axis / axes (set the containing axes object), parent (set the parent figure/panel)\n');
-        return;
-    end
+
+    if nargin==0, help('util.plot.show'); return; end
     
     if isa(M, 'img.DataSet')
         M = M.data;
