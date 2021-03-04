@@ -18,6 +18,7 @@ void SaveDataHDF5::writeData(){ // write to file all the main data sets (images,
 	// if any of these is empty, they will get skipped...
 	writeMatrix(file, images);
 	writeMatrix(file, timestamps);
+	writeMatrix(file, juldates); 
 	writeMatrix(file, cutouts);
 	writeMatrix(file, positions);
 	writeMatrix(file, coordinates);
