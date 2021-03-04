@@ -72,8 +72,6 @@ classdef EventFinder < handle
         
         bank@occult.ShuffleBank; % randomly picked filter kernels used for matched-filtering (loaded from file when needed)
         bank_small@occult.ShuffleBank; % a smaller filter bank used to weed out only the good stars for full-filtering
-%         bank_hills@occult.ShuffleBank; % a filter bank for inner Oort cloud (Hills cloud)
-%         bank_hills_small@occult.ShuffleBank; % a filter bank for inner Oort cloud (Hills cloud)
         bank_oort@occult.ShuffleBank; % a vector of filter banks for Oort cloud occultations at different distances
         bank_oort_small@occult.ShuffleBank; % a vector of filter banks for Oort cloud occultations with lower threshold for initial filtering
         
@@ -89,7 +87,6 @@ classdef EventFinder < handle
         psd@trig.CorrectPSD; % calculates the Power Spectra Density using Welch's method, then dereddens the flux
         
         var_buf@util.vec.CircularBuffer; % circular buffers for each star/kernel, holding a few variance measurements from past batches
-%         var_buf_hills@util.vec.CircularBuffer; % another buffer for the inner Oort cloud (Hills cloud) templates 
         var_buf_oort@util.vec.CircularBuffer; % a vector of buffers for the Oort cloud templates at different distances
         
         cand@trig.Candidate;
@@ -165,8 +162,6 @@ classdef EventFinder < handle
                 obj.store = trig.DataStore;
                 
                 obj.var_buf = util.vec.CircularBuffer; 
-%                 obj.var_buf_hills = util.vec.CircularBuffer; 
-%                 obj.var_buf_oort = util.vec.CircularBuffer; 
                 
                 obj.monitor = trig.StarMonitor; 
                 

@@ -76,12 +76,12 @@ classdef CurveGenerator < handle
         use_source_matrix = 1;
         use_single = 1;
         use_binary = 0;
-        use_geometric = 0;
+        use_geometric = 1;
         use_clipping = 0;
         
         use_residual_geometric = 0; % use this to calculate only the residual between geometric and diffractive lightcurves
         
-        rho_range = [0 10]; 
+        rho_range = [0 32]; 
         rho_step = 0.01;
         
         r_range = [0.1 3];
@@ -102,8 +102,8 @@ classdef CurveGenerator < handle
     
     properties (Hidden = true)
         
-        geometric_limit_r = 1;
-        geometric_limit_R = 3;
+%         geometric_limit_r = 1;
+        geometric_limit_R = 10;
         
         rho_axis;
         previous_amplitude_primary; % keep a copy of the last amplitude vector for a given radius
@@ -1374,7 +1374,7 @@ classdef CurveGenerator < handle
                         
                         high_res_lc = high_res_lc2 - high_res_lc + 1;
                         
-                    elseif obj.use_geometric && obj.R(ii)>obj.geometric_limit_R && obj.r(ii)>obj.geometric_limit_r
+                    elseif obj.use_geometric && obj.R(ii)>obj.geometric_limit_R % && obj.r(ii)>obj.geometric_limit_r
                         
                         high_res_lc = obj.geometricLightcurve(obj.r(ii), obj.R(ii), obj.b(ii)); 
                         high_res_lc = [flip(high_res_lc); high_res_lc(2:end)];

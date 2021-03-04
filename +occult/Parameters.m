@@ -76,9 +76,9 @@ classdef Parameters < handle
     properties % occultation parameters
         
         % scalar values
-        T = 30; % integration time (millisecond)
+        T = 39; % integration time (millisecond)
         f = 25; % observation frame rate (Hz)
-        W = 4; % width of observation window (sec)
+        W = 8; % width of observation window (sec)
         
         % noise parameters
         snr = 10; % noise snr (can be scalar or vector of any length)
