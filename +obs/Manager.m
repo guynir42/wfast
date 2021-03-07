@@ -1543,6 +1543,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             if strcmp(ME.identifier, 'example:some:exception:with:three:tries')
                 N = 3; % give this error three tries in each 12 hour period, before sending an email/telegram
+            elseif strcmp(ME.identifier, 'dome_pc:mount:check_before_slew:no_assistant')
+                N = 3; 
             elseif strcmp(ME.identifier, 'cam_pc:acquisition:astrometry:no_solution')
                 N = 2;
             elseif strcmp(ME.identifier, 'cam_pc:acquisition:focus:no_stars')
@@ -1961,12 +1963,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function commandCamPC(obj, str, varargin)
             
-            input = util.text.InputVars;
-            input.input_var('num_batches', []); 
-            input.input_var('cam_mode', 'fast', 'mode'); 
-            input.input_var('exp_time', []); 
-            input.input_var('use_focus', []); 
-            input.scan_vars(varargin{:}); 
+%             input = util.text.InputVars;
+%             input.input_var('num_batches', 3600); 
+%             input.input_var('cam_mode', 'fast', 'mode'); 
+%             input.input_var('exp_time', []); 
+%             input.input_var('use_focus', []); 
+%             input.scan_vars(varargin{:}); 
             
             obj.cam_pc.outgoing.command_str = str; % can be "start" or "stop" or... 
             obj.cam_pc.outgoing.command_time = util.text.time2str(datetime('now', 'TimeZone', 'UTC')); 
