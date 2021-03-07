@@ -338,20 +338,32 @@ classdef ContrastLimits < handle
                 return;
             end
             
-            new_lim = util.img.autodyn(im.CData);
-            if new_lim(1)>=new_lim(2)
-                new_lim(1) = new_lim(2).*0.8;
+            try
+            
+                new_lim = real(util.img.autodyn(im.CData)); % use real just in case we get imaginary values somehow... 
+                if new_lim(1)>=new_lim(2)
+                    if new_lim(2)>0
+                        new_lim(1) = new_lim(2).*0.8;
+                    elseif new_lim(2)<0
+                        new_lim(1) = new_lim(2).*1.2;
+                    else % equal zero?!
+                        new_lim(1) = -1; 
+                    end
+                end
+
+                obj.clim = new_lim;
+
+                if obj.clim(1)<0 
+                    obj.min_val = -2.^ceil(log2(abs(obj.clim(1)))); 
+                else
+                    obj.min_val = 0;
+                end
+
+                obj.max_val = 2.^ceil(log2(obj.clim(2)));
+
+            catch ME
+                warning(ME.getReport)
             end
-            
-            obj.clim = new_lim;
-            
-            if obj.clim(1)<0 
-                obj.min_val = -2.^ceil(log2(abs(obj.clim(1)))); 
-            else
-                obj.min_val = 0;
-            end
-            
-            obj.max_val = 2.^ceil(log2(obj.clim(2)));
             
             obj.update;
             

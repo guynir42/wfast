@@ -2183,6 +2183,11 @@ classdef Acquisition < file.AstroData
                         input.input_var('frame_rate', []); 
                         input.scan_vars(args{:}); 
                         
+                        % the default number of batches is long, as the 
+                        % dome-pc can stop this run at any time, and can 
+                        % also specify num_batches explicitely. 
+                        args = ['num_batches', 3600, args]; 
+                        
                         obj.dome_pc.outgoing.error = ''; 
                         obj.dome_pc.outgoing.err_time = ''; 
                         obj.dome_pc.outgoing.report = 'Starting';
@@ -2226,7 +2231,7 @@ classdef Acquisition < file.AstroData
                             args{end+1} = input.exp_time;
                             
                             if isempty(input.frame_rate)
-                                input.frame_rate = (1./input.exp_time).*0.99; % make the frame rate a little lower than the expected
+                                input.frame_rate = 1./(input.exp_time+0.0005); % make the frame rate a little lower than the expected
                             end
                             
                             args{end+1} = 'frame_rate';
@@ -2683,7 +2688,15 @@ classdef Acquisition < file.AstroData
                         if obj.cat.success
                             obj.addForcedPositions; 
                         end
+
+                        if ~isempty(obj.gui) && obj.gui.check
+                            obj.gui.update;
+                        end
                         
+                        if obj.use_show
+                            obj.show;
+                        end
+
                     end
                     
                 end
