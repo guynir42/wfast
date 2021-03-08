@@ -127,6 +127,7 @@ classdef Acquisition < file.AstroData
         
         % display parameters
         use_show = true;
+        show_every_num_frames = 10; % only update the display every N images to save time
         
         show_what = 'images'; % can choose "images" or "stack"
         display_num_rect_stars = 30;
@@ -2614,6 +2615,9 @@ classdef Acquisition < file.AstroData
                     
                 end
                 
+                if ~isempty(obj.cam.gui) && obj.cam.gui.check
+                    delete(obj.cam.gui.fig.fig); 
+                end
                 
                 if input.use_reset % this parameter is not saved in the object because we only use it here... 
                     
@@ -3024,7 +3028,7 @@ classdef Acquisition < file.AstroData
             
             t_show = tic;
             
-            if obj.use_show
+            if obj.use_show && mod(obj.batch_counter, obj.show_every_num_frames)==1
                 obj.show;
             end
             

@@ -57,6 +57,7 @@ classdef AcqGUI < handle
         
         button_show_what;
         button_gray;
+        input_show_every; 
 %         button_src_status;
         button_flip;
         button_show_switch;
@@ -285,13 +286,16 @@ classdef AcqGUI < handle
             
             obj.button_flip = GraphicButton(obj.panel_image, [0.9 0.00 0.1 0.05], obj.owner, 'use_flip', 'toggle', 'flip is off', 'flip is on', 'small');
             obj.button_show_switch = GraphicButton(obj.panel_image, [0.8 0.00 0.1 0.05], obj.owner, 'use_show', 'toggle', 'show is off', 'show is on', 'small');
-                        
+            obj.input_show_every = GraphicButton(obj.panel_image, [0.8 0.05 0.2 0.05], obj.owner, 'show_every_num_frames', 'input', 'show_every= ', '', 'small'); 
+            
             obj.button_num_stars = GraphicButton(obj.panel_image, [0.00 0.95 0.1 0.05], obj.owner, 'display_num_rect_stars', 'input', 'rect= ', '', 'small');
             
             obj.button_unlock = GraphicButton(obj.panel_image, [0.9 0.95 0.1 0.05], obj.owner, 'unlock', 'push', 'unlock');
             
             obj.button_show_what.Tooltip = 'Display images, stack, or stack processed (dark, flat, background removed)';
             obj.button_flip.Tooltip = 'Flip the image 180 degrees (for viewing beyond the meridian)';
+            obj.button_show_switch.Tooltip = 'turn on/off the display of incoming images'; 
+            obj.input_show_every.Tooltip = 'only update the image display every N images';
             obj.button_unlock.Tooltip = 'Manually remove all locks left over from run-time errors. Make sure camera is stopped!!';
             
             obj.update;

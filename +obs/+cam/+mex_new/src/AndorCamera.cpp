@@ -352,10 +352,13 @@ void AndorCamera::batch(int idx){
 		for(int j=0;j<height;j++){ // copy each row
 			memcpy(images_ptrs[idx]+pos+(j*width), buf+j*stride, width*2);
 		}
-
+		
 		clock=getTimestamps(buf, (int) ImageSizeBytes);
 		timestamps_ptrs[idx][i]=((double)clock)/clockFreq;
 		
+		// re-initialize the values in the buf to zero
+		memset(buf, 0, height*width*2);
+
 		ret=AT_QueueBuffer((AT_H) hndl, buf, static_cast<int> (ImageSizeBytes));
 		if(ret!=AT_SUCCESS){ report_error("batch>queue buffer", ret, mex_flag_cam); return; }
 
