@@ -573,7 +573,7 @@ classdef Catalog < handle
                 if ~isempty(obj.bg_mean) && ~isempty(obj.zero_point) && ~isempty(obj.head) && ~isempty(obj.head.SCALE)
                     
                     B_pix = nanmedian(obj.bg_mean); % background flux per pixel
-                    B_arcsec = B_pix./obj.head.SCALE.^2; % convert to background flux per arcsecong^2
+                    B_arcsec = B_pix./obj.head.SCALE.^2; % convert to background flux per arcsecond^2
                     
                     obj.sky_magnitude = obj.zero_point - 2.5*log10(B_arcsec); 
                     
