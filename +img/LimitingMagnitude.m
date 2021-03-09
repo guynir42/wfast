@@ -74,7 +74,7 @@ classdef LimitingMagnitude < handle
     
     properties(Dependent=true)
         
-        
+        expT; 
         
     end
     
@@ -169,6 +169,16 @@ classdef LimitingMagnitude < handle
     end
     
     methods % getters
+        
+        function val = get.expT(obj)
+            
+            if isempty(obj.head)
+                val = [];
+            else
+                val = obj.head.EXPTIME;
+            end
+            
+        end
         
         function val = getDescription(obj)
             
@@ -417,7 +427,7 @@ classdef LimitingMagnitude < handle
             m(obj.mag>obj.max_mag | obj.snr<obj.threshold) = []; 
             s(obj.mag>obj.max_mag | obj.snr<obj.threshold) = []; 
             
-            obj.fit_results = util.fit.polyfit(s, m, 'order', 2, 'double', 1, 'sigma', 2.5, 'iterations', 3); 
+            obj.fit_results = util.fit.polyfit(s, m, 'order', 2, 'double', 1, 'sigma', 2.5, 'iterations', 3, 'var', nanmax(s)./s); 
             
             obj.limmag = obj.fit_results.func(log10(obj.threshold)); 
             
@@ -451,7 +461,7 @@ classdef LimitingMagnitude < handle
             util.plot.inner_title(obj.getDescription, 'Position', 'NorthWest', ...
                 'ax', ax1, 'FontSize', input.font_size); 
             
-            ax2 = axes('Parent', input.parent, 'Position', [0.15 0.5 0.35 0.35]); 
+            ax2 = axes('Parent', input.parent, 'Position', [0.15 0.45 0.4 0.4]); 
             
             obj.showFit('ax', ax2, 'font_size', input.font_size); 
             
@@ -479,7 +489,8 @@ classdef LimitingMagnitude < handle
             s(m<m_min | m>obj.max_mag) = [];
             m(m<m_min | m>obj.max_mag) = [];
             
-            semilogy(input.ax, obj.mag, obj.snr, '.', m, s, '-', 'LineWidth', 2, 'MarkerSize', 10); 
+            semilogy(input.ax, obj.mag(1:1:end), obj.snr(1:1:end), '.', ...
+                m, s, '-', 'LineWidth', 2, 'MarkerSize', 10); 
             
             hold(input.ax, 'on'); 
             
@@ -500,6 +511,7 @@ classdef LimitingMagnitude < handle
             
             input.ax.XLim = [m_min, obj.max_mag]; 
             input.ax.YLim = [1, s_max*2]; 
+            input.ax.YTick = 10.^(1:2:log10(s_max*2)); 
             input.ax.FontSize = input.font_size; 
     
         end
