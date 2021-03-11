@@ -57,6 +57,8 @@ classdef Analysis < file.AstroData
         futures_analysis_folder;
         futures_batches;
         
+        monitor@img.gui.FutureMonitor; 
+        
         aux_figure;
         
     end
@@ -2130,6 +2132,16 @@ classdef Analysis < file.AstroData
             end
             
             obj.gui.make;
+            
+        end
+        
+        function makeMonitor(obj)
+            
+            if isempty(obj.monitor)
+                obj.monitor = img.gui.FutureMonitor(obj);
+            end
+            
+            obj.monitor.show;
             
         end
         

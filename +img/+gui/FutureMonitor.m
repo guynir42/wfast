@@ -55,6 +55,9 @@ classdef FutureMonitor < handle
             if ~isempty(varargin) && isa(varargin{1}, 'img.gui.FutureMonitor')
                 if obj.debug_bit>1, fprintf('FutureMonitor copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
+            elseif ~isempty(varargin) && isa(varargin{1}, 'img.Analysis')
+                if obj.debug_bit>1, fprintf('FutureMonitor analysis constructor v%4.2f\n', obj.version); end
+                obj.owner = varargin{1};
             else
                 if obj.debug_bit>1, fprintf('FutureMonitor constructor v%4.2f\n', obj.version); end
             

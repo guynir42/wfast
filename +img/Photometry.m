@@ -454,8 +454,8 @@ classdef Photometry < handle
 
                     % this correction comes from the fact we are multiplying a Gaussian by another Gaussian...
                     good_widths = obj.widths_gauss<obj.gauss_sigma; 
-                    obj.widths_gauss = real(obj.gauss_sigma.*obj.widths_gauss./sqrt(obj.gauss_sigma.^2-obj.widths_gauss.^2));  % the measured width should not be larger than the gaussian tapered aperture. If it is, put NaN instead!
-                    obj.widths_gauss(~good_widths) = NaN;
+                    obj.widths_gauss = real(obj.gauss_sigma.*obj.widths_gauss./sqrt(obj.gauss_sigma.^2-obj.widths_gauss.^2));  
+                    obj.widths_gauss(~good_widths) = NaN; % the measured width should not be larger than the gaussian tapered aperture. If it is, put NaN instead!
                     
                     if ~isempty(obj.positions)
                         obj.centroids_x_gauss = obj.offsets_x_gauss + obj.positions(:,1)';

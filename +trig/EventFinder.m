@@ -747,7 +747,8 @@ classdef EventFinder < handle
                 else % do not prefilter, just put all stars into the big filter bank
 
                     star_indices = util.vec.tocolumn(1:size(fluxes,2)); % just list all the stars
-
+                    pre_snr = 0; 
+                    
                 end
 
                 best_snr = nanmax(pre_snr); % need to keep track what is the best S/N for this batch, regardless of which filter and regardless of if there were any candidates detected. 
@@ -1313,11 +1314,10 @@ classdef EventFinder < handle
             
             bg = nanmedian(bg); % prefer the median value to individual measurements, that could be outliers
             
-            flux_final = flux_raw - bg; % this is used to calculate the mean flux
-            F = nanmean(flux_final,1); % the mean flux
+            F = nanmean(flux_all(:,star_idx),1) - bg; % the mean flux
             
-            t = (1:length(flux_final))'; % fake timestamps for the fit            
-            fr = util.fit.polyfit(t, detrend_all(:,star_idx), 'order', 2); % fit the detrended flux to a second order polynomial
+            t = (1:size(flux_all,1))'; % fake timestamps for the fit            
+            fr = util.fit.polyfit(t, detrend_all(:,star_idx), 'order', 2, 'double', 1); % fit the detrended flux to a second order polynomial
             
             flux_smoothed = fr.ym + F; % any residual 2nd order polynomial from the detrended flux, added to the mean flux level
             flux_noise = detrend_all(:,star_idx) - fr.ym; % separate the noise from the polynomial fit
@@ -1332,9 +1332,11 @@ classdef EventFinder < handle
                 error('this shouldn''t happen!'); % we chose a star that has good times in its lightcurve! 
             end
             
-            margin = length(flux_final) - length(template); % margins on both sides of the template, combined
+            template = util.img.crop2size(template, size(flux_all,1)); 
             
-            if margin>0
+            margin = size(flux_all,1) - length(template); % margins on both sides of the template, combined
+            
+            if margin>=0
                 
                 if length(good_times)>1 % choose a random point inside the good_times regions
                     peak_idx = randperm(length(good_times),1); 
