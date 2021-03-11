@@ -214,7 +214,10 @@ classdef Calibration < handle
                 obj.reader_dark = file.Reader;
                 obj.reader_flat = file.Reader;
 
-                obj.audio = util.sys.AudioControl;
+                if ~isempty(obj.audio)
+                    obj.audio = util.sys.AudioControl;
+                end
+                
                 obj.prog = util.sys.ProgressBar;
 
             end
@@ -939,7 +942,9 @@ classdef Calibration < handle
                     end
                 catch ME
                     obj.brake_bit = 1;
-                    obj.audio.playError;
+                    if ~isempty(obj.audio)
+                        obj.audio.playError; 
+                    end
                     rethrow(ME);
                 end
                 
@@ -1674,7 +1679,7 @@ classdef Calibration < handle
                 
             end
             
-            if isempty(obj.audio)
+            if isempty(obj.audio) && ispc
                 obj.audio = util.sys.AudioControl;
             end
             

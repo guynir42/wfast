@@ -80,8 +80,18 @@ classdef Scanner < handle
                 obj = util.oop.full_copy(varargin{1});
             else
                 if obj.debug_bit>1, fprintf('Scanner constructor v%4.2f\n', obj.version); end
-            
+                obj.makeAnalysisObject; 
             end
+            
+        end
+        
+        function makeAnalysisObject(obj)
+            
+            obj.a = img.Analysis;
+            obj.a.use_save_batched_lightcurves = 0; 
+
+            % TODO: make sure this object has all the correct
+            % parametrers, e.g., not to save lightcurves... 
             
         end
         
@@ -318,11 +328,7 @@ classdef Scanner < handle
             end
             
             if isempty(obj.a)
-                obj.a = img.Analysis;
-                obj.a.use_save_batched_lightcurves = 0; 
-                
-                % TODO: make sure this object has all the correct
-                % parametrers, e.g., not to save lightcurves... 
+                obj.makeAnalysisObject;
             end
             
             for ii = 1:length(obj.a.futures)
