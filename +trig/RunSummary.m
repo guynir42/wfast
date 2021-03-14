@@ -82,6 +82,7 @@ classdef RunSummary < handle
         R_bin_width = 0.1;
         R_bin_max = 5; % stars bigger than this are not saved in the summary... 
         
+        use_progress_bar = 0; 
         debug_bit = 1;
         
     end
@@ -451,7 +452,7 @@ classdef RunSummary < handle
                 values_v = res(res.v>=v_axis(ii) & res.v<v_axis(ii+1),:); 
                 if isempty(values_v), continue; end
                 
-                prog.start(length(b_axis)-1);
+                if obj.use_progress_bar, prog.start(length(b_axis)-1); end
                 
                 for jj = 1:length(b_axis)-1
                     
@@ -490,7 +491,7 @@ classdef RunSummary < handle
                         
                     end % for kk (r)
                     
-                    if obj.debug_bit, prog.showif(jj); end
+                    if obj.use_progress_bar, prog.showif(jj); end
                     
                 end % for jj (b)
                 
