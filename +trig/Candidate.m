@@ -1545,7 +1545,23 @@ classdef Candidate < handle
             
             N = 2*length(obj.time_range); 
             
-            util.plot.show_cutouts(obj.cutouts, 'frame', obj.frame_index, 'number', N); 
+            ax = util.plot.show_cutouts(obj.cutouts, 'frame', obj.time_index, 'number', N); 
+            
+            mn = 0;
+            mx = 1;
+            
+            for ii = 1:length(ax)
+                if ax{ii}.CLim(1)<mn 
+                    mn = ax{ii}.CLim(1);
+                end
+                if ax{ii}.CLim(2)>mx 
+                    mx = ax{ii}.CLim(2); 
+                end
+            end
+            
+            for ii = 1:length(ax)
+                ax{ii}.CLim = [mn,mx]; 
+            end
             
         end
         
