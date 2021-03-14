@@ -386,7 +386,18 @@ classdef ShuffleBank < handle
             
             obj.timestamps = input.times;
             
-            obj.fluxes_filtered = util.vec.convolution(obj.kernels, obj.fluxes, 'cross', 1)./obj.stds;
+            try
+                obj.fluxes_filtered = util.vec.convolution(obj.kernels, obj.fluxes, 'cross', 1)./obj.stds;
+            catch ME
+                
+                if strcmp(ME, 'MATLAB:nomem') % maybe we can try this again after 5 minutes? 
+                    pause(300); 
+                    obj.fluxes_filtered = util.vec.convolution(obj.kernels, obj.fluxes, 'cross', 1)./obj.stds;
+                else
+                    rethrow(ME)
+                end
+                
+            end
             
             if nargout>0
                 flux_out = obj.fluxes_filtered;
