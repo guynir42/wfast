@@ -162,7 +162,9 @@ classdef ModelPSF < handle
             obj.offsets_x = input.offsets_x(:,1:N);
             obj.offsets_y = input.offsets_y(:,1:N);
             obj.fluxes = input.fluxes(:,1:N); 
-            obj.positions = input.positions(1:N,:); 
+            if ~isempty(input.positions)
+                obj.positions = input.positions(1:N,:); 
+            end
             
             S = util.vec.imsize(obj.cutouts);
             

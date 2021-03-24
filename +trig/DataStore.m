@@ -527,49 +527,16 @@ classdef DataStore < handle
                 obj.removeCosmicRays;
             end
             
-            % we may as well interpolate the NaNs right here...
-            obj.this_input.fluxes = fillmissing(obj.this_input.fluxes, 'spline'); 
+            obj.removeFluxNans; % we may as well interpolate the NaNs right here...
             
             obj.removeLinearFit; % put the detrended fluxes in this_input
             
-            % store the new fluxes and timestamps
-            obj.flux_buffer = vertcat(obj.flux_buffer, single(obj.this_input.fluxes));
-            obj.detrend_buffer = vertcat(obj.detrend_buffer, single(obj.this_input.detrend)); 
-            obj.timestamps = vertcat(obj.timestamps, single(obj.this_input.timestamps)); % this tracks timestamps for the entire run
-            obj.timestamps_buffer = vertcat(obj.timestamps_buffer, single(obj.this_input.timestamps));
-            obj.juldates_buffer = vertcat(obj.juldates_buffer, obj.this_input.juldates); 
-            obj.filename_buffer = vertcat(obj.filename_buffer, repmat({obj.this_input.filename}, [length(obj.this_input.timestamps), 1])); 
-            obj.frame_num_buffer = vertcat(obj.frame_num_buffer, single(1:length(obj.this_input.timestamps))'); % assume the frame numbers are just run continuously from 1->number of frames in batch
+            obj.storeBuffers; % store the new fluxes and timestamps
             
-            if size(obj.flux_buffer,1)>obj.pars.length_psd % only save the recent data
-                obj.flux_buffer = obj.flux_buffer(end-obj.pars.length_psd+1:end,:,:); 
-                obj.detrend_buffer = obj.detrend_buffer(end-obj.pars.length_psd+1:end,:,:); 
-                obj.timestamps_buffer = obj.timestamps_buffer(end-obj.pars.length_psd+1:end); 
-                obj.juldates_buffer = obj.juldates_buffer(end-obj.pars.length_psd+1:end); 
-                obj.filename_buffer = obj.filename_buffer(end-obj.pars.length_psd+1:end); 
-                obj.frame_num_buffer = obj.frame_num_buffer(end-obj.pars.length_psd+1:end); 
-            end
+            obj.storeCutouts; % store the cutouts for the extended region only
             
-            % store the cutouts for the extended region only
-            obj.cutouts = cat(3, obj.cutouts, obj.this_input.cutouts); 
-            if size(obj.cutouts,3)>obj.pars.length_extended
-                obj.cutouts = obj.cutouts(:,:,end-obj.pars.length_extended+1:end,:); 
-            end
+            obj.storeAuxiliary; % store the new aux data
             
-            % store the new aux data
-            list = obj.aux_names;
-            new_aux = NaN(size(obj.this_input.errors,1), size(obj.this_input.widths,2), length(list), size(obj.this_input.widths,3), 'like', obj.this_input.widths); % preallocate
-            
-            for ii = 1:length(list)
-                new_aux(:,:,ii,:) = permute(obj.this_input.(list{ii}), [1,2,4,3]); % allow multiple apertures (3D aux matrices from photometry) 
-            end
-            
-            obj.aux_buffer = vertcat(obj.aux_buffer, new_aux); % add the new auxiliary data
-
-            if size(obj.aux_buffer,1)>obj.pars.length_psd % make sure to only save the recent data
-                obj.aux_buffer = obj.aux_buffer(end-(obj.pars.length_psd)+1:end,:,:,:); 
-            end
-
             obj.calcSubBuffers; % cut the background, extended and search regions from the relevant buffers
             
             if obj.is_done_burn
@@ -739,6 +706,12 @@ classdef DataStore < handle
             
         end
         
+        function removeFluxNans(obj)
+            
+            obj.this_input.fluxes = fillmissing(obj.this_input.fluxes, 'spline'); 
+            
+        end
+        
         function removeLinearFit(obj)
             
             f = obj.this_input.fluxes; 
@@ -751,6 +724,53 @@ classdef DataStore < handle
 
                 obj.this_input.detrend(:,:,ii) = f2; 
 
+            end
+            
+        end
+        
+        function storeBuffers(obj)
+            
+            obj.flux_buffer = vertcat(obj.flux_buffer, single(obj.this_input.fluxes));
+            obj.detrend_buffer = vertcat(obj.detrend_buffer, single(obj.this_input.detrend)); 
+            obj.timestamps = vertcat(obj.timestamps, single(obj.this_input.timestamps)); % this tracks timestamps for the entire run
+            obj.timestamps_buffer = vertcat(obj.timestamps_buffer, single(obj.this_input.timestamps));
+            obj.juldates_buffer = vertcat(obj.juldates_buffer, obj.this_input.juldates); 
+            obj.filename_buffer = vertcat(obj.filename_buffer, repmat({obj.this_input.filename}, [length(obj.this_input.timestamps), 1])); 
+            obj.frame_num_buffer = vertcat(obj.frame_num_buffer, single(1:length(obj.this_input.timestamps))'); % assume the frame numbers are just run continuously from 1->number of frames in batch
+            
+            if size(obj.flux_buffer,1)>obj.pars.length_psd % only save the recent data
+                obj.flux_buffer = obj.flux_buffer(end-obj.pars.length_psd+1:end,:,:); 
+                obj.detrend_buffer = obj.detrend_buffer(end-obj.pars.length_psd+1:end,:,:); 
+                obj.timestamps_buffer = obj.timestamps_buffer(end-obj.pars.length_psd+1:end); 
+                obj.juldates_buffer = obj.juldates_buffer(end-obj.pars.length_psd+1:end); 
+                obj.filename_buffer = obj.filename_buffer(end-obj.pars.length_psd+1:end); 
+                obj.frame_num_buffer = obj.frame_num_buffer(end-obj.pars.length_psd+1:end); 
+            end
+            
+        end
+        
+        function storeCutouts(obj)
+            
+            obj.cutouts = cat(3, obj.cutouts, obj.this_input.cutouts); 
+            if size(obj.cutouts,3)>obj.pars.length_extended
+                obj.cutouts = obj.cutouts(:,:,end-obj.pars.length_extended+1:end,:); 
+            end
+            
+        end
+        
+        function storeAuxiliary(obj)
+            
+            list = obj.aux_names;
+            new_aux = NaN(size(obj.this_input.errors,1), size(obj.this_input.widths,2), length(list), size(obj.this_input.widths,3), 'like', obj.this_input.widths); % preallocate
+            
+            for ii = 1:length(list)
+                new_aux(:,:,ii,:) = permute(obj.this_input.(list{ii}), [1,2,4,3]); % allow multiple apertures (3D aux matrices from photometry) 
+            end
+            
+            obj.aux_buffer = vertcat(obj.aux_buffer, new_aux); % add the new auxiliary data
+
+            if size(obj.aux_buffer,1)>obj.pars.length_psd % make sure to only save the recent data
+                obj.aux_buffer = obj.aux_buffer(end-(obj.pars.length_psd)+1:end,:,:,:); 
             end
             
         end

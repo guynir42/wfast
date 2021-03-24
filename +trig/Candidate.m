@@ -286,9 +286,19 @@ classdef Candidate < handle
             
             t = datetime(J, 'convertFrom', 'juliandate', 'TimeZone', 'UTC'); 
             
-            str = sprintf('id: %d | star: %d | frame= %d | batch= %d | time: %02d:%02d:%02d | event S/N= %4.2f | star S/N= %4.2f (%4.2f) | x/y= %d, %d ', ...
+            str = sprintf('id: %d | star: %d | frame= %d | batch= %d | time: %02d:%02d:%02d | event S/N= %4.2f | star S/N= %4.2f (%4.2f) | FWHM= %4.1f" | x/y= %d, %d ', ...
                     obj.serial, obj.star_index, obj.time_index, obj.batch_number, hour(t), minute(t), round(second(t)), obj.snr, obj.star_current_snr, obj.star_snr, ...
-                    round(nanmean(obj.auxiliary(:,obj.aux_indices.centroids_x))), round(nanmean(obj.auxiliary(:,obj.aux_indices.centroids_y))));
+                    obj.fwhm, round(nanmean(obj.auxiliary(:,obj.aux_indices.centroids_x))), round(nanmean(obj.auxiliary(:,obj.aux_indices.centroids_y))));
+            
+        end
+        
+        function val = fwhm(obj)
+            
+            if isempty(obj.cut_matrix) || isempty(obj.cut_indices) || ~isfield(obj.cut_indices, 'fwhm')
+                val = [];
+            else
+                val = obj.cut_matrix(1,obj.cut_indices.fwhm);
+            end
             
         end
         
