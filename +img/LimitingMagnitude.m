@@ -180,9 +180,25 @@ classdef LimitingMagnitude < handle
             
         end
         
+        function val = getShortname(obj)
+            
+            if isempty(obj.head)
+                val = '';            
+            elseif obj.expT<1
+                val = sprintf('lim_mag_%dHz', round(obj.head.FRAMERATE));
+            else
+                val = sprintf('lim_mag_%ds', round(obj.head.EXPTIME)); 
+            end
+            
+        end
+        
         function val = getDescription(obj)
             
-            val = sprintf('Lim-mag is %4.2f for %s%4.2fs images', obj.limmag, obj.stack_str, obj.head.EXPTIME); 
+            if isempty(obj.limmag) || isempty(obj.head)
+                val = ''; 
+            else
+                val = sprintf('Lim-mag is %4.2f for %s%4.2fs images', obj.limmag, obj.stack_str, obj.head.EXPTIME); 
+            end
             
         end
         
@@ -299,7 +315,7 @@ classdef LimitingMagnitude < handle
                     if obj.debug_bit, fprintf('Could not find stack images, generating sum from image data...\n'); end
                     
                     obj.I_raw = h5read(f, '/images'); 
-                    obj.S_raw = single(sum(obj.I_raw,3)); 
+                    obj.S_raw = single(sum(single(obj.I_raw),3)); 
                     obj.num_sum = size(obj.I_raw,3); 
                     
                 end
@@ -307,7 +323,10 @@ classdef LimitingMagnitude < handle
                 obj.S_cal = obj.cal.input(obj.S_raw, 'sum', obj.num_sum); 
                 
                 obj.I_final = obj.S_cal; 
-                obj.stack_str = sprintf('a %d stack of ', obj.num_sum); 
+                
+                if obj.num_sum>1
+                    obj.stack_str = sprintf('a %d stack of ', obj.num_sum); 
+                end
                 
             else
                 
@@ -330,7 +349,10 @@ classdef LimitingMagnitude < handle
                     obj.S_cal = obj.cal.input(obj.S_raw, 'sum', obj.num_sum); 
                     
                     obj.I_final = obj.S_cal; 
-                    obj.stack_str = sprintf('a %d stack of ', obj.num_sum); 
+                    
+                    if obj.num_sum>1
+                        obj.stack_str = sprintf('a %d stack of ', obj.num_sum); 
+                    end
                     
                 end
                 
@@ -356,7 +378,7 @@ classdef LimitingMagnitude < handle
     
                 obj.stars = util.img.quick_find_stars(I, 'number', Nstars, ... % only look for the brightest stars at this point
                     'thresh', obj.threshold, 'saturation', obj.saturation.*obj.num_sum, ...
-                    'psf', psf_width, 'unflagged', 1, ...
+                    'psf', psf_width, 'unflagged', 0, ...
                     'mean', 0, 'std', sqrt(obj.bg_var_map)); % the background is estimated for all locations
                 
                 Nstars = min(Nstars, height(obj.stars)); 
@@ -376,7 +398,7 @@ classdef LimitingMagnitude < handle
                             
             obj.stars = util.img.quick_find_stars(I, ...
                 'thresh', obj.threshold, 'saturation', obj.saturation.*obj.num_sum, ...
-                'psf', psf_width, 'unflagged', 1, ...
+                'psf', psf_width, 'unflagged', 0, ...
                 'mean', 0, 'std', sqrt(obj.bg_var_map)); % the background is estimated for all locations
 
             [obj.cutouts, obj.I_removed] = util.img.mexCutout(I, obj.stars.pos(1:100,:), 15); % should replace 100 with a parameter (and test it isn't bigger than the number of stars!)
@@ -398,7 +420,7 @@ classdef LimitingMagnitude < handle
             obj.cat.input(obj.stars); 
             
             obj.mag = obj.cat.magnitudes;
-            obj.snr = obj.stars.flux; 
+            obj.snr = obj.stars.snr; 
             
         end
         
@@ -427,7 +449,7 @@ classdef LimitingMagnitude < handle
             m(obj.mag>obj.max_mag | obj.snr<obj.threshold) = []; 
             s(obj.mag>obj.max_mag | obj.snr<obj.threshold) = []; 
             
-            obj.fit_results = util.fit.polyfit(s, m, 'order', 2, 'double', 1, 'sigma', 2.5, 'iterations', 3, 'var', nanmax(s)./s); 
+            obj.fit_results = util.fit.polyfit(s, m, 'order', 1, 'double', 1, 'sigma', 2.5, 'iterations', 3); 
             
             obj.limmag = obj.fit_results.func(log10(obj.threshold)); 
             
@@ -483,13 +505,13 @@ classdef LimitingMagnitude < handle
             m_min = nanmin(obj.mag);
             s_max = nanmax(obj.snr);
             
-            s = obj.threshold:0.01:s_max; 
+            s = obj.threshold:10:s_max; 
             m = obj.fit_results.func(log10(s)); 
             
             s(m<m_min | m>obj.max_mag) = [];
             m(m<m_min | m>obj.max_mag) = [];
             
-            semilogy(input.ax, obj.mag(1:1:end), obj.snr(1:1:end), '.', ...
+            semilogy(input.ax, obj.mag, obj.snr, '.', ...
                 m, s, '-', 'LineWidth', 2, 'MarkerSize', 10); 
             
             hold(input.ax, 'on'); 
@@ -510,8 +532,8 @@ classdef LimitingMagnitude < handle
             ylabel(input.ax, 'detection S/N'); 
             
             input.ax.XLim = [m_min, obj.max_mag]; 
-            input.ax.YLim = [1, s_max*2]; 
-            input.ax.YTick = 10.^(1:2:log10(s_max*2)); 
+            input.ax.YLim = [1, 10.^ceil(log10(s_max))]; 
+            input.ax.YTick = 10.^(1:2:ceil(log10(s_max))); 
             input.ax.FontSize = input.font_size; 
     
         end

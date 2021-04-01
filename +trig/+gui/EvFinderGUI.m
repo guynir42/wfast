@@ -118,8 +118,9 @@ classdef EvFinderGUI < handle
             obj.menu_pars.menu_corrections.addButton('input_cr', 'CR &Threshold', 'input', 'store.pars.cosmic_ray_threshold', 'threshold for removing cosmic rays'); 
             obj.menu_pars.menu_corrections.addButton('button_psd', 'use &PSD', 'toggle', 'pars.use_psd_correction', 'apply Power Spectral Density correction to the fluxes', 1); 
             obj.menu_pars.menu_corrections.addButton('button_std', 'use filtered &STD', 'toggle', 'pars.use_std_filtered', 'correct the filtered flux by the STD calculated on the background region'); 
+            obj.menu_pars.menu_corrections.addButton('button_detrend', 'use &Detrend after PSD', 'toggle', 'pars.use_detrend_after_psd', 'run another detrend after the PSD correction is applied'); 
             obj.menu_pars.menu_corrections.addButton('button_keep_var', 'keep &Variances', 'toggle', 'pars.use_keep_variances', 'keep the values of the filtered fluxes variance for all batches', 1); 
-            
+                        
             obj.menu_pars.addButton('menu_filters', '&Filters', 'menu'); 
             obj.menu_pars.menu_filters.addButton('button_prefilter', '&Prefilter', 'toggle', 'pars.use_prefilter', 'filter on a small template-bank with lower threshold and only use the full bank on passing stars');
             obj.menu_pars.menu_filters.addButton('input_prefilter', '&Threshold', 'input', 'pars.pre_threshold', 'threshold for the smaller template bank');

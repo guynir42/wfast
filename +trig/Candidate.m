@@ -121,6 +121,7 @@ classdef Candidate < handle
         timestamps; 
         juldates;
         flux_raw; % all fluxes for all stars, without any processing
+        flux_detrended; % fluxes for all stars, after removing linear fit from each batch
         flux_corrected; % fluxes for all stars, corrected by PSD or by removing linear fit
         flux_filtered; % flux after matched-filtering, for the peak star and kernel
         psd; % power spectral density for this star only
@@ -179,9 +180,10 @@ classdef Candidate < handle
         flux_buffer; % flux buffer going back as far as possible, for this star only
         detrend_buffer; % flux after removing a linear fit from each batch
         timestamps_buffer; % timestamps for the above
-        filtered_flux_past_values; % normalization data for this star and this kernel only. Can be either raw filtered_flux values for the last "backround" period, or the variance values from the var_buf
+%         filtered_flux_past_values; % normalization data for this star and this kernel only. Can be either raw filtered_flux values for the last "backround" period, or the variance values from the var_buf
         
         flux_raw_all; % the raw flux (over the extended region) for all stars
+        flux_detrended_all; % the flux after removing a linear fit from each batch, for all stars
         flux_corrected_all; % the corrected flux (over the exteneded region) for all stars
         auxiliary_all; % the auxiliary data (for the extended region) for all stars
         cutouts_all; % the cutouts for all stars (in the extended region)
@@ -587,6 +589,7 @@ classdef Candidate < handle
             for ii = 1:length(obj_vec)
 
                 obj_vec(ii).flux_raw_all = [];
+                obj_vec(ii).flux_detrended_all = []; 
                 obj_vec(ii).flux_corrected_all = [];
                 obj_vec(ii).auxiliary_all = [];
                 obj_vec(ii).cutouts_all = [];

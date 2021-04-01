@@ -715,16 +715,18 @@ classdef DataStore < handle
         function removeLinearFit(obj)
             
             f = obj.this_input.fluxes; 
+
+            obj.this_input.detrend = util.series.detrend(f, 'iterations', 2); 
             
-            for ii = 1:size(f,3)
-
-                fit_result = util.fit.polyfit(1:size(f,1), f(:,:,ii), 'order', 1, 'double', 1, 'sigma', 3, 'iterations', 2); 
-
-                f2 = f(:,:,ii) - [fit_result.ym]; % remove the fit
-
-                obj.this_input.detrend(:,:,ii) = f2; 
-
-            end
+%             for ii = 1:size(f,3)
+%                 
+%                 fit_result = util.fit.polyfit(1:size(f,1), f(:,:,ii), 'order', 1, 'double', 1, 'sigma', 3, 'iterations', 2); 
+% 
+%                 f2 = f(:,:,ii) - [fit_result.ym]; % remove the fit
+% 
+%                 obj.this_input.detrend(:,:,ii) = f2; 
+% 
+%             end
             
         end
         

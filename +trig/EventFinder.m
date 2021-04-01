@@ -190,7 +190,8 @@ classdef EventFinder < handle
             
             obj.pars.use_psd_correction = 1; % use welch on a flux buffer to correct red noise
             obj.pars.use_std_filtered = 1; % normalize variance of filtered flux of each kernel to the average of previous batches (averaging size is set by length_background in the store)
-
+            obj.pars.use_detrend_after_psd = 1; % apply another linear detrend after PSD correction
+            
             obj.pars.use_prefilter = 1; % filter all stars on a smaller bank, using a lower threshold, and then only vet the survivors with the full filter bank
             obj.pars.pre_threshold = 5.0; % threshold for the pre-filter
             
@@ -655,8 +656,36 @@ classdef EventFinder < handle
             end
             
             if obj.pars.use_psd_correction
+                
                 flux_out = obj.psd.input(fluxes, 1, star_indices); 
-%             else
+                
+                if obj.pars.use_detrend_after_psd
+                    
+                    idx1 = find(obj.store.extended_frame_num==1); % indices where a new batch begins
+                    idx2 = find(obj.store.extended_frame_num==obj.head.NAXIS3); % indices where the batch ends
+                    
+                    for ii = 1:length(idx1)
+                        
+                        if length(idx2)<ii
+                            f = flux_out(idx1(ii):end,:); 
+                        else
+                            f = flux_out(idx1(ii):idx2(ii),:); 
+                        end
+                        
+                        f = util.series.detrend(f, 'iterations', 2); % remove linear fit to the data
+                        
+                        if length(idx2)<ii
+                            flux_out(idx1(ii):end,:) = f; 
+                        else
+                            flux_out(idx1(ii):idx2(ii),:) = f; 
+                        end
+                        
+                    end
+                    
+                end
+                
+            else
+                flux_out = fluxes; 
 %                 flux_out = obj.removeLinearFit(fluxes, obj.store.extended_timestamps); 
 %                 flux_out = fillmissing(flux_out, 'linear'); 
             end
@@ -681,7 +710,7 @@ classdef EventFinder < handle
             
         end
         
-        function [candidates_all, star_indices_all, best_snr_all] = applyTemplateBank(obj, bank_name, fluxes, stds)
+        function [candidates_all, star_indices_all, best_snr_all] = applyTemplateBank(obj, bank_name, fluxes_det, fluxes_corr, stds)
         % do a prefilter (optional) and then a filter and then find candidates. 
         % INPUTS: 
         %   -bank_name: a string: "kbos" or "oort". 
@@ -712,11 +741,15 @@ classdef EventFinder < handle
                 bank_name = 'kbos';
             end
             
-            if nargin<3 || isempty(fluxes)
-                fluxes = obj.corrected_fluxes;
+            if nargin<3 || isempty(fluxes_det)
+                fluxes_det = obj.store.extended_detrend;
             end
             
-            if nargin<4 || isempty(stds)
+            if nargin<4 || isempty(fluxes_corr)
+                fluxes_corr = obj.corrected_fluxes;
+            end
+            
+            if nargin<5 || isempty(stds)
                 stds = obj.corrected_stds;
             end
             
@@ -738,7 +771,7 @@ classdef EventFinder < handle
                 
                 if obj.pars.use_prefilter % use a small filter bank and only send the best stars to the big bank
 
-                    fluxes_filtered_small = obj.filterFluxes(fluxes, stds, bank_small(ii), [], var_buf(ii)); 
+                    fluxes_filtered_small = obj.filterFluxes(fluxes_corr, stds, bank_small(ii), [], var_buf(ii)); 
 
                     pre_snr = squeeze(util.stat.max2(fluxes_filtered_small)); % signal to noise peak for each star at any time and any filter kernel
 
@@ -746,7 +779,7 @@ classdef EventFinder < handle
 
                 else % do not prefilter, just put all stars into the big filter bank
 
-                    star_indices = util.vec.tocolumn(1:size(fluxes,2)); % just list all the stars
+                    star_indices = util.vec.tocolumn(1:size(fluxes_corr,2)); % just list all the stars
                     pre_snr = 0; 
                     
                 end
@@ -761,11 +794,11 @@ classdef EventFinder < handle
                         var_buf_large_filter = var_buf(ii); % always use all stars, no problem applying the var buffer
                     end
 
-                    filtered_fluxes = obj.filterFluxes(fluxes, stds, bank(ii), star_indices, var_buf_large_filter); 
+                    filtered_fluxes = obj.filterFluxes(fluxes_corr, stds, bank(ii), star_indices, var_buf_large_filter); 
 
-                    [candidates, best_snr] = obj.searchForCandidates(obj.store.extended_flux, fluxes, filtered_fluxes, star_indices, bank(ii)); % loop over the normalized filtered flux and find multiple events
+                    [candidates, best_snr] = obj.searchForCandidates(obj.store.extended_flux, fluxes_det, fluxes_corr, filtered_fluxes, star_indices, bank(ii)); % loop over the normalized filtered flux and find multiple events
 
-                    if length(star_indices)==size(fluxes,2) % if all stars passed prefilter (or when skipping pre-filter)
+                    if length(star_indices)==size(fluxes_corr,2) % if all stars passed prefilter (or when skipping pre-filter)
                         star_indices = [candidates.star_index]; % only keep stars that triggered
                     end
 
@@ -853,9 +886,9 @@ classdef EventFinder < handle
             
         end
             
-        function [new_candidates, best_snr] = searchForCandidates(obj, fluxes_raw, fluxes_corrected, fluxes_filtered, star_indices, bank, max_num_events) % loop over filtered fluxes, find above-threshold peaks, remove that area, then repeat
+        function [new_candidates, best_snr] = searchForCandidates(obj, fluxes_raw, fluxes_detrended, fluxes_corrected, fluxes_filtered, star_indices, bank, max_num_events) % loop over filtered fluxes, find above-threshold peaks, remove that area, then repeat
 
-            if nargin<7 || isempty(max_num_events)
+            if nargin<8 || isempty(max_num_events)
                 max_num_events = obj.pars.max_events;
             end
             
@@ -877,7 +910,7 @@ classdef EventFinder < handle
                 
                 if mx>=obj.pars.threshold % at least one part of the filtered lightcurves passed the threshold
 
-                    c = obj.makeNewCandidate(fluxes_raw, fluxes_corrected, fluxes_filtered, idx, star_indices, bank); 
+                    c = obj.makeNewCandidate(fluxes_raw, fluxes_detrended, fluxes_corrected, fluxes_filtered, idx, star_indices, bank); 
 
                     c.serial = length(obj.cand) + length(obj.latest_candidates) + 1; % new event gets a serial number
                     new_candidates = vertcat(new_candidates, c); % add this event to the list of new candidates
@@ -893,7 +926,7 @@ classdef EventFinder < handle
             
         end
         
-        function c = makeNewCandidate(obj, fluxes_raw, fluxes_corrected, fluxes_filtered, idx, star_indices, bank) % generate a Candidate object and fill it with data
+        function c = makeNewCandidate(obj, fluxes_raw, fluxes_detrended, fluxes_corrected, fluxes_filtered, idx, star_indices, bank) % generate a Candidate object and fill it with data
 
             c = trig.Candidate;
             
@@ -937,11 +970,13 @@ classdef EventFinder < handle
             
             % store the different types of flux
             c.flux_raw = fluxes_raw(:,c.star_index); 
+            c.flux_detrended = fluxes_detrended(:,c.star_index);
             c.flux_corrected = fluxes_corrected(:,c.star_index); 
             c.flux_filtered = fluxes_filtered(:,idx(2),idx(3));
 
             % store data for all stars as reference
             c.flux_raw_all = fluxes_raw; 
+            c.flux_detrended_all = fluxes_detrended; 
             c.flux_corrected_all = fluxes_corrected; 
             c.auxiliary_all = obj.store.extended_aux; 
             
@@ -950,8 +985,11 @@ classdef EventFinder < handle
             c.flux_buffer = obj.store.flux_buffer(:,c.star_index); % flux history for this star
             c.detrend_buffer = obj.store.detrend_buffer(:,c.star_index); % detrended flux history for this star
             c.timestamps_buffer = obj.store.timestamps_buffer; % timestamps for that duration
-            c.psd = obj.psd.power_spectrum(:,c.star_index); % the Power Spectral Density (PSD) for this star
-            c.freq_psd = obj.psd.freq; % frequency axis for the PSD
+            
+            if ~isempty(obj.psd.power_spectrum)
+                c.psd = obj.psd.power_spectrum(:,c.star_index); % the Power Spectral Density (PSD) for this star
+                c.freq_psd = obj.psd.freq; % frequency axis for the PSD
+            end
             
             % store some statistics on this star's raw flux
             A = obj.store.background_aux(:,c.star_index, obj.store.aux_indices.areas); 
@@ -1208,7 +1246,11 @@ classdef EventFinder < handle
                 star_index_sim = star_indices(randperm(length(star_indices),1)); % randomly choose a single star from the list
             end
 
-            all_banks = [obj.bank, obj.bank_oort]; % append all template banks, KBOs and Oort
+            if obj.pars.use_oort
+                all_banks = [obj.bank, obj.bank_oort]; % append all template banks, KBOs and Oort
+            else
+                all_banks = obj.bank; % only KBO banks
+            end
             
             bank = all_banks(randi(length(all_banks))); % choose a random bank to simulate from
             
@@ -1233,7 +1275,7 @@ classdef EventFinder < handle
 
                 end % need to correct the filtered fluxes by their measured noise
 
-                candidate = obj.searchForCandidates(flux_sim, f_corr, f_filt, star_index_sim, all_banks(ii), 1); % try to find a single event on this single star
+                candidate = obj.searchForCandidates(flux_sim, detrend_sim, f_corr, f_filt, star_index_sim, all_banks(ii), 1); % try to find a single event on this single star
 
                 all_cand = vertcat(all_cand, candidate);
                 
@@ -1260,6 +1302,14 @@ classdef EventFinder < handle
                 end
                 
             else % no events were recovered
+                
+                r = sim_pars.r;
+                R = sim_pars.R;
+                b = sim_pars.b;
+                
+                if r>1.5 && r>R && r>b
+                    fprintf('failed to detect event with r= %4.2f | R= %4.2f | b= %4.2f\n', r, R, b); 
+                end
                 
                 sim_pars.detect_snr = 0; % event was not detected, so S/N is zero
                 sim_pars.passed = false; 
@@ -1314,12 +1364,12 @@ classdef EventFinder < handle
             
             bg = nanmedian(bg); % prefer the median value to individual measurements, that could be outliers
             
-            F = nanmean(flux_all(:,star_idx),1) - bg; % the mean flux
+            F = nanmean(flux_all(:,star_idx),1) - bg; % the mean flux, excluding the background
             
-            t = (1:size(flux_all,1))'; % fake timestamps for the fit            
+            t = (1:size(flux_all,1))'; % fake timestamps for the fit
             fr = util.fit.polyfit(t, detrend_all(:,star_idx), 'order', 2, 'double', 1); % fit the detrended flux to a second order polynomial
             
-            flux_smoothed = fr.ym + F; % any residual 2nd order polynomial from the detrended flux, added to the mean flux level
+            flux_smoothed = fr.ym + F; % any residual 2nd order polynomial from the detrended flux, added to the mean flux level (this does not include the b/g)
             flux_noise = detrend_all(:,star_idx) - fr.ym; % separate the noise from the polynomial fit
             
             %%%% choose a good point to put the peak of the template %%%%
@@ -1357,7 +1407,7 @@ classdef EventFinder < handle
             
             %%%% add the template on the flux %%%%
             
-            flux_smoothed_sim = flux_smoothed.*template_shift; % the mean flux is multiplied by the template (that should be 1 outside the occulation region)
+            flux_smoothed_sim = flux_smoothed.*template_shift; % the mean flux is multiplied by the template (which is 1 outside the occulation region)
             
             if obj.pars.sim_rescale_noise
                 
@@ -1374,7 +1424,7 @@ classdef EventFinder < handle
             flux_final = flux_smoothed_sim + flux_noise_corrected + bg; % now we can re-attach the noise and the background we extracted before
             
             flux_all(:,star_idx) = flux_final; 
-            detrend_all(:,star_idx) = flux_final - F; % the detrended flux does not include the mean flux level!  
+            detrend_all(:,star_idx) = flux_final - F - bg; % the detrended flux does not include the mean flux level!  
             
             % add some parameters known from the simulation
             sim_pars.time_index = peak; % what was the real peak time of this event
