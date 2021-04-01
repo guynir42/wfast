@@ -35,7 +35,7 @@ class BufferQueue {
 	
 	void printout();
 	
-	void allocate(AT_H camera_handle, int num_images=10);
+	void allocate(AT_H camera_handle, int num_images=12);
 	void release(); 
 	void queue(); 
 	void wait(long int timeout=10000); 

@@ -47,6 +47,16 @@ void AndorCamera::loadFromCamera(const mxArray *camera){ // load control switche
 	ret=AT_GetInt((AT_H) hndl, L"AOIStride", &stride);
 	if(ret) mexErrMsgIdAndTxt( "MATLAB:obs:cam:AndorCamera:getStride", "Cannot get stride from device.");
 
+	int trigger_index=0;
+	ret=AT_GetEnumIndex((AT_H) hndl, L"TriggerMode", &trigger_index); 
+	if(ret) mexErrMsgIdAndTxt( "MATLAB:obs:cam:AndorCamera:getTriggerIndex", "Cannot get trigger mode index from device.");
+	wchar_t trigger_mode[256];
+	ret=AT_GetEnumStringByIndex((AT_H) hndl, L"TriggerMode", trigger_index, trigger_mode, 256);
+	if(ret) mexErrMsgIdAndTxt( "MATLAB:obs:cam:AndorCamera:getTriggerMode", "Cannot get trigger mode from device.");
+	// printf("trigger mode= %S\n", trigger_mode); 
+	if(wcscmp(L"Software", trigger_mode)==0) use_software_trigger=1;
+	else use_software_trigger=0;
+	
 }
 
 void AndorCamera::loadFromBuffers(mxArray *buffers){ // load mex flags and data arrays from buffer struct
@@ -186,8 +196,9 @@ void AndorCamera::startup(){
 	
 	for(int i=0;i<NTEMPBUF;i++){
 		
-		temp_buffers[i]=new unsigned char[image_size_bytes+8]; // add 8 for byte alignment
-		// temp_buffers[i]=(unsigned char *) mxCalloc(image_size_bytes+8,1);
+		// temp_buffers[i]=new unsigned char[image_size_bytes+8]; // add 8 for byte alignment
+		temp_buffers[i]=(unsigned char*) mxCalloc(image_size_bytes,1); 
+		// aligned_buffers[i]=reinterpret_cast<unsigned char*>((reinterpret_cast<unsigned long long>(temp_buffers[i]) + 7) & ~0x7);
 		ret=AT_QueueBuffer((AT_H) hndl, temp_buffers[i], image_size_bytes);
 		if(ret!=AT_SUCCESS){ report_error("startup>queue buffers", ret, mex_flag_cam); return; }
 		
@@ -202,8 +213,13 @@ void AndorCamera::startup(){
     // std::chrono::system_clock::now().time_since_epoch() / std::chrono::milliseconds(1);
 	// printf("Current POSIX time is: %lld.%lld seconds\n", milliseconds_since_epoch/1000, milliseconds_since_epoch%1000);
 	
-	ret=AT_Command((AT_H) hndl, L"ACquisitionStart");
+	ret=AT_Command((AT_H) hndl, L"AcquisitionStart");
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	
+	if(use_software_trigger){
+		ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
+		if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
+	}
 	
 	if(ret!=AT_SUCCESS){ report_error("startup>acquisition start", ret, mex_flag_cam); return; }
 		
@@ -222,9 +238,10 @@ void AndorCamera::finishup(){
 	if(ret!=AT_SUCCESS){ report_error("finishup>flush buffers", ret, mex_flag_cam); return; }
 	
 	for(int i=0;i<NTEMPBUF;i++){ 
-		if(temp_buffers[i]) delete temp_buffers[i];
-		// if(temp_buffers[i]) mxFree(temp_buffers[i]);
+		// if(temp_buffers[i]) delete temp_buffers[i];
+		if(temp_buffers[i]) mxFree(temp_buffers[i]);
 		temp_buffers[i]=0;
+		//aligned_buffers[i]=0; 
 	}
 	
 	mex_flag_cam[0]=0; // mark that camera is done recording... 
@@ -308,19 +325,16 @@ void AndorCamera::batch(int idx){
 	AT_GetInt((AT_H) hndl, L"ImageSizeBytes", &ImageSizeBytes);
 	int ret=0;
 	
-	unsigned char *buf=0;
 	int return_buf_size=0;
-	
-	// ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
-	// if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
 	
 	AT_64 clock=0;
 
-	ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
-	if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
+	//ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
+	//if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
 
 	for(unsigned int i=0; i<batch_size; i++){
 		
+		unsigned char *buf=0;
 		int error_counter=0; // to make sure we are not in an endless loop... 
 
 		ret=AT_WaitBuffer((AT_H) hndl, &buf, &return_buf_size, getTimeout());
@@ -332,38 +346,56 @@ void AndorCamera::batch(int idx){
 			restart();
 			i--;
 			error_counter++;
-			if(error_counter>10) report_error("batch>wait buffer", ret, mex_flag_cam);
+			if(error_counter>12) report_error("batch>wait buffer", ret, mex_flag_cam);
 			continue;
 		}
 		
 		// printf("i= %d | queue buffer...\n", i);
-		int pos=i*height*width; // where inside the buffer to start writing now... 		
+		unsigned long long int pos=i*height*width; // where inside the buffer to start writing now... 		
 		// printf("height= %d | width= %d | stride= %d\n", height, width, stride);
 		
 		// ret=AT_ConvertBuffer(buf, (AT_U8*)(images_ptrs[idx]+pos), width, height, stride, L"Mono16", L"Mono16");
 		//if(ret!=AT_SUCCESS){ report_error("batch>convert buffer", ret, mex_flag_cam); return; }
 		
-		if(i<batch_size-1){
+		if(use_software_trigger){
 			ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
 			if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
 		}
 		
+		memset(images_ptrs[idx]+pos, 0, height*width*2);
+		
 		// memcpy(images_ptrs[idx]+pos, buf, height*width*2);
 		for(int j=0;j<height;j++){ // copy each row
-			memcpy(images_ptrs[idx]+pos+(j*width), buf+j*stride, width*2);
+			// memcpy(images_ptrs[idx]+pos+j*width, buf+j*stride, width*2);
+			memmove(images_ptrs[idx]+pos+width*j, buf+stride*j, width*2);
 		}
+		
+		// for(int j=0;j<height-1;j++){ // add a signal to each row
+			// *(images_ptrs[idx]+pos+j*width+i)=128;
+		// }
 		
 		clock=getTimestamps(buf, (int) ImageSizeBytes);
 		timestamps_ptrs[idx][i]=((double)clock)/clockFreq;
 		
 		// re-initialize the values in the buf to zero
-		memset(buf, 0, height*width*2);
+		memset(buf, 0, ImageSizeBytes);
 
 		ret=AT_QueueBuffer((AT_H) hndl, buf, static_cast<int> (ImageSizeBytes));
 		if(ret!=AT_SUCCESS){ report_error("batch>queue buffer", ret, mex_flag_cam); return; }
 
-		
-	}
+		//memset(images_ptrs[idx]+pos, i, height*width*2); // this is for debugging only! 
+	
+	} // for i (each frame in the batch)
+	
+	// to pass in the first pixel of each image the number of repeated pixels 
+	// for(int i=0;i<80;i++){
+	
+		// long long int S=0;
+		// for(int j=0;j<width*height;j++){
+			// if(*(images_ptrs[idx]+(i+10)*width*height+j)==*(images_ptrs[idx]+i*width*height+j)) S++; 
+		// }
+		// *(images_ptrs[idx]+i*width*height)=S/1000; 
+	// }
 	
 	// get the system clock value (in POSIX time)
 	t_vec_ptrs[idx][1]=getPosixTime();
@@ -395,11 +427,12 @@ void AndorCamera::restart(){
 				
 	}
 			
-	ret=AT_Command((AT_H) hndl, L"ACquisitionStart");
+	ret=AT_Command((AT_H) hndl, L"AcquisitionStart");
 	if(ret!=AT_SUCCESS){ report_error("restart>acquisition start", ret, mex_flag_cam); return; }
-	
-	ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
-	if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
+	if(use_software_trigger){
+		ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
+		if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
+	}
 	
 }
 
@@ -478,7 +511,7 @@ int AndorCamera::waitForReading(int idx){ // make sure buffer is not locked whil
 	unsigned int N=((unsigned int) getTimeout()*batch_size); // in miliseconds
 	unsigned int mil=10; // time resolution in milliseconds
 	
-	for(int i=0;i<N/mil; i++){
+	for(unsigned int i=0;i<N/mil; i++){
 		 // if we haven't started reading or already finished reading this buffer, or there is no data in there, just get out with success
 		// if((mex_flag_read_ptrs[idx][0]==0 || mex_flag_read_ptrs[idx][1]==1) && mex_flag_read_ptrs[idx][2]==0) return 0;
 		if(mex_flag_read_ptrs[idx][0]==0) return 0; // if released for reading (or never started reading)

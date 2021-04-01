@@ -59,6 +59,7 @@ class AndorCamera {
 	// parameters:
 	unsigned int num_batches=1;
 	unsigned int batch_size;
+	bool use_software_trigger=1; 
 	
 	AT_64 height;
 	AT_64 width;
@@ -91,9 +92,11 @@ class AndorCamera {
 	unsigned int current_batch=0;
 	
 	// internal data used by the SDK
-	static const int NTEMPBUF=30; // how many buffers to give the zyla...
+	static const int NTEMPBUF=25; // how many buffers to give the zyla...
 	
-	alignas(8) unsigned char *temp_buffers[NTEMPBUF]={NULL}; // number of empty pointers for Zyla
+	alignas(8) unsigned char *temp_buffers[NTEMPBUF]={NULL}; // number of empty pointers for the camera
+	// unsigned char *temp_buffers[NTEMPBUF]={NULL}; // number of empty pointers for the camera
+	// unsigned char *aligned_buffers[NTEMPBUF]={NULL}; // other buffer pointers to align them to an "8 byte boundary" 
 	int image_size_bytes;
 	
 	

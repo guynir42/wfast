@@ -426,7 +426,7 @@ classdef Acquisition < file.AstroData
 %             obj.num_batches = 500;
             obj.batch_size = 100;
             
-            obj.num_stars = 2000;
+            obj.num_stars = 5000;
             obj.cut_size = 15;
             obj.avoid_edges = 50;
             
@@ -1279,6 +1279,7 @@ classdef Acquisition < file.AstroData
             obj.use_adjust_cutouts = 0;
             obj.use_autodeflate = 0;
             obj.use_check_positions = 0;
+            obj.num_stars = 1000; 
 %             obj.use_sync_stop = 0;
             obj.use_ignore_sync_object_name = 1;
             obj.head.OBJECT = 'test'; 
@@ -1294,6 +1295,8 @@ classdef Acquisition < file.AstroData
             obj.use_check_positions = 1;
             obj.use_ignore_sync_object_name = 0;
 %             obj.use_sync_stop = 1;
+            obj.num_stars = 5000; 
+
             
         end
         
@@ -2970,6 +2973,7 @@ classdef Acquisition < file.AstroData
             end
             
             t_stack = tic;
+
             obj.calcStack;
             t_stack = toc(t_stack);
             
@@ -2992,6 +2996,9 @@ classdef Acquisition < file.AstroData
                 str = sprintf('Finished calculating lightcurves'); 
                 if obj.log_level>4, obj.log.input(str); end
             
+            else
+                t_cut = 0; 
+                t_light = 0;
             end
             
             obj.positions = obj.clip.positions;
@@ -3028,9 +3035,11 @@ classdef Acquisition < file.AstroData
             
             t_show = tic;
             
-            if obj.use_show && mod(obj.batch_counter, obj.show_every_num_frames)==1
-                obj.show;
+            if obj.use_show && obj.show_every_num_frames>1 && mod(obj.batch_counter, obj.show_every_num_frames)==1
+                obj.show;                
             end
+            
+%             plot(squeeze(obj.images(1,1,:)));
             
             t_show = toc(t_show);
             
@@ -3061,11 +3070,11 @@ classdef Acquisition < file.AstroData
             
             % make the basic stack image
             obj.num_sum = size(obj.images,3);
-%             obj.stack = util.stat.sum_single(obj.images); % sum along the 3rd dimension directly into single precision
+
             try
                 
                 obj.stack = single(sum(obj.images,3)); % sum along the 3rd dimension directly into single precision
-                
+%                 obj.stack = ones(size(obj.images,1), size(obj.images,2), 'single'); 
             catch ME
                 if strcmp(ME.identifier, 'MATLAB:nomem')
                     disp('Ran out of memory while stacking images. Trying again with a split array...');
@@ -3083,8 +3092,9 @@ classdef Acquisition < file.AstroData
                 end
             
             end
-            
+
             obj.stack_proc = obj.cal.input(obj.stack, 'sum', obj.num_sum); % stack after calibration
+%             obj.stack_proc = obj.stack;
             
             % make the background cutouts of the stack 
             if isempty(obj.clip_bg.positions) % only if we didn't already assign positions to the bg_cutouts
@@ -3210,7 +3220,9 @@ classdef Acquisition < file.AstroData
             end
             
             if obj.use_arbitrary_pos
-                obj.clip.arbitraryPositions('im_size', size(obj.stack)); % maybe add some input parameters?
+%                 obj.clip.arbitraryPositions('im_size', size(obj.stack)); % maybe add some input parameters?
+                                obj.clip.arbitraryPositions('im_size', [4000 4000]); % maybe add some input parameters?
+
                 obj.positions = obj.clip.positions;
             elseif obj.use_mextractor
                 obj.findStarsMAAT;
@@ -3516,6 +3528,7 @@ classdef Acquisition < file.AstroData
             if obj.log_level>4, obj.log.input(str); end
             
             obj.cutouts_proc = obj.cal.input(obj.cutouts, 'clip', obj.clip);
+            
             str = sprintf('Finished calibrating cutouts'); 
             if obj.log_level>4, obj.log.input(str); end
             
@@ -3560,7 +3573,7 @@ classdef Acquisition < file.AstroData
             if obj.use_simple_photometry
                 
                 obj.fluxes = permute(util.stat.sum2(C), [3,4,2,1]); 
-                
+
             else % use extensive photometry method
             
                 obj.phot.input('images', C, 'timestamps', obj.timestamps, 'positions', P, 'juldates', obj.juldates); % add variance input? 

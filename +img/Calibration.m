@@ -1182,14 +1182,14 @@ classdef Calibration < handle
             
             %%%%%%%%%%%%%%%%% Take care of zero frames %%%%%%%%%%%%%%%%%%%%
             
-            if obj.use_remove_empty_frames
-                
-                idx = squeeze(sum(util.stat.sum2(abs(I)),4)==0); % vector of true if the whole frame (dim 3) is zero
-                I(:,:,idx,:) = NaN;
-                
-%                 I(I==0) = NaN;
-                
-            end
+%             if obj.use_remove_empty_frames
+%                 
+%                 idx = squeeze(sum(util.stat.sum2(abs(I)),4)==0); % vector of true if the whole frame (dim 3) is zero
+%                 I(:,:,idx,:) = NaN;
+%                 
+% %                 I(I==0) = NaN;
+%                 
+%             end
             
             if ~isempty(input.clipper) % this means we are working with cutouts
                 
@@ -1215,7 +1215,9 @@ classdef Calibration < handle
             
             if input.num_sum>1
                 D = D*input.num_sum; % if we need to subtract multiple darks from a summed image...
-                I = sum(I,3); % just making sure the input images are summed 
+                if size(I,3)>1 % making sure the input images are summed 
+                    I = sum(I,3); 
+                end
             end
             
             if size(I,1)~=size(D,1) || size(I,2)~=size(D,2)

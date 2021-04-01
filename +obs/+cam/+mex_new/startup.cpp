@@ -77,8 +77,10 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	
 	cc->num_batches=1;	
 	if(nrhs>INDEX_NUM) cc->num_batches=(unsigned int) mxGetScalar(prhs[INDEX_NUM]);
-	
+		
 	cc->loadFromCamera(prhs[INDEX_CAM]);
+	// printf("height= %d | width= %d | stride= %d\n", cc->height, cc->width, cc->stride); 
+	// printf("triggering in software mode: %d\n", cc->use_software_trigger); 
 	
 	cc->index_rec_vector=mxGetPr(prhs[INDEX_REC]);	
 	

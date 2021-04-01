@@ -1125,7 +1125,7 @@ classdef Andor < file.AstroData
                 
                 if isempty(obj.frame_rate) || isnan(obj.frame_rate) % in this mode the camera takes an image as soon as it gets a command to "software trigger"
 %                     [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'TriggerMode','Software'); obs.cam.sdk.AT_CheckWarning(rc);
-                    obs.cam.mex_new.set(obj.hndl, 'trigger mode', 'Software'); 
+%                     obs.cam.mex_new.set(obj.hndl, 'trigger mode', 'Software'); 
                 else % in this mode there is a fixed frame rate, so the frame rate may be lower than the maximum 
 %                     [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'TriggerMode','Internal'); obs.cam.sdk.AT_CheckWarning(rc);
                     obs.cam.mex_new.set(obj.hndl, 'trigger mode', 'Internal'); 
@@ -1297,8 +1297,8 @@ classdef Andor < file.AstroData
             obj.batch_counter = obj.batch_counter + 1;
             
             if obj.use_show && ~isempty(obj.gui) && obj.gui.check
-%                 obj.show(obj.pass_show{:});
                 obj.show;
+%                 plot(squeeze(obj.images(1,1,:)));
             end
             
             obj.frame_rate_camera = size(obj.images,3)./(obj.t_end_stamp - obj.timestamps(1)); % how many frames in what time (not including dead time and read time)
@@ -1948,9 +1948,11 @@ classdef Andor < file.AstroData
                 error('Input a shutter mode, either "global" or "rolling"'); 
             elseif util.text.cs(val, 'global')
 %                 [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'ElectronicShutteringMode','Global'); obs.cam.sdk.AT_CheckWarning(rc);
+%                 obs.cam.mex_new.set(obj.hndl, 'shutter mode', 'Global - 100% Duty Cycle'); % maybe use Global - 100% Duty Cycle? 
                 obs.cam.mex_new.set(obj.hndl, 'shutter mode', 'Global'); % maybe use Global - 100% Duty Cycle? 
             elseif util.text.cs(val, 'rolling')
 %                 [rc] = obs.cam.sdk.AT_SetEnumString(obj.hndl,'ElectronicShutteringMode','Rolling'); obs.cam.sdk.AT_CheckWarning(rc);
+%                 obs.cam.mex_new.set(obj.hndl, 'shutter mode', 'Rolling - 100% Duty Cycle'); % maybe use Rolling - 100% Duty Cycle?
                 obs.cam.mex_new.set(obj.hndl, 'shutter mode', 'Rolling'); % maybe use Rolling - 100% Duty Cycle?
             else
                 error('Unknown shutter mode: "%s". Use "global" or "rolling"', val);
