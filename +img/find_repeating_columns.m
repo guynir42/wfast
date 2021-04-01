@@ -1,0 +1,98 @@
+function num_columns = find_repeating_columns(Im, varargin)
+% Usage: num_columns = find_repeating_columns(Im, varargin)
+% Scan a 3D data cube of images, or a 4D matrix of cutouts, and return the 
+% number of columns that have at least 50% of the pixel values identical to
+% the pixels 10 frames earlier (50% means top half or bottom half). 
+% The output is for the number of columns that are copies of PREVIOUSLY 
+% captured frames (lower index in the matrix), as it is understood that the
+% first copy is the real data and the second copy is the corrupted data. 
+%
+% For example, if there are two columns in frame 22 that have either top or
+% bottom half which is identical to the same pixels in frame 12, then the 
+% output "num_columns" would have the value 2 in position 22. 
+%
+% If the input is 4D (cutouts), then each column in the output represents
+% the result for a different cutout. I.e., the output dim1 is the same size
+% as the input dim3 and the output dim2 is the same size as the input dim4. 
+%
+% OPTIONAL ARGUMENTS:
+%   -gap: how many frames to look back to find identical columns. If gap=10
+%         then frame 37 would be checked against frame 27. Default is 10. 
+%   -edges: number of frames/images that are skipped from the beginning/end
+%           of the dataset. You can enter a scalar or a 2-element vector, 
+%           so that the elements specify the number of frames to skip from
+%           the start and end, independently of each other. 
+%           The default is zero, but whatever the value is, at least "gap" 
+%           number of frames are skipped in the beginning of the frame, 
+%           because those are frames that have no matching columns to 
+%           compare against. E.g., if gap=10 and edges=5, the first 10 
+%           frames and the final 5 frames would be skipped. 
+%           Skipped frames just have zero output values, but the size of 
+%           the output does not change. 
+%   -fraction: the fraction of the frame size, either continuous from the 
+%              top or from the bottom, that needs to be identical to count 
+%              as a repeated column. Default is 0.5. 
+%   
+
+    if nargin==0, help('img.find_repeating_columns'); return; end
+    
+    input = util.text.InputVars; 
+    input.input_var('gap', 10); 
+    input.input_var('edges', 0); 
+    input.input_var('fraction', 0.5); 
+    input.scan_vars(varargin{:}); 
+    
+    % first frame to scan (after gap or edges, whichever is bigger)
+    start = input.edges(1); 
+    
+    if start<input.gap
+        start = input.gap;
+    end
+    
+    start = start + 1; 
+    
+    % last frame to scan
+    if isscalar(input.edges)
+        finish = size(Im,3)-input.edges(1);
+    else
+        finish = size(Im,3)-input.edges(2);
+    end
+    
+    % pixel index for top and bottom part of the column 
+    top = ceil(input.fraction.*size(Im,1));
+    bottom = floor((1-input.fraction).*size(Im,1));
+    
+    % preallocate output matrix
+    if islogical(Im)
+        num_columns = zeros(size(Im,3),size(Im,4), 'uint16'); 
+    else 
+        num_columns = zeros(size(Im,3),size(Im,4), 'like', Im); 
+    end        
+    
+    % loop over frames and cutouts
+    for ii = start:finish
+        
+%         fprintf('ii= %d\n', ii); 
+        
+        for jj = 1:size(Im,4)
+            
+            cols_top = all(Im(1:top,:,ii,jj)==Im(1:top,:,ii-input.gap,jj));
+            
+            cols_bottom = all(Im(bottom:end,:,ii,jj)==Im(bottom:end,:,ii-input.gap,jj));
+            
+            num_columns(ii,jj) = sum(cols_top | cols_bottom); 
+            
+        end % for jj (cutout number)
+        
+    end % for ii (frame number)
+    
+end
+
+
+
+
+
+
+
+
+
