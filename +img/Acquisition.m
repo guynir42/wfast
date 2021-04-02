@@ -2178,6 +2178,10 @@ classdef Acquisition < file.AstroData
                             obj.brake_bit && obj.is_running==0 && obj.is_running_single==0 &&...
                             obj.cam.is_running==0 && obj.cam.is_running_focus==0
 
+                        % make sure the camera is taking science images, not dark/flat
+                        obj.cam.mode = 'science'; 
+                        obj.cam.mode_index = 1; 
+                        
                         args = util.text.parse_inputs(obj.latest_command_pars);
                         
                         input = util.text.InputVars;
