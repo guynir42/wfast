@@ -32,7 +32,8 @@ function num_columns = find_repeating_columns(Im, varargin)
 %   -fraction: the fraction of the frame size, either continuous from the 
 %              top or from the bottom, that needs to be identical to count 
 %              as a repeated column. Default is 0.5. 
-%   
+%   -saturation: pixel values above this threshold are not counted as being
+%                equal among rows. Default is 5e4. 
 
     if nargin==0, help('img.find_repeating_columns'); return; end
     
@@ -40,6 +41,7 @@ function num_columns = find_repeating_columns(Im, varargin)
     input.input_var('gap', 10); 
     input.input_var('edges', 0); 
     input.input_var('fraction', 0.5); 
+    input.input_var('saturation', 5e4);
     input.scan_vars(varargin{:}); 
     
     % first frame to scan (after gap or edges, whichever is bigger)
@@ -74,15 +76,32 @@ function num_columns = find_repeating_columns(Im, varargin)
         
 %         fprintf('ii= %d\n', ii); 
         
+        cols_top = all(squeeze(Im(1:top,:,ii,:))==squeeze(Im(1:top,:,ii-input.gap,:)));
+        cols_bottom = all(squeeze(Im(bottom:end,:,ii,:))==squeeze(Im(bottom:end,:,ii-input.gap,:)));
+
         for jj = 1:size(Im,4)
             
-            cols_top = all(Im(1:top,:,ii,jj)==Im(1:top,:,ii-input.gap,jj));
+%             cols_top = all(Im(1:top,:,ii,jj)==Im(1:top,:,ii-input.gap,jj));
             
-            cols_bottom = all(Im(bottom:end,:,ii,jj)==Im(bottom:end,:,ii-input.gap,jj));
+            cols_top_index = find(cols_top(1,:,jj)); 
+            for kk = cols_top_index
+                if all(Im(1:top,kk,ii,jj)>=input.saturation)
+                    cols_top(1,kk,jj) = 0; 
+                end
+            end
             
-            num_columns(ii,jj) = sum(cols_top | cols_bottom); 
+%             cols_bottom = all(Im(bottom:end,:,ii,jj)==Im(bottom:end,:,ii-input.gap,jj));
+            
+            cols_bottom_index = find(cols_bottom(1,:,jj)); 
+            for kk = cols_bottom_index
+                if all(Im(bottom:end,kk,ii,jj)>=input.saturation)
+                    cols_bottom(1,kk,jj) = 0; 
+                end
+            end
             
         end % for jj (cutout number)
+        
+        num_columns(ii,:) = permute(sum(cols_top | cols_bottom, 2), [1,3,2]); 
         
     end % for ii (frame number)
     
