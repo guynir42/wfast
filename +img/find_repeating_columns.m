@@ -74,14 +74,10 @@ function num_columns = find_repeating_columns(Im, varargin)
     % loop over frames and cutouts
     for ii = start:finish
         
-%         fprintf('ii= %d\n', ii); 
-        
         cols_top = all(squeeze(Im(1:top,:,ii,:))==squeeze(Im(1:top,:,ii-input.gap,:)));
         cols_bottom = all(squeeze(Im(bottom:end,:,ii,:))==squeeze(Im(bottom:end,:,ii-input.gap,:)));
 
-        for jj = 1:size(Im,4)
-            
-%             cols_top = all(Im(1:top,:,ii,jj)==Im(1:top,:,ii-input.gap,jj));
+        for jj = 1:size(Im,4) % verify that those columns are not all saturated
             
             cols_top_index = find(cols_top(1,:,jj)); 
             for kk = cols_top_index
@@ -89,8 +85,6 @@ function num_columns = find_repeating_columns(Im, varargin)
                     cols_top(1,kk,jj) = 0; 
                 end
             end
-            
-%             cols_bottom = all(Im(bottom:end,:,ii,jj)==Im(bottom:end,:,ii-input.gap,jj));
             
             cols_bottom_index = find(cols_bottom(1,:,jj)); 
             for kk = cols_bottom_index

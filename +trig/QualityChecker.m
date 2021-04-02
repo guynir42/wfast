@@ -107,6 +107,7 @@ classdef QualityChecker < handle
         linear_motion; % are the x/y offsets moving in a linear line across the cutout (like a satellite?)
         background_intensity; % the background per pixel value (remove frames with star in annulus or when the sky is too bright)
         bad_pixels; % how many bad pixels are in the aperture
+        repeating_columns; % how many columns are repeated for each frame/star
         
         flux_corr; % correlations of flux between stars
         
@@ -227,6 +228,7 @@ classdef QualityChecker < handle
             obj.pars.use_nan_offsets = false;
             obj.pars.use_photo_flag = false; 
             obj.pars.use_bad_pixels = true; 
+            obj.pars.use_repeating_columns = true; 
             obj.pars.use_flux_corr = true;
             obj.pars.use_correlations = true;
 
@@ -366,6 +368,12 @@ classdef QualityChecker < handle
             if obj.pars.use_bad_pixels
                 obj.cut_names{end+1} = 'bad_pixels'; 
                 obj.cut_thresholds(end+1) = 1;
+                obj.cut_two_sided(end+1) = false;
+            end
+            
+            if obj.pars.use_repeating_columns
+                obj.cut_names{end+1} = 'repeating_columns'; 
+                obj.cut_thresholds(end+1) = 1; % maybe at some point we may want to only trigger on multiple repeated rows per cutout? 
                 obj.cut_two_sided(end+1) = false;
             end
             
@@ -645,6 +653,10 @@ classdef QualityChecker < handle
            
             obj.bad_pixels = p;
             
+            if obj.pars.use_repeating_columns % we only trigger this if we have to, it takes a while to calculate
+                obj.repeating_columns = img.find_repeating_columns(obj.cutouts); % additional arguments may change the fraction of a column that is tested (for cutouts 50% is fine)
+            end
+            
             obj.flux_corr = obj.calculateFluxCorr(obj.extended_detrend, [10 25 50]); % can also give multiple time scales to run the correlation (default is 50)
             
             aux = zeros(size(f,1),size(f,2),length(obj.pars.corr_types), 'like', f); 
@@ -753,6 +765,14 @@ classdef QualityChecker < handle
             
             if obj.pars.use_photo_flag
                 obj.cut_values_matrix(:,:,obj.cut_indices.photo_flag) = obj.photo_flag; 
+            end
+            
+            if obj.pars.use_bad_pixels
+                obj.cut_values_matrix(:,:,obj.cut_indices.bad_pixels) = obj.bad_pixels;
+            end
+            
+            if obj.pars.use_repeating_columns
+                obj.cut_values_matrix(:,:,obj.cut_indices.repeating_columns) = obj.repeating_columns;
             end
             
             if obj.pars.use_flux_corr

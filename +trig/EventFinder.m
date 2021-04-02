@@ -206,7 +206,7 @@ classdef EventFinder < handle
             obj.pars.use_sim = 1; % add simulated events in a few batches randomly spread out in the whole run
             obj.pars.num_sim_events_per_batch = 0.25; % fractional probability to add a simulated event into each new batch. 
             obj.pars.use_keep_simulated = true; % if false, the simulated events would not be kept with the list of detected candidates (for running massive amount of simualtions)
-            obj.pars.sim_max_R = 3; % maximum value of stellar size for simulated events
+            obj.pars.sim_max_R = 10; % maximum value of stellar size for simulated events
             
             obj.pars.sim_rescale_noise = true;
             
@@ -660,28 +660,7 @@ classdef EventFinder < handle
                 flux_out = obj.psd.input(fluxes, 1, star_indices); 
                 
                 if obj.pars.use_detrend_after_psd
-                    
-                    idx1 = find(obj.store.extended_frame_num==1); % indices where a new batch begins
-                    idx2 = find(obj.store.extended_frame_num==obj.head.NAXIS3); % indices where the batch ends
-                    
-                    for ii = 1:length(idx1)
-                        
-                        if length(idx2)<ii
-                            f = flux_out(idx1(ii):end,:); 
-                        else
-                            f = flux_out(idx1(ii):idx2(ii),:); 
-                        end
-                        
-                        f = util.series.detrend(f, 'iterations', 2); % remove linear fit to the data
-                        
-                        if length(idx2)<ii
-                            flux_out(idx1(ii):end,:) = f; 
-                        else
-                            flux_out(idx1(ii):idx2(ii),:) = f; 
-                        end
-                        
-                    end
-                    
+                    flux_out = obj.removeTrendByBatches(flux_out); 
                 end
                 
             else
@@ -707,6 +686,33 @@ classdef EventFinder < handle
             b = (s(f).*s(t.^2)-s(t).*s(t.*f))./denom;
             
             flux_rem = flux - (a.*t + b); 
+            
+        end
+        
+        function flux_out = removeTrendByBatches(obj, flux)
+            
+            flux_out = flux; 
+            
+            idx1 = find(obj.store.extended_frame_num==1); % indices where a new batch begins
+            idx2 = find(obj.store.extended_frame_num==obj.head.NAXIS3); % indices where the batch ends
+
+            for ii = 1:length(idx1)
+
+                if length(idx2)<ii
+                    f = flux(idx1(ii):end,:); 
+                else
+                    f = flux(idx1(ii):idx2(ii),:); 
+                end
+
+                f = util.series.detrend(f, 'iterations', 2); % remove linear fit to the data
+
+                if length(idx2)<ii
+                    flux_out(idx1(ii):end,:) = f; 
+                else
+                    flux_out(idx1(ii):idx2(ii),:) = f; 
+                end
+
+            end
             
         end
         
@@ -1252,7 +1258,8 @@ classdef EventFinder < handle
                 all_banks = obj.bank; % only KBO banks
             end
             
-            bank = all_banks(randi(length(all_banks))); % choose a random bank to simulate from
+            bank_idx = randi(length(all_banks)); % index of bank that was used to produce this event
+            bank = all_banks(bank_idx); % choose a random bank to simulate from
             
             [flux_sim, detrend_sim, sim_pars] = obj.getFluxWithSimulatedLightcurve(star_index_sim, bank); % add the simulated occultation to the raw fluxes
 
@@ -1275,7 +1282,7 @@ classdef EventFinder < handle
 
                 end % need to correct the filtered fluxes by their measured noise
 
-                candidate = obj.searchForCandidates(flux_sim, detrend_sim, f_corr, f_filt, star_index_sim, all_banks(ii), 1); % try to find a single event on this single star
+                [candidate, best_snr(ii)] = obj.searchForCandidates(flux_sim, detrend_sim, f_corr, f_filt, star_index_sim, all_banks(ii), 1); % try to find a single event on this single star
 
                 all_cand = vertcat(all_cand, candidate);
                 
@@ -1307,12 +1314,13 @@ classdef EventFinder < handle
                 R = sim_pars.R;
                 b = sim_pars.b;
                 
-                if r>1.5 && r>R && r>b
-                    fprintf('failed to detect event with r= %4.2f | R= %4.2f | b= %4.2f\n', r, R, b); 
-                end
+%                 if r>1.5 && r>R && r>b
+%                     fprintf('failed to detect event with r= %4.2f | R= %4.2f | b= %4.2f\n', r, R, b); 
+%                 end
                 
-                sim_pars.detect_snr = 0; % event was not detected, so S/N is zero
                 sim_pars.passed = false; 
+%                 sim_pars.detect_snr = 0; % event was not detected, so S/N is zero
+                sim_pars.detect_snr = best_snr(bank_idx); % this does not guarantee that the S/N is not from just random noise triggering at an unrelated filter/peak time
                 
                 sim_pars.num_triggers = 0; % how many template banks triggered
                 sim_pars.bank_names = {}; % what the names of those banks were
@@ -1425,6 +1433,7 @@ classdef EventFinder < handle
             
             flux_all(:,star_idx) = flux_final; 
             detrend_all(:,star_idx) = flux_final - F - bg; % the detrended flux does not include the mean flux level!  
+            detrend_all(:,star_idx) = obj.removeTrendByBatches(detrend_all(:,star_idx)); % remove trends after adding the simulated event (which is more realistic!)
             
             % add some parameters known from the simulation
             sim_pars.time_index = peak; % what was the real peak time of this event
