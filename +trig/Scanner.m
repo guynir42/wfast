@@ -295,6 +295,31 @@ classdef Scanner < handle
             
         end
         
+        function cand = collectOccultations(obj)
+            
+            if ~isempty(obj.overview)
+                obj.calcOverview;
+            end
+            
+            cand = trig.Candidate.empty; 
+            
+            for ii = 1:length(obj.overview.folders)
+                
+                f = fullfile(obj.overview.folders(ii).folder, ...
+                       obj.overview.folders(ii).analysis_folder, 'classified.mat');
+                
+                if exist(f, 'file')
+                    L = load(f);
+
+                    new_cand = L.candidates([L.candidates.is_simulated]==0); 
+
+                    cand = vertcat(cand, new_cand); 
+                end
+                
+            end
+            
+        end
+        
     end
     
     methods % internal utilities

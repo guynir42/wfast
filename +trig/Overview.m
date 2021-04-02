@@ -582,6 +582,8 @@ classdef Overview < handle
 %             E_u = fillmissing(E_u, 'next'); 
             
             
+%             E = ones(size(E)); % debugging only
+
             T = nansum(nansum(obj.star_seconds,1),2); % star-seconds integrated over all S/N and stellar sizes
             T = permute(T, [4,1,3,2]); % arrange velocity into the 1st dim, leave dim 2 as scalar (for r) and dim 3 for ecl 
             
@@ -603,7 +605,7 @@ classdef Overview < handle
             cov_upper = permute(cov_upper, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
             cov_upper = cov_upper.*obj.fsu2deg2(distance_au); 
             
-            v_weights = permute(T.*v, [1,3,2]); % dim 1 is velocity, dim 2 is ecliptic latitude
+            v_weights = permute(T, [1,3,2]); % dim 1 is velocity, dim 2 is ecliptic latitude
             
         end
         
