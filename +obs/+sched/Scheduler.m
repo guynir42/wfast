@@ -738,12 +738,16 @@ classdef Scheduler < handle
             
             if ~use_sim
 
+                for ii = 1:length(obj.targets_sim)
+                    obj.targets_sim(ii).finish_observation(time); % make sure all targets are stopped
+                end
+
                 if isempty(obj.current)
                     return; % silently ignore this command if the current target is empty (idle mode)
                 end
 
                 obj.current.finish_observation(time);
-
+                
                 if ~isempty(obj.obs_history) && ~isempty(obj.current) && ~isempty(obj.current.obs_history)
                     obj.obs_history(end).end_time = obj.current.obs_history(end).end_time;
                     obj.obs_history(end).runtime = obj.current.obs_history(end).runtime;
@@ -752,6 +756,10 @@ classdef Scheduler < handle
 %                 obj.current = obs.sched.Target.empty;
                 
             else
+                
+                for ii = 1:length(obj.targets)
+                    obj.targets(ii).finish_observation(time); % make sure all targets are stopped
+                end
                 
                 if isempty(obj.current_sim)
                     return; % silently ignore this command if the current target is empty (idle mode)

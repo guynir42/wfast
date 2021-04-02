@@ -104,6 +104,8 @@ classdef SensorChecker < handle
         good_state = []; % save the last state of the weather data
         sun_state = []; % save the last state of the sun to reset the total_time/good_time when sun goes up
         
+        default_show_day_frac = 0.2;
+        
         version = 1.03;
         % 1.03 (2020/05/28) added history of last night's good weather
         % 1.02 (2019/12/16) added virtual sensors, communications with Wise, and put all data into structures

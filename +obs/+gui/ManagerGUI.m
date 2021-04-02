@@ -50,6 +50,7 @@ classdef ManagerGUI < handle
         
         panel_image;
         button_reset_axes;
+        input_day_frac;
         button_mean_only;
         button_clicker;
         button_info; 
@@ -265,6 +266,9 @@ classdef ManagerGUI < handle
             obj.button_reset_axes = GraphicButton(obj.panel_image, [0.0 0.0 0.1 0.05], obj.owner, '', 'custom', 'reset plot');
             obj.button_reset_axes.Callback = @obj.makeAxes;
             obj.button_reset_axes.Tooltip = 'redraw the weather axes';
+            
+            obj.input_day_frac = GraphicButton(obj.panel_image, [0.1 0.0 0.1 0.05], obj.owner, 'checker.show_day_frac', 'input', 'day frac= ');
+            obj.input_day_frac.Tooltip = 'What fraction of a day to show on the weather plot'; 
             
             obj.button_mean_only = GraphicButton(obj.panel_image, [0.0 0.95 0.1 0.05], obj.owner, 'checker.use_only_plot_mean', 'toggle', 'all', 'mean'); 
             obj.button_mean_only.Tooltip = 'show weather data for all sensors or only for the mean of each data type';

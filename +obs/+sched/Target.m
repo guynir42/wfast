@@ -523,11 +523,14 @@ classdef (CaseInsensitiveProperties) Target < handle
 %                 error('Can not finish an observation that has not been started yet! Use start_observation()'); 
             end
             
-            obj.obs_history(end).end_time = time; 
-            obj.obs_history(end).runtime = obj.compare_times_hours(obj.start_time, time); 
-            
-            obj.ephem.time = time;
-            obj.ephem.finish_observing;
+            if isempty(obj.obs_history(end).end_time)
+                obj.obs_history(end).end_time = time; 
+                obj.obs_history(end).runtime = obj.compare_times_hours(obj.start_time, time);                 
+                obj.ephem.time = time;
+                obj.ephem.finish_observing;
+            else
+                obj.ephem.now_observing = 0; % this should already be 0, but need to verify it
+            end
             
             obj.start_time = ''; % when finished we no longer need to keep this info (it is stored in obs_history)
             

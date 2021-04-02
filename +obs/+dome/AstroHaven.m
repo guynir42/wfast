@@ -513,7 +513,7 @@ classdef AstroHaven < handle
             end
             
             if isempty(Dec_deg) || Dec_deg<-35
-                error('Unable to view targets with %d declinations!', Dec_dec);
+                error('Unable to view targets with %d declinations!', Dec_deg);
             end
             
             if util.text.cs(side, 'East')

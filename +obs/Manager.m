@@ -800,6 +800,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 obj.gui.panel_controls.button_lights.update;
                 
+                if obj.is_camera_idle
+                    obj.sched.finish_current; % make sure that as soon as camera is idle we update the scheduler that nothing is observing
+                end
+                
             end
             
         end
@@ -1545,6 +1549,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 N = 3; % give this error three tries in each 12 hour period, before sending an email/telegram
             elseif strcmp(ME.identifier, 'dome_pc:mount:check_before_slew:no_assistant')
                 N = 3; 
+            elseif strcmp(ME.identifier, 'dome_pc:manager:slew:unsuccessful')
+                N = 2; 
             elseif strcmp(ME.identifier, 'cam_pc:acquisition:astrometry:no_solution')
                 N = 2;
             elseif strcmp(ME.identifier, 'cam_pc:acquisition:focus:no_stars')
@@ -1690,6 +1696,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             % the following conditions for shutting down
             if obj.use_shutdown && obj.devices_ok==0 % critical device failure, must shut down
                 if obj.is_shutdown==0 % if already shut down, don't need to do it again
+                    if obj.mount.status==0
+                        obj.inputToErrorBuffer(MException('manager:devices_error:mount', 'Mount is malfunctioning!'));
+                    elseif obj.dome.status==0
+                        obj.inputToErrorBuffer(MException('manager:devices_error:dome', 'Dome is malfunctioning!'));
+                    else
+                        obj.inputToErrorBuffer(MException('manager:devices_error:other_device', 'A critical device is malfunctioning!'));
+                    end
                     fprintf('%s: Device problems... %s \n', datestr(obj.log.time), obj.devices_report); 
                     obj.shutdown;
                 end
@@ -1961,6 +1974,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
+        function val = is_camera_idle(obj)
+            
+            val = isfield(obj.cam_pc.incoming, 'report') && strcmpi(obj.cam_pc.incoming.report, 'idle');
+            
+        end
+        
         function commandCamPC(obj, str, varargin)
             
 %             input = util.text.InputVars;
@@ -2014,7 +2033,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             obj.commandCamPC('stop'); 
             if ~isempty(obj.sched.current)
-                obj.sched.current.ephem.now_observing = 0;
+%                 obj.sched.current.ephem.now_observing = 0;
+                for ii = 1:length(obj.sched.targets)
+                    obj.sched.targets(ii).ephem.now_observing = 0; 
+                end
             end
             
         end
@@ -2263,7 +2285,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 res = 0.1; 
                 for ii = 1:100 % max wait time is 10 sec
                     
-                    if isfield(obj.cam_pc.incoming, 'report') && strcmpi(obj.cam_pc.incoming.report, 'idle')
+                    if obj.is_camera_idle
                         break;
                     end
                     
