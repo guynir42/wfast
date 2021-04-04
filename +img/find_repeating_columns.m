@@ -18,14 +18,14 @@ function num_columns = find_repeating_columns(Im, varargin)
 % OPTIONAL ARGUMENTS:
 %   -gap: how many frames to look back to find identical columns. If gap=10
 %         then frame 37 would be checked against frame 27. Default is 10. 
-%   -edges: number of frames/images that are skipped from the beginning/end
+%   -margins: number of frames/images that are skipped from the beginning/end
 %           of the dataset. You can enter a scalar or a 2-element vector, 
 %           so that the elements specify the number of frames to skip from
 %           the start and end, independently of each other. 
 %           The default is zero, but whatever the value is, at least "gap" 
 %           number of frames are skipped in the beginning of the frame, 
 %           because those are frames that have no matching columns to 
-%           compare against. E.g., if gap=10 and edges=5, the first 10 
+%           compare against. E.g., if gap=10 and margins=5, the first 10 
 %           frames and the final 5 frames would be skipped. 
 %           Skipped frames just have zero output values, but the size of 
 %           the output does not change. 
@@ -39,13 +39,13 @@ function num_columns = find_repeating_columns(Im, varargin)
     
     input = util.text.InputVars; 
     input.input_var('gap', 10); 
-    input.input_var('edges', 0); 
+    input.input_var('margins', 0); 
     input.input_var('fraction', 0.5); 
     input.input_var('saturation', 5e4);
     input.scan_vars(varargin{:}); 
     
-    % first frame to scan (after gap or edges, whichever is bigger)
-    start = input.edges(1); 
+    % first frame to scan (after gap or margins, whichever is bigger)
+    start = input.margins(1); 
     
     if start<input.gap
         start = input.gap;
@@ -54,10 +54,10 @@ function num_columns = find_repeating_columns(Im, varargin)
     start = start + 1; 
     
     % last frame to scan
-    if isscalar(input.edges)
-        finish = size(Im,3)-input.edges(1);
+    if isscalar(input.margins)
+        finish = size(Im,3)-input.margins(1);
     else
-        finish = size(Im,3)-input.edges(2);
+        finish = size(Im,3)-input.margins(2);
     end
     
     % pixel index for top and bottom part of the column 
