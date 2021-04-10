@@ -325,14 +325,14 @@ void AndorCamera::batch(int idx){
 	AT_GetInt((AT_H) hndl, L"ImageSizeBytes", &ImageSizeBytes);
 	int ret=0;
 	
-	int return_buf_size=0;
+	int return_buf_size=0; // the WaitBuffer command returns a buffer size that should be the same as ImageSizeBytes
 	
 	AT_64 clock=0;
 
 	//ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
 	//if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
 
-	for(unsigned int i=0; i<batch_size; i++){
+	for(unsigned int i=0; i<batch_size; i++){ // loop over a 100 images in a batch
 		
 		unsigned char *buf=0;
 		int error_counter=0; // to make sure we are not in an endless loop... 
@@ -350,19 +350,17 @@ void AndorCamera::batch(int idx){
 			continue;
 		}
 		
-		// printf("i= %d | queue buffer...\n", i);
 		unsigned long long int pos=i*height*width; // where inside the buffer to start writing now... 		
-		// printf("height= %d | width= %d | stride= %d\n", height, width, stride);
 		
 		// ret=AT_ConvertBuffer(buf, (AT_U8*)(images_ptrs[idx]+pos), width, height, stride, L"Mono16", L"Mono16");
 		//if(ret!=AT_SUCCESS){ report_error("batch>convert buffer", ret, mex_flag_cam); return; }
 		
-		if(use_software_trigger){
+		if(use_software_trigger){ // only true in software trigger mode
 			ret = AT_Command((AT_H) hndl, L"SoftwareTrigger");
 			if(ret!=AT_SUCCESS){ report_error("batch>software trigger", ret, mex_flag_cam); return; }
 		}
 		
-		memset(images_ptrs[idx]+pos, 0, height*width*2);
+		memset(images_ptrs[idx]+pos, 0, height*width*2); // initialize the output array image_ptrs that is used by matlab
 		
 		// memcpy(images_ptrs[idx]+pos, buf, height*width*2);
 		for(int j=0;j<height;j++){ // copy each row
@@ -370,12 +368,12 @@ void AndorCamera::batch(int idx){
 			memmove(images_ptrs[idx]+pos+width*j, buf+stride*j, width*2);
 		}
 		
-		// for(int j=0;j<height-1;j++){ // add a signal to each row
-			// *(images_ptrs[idx]+pos+j*width+i)=128;
+		// for(int j=0;j<height;j++){ // add a signal to each row to verify which image belongs to which frame
+			// *(images_ptrs[idx]+pos+j*width+i)=128; // for debugging only
 		// }
 		
-		clock=getTimestamps(buf, (int) ImageSizeBytes);
-		timestamps_ptrs[idx][i]=((double)clock)/clockFreq;
+		clock=getTimestamps(buf, (int) ImageSizeBytes); // timestamp in FPGA clock ticks
+		timestamps_ptrs[idx][i]=((double)clock)/clockFreq; // timestamps in seconds (passed out to matlab)
 		
 		// re-initialize the values in the buf to zero
 		memset(buf, 0, ImageSizeBytes);
@@ -387,7 +385,7 @@ void AndorCamera::batch(int idx){
 	
 	} // for i (each frame in the batch)
 	
-	// to pass in the first pixel of each image the number of repeated pixels 
+	// to pass in the first pixel of each image the number of repeated pixels (debugging only!)
 	// for(int i=0;i<80;i++){
 	
 		// long long int S=0;

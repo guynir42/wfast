@@ -420,11 +420,11 @@ classdef Acquisition < file.AstroData
         end
 
         function setupDefaults(obj)
-
+            
+            obj.batch_size = 100;
             obj.runtime_units = 'hours';
             obj.total_runtime = 2;
 %             obj.num_batches = 500;
-            obj.batch_size = 100;
             
             obj.num_stars = 5000;
             obj.cut_size = 15;
@@ -548,6 +548,22 @@ classdef Acquisition < file.AstroData
             else
                 val = Inf;
             end
+            
+        end
+        
+        function val = getNumBatches(obj, hours)
+            
+            if nargin<2 || isempty(hours)
+                hours = 2;
+            end
+            
+            val = ceil(hours.*3600.*obj.getFrameRateEstimate./obj.batch_size);
+            
+        end
+        
+        function val = getTotalRuntime(obj)
+            
+            val = obj.num_batches./obj.convertRuntimeToSeconds./obj.getFrameRateEstimate.*obj.batch_size; 
             
         end
         
@@ -2189,12 +2205,8 @@ classdef Acquisition < file.AstroData
                         input.input_var('mode', 'fast', 'cam_mode', 'camera_mode'); 
                         input.input_var('exp_time', [], 'exposure_time');
                         input.input_var('frame_rate', []); 
+                        input.input_var('hours', 2); % the default number of batches is for 2 hours, as the dome-pc can stop this run at any time, and can also specify num_batches explicitely. 
                         input.scan_vars(args{:}); 
-                        
-                        % the default number of batches is long, as the 
-                        % dome-pc can stop this run at any time, and can 
-                        % also specify num_batches explicitely. 
-                        args = ['num_batches', 3600, args]; 
                         
                         obj.dome_pc.outgoing.error = ''; 
                         obj.dome_pc.outgoing.err_time = ''; 
@@ -2235,6 +2247,7 @@ classdef Acquisition < file.AstroData
                         end
                         
                         if ~isempty(input.exp_time)
+                            
                             args{end+1} = 'expT'; % this is the only format that is understood by run()
                             args{end+1} = input.exp_time;
                             
@@ -2252,6 +2265,8 @@ classdef Acquisition < file.AstroData
                         if ~isempty(obj.gui) && obj.gui.check
                             figure(obj.gui.fig.fig); % pop the GUI back on top
                         end
+                        
+                        args = ['num_batches', obj.getNumBatches(input.hours), args]; 
                         
                         obj.run('reset', 1, args{:}); % the rest of the inputs from dome-pc are parsed in the regular way
                         
@@ -2590,7 +2605,8 @@ classdef Acquisition < file.AstroData
                 end
                 
                 obj.stash_parameters(input);
-            
+                obj.total_runtime = obj.getTotalRuntime; 
+                
                 if obj.use_arbitrary_pos && obj.use_astrometry
                     obj.gui.latest_error = 'Cannot use astrometry and arbitrary pos at the same time!';
                     warning(obj.gui.latest_error); 
@@ -2640,23 +2656,20 @@ classdef Acquisition < file.AstroData
                 
                 if ~obj.cal.checkDark
                     obj.gui.latest_error = 'Cannot start a new run without loading darks into calibration object!';
-                    warning(obj.gui.latest_error);
                     obj.log.error(obj.gui.latest_error);
-                    return;
+                    error(obj.gui.latest_error);                    
                 end
                 
                 if obj.getTimeLeft>3600*10
-                    obj.gui.latest_error = sprintf('Run scheduled to take %4.2f hours with these parameter... aborting!', obj.getTimeLeft/3600);
-                    warning(obj.gui.latest_error);
+                    obj.gui.latest_error = sprintf('Run scheduled to take %4.2f hours with these parameters... aborting!', obj.getTimeLeft/3600);
                     obj.log.error(obj.gui.latest_error);
-                    return;
+                    error(obj.gui.latest_error);
                 end
                 
                 if obj.use_save && obj.getGbLeft>util.sys.disk_space(obj.buf.directory)*1.0 % only throw an error if the required disk space is bigger than storage! 
                     obj.gui.latest_error = sprintf('Run scheduled requires an estimated %5.2f Gb of storage. Only %5.2f Gb available on drive!', obj.getGbLeft, util.sys.disk_space(obj.buf.directory));
-                    warning(obj.gui.latest_error);
                     obj.log.error(obj.gui.latest_error);
-                    return;
+                    error(obj.gui.latest_error);
                 end
                 
                 if obj.display_num_rect_stars>100
@@ -3040,7 +3053,7 @@ classdef Acquisition < file.AstroData
             t_show = tic;
             
             if obj.use_show && obj.show_every_num_frames>1 && mod(obj.batch_counter, obj.show_every_num_frames)==1
-                obj.show;                
+                obj.show;
             end
             
 %             plot(squeeze(obj.images(1,1,:)));
