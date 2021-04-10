@@ -104,8 +104,7 @@ classdef ScopeAssistant < handle
                 
 %                     obj.disconnect; % we don't have to disconnect since we could still find this bluetooth object using instrfindall 
 
-                    t = datetime('now', 'TimeZone', 'UTC');
-                    fprintf('%s: connecting arduino bluetooth\n', t);
+                    util.text.date_printf('Connecting Arduino bluetooth');
 
                     obj.connectBluetooth(varargin{:});
 
@@ -160,8 +159,7 @@ classdef ScopeAssistant < handle
                     try % try, try again
                         fopen(obj.hndl);
                     catch 
-                        t = datetime('now', 'TimeZone', 'UTC');
-                        fprintf('%s: Cannot open bluetooth to ScopeAssistant!\n', t); 
+                        util.text.date_printf('Cannot open bluetooth to ScopeAssistant!'); 
                         delete(obj.hndl); 
                         obj.hndl = [];
                         return; 
@@ -349,17 +347,17 @@ classdef ScopeAssistant < handle
                 fprintf(obj.hndl, str);
                 ok = 1;
             catch ME
-%                 disp('Problem writing to Arduino'); 
+%                 util.text.date_printf('Problem writing to Arduino'); 
                 
                 try % try again
                     fprintf(obj.hndl, str);
                     ok = 1;
                 catch ME
-%                     disp('Failed second attempt to write'); 
+%                     util.text.date_printf('Failed second attempt to write'); 
 %                     warning(ME.getReport); 
                     ok = 0;
                     if obj.status
-                        fprintf('%s: ScopeAssistant has disconnected!\n', datetime('now', 'TimeZone', 'UTC'));
+                        util.text.date_printf('ScopeAssistant has disconnected!');
                     end
                     obj.status = 0;
                 end
@@ -375,13 +373,12 @@ classdef ScopeAssistant < handle
                 
                 obj.reply = strip(fgetl(obj.hndl)); % text reply
 
-    %             t = datetime('now', 'TimeZone', 'UTC'); 
-    %             fprintf('%s Arduino reply: %s\n', t, obj.reply); 
+    %             util.text.date_printf('Arduino reply: %s.', obj.reply); 
 
     %             reply = str2double(regexp(obj.reply,'-?\d*','Match'));
                 numeric_reply = str2double(split(obj.reply, ','))';
 
-                if isnan(numeric_reply), disp(obj.reply); end
+                if isnan(numeric_reply), util.text.date_printf(obj.reply); end
 
                 if length(numeric_reply)<5, return; end
 
@@ -395,7 +392,7 @@ classdef ScopeAssistant < handle
                 obj.data.input([obj.jd obj.acc_vec obj.distance]);
 
                 if obj.debug_bit>1
-                    disp(['ALT= ' num2str(obj.ALT)]);
+                    util.text.date_printf('ALT= %4.2f', obj.ALT);
                 end
 
                 if ~isempty(obj.telescope) && obj.telescope.use_accelerometer && obj.use_check_alt && obj.ALT<obj.alt_limit
@@ -405,9 +402,7 @@ classdef ScopeAssistant < handle
                         obj.telescope.stop;
 
                         if obj.log_message_sent==0
-                            obj.telescope.log.input(['Arduino stopped telescope at angle ALT: ' num2str(obj.ALT) ' degrees...']);
-%                             fprintf('%s: Arduino sending stop signal to telescope!\n', obj.telescope.log.report(1:8));
-                            disp(obj.telescope.log.report); 
+                            obj.telescope.log.input(util.text.date_printf('Arduino stopped telescope at angle ALT: %42.f degrees...', obj.ALT));
                             obj.log_message_sent = 1;
                         end
 
@@ -474,10 +469,10 @@ classdef ScopeAssistant < handle
 
             if obj.debug_bit
                 
-                fprintf('Calibration complete. GAIN= %f %f %f | BIAS= %f %f %f\n', ...
+                util.text.date_printf('Calibration complete. GAIN= %f %f %f | BIAS= %f %f %f\n', ...
                     obj.gain(1), obj.gain(2), obj.gain(3), obj.bias(1), obj.bias(2), obj.bias(3));
                 
-                fprintf('---> Total summed errors= %f\n', S);
+                util.text.date_printf('---> Total summed errors= %f\n', S);
                 
             end
             

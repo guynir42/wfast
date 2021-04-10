@@ -566,8 +566,8 @@ classdef Scheduler < handle
                 
                 for ii = 1:length(target_list) % go over the list an re-resolve any targets that need to be updated
                     if target_list(ii).use_resolver
-%                         target_list(ii).ephem.resolve([], arguments{:}); % also updates secondaries
-                        target_list(ii).ephem.resolve; % also updates secondaries
+                        target_list(ii).ephem.resolve([], arguments{:}); % also updates secondaries
+%                         target_list(ii).ephem.resolve; % also updates secondaries
                     end 
                 end
 

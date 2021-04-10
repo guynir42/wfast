@@ -997,12 +997,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 keyword = obj.keyword;
             end
             
+            obj.constraints.scan_vars(varargin{:}); 
+            
             if cs(keyword, 'ecliptic', 'kbos')
                 obj.keyword = 'ecliptic'; % dynamically allocate this field after setting the time
-                obj.gotoDefaultField(obj.name, varargin{:}); 
+                obj.gotoDefaultField(obj.name, varargin{:}); % do we need the varargin here?
             elseif cs(keyword, 'galactic')
                 obj.keyword = 'galactic'; % dynamically allocate this field after setting the time
-                obj.gotoDefaultField(obj.name, varargin{:});
+                obj.gotoDefaultField(obj.name, varargin{:}); % do we need the varargin here?
             elseif cs(keyword, 'moon')
                 obj.keyword = 'moon'; % dynamically allocate this field after setting the time
                 obj.updateMoon;
@@ -1028,7 +1030,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                                 'ObsCoo', [obj.longitude, obj.latitude, obj.elevation], 'OutputUnits', 'deg', 'NameServer', 'jpl');
                         catch ME
                             if strcmp(ME.identifier, 'MATLAB:structRefFromNonStruct')
-                                fprintf('Could not resolve name "%s" with convert2equatorial()!\n', keyword);
+                                util.text.date_printf('Could not resolve name "%s" with convert2equatorial()!', keyword);
                                 return; 
                             else
                                 rethrow(ME); 
@@ -1036,7 +1038,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                         end
                         
                         if isnan(RA) || isnan(DEC) % failed to resolve using JPL also
-                            fprintf('Could not resolve name "%s" with convert2equatorial()!\n', keyword);
+                            util.text.date_printf('Could not resolve name "%s" with convert2equatorial()!', keyword);
                             return;
                         end
                         
@@ -1052,7 +1054,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                     [RA, DEC] = celestial.coo.coo_resolver(keyword, 'OutUnits', 'deg', 'NameServer', @VO.name.server_simbad);
 
                     if isnan(RA) || isnan(DEC)
-                        fprintf('Could not resolve name "%s" with coo_resolver()!\n', keyword); 
+                        util.text.date_printf('Could not resolve name "%s" with coo_resolver()!', keyword); 
                         return;
                     end
 
@@ -1301,14 +1303,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 obj.time = input.time;
             end
             
-            if other.observable(varargin{:})==0
-                val = 1;
-                return; 
-            end
-            
             if obj.observable(varargin{:})==0
                 val = 0;
                 return;
+            end
+            
+            if other.observable(varargin{:})==0
+                val = 1;
+                return; 
             end
             
             if obj.now_observing && other.now_observing

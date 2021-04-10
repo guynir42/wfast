@@ -128,7 +128,7 @@ classdef AstroHaven < handle
             
             if isempty(varargin)
             
-                if obj.debug_bit>1, fprintf('Boltwood default constructor v%4.2f\n', obj.version); end
+                if obj.debug_bit>1, fprintf('AstroHaven default constructor v%4.2f\n', obj.version); end
                 
                 obj.log = util.sys.Logger('AstroHaven_dome', obj);
                 
@@ -155,7 +155,7 @@ classdef AstroHaven < handle
 
                     str = sprintf('connecting to dome! attempt %d', ii);
 
-                    if obj.debug_bit>1, disp(str); end
+                    if obj.debug_bit>1, util.text.date_printf(str); end
 
                     obj.log.input(str);
 
@@ -177,7 +177,7 @@ classdef AstroHaven < handle
 
                         if strcmp(ME.identifier, 'MATLAB:serial:fopen:opfailed') % if this is the regular connection error, just report it and try again
                             str = sprintf('failed to open serial port, attempt %d\n', ii); 
-                            if obj.debug_bit>1, disp(str); end 
+                            if obj.debug_bit>1, util.text.date_printf(str); end 
                             obj.log.input(str);
                         else 
                             rethrow(ME); % if this is some other error, throw it up the line
@@ -191,7 +191,7 @@ classdef AstroHaven < handle
 
                 if strcmp(obj.hndl.Status, 'open') % if the loop ended with success
 
-                    if obj.debug_bit>1, disp('Successful reconnect!'); end
+                    if obj.debug_bit>1, util.text.date_printf('Successful reconnect!'); end
 
                     obj.update;
 
@@ -201,7 +201,7 @@ classdef AstroHaven < handle
 
                 else % failed to connect after so many tries
 
-                    if obj.debug_bit>1, disp('Giving up on opening serial port...'); end
+                    if obj.debug_bit>1, util.text.date_printf('Giving up on opening serial port...'); end
                     obj.log.input('Failed to connect to serial port :(');
 
                     if ~isempty(obj.hndl)
@@ -221,7 +221,7 @@ classdef AstroHaven < handle
         
         function disconnect(obj) % close, delete and clear the serial object "hndl"
             
-            if obj.debug_bit>1, disp('disconnecting from dome!'); end
+            if obj.debug_bit>1, util.text.date_printf('Disconnecting from dome!'); end
             
             obj.log.input('Disconnecting from dome');
             
@@ -897,8 +897,7 @@ classdef AstroHaven < handle
                 try 
                    
                     % first move the West shutter down 
-                    date_str = util.text.time2str(datetime('now', 'TimeZone', 'UTC')); 
-                    if obj.debug_bit, fprintf('%s: Opening West shutter by %d steps\n', date_str, obj.track_rate); end
+                    if obj.debug_bit, util.text.date_printf('Opening West shutter by %d steps\n', obj.track_rate); end
                     
                     t = tic;
                 
@@ -912,7 +911,7 @@ classdef AstroHaven < handle
 
                     % now close the East shutter
                     date_str = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
-                    if obj.debug_bit, fprintf('%s: Closing East shutter by %d steps\n', date_str, obj.track_rate); end
+                    if obj.debug_bit, util.text.date_printf('Closing East shutter by %d steps\n', obj.track_rate); end
                     
                     t = tic;
 
@@ -1054,16 +1053,16 @@ classdef AstroHaven < handle
                     flushinput(obj.hndl);
                     fprintf(obj.hndl, command);
                     reply = obj.getReply;
-                    if obj.debug_bit>4, fprintf('sent: %s | reply: %s\n', command, reply); end
+                    if obj.debug_bit>4, util.text.date_printf('sent: %s | reply: %s', command, reply); end
                 end
                 
             catch ME
 
                 if strcmp(ME.identifier, 'MATLAB:serial:fprintf:opfailed')
-                    if obj.debug_bit>1, disp('Failed to send command...'); end
+                    if obj.debug_bit>1, util.text.date_printf('Failed to send command...'); end
                     reply = '';
                 elseif strcmp(ME.identifier, 'MATLAB:serial:flushinput:opfailed')
-                    if obj.debug_bit>1, disp('Failed to flush input...'); end
+                    if obj.debug_bit>1, util.text.date_printf('Failed to flush input...'); end
                     reply = '';
                 else
                     rethrow(ME); % any other error is reported up the line
@@ -1075,7 +1074,7 @@ classdef AstroHaven < handle
         
         function update(obj) % communicate with hardware to make sure it is still connected
             
-            if obj.debug_bit>1, fprintf('updating data...\n'); end
+            if obj.debug_bit>1, util.text.date_printf('updating data...'); end
             
             if isempty(obj.hndl)
                 obj.status = 0;
@@ -1110,7 +1109,7 @@ classdef AstroHaven < handle
                 reply = char(reply);
             catch ME
                 if strcmp(ME.identifier, 'MATLAB:serial:fread:opfailed')
-                    if obj.debug_bit>1, disp('Failed to read command...'); end
+                    if obj.debug_bit>1, util.text.date_printf('Failed to read command...'); end
                     obj.reply = '';
                 else
                     rethrow(ME); % any other error is reported up the line
@@ -1119,7 +1118,7 @@ classdef AstroHaven < handle
             
             if num==0 || isempty(reply)
                 obj.reply = '';
-                if obj.debug_bit>1, disp('Failed to read command...'); end
+                if obj.debug_bit>1, util.text.date_printf('Failed to read command...'); end
                 return;
             else
                 obj.reply = reply;

@@ -266,7 +266,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 warning(ME.getReport);
                 
-                disp('Cannot connect to AstroHaven dome. Using simulator instead...');
+                util.text.date_printf('Cannot connect to AstroHaven dome. Using simulator instead...');
                 
                 try
                     obj.dome = obs.dome.Simulator;
@@ -309,7 +309,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.log.input('Connecting to weather simulator.');
                 warning(ME.getReport);
                 
-                disp('Cannot connect to Boltwood weather station. Using simulator instead...');
+                util.text.date_printf('Cannot connect to Boltwood weather station. Using simulator instead...');
                 
                 try
                     obj.weather = obs.sens.Simulator;
@@ -335,7 +335,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 warning(ME.getReport);
                 
-                disp('Cannot connect to WindETH sensor.');
+                util.text.date_printf('Cannot connect to WindETH sensor.');
                 
             end
             
@@ -356,7 +356,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             catch ME
                 obj.log.error(ME);
                 warning(ME.getReport);
-                disp('Cannot initialize SensorChecker!');
+                util.text.date_printf('Cannot initialize SensorChecker!');
             end
 
         end
@@ -371,7 +371,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             catch ME
                 obj.log.error(ME);
                 warning(ME.getReport);
-                disp('Cannot create a PcSync tcp/ip object')
+                util.text.date_printf('Cannot create a PcSync tcp/ip object')
             end
             
         end
@@ -1231,7 +1231,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             t = datetime('yesterday', 'TimeZone', 'UTC');
             date_string = datestr(t, 'yyyy-mm-dd');
             
-            if obj.debug_bit, fprintf('%s: sending morning report by Email!\n', t); end
+            if obj.debug_bit, util.text.date_printf('%s: sending morning report by Email!\n', t); end
             
             str = '';
             
@@ -1403,7 +1403,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             obj.log.input(text, error_flag); 
             
-            if obj.debug_bit, disp(obj.log.report); end
+            if obj.debug_bit, util.text.date_printf(text); end
             
             if ~isempty(obj.gui) && obj.gui.check
                 obj.gui.button_info.String = obj.log.report;
@@ -1432,7 +1432,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 
             try % send an email
                 
-                if obj.debug_bit, fprintf('Sending email to %s with subject: %s\n', name, subject); end
+                if obj.debug_bit, util.text.date_printf('Sending email to %s with subject: %s\n', name, subject); end
 
                 if isempty(name) % if we cannot get the observer name, send to whole list
                     obj.email.sendToList('subject', subject, 'text', sprintf('Observer: ----.\n %s', text)); 
@@ -1464,7 +1464,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function sendTelegram(obj, name, subject)
             
-            if obj.debug_bit, fprintf('Sending telegram to %s with subject: %s\n', name, subject); end
+            if obj.debug_bit, util.text.date_printf('Sending telegram to %s with subject: %s\n', name, subject); end
 
             token = '';
             id = '';
@@ -1540,7 +1540,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             end
             
             if isempty(ME.identifier) % there's not much we can do without an identifier! 
-                fprintf('Cannot buffer this error, without an identifier: %s\n', ME.getReport('extended', 'hyperlinks', 'off')); 
+                util.text.date_printf('Cannot buffer this error, without an identifier: %s\n', ME.getReport('extended', 'hyperlinks', 'off')); 
                 obj.sendError(ME, time); 
                 return; % don't add this error to the buffer, without an identifier it is meaningless! 
             end
@@ -1662,7 +1662,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.ephem.update;
                 if obj.use_shutdown && obj.ephem.sun.Alt>obj.checker.sun_max_alt
                     if obj.is_shutdown==0 % if already shut down, don't need to do it again
-                        fprintf('%s:Sun elevation %d is above %d deg... \n', datestr(obj.log.time), round(obj.ephem.sun.Alt), obj.checker.sun_max_alt); 
+                        fprintf('Sun elevation %d is above %d deg...', round(obj.ephem.sun.Alt), obj.checker.sun_max_alt); 
                         obj.shutdown;
                     end
                 end
@@ -1673,7 +1673,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             if obj.use_shutdown && obj.checker.checkDayTime % check if the system clock says it is day time
                 if obj.is_shutdown==0 % if already shut down, don't need to do it again
-                    fprintf('%s: System clock says it is day time... \n', datestr(obj.log.time)); 
+                    util.text.date_printf('%s: System clock says it is day time... \n', datestr(obj.log.time)); 
                     obj.shutdown;
                 end
             end
@@ -1703,14 +1703,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     else
                         obj.inputToErrorBuffer(MException('manager:devices_error:other_device', 'A critical device is malfunctioning!'));
                     end
-                    fprintf('%s: Device problems... %s \n', datestr(obj.log.time), obj.devices_report); 
+                    util.text.date_printf('Device problems... %s \n', obj.devices_report); 
                     obj.shutdown;
                 end
             end
 
             if obj.use_shutdown && (obj.checker.sensors_ok==0 || obj.checker.light_ok==0) % one of the sensors reports bad weather, must shut down
                 if obj.is_shutdown==0 % if already shut down, don't need to do it again
-                    fprintf('%s: Bad weather... %s \n', datestr(obj.log.time), obj.checker.report); 
+                    fprintf('Bad weather... %s \n', obj.checker.report); 
                     obj.shutdown;
                 end
             end
@@ -1862,7 +1862,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 % trust the "status" flag to check if we need to reconnect
                 if ~obj.cam_pc.is_connected || ~obj.cam_pc.status
-%                     fprintf('%s: Trying to connect...\n', datetime('now', 'TimeZone', 'UTC'));
+%                     util.text.date_printf('%s: Trying to connect...\n', datetime('now', 'TimeZone', 'UTC'));
                     obj.cam_pc.connect;
                 end
                 
@@ -1876,7 +1876,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 %                 
 %                 if minutes(t_now-t_in)>10
 %                     % do something like try to reconnect
-%                     disp('input from "cam_pc" is out of date by more than 10 minutes!'); 
+%                     util.text.date_printf('input from "cam_pc" is out of date by more than 10 minutes!'); 
 %                     obj.cam_pc.connect;
 %                 end
                 
@@ -1901,7 +1901,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 
             catch 
 %                 t = datetime('now', 'TimeZone', 'UTC'); 
-%                 fprintf('%s: Failed to connect to camera computer\n', t); 
+%                 fprintf('Failed to connect to camera computer.'); 
                 % do nothing, as we can be waiting for ever for server to connect
             end
             
@@ -2103,7 +2103,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.mount.object.name = '';
                 obj.mount.object.RA = '';
                 obj.mount.object.Dec = '';
-                fprintf('Could not find any targets! \nTry changing the constraints or adding new targets and reloading the scheduler.\n'); 
+                util.text.date_printf('Could not find any targets! \nTry changing the constraints or adding new targets and reloading the scheduler.\n'); 
             else
                 obj.mount.object.name = obj.sched.current.name;
                 obj.mount.object.RA = obj.sched.current.RA;
@@ -2365,7 +2365,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             obj.print_message('Shutting down observatory!'); 
             
-%             disp([char(obj.log.time) ': Shutting down observatory!']);
+%             util.text.date_printf('Shutting down observatory!');
             
             try % stop dome and mount
 

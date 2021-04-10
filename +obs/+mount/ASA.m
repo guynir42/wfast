@@ -294,7 +294,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     
                     if obj.ard.status==0 % re-try to connect use DomeAssistant
                         
-                        if obj.debug_bit, disp('Toggling power to ScopeAssistant'); end
+                        if obj.debug_bit, util.text.date_printf('Toggling power to ScopeAssistant'); end
                         
                         obj.owner.assist.scope_assistant = 0;
                         
@@ -351,7 +351,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                         obj.ard.update;
                         pause(2); 
                         
-                        fprintf('%s: ard.status= %d\n', datetime('now', 'TimeZone', 'UTC'), obj.ard.status); 
+                        util.text.date_printf('ard.status= %d\n', obj.ard.status); 
                         
                     end
                     
@@ -1061,7 +1061,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             obj.object.update; % the Ephemeris object can calculate the ALT and whatever other parameters
             
             if obj.object.Alt_deg<obj.limit_alt
-                disp(['Target alt (' num2str(obj.object.Alt_deg) ') is below alt limit (' num2str(obj.limit_alt) ')']);
+                util.text.date_printf(['Target alt (' num2str(obj.object.Alt_deg) ') is below alt limit (' num2str(obj.limit_alt) ')']);
                 return;
             end
             
@@ -1080,7 +1080,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 end
                 
                 if isempty(obj.ard) || obj.ard.status==0
-                    error('dome_pc:mount:check_before_slew:no_assistant', 'Cannot slew without a responsive ScopeAssistant (arduino)');
+                    error('dome_pc:mount:check_before_slew:no_assistant', 'Cannot slew without a responsive ScopeAssistant (Arduino)');
                 end
                 
             end
@@ -1107,7 +1107,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             try 
                 
                 if obj.telALT<obj.limit_alt
-                    fprintf('Alt limit crossed! \n'); 
+                    util.text.date_printf('Alt limit crossed!'); 
                     return;
                 end
 
@@ -1116,7 +1116,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     ok = obj.ard.update;
 
                     if obj.ard.ALT<obj.ard.alt_limit || ok==0
-                        fprintf('ALT= %f\n', obj.ard.alt); 
+                        util.text.date_printf('ALT= %f', obj.ard.alt); 
                         return;
                     end
 
@@ -1355,7 +1355,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                                 obj.slewWithoutPrechecks(mod(obj.object.LST_deg/15-4,24), 45); % do a second preslew to the same Dec with RA that is easier to flip from
                             end
                         catch ME
-                            disp('Could not complete the second pre-slew:'); 
+                            util.text.date_printf('Could not complete the second pre-slew:'); 
                             warning(ME.getReport); 
                         end
                         
@@ -1376,8 +1376,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 if ~obj.check_after_slew
                     
                     if obj.brake_bit, return; end % in case user clicked stop!
-                    obj.log.input('Slew post-check failed, trying to slew again...');
-                    disp(obj.log.report); 
+                    obj.log.input(util.text.date_printf('Slew post-check failed, trying to slew again...'));
                     
                     obj.slewWithoutPrechecks(ra_hours_Jnow, dec_deg_Jnow);
                     
@@ -1388,9 +1387,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     if ~obj.check_after_slew % if this fails, slew aside a little and come back
                         
                         if obj.brake_bit, return; end % in case user clicked stop!
-                        obj.log.input('Slew post-check failed again, trying to slew to different coordinate and return...'); 
-                        disp(obj.log.report); 
-
+                        obj.log.input(util.text.date_printf('Slew post-check failed again, trying to slew to different coordinate and return...')); 
+                        
                         if obj.object.HA_deg>0 % target is on West side
                             obj.slewWithoutPrechecks(ra_hours_Jnow-0.1, dec_deg_Jnow+1);
                         else % target is on East side
@@ -1573,8 +1571,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 obj.hndl.SlewToCoordinatesAsync(ra_hours_Jnow, dec_deg_Jnow);
             catch ME
                 if strcmp(ME.identifier, 'MATLAB:COM:E2148734208')
-                    t = datestr(datetime('now', 'TimeZone', 'UTC'), 'HH:MM:SS.FFF'); 
-                    fprintf('%S: Hardware error: "%s". Slewing again (attempt %d)...\n', t, ME.identifier, ii);
+                    util.text.date_printf('Hardware error: "%s". Slewing again (attempt %d)...\n', ME.identifier, ii);
                     obj.hndl.ErrorClear; 
 %                     obj.hndl.SlewToCoordinatesAsync(ra_hours_Jnow, dec_deg_Jnow);
                 end
@@ -1872,8 +1869,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 %                 if ~isempty(obj.cam_pc)
 % 
 %                     if isfield(obj.cam_pc.outgoing, 'stop_camera') && obj.cam_pc.outgoing.stop_camera==0
-%                         obj.log.input('Telescope stopped, sending camera stop command');
-%                         disp(obj.log.report);
+%                         obj.log.input(util.text.date_printf('Telescope stopped, sending camera stop command'));                         
 %                     end
 % 
 %                     obj.cam_pc.outgoing.stop_camera = 1;
@@ -1889,10 +1885,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
         
         function emergency_stop(obj) % stops slew, tracking and guiding and reports it on log
             
-            obj.log.input('stopping telescope');
-            
-            disp('stopping telescope!');
-            
+            obj.log.input(util.text.date_printf('stopping telescope'));
             obj.stop;
             
         end
