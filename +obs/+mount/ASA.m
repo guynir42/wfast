@@ -351,7 +351,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                         obj.ard.update;
                         pause(2); 
                         
-                        util.text.date_printf('ard.status= %d\n', obj.ard.status); 
+                        util.text.date_printf('ard.status= %d', obj.ard.status); 
                         
                     end
                     
@@ -1061,7 +1061,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             obj.object.update; % the Ephemeris object can calculate the ALT and whatever other parameters
             
             if obj.object.Alt_deg<obj.limit_alt
-                util.text.date_printf(['Target alt (' num2str(obj.object.Alt_deg) ') is below alt limit (' num2str(obj.limit_alt) ')']);
+                util.text.date_printf('Target alt (%4.2f) is below alt limit (%4.2f)', obj.object.Alt_deg, obj.limit_alt);
                 return;
             end
             
@@ -1571,7 +1571,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 obj.hndl.SlewToCoordinatesAsync(ra_hours_Jnow, dec_deg_Jnow);
             catch ME
                 if strcmp(ME.identifier, 'MATLAB:COM:E2148734208')
-                    util.text.date_printf('Hardware error: "%s". Slewing again (attempt %d)...\n', ME.identifier, ii);
+                    util.text.date_printf('Hardware error: "%s". Slewing again (attempt %d)...', ME.identifier, ii);
                     obj.hndl.ErrorClear; 
 %                     obj.hndl.SlewToCoordinatesAsync(ra_hours_Jnow, dec_deg_Jnow);
                 end

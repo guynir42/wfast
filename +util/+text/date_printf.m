@@ -14,7 +14,7 @@ function str = date_printf(str, varargin)
     
     str = sprintf(str, varargin{:}); 
     
-    now = datetime('now', 'TimeZone', 'UTC', 'Format', 'uuuu-MM-dd hh:mm:ss.sss'); 
+    now = datetime('now', 'TimeZone', 'UTC', 'Format', 'uuuu-MM-dd HH:mm:ss.sss'); 
     
     disp([char(now) ': ' str]); 
     

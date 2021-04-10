@@ -176,7 +176,7 @@ classdef AstroHaven < handle
                     catch ME
 
                         if strcmp(ME.identifier, 'MATLAB:serial:fopen:opfailed') % if this is the regular connection error, just report it and try again
-                            str = sprintf('failed to open serial port, attempt %d\n', ii); 
+                            str = sprintf('failed to open serial port, attempt %d', ii); 
                             if obj.debug_bit>1, util.text.date_printf(str); end 
                             obj.log.input(str);
                         else 
@@ -897,7 +897,7 @@ classdef AstroHaven < handle
                 try 
                    
                     % first move the West shutter down 
-                    if obj.debug_bit, util.text.date_printf('Opening West shutter by %d steps\n', obj.track_rate); end
+                    if obj.debug_bit, util.text.date_printf('Opening West shutter by %d steps', obj.track_rate); end
                     
                     t = tic;
                 
@@ -911,7 +911,7 @@ classdef AstroHaven < handle
 
                     % now close the East shutter
                     date_str = util.text.time2str(datetime('now', 'TimeZone', 'UTC'));
-                    if obj.debug_bit, util.text.date_printf('Closing East shutter by %d steps\n', obj.track_rate); end
+                    if obj.debug_bit, util.text.date_printf('Closing East shutter by %d steps', obj.track_rate); end
                     
                     t = tic;
 

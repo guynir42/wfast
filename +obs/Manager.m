@@ -1231,7 +1231,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             t = datetime('yesterday', 'TimeZone', 'UTC');
             date_string = datestr(t, 'yyyy-mm-dd');
             
-            if obj.debug_bit, util.text.date_printf('%s: sending morning report by Email!\n', t); end
+            if obj.debug_bit, util.text.date_printf('%s: sending morning report by Email!', t); end
             
             str = '';
             
@@ -1432,7 +1432,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 
             try % send an email
                 
-                if obj.debug_bit, util.text.date_printf('Sending email to %s with subject: %s\n', name, subject); end
+                if obj.debug_bit, util.text.date_printf('Sending email to %s with subject: %s', name, subject); end
 
                 if isempty(name) % if we cannot get the observer name, send to whole list
                     obj.email.sendToList('subject', subject, 'text', sprintf('Observer: ----.\n %s', text)); 
@@ -2103,7 +2103,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.mount.object.name = '';
                 obj.mount.object.RA = '';
                 obj.mount.object.Dec = '';
-                util.text.date_printf('Could not find any targets! \nTry changing the constraints or adding new targets and reloading the scheduler.\n'); 
+                util.text.date_printf('Could not find any targets! \nTry changing the constraints or adding new targets and reloading the scheduler.'); 
             else
                 obj.mount.object.name = obj.sched.current.name;
                 obj.mount.object.RA = obj.sched.current.RA;

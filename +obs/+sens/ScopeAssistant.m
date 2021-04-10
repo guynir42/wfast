@@ -104,7 +104,7 @@ classdef ScopeAssistant < handle
                 
 %                     obj.disconnect; % we don't have to disconnect since we could still find this bluetooth object using instrfindall 
 
-                    util.text.date_printf('Connecting Arduino bluetooth');
+                    util.text.date_printf('Connecting Arduino bluetooth...');
 
                     obj.connectBluetooth(varargin{:});
 
@@ -469,10 +469,10 @@ classdef ScopeAssistant < handle
 
             if obj.debug_bit
                 
-                util.text.date_printf('Calibration complete. GAIN= %f %f %f | BIAS= %f %f %f\n', ...
+                util.text.date_printf('Calibration complete. GAIN= %f %f %f | BIAS= %f %f %f', ...
                     obj.gain(1), obj.gain(2), obj.gain(3), obj.bias(1), obj.bias(2), obj.bias(3));
                 
-                util.text.date_printf('---> Total summed errors= %f\n', S);
+                util.text.date_printf('---> Total summed errors= %f', S);
                 
             end
             
