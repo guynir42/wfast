@@ -807,7 +807,7 @@ classdef BufferWheel < file.AstroData
                 return;
             end
             
-            if obj.debug_bit>1, fprintf('waitForRecording. record_flag= %d %d\n', buf.mex_flag_record(1), buf.mex_flag_record(2)); end
+            if obj.debug_bit>1, util.text.date_printf('waitForRecording. record_flag= %d %d', buf.mex_flag_record(1), buf.mex_flag_record(2)); end
             
             res = 0.01; % time resolution
 
@@ -1021,7 +1021,7 @@ classdef BufferWheel < file.AstroData
             
             if obj.debug_bit 
                 if isempty(obj.modulator) || mod(obj.serial, obj.modulator)==1
-                    fprintf('Buffer %d saving file % 4d  : %s (async: %d defalte: %d)\n', buf.buf_number, obj.serial, this_filename, obj.use_async, obj.use_deflate);
+                    util.text.date_printf('Buf %d, file % 4d  : %s (async: %d defalte: %d)', buf.buf_number, obj.serial, this_filename, obj.use_async, obj.use_deflate);
                 end
             end
             

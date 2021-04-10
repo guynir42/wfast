@@ -399,12 +399,11 @@ classdef Andor < file.AstroData
                 if exist('C:\Users\Public\PI\PI_MATLAB_Driver_GCS2', 'dir')
                     obj.focuser = obs.focus.FocusSpider;
                 else
-                    obj.log.input('Cannot find PI actuator folder, setting up sim-focuser instead'); 
-                    disp(obj.log.report);
+                    obj.log.input(util.text.date_printf('Cannot find PI actuator folder, setting up sim-focuser instead')); 
                     obj.focuser = obs.focus.Simulator;
                 end
             catch ME
-                disp('Cannot connect to focuser, using simulator instead');
+                util.text.date_printf('Cannot connect to focuser, using simulator instead');
                 warning(ME.getReport);
                 obj.log.input('Cannot connect to focuser, using simulator instead');
                 obj.log.input(ME.getReport);
@@ -453,8 +452,7 @@ classdef Andor < file.AstroData
             try
                 obj.audio = util.sys.AudioControl;
             catch ME
-                disp('Cannot connect to audio driver. Continuing without it!');
-                obj.log.input('Cannot connect to audio driver. Continuing without it!');
+                obj.log.input(util.text.date_printf('Cannot connect to audio driver. Continuing without it!'));
             end
             
         end
@@ -700,7 +698,7 @@ classdef Andor < file.AstroData
         
         function set.mex_flag(~, ~) % prevents users from altering the value of mex_flag... 
            
-            disp('You must not change "mex_flag" directly. Use util.vec.mex_change or obj.stop or obj.unlockMexFlag');
+            util.text.date_printf('You must not change "mex_flag" directly. Use util.vec.mex_change or obj.stop or obj.unlockMexFlag');
             
         end
         
@@ -871,7 +869,7 @@ classdef Andor < file.AstroData
                 end
                 
                 if obj.is_running
-                    disp('Camera is already running. Set is_running to zero...');
+                    util.text.date_printf('Camera is already running. Set is_running to zero...');
                     return;
                 end
 
@@ -982,7 +980,7 @@ classdef Andor < file.AstroData
                     obj.af.gui.update;
                 end
                 
-                fprintf('FOCUSER RESULTS: width= %f | pos= %f | tip= %f | tilt= %f\n', obj.af.found_width, obj.af.found_pos, obj.af.found_tip, obj.af.found_tilt);
+                util.text.date_printf('FOCUSER RESULTS: width= %f | pos= %f | tip= %f | tilt= %f\n', obj.af.found_width, obj.af.found_pos, obj.af.found_tip, obj.af.found_tilt);
                 
                 if ~isnan(obj.af.found_pos)
                     obj.focuser.pos = obj.af.found_pos;
@@ -991,7 +989,7 @@ classdef Andor < file.AstroData
                         obj.focuser.tiltRelativeMove(obj.af.found_tilt);
                     end
                 else
-                    disp('The location of new position is NaN. Choosing original position');
+                    util.text.date_printf('The location of new position is NaN. Choosing original position');
                     obj.focuser.pos = old_pos;
                 end
                 
@@ -1021,7 +1019,7 @@ classdef Andor < file.AstroData
         
         function update(obj) % check that connection is still ok
             
-            if obj.debug_bit>3, disp('updating camera'); end
+            if obj.debug_bit>3, util.text.date_printf('updating camera'); end
             
 %             rc = obs.cam.sdk.AT_GetFloat(obj.hndl, 'ExposureTime'); % contact hardware to see if it is connected
 %             
@@ -1046,7 +1044,7 @@ classdef Andor < file.AstroData
         function run(obj, varargin) % calls "startup", loops over calls to "batch", then calls "finishup"
             
             if obj.is_running
-                disp('Camera is already running. Set is_running to zero...');
+                util.text.date_printf('Camera is already running. Set is_running to zero...');
                 return;
             else
                 obj.is_running = 1;
@@ -1063,7 +1061,7 @@ classdef Andor < file.AstroData
                     if obj.brake_bit, break; end
                     
                     if ~obj.use_save && obj.num_batches>1 && (isempty(obj.gui) || ~obj.gui.check)
-                        disp('Breaking out of live view!'); 
+                        util.text.date_printf('Breaking out of live view!'); 
                         break; % in case we are in live view and GUI is closed 
                     end
                     
@@ -1087,7 +1085,7 @@ classdef Andor < file.AstroData
             try 
                 
                 if obj.brake_bit==0
-                    disp('Cannot startup camera while it is still runnning (turn off brake_bit)');
+                    util.text.date_printf('Cannot startup camera while it is still runnning (turn off brake_bit)');
                 end
                 
                 input = obj.makeInputVars(varargin{:});
@@ -1514,7 +1512,7 @@ classdef Andor < file.AstroData
             obj.copyFrom(obj.buffers); % copies the pointers to the data in "buf"
             
             if obj.debug_bit>5
-                fprintf('Buffer: reading batch % 4d from buffer %d | read_flag: %s\n', obj.batch_counter, obj.buffers.index, util.text.print_vec(obj.buffers.this_buf.mex_flag_read));
+                util.text.date_printf('Buffer: reading batch % 4d from buffer %d | read_flag: %s\n', obj.batch_counter, obj.buffers.index, util.text.print_vec(obj.buffers.this_buf.mex_flag_read));
             end
             
         end
@@ -1572,7 +1570,7 @@ classdef Andor < file.AstroData
 %                     end
                     warning(ME.getReport); 
                     obj.num_restarts = obj.num_restarts + 1;
-                    disp(['Restarting acquisition... num_restart= ' num2str(obj.num_restarts)]);
+                    util.text.date_printf('Restarting acquisition... num_restart= %d', obj.num_restarts);
                     obj.restart_sync; % stop the camera and restart the acquisition
                     
                 end
@@ -1721,9 +1719,7 @@ classdef Andor < file.AstroData
             [~,f_max] = obj.getFrameRateLimitsHW;
             
             if val>=f_max % cannot set frame rate to higher than top frame rate (set by expT)
-                str = sprintf('Cannot set frame rate to %g. Setting to %g instead', val, f_max.*0.99);
-                disp(str);
-                obj.log.input(str);
+                obj.log.input(util.text.disp_printf('Cannot set frame rate to %g. Setting to %g instead.', val, f_max.*0.99));
                 val = f_max.*0.99;
             end 
             

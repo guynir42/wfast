@@ -1384,7 +1384,7 @@ classdef Acquisition < file.AstroData
         function run(obj, varargin)
             
             if obj.is_running || obj.is_running_single
-                disp('Already running, set is_running and is_running_single to zero...');
+                util.text.date_printf('Already running, set is_running and is_running_single to zero...');
                 return;
             else
                 obj.is_running = 1;
@@ -1426,7 +1426,7 @@ classdef Acquisition < file.AstroData
             check = 0;
             
             if obj.is_running_single
-                disp('Already running "single". Set is_running_single to zero...');
+                util.text.date_printf('Already running "single". Set is_running_single to zero...');
                 return;
             else
                 obj.is_running_single = 1;
@@ -1564,7 +1564,7 @@ classdef Acquisition < file.AstroData
                     
                     if obj.brake_bit, return; end
                     
-                    if obj.debug_bit, fprintf('Running focus loop attempt %d\n', ii); end
+                    if obj.debug_bit, util.text.date_printf('Running focus loop attempt %d\n', ii); end
                     
                     if obj.use_cam_focusing
                         success = obj.cam.autofocus('iteration', ii); % run the autofocus loop inside the Andor class (no calibration...)
@@ -1596,7 +1596,7 @@ classdef Acquisition < file.AstroData
                             end
                             
                             if obj.cam.is_running
-                                disp('Camera is already running. Set is_running to zero...');
+                                util.text.date_printf('Camera is already running. Set is_running to zero...');
                                 return;
                             end
                             
@@ -1715,7 +1715,7 @@ classdef Acquisition < file.AstroData
                                 obj.cam.af.gui.update;
                             end
                             
-                            fprintf('FOCUSER RESULTS: width= %f | pos= %f | tip= %f | tilt= %f\n', obj.cam.af.found_width, obj.cam.af.found_pos, obj.cam.af.found_tip, obj.cam.af.found_tilt);
+                            util.text.date_printf('FOCUSER RESULTS: width= %f | pos= %f | tip= %f | tilt= %f\n', obj.cam.af.found_width, obj.cam.af.found_pos, obj.cam.af.found_tip, obj.cam.af.found_tilt);
                             
                             if ~isnan(obj.cam.af.found_pos)
                                 obj.cam.focuser.pos = obj.cam.af.found_pos;
@@ -1724,7 +1724,7 @@ classdef Acquisition < file.AstroData
                                     obj.cam.focuser.tiltRelativeMove(obj.cam.af.found_tilt);
                                 end
                             else
-                                disp('The location of new position is NaN. Choosing original position');
+                                util.text.date_printf('The location of new position is NaN. Choosing original position');
                                 obj.cam.focuser.pos = old_pos;
                             end
                             
@@ -1756,7 +1756,7 @@ classdef Acquisition < file.AstroData
                     min_pos = obj.cam.af.pos(2);
                     max_pos = obj.cam.af.pos(end-1);
                     
-                    if obj.debug_bit, fprintf('Resulting focus point is %4.2f at FWHM of %4.2f"\n', obj.cam.af.found_pos, obj.cam.af.found_width.*2.355.*obj.head.SCALE); end
+                    if obj.debug_bit, util.text.date_printf('Resulting focus point is %4.2f at FWHM of %4.2f"\n', obj.cam.af.found_pos, obj.cam.af.found_width.*2.355.*obj.head.SCALE); end
                     
                     if obj.cam.af.found_width<1.2 && obj.cam.af.found_pos>=min_pos && obj.cam.af.found_pos<=max_pos
                         success = 1;
@@ -1860,7 +1860,7 @@ classdef Acquisition < file.AstroData
                         tips(ii,jj,kk) = obj.cam.focuser.tip;
                         tilts(ii,jj,kk) = obj.cam.focuser.tilt; 
                         
-                        fprintf('pos= %4.2f | tip= %4.2f | tilt= %4.2f | N_stars= %d \n', ...
+                        util.text.date_printf('pos= %4.2f | tip= %4.2f | tilt= %4.2f | N_stars= %d \n', ...
                             obj.cam.focuser.pos, obj.cam.focuser.tip, obj.cam.focuser.tilt, N_stars(ii,jj,kk)); 
                         
                     end % for kk (positions)
@@ -1955,7 +1955,7 @@ classdef Acquisition < file.AstroData
             pause(0.05); 
             
             if obj.dome_pc.status==0 && obj.brake_bit % do not stop to reconnect during acquisition! 
-%                 disp('connecting to PcSync'); 
+%                 util.text.date_printf('connecting to PcSync'); 
                 obj.connectSync;
                 
                 if obj.dome_pc.status
@@ -2034,7 +2034,7 @@ classdef Acquisition < file.AstroData
         
         function updateSyncData(obj)
             
-%             disp('updateSyncData'); 
+%             util.text.date_printf('updateSyncData'); 
             
             try 
                 
@@ -2153,7 +2153,7 @@ classdef Acquisition < file.AstroData
         
         function parseCommands(obj)
             
-%             disp('parseCommands'); 
+%             util.text.date_printf('parseCommands'); 
             
             import util.text.cs;
             
@@ -2166,7 +2166,7 @@ classdef Acquisition < file.AstroData
                 obj.dome_pc.outgoing.echo_str = obj.dome_pc.incoming.command_str;
                 obj.dome_pc.outgoing.echo_time = obj.dome_pc.incoming.command_time;
                 
-%                 fprintf('command_str= %s | command_time= %s\n', obj.dome_pc.incoming.command_str, obj.dome_pc.incoming.command_time); 
+%                 util.text.date_printf('command_str= %s | command_time= %s\n', obj.dome_pc.incoming.command_str, obj.dome_pc.incoming.command_time); 
                 
                 obj.dome_pc.read_data(obj.dome_pc.hndl_rx, 'rx'); 
                 obj.dome_pc.read_data(obj.dome_pc.hndl_tx, 'tx'); 
@@ -2218,7 +2218,7 @@ classdef Acquisition < file.AstroData
                         pause(0.1); % leave time to update
                         
                         if input.focus 
-                            disp('Now running focus by order of dome-PC'); % this message will be removed later on...
+                            util.text.date_printf('Now running focus by order of dome-PC'); % this message will be removed later on...
                             
                             if obj.use_altitude_focus % set an initial focus point based on the altitude 
                                 C = obj.alt_focus_coeffs;
@@ -2233,8 +2233,7 @@ classdef Acquisition < file.AstroData
                             end
                         end
                         
-                        obj.log.input(sprintf('Starting run command from Dome-PC. Args= "%s"', obj.latest_command_pars)); 
-                        disp(obj.log.report); 
+                        obj.log.input(util.text.date_printf('Starting run command from Dome-PC. Args= "%s"', obj.latest_command_pars)); 
                         
                         if cs(input.mode, 'fast')
                             obj.setupFastMode;
@@ -2278,8 +2277,7 @@ classdef Acquisition < file.AstroData
                         
                         obj.dome_pc.outgoing.report = 'idle';
 
-                        obj.log.input('Received "stop" command from dome-PC'); 
-                        disp(obj.log.report); 
+                        obj.log.input(util.text.date_printf('Received "stop" command from dome-PC')); 
                         
                     else
                         error('cam_pc:acquisition:parse:unknown_command','Unknown command: %s! Use "start" or "stop", etc...', obj.dome_pc.incoming.command_str); 
@@ -2298,7 +2296,6 @@ classdef Acquisition < file.AstroData
                 obj.dome_pc.outgoing.report = 'idle'; 
                 rethrow(ME); 
             end
-
             
         end
         
@@ -2315,8 +2312,18 @@ classdef Acquisition < file.AstroData
                 f = 0;
             end
             
-            fprintf('T= %f | f= %f\n', T, f); 
+%             util.text.date_printf('T= %f | f= %f\n', T, f); 
             
+            if T && f
+                if T<1
+                    obj.batch_size = 100;
+                else
+                    obj.batch_size = 1;
+                end
+                obj.expT = T; 
+                obj.frame_rate = f;
+            end
+
         end
         
     end
@@ -2512,7 +2519,7 @@ classdef Acquisition < file.AstroData
         
         function update(obj, input)
             
-%             disp('update');
+%             util.text.date_printf('update');
             
             if nargin>=2 && ~isempty(input) && isa(input, 'util.text.InputVars')
                 
@@ -2582,7 +2589,7 @@ classdef Acquisition < file.AstroData
             try 
                 
                 if obj.brake_bit==0
-                    disp('Cannot start a new acquisition while old one is still runnning (turn off brake_bit)');
+                    util.text.date_printf('Cannot start a new acquisition while old one is still runnning (turn off brake_bit)');
                     return;
                 end
                 
@@ -2646,7 +2653,7 @@ classdef Acquisition < file.AstroData
                     
                     obj.reset;
                     
-                    if obj.debug_bit, disp(['Starting run "' obj.run_name '" for ' num2str(obj.num_batches) ' batches.']); end
+                    if obj.debug_bit, util.text.date_printf('Starting run "%s" for %d batches.', obj.run_name, obj.num_batches); end
 
                     if input.log_level
                         obj.log.input(sprintf('Starting a new run "%s" (saving is %d). ', obj.run_name, obj.use_save)); 
@@ -2666,7 +2673,7 @@ classdef Acquisition < file.AstroData
                     error(obj.gui.latest_error);
                 end
                 
-                if obj.use_save && obj.getGbLeft>util.sys.disk_space(obj.buf.directory)*1.0 % only throw an error if the required disk space is bigger than storage! 
+                if obj.use_save && obj.getGbLeft>util.sys.disk_space(obj.buf.directory) % only throw an error if the required disk space is bigger than storage! 
                     obj.gui.latest_error = sprintf('Run scheduled requires an estimated %5.2f Gb of storage. Only %5.2f Gb available on drive!', obj.getGbLeft, util.sys.disk_space(obj.buf.directory));
                     obj.log.error(obj.gui.latest_error);
                     error(obj.gui.latest_error);
@@ -2690,7 +2697,7 @@ classdef Acquisition < file.AstroData
                         obj.gui.update; 
                     end
                     
-                    if obj.debug_bit, disp(str); end
+                    if obj.debug_bit, util.text.date_printf(str); end
                     
                     obj.dome_pc.outgoing.report = 'Finding stars';
                     obj.dome_pc.update;
@@ -2901,8 +2908,9 @@ classdef Acquisition < file.AstroData
                 
             end
             
-            obj.log.input(['Finished run "' obj.run_name '" with ' num2str(obj.batch_counter) ' batches.']);
-            if obj.debug_bit, disp(obj.log.report); end
+            str = sprintf('Finished run "%s" with %d batches', obj.run_name, obj.batch_counter); 
+            obj.log.input(str);
+            if obj.debug_bit, util.text.date_printf(str); end
             
             if obj.use_audio
                 try
@@ -2970,7 +2978,7 @@ classdef Acquisition < file.AstroData
             
             str = sprintf('Starting batch %d. Loaded %d images from "%s" source.', obj.batch_counter+1, size(obj.images,3), class(obj.src));
             if obj.log_level>2, obj.log.input(str); end
-            if obj.debug_bit>1,  disp(str); end
+            if obj.debug_bit>1,  util.text.date_printf(str); end
             
             obj.head.END_STAMP = obj.t_end_stamp;
                         
@@ -3094,7 +3102,7 @@ classdef Acquisition < file.AstroData
 %                 obj.stack = ones(size(obj.images,1), size(obj.images,2), 'single'); 
             catch ME
                 if strcmp(ME.identifier, 'MATLAB:nomem')
-                    disp('Ran out of memory while stacking images. Trying again with a split array...');
+                    util.text.date_printf('Ran out of memory while stacking images. Trying again with a split array...');
                     pause(0.1);
                     
                     indices = ceil([size(obj.images,1) size(obj.images,2)]./2); 
@@ -3275,7 +3283,7 @@ classdef Acquisition < file.AstroData
         
         function runAstrometry(obj)
             
-            if obj.debug_bit, disp('runAstrometry'); end
+            if obj.debug_bit, util.text.date_printf('runAstrometry'); end
             
             obj.log.input('Runing Astrometry'); 
             
@@ -3328,7 +3336,7 @@ classdef Acquisition < file.AstroData
             
             obj.log.input(str); 
             
-            if obj.debug_bit, disp(str); end
+            if obj.debug_bit, util.text.date_printf(str); end
             obj.head.LIMMAG_DETECTION = obj.cat.detection_limit;
             
             [obj.object_idx, dist] = obj.cat.findNearestObject;
@@ -3496,8 +3504,9 @@ classdef Acquisition < file.AstroData
                 
             else
                 
-                obj.log.input('Lost star positions, using quick_align'); 
-                if obj.debug_bit, disp(obj.log.report); end
+                str = 'Lost star positions, using quick_align'; 
+                obj.log.input(str); 
+                if obj.debug_bit, util.text.date_printf(str); end
                     
                 [~,shift] = util.img.quick_align(obj.stack_proc, obj.ref_stack);
                 obj.clip.positions(1:size(obj.ref_positions,1),:) = double(obj.ref_positions + flip(shift));
@@ -3522,8 +3531,7 @@ classdef Acquisition < file.AstroData
                     
                     if obj.failed_batch_counter>obj.max_failed_batches
                         
-                        obj.log.input(sprintf('Cannot find stars %d times in a row. Quiting run...\n', obj.failed_batch_counter));
-                        disp(obj.log.report); 
+                        obj.log.input(util.text.date_printf('Cannot find stars %d times in a row. Quiting run...\n', obj.failed_batch_counter));
                         
                         obj.brake_bit = 1; % finish this batch and then quit the run
                         

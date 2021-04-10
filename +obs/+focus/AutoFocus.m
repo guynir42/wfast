@@ -390,12 +390,12 @@ classdef AutoFocus < handle
             [obj.found_width, idx] = nanmin(util.vec.weighted_average(obj.widths, obj.weights, 1)); 
             obj.found_pos = obj.pos(idx); 
 
-%             if obj.debug_bit, fprintf('BEST POS: mean= %f | surface piston term= %f\n', nanmean(obj.min_positions), obj.surface_coeffs(1)); end
+%             if obj.debug_bit, util.text.date_printf('BEST POS: mean= %f | surface piston term= %f.', nanmean(obj.min_positions), obj.surface_coeffs(1)); end
             
             obj.found_tip = obj.surface_coeffs(2).*obj.spider_diameter.*1e4./obj.pixel_size; % in this case tip is X slope
             obj.found_tilt = obj.surface_coeffs(3).*obj.spider_diameter.*1e4./obj.pixel_size; % in this case tip is Y slope
             
-%             if obj.debug_bit, fprintf('BEST TIP= %f | BEST tilt= %f\n', obj.found_tip, obj.found_tilt); end
+%             if obj.debug_bit, util.text.date_printf('BEST TIP= %f | BEST tilt= %f.', obj.found_tip, obj.found_tilt); end
             
         end
         

@@ -346,7 +346,7 @@ classdef Deflator < file.AstroData
 
                     end
                     
-                    disp(['going over directory: ' obj.src_subdir.pwd]);
+                    util.text.date_printf('Going over directory: %s.', obj.src_subdir.pwd);
                     
                     if obj.brake_bit
                         return;
@@ -359,11 +359,11 @@ classdef Deflator < file.AstroData
                         for ii = 1:length(f)
                             
                             [~, name, ext] = fileparts(f{ii});
-                            disp(['copying file ' name ext ' from ' obj.src_subdir.pwd ' to ' obj.out_subdir.pwd])
+                            util.text.date_printf('Copying file %s%s from %s to %s.', name, ext, obj.src_subdir.pwd, obj.out_subdir.pwd);
                             copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir.pwd, name, ext));
                             
                             if obj.use_auto_backup
-                                disp(['copying file ' name ext ' from ' obj.src_subdir.pwd ' to ' obj.out_subdir_backup.pwd ' (backup)'])
+                                util.text.date_printf('Copying file %s%s from %s to %s (backup).', name, ext, obj.src_subdir.pwd, obj.out_subdir_backup.pwd);
                                 copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir_backup.pwd, name, ext));
                             
                             end
@@ -375,7 +375,7 @@ classdef Deflator < file.AstroData
                         f = obj.src_subdir.match('catalog.mat');
                         if ~isempty(f)
                             [~, name, ext] = fileparts(f{1});
-                            disp(['copying file ' name ext ' from ' obj.src_subdir.pwd ' to ' obj.out_subdir.pwd])
+                            util.text.date_printf('Copying file %s from %s to %s.', name, ext, obj.src_subdir.pwd, obj.out_subdir.pwd);
                             copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir.pwd, name, ext));
                         end
                     end
@@ -384,7 +384,7 @@ classdef Deflator < file.AstroData
                         f = obj.src_subdir.match('calibration*.mat');
                         if ~isempty(f)
                             [~, name, ext] = fileparts(f{1});
-                            disp(['copying file ' name ext ' from ' obj.src_subdir.pwd ' to ' obj.out_subdir.pwd])
+                            util.text.date_printf('Copying file %s%s from %s to %s.', name, ext, obj.src_subdir.pwd, obj.out_subdir.pwd);
                             copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir.pwd, name, ext));
                         end
                     end
@@ -393,7 +393,7 @@ classdef Deflator < file.AstroData
                         f = obj.src_subdir.match('lightcurves*.mat');
                         if ~isempty(f)
                             [~, name, ext] = fileparts(f{1});
-                            disp(['copying file ' name ext ' from ' obj.src_subdir.pwd ' to ' obj.out_subdir.pwd])
+                            util.text.date_printf('Copying file %s%s from %s to %s.', name, ext, obj.src_subdir.pwd, obj.out_subdir.pwd);
                             copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir.pwd, name, ext));
                         end
                     end
@@ -402,7 +402,7 @@ classdef Deflator < file.AstroData
                         f = obj.src_subdir.match('micro_flares*.mat');
                         if ~isempty(f)
                             [~, name, ext] = fileparts(f{1});
-                            disp(['copying file ' name ext ' from ' obj.src_subdir.pwd ' to ' obj.out_subdir.pwd])
+                            util.text.date_printf('Copying file %s%s from %s to %s.', name, ext, obj.src_subdir.pwd, obj.out_subdir.pwd);
                             copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir.pwd, name, ext));
                         end
                     end
@@ -466,7 +466,7 @@ classdef Deflator < file.AstroData
             
             obj.prog.finish;
             
-            disp('done deflating files...');
+            util.text.date_printf('done deflating files...');
             
         end
         
@@ -524,7 +524,7 @@ classdef Deflator < file.AstroData
 %                 return;
 %             end
             
-            if obj.debug_bit, fprintf('%s: Deleting old temporary files.\n', datetime('now', 'TimeZone', 'UTC')); end
+            if obj.debug_bit, util.text.date_printf('Deleting old temporary files.'); end
             
             % run auto-delete!
             list = flip(d.walk);
@@ -546,7 +546,7 @@ classdef Deflator < file.AstroData
                     
                     if obj.checkFileExists(files{jj}, d_bkp)
                         
-                        if obj.debug_bit>1, fprintf('Found copy of file "%s" in "%s". Deleting it now!\n', files{jj}, d_bkp); end
+                        if obj.debug_bit>1, util.text.date_printf('Found copy of file "%s" in "%s". Deleting it now!', files{jj}, d_bkp); end
                         
                         delete(files{jj}); 
                         
@@ -555,7 +555,7 @@ classdef Deflator < file.AstroData
                 end
                 
                 if d.is_empty
-                    if obj.debug_bit, fprintf('Deleting empty folder "%s".\n', d.pwd); end
+                    if obj.debug_bit, util.text.date_printf('Deleting empty folder "%s".', d.pwd); end
                     rmdir(d.pwd); 
                 end
                 
@@ -595,7 +595,7 @@ classdef Deflator < file.AstroData
         
         function callback_timer(obj, ~, ~) % this is called when the timer triggers
             
-            disp('Running auto-deflate!');
+            util.text.date_printf('Running auto-deflate!');
             
             obj.makeGUI;
             
