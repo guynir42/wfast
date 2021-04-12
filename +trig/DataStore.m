@@ -730,32 +730,91 @@ classdef DataStore < handle
             
         end
         
+        function data_out = appendData(obj, data_existing, data_new) % append buffer data inside a try/catch to protect against temporary memory shortages
+            
+            try
+            
+                data_out = vertcat(data_existing, data_new); 
+
+                if size(data_out,1)>obj.pars.length_psd
+                    data_out = data_out(end-obj.pars.length_psd+1:end,:,:,:,:); 
+                end
+
+            catch ME
+                
+                if strcmp(ME.identifier, 'MATLAB:nomem')
+
+                    util.text.date_printf('Out of memory while appending data! Trying again...'); 
+                    
+                    pause(30); % let the memory from other runs free up
+                    
+                    data_out = vertcat(data_existing, data_new); 
+
+                    if size(data_out,1)>obj.pars.length_psd
+                        data_out = data_out(end-obj.pars.length_psd+1:end,:,:,:,:); 
+                    end
+
+                else
+                    rethrow(ME); 
+                end
+                
+            end
+            
+        end
+        
         function storeBuffers(obj)
             
-            obj.flux_buffer = vertcat(obj.flux_buffer, single(obj.this_input.fluxes));
-            obj.detrend_buffer = vertcat(obj.detrend_buffer, single(obj.this_input.detrend)); 
+            obj.flux_buffer = obj.appendData(obj.flux_buffer, single(obj.this_input.fluxes));
+            obj.detrend_buffer = obj.appendData(obj.detrend_buffer, single(obj.this_input.detrend)); 
             obj.timestamps = vertcat(obj.timestamps, single(obj.this_input.timestamps)); % this tracks timestamps for the entire run
-            obj.timestamps_buffer = vertcat(obj.timestamps_buffer, single(obj.this_input.timestamps));
-            obj.juldates_buffer = vertcat(obj.juldates_buffer, obj.this_input.juldates); 
-            obj.filename_buffer = vertcat(obj.filename_buffer, repmat({obj.this_input.filename}, [length(obj.this_input.timestamps), 1])); 
-            obj.frame_num_buffer = vertcat(obj.frame_num_buffer, single(1:length(obj.this_input.timestamps))'); % assume the frame numbers are just run continuously from 1->number of frames in batch
+            obj.timestamps_buffer = obj.appendData(obj.timestamps_buffer, single(obj.this_input.timestamps));
+            obj.juldates_buffer = obj.appendData(obj.juldates_buffer, obj.this_input.juldates); 
+            obj.filename_buffer = obj.appendData(obj.filename_buffer, repmat({obj.this_input.filename}, [length(obj.this_input.timestamps), 1])); 
+            obj.frame_num_buffer = obj.appendData(obj.frame_num_buffer, single(1:length(obj.this_input.timestamps))'); % assume the frame numbers are just run continuously from 1->number of frames in batch
             
-            if size(obj.flux_buffer,1)>obj.pars.length_psd % only save the recent data
-                obj.flux_buffer = obj.flux_buffer(end-obj.pars.length_psd+1:end,:,:); 
-                obj.detrend_buffer = obj.detrend_buffer(end-obj.pars.length_psd+1:end,:,:); 
-                obj.timestamps_buffer = obj.timestamps_buffer(end-obj.pars.length_psd+1:end); 
-                obj.juldates_buffer = obj.juldates_buffer(end-obj.pars.length_psd+1:end); 
-                obj.filename_buffer = obj.filename_buffer(end-obj.pars.length_psd+1:end); 
-                obj.frame_num_buffer = obj.frame_num_buffer(end-obj.pars.length_psd+1:end); 
-            end
+%             if size(obj.flux_buffer,1)>obj.pars.length_psd % only save the recent data
+%                 obj.flux_buffer = obj.flux_buffer(end-obj.pars.length_psd+1:end,:,:); 
+%                 obj.detrend_buffer = obj.detrend_buffer(end-obj.pars.length_psd+1:end,:,:); 
+%                 obj.timestamps_buffer = obj.timestamps_buffer(end-obj.pars.length_psd+1:end); 
+%                 obj.juldates_buffer = obj.juldates_buffer(end-obj.pars.length_psd+1:end); 
+%                 obj.filename_buffer = obj.filename_buffer(end-obj.pars.length_psd+1:end); 
+%                 obj.frame_num_buffer = obj.frame_num_buffer(end-obj.pars.length_psd+1:end); 
+%             end
+            
             
         end
         
         function storeCutouts(obj)
             
-            obj.cutouts = cat(3, obj.cutouts, obj.this_input.cutouts); 
-            if size(obj.cutouts,3)>obj.pars.length_extended
-                obj.cutouts = obj.cutouts(:,:,end-obj.pars.length_extended+1:end,:); 
+            try
+            obj.cutouts = cat(3, obj.cutouts, obj.this_input.cutouts);
+            catch ME
+                if strcmp(ME.identifier, 'MATLAB:nomem')
+                    util.text.date_printf('Out of memory while storing cutouts! Trying again...'); 
+                    pause(30); 
+                    obj.cutouts = cat(3, obj.cutouts, obj.this_input.cutouts);
+                else    
+                    rethrow(ME);
+                end
+                
+            end
+            
+            try 
+             
+                if size(obj.cutouts,3)>obj.pars.length_extended
+                    obj.cutouts = obj.cutouts(:,:,end-obj.pars.length_extended+1:end,:); 
+                end
+            
+            catch ME
+                if strcmp(ME.identifier, 'MATLAB:nomem')
+                    util.text.date_printf('Out of memory while reducing size of cutouts! Trying again...'); 
+                    pause(30); 
+                    if size(obj.cutouts,3)>obj.pars.length_extended
+                        obj.cutouts = obj.cutouts(:,:,end-obj.pars.length_extended+1:end,:); 
+                    end
+                else
+                    rethrow(ME); 
+                end
             end
             
         end
@@ -769,11 +828,13 @@ classdef DataStore < handle
                 new_aux(:,:,ii,:) = permute(obj.this_input.(list{ii}), [1,2,4,3]); % allow multiple apertures (3D aux matrices from photometry) 
             end
             
-            obj.aux_buffer = vertcat(obj.aux_buffer, new_aux); % add the new auxiliary data
-
-            if size(obj.aux_buffer,1)>obj.pars.length_psd % make sure to only save the recent data
-                obj.aux_buffer = obj.aux_buffer(end-(obj.pars.length_psd)+1:end,:,:,:); 
-            end
+            obj.aux_buffer = obj.appendData(obj.aux_buffer, new_aux); 
+            
+%             obj.aux_buffer = vertcat(obj.aux_buffer, new_aux); % add the new auxiliary data
+% 
+%             if size(obj.aux_buffer,1)>obj.pars.length_psd % make sure to only save the recent data
+%                 obj.aux_buffer = obj.aux_buffer(end-(obj.pars.length_psd)+1:end,:,:,:); 
+%             end
             
         end
         

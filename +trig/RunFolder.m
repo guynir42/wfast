@@ -546,17 +546,18 @@ classdef RunFolder < dynamicprops
                         %%%%%%%% go into the analysis folders %%%%%%%%%
 
                         analysis_folders = sort(d.match_folders('analysis_*')); % get the folders in ascending time order
-
-                        if isempty(analysis_folders) % no analysis has been done to this folder yet
-
-                            new_obj.analysis_folder = ''; 
-                            new_obj.analysis_date = ''; 
-                            new_obj.was_processed = 0;
-                            new_obj.has_summary = 0;
-                            new_obj.has_candidates = 0;
-                            new_obj.has_classified = 0; 
-
-                        else % we found an analysis folder! 
+                        
+                        % no analysis has been found for this folder yet
+                        new_obj.analysis_folder = ''; 
+                        new_obj.analysis_date = ''; 
+                        new_obj.was_processed = false;
+                        new_obj.has_summary = false;
+                        new_obj.has_candidates = false;
+                        new_obj.has_classified = false; 
+                        new_obj.has_lightcurves_mat = false;
+                        new_obj.has_lightcurves_hdf5 = false;
+                        
+                        if ~isempty(analysis_folders) % we found an analysis folder! 
 
                             [~, new_obj.analysis_folder] = fileparts(analysis_folders{end});
                             
@@ -564,40 +565,38 @@ classdef RunFolder < dynamicprops
 
                             new_obj.process_date = input.process_date; % remember the limiting date for considering analysis folders (not the actual date when it was analyized!)
                             
-                            if new_obj.analysis_date<input.process_date % the processing was done before the minimal processing date, it doesn't count
-                                new_obj.was_processed = 0; 
-                            else % there is an analysis folder that is up-to-date enough to use it:
-
+                            if new_obj.analysis_date>=input.process_date % there is an analysis folder that is up-to-date enough to use it:
+                                
+                                new_obj.was_processed = true; 
+                                
                                 d.cd(analysis_folders{end}); % now we are in the most recent analysis folder! 
-
-                                new_obj.was_processed = 1; 
 
                                 if exist(fullfile(d.pwd, 'summary.mat'), 'file') % load the RunSummary from the MAT-file
                                     try 
                                         load(fullfile(d.pwd, 'summary.mat'));                             
                                         obj.summary = summary; 
-                                        new_obj.has_summary = 1;
+                                        new_obj.has_summary = true;
                                     catch ME
                                         warning(ME.getReport); 
                                     end
                                 end
 
                                 if exist(fullfile(d.pwd, 'candidates.mat'), 'file') % load the Candidate objects from the MAT-file
-                                    new_obj.has_candidates = 1;
+                                    new_obj.has_candidates = true;
                                 end
 
                                 if exist(fullfile(d.pwd, 'classified.mat'), 'file') % load the classified Candidates from the MAT-file
-                                    new_obj.has_classified = 1;
+                                    new_obj.has_classified = true;
                                 end
 
                                 if exist(fullfile(d.pwd, 'lightcurves.mat'), 'file') % check if there is a lightcurves MAT file
-                                    new_obj.has_lightcurves_mat = 1;
+                                    new_obj.has_lightcurves_mat = true;
                                 end
 
                                 LCs = d.match('*Lightcurves.h5*'); % check if there are lightcurve HDF5 files
 
                                 if ~isempty(LCs)
-                                    new_obj.has_lightcurves_hdf5 = 1;
+                                    new_obj.has_lightcurves_hdf5 = true;
                                 end
 
                             end % processing time

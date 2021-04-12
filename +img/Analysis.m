@@ -989,13 +989,14 @@ classdef Analysis < file.AstroData
             input.input_var('save', []); % save the events and lightcurves from this run
             input.input_var('overwrite', 0); % delete the existing analysis folder without warning (make sure there is no ongoing analysis!)
             input.input_var('worker', []); % index of worker/future you want to use
+            input.input_var('output', true); % choose if you want to get back an Analysis object as output from the calculation
             input.scan_vars(varargin{:});
             
             if isempty(input.worker)
                 input.worker = obj.findWorker;
             end
             
-            obj.futures{input.worker} = parfeval(obj.pool, @obj.run, 1, 'reset', input.reset, 'logging', input.logging, 'save', input.save, 'overwrite', input.overwrite); 
+            obj.futures{input.worker} = parfeval(obj.pool, @obj.run, double(input.output), 'reset', input.reset, 'logging', input.logging, 'save', input.save, 'overwrite', input.overwrite); 
             obj.futures_dir{input.worker} = obj.reader.dir.two_tail;
             obj.futures_analysis_folder{input.worker} = fullfile(obj.reader.dir.pwd, ['analysis_' char(datetime('now', 'TimeZone', 'UTC'), 'yyyy-MM-dd')]);
             obj.futures_batches{input.worker} = obj.num_batches; 
@@ -1093,7 +1094,7 @@ classdef Analysis < file.AstroData
             
         end
         
-        function obj = run(obj, varargin)
+        function obj_out = run(obj, varargin)
             
             try
             
@@ -1266,6 +1267,10 @@ classdef Analysis < file.AstroData
                     warning(ME.getReport); % minor error occured after pipeline is done
                 end
                 
+            end
+            
+            if nargout>0
+                obj_out = obj;
             end
             
         end

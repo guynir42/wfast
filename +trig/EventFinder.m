@@ -445,7 +445,18 @@ classdef EventFinder < handle
                 %%%%%%%%%%%%%% PSD CORRECTION %%%%%%%%%%%%%%%
                 
                 if obj.pars.use_psd_correction
-                    obj.psd.calcPSD(obj.store.detrend_buffer, obj.store.timestamps_buffer, obj.store.pars.length_extended, obj.store.pars.length_background*2); % first off, make the PSD correction for the current batch
+                    try
+                        obj.psd.calcPSD(obj.store.detrend_buffer, obj.store.timestamps_buffer, obj.store.pars.length_extended, obj.store.pars.length_background*2); % first off, make the PSD correction for the current batch
+                    catch ME
+                        if strcmp(ME.identifier, 'MATLAB:nomem')
+                            util.text.date_printf('Out of memory while caclulating PSD! Trying again...');
+                            pause(30);
+                            obj.psd.calcPSD(obj.store.detrend_buffer, obj.store.timestamps_buffer, obj.store.pars.length_extended, obj.store.pars.length_background*2); % first off, make the PSD correction for the current batch
+                        else
+                            rethrow(ME);
+                        end
+                        
+                    end
                 end
                 
                 [obj.corrected_fluxes, obj.corrected_stds] = obj.correctFluxes(obj.store.extended_detrend); % runs either PSD correction or simple removal of linear fit to each lightcurve
@@ -868,7 +879,18 @@ classdef EventFinder < handle
                         [bg_fluxes, bg_stds] = obj.correctFluxes(obj.store.background_detrend(:,star_indices), star_indices); 
                     end
                     
-                    bg_filtered_fluxes = bank.input(bg_fluxes, bg_stds); 
+                    try
+                        bg_filtered_fluxes = bank.input(bg_fluxes, bg_stds); 
+                    catch ME
+                        if strcmp(ME.identifier, 'MATLAB:nomem')
+                            util.text.date_printf('Out of memory while filtering fluxes! Trying again...'); 
+                            pause(30); 
+                            bg_filtered_fluxes = bank.input(bg_fluxes, bg_stds); 
+                        else
+                            rethrow(ME); 
+                        end
+
+                    end
                     
                     ff_std = nanstd(bg_filtered_fluxes); % STD correction from filtered background fluxes
                     
@@ -880,7 +902,18 @@ classdef EventFinder < handle
                 ff_std = 1; % no STD correction
             end
             
-            ff = bank.input(fluxes(:,star_indices), stds(1,star_indices));
+            try
+                ff = bank.input(fluxes(:,star_indices), stds(1,star_indices));
+            catch ME
+                if strcmp(ME.identifier, 'MATLAB:nomem')
+                    util.text.date_printf('Out of memory while filtering fluxes! Trying again...'); 
+                    pause(30); 
+                    ff = bank.input(fluxes(:,star_indices), stds(1,star_indices));
+                else
+                    rethrow(ME); 
+                end
+
+            end
             
             if ~isempty(var_buf) % if we are using a var buffer, load the new results into it
                 
@@ -1352,6 +1385,7 @@ classdef EventFinder < handle
             R_star = R_star*sqrt(bank.D_au./40); % adjust the stellar size in case the bank is for Hills/Oort cloud
 
             r_occulter = util.stat.power_law_dist(3.0, 'min', bank.r_range(1), 'max', bank.r_range(2)); % occulter radius drawn from power law distribution
+            
             b_par = bank.b_range(1) + rand*(diff(bank.b_range)); % impact parameter drawn from uniform distribution
             vel = bank.v_range(1) + rand*(diff(bank.v_range)); % velocity drawn from uniform distribution
 

@@ -654,12 +654,16 @@ classdef QualityChecker < handle
             obj.bad_pixels = p;
             
             if obj.pars.use_repeating_columns % we only trigger this if we have to, it takes a while to calculate
-                edges = floor((size(obj.extended_flux,1) - size(obj.search_flux,1))/2); % the margins on either edge of the search region
-                edges = edges - obj.pars.dilate_region; % make the margins smaller to allow dilation from outside the search region
+                margins = floor((size(obj.extended_flux,1) - size(obj.search_flux,1))/2); % the margins on either edge of the search region
+                margins = margins- obj.pars.dilate_region; % make the margins smaller to allow dilation from outside the search region
                 obj.repeating_columns = img.find_repeating_columns(obj.cutouts, 'margins', margins); % additional arguments may change the fraction of a column that is tested (for cutouts 50% is fine)
             end
             
-            obj.flux_corr = obj.calculateFluxCorr(obj.extended_detrend, [10 25 50]); % can also give multiple time scales to run the correlation (default is 50)
+            try 
+                obj.flux_corr = obj.calculateFluxCorr(obj.extended_detrend, [10 25 50]); % can also give multiple time scales to run the correlation (default is 50)
+            catch ME
+                
+            end
             
             aux = zeros(size(f,1),size(f,2),length(obj.pars.corr_types), 'like', f); 
 %             aux(:,:,obj.corr_indices.a) = a;
@@ -890,7 +894,7 @@ classdef QualityChecker < handle
                     
                     if strcmp(ME.identifier, 'MATLAB:nomem')
                         
-                        disp('Out of memory error... Using a loop instead!');
+                        util.text.date_printf('Out of memory error... Using a loop instead!');
                         
                         FC = zeros(size(numer), 'like', numer); 
                         

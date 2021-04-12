@@ -206,6 +206,15 @@ classdef Scanner < handle
             
         end
         
+        function all_runs = getAllRuns(obj)
+            
+            all_runs = trig.RunFolder.scan('folder', obj.root_folder, 'start', obj.date_start, ...
+                    'end', obj.date_end, 'next', [], 'process_date', obj.date_process); % get all folders
+            
+            all_runs = all_runs';
+            
+        end
+        
         function all_runs = calcOverview(obj, varargin)
            
             input = util.text.InputVars;
@@ -221,8 +230,7 @@ classdef Scanner < handle
             
             if isempty(input.runs)  
                 t0 = tic;
-                all_runs = trig.RunFolder.scan('folder', obj.root_folder, 'start', obj.date_start, ...
-                    'end', obj.date_end, 'next', [], 'process_date', obj.date_process); % get all folders
+                all_runs = obj.getAllRuns; 
                 if obj.debug_bit, fprintf('Time to load run folders is %s\n', util.text.secs2hms(toc(t0))); end
             else
                 all_runs = input.runs; 
@@ -400,7 +408,7 @@ classdef Scanner < handle
             else % we can run this folder now! 
                 obj.a.reader.dir.cd(r.folder); 
                 obj.a.reader.loadFiles; 
-                obj.a.async_run('worker', worker_idx, 'reset', 1, 'logging', 1, 'save', 1); 
+                obj.a.async_run('worker', worker_idx, 'reset', 1, 'logging', 1, 'save', 1, 'output', 0); 
                 run_id = util.text.run_id(obj.a.reader.current_dir); 
                 report = sprintf('Started new run on worker %d for folder %s', worker_idx, run_id);
                 if obj.debug_bit, fprintf('%s: %s\n', datetime('now', 'TimeZone', 'UTC'), report); end
