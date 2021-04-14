@@ -488,7 +488,7 @@ classdef Scheduler < handle
                 end
             end
             
-            idx_sim = find(strcmpi('use_sim', varargin)); 
+            idx_sim = find(strcmpi('use_sim', varargin)); % check if any of the varargin are "use_sim"
             
             if isempty(idx_sim)
                 use_sim = 0;
@@ -500,6 +500,7 @@ classdef Scheduler < handle
             obj.readFile; % update the targets from the text file
             obj.report = '';
             obj.rationale = ''; 
+            obj.continue_run = 0; % by default we do not continue the run (can be changed below)
             
 %             arguments = obj.ephem.constraints.output_vars;
             arguments = {}; % all the global constraints from ephem are already copied into each target in readFile, then overwritten by target list
@@ -551,7 +552,7 @@ classdef Scheduler < handle
                     if e.getRuntimeMinutes + e.constraints.fudge_time < e.constraints.continuous*60
                         new_target = target_list(ii); % this target must be observed for some time before a new target can be observed... 
                         obj.rationale = sprintf('%s: Target "%s" has been observed for only %d minutes! Continuing observations... ', time, new_target.name, floor(e.getRuntimeMinutes)); 
-                        obj.continue_run = 1; % by default we do not need to continue the run, and will instead start a new one
+                        obj.continue_run = 1; % in this case we want to continue observing
                         break; % skip the other targets (assume there is only one target being observed at each time)
                     end
                     
@@ -564,10 +565,9 @@ classdef Scheduler < handle
             % if we didn't find any target that is still constrained by "continuous", look for the best available target
             if isempty(new_target) % this happens if there is no target currently under "continuous" condition
                 
-                for ii = 1:length(target_list) % go over the list an re-resolve any targets that need to be updated
+                for ii = 1:length(target_list) % go over the list and re-resolve any targets that need to be updated
                     if target_list(ii).use_resolver
                         target_list(ii).ephem.resolve([], arguments{:}); % also updates secondaries
-%                         target_list(ii).ephem.resolve; % also updates secondaries
                     end 
                 end
 
@@ -628,7 +628,7 @@ classdef Scheduler < handle
                 
                 obj.report = sprintf('%s: No available targets. Going to idle mode...', time); 
                 
-%                 obj.continue_run = 0; % we need to move to a new target
+                obj.continue_run = 0; % we need to move to a new target
             
             elseif ~isequal(this_target, new_target) || ~obj.compare_coordinates(new_target, use_sim) % different target
             % new target is different from the current one, or current target is empty, 
@@ -645,7 +645,7 @@ classdef Scheduler < handle
                 
                 obj.continue_run = 0; % we need to move to a new target (because of flip)
             
-            else % same target, same side -> continue observing
+            else % same target, same coordinates, same side -> continue observing
                 obj.report = sprintf('%s: Continue observing:   %50s', time, new_target.summary); 
                 obj.continue_run = 1; % this is the only case where we do not need to start a new run! 
             end
@@ -789,7 +789,7 @@ classdef Scheduler < handle
 
                 if isempty(obj.obs_history) || isempty(obj.obs_history(end).RA_deg) || isempty(obj.obs_history(end).Dec_deg)
                     val = 0; % no current coordinates, so it can't be close enough
-                elseif abs(target.ephem.RA_deg-obj.obs_history(end).RA_deg)<thresh && ...
+                elseif target.ephem.angleDifference(target.ephem.RA_deg,obj.obs_history(end).RA_deg)<thresh && ...
                         abs(target.ephem.Dec_deg-obj.obs_history(end).Dec_deg)<thresh % both coordinates are close enough
                     val = 1; 
                 else % coordinates are too far, consider this a new target
@@ -798,9 +798,9 @@ classdef Scheduler < handle
 
             else
                 
-                if isempty(obj.obs_history_sim(end).RA_deg) || isempty(obj.obs_history_sim(end).Dec_deg)
+                if isempty(obj.obs_history_sim) || isempty(obj.obs_history_sim(end).RA_deg) || isempty(obj.obs_history_sim(end).Dec_deg)
                     val = 0; % no current coordinates, so it can't be close enough
-                elseif abs(target.ephem.RA_deg-obj.obs_history_sim(end).RA_deg)<thresh && ...
+                elseif target.ephem.angleDifference(target.ephem.RA_deg-obj.obs_history_sim(end).RA_deg)<thresh && ...
                         abs(target.ephem.Dec_deg-obj.obs_history_sim(end).Dec_deg)<thresh % both coordinates are close enough
                     val = 1; 
                 else

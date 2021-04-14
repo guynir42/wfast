@@ -1464,7 +1464,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function sendTelegram(obj, name, subject)
             
-            if obj.debug_bit, util.text.date_printf('Sending telegram to %s with subject: %s\n', name, subject); end
+            if obj.debug_bit, util.text.date_printf('Sending telegram to %s with subject: %s', name, subject); end
 
             token = '';
             id = '';
@@ -1710,7 +1710,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 
             if obj.use_shutdown && (obj.checker.sensors_ok==0 || obj.checker.light_ok==0) % one of the sensors reports bad weather, must shut down
                 if obj.is_shutdown==0 % if already shut down, don't need to do it again
-                    fprintf('Bad weather... %s \n', obj.checker.report); 
+                    util.text.date_printf('Bad weather... %s!', obj.checker.report); 
                     obj.shutdown;
                 end
             end
@@ -1743,7 +1743,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     
                     if ~strcmpi(obj.cam_pc.incoming.report, 'idle') && (isempty(obj.sched.current) || obj.sched.current.ephem.now_observing==0) % not observing anything, but we should be! 
                         
-                        tol = 3; % arcsec
+                        tol = 10; % arcsec
                         
                         chosen_target = [];
                         
@@ -2103,7 +2103,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.mount.object.name = '';
                 obj.mount.object.RA = '';
                 obj.mount.object.Dec = '';
-                util.text.date_printf('Could not find any targets! \nTry changing the constraints or adding new targets and reloading the scheduler.'); 
+                util.text.date_printf('Could not find any targets! Try changing the constraints or adding new targets and reloading the scheduler.'); 
             else
                 obj.mount.object.name = obj.sched.current.name;
                 obj.mount.object.RA = obj.sched.current.RA;
@@ -2269,7 +2269,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
             else
                 
-                obj.print_message(sprintf('\nMoving to target %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
+                obj.print_message(sprintf('Moving to target %s at %s%s', obj.sched.current.name, obj.sched.current.RA, obj.sched.current.Dec)); 
                 pause(1); 
                 % actively switch targets and start a new run: 
                 
@@ -2283,7 +2283,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 % wait for camera to send "idle" report
                 res = 0.1; 
-                for ii = 1:100 % max wait time is 10 sec
+                for ii = 1:300 % max wait time is 30 sec
                     
                     if obj.is_camera_idle
                         break;
