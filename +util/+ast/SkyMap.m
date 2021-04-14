@@ -68,6 +68,8 @@ classdef SkyMap < handle
         
         latest_catalog; % the data from the latest file loaded 
         
+        galactic_survey_fields; % table with galactic plane survey fields
+        
     end
     
     properties % switches/controls
@@ -103,6 +105,8 @@ classdef SkyMap < handle
         show_moon = false;
 %         dist_moon = 50; % contour around moon for overlay
         
+        show_survey_galactic = false; % show the fields in the galactic plane survey
+
         show_ra_units = 'hours'; % choose to show the RA on the plot in "hours" or "degrees"
         show_grid = false; % show an RA/Dec grid on top of the map
         
@@ -591,6 +595,254 @@ classdef SkyMap < handle
         
     end
     
+    methods % survey fields
+        
+        function T = produceGalacticSurveyFields(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('declination', -27, 'south limit'); 
+            input.input_var('galactic', 3, 'galactic_latitude'); 
+            input.input_var('field_size_deg', 2.4); 
+            input.input_var('limmag', 16); 
+            
+            input.scan_vars(varargin{:}); 
+            
+            N = ceil(180./input.field_size_deg); 
+            
+            tile_list = celestial.coo.tile_the_sky(N.*2, N);
+            
+            T = array2table(tile_list(:,1:2).*180/pi); 
+            
+            T.Properties.VariableNames = {'GalacticLongitude', 'GalacticLatitute'};
+            
+            RA_Dec = celestial.coo.coco(tile_list(:,1:2), 'g','j2000.0');  % convert to equatorial
+            
+            T = horzcat(array2table(RA_Dec.*180/pi), T); 
+            
+            T.Properties.VariableNames(1:2) = {'RightAscension', 'Declination'};
+            
+            idx = abs(T.GalacticLatitute)<input.galactic & T.Declination>(input.declination);
+            
+            T = T(idx,:); 
+            
+            T = horzcat(array2table((1:height(T))'), T); 
+            T.Properties.VariableNames{1} = 'Index'; 
+            
+            T = horzcat(T, array2table(zeros(height(T),1)));
+            T.Properties.VariableNames{end} = 'NumStars'; 
+                       
+            M = obj.getMap('max_mag', input.limmag); 
+            
+            % smear the map to get the total number of stars in the field of view
+            
+            dRA = median(diff(obj.RA_axis)); 
+            dDE = median(diff(obj.DE_axis)); 
+            
+            N_RA = ceil(input.field_size_deg./dRA); 
+            N_DE = ceil(input.field_size_deg./dDE); 
+            
+            kernel = ones(N_DE, N_RA); 
+            
+            M = filter2(kernel, M); 
+            
+            for ii = 1:height(T)
+                
+                idx_RA = find(T.RightAscension(ii)>obj.RA_axis, 1, 'last');
+                idx_Dec = find(T.Declination(ii)>obj.DE_axis, 1, 'last');
+                
+                T.NumStars(ii) = M(idx_Dec, idx_RA);
+                
+            end
+            
+            T = horzcat(T, array2table(zeros(height(T),1)));
+            T.Properties.VariableNames{end} = 'ObsHours'; 
+            
+            T = horzcat(T, array2table(NaT(height(T),1)));
+            T.Properties.VariableNames{end} = 'LastObserved'; 
+            
+            obj.galactic_survey_fields = T; 
+            
+        end
+        
+        function saveGalacticSurveyFields(obj, filename)
+            
+            if nargin<2 || isempty(filename)
+                filename = sprintf('galactic_survey_fields_%s.txt', datetime('today', 'Format', 'uuuu_MM_dd'));  
+                filename = fullfile(getenv('DATA'), 'WFAST/target_lists/', filename); 
+            end
+            
+            writetable(obj.galactic_survey_fields, filename); 
+            
+        end
+        
+        function loadGalacticSurveyFields(obj, filename)
+            
+            if nargin<2 || isempty(filename)
+                d = util.sys.WorkingDirectory(fullfile(getenv('DATA'), 'WFAST/target_lists')); 
+                f = d.match('galactic_survey_fields*.txt'); 
+                f = sort(f); 
+                filename = f{end}; 
+            end
+            
+            T = readtable(filename); 
+            
+            time = datetime(T.LastObserved, 'TimeZone', 'UTC', 'Format', 'uuuu-MM-dd HH:mm:ss.sss'); 
+
+            T.LastObserved = time; 
+
+            obj.galactic_survey_fields = T; 
+            
+        end
+        
+        function [field_table, obs_log] = runSurveySimulation(obj, varargin)
+            
+            this_year = year(datetime('now', 'TimeZone', 'UTC')); 
+            
+            input = util.text.InputVars;
+            input.input_var('table', []); 
+            input.input_var('start', datetime(sprintf('%4d-01-01 15:00:00', this_year), 'TimeZone', 'UTC', 'Format', 'uuuu-MM-dd HH:mm:ss.sss')); 
+            input.input_var('end', datetime(sprintf('%4d-12-31', this_year), 'TimeZone', 'UTC')); 
+            input.input_var('ax', [], 'axes', 'axis'); 
+            input.input_var('font_size', 18); 
+            input.input_var('pause', 0.2); 
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.ax)
+                input.ax = gca;
+            end
+            
+            if ~isempty(input.ax.UserData) && isa(input.ax.UserData, 'util.text.InputVars')
+                input = input.ax.UserData; % load the saved "input" object from the axes
+                input.scan_vars(varargin{:}); 
+            end
+            
+            input.ax.UserData = input; % make sure to store the parameters in the axes
+            
+            if isempty(input.table)
+                if isempty(obj.galactic_survey_fields)
+                    obj.loadGalacticSurveyFields;
+                end
+                
+                input.table = obj.galactic_survey_fields;
+                
+            end
+            
+            L = {}; 
+            T = input.table;
+            T.LastObserved = datetime(NaT(height(T),1), 'TimeZone', 'UTC'); 
+            T.ObsHours = zeros(height(T),1); 
+            
+            obj.show('galactic', 0, 'ecliptic', 0, 'moon', 0, 'meridian', 0, 'units', 'deg'); 
+            
+            delete(findobj(input.ax.Parent, 'Type', 'UIControl')); 
+            
+            h_button = uicontrol(input.ax.Parent, 'String', 'STOP SIM', 'UserData', 0, ...
+                'FontSize', input.font_size, 'Units', 'Normalized', 'Position', [0.0 0.0 0.2 0.1], ...
+                'Callback', @obj.callback_sim_stop_button); 
+            
+            hold(input.ax, 'on'); 
+            
+            h_all = [];
+            h_obs = [];
+            h_now = [];
+            h_lst = [];
+            
+            e = head.Ephemeris; 
+            
+            e.time = input.start;
+            
+            for ii = 1:ceil(days(input.end - input.start))
+                
+                if ~isvalid(input.ax) || h_button.UserData==1
+                    break; % stop if the figure is closed or if the button is pushed
+                end
+                
+                if e.time>input.end 
+                    break; % reached the end of the simulation
+                end
+                
+                delete(h_all);
+                delete(h_obs);
+                delete(h_now); 
+                delete(h_lst); 
+                
+%                 h_all = plot(input.ax, T.RightAscension, T.Declination, '.', 'Color', 'magenta'); 
+                
+                if nnz(T.ObsHours>0)
+                    h_obs = scatter(input.ax, T{T.ObsHours>0, 'RightAscension'}, T{T.ObsHours>0, 'Declination'}, 50.*T{T.ObsHours>0, 'ObsHours'}, '.g'); 
+                end
+                
+                e.time = e.time + days(1);
+                
+                title(input.ax, char(e.time)); 
+                
+                % here we choose the index of the chosen field
+                h_lst = plot(input.ax, e.LST_deg.*[1 1], [-90 90], '--b'); 
+                
+%                 idx = ii; % simply go over fields in order
+                
+                % closest to meridian
+%                 distances = abs(e.LST_deg - T.RightAscension); 
+%                 [distances,sort_idx] = sort(distances);                 
+%                 idx = sort_idx(1); 
+                
+                % group of fields close to meridian
+                group_idx = find(abs(e.angleDifference(T.RightAscension, e.LST_deg))<5);
+                Tg = T(group_idx,:); 
+                
+                idx = []; 
+                
+                if ~isempty(Tg)
+%                     Tg = sortrows(Tg, 'RightAscension'); 
+                    [~, sort_idx] = sort(e.time - Tg.LastObserved); 
+                    idx = group_idx(sort_idx(end)); 
+                
+                end
+                
+                % make sure to update this row in the table 
+                if ~isempty(idx)
+                    
+                    field = T(T.Index==idx,:); 
+                    T{T.Index==idx, 'ObsHours'} = T{T.Index==idx, 'ObsHours'} + 1; 
+                    T{T.Index==idx, 'LastObserved'} = e.time; 
+
+                    % plot the current field
+                    if ~isempty(field)
+                        h_now = plot(input.ax, field.RightAscension, field.Declination, 'og'); 
+                    end
+
+                    L{end+1} = sprintf('%s: Observed field %d at %s %s', e.time, field.Index, e.deg2hour(field.RightAscension), e.deg2sex(field.Declination));
+                    
+                else
+                    
+                    L{end+1} = sprintf('%s: Cannot find any fields!', e.time);
+                    
+                end
+                
+                pause(input.pause); 
+                
+            end
+            
+            hold(input.ax, 'off'); 
+            
+            field_table = T;
+            
+            h_button.String = 'START SIM'; 
+            
+        end
+        
+        function callback_sim_stop_button(obj, hndl, ~)
+            
+            if hndl.UserData
+                obj.runSurveySimulation; 
+            else
+                hndl.UserData = 1;
+            end
+            
+        end
+        
+    end
+    
     methods % plotting tools / GUI
         
         function makeGUI(obj)
@@ -648,6 +900,7 @@ classdef SkyMap < handle
             input.input_var('horizon', obj.show_horizon, 'show_horizon'); 
             input.input_var('moon', obj.show_moon, 'show_moon'); 
             input.input_var('dist_moon', obj.dist_moon); 
+            input.input_var('survey', ''); 
             input.input_var('units', obj.show_ra_units, 'ra_units');
             input.input_var('grid', obj.show_grid, 'use_grid'); 
             input.input_var('font_size', 24); 
@@ -662,6 +915,10 @@ classdef SkyMap < handle
             end
             
             input.south_limit = -abs(input.south_limit); % make sure this only clips the negative DE values
+            
+            if isempty(input.survey) && obj.show_survey_galactic
+                input.survey = 'galactic'; 
+            end
             
             M = obj.getMap('min_mag', input.min_mag, 'max_mag', input.max_mag, 'biggest_size', input.biggest_size);
             
@@ -769,10 +1026,31 @@ classdef SkyMap < handle
                 
                 distances = obj.getMoonDist;
                 
-                plot(input.ax, obj.ephem.moon.RA/15, obj.ephem.moon.Dec, 'co', 'MarkerSize', 18, 'MarkerFaceColor', 'c'); % show moon
+                if strcmp(obj.show_ra_units, 'hours')
+                    moon_ra = obj.ephem.moon.RA/15;
+                else
+                    moon_ra = obj.ephem.moon.RA;
+                end
+                
+                plot(input.ax, moon_ra, obj.ephem.moon.Dec, 'co', 'MarkerSize', 18, 'MarkerFaceColor', 'c'); % show moon
                 
                 [C4,h4] = contour(input.ax, x, y, distances, [0 input.dist_moon], 'Color', 'cyan'); 
                 clabel(C4,h4, 'FontSize', input.font_size-10, 'Color', 'cyan');
+                
+            end
+            
+            if ~isempty(input.survey)
+                
+                if util.text.cs(input.survey, 'galactic')
+                    
+                    if isempty(obj.galactic_survey_fields)
+                        obj.loadGalacticSurveyFields;
+                    end
+                    
+                    T = obj.galactic_survey_fields;
+                    plot(input.ax, T.RightAscension, T.Declination, '.', 'Color', 'magenta'); 
+                    
+                end
                 
             end
             

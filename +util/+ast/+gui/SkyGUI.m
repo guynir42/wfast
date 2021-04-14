@@ -103,7 +103,7 @@ classdef SkyGUI < handle
             
             % Add buttons using obj.addButton(button_name, var_name='', type='', str1='', str2='', font_size='', split=1, color_on=[], color_off=[], tooltip)
             
-            num_buttons = 8;
+            num_buttons = 9;
             obj.panel_controls = GraphicPanel(obj.owner, [0 (N-num_buttons)/N 0.2 num_buttons/N], 'controls', 1); % last input is for vertical (default)
             obj.panel_controls.addButton('button_min_mag', 'show_brightest_magnitude', 'input', 'M_min= ', '', '', 0.5, '', '', 'Minimal magnitude (brightest) to show'); 
             obj.panel_controls.addButton('button_max_mag', 'show_faintest_magnitude', 'input', 'M_max= ', '', '', 0.5, '', '', 'Maximal magnitude (faintest) to show'); 
@@ -119,6 +119,8 @@ classdef SkyGUI < handle
             obj.panel_controls.addButton('input_alt_limit', 'alt_limit', 'input', 'alt lim.= ', ' deg', '', 0.5, '', '', 'The minimal altitude for observations, shown on the horizon overlay'); 
             obj.panel_controls.addButton('button_moon', 'show_moon', 'toggle', 'moon', 'moon', '', 0.5, 'cyan', '', 'Show the moon position and the distance to it');
             obj.panel_controls.addButton('input_dist_moon', 'dist_moon', 'input', 'distance= ', ' deg', '', 0.5, '', '', 'The minimal mnoon distance for observations'); 
+            obj.panel_controls.addButton('button_survey_galactic', 'show_survey_galactic', 'toggle', 'gal. survey', 'gal. survey', '', 0.5, 'magenta', '', 'Show the positions of the galactic plane survey fields');
+            obj.panel_controls.addButton('button_placeholder', '', 'custom', ' ', ' ', '', 0.5, '', '', '');
             obj.panel_controls.addButton('button_ra_units', 'show_ra_units', 'custom', '', '', '', 0.5, '', '', 'Choose "degrees" or "hours" for the RA coordinate axis');
             obj.panel_controls.addButton('button_grid', 'show_grid', 'toggle', 'grid', 'grid', '', 0.5, 'blue', '', 'Show the time zone overlay');
             obj.panel_controls.number = num_buttons;
@@ -142,7 +144,7 @@ classdef SkyGUI < handle
             obj.panel_close = uipanel('Position', [0 0 0.2 1/N]);
             obj.button_close = GraphicButton(obj.panel_close, [0 0 1 1], obj.owner, '', 'custom', 'CLOSE');
             obj.button_close.Callback = @obj.callback_close;
-                        
+            
             %%%%%%%%%%% panel image %%%%%%%%%%%%%%%%%%
             
             obj.panel_image = uipanel('Title', '', 'Position', [0.2 0 0.8 1]);

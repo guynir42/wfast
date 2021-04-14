@@ -1603,6 +1603,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
+        function getFieldList(obj, filename)
+            
+            
+            
+        end
+        
     end
     
     methods % plotting tools / GUI
@@ -2082,6 +2088,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
 
                 nut_obli = DObl./10000/3600; % convert to degrees...
             end
+        end
+        
+        function val = angleDifference(alpha, beta)
+            
+            val = 180 - abs(abs(alpha - beta) - 180);
+            
         end
         
     end
