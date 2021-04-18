@@ -212,10 +212,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.constructEmail;
             
             % start the 3 layers of timers
+            obj.setup_t4; % check t3 is alive (1 hour)
             obj.setup_t3; % check t2 is alive (half hour period)
             obj.setup_t2; % check devices, collect weather, decide on closing dome, make log report (5 minute period)
             obj.setup_t1; % get sensors to measure weather data for averaging (1 minute period)
-                
+            obj.setup_t0; % update parts of the GUI like stop button
+
             obj.ephem = head.Ephemeris; 
             
         end
@@ -1662,7 +1664,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.ephem.update;
                 if obj.use_shutdown && obj.ephem.sun.Alt>obj.checker.sun_max_alt
                     if obj.is_shutdown==0 % if already shut down, don't need to do it again
-                        fprintf('Sun elevation %d is above %d deg...', round(obj.ephem.sun.Alt), obj.checker.sun_max_alt); 
+                        util.text.date_printf('Sun elevation %d is above %d deg...', round(obj.ephem.sun.Alt), obj.checker.sun_max_alt); 
                         obj.shutdown;
                     end
                 end
