@@ -234,6 +234,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             obj.constraints.input_var('south_limit', -30, 'declination_limit'); 
             obj.constraints.add_comment('south_limit', 'lowest declination we are ready to accept'); 
             
+            obj.constraints.input_var('time_limit', [], 'minimal_time_limit'); 
+            obj.constraints.add_comment('time_limit', 'do not begin observing a target with less than this many hours left until the nearest limit'); 
+            
             obj.constraints.input_var('moon', 50, 'moon_distance'); 
             obj.constraints.add_comment('moon', 'target must be this far away from the moon (degrees)'); 
             
@@ -1221,12 +1224,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             if isempty(obj.RA) || isempty(obj.Dec), obj.unobservable_reason = 'No coordinates'; return; end
             
             t_start = obj.parseTime(input.earliest);
-            if ~isempty(input.earliest) 
-                if obj.time<t_start-minutes(input.fudge_time), obj.unobservable_reason = sprintf('Can''t observe before %2d:%2d', t_start.Hour, t_start.Minute); return; end
-            end % current time is too early
+            if ~isempty(input.earliest) && obj.time<t_start-minutes(input.fudge_time) % current time is too early
+                obj.unobservable_reason = sprintf('Can''t observe before %2d:%2d', t_start.Hour, t_start.Minute); 
+                return;                 
+            end 
             
             t_end = obj.parseTime(input.latest);
-            if ~isempty(input.latest) && obj.time>t_end+minutes(input.fudge_time), obj.unobservable_reason = sprintf('Can''t observe after %2d:%2d', t_end.Hour, t_end.Minute); return; end % current time is too late
+            if ~isempty(input.latest) && obj.time>t_end+minutes(input.fudge_time) % current time is too late
+                obj.unobservable_reason = sprintf('Can''t observe after %2d:%2d', t_end.Hour, t_end.Minute); 
+                return; 
+            end 
             
             if obj.HA_deg<0 && util.text.cs(input.side, 'West'), obj.unobservable_reason = 'Eastern target'; return; end % target is on East side when only West is accepted
             
@@ -1243,7 +1250,17 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             if obj.moon.Dist<input.moon, obj.unobservable_reason = sprintf('Moon dist= %d<%d', round(obj.moon.Dist), round(input.moon)); return; end
             
             minutes_left = obj.calcObsTimeMinutes(input.altitude);
-            if obj.now_observing==0 && minutes_left<input.continuous*60, obj.unobservable_reason = sprintf('Time left %d<%d minutes', round(minutes_left), round(input.continuous.*60)); return; end % there is not enough time left to observe this target
+            if obj.now_observing==0 
+                if ~isempty(input.time_limit) && minutes_left<input.time_limit*60 % there is not enough time left to start observing this target?
+                    obj.unobservable_reason = sprintf('Time left %d<%d minutes', round(minutes_left), round(input.time_limit.*60)); 
+                    return;
+                end
+                
+                if minutes_left<input.continuous*60 % there is not enough time left to start observing this target?
+                    obj.unobservable_reason = sprintf('Time left %d<%d minutes', round(minutes_left), round(input.continuous.*60)); 
+                    return; 
+                end 
+            end
             
             % any other constraints? 
             
@@ -1322,6 +1339,42 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             else
                 val = obj.AIRMASS<=other.AIRMASS; % if this object has lower airmass, it is better
             end
+            
+        end
+        
+        function [RA_min, RA_max] = findSurveySection(obj, midnight_distance_hours, section_size_hours, section_step_hours, section_start_hours) % not sure if we need this anymore
+            
+            if nargin<2 || isempty(midnight_distance_hours)
+                midnight_distance_hours = 0; 
+            end
+            
+            if nargin<3 || isempty(section_size_hours)
+                section_size_hours = 1;
+            end
+            
+            if nargin<4 || isempty(section_step_hours)
+                section_step_hours = 1;
+            end
+            
+            if nargin<5 || isempty(section_start_hours)
+                section_start_hours = 0;
+            end
+            
+            RA_axis = section_start_hours:section_step_hours:24; 
+            
+            e = head.Ephemeris; 
+            e.time = obj.time;
+            e.time.Hour = 0;
+            e.time.Minute = 0;
+            e.time.Second = 0; 
+            
+            RA = mod(e.LST_deg/15 + midnight_distance_hours, 24);
+            
+            idx = find(RA>RA_axis,1,'last'); 
+            
+            RA_min = RA_axis(idx);             
+%             RA_max = RA_axis(idx+num_sections); 
+            RA_max = mod(RA_min + section_size_hours, 24);
             
         end
         
@@ -2094,6 +2147,24 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             val = 180 - abs(abs(alpha - beta) - 180);
             
+        end
+        
+        function time = stripHours(time)
+            
+            time.Hour = zeros(size(time));
+            time.Minute = zeros(size(time));
+            time.Second = zeros(size(time));
+            
+        end
+        
+        function time = dateNight(time)
+            
+            if time.Hour<12
+                time = time - day(1); 
+            end
+
+            time = head.Ephemeris.stripHours(time); 
+
         end
         
     end

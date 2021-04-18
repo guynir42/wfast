@@ -625,6 +625,8 @@ classdef SkyMap < handle
             
             T = T(idx,:); 
             
+            T = sortrows(T, 'RightAscension'); 
+            
             T = horzcat(array2table((1:height(T))'), T); 
             T.Properties.VariableNames{1} = 'Index'; 
             
@@ -655,7 +657,19 @@ classdef SkyMap < handle
             end
             
             T = horzcat(T, array2table(zeros(height(T),1)));
-            T.Properties.VariableNames{end} = 'ObsHours'; 
+            T.Properties.VariableNames{end} = 'TonightHours'; 
+            
+            T = horzcat(T, array2table(zeros(height(T),1)));
+            T.Properties.VariableNames{end} = 'TotalHours'; 
+            
+            T = horzcat(T, array2table(zeros(height(T),1)));
+            T.Properties.VariableNames{end} = 'ObsNights'; 
+            
+            T = horzcat(T, array2table(zeros(height(T),1)));
+            T.Properties.VariableNames{end} = 'ConsecutiveNights'; 
+            
+            T = horzcat(T, array2table(zeros(height(T),1)));
+            T.Properties.VariableNames{end} = 'MaxConsecutive'; 
             
             T = horzcat(T, array2table(NaT(height(T),1)));
             T.Properties.VariableNames{end} = 'LastObserved'; 
@@ -700,23 +714,19 @@ classdef SkyMap < handle
             
             input = util.text.InputVars;
             input.input_var('table', []); 
-            input.input_var('start', datetime(sprintf('%4d-01-01 15:00:00', this_year), 'TimeZone', 'UTC', 'Format', 'uuuu-MM-dd HH:mm:ss.sss')); 
+            input.input_var('sort_columns', {'TotalHours', 'NumStars*'});
+            input.input_var('start', datetime(sprintf('%4d-07-01', this_year), 'TimeZone', 'UTC', 'Format', 'uuuu-MM-dd HH:mm:ss.sss')); 
             input.input_var('end', datetime(sprintf('%4d-12-31', this_year), 'TimeZone', 'UTC')); 
+            input.input_var('time_step', 1); % hours
+            input.input_var('repeat_max', 2); % how many nights can be observed in a row before moving on
             input.input_var('ax', [], 'axes', 'axis'); 
             input.input_var('font_size', 18); 
-            input.input_var('pause', 0.2); 
+            input.input_var('pause', 0.00); 
             input.scan_vars(varargin{:}); 
             
             if isempty(input.ax)
                 input.ax = gca;
             end
-            
-            if ~isempty(input.ax.UserData) && isa(input.ax.UserData, 'util.text.InputVars')
-                input = input.ax.UserData; % load the saved "input" object from the axes
-                input.scan_vars(varargin{:}); 
-            end
-            
-            input.ax.UserData = input; % make sure to store the parameters in the axes
             
             if isempty(input.table)
                 if isempty(obj.galactic_survey_fields)
@@ -731,9 +741,49 @@ classdef SkyMap < handle
             T = input.table;
             T.LastObserved = datetime(NaT(height(T),1), 'TimeZone', 'UTC'); 
             T.ObsHours = zeros(height(T),1); 
+            T.TonightHours = zeros(height(T),1); 
+            T.ConsecutiveNights = zeros(height(T),1); 
+            T.ObsNights = zeros(height(T),1); 
+            
+            column_names = T.Properties.VariableNames; 
+            cols = [];
+            order = {}; 
+            for jj = 1:length(input.sort_columns)
+            
+                name = input.sort_columns{jj};
+                
+                if name(end)=='*'
+                    name = name(1:end-1); 
+                    order{jj} = 'descend'; 
+                else
+                    order{jj} = 'ascend'; 
+                end
+                
+                col_index = find(strcmp(column_names, name), 1, 'first'); 
+                
+                if isempty(col_index)
+                    error('Unknown column name to sort on: "%s". Use one of the column names on the field table.', name); 
+                end
+                
+                cols(jj) = col_index;
+                
+            end
+                        
+            fig = input.ax.Parent;
+            fig.UserData = input; 
+            
+            delete(input.ax.Children); 
+            
+            e = obj.ephem;
+            on_cleanup = onCleanup(@() e.update); % make sure to return the sky map to current time when done! 
+            
+            e.time = input.start;
             
             obj.show('galactic', 0, 'ecliptic', 0, 'moon', 0, 'meridian', 0, 'units', 'deg'); 
             
+            x = obj.RA_axis(1:end-1);
+            y = obj.DE_axis(1:end-1);
+
             delete(findobj(input.ax.Parent, 'Type', 'UIControl')); 
             
             h_button = uicontrol(input.ax.Parent, 'String', 'STOP SIM', 'UserData', 0, ...
@@ -744,14 +794,26 @@ classdef SkyMap < handle
             
             h_all = [];
             h_obs = [];
+            h_two = [];
             h_now = [];
             h_lst = [];
+            h_group = []; 
+            h_consec = []; 
+            h_moon = [];
+            h_moon_contours = [];
             
-            e = head.Ephemeris; 
+            new_night = 1; 
             
-            e.time = input.start;
+            for jj = 1:height(T)
+                fields(jj) = util.oop.full_copy(e); % copy the constraints but keep it separate from the main ephemeris object
+                fields(jj).RA_deg = T{jj,'RightAscension'}; 
+                fields(jj).Dec_deg = T{jj,'Declination'}; 
+            end
             
-            for ii = 1:ceil(days(input.end - input.start))
+            for ii = 1:1e8
+                
+                e.timeTravelHours(input.time_step); 
+                e.updateSecondaryCoords; 
                 
                 if ~isvalid(input.ax) || h_button.UserData==1
                     break; % stop if the figure is closed or if the button is pushed
@@ -761,65 +823,140 @@ classdef SkyMap < handle
                     break; % reached the end of the simulation
                 end
                 
+%                 fprintf('Time: %s | Sun alt= %4.3f\n', e.time, e.sun.Alt); 
+                
                 delete(h_all);
                 delete(h_obs);
+                delete(h_two); 
                 delete(h_now); 
                 delete(h_lst); 
+                delete(h_group); 
+                delete(h_consec); 
+                delete(h_moon); 
+                delete(h_moon_contours); 
                 
-%                 h_all = plot(input.ax, T.RightAscension, T.Declination, '.', 'Color', 'magenta'); 
-                
-                if nnz(T.ObsHours>0)
-                    h_obs = scatter(input.ax, T{T.ObsHours>0, 'RightAscension'}, T{T.ObsHours>0, 'Declination'}, 50.*T{T.ObsHours>0, 'ObsHours'}, '.g'); 
-                end
-                
-                e.time = e.time + days(1);
-                
-                title(input.ax, char(e.time)); 
-                
-                % here we choose the index of the chosen field
-                h_lst = plot(input.ax, e.LST_deg.*[1 1], [-90 90], '--b'); 
-                
-%                 idx = ii; % simply go over fields in order
-                
-                % closest to meridian
-%                 distances = abs(e.LST_deg - T.RightAscension); 
-%                 [distances,sort_idx] = sort(distances);                 
-%                 idx = sort_idx(1); 
-                
-                % group of fields close to meridian
-                group_idx = find(abs(e.angleDifference(T.RightAscension, e.LST_deg))<5);
-                Tg = T(group_idx,:); 
-                
-                idx = []; 
-                
-                if ~isempty(Tg)
-%                     Tg = sortrows(Tg, 'RightAscension'); 
-                    [~, sort_idx] = sort(e.time - Tg.LastObserved); 
-                    idx = group_idx(sort_idx(end)); 
-                
-                end
-                
-                % make sure to update this row in the table 
-                if ~isempty(idx)
-                    
-                    field = T(T.Index==idx,:); 
-                    T{T.Index==idx, 'ObsHours'} = T{T.Index==idx, 'ObsHours'} + 1; 
-                    T{T.Index==idx, 'LastObserved'} = e.time; 
-
-                    % plot the current field
-                    if ~isempty(field)
-                        h_now = plot(input.ax, field.RightAscension, field.Declination, 'og'); 
-                    end
-
-                    L{end+1} = sprintf('%s: Observed field %d at %s %s', e.time, field.Index, e.deg2hour(field.RightAscension), e.deg2sex(field.Declination));
-                    
+                if e.sun.Alt>-10
+                    new_night = 1;                    
+                    continue;
                 else
                     
-                    L{end+1} = sprintf('%s: Cannot find any fields!', e.time);
+                    if new_night
+                        
+                        T.TonightHours = zeros(height(T),1); % no observations were done tonight, yet
+                        
+                        for jj = 1:height(T) % clear consecutive nights for fields that were not observed last night
+                            if e.dateNight(T{jj, 'LastObserved'}) < e.dateNight(e.time -days(1))
+                                T{jj,'MaxConsecutive'} = max(T{jj,'MaxConsecutive'}, T{jj,'ConsecutiveNights'}); % log the longest stretch of consecutive nights before clearing them
+                                T{jj,'ConsecutiveNights'} = 0; 
+                            end
+                        end
+                        
+                    end
+                    
+                    new_night = 0;
                     
                 end
                 
+                [h_moon, h_moon_contours] = obj.showMoonContours(x, y, e.constraints.moon, input.ax); 
+                
+                h_all = plot(input.ax, T.RightAscension, T.Declination, '.', 'Color', 'magenta'); 
+                h_all.DisplayName = 'All galactic survey fields'; 
+                
+                if nnz(T.TotalHours>0)
+                    h_obs = scatter(input.ax, T{T.TotalHours>0, 'RightAscension'}, T{T.TotalHours>0, 'Declination'}, 50.*T{T.TotalHours>0, 'TotalHours'}, '.y'); 
+                    h_obs.DisplayName = 'Observed a single night'; 
+                end
+                
+                if nnz(T.ObsNights)
+                    h_two = scatter(input.ax, T{T.ObsNights>1, 'RightAscension'}, T{T.ObsNights>1, 'Declination'}, 50.*T{T.ObsNights>1, 'TotalHours'}, '.g'); 
+                    h_two.DisplayName = 'Observed two nights or more'; 
+                end
+                
+%                 title(input.ax, char(e.time)); 
+                
+                h_lst = plot(input.ax, e.LST_deg.*[1 1], [-90 90], '--b'); 
+                h_lst.DisplayName = 'Local sidereal time'; 
+                
+                h_consec = bar(input.ax, T.RightAscension, (T.ConsecutiveNights)*10-90, 'BaseValue', -90, 'FaceColor', 'blue'); 
+                drawnow;
+                
+                % choose a new field! 
+                idx = []; 
+                
+                select_idx = find(abs(e.angleDifference(e.LST_deg, T.RightAscension)/15)<2.5 & T.ConsecutiveNights<input.repeat_max); % narrow down the fields a little
+                if isempty(select_idx)
+                    continue;
+                end
+                
+                Tsel = T(select_idx,:); 
+                
+                [Tsort, sort_idx] = sortrows(Tsel, cols, order); 
+                
+                options_idx = []; 
+                
+                for nn = 0:1
+                    options_idx = vertcat(options_idx, find(e.dateNight(Tsort.LastObserved)==e.dateNight(e.time-days(nn)))); % find options for fields that were observed tonight or last night
+                end
+                
+                options_idx = vertcat(options_idx, (1:height(Tsort))'); % there will be repeated indices, but not too many... 
+%                 options_idx = vertcat(options_idx, 1); % there will be repeated indices, but not too many... 
+
+                target = head.Ephemeris.empty; % fill this if we find a good field
+                
+                for jj = 1:length(options_idx) % go over our options, sorted according to: observed tonight, observed last night, everything else 
+                
+                    idx = select_idx(sort_idx(options_idx(jj))); % convert to original indexing in T instead of the sorted and down-selected Tsort
+                    
+                    fields(idx).time = e.time; 
+                    fields(idx).updateMoon; % maybe update secondaries? 
+                    
+                    if fields(idx).observable
+                        target = fields(idx); 
+                        break;
+                    end
+                    
+                end
+                
+                % a field is chosen
+                if ~isempty(target)
+                    
+                    for jj = 1:length(fields)
+                        fields(jj).now_observing = 0; % all fields are not observed... except one
+                    end
+                    
+                    target.now_observing = 1; % this one! 
+                    
+                    field_number = T{idx,'Index'};
+
+                    T{idx, 'TotalHours'} = T{idx, 'TotalHours'} + input.time_step; 
+
+                    if T{idx, 'TonightHours'} == 0  % this is the first time this field is observed tonight!
+
+                        T{idx, 'ObsNights'} = T{idx, 'ObsNights'} + 1;
+
+                        if e.dateNight(T{idx, 'LastObserved'})==e.dateNight(target.time-days(1)) % was observed last night
+                            T{idx, 'ConsecutiveNights'} = T{idx, 'ConsecutiveNights'} + 1;
+                        end
+
+                    end
+
+                    T{idx, 'TonightHours'} = T{idx, 'TonightHours'} + input.time_step; 
+                    T{idx, 'LastObserved'} = e.time; 
+
+                    % plot the current field
+
+                    h_now = plot(input.ax, target.RA_deg, target.Dec_deg, 'or'); 
+                    h_now.DisplayName = 'Now observing this field'; 
+
+                    L{end+1} = sprintf('%s: Observed field %d at %s %s', target.time, field_number, target.RA, target.Dec);
+                else                    
+                    L{end+1} = sprintf('%s: Cannot find any fields!', e.time);
+                end
+                
+%                 legend(input.ax, 'Location', 'SouthWest'); 
+                
                 pause(input.pause); 
+                title(input.ax, L{end});
                 
             end
             
@@ -833,8 +970,10 @@ classdef SkyMap < handle
         
         function callback_sim_stop_button(obj, hndl, ~)
             
+%             fprintf('callback sim stop. Value= %d\n', hndl.UserData); 
+            
             if hndl.UserData
-                obj.runSurveySimulation; 
+                obj.runSurveySimulation(hndl.Parent.UserData.output_vars{:}); 
             else
                 hndl.UserData = 1;
             end
@@ -913,6 +1052,8 @@ classdef SkyMap < handle
             if isempty(input.ax)
                 input.ax = gca;
             end
+            
+            hold_state = input.ax.NextPlot;
             
             input.south_limit = -abs(input.south_limit); % make sure this only clips the negative DE values
             
@@ -1024,18 +1165,20 @@ classdef SkyMap < handle
             
             if input.moon
                 
-                distances = obj.getMoonDist;
+                obj.showMoonContours(x, y, input.dist_moon, input.ax, input.font_size); 
                 
-                if strcmp(obj.show_ra_units, 'hours')
-                    moon_ra = obj.ephem.moon.RA/15;
-                else
-                    moon_ra = obj.ephem.moon.RA;
-                end
-                
-                plot(input.ax, moon_ra, obj.ephem.moon.Dec, 'co', 'MarkerSize', 18, 'MarkerFaceColor', 'c'); % show moon
-                
-                [C4,h4] = contour(input.ax, x, y, distances, [0 input.dist_moon], 'Color', 'cyan'); 
-                clabel(C4,h4, 'FontSize', input.font_size-10, 'Color', 'cyan');
+%                 distances = obj.getMoonDist;
+%                 
+%                 if strcmp(obj.show_ra_units, 'hours')
+%                     moon_ra = obj.ephem.moon.RA/15;
+%                 else
+%                     moon_ra = obj.ephem.moon.RA;
+%                 end
+%                 
+%                 plot(input.ax, moon_ra, obj.ephem.moon.Dec, 'co', 'MarkerSize', 18, 'MarkerFaceColor', 'c'); % show moon
+%                 
+%                 [C4,h4] = contour(input.ax, x, y, distances, [0 input.dist_moon], 'Color', 'cyan'); 
+%                 clabel(C4,h4, 'FontSize', input.font_size-10, 'Color', 'cyan');
                 
             end
             
@@ -1054,12 +1197,37 @@ classdef SkyMap < handle
                 
             end
             
-            input.ax.NextPlot = 'replace';
+            input.ax.NextPlot = hold_state;
             
             if nargout>0
                 h_out = h;
             end
             
+        end
+        
+        function [h, h2] = showMoonContours(obj, x, y, moon_dist, ax, font_size)
+            
+            if nargin<5 || isempty(ax)
+                ax = gca;
+            end
+            
+            if nargin<6 || isempty(font_size)
+                font_size = 24;
+            end
+            
+            distances = obj.getMoonDist;
+
+            if strcmp(obj.show_ra_units, 'hours')
+                moon_ra = obj.ephem.moon.RA/15;
+            else
+                moon_ra = obj.ephem.moon.RA;
+            end
+
+            h = plot(ax, moon_ra, obj.ephem.moon.Dec, 'co', 'MarkerSize', 18, 'MarkerFaceColor', 'c'); % show moon
+
+            [C,h2] = contour(ax, x, y, distances, [0 moon_dist], 'Color', 'cyan'); 
+            clabel(C,h2, 'FontSize', font_size-10, 'Color', 'cyan');
+
         end
         
     end    
