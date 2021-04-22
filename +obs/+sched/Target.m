@@ -47,6 +47,9 @@ classdef (CaseInsensitiveProperties) Target < handle
         start_RA_deg = [];
         start_Dec_deg = [];
         
+        list_table = []; % a table with survey field coordinates and other details like number of stars, how many hours it was observed, etc.
+%         last_list_update = NaT; % datetime with the last time the list file was updated from memory
+        
     end
     
     properties % switches/controls
@@ -63,6 +66,11 @@ classdef (CaseInsensitiveProperties) Target < handle
         tracking = 1; % most targets need the telescope to be tracking 
         cam_mode = 'fast'; % choose "fast" for KBO type survey at 25Hz, or "slow" for deeper targets with 3 second exposures
         exp_time = []; % change this only when using "slow" camera mode. Should not be larger than 5 or 10 seconds for guiding to work. 
+        
+        % additional info
+        list_filename = ''; % should we load the target from a list in a text file? 
+        sort_columns = {'TotalHours', 'NumStars*'}; % sort first on what was observed least, then on what has the most stars
+        repeat_max = 2; % do not observe fields more than two nights in a row
         
         debug_bit = 1;
         
@@ -84,7 +92,9 @@ classdef (CaseInsensitiveProperties) Target < handle
     
     properties(Hidden=true)
        
-        version = 1.00;
+        list_filename_loaded = ''; 
+        
+        version = 1.01;
         
     end
     
@@ -267,6 +277,7 @@ classdef (CaseInsensitiveProperties) Target < handle
         % NOTE: there is no need to use quotes of any kind. 
         
             import util.text.cs;
+            import util.text.parse_bool; 
             
             if nargin==1, help('obs.sched.Target.parseText'); return; end
         
@@ -336,13 +347,19 @@ classdef (CaseInsensitiveProperties) Target < handle
                 elseif cs(key, 'decay rate')
                     obj.decay_rate = val;
                 elseif cs(key, 'tracking')
-                    obj.tracking = val;
+                    obj.tracking = parse_bool(val);
                 elseif cs(key, 'cam_mode', 'camera mode', 'mode')
                     obj.cam_mode = val;
                 elseif cs(key, 'exp time', 'exposure time')
                     obj.exp_time = val;
                 elseif cs(key, 'keyword')
                     obj.ephem.keyword = val;
+                elseif cs(key, 'list_filename')
+                    obj.list_filename = val;
+                elseif cs(key, 'sort_columns')
+                    obj.sort_columns = val;
+                elseif cs(key, 'repeat_maximum')
+                    obj.repeat_max = val; 
                 else % assume all other inputs are constraints on the target field
                     obj.ephem.constraints.scan_vars(key, val);
                 end
@@ -533,6 +550,156 @@ classdef (CaseInsensitiveProperties) Target < handle
             end
             
             obj.start_time = ''; % when finished we no longer need to keep this info (it is stored in obs_history)
+            
+        end
+        
+        function loadFromTargetList(obj)
+            
+            if isempty(obj.list_filename)
+                error('Cannot load a target list without a filename!'); 
+            end
+            
+            if isempty(obj.list_table)
+            % first get the most up-to-date target list into a table            
+            d = util.sys.WorkingDirectory(fullfile(getenv('DATA'), 'WFAST/target_lists/')); 
+            files = d.match([obj.list_filename '*']); % all files matching the filename + additional info like creation date
+            files = sort(files); % get the latest file last
+            
+            if isempty(files)
+                error('Could not find any files matching "%s". ', obj.list_filename); 
+            end
+            
+            obj.list_table = readtable(files{end}); 
+            obj.list_filename_loaded = files{end}; % keep track of the full name of the file we just loaded
+            
+            end
+            
+            T = obj.list_table; % shorthand
+            
+            time = datetime(T.LastObserved, 'TimeZone', 'UTC', 'Format', 'uuuu-MM-dd HH:mm:ss.sss'); % convert the text into datetime objects
+
+            T.LastObserved = time; 
+
+            %%%%%% choose the best target from this list %%%%%%
+            
+            % find the column names for sorting
+            column_names = T.Properties.VariableNames; 
+            cols = [];
+            order = {}; 
+            for jj = 1:length(obj.sort_columns)
+            
+                col_name = obj.sort_columns{jj};
+                
+                if col_name(end)=='*'
+                    col_name = col_name(1:end-1); 
+                    order{jj} = 'descend'; 
+                else
+                    order{jj} = 'ascend'; 
+                end
+                
+                col_index = find(strcmp(column_names, col_name), 1, 'first'); 
+                
+                if isempty(col_index)
+                    error('Unknown column name to sort on: "%s". Use one of the column names on the field table.', col_name); 
+                end
+                
+                cols(jj) = col_index;
+                
+            end
+            
+            % create ephemeris objects for all fields
+            e = util.oop.full_copy(obj.ephem); 
+            for jj = height(T):-1:1 % reverse order make sure the allocation happens at the beginning
+                fields(jj) = head.Ephemeris; % copy the constraints but keep it separate from the main ephemeris object
+                fields(jj).time = e.time;
+                fields(jj).constraints = e.constraints; 
+                fields(jj).RA_deg = T{jj,'RightAscension'}; 
+                fields(jj).Dec_deg = T{jj,'Declination'}; 
+                fields(jj).field_id = T{jj,'Index'}; 
+                if ~isempty(obj.ephem.field_id) && obj.ephem.field_id==fields(jj).field_id && obj.ephem.now_observing 
+                    fields(jj).now_observing = 1; 
+                else
+                    fields(jj).now_observing = 0;
+                end
+            end
+            
+            % clear out data from last night, if this is a new night
+            tonight = e.dateNight(e.time); % the datetime for the beginning of this night
+            last_observed_nights = e.dateNight(T.LastObserved); 
+            
+            if all(last_observed_nights<tonight) % not yet observed any of these fields tonight
+                
+                for jj = 1:height(T) % clear consecutive nights for fields that were not observed last night
+                    
+                    T{jj, 'TotalHours'} = T{jj, 'TotalHours'} + T{jj, 'TonightHours'}; % accumulate last night's hours into the total count
+                    T{jj, 'TonightHours'} = 0; % clear out any hours taken last night
+                    
+                    if last_observed_nights(jj) < tonight - days(1)
+                        T{jj,'MaxConsecutive'} = max(T{jj,'MaxConsecutive'}, T{jj,'ConsecutiveNights'}); % log the longest stretch of consecutive nights before clearing them
+                        T{jj,'ConsecutiveNights'} = 0; 
+                    end
+                end
+                
+            end
+            
+            % choose a new field! 
+            idx = []; 
+
+            select_idx = find(abs(e.angleDifference(e.LST_deg, T.RightAscension)/15)<2.5 & T.ConsecutiveNights<obj.repeat_max); % narrow down the fields a little
+            if isempty(select_idx)
+                obj.list_table = T; 
+                return;
+            end
+
+            Tsel = T(select_idx,:); 
+
+            [Tsort, sort_idx] = sortrows(Tsel, cols, order); 
+
+            options_idx = []; 
+
+            for nn = 0:1
+                options_idx = vertcat(options_idx, find(e.dateNight(Tsort.LastObserved)==tonight-days(nn))); % find options for fields that were observed tonight or last night
+            end
+
+            options_idx = vertcat(options_idx, (1:height(Tsort))'); % there will be repeated indices, but not too many... 
+
+            target = head.Ephemeris.empty; % fill this if we find a good field
+
+            for jj = 1:length(options_idx) % go over our options, sorted according to: observed tonight, observed last night, everything else 
+
+                idx = select_idx(sort_idx(options_idx(jj))); % convert to original indexing in T instead of the sorted and down-selected Tsort
+
+                fields(idx).updateMoon; % maybe update secondaries? 
+
+                if fields(idx).observable
+                    target = fields(idx); 
+                    break;
+                end
+
+            end
+
+            if isempty(target)
+                obj.ephem.RA = ''; 
+                obj.ephem.Dec = ''; 
+                obj.ephem.field_id = []; 
+            else
+                % copy the best field parameters
+                obj.ephem.RA = target.RA; 
+                obj.ephem.Dec = target.Dec; 
+                obj.ephem.field_id = T{idx, 'Index'}; 
+            end
+            
+            obj.list_table = T; 
+            
+        end
+        
+        function saveListTable(obj)
+            
+            if isempty(obj.list_filename) || isempty(obj.list_filename_loaded)
+                error('Cannot load a target list without a filename!'); 
+            end
+            
+            writetable(obj.list_table, obj.list_filename_loaded); % write the data back into the same file
             
         end
         

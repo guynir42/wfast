@@ -447,7 +447,40 @@ classdef Scheduler < handle
                         if ~isempty(st(jj).runtime)
                             dur = dur + st(jj).runtime;
                         end
+                        
+                        if ~isempty(obj.targets(ii).list_table) && ~isempty(st(jj).field_id) % we can update a specific filed from the table
                             
+                            idx = find(obj.targets(ii).list_table.Index == st(jj).field_id); % table index
+                            
+                            try 
+                                
+%                                 obj.targets(ii).list_table{idx, 'TotalHours'} = obj.targets(ii).list_table{idx, 'TotalHours'} + st(jj).runtime; 
+                                
+                                if obj.targets(ii).list_table{idx, 'TonightHours'} == 0  % this is the first time this field is observed tonight!
+
+                                    obj.targets(ii).list_table{idx, 'ObsNights'} = obj.targets(ii).list_table{idx, 'ObsNights'} + 1; % keep track of the fact that this is now observed one more night
+
+                                    if obj.targets(ii).ephem.dateNight(obj.targets(ii).list_table{idx, 'LastObserved'})==obj.targets(ii).ephem.dateNight(obj.targets(ii).ephem.time-days(1)) % was observed last night
+                                        obj.targets(ii).list_table{idx, 'ConsecutiveNights'} = obj.targets(ii).list_table{idx, 'ConsecutiveNights'} + 1; % one more night in a row
+                                    end
+
+                                end
+                                
+                                obj.targets(ii).list_table{idx, 'TonightHours'} = st(jj).runtime; 
+                                
+                                if isfield(st(jj), 'end') && ~isempty(st(jj).end)
+                                    obj.targets(ii).list_table{idx, 'LastObserved'} = util.text.str2time(st(jj).end); % if end time exists, it is more recent
+                                else
+                                    obj.targets(ii).list_table{idx, 'LastObserved'} = util.text.str2time(st(jj).start);% if not, use the start time
+                                end
+                                
+                            catch ME
+                                fprintf('Could not apply runtime to list table on target "%s" with field id %d\n', obj.targets(ii).name, st(jj).field_id); 
+                                warning(ME.getReport); 
+                            end
+                            
+                        end
+                        
                         if jj==length(st) % last iteration, update the target ephemeris
                             
                             obj.targets(ii).ephem.prev_runtime_minutes = dur/60; % convert to minutes
@@ -457,11 +490,15 @@ classdef Scheduler < handle
                                 obj.targets(ii).ephem.STARTTIME = st(jj).start; 
                             end
 
-                            if ~isempty(st(jj).end) % the last object in the log has finished observing!
-                                obj.targets(ii).ephem.now_observing = 0;
-                            else % the last object in the log is still running! 
-                                obj.targets(ii).ephem.now_observing = 1;
+                            if ~isempty(st(jj).end)
+                                obj.targets(ii).ephem.end_time= st(jj).end; 
                             end
+
+%                             if ~isempty(st(jj).end) % the last object in the log has finished observing!
+%                                 obj.targets(ii).ephem.now_observing = 0;
+%                             else % the last object in the log is still running! 
+%                                 obj.targets(ii).ephem.now_observing = 1;
+%                             end
 
                         end
                         
@@ -472,7 +509,6 @@ classdef Scheduler < handle
                 end
                 
             end
-            
             
         end
         
@@ -566,9 +602,15 @@ classdef Scheduler < handle
             if isempty(new_target) % this happens if there is no target currently under "continuous" condition
                 
                 for ii = 1:length(target_list) % go over the list and re-resolve any targets that need to be updated
-                    if target_list(ii).use_resolver
-                        target_list(ii).ephem.resolve([], arguments{:}); % also updates secondaries
+                    
+                    if target_list(ii).use_resolver % target does not have explicite coordinates in the target list
+                        if isempty(target_list(ii).list_filename) % no specific target list/bank, use the Ephemeris name resolver
+                            target_list(ii).ephem.resolve([], arguments{:}); % also updates secondaries
+                        else % use the specific target list file
+                            target_list(ii).loadFromTargetList;
+                        end
                     end 
+                    
                 end
 
                 dur_flag = true(length(target_list),1); % indices of the targets that meet the duration prerequisite
@@ -789,7 +831,9 @@ classdef Scheduler < handle
 
                 if isempty(obj.obs_history) || isempty(obj.obs_history(end).RA_deg) || isempty(obj.obs_history(end).Dec_deg)
                     val = 0; % no current coordinates, so it can't be close enough
-                elseif target.ephem.angleDifference(target.ephem.RA_deg,obj.obs_history(end).RA_deg)<thresh && ...
+                elseif isempty(target.ephem.RA_deg) || isempty(target.ephem.Dec_deg) || isempty(obj.obs_history(end).RA_deg) || isempty(obj.obs_history(end).Dec_deg)
+                    val = 0; 
+                elseif target.ephem.angleDifference(target.ephem.RA_deg, obj.obs_history(end).RA_deg)<thresh && ...
                         abs(target.ephem.Dec_deg-obj.obs_history(end).Dec_deg)<thresh % both coordinates are close enough
                     val = 1; 
                 else % coordinates are too far, consider this a new target
@@ -800,7 +844,9 @@ classdef Scheduler < handle
                 
                 if isempty(obj.obs_history_sim) || isempty(obj.obs_history_sim(end).RA_deg) || isempty(obj.obs_history_sim(end).Dec_deg)
                     val = 0; % no current coordinates, so it can't be close enough
-                elseif target.ephem.angleDifference(target.ephem.RA_deg-obj.obs_history_sim(end).RA_deg)<thresh && ...
+                elseif isempty(target.ephem.RA_deg) || isempty(target.ephem.Dec_deg) || isempty(obj.obs_history_sim(end).RA_deg) || isempty(obj.obs_history_sim(end).Dec_deg)
+                    val = 0; 
+                elseif target.ephem.angleDifference(target.ephem.RA_deg, obj.obs_history_sim(end).RA_deg)<thresh && ...
                         abs(target.ephem.Dec_deg-obj.obs_history_sim(end).Dec_deg)<thresh % both coordinates are close enough
                     val = 1; 
                 else
@@ -843,7 +889,7 @@ classdef Scheduler < handle
             end
             
             if nargin<4 || isempty(end_time)
-                end_time = datetime('today', 'TimeZone', 'UTC'); 
+                end_time = start_time; 
                 end_time = end_time + days(1); % tomorrow morning! 
                 end_time.Hour = 04; % set the time to 7:00 Israel time (in winter??) 
             end

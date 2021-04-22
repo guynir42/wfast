@@ -89,6 +89,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         RA_deg; % numeric value in degrees
         Dec_deg; % numeric value in degrees
         
+        field_id; % numeric identifier for fileds inside a list/bank
+        
     end
     
     properties(Dependent=true)
@@ -1039,10 +1041,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                                 'ObsCoo', [obj.longitude, obj.latitude, obj.elevation], 'OutputUnits', 'deg', 'NameServer', 'jpl');
                         catch ME
                             if strcmp(ME.identifier, 'MATLAB:structRefFromNonStruct')
+                                RA = NaN;
+                                DEC = NaN; 
                                 util.text.date_printf('Could not resolve name "%s" with convert2equatorial()!', keyword);
                                 return; 
                             else
-                                rethrow(ME); 
+                                RA = NaN;
+                                DEC = NaN; 
+                                warning(ME.getReport);
+%                                 rethrow(ME);
                             end
                         end
                         
@@ -1060,8 +1067,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                     
                 elseif ~isempty(which('celestial.coo.coo_resolver', 'function')) % use Eran's name resolver
 
-                    [RA, DEC] = celestial.coo.coo_resolver(keyword, 'OutUnits', 'deg', 'NameServer', @VO.name.server_simbad);
-
+                    try
+                        [RA, DEC] = celestial.coo.coo_resolver(keyword, 'OutUnits', 'deg', 'NameServer', @VO.name.server_simbad);
+                    catch ME
+                        RA = NaN;
+                        DEC = NaN; 
+                        warning(ME.getReport);
+                    end
+                    
                     if isnan(RA) || isnan(DEC)
                         util.text.date_printf('Could not resolve name "%s" with coo_resolver()!', keyword); 
                         return;
@@ -1214,12 +1227,19 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             % start with the existing constraints for this target and update with varargin
             input = util.oop.full_copy(obj.constraints); 
-            input.input_var('time', [], 'current_time'); % time at which to compare these targets
-            input.scan_vars(varargin{:}); 
             
-            if ~isempty(input.time)
-                obj.time = input.time; % this also parses strings or "now" into datetime objects
+            for ii = 1:2:length(varargin)
+                if util.text.cs(varargin{ii}, 'time', 'current_time')
+                    
+                    if ischar(varargin{ii+1}) || isa(varargin{ii+1}, 'datetime')
+                        obj.time = varargin{ii+1}; % this also parses strings or "now" into datetime objects
+                        varargin(ii:ii+1) = []; 
+                    end
+                    
+                end
             end
+            
+            input.scan_vars(varargin{:});
             
             if isempty(input.fudge_time)
                 input.fudge_time = 0;
@@ -1308,11 +1328,6 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
             if nargin==1, help('head.Ephemeris.better_than'); return; end
         
-            % start with the existing constraints for this target and update with varargin
-            input = util.oop.full_copy(obj.constraints); 
-            input.input_var('time', [], 'current_time'); % time at which to compare these targets
-            input.scan_vars(varargin{:}); 
-            
             if isempty(other) || ~isa(other, 'head.Ephemeris') || obj==other
                 error('head:ephemeris:better_than:wrong_input', 'Must supply another Ephemeris object to this function!'); 
             end
@@ -1322,10 +1337,22 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 return;
             end
             
-            if ~isempty(input.time)
-                obj.time = input.time;
+            % start with the existing constraints for this target and update with varargin
+            input = util.oop.full_copy(obj.constraints); 
+            
+            for ii = 1:2:length(varargin)
+                if util.text.cs(varargin{ii}, 'time', 'current_time')
+                    
+                    if ischar(varargin{ii+1}) || isa(varargin{ii+1}, 'datetime')
+                        obj.time = varargin{ii+1}; % this also parses strings or "now" into datetime objects
+                        varargin(ii:ii+1) = []; 
+                    end
+                    
+                end
             end
             
+            input.scan_vars(varargin{:});
+
             if obj.observable(varargin{:})==0
                 val = 0;
                 return;
@@ -1491,6 +1518,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 
                 e = head.Ephemeris; % make a test object 
                 e.time = obj.time; % make sure the objects are defined on the same time
+%                 e.RA_deg = obj.RA_deg;
+%                 e.Dec_deg = obj.Dec_deg; 
                 e.constraints = util.oop.full_copy(obj.constraints); % and with the same constraints
                 
                 for ii = 2:length(s)
@@ -2165,12 +2194,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         function time = dateNight(time)
             
-            if time.Hour<12
-                time = time - day(1); 
+            for ii = 1:numel(time) % run the same logic on any size of input
+                
+                if time(ii).Hour<12
+                    time(ii) = time(ii) - day(1); 
+                end
+
+                time(ii) = head.Ephemeris.stripHours(time(ii)); 
+                
             end
-
-            time = head.Ephemeris.stripHours(time); 
-
+            
         end
         
     end

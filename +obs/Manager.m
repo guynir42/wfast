@@ -1017,6 +1017,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 warning(ME.getReport); 
             end
             
+            try % save any target list tables 
+                
+                for ii = 1:length(obj.sched.targets)
+                    
+                    if ~isempty(obj.sched.targets(ii).list_table)
+                        obj.sched.targets(ii).saveListTable;
+                    end
+                        
+                end
+                
+            catch ME
+                obj.log.error(ME);
+                warning(ME.getReport);
+            end
+            
             try % reset the observation history
                
                 t = datetime('now', 'TimeZone', 'UTC');
@@ -1723,6 +1738,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             end
             
             obj.matchRuntimes; 
+            obj.checkNowObserving; 
             obj.updateUserPrompt; % make sure the "proceedToTarget" button is greyed out if weather is bad / dome is closed
             
             if ~isempty(obj.mount)
@@ -1923,7 +1939,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.cam_pc.outgoing.HUMID_OUT = obj.average_humidity;
             obj.cam_pc.outgoing.LIGHT = obj.average_light; 
             obj.cam_pc.outgoing.PRESSURE = obj.average_pressure;             
-            
+            obj.cam_pc.outgoing.FIELD_ID = obj.mount.object.field_id; 
             obj.cam_pc.update;
             
             if ~isempty(obj.cam_pc.incoming) 
@@ -2074,7 +2090,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
             end
             
-            if ~isempty(obj.sched.current)
+            if ~isempty(obj.sched.current) % must check this target is actually the one observed! 
                 obj.sched.current.ephem.now_observing = 1;
             end
             
@@ -2092,6 +2108,22 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
+        function checkNowObserving(obj) % compare object name and only if it is being observed set the now_observing=1
+            
+            idle = obj.is_camera_idle; % is the camera taking images? 
+            
+            for ii = 1:length(obj.sched.targets)
+                
+                if ~idle && util.text.legalize(obj.sched.targets(ii).name)==obj.cam_pc.outgoing.OBJECT
+                    obj.sched.targets(ii).ephem.now_observing = 1; 
+                else
+                    obj.sched.targets(ii).ephem.now_observing = 0; 
+                end
+                
+            end
+            
+        end
+        
         function chooseNewTarget(obj, varargin) % this is called when pushing "CHOOSE" or inside the checkNewTarget() function
             
             obj.sched.current_side = obj.mount.telHemisphere;
@@ -2105,11 +2137,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.mount.object.name = '';
                 obj.mount.object.RA = '';
                 obj.mount.object.Dec = '';
+                obj.mount.object.field_id = []; 
                 util.text.date_printf('Could not find any targets! Try changing the constraints or adding new targets and reloading the scheduler.'); 
             else
                 obj.mount.object.name = obj.sched.current.name;
                 obj.mount.object.RA = obj.sched.current.RA;
                 obj.mount.object.Dec = obj.sched.current.Dec;
+                obj.mount.object.field_id = obj.sched.current.ephem.field_id; 
             end
             
         end

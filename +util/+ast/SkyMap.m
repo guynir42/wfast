@@ -1191,7 +1191,11 @@ classdef SkyMap < handle
                     end
                     
                     T = obj.galactic_survey_fields;
-                    plot(input.ax, T.RightAscension, T.Declination, '.', 'Color', 'magenta'); 
+                    ra_convert = 1; 
+                    if util.text.cs(obj.show_ra_units, 'hours')
+                        ra_convert = 15; 
+                    end
+                    plot(input.ax, T.RightAscension./ra_convert, T.Declination, '.', 'Color', 'magenta'); 
                     
                 end
                 

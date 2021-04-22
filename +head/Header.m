@@ -145,6 +145,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         DEC; % this is the Dec given to telescope by scheduler/user, in sexagesimal degree string
         RA_DEG; % this is the RA given to telescope by scheduler/user, in numeric degrees
         DEC_DEG; % this is the Dec given to telescope by scheduler/user, in numeric degrees
+        FIELD_ID; % numeric identifier for fields in a target list/bank
         
         HA; % hour angle, in sexagesimal hour string
         HA_DEG; % hour angle, in numeric degrees
@@ -481,6 +482,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         function val = get.DEC_DEG(obj)
             
             val = obj.ephem.DEC_deg;
+            
+        end
+        
+        function val = get.FIELD_ID(obj)
+            
+            val = obj.ephem.field_id; 
             
         end
         
@@ -870,6 +877,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             else
                 obj.ephem.Dec = val;
             end
+            
+        end
+        
+        function set.FIELD_ID(obj, val)
+            
+            obj.ephem.field_id = val; 
             
         end
         
