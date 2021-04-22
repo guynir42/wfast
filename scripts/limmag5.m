@@ -1,6 +1,7 @@
 % draw the limiting magnitude using the new LimitingMagnitude class
 
-base_dir = util.sys.WorkingDirectory(fullfile(getenv('DATA'), 'WFAST/saved/limmag2')); 
+base_dir = util.sys.WorkingDirectory(fullfile(getenv('DATA'), 'WFAST/saved/limmag3')); 
+
 
 d = base_dir.match_folders('limmag*'); 
 

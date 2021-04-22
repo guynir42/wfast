@@ -1289,7 +1289,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         function list = makeSyncList % list of parameters to give from dome-PC manager to the PcSync object (so it would be passed to the camera PC)
             
             list = {'OBJECT', 'OBJRA', 'OBJDEC', 'OBJRA_DEG', 'OBJDEC_DEG', 'TELRA', 'TELDEC', 'TELRA_DEG', 'TELDEC_DEG',...
-                'TEMP_IN', 'TEMP_OUT', 'WIND_DIR', 'WIND_SPEED', 'HUMID_IN', 'HUMID_OUT', 'PRESSURE', 'LIGHT'};
+                'FIELD_ID', 'TEMP_IN', 'TEMP_OUT', 'WIND_DIR', 'WIND_SPEED', 'HUMID_IN', 'HUMID_OUT', 'PRESSURE', 'LIGHT'};
                 
         end
         

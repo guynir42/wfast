@@ -90,7 +90,7 @@ classdef Acquisition < file.AstroData
         
         use_cutouts = true;
         use_adjust_cutouts = 1; % use adjustments in software (not by moving the mount)
-        use_lock_adjust = 0; % make all cutouts move together based on the average drift 
+        use_lock_adjust = 1; % make all cutouts move together based on the average drift 
         % add switch to allow unlocking only some of the cutouts (e.g.,
         % those without a match to GAIA
         
@@ -2063,6 +2063,7 @@ classdef Acquisition < file.AstroData
                         list = list(~strcmpi(list, 'OBJDEC'));
                         list = list(~strcmpi(list, 'RA_DEG'));
                         list = list(~strcmpi(list, 'DEC_DEG'));
+                        list = list(~strcmpi(list, 'FIELD_ID')); 
                     end
                     
                     if ~isempty(s) && isstruct(s)
@@ -2098,15 +2099,16 @@ classdef Acquisition < file.AstroData
                         else
 
                             if ~isfield(obj.obs_log, obj.run_name)
-                                obj.obs_log.(obj.run_name) = struct('name', obj.run_name, 'start', '', 'end', '', 'runtime', [], 'num_files', []);
+                                obj.obs_log.(obj.run_name) = struct('name', obj.run_name, 'start', '', 'end', '', 'runtime', [], 'num_files', [], 'field_id', []);
                             end
 
                             s_obs = obj.obs_log.(obj.run_name); % get the structs for this run name
                             s_obs(end).runtime = obj.t_end_stamp;
                             s_obs(end).end_time = obj.t_end;
                             s_obs(end).num_files = obj.batch_counter;
-                            obj.obs_log.(obj.run_name) = s_obs; % structs are not handles! 
-
+                            s_obs(end).field_id = obj.head.field_id; 
+                            obj.obs_log.(obj.run_name) = s_obs; % structs are not handles! must re-assign the modified struct
+                            
                         end
 
                     end
@@ -2760,9 +2762,9 @@ classdef Acquisition < file.AstroData
                         start = util.text.time2str(datetime('now', 'TimeZone', 'UTC')); 
 
                         if ~isfield(obj.obs_log, obj.run_name) % this run name has not been created yet
-                            obj.obs_log.(obj.run_name) = struct('name', obj.run_name, 'start', start, 'end', '', 'runtime', 0, 'num_files', 0); % make a new struct for this name
+                            obj.obs_log.(obj.run_name) = struct('name', obj.run_name, 'start', start, 'end', '', 'runtime', 0, 'num_files', 0, 'field_id', obj.head.FIELD_ID); % make a new struct for this name
                         else % there are previous runs with this name, need to 
-                            obj.obs_log.(obj.run_name) = vertcat(obj.obs_log.(obj.run_name), struct('name', obj.run_name, 'start', start, 'end', '', 'runtime', 0, 'num_files', 0)); 
+                            obj.obs_log.(obj.run_name) = vertcat(obj.obs_log.(obj.run_name), struct('name', obj.run_name, 'start', start, 'end', '', 'runtime', 0, 'num_files', 0, 'field_id', obj.head.FIELD_ID)); 
                         end
 
                     catch ME
@@ -3735,7 +3737,7 @@ classdef Acquisition < file.AstroData
                     s.(name) = struct.empty;
                 end
                 
-                new_struct = struct('name', name, 'start', '', 'end', '', 'runtime', [], 'num_files', []); 
+                new_struct = struct('name', name, 'start', '', 'end', '', 'runtime', [], 'num_files', [], 'field_id', []); 
                 new_struct = obj.getObsLogFromFolder(fullfile(d.pwd, list{ii}), new_struct);
                 s.(name) = vertcat(s.(name), new_struct); 
                 
@@ -3754,6 +3756,7 @@ classdef Acquisition < file.AstroData
                 log_struct.end = '';
                 log_struct.num_files = '';
                 log_struct.runtime = [];
+                log_struct.field_id = []; 
             end
             
             d = util.sys.WorkingDirectory(folder);
@@ -3792,6 +3795,12 @@ classdef Acquisition < file.AstroData
                         log_struct.runtime = parse_value(tline(idx+1:end)); 
                     end
                     
+                    [~, idx] = regexp(tline, 'FIELD_ID:'); 
+                    
+                    if ~isempty(idx) && isempty(log_struct.field_id)
+                        log_struct.field_id = parse_value(tline(idx+1:end)); 
+                    end
+                    
                 end % for ii (file lines)
                 
             elseif ~isempty(files) % can't find the readme, use the last HDF5 file instead
@@ -3800,10 +3809,12 @@ classdef Acquisition < file.AstroData
                     log_struct.start = h5readatt(files{end}, '/head', 'RUNSTART');
                     log_struct.end = h5readatt(files{end}, '/head', 'ENDTIME'); 
                     log_struct.runtime = h5readatt(files{end}, '/head', 'END_STAMP'); 
+                    log_struct.field_id = h5readatt(files{end}, '/head', 'FIELD_ID'); 
                 catch 
                     log_struct.start = h5readatt(files{end}, '/header', 'RUNSTART');
                     log_struct.end = h5readatt(files{end}, '/header', 'ENDTIME'); 
                     log_struct.runtime = h5readatt(files{end}, '/header', 'END_STAMP'); 
+                    log_struct.field_id = h5readatt(files{end}, '/header', 'FIELD_ID'); 
                 end
                 
             end

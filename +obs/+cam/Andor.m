@@ -1719,7 +1719,7 @@ classdef Andor < file.AstroData
             [~,f_max] = obj.getFrameRateLimitsHW;
             
             if val>=f_max % cannot set frame rate to higher than top frame rate (set by expT)
-                obj.log.input(util.text.disp_printf('Cannot set frame rate to %g. Setting to %g instead.', val, f_max.*0.99));
+                obj.log.input(util.text.date_printf('Cannot set frame rate to %g. Setting to %g instead.', val, f_max.*0.99));
                 val = f_max.*0.99;
             end 
             
