@@ -14,7 +14,11 @@ cat2.loadMAT(fullfile(d2.pwd, 'catalog.mat'));
 L2 = img.Lightcurves; 
 L2.head = cat2.head; 
 L2.cat = cat2;
+L2.use_airmass_correction = 0; 
+L2.use_background_median = 0; 
 L2.use_psf_correction = 0;
+L2.zero_point_spatial_order = 0; 
+L2.use_offset_fit = 0; 
 
 L2.loadHDF5(d2); 
 L2.calcJuldates; 
@@ -39,7 +43,7 @@ zp = util.vec.weighted_average(mag_offsets, sqrt(f)); % zero point between magni
 
 f2 = 10.^(0.4.*(zp - m)); % fluxes extrapolated from the magnitudes and the image ZP
 
-mag_step = 1; % can also do fractions of mag; 
+mag_step = 0.5; % can also do fractions of mag; 
 mag_bins = (8:mag_step:13)'; 
 
 rms_mean = NaN(length(mag_bins), length(time_bins)); % center of RMS of bin
@@ -58,8 +62,10 @@ for ii = 1:length(mag_bins)
             
             rms_total(ii,jj) = nnz(idx); 
             
-            [rms_mean(ii,jj), rms_std(ii,jj), ~, rms_excl(ii,jj)] = util.stat.sigma_clipping(v(idx, jj), 'sigma', 3); 
-
+%             [rms_mean(ii,jj), rms_std(ii,jj), ~, rms_excl(ii,jj)] = util.stat.sigma_clipping(v(idx, jj), 'sigma', 3); 
+            rms_mean(ii,jj) = nanmedian(v(idx,jj)); 
+            rms_std(ii,jj) = mad(v(idx,jj)); 
+            
         end % for jj
 
     end
@@ -77,34 +83,38 @@ ax = axes('Parent', f1.fig);
 
 ax.NextPlot = 'add'; 
 
-for ii = 1:length(time_bins)
+colors = [0.1 0.2 0.8;
+          0.8 0.1 0.2;
+          0.2 0.8 0.1];
+
+for ii = 1:2 % length(time_bins)
     
-    ax.ColorOrderIndex = ii; 
-    
-    h = errorbar(mag_bins+0.5, rms_mean(:,ii)*100, rms_std(:,ii)*50, rms_std(:,ii)*50, 0.5*ones(length(mag_bins),1), 0.5*ones(length(mag_bins),1), '.', 'LineWidth', 3); 
+    ax.ColorOrderIndex = ii;
+%     h = errorbar(mag_bins+0.5, rms_mean(:,ii)*100, rms_std(:,ii)*50, rms_std(:,ii)*50, 0.5*mag_step*ones(length(mag_bins),1), 0.5*mag_step*ones(length(mag_bins),1), '.', 'LineWidth', 3); 
+
+    good_idx = m>=8 & m<=14;
+    h2 = plot(m(good_idx), v(good_idx,ii)*100, 'p', 'MarkerSize', 7.5);
+    h2.HandleVisibility = 'on'; 
     
     if time_bins(ii)<1
-        h.DisplayName = sprintf('exp.time= %dms', round(100*time_bins(ii))); 
+        h2.DisplayName = sprintf('exp.time= %4.2fs', round(1000*time_bins(ii))/1000); 
     else
-        h.DisplayName = sprintf('exp.time= %ds', round(time_bins(ii))); 
+        h2.DisplayName = sprintf('exp.time= %ds', round(time_bins(ii))); 
     end
     
-    good_idx = m>=8 & m<=14;
-    h2 = plot(m(good_idx), v(good_idx,ii)*100, '.', 'Color', h.Color, 'MarkerSize', 7.5);
-    h2.HandleVisibility = 'off'; 
-    
-    v2 = 1./sqrt(f2(good_idx)*0.8)./sqrt(time_bins(ii)./time_bins(1))*100;
+    B = util.stat.median2(L2.areas.*L2.backgrounds);
+    v2 = sqrt((f2(good_idx).*0.02).^2 + f2(good_idx)*0.8 + B.^2)./(f2(good_idx)*0.8)./sqrt(time_bins(ii)./time_bins(1))*100;
     [m_sorted, sorting_idx] = sort(m(good_idx)); 
     v_sorted = v2(sorting_idx);
-    h3 = plot(m_sorted, v_sorted, '--', 'Color', h.Color, 'LineWidth', 1.5);
+    h3 = plot(m_sorted, v_sorted, '--', 'Color', 'k', 'LineWidth', 1.5);
     h3.HandleVisibility = 'off'; 
     
 end
 
 ax.NextPlot = 'replace'; 
 
-ax.FontSize = 24; 
-xlabel(ax, 'Magnitude bin [GAIA B_P]'); 
+ax.FontSize = 22; 
+xlabel(ax, 'Magnitude bin [Gaia BP]'); 
 ylabel(ax, 'Relative error'); 
 
 ax.YScale = 'log';
@@ -116,7 +126,11 @@ ax.MinorGridAlpha = 0;
 ax.Box = 'on'; 
 grid(ax, 'on');
 
+ax.XLim=[8,14.25];
+ax.YLim=[0.08 120];
+
 hl = legend(ax, 'Location', 'NorthWest'); 
+hl.Position = [0.15 0.8 0.25 0.11];
 
 %% save the plot
 
