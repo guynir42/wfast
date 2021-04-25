@@ -2114,7 +2114,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             for ii = 1:length(obj.sched.targets)
                 
-                if ~idle && util.text.legalize(obj.sched.targets(ii).name)==obj.cam_pc.outgoing.OBJECT
+                if ~idle && isfield(obj.cam_pc.outgoing, 'OBJECT') && strcmp(util.text.legalize(obj.sched.targets(ii).name), obj.cam_pc.outgoing.OBJECT)
                     obj.sched.targets(ii).ephem.now_observing = 1; 
                 else
                     obj.sched.targets(ii).ephem.now_observing = 0; 

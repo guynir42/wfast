@@ -998,7 +998,9 @@ classdef Candidate < handle
             mx = util.stat.max2(aux(obj.time_range,:));
             mn = util.stat.min2(aux(obj.time_range,:)); 
             
-            input.ax.YLim = [mn-0.25.*abs(mn) mx+0.25.*abs(mx)]; 
+            if ~isnan(mn) && ~isnan(mx)
+                input.ax.YLim = [mn-0.25.*abs(mn) mx+0.25.*abs(mx)]; 
+            end
             
 %             ylabel(input.ax, 'pixels or count/pixel');
             ylabel(input.ax, 'auxiliary data');
