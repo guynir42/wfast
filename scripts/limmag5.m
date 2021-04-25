@@ -15,14 +15,14 @@ for ii = 1:length(d)
     
     fprintf('Running calculations for %s\n\n', d{ii}); 
     L(end+1) = img.LimitingMagnitude;
-    L(end).run('folder', d{ii}, 'use_sum', 1, 'use_find_twice'); 
+    L(end).run('folder', d{ii}, 'use_sum', 1, 'use_find_twice', 1); 
     
     if regexp(d{ii}, 's$')
         L(end).max_mag = 20;
     else
         L(end).max_mag = 18; 
         L(end+1) = img.LimitingMagnitude;
-        L(end).run('folder', d{ii}, 'use_sum', 0, 'use_find_twice'); 
+        L(end).run('folder', d{ii}, 'use_sum', 0, 'use_find_twice', 1); 
     end
     
 end
