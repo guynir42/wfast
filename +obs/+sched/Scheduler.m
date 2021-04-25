@@ -466,7 +466,9 @@ classdef Scheduler < handle
 
                                 end
                                 
-                                obj.targets(ii).list_table{idx, 'TonightHours'} = st(jj).runtime; 
+                                if ~isempty(st(jj).runtime)
+                                    obj.targets(ii).list_table{idx, 'TonightHours'} = st(jj).runtime; 
+                                end
                                 
                                 if isfield(st(jj), 'end') && ~isempty(st(jj).end)
                                     obj.targets(ii).list_table{idx, 'LastObserved'} = util.text.str2time(st(jj).end); % if end time exists, it is more recent
