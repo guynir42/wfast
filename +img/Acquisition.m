@@ -1359,6 +1359,13 @@ classdef Acquisition < file.AstroData
             
         end
         
+        function connectDomePC(obj)
+            
+            obj.dome_pc.reco.unlock;
+            obj.dome_pc.connect; 
+            
+        end
+        
     end
     
     methods % commands/calculations

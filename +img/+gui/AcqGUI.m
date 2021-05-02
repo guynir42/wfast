@@ -62,6 +62,7 @@ classdef AcqGUI < handle
         button_flip;
         button_show_switch;
         button_num_stars;
+        button_dome_pc;
         axes_image;
         
 %         panel_close;
@@ -168,6 +169,8 @@ classdef AcqGUI < handle
             obj.menu_options.menu_sync.addButton('button_stop', 'Sync &stop', 'toggle', 'use_sync_stop', 'when true, will stop camera when given command from Manager, when dome is close, when telescope is not tracking');
             obj.menu_options.menu_sync.addButton('button_guiding', '&Guiding', 'toggle', 'use_autoguide', 'use this to pass position data back to mount');
             obj.menu_options.menu_sync.addButton('button_object', 'ignore &Object', 'toggle', 'use_ignore_sync_object_name', 'when true, OBJECT in header will not be updated'); 
+            obj.menu_options.menu_sync.addButton('button_connect', '&Reconnect', 'push', 'connectDomePC', 'attempt to connect via TCP/IP to the Dome-PC', 1); 
+            
             
             obj.menu_options.addButton('menu_deflate', '&Deflate', 'menu');
             obj.menu_options.menu_deflate.addButton('button_autodeflate', '&Autodeflate', 'toggle', 'use_autodeflate', 'turn on the deflate automatically in the morning');
@@ -289,6 +292,7 @@ classdef AcqGUI < handle
             obj.input_show_every = GraphicButton(obj.panel_image, [0.8 0.05 0.2 0.05], obj.owner, 'show_every_num_frames', 'input', 'show_every= ', '', 'small'); 
             
             obj.button_num_stars = GraphicButton(obj.panel_image, [0.00 0.95 0.1 0.05], obj.owner, 'display_num_rect_stars', 'input', 'rect= ', '', 'small');
+            obj.button_dome_pc = GraphicButton(obj.panel_image, [0.1 0.95 0.1 0.05], obj.owner, 'connectDomePC', 'push', 'dome-PC', '', 'small'); 
             
             obj.button_unlock = GraphicButton(obj.panel_image, [0.9 0.95 0.1 0.05], obj.owner, 'unlock', 'push', 'unlock');
             
@@ -446,6 +450,14 @@ classdef AcqGUI < handle
                 obj.panel_info.button_message.ForegroundColor = 'red'; 
             else
                 obj.panel_info.button_message.ForegroundColor = 'black'; 
+            end
+            
+            if obj.owner.dome_pc.status
+                obj.button_dome_pc.BackgroundColor = 'green'; 
+                obj.button_dome_pc.Tooltip = 'Dome-PC is connected!'; 
+            else
+                obj.button_dome_pc.BackgroundColor = 'red'; 
+                obj.button_dome_pc.Tooltip = 'Dome-PC is disconnected! push to reconnect (then do the same on dome-PC...)'; 
             end
             
 %             if obj.owner.use_show && ~isempty(obj.owner.images)
