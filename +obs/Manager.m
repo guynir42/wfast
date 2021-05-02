@@ -838,7 +838,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function callback_t1(obj, ~, ~) % update sensors and GUI
             
-            try 
+            try % update sensors and Cam-PC (and verify t0 is running)
                 
                 % make sure t0 is running! 
                 if isempty(obj.t0) || ~isvalid(obj.t0) || strcmp(obj.t0.Running, 'off')
