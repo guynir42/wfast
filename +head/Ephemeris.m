@@ -847,13 +847,29 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             RAD = pi./180;
             
             if ~isempty(which('celestial.SolarSys.get_sun'))
+                
                 obj.sun = celestial.SolarSys.get_sun(obj.JD, [obj.longitude, obj.latitude].*pi./180);
                 obj.sun.RA = obj.sun.RA./RAD; % convert to degrees
                 obj.sun.Dec = obj.sun.Dec./RAD; % convert to degrees
+                
+                % correct the coordinates from Jnow to J2000                
+                JY = convert.time(obj.JD,'JD','J');
+                CurrentEquinox = sprintf('J%8.3f',JY);
+                out_coord = celestial.coo.coco([obj.sun.RA, obj.sun.Dec], CurrentEquinox, 'J2000', 'd', 'd');
+                
+                obj.sun.RA = out_coord(1);
+                obj.sun.Dec = out_coord(2); 
+                
                 obj.sun.Az = obj.sun.Az./RAD; % convert to degrees
                 obj.sun.Alt = obj.sun.Alt./RAD; % convert to degrees
                 obj.sun.dAzdt = obj.sun.dAzdt./RAD; % convert to degrees
                 obj.sun.dAltdt = obj.sun.dAltdt./RAD; % convert to degrees
+                
+                out_coord = celestial.coo.coco([obj.sun.RA, obj.sun.Dec], 'J2000', 'e', 'd', 'd');
+                
+                obj.sun.ecliptic_longitude = out_coord(1); 
+                obj.sun.ecliptic_latitude = out_coord(2); 
+                
             else
                 obj.sun = [];
             end
@@ -865,9 +881,19 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             RAD = pi./180;
             
             if ~isempty(which('celestial.SolarSys.get_moon'))
+                
                 obj.moon = celestial.SolarSys.get_moon(obj.JD, [obj.longitude, obj.latitude].*RAD);
                 obj.moon.RA = obj.moon.RA./RAD; % convert to degrees
                 obj.moon.Dec = obj.moon.Dec./RAD; % convert to degrees
+                
+                % correct the coordinates from Jnow to J2000                
+                JY = convert.time(obj.JD,'JD','J');
+                CurrentEquinox = sprintf('J%8.3f',JY);
+                out_coord = celestial.coo.coco([obj.moon.RA, obj.moon.Dec], CurrentEquinox, 'J2000', 'd', 'd');
+                
+                obj.moon.RA = out_coord(1);
+                obj.moon.Dec = out_coord(2); 
+                
                 obj.moon.Az = obj.moon.Az./RAD; % convert to degrees
                 obj.moon.Alt = obj.moon.Alt./RAD; % convert to degrees
                 obj.moon.Phase = obj.moon.Phase./pi; % convert to fraction
@@ -1019,6 +1045,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 obj.keyword = 'antisolar';
                 obj.updateSun;
                 [obj.RA_deg, obj.Dec_deg] = obj.getAntiSolarPoint; 
+            elseif cs(keyword, 'quadrature')
+                obj.keyword = 'quadrature';
+                obj.updateSun;
+                obj.gotoQuadratureField; 
             else
                 
                 obj.keyword = keyword;
@@ -1410,6 +1440,33 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             RA_max = mod(RA_min + section_size_hours, 24);
             
         end
+        
+        function gotoQuadratureField(obj)
+            
+            L = mod(180 + obj.sun.ecliptic_longitude, 360); 
+            
+            L1 = mod(L - 90, 360); 
+            L2 = mod(L + 90, 360); 
+            
+            out_coord = celestial.coo.coco([L1, 0], 'e', 'J2000', 'd', 'd');
+            RA = out_coord(1);
+            DE = out_coord(2); 
+            
+            % reference: http://www.jgiesen.de/elevaz/basics/
+            alt = asind(sind(DE).*sind(obj.latitude) + cosd(DE).*cosd(obj.latitude).*cosd(obj.LST_deg - RA)); % the last cosd just has HA
+            
+            if alt<obj.constraints.altitude % if leading quadrature is below horizon, set this object to the trailing quadrature
+                out_coord = celestial.coo.coco([L2, 0], 'e', 'J2000', 'd', 'd');
+                RA = out_coord(1);
+                DE = out_coord(2); 
+            end
+            
+            obj.RA_deg = RA;
+            obj.Dec_deg = DE; 
+            obj.updateEcliptic;             
+            
+        end
+        
         
     end
     

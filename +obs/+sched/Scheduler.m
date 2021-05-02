@@ -606,10 +606,11 @@ classdef Scheduler < handle
                 for ii = 1:length(target_list) % go over the list and re-resolve any targets that need to be updated
                     
                     if target_list(ii).use_resolver % target does not have explicite coordinates in the target list
-                        if isempty(target_list(ii).list_filename) % no specific target list/bank, use the Ephemeris name resolver
-                            target_list(ii).ephem.resolve([], arguments{:}); % also updates secondaries
-                        else % use the specific target list file
+                        if ~isempty(target_list(ii).list_filename) % use the specific target list file
                             target_list(ii).loadFromTargetList;
+                        % add resolve name by Target (not by Ephemeris) by adding extra elseif statements here
+                        else % no specific target list/bank, use the Ephemeris name resolver                         
+                            target_list(ii).ephem.resolve([], arguments{:}); % also updates secondaries
                         end
                     end 
                     
