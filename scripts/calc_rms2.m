@@ -103,7 +103,8 @@ for ii = 1:2 % length(time_bins)
     end
     
     B = util.stat.median2(L2.areas.*L2.backgrounds);
-    v2 = sqrt((f2(good_idx).*0.02).^2 + f2(good_idx)*0.8 + B.^2)./(f2(good_idx)*0.8)./sqrt(time_bins(ii)./time_bins(1))*100;
+%     v2 = sqrt((f2(good_idx).*0.02).^2 + f2(good_idx)*0.8 + B.^2)./(f2(good_idx)*0.8)./sqrt(time_bins(ii)./time_bins(1))*100;
+    v2 = sqrt(f2(good_idx)*0.8 + B.^2)./(f2(good_idx)*0.8)./sqrt(time_bins(ii)./time_bins(1))*100;
     [m_sorted, sorting_idx] = sort(m(good_idx)); 
     v_sorted = v2(sorting_idx);
     h3 = plot(m_sorted, v_sorted, '--', 'Color', 'k', 'LineWidth', 1.5);
