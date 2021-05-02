@@ -8,7 +8,7 @@
 #include <thread>
 #include <chrono>
 
-void find_peaks(int **array, unsigned char *images, size_t rows, size_t cols, int start_idx, int end_idx, bool *mask, unsigned char new_thresh, int max_number);
+void find_peaks(unsigned short **array, unsigned short *images, size_t rows, size_t cols, int start_idx, int end_idx, bool *mask, unsigned char new_thresh, int max_number);
 
 void mexFunction( int nlhs, mxArray *plhs[],
                   int nrhs, const mxArray *prhs[] ){
@@ -16,7 +16,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	// check inputs!
 	if (nrhs==0){ // no inputs, output the help
 		
-		const char *string[1]={"util.img.find_cosmic_rays"};
+		const char *string[1]={"util.img.find_flares"};
 		mxArray *array[1]={mxCreateCharMatrixFromStrings(1, string)};
 		mexCallMATLAB(0,0,1,array,"help"); 
 		return;
@@ -24,13 +24,13 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	}
 				  
 	// check argument 1 (input image)
-	if(mxIsNumeric(prhs[0])==0 || mxIsClass(prhs[0], "uint16")==0) mexErrMsgIdAndTxt("util:img:find_cosmic_rays:inputNotUINT16", "Input 1 to find_cosmic_rays must be uint16 class!");
+	if(mxIsNumeric(prhs[0])==0 || mxIsClass(prhs[0], "uint16")==0) mexErrMsgIdAndTxt("util:img:find_flares:inputNotUINT16", "Input 1 to find_flares must be uint16 class!");
 	if(mxIsEmpty(prhs[0])){ // empty input matrix just returns an empty matrix
 		plhs[0]=mxDuplicateArray(prhs[0]);
 		if(nlhs>1) plhs[1]=mxDuplicateArray(prhs[0]);
 		return; 
 	}
-	if( mxGetN(prhs[0])<2 || mxGetM(prhs[0])<2 || mxGetNumberOfDimensions(prhs[0])>3 ) mexErrMsgIdAndTxt("util:img:find_cosmic_rays:wrongInputDimensions", "Must input a (2D or 3D) matrix!");
+	if( mxGetN(prhs[0])<2 || mxGetM(prhs[0])<2 || mxGetNumberOfDimensions(prhs[0])>3 ) mexErrMsgIdAndTxt("util:img:find_flares:wrongInputDimensions", "Must input a (2D or 3D) matrix!");
 	
 	// get the dimensions of the input
 	size_t rows=mxGetM(prhs[0]);
@@ -46,53 +46,56 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	}
 	
 	// check argument 2 (source/bad pixel mask)
-	if(mxIsLogical(prhs[1])==0) mexErrMsgIdAndTxt("util:img:find_cosmic_rays:inputNotLogical", "Input 2 to find_cosmic_rays is not logical class!");
-	if( mxGetN(prhs[1])!=cols || mxGetM(prhs[1])!=rows ) mexErrMsgIdAndTxt("util:img:find_cosmic_rays:sizeMismatch", "The x and y size of input 1 and 2 must be the same!");
+	if(mxIsLogical(prhs[1])==0) mexErrMsgIdAndTxt("util:img:find_flares:inputNotLogical", "Input 2 to find_flares is not logical class!");
+	if( mxGetN(prhs[1])!=cols || mxGetM(prhs[1])!=rows ) mexErrMsgIdAndTxt("util:img:find_flares:sizeMismatch", "The x and y size of input 1 and 2 must be the same!");
 	
 	// check argument 3 (threshold)
 	int threshold=256;
 	if(nrhs>2 && mxIsEmpty(prhs[2])==0){
-		if(mxIsNumeric(prhs[2])==0 || mxIsScalar(prhs[2])==0) mexErrMsgIdAndTxt("util:img:find_cosmic_rays:inputNotNumericScalar", "Input 3 to find_cosmic_rays is not a numeric scalar!");
+		if(mxIsNumeric(prhs[2])==0 || mxIsScalar(prhs[2])==0) mexErrMsgIdAndTxt("util:img:find_flares:inputNotNumericScalar", "Input 3 to find_flares is not a numeric scalar!");
 		threshold=(int) mxGetScalar(prhs[2]);
 	}
 	
 	// check argument 4 (number of threads)
 	int num_threads=1;
 	if(nrhs>3 && mxIsEmpty(prhs[3])==0){
-		if(mxIsNumeric(prhs[3])==0 || mxIsScalar(prhs[3])==0) mexErrMsgIdAndTxt("util:img:find_cosmic_rays:inputNotNumericScalar", "Input 4 to find_cosmic_rays is not a numeric scalar!");
+		if(mxIsNumeric(prhs[3])==0 || mxIsScalar(prhs[3])==0) mexErrMsgIdAndTxt("util:img:find_flares:inputNotNumericScalar", "Input 4 to find_flares is not a numeric scalar!");
 		num_threads=(int) mxGetScalar(prhs[3]);
 	}
 	
 	// check argument 5 (maximum number of peaks)
 	int max_number=100;
 	if(nrhs>4 && mxIsEmpty(prhs[4])==0){
-		if(mxIsNumeric(prhs[4])==0 || mxIsScalar(prhs[4])==0) mexErrMsgIdAndTxt("util:img:find_cosmic_rays:inputNotNumericScalar", "Input 5 to find_cosmic_rays is not a numeric scalar!");
+		if(mxIsNumeric(prhs[4])==0 || mxIsScalar(prhs[4])==0) mexErrMsgIdAndTxt("util:img:find_flares:inputNotNumericScalar", "Input 5 to find_flares is not a numeric scalar!");
 		max_number=(int) mxGetScalar(prhs[4]);
 	}
 	
-	// check argument 6 (debug_bit)
+	// check argument 6 (debug bit)
 	int debug_bit=0;
 	if(nrhs>5 && mxIsEmpty(prhs[5])==0){
-		if(mxIsNumeric(prhs[5])==0 && mxIsLogical(prhs[5])==0 || mxIsScalar(prhs[5])==0) mexErrMsgIdAndTxt("util:img:find_cosmic_rays:inputNotNumericScalar", "Input 6 to find_cosmic_rays is not a numeric/logical scalar!");
+		if(mxIsNumeric(prhs[5])==0 && mxIsLogical(prhs[5])==0 || mxIsScalar(prhs[5])==0) mexErrMsgIdAndTxt("util:img:find_flares:inputNotNumericScalar", "Input 6 to find_flares is not a numeric/logical scalar!");
 		debug_bit=(int) mxGetScalar(prhs[5]);
 	}
 	
 	// if(debug_bit) printf("cols= %d | rows= %d\n", cols, rows); 
 	
-	int ***array=new int**[num_threads];
+	unsigned short ***array=new unsigned short**[num_threads]; // allocate space for the results from each thread
 	for(int t=0;t<num_threads;t++){ 
-		array[t]=new int*[max_number]; 
+		array[t]=new unsigned short*[max_number]; 
 		for(int i=0;i<max_number;i++){ 
-			array[t][i]=new int[4]; 
-			for(int j=0;j<4;j++) array[t][i][j]=0;
+			array[t][i]=new unsigned short[4]; 
+			for(int j=0;j<4;j++) array[t][i][j]=0; // allocate 4 places for x,y, frame number and peak value
 		}
 		
 	}
 	
-	unsigned char *images=(unsigned char*) mxGetData(prhs[0]); // get the input image matrix
+	// array contains 4 values: x,y, frame num, peak value
+	// array has 1st index for number of threads, 2nd for number of peaks, 3rd for those 4 values
+	
+	unsigned short *images=(unsigned short*) mxGetData(prhs[0]); // get the input image matrix
 	bool *mask=mxGetLogicals (prhs[1]); // get the input mask
 	
-	unsigned char new_thresh=(unsigned char) (threshold/256);
+	// unsigned char new_thresh=(unsigned char) (threshold/256); 
 	
 	std::vector<std::thread> threads;
 	
@@ -104,44 +107,44 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		
 		if(t<num_threads-1){ // the first sections of the data go to asynchronuous threads
 			int end_idx=start_idx+num_pages_per_thread;
-			threads.push_back(std::thread(find_peaks, array[t], images, rows, cols, start_idx, end_idx, mask, new_thresh, max_number));  
+			threads.push_back(std::thread(find_peaks, array[t], images, rows, cols, start_idx, end_idx, mask, threshold, max_number));  
 		}
 		else{ // last iteration goes on the main thread				
 			int end_idx=(int) pages; // last iteration gets the additional round-off pages
-			find_peaks(array[t], images, rows, cols, start_idx, end_idx, mask, new_thresh, max_number);
+			find_peaks(array[t], images, rows, cols, start_idx, end_idx, mask, threshold, max_number);
 		}
 		
 	}
 	
-	for(int t=0;t<num_threads-1;t++){
+	for(int t=0;t<num_threads-1;t++){ // collect the results from all threads (this only completes after all threads are done)
 		threads[t].join();
 	}
 	
 	std::vector< std::vector<int> > results;
-	int dist=3;
+	int dist=3; // distance between existing peaks
 	
 	// consolidate the results
 	for(int t=0;t<num_threads;t++){ // we can gain some speed improvement if we collect a separate vector for each thread, but this may be negligible
 		
 		for(int i=0;i<max_number;i++){
 			
-			int *new_result=array[t][i];
+			unsigned short *new_result=array[t][i]; // get the row inside the large "array" so we can grab the results from that
 			
 			if(new_result[0]>0){
 				
 				// printf("i=%d | val= %05d | x= %04d | y= %04d | p= %02d\n", i, new_result[0], new_result[1], new_result[2], new_result[3]);
 				
 				int j=0; // need to query this to find if we broke the loop...
-				for(j=0;j<results.size();j++){
-					if (new_result[3]==results[j][3] 
-						&& abs(new_result[1]-results[j][1])<dist 
-						&& abs(new_result[2]-results[j][2])<dist){ // I think we can do something more sophisticated with clustering but I don't have patience for this
-							
-						if(new_result[0]>results[j][0]) { // new results supercede the old one
+				for(j=0;j<results.size();j++){ // check the new result against all previously saved results
+					if (new_result[3]==results[j][3] // check if two flares are on the same frame and close to each other
+						&& abs((int) new_result[1] - (int) results[j][1])<dist 
+						&& abs((int) new_result[2] - (int) results[j][2])<dist){ // I think we can do something more sophisticated with clustering but I don't have patience for this
+						
+						if(new_result[0]>results[j][0]) { // new results is brighter so it supercedes the old one
 							for(int k=0;k<4;k++) results[j][k]=new_result[k]; // overwrite the old result
 						} // new_result is better
 						
-						break; // skip the other results because we already see the new_result is too close to an existing0 result
+						break; // skip the other results because we already see the new_result is too close to an existing result
 						
 					} // if close enough to an existing result
 	
@@ -154,7 +157,6 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		} // go over array i index
 		
 	} // go over array t index
-	
 	
 	int N=results.size(); 
 	
@@ -173,7 +175,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	
 } // end mex function
 
-void find_peaks(int **array, unsigned char *images, size_t rows, size_t cols, int start_idx, int end_idx, bool *mask, unsigned char new_thresh, int max_number){
+void find_peaks(unsigned short **array, unsigned short *images, size_t rows, size_t cols, int start_idx, int end_idx, bool *mask, unsigned char threshold, int max_number){
 
 	int counter=0;
 	
@@ -183,20 +185,22 @@ void find_peaks(int **array, unsigned char *images, size_t rows, size_t cols, in
 
 			if(!mask[i]){
 				
-				unsigned char value=images[p*rows*cols*2 + i*2 + 1]; // take only the significant byte
+				//unsigned char value=images[p*rows*cols*2 + i*2 + 1]; // take only the significant byte
 				
-				if(value>=new_thresh){ 
-										
+				unsigned short value=images[p*rows*cols + i]; // take one pixel value at a time
+				
+				if(value>=threshold){ 
+				
 					// save the information on this peak
-					array[counter][0]= ((int) value)*256 + ((int) images[p*rows*cols*2 + i*2]); 
-					array[counter][1]=  (i/rows) + 1; // x position
-					array[counter][2]=  (i%rows) + 1; // y position
+					array[counter][0]=  value;
+					array[counter][1]=  ( i/rows ) + 1; // x position
+					array[counter][2]=  ( i%rows ) + 1; // y position
 					array[counter][3]=  p + 1; // page or image number 
 					
 					counter++;
 					if(counter>=max_number) return;
 					
-				}// if value>new_thresh
+				}// if value>threshold
 								
 			} // if mask==0
 			

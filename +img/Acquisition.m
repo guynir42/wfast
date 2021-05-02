@@ -3153,7 +3153,8 @@ classdef Acquisition < file.AstroData
                     
                     obj.cosmic_ray_mask = imdilate(obj.stack_proc>obj.cosmic_ray_mask_threshold, ones(7)); % dilate the area around stars
                     obj.cosmic_ray_mask = logical(obj.cal.dark_mask + obj.cosmic_ray_mask); % add the bad pixels to the mask
-                    pos = util.img.find_cosmic_rays(obj.images, obj.cosmic_ray_mask,obj.cosmic_ray_peak_threshold, 6, 100, 0); % the arguments are: images, mask, threshold, num_threads, max_number, debug_bit
+%                     pos = util.img.find_cosmic_rays(obj.images, obj.cosmic_ray_mask, obj.cosmic_ray_peak_threshold, 6, 100, 0); % the arguments are: images, mask, threshold, num_threads, max_number, debug_bit
+                    pos = util.img.find_flares(obj.images, obj.cosmic_ray_mask, obj.cosmic_ray_peak_threshold, 6, 100, 0); % the arguments are: images, mask, threshold, num_threads, max_number, debug_bit
                     
                     if ~isempty(pos)
                         pos = sortrows(pos, 4, 'descend'); 
