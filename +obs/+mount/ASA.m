@@ -175,7 +175,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             obj.guiding_history = util.vec.CircularBuffer;
             obj.correct_history = util.vec.CircularBuffer;
             
-            obj.reco =obs.comm.Reconnect;
+            obj.reco = obs.comm.Reconnect;
             
             obj.log = util.sys.Logger('ASA_mount', obj);
             
@@ -249,6 +249,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     rethrow(ME);
                 end
 
+            end
+            
+            if obj.ard.status==0
+                obj.connectArduino;
             end
             
         end

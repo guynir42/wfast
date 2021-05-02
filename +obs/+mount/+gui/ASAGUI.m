@@ -102,9 +102,11 @@ classdef ASAGUI < handle
             obj.panel_status.addButton('button_placeholder1', '', 'custom');
             obj.panel_status.addButton('button_vibrations', '', 'custom');
             obj.panel_status.addButton('button_on_target', '', 'custom');
-            obj.panel_status.addButton('button_connect', 'connect', 'push', 'Connect', '', '', [], '', '', 'Reload Autoslew software and connect to telescope');
+            obj.panel_status.addButton('button_connect', 'connect', 'push', 'Connect mount', '', '', [], '', '', 'Reload Autoslew software and connect to telescope');
             obj.panel_status.margin = [0.005 0.1];
             obj.panel_status.make;
+            
+            obj.panel_status.button_connect.BackgroundColor = [0.1 0.9 0.1]; 
             
             %%%%%%%%%%% panel pointing %%%%%%%%%%%%%%%
             
@@ -239,7 +241,7 @@ classdef ASAGUI < handle
             obj.panel_arduino = GraphicPanel(obj.owner, [0.8 pos/N 0.2 num_buttons/N], 'arduino', 1); % last input is for vertical 
             obj.panel_arduino.number = num_buttons;
             obj.panel_arduino.addButton('button_status', 'ard.status', 'info', 'Status= ', '', '', 0.5, '', '', 'Status of communication with arduino');
-            obj.panel_arduino.addButton('button_connect', '', 'custom', 'Connect', '', '', 0.5, '', '', 'Attempt to reconnect with arduino');
+            obj.panel_arduino.addButton('button_connect', '', 'custom', 'Connect Ard', '', 'edit', 0.5, '', '', 'Attempt to reconnect with arduino');
             obj.panel_arduino.addButton('button_use_accel', 'use_accelerometer', 'toggle', 'accel. off ', 'use accel.', '', 0.5, obj.color_on, 'red', 'Use arduino accelerometer to stop telescope at low altitude');
             obj.panel_arduino.addButton('button_angle', 'ard.ALT', 'info', 'ALT= ', '', 'edit', 0.5, '', '', 'Current measured Altitude angle (degrees)');
             obj.panel_arduino.addButton('button_use_ultra', 'use_ultrasonic', 'toggle', 'ultra. off ', 'use ultra.', '', 0.5, obj.color_on, 'red', 'Use arduino ultrasonic sensor to warn agains obstacles in front of telescope');
@@ -247,7 +249,8 @@ classdef ASAGUI < handle
             obj.panel_arduino.margin = [0.02 0.02];
             obj.panel_arduino.make;
             
-            obj.panel_arduino.button_connect.Callback = @obj.callback_connect_arduino; 
+            obj.panel_arduino.button_connect.Callback = @obj.callback_connect_arduino;             
+            obj.panel_arduino.button_connect.BackgroundColor = [0.5 0.5 1.0]; 
             
             %%%%%%%%%%% panel slew %%%%%%%%%%%%%%%
             
@@ -261,8 +264,11 @@ classdef ASAGUI < handle
             obj.panel_slew.make;
             
             obj.panel_slew.button_slew.Callback = @obj.callback_slew;
-            obj.panel_slew.button_sync.Callback = @obj.callback_sync;
+            obj.panel_slew.button_slew.BackgroundColor = [1.0 0.4 0.4]; 
             
+            obj.panel_slew.button_sync.Callback = @obj.callback_sync;
+            obj.panel_slew.button_sync.BackgroundColor = [0.8 0.8 0.2];
+                        
             obj.fig.fig.WindowButtonUpFcn = @obj.callback_button_up;
             obj.fig.fig.CloseRequestFcn = @obj.callback_close_fig;
             

@@ -54,6 +54,7 @@ classdef ManagerGUI < handle
         button_mean_only;
         button_clicker;
         button_info; 
+        button_cam_pc;
         axes_image;
         
         menu_options;
@@ -278,6 +279,8 @@ classdef ManagerGUI < handle
             
             obj.button_info = GraphicButton(obj.panel_image, [0.15 0.94 0.7 0.05], obj.owner, '', 'custom', '', ''); 
             
+            obj.button_cam_pc = GraphicButton(obj.panel_image, [0.88 0.94 0.1 0.05], obj.owner, 'connectCamPC', 'push', 'cam-PC', ''); 
+            
             %%%%%%%%%%% panel camera %%%%%%%%%%%%%%%%%
             
             obj.panel_camera = GraphicPanel(obj.owner, [0.2 0 0.8 2/N_middle], 'camera');
@@ -342,6 +345,9 @@ classdef ManagerGUI < handle
             obj.menu_options.menu_robot.addButton('button_prompt', '&Prompt user', 'toggle', 'use_prompt_user', 'pop up a prompt that user must confirm when switching targets using the scheduler'); 
             obj.menu_options.menu_robot.addButton('button_side', '&Stay on side', 'toggle', 'sched.use_stay_on_side', 'force the scheduler to stay on the same side and not perform a flip on its own'); 
             obj.menu_options.menu_robot.addButton('button_maintenance', '&Maintenance mode', 'toggle', 'use_maintenance_mode', 'block all automatic motion of mount/dome. Make sure to turn this off!', 1); 
+            
+            obj.menu_options.addButton('menu_camera', '&Camera', 'menu'); 
+            obj.menu_options.menu_camera.addButton('button_connect', '&Reconnect', 'push', 'connectCamPc', 'attempt to establish TCP/IP connection with Cam-PC'); 
                         
             obj.menu_objects = MenuItem(obj, '&Device GUIs', 'menu');
             obj.menu_objects.addButton('button_dome', '&Dome', 'push', 'dome', 'dome GUI', 'Open the dome GUI');
@@ -495,6 +501,14 @@ classdef ManagerGUI < handle
             
             obj.updateStopButton;
 
+            if obj.owner.cam_pc.status
+                obj.button_cam_pc.BackgroundColor = 'green'; 
+                obj.button_cam_pc.Tooltip = 'Cam-PC is connected!'; 
+            else
+                obj.button_cam_pc.BackgroundColor = 'red'; 
+                obj.button_cam_pc.Tooltip = 'Cam-PC is disconnected! push to reconnect (cam-PC must be waiting for connections...)'; 
+            end
+            
             obj.owner.checker.plotWeather('ax', obj.axes_image, 'color', obj.color_bg);
                         
         end

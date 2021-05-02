@@ -1668,6 +1668,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
+        function connectCamPC(obj)
+            
+            obj.cam_pc.reco.unlock;
+            obj.cam_pc.connect; 
+            
+        end
+        
     end
     
     methods % calculations / commands
@@ -2138,7 +2145,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.mount.object.RA = '';
                 obj.mount.object.Dec = '';
                 obj.mount.object.field_id = []; 
-                util.text.date_printf('Could not find any targets! Try changing the constraints or adding new targets and reloading the scheduler.'); 
+%                 util.text.date_printf('Could not find any targets! Try changing the constraints or adding new targets and reloading the scheduler.'); 
             else
                 obj.mount.object.name = obj.sched.current.name;
                 obj.mount.object.RA = obj.sched.current.RA;
@@ -2282,7 +2289,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             if isempty(obj.sched.current)
 
-                obj.print_message(sprintf('\nCould not find any targets. Going to idle mode...'));
+                obj.print_message('Could not find any targets. Going to idle mode...');
  
                 if ~isempty(obj.prompt_fig) && isvalid(obj.prompt_fig)
                     obj.button_target.String = obj.log.report; 

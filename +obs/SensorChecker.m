@@ -164,7 +164,7 @@ classdef SensorChecker < handle
 
                     end
                 catch ME
-                    fprintf('Problem connecting to sensor "%s"\n', name); 
+                    util.text.date_printf('Problem connecting to sensor "%s".', name); 
                 end
             end
             
@@ -477,15 +477,22 @@ classdef SensorChecker < handle
         
         function update(obj)
             
+            try
+            
             for ii = 1:length(obj.sensors)
                 if ismethod(obj.sensors{ii}, 'update')
                     try
                         obj.sensors{ii}.update;
                     catch ME
                         obj.sensors{ii}.connect;
-                        warning(ME.getReport);
+                        rethrow(ME);
                     end
                 end
+            end
+            
+            catch ME
+                util.text.date_printf('Error on connecting to sensor %d', ii); 
+                warning(ME.getReport); 
             end
             
         end
@@ -631,7 +638,7 @@ classdef SensorChecker < handle
                 obj.wise_data_struct = jsondecode(value.Value); 
                 
             else
-                fprintf('cURL error code %d in getWiseData\n', rc); 
+                util.text.date_printf('cURL error code %d in getWiseData.', rc); 
             end
             
             [value,reason] = obj.getWiseSafeFlag;
@@ -789,7 +796,7 @@ classdef SensorChecker < handle
                 end
 
             else
-                fprintf('cURL error code %d in getWiseSafeFlag\n', rc); 
+                util.text.date_printf('cURL error code %d in getWiseSafeFlag.', rc); 
             end
 
         end
