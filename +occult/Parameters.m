@@ -284,6 +284,25 @@ classdef Parameters < handle
             
         end
         
+        function val = printout(obj)
+            
+            if obj.r2 && obj.d
+                val = sprintf('R=%4.2f | r= %4.2f | r2 = %4.2f | d= %4.2f | th= %4.2f', obj.R, obj.r, obj.r2, obj.d, obj.th); 
+            else
+                val = sprintf('R=%4.2f | r= %4.2f', obj.R, obj.r); 
+            end
+            
+            val = sprintf('%s | b= %4.2f | v= %4.2f | t= %4.2f', val, obj.b, obj.v, obj.t); 
+            
+            val = sprintf('%s | lkl= %g', val, obj.likelihood); 
+            
+            if nargout==0
+                disp(val);
+                clear val;
+            end
+            
+        end
+        
     end 
     
     methods % setters

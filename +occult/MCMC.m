@@ -8,12 +8,19 @@ classdef MCMC < handle
     
     properties % objects
         
-        gen@occult.CurveGenerator;
+        gen@occult.CurveGenerator; % used to create lightcurves to fit to the measured
         
-        points@occult.Parameters; % a 2D matrix, each column contains one chain of points in parameter space
+        bank@occult.ShuffleBank; % for finding an initial guess
         
-        prog@util.sys.ProgressBar;
+        init_point@occult.Parameters; % keep track of the initial point 
+        true_point@occult.Parameters; % if the data is simulated and the true value is known
+        best_point@occult.Parameters;
+        pick_point@occult.Parameters;
+
+        points@occult.Parameters; % a chain of trial points
         
+        prog@util.sys.ProgressBar; % print out the progress
+
     end
     
     properties % inputs/outputs
@@ -21,24 +28,24 @@ classdef MCMC < handle
         input_flux; % the input lightcurve to be matched
         input_errors; % the rms error on the given flux
         
-        num_successes = 0;
-        num_failures = 0;
+        counter = 0; 
+        num_successes = 0; % number of steps that succeeded
+        num_failures = 0; % number of steps that failed
         
-        runtime = 0;
         
     end
     
     properties % switches/controls
         
-        num_chains = 1;
         num_steps = 1000; 
         num_burned = 100; 
         
-        step_size = 0.1;
-        
-        default_error = 0.1; % if input lightcurves don't have any errors per sample, use this instead... 
+        step_sizes = [0.1, 0.1, 1];
+        circ_bounds = [0 1 0]; 
         
         par_list = {'r', 'b', 'v'}; % these parameters are chosen randomly each step. The rest are taken from the generator's parameters
+        
+        prior_functions = {}; % can input a cell array with a different function per parameter (leave empty for uniform prior). min/max values are taken from generator
         
         debug_bit = 1;
         
@@ -52,7 +59,7 @@ classdef MCMC < handle
     
     properties(Hidden=true)
 
-        version = 1.01;
+        version = 1.02;
         
     end
     
@@ -67,6 +74,11 @@ classdef MCMC < handle
                 if obj.debug_bit>1, fprintf('MCMC constructor v%4.2f\n', obj.version); end
             
                 obj.gen = occult.CurveGenerator;
+                obj.init_point = occult.Parameters; 
+                obj.true_point = occult.Parameters; 
+                obj.best_point = occult.Parameters; 
+                obj.pick_point = occult.Parameters; 
+                
                 obj.prog = util.sys.ProgressBar;
                 
             end
@@ -79,12 +91,15 @@ classdef MCMC < handle
         
         function reset(obj)
             
-            obj.points = occult.Parameters.empty;
-
+            obj.points = occult.Parameters.empty; 
+            
+            obj.init_point = occult.Parameters;
+            obj.best_point = occult.Parameters;
+            obj.pick_point = occult.Parameters;
+            
+            obj.counter = 0; 
             obj.num_successes = 0;
             obj.num_failures = 0;
-            
-            obj.runtime = 0;
             
         end
         
@@ -100,11 +115,40 @@ classdef MCMC < handle
     
     methods % calculations
         
+        function loadTemplateBank(obj, varargin)
+            
+            input = util.text.InputVars; 
+            input.input_var('distance', 40, 'distance_au');
+            input.input_var('frame_rate', 25); 
+            input.scan_vars(varargin{:}); 
+            
+            f = sprintf('templates_%dAU_%dHz.mat', floor(input.distance), floor(input.frame_rate)); 
+            
+            f = fullfile(getenv('DATA'), 'WFAST/occultations/', f); 
+            
+            if exist(f, 'file')
+                if obj.debug_bit 
+                    fprintf('Loading templates from %s\n', f); 
+                end
+                
+                load(f); 
+                
+                obj.bank = bank;
+                
+                % maybe copy the ranges into this object's main generator? 
+                
+            else
+                error('Cannot find file: %s', f); 
+            end
+            
+        end
+        
         function useSimulatedInput(obj, varargin)
             
             obj.gen.getLightCurves;
             obj.input_flux = obj.gen.lc.flux;
             
+            obj.true_point.copy_from(obj.gen.lc.pars); 
             
         end
         
@@ -114,35 +158,63 @@ classdef MCMC < handle
                 error('Must setup generator with all scalar parameters!');
             end
             
-            obj.points(obj.num_steps, obj.num_chains) = occult.Parameters;
-            
-            obj.runtime = 0;
+            obj.points(obj.num_steps,1) = occult.Parameters; 
             
         end
         
-        function gotoInitialPoint(obj)
+        function finishup(obj)
+            
+            obj.points = obj.points(1:obj.counter); 
+            obj.prog.finish;
+            
+        end
+        
+        function gotoBestTemplateInitialPoint(obj)
+            
+            if isempty(obj.bank)
+                error('Must load a template bank first!'); 
+            end
+            
+            f = obj.input_flux - 1;
+            
+            ff = util.vec.convolution(obj.bank.kernels, f, 'cross', 1); % filtered flux
+            
+            [~,idx] = util.stat.max2(abs(ff)); % find the peak in the filtered flux
+            
+            pars = obj.bank.pars(idx(2)); % grab a struct with some parameters
+            
+            obj.init_point.copy_from(obj.gen.lc.pars); % start by getting all parameters from generator
             
             for ii = 1:length(obj.par_list)
                 
-                if strcmp(obj.par_list{ii}, 'r')
-                    obj.gen.r = (obj.gen.max_r-obj.gen.min_r)*rand + obj.gen.min_r;
-                elseif strcmp(obj.par_list{ii}, 'r2')
-                    obj.gen.r2 = (obj.gen.max_r2-obj.gen.min_r2)*rand + obj.gen.min_r2;
-                elseif strcmp(obj.par_list{ii}, 'd')
-                    obj.gen.d = (obj.gen.max_d-obj.gen.min_d)*rand + obj.gen.min_d;
-                elseif strcmp(obj.par_list{ii}, 'th')
-                    obj.gen.th = (obj.gen.max_th-obj.gen.min_th)*rand + obj.gen.min_th;
-                elseif strcmp(obj.par_list{ii}, 'R')
-                    obj.gen.R = (obj.gen.max_R-obj.gen.min_R)*rand + obj.gen.min_R;
-                elseif strcmp(obj.par_list{ii}, 'b')
-                    obj.gen.b = (obj.gen.max_b-obj.gen.min_b)*rand + obj.gen.min_b;
-                elseif strcmp(obj.par_list{ii}, 'v')
-                    obj.gen.v = (obj.gen.max_v-obj.gen.min_v)*rand + obj.gen.min_v;
-                elseif strcmp(obj.par_list{ii}, 't')
-                    obj.gen.t = (obj.gen.max_t-obj.gen.min_t)*rand + obj.gen.min_t;
+                name = obj.par_list{ii};
+                
+                if isfield(pars, name)                    
+                    obj.init_point.(name) = pars.(name); 
                 end
                 
             end
+            
+            if ismember('t', obj.par_list)
+                obj.init_point.t = 0; % the template banks all have t=0 
+            end
+            
+            obj.gen.lc.pars.copy_from(obj.init_point); 
+            
+        end
+        
+        function gotoRandomInitialPoint(obj)
+            
+            for ii = 1:length(obj.par_list)
+                
+                name = obj.par_list{ii}; 
+                range = obj.gen.([name '_range']); 
+                
+                obj.gen.(name) = diff(range).*rand + range(1); 
+                
+            end
+            
+            obj.init_point.copy_from(obj.gen.lc.pars); 
             
         end
         
@@ -150,76 +222,18 @@ classdef MCMC < handle
             
             for ii = 1:length(obj.par_list)
                 
-                if strcmp(obj.par_list{ii}, 'r')
+                name = obj.par_list{ii}; 
+                range = obj.gen.([name '_range']); 
+                obj.gen.(name) = normrnd(obj.gen.(name), obj.step_sizes(ii)); 
+                
+                if obj.circ_bounds(ii)
                     
-                    obj.gen.r = normrnd(obj.gen.r, obj.step_size);
-                    if obj.gen.r<obj.gen.min_r
-                        obj.gen.r = obj.gen.min_r;
-                    elseif obj.gen.r>obj.gen.max_r
-                        obj.gen.r = obj.gen.max_r;
-                    end
-                    
-                elseif strcmp(obj.par_list{ii}, 'r2')
-                    
-                    obj.gen.r2 = normrnd(obj.gen.r2, obj.step_size);
-                    if obj.gen.r2<obj.gen.min_r2
-                        obj.gen.r2 = obj.gen.min_r2;
-                    elseif obj.gen.r2>obj.gen.max_r2
-                        obj.gen.r2 = obj.gen.max_r2;
-                    end
-                    
-                elseif strcmp(obj.par_list{ii}, 'd')
-                    
-                    obj.gen.d = normrnd(obj.gen.d, obj.step_size);
-                    if obj.gen.d<obj.gen.min_d
-                        obj.gen.d = obj.gen.min_d;
-                    elseif obj.gen.d>obj.gen.max_d
-                        obj.gen.d = obj.gen.max_d;
-                    end
-                    
-                elseif strcmp(obj.par_list{ii}, 'th')
-                    
-                    obj.gen.th = normrnd(obj.gen.th, 1); % note angles step is taken as 1 deg for simplicity
-                    if obj.gen.th<obj.gen.min_th
-                        obj.gen.th = obj.gen.min_th;
-                    elseif obj.gen.th>obj.gen.max_th
-                        obj.gen.th = obj.gen.max_th;
-                    end
-                    
-                elseif strcmp(obj.par_list{ii}, 'R')
-                    
-                    obj.gen.R = normrnd(obj.gen.R, obj.step_size);
-                    if obj.gen.R<obj.gen.min_R
-                        obj.gen.R = obj.gen.min_R;
-                    elseif obj.gen.R>obj.gen.max_R
-                        obj.gen.R = obj.gen.max_R;
-                    end
-                    
-                elseif strcmp(obj.par_list{ii}, 'b')
-                    
-                    obj.gen.b = normrnd(obj.gen.b, obj.step_size);
-                    if obj.gen.b<obj.gen.min_b
-                        obj.gen.b = obj.gen.min_b;
-                    elseif obj.gen.b>obj.gen.max_b
-                        obj.gen.b = obj.gen.max_b;
-                    end
-                    
-                elseif strcmp(obj.par_list{ii}, 'v')
-                    
-                    obj.gen.v = normrnd(obj.gen.v, 1); % note the velocity step is 1 FSU/s for simplicity
-                    if obj.gen.v<obj.gen.min_v
-                        obj.gen.v = obj.gen.min_v;
-                    elseif obj.gen.v>obj.gen.max_v
-                        obj.gen.v = obj.gen.max_v;
-                    end
-                    
-                elseif strcmp(obj.par_list{ii}, 't')
-                    
-                    obj.gen.t = normrnd(obj.gen.t, 1); % note the time offset step is 1 ms for simplicity
-                    if obj.gen.t<obj.gen.min_t
-                        obj.gen.t = obj.gen.min_t;
-                    elseif obj.gen.t>obj.gen.max_t
-                        obj.gen.t = obj.gen.max_t;
+                    if obj.gen.(name)>range(2)
+                        delta = obj.gen.(name) - range(2);
+                        obj.gen.(name) = range(1) + delta; % circle back the rest of the way from the lower bound
+                    elseif obj.gen.(name)<range(1)
+                        delta = range(1) - obj.gen.(name);
+                        obj.gen.(name) = range(2) - delta; % circle back the rest of the way from the upper bound
                     end
                     
                 end
@@ -230,10 +244,24 @@ classdef MCMC < handle
         
         function calcLikelihood(obj)
             
+            for ii = 1:length(obj.par_list)
+                
+                value = obj.gen.lc.pars.(obj.par_list{ii});
+                range = obj.gen.([obj.par_list{ii} '_range']);                
+                
+                if value<range(1) || value>range(2)
+                    obj.gen.lc.pars.likelihood = 0; 
+                    return;
+                end
+                
+            end
+            
+            obj.gen.getLightCurves; 
+            
             if ~isempty(obj.input_errors)
                 e = obj.input_errors;
             else
-                e = obj.default_error;
+                e = 1./obj.gen.snr;
             end
             
             f1 = obj.gen.lc.flux;
@@ -256,6 +284,8 @@ classdef MCMC < handle
             obj.reset;
             obj.startup;
             
+            on_cleanup = onCleanup(@() obj.finishup); % make sure to wrap up: truncate the chain, shut down the progress bar
+            
             if input.plot
                 
                 if isempty(input.ax)
@@ -264,45 +294,58 @@ classdef MCMC < handle
                 
             end
             
-            t = tic;
+            obj.prog.start(obj.num_steps);
+
+            if isempty(obj.bank)
+                obj.gotoRandomInitialPoint;
+            else
+                obj.gotoBestTemplateInitialPoint; 
+            end
             
-            obj.prog.start(obj.num_chains.*obj.num_steps);
+            obj.calcLikelihood; % get the first point likelihood/chi2
+
+            obj.points(1).copy_from(obj.gen.lc.pars); % automatically accept first point... 
             
-            for ii = 1:obj.num_chains
+            for jj = 2:obj.num_steps
+
+                obj.prog.showif(jj);
+
+                obj.takeStep; % move the generator to a nearby random point
+
+                obj.calcLikelihood;
                 
-                obj.gotoInitialPoint;
-                obj.gen.getLightCurves;
-                obj.calcLikelihood; % get the first point likelihood/chi2
+                if obj.debug_bit>2
+                    obj.gen.lc.pars.printout;
+                end
                 
-                obj.points(1,ii).copy_from(obj.gen.lc.pars); % automatically accept first point... 
-                
-                for jj = 2:obj.num_steps
+                ratio = obj.gen.lc.pars.likelihood./obj.points(jj-1).likelihood; % compare the new potential point with the last point
+
+                if rand<=ratio % if ratio is big, we are likely to take the new point
+                    obj.num_successes = obj.num_successes + 1;
+                    obj.points(jj).copy_from(obj.gen.lc.pars);
+                    obj.points(jj).counts = 1;
                     
-                    obj.prog.showif((ii-1)*obj.num_steps + jj);
-                    
-                    obj.takeStep; % move the generator to a nearby random point
-                    
-                    obj.gen.getLightCurves;
-                    obj.calcLikelihood;
-                    
-                    ratio = obj.gen.lc.pars.likelihood./obj.points(jj-1,ii).likelihood;
-                    
-                    if rand<=ratio % if ratio is big, we are likely to take the new point
-                        obj.num_successes = obj.num_successes + 1;
-                        obj.points(jj,ii).copy_from(obj.gen.lc.pars);
-                        obj.points(jj,ii).counts = 1;
-                    else % point is rejected, repeat the previous point
-                        obj.num_failures = obj.num_failures + 1;
-                        obj.points(jj,ii).copy_from(obj.points(jj-1,ii));
-                        obj.points(jj,ii).counts = obj.points(jj-1,ii).counts + 1;
+                    if obj.best_point.likelihood<obj.points(jj).likelihood % keep track of the best fit point
+                        obj.best_point.copy_from(obj.points(jj)); 
                     end
                     
+                else % point is rejected, repeat the previous point
+                    obj.num_failures = obj.num_failures + 1;
+                    obj.points(jj).copy_from(obj.points(jj-1));
+                    obj.points(jj).counts = obj.points(jj-1).counts + 1;
+                end
+
+                obj.gen.lc.pars.copy_from(obj.points(jj)); 
+                
+                obj.counter = obj.counter + 1;
+                
+                if input.plot
+                    obj.plot; 
+                    drawnow;
                 end
                 
             end
-            
-            obj.runtime = toc(t);
-            
+                        
         end
         
     end
@@ -312,12 +355,21 @@ classdef MCMC < handle
         function plot(obj, varargin)
             
             input = util.text.InputVars;
-            input.input_var('ax', [], 'axes', 'axis');
             input.input_var('pars', []); 
+            input.input_var('burn', false); 
+            input.input_var('ax', [], 'axes', 'axis');
+            input.input_var('font_size', 18); 
+            input.input_var('hold', false);             
             input.scan_vars(varargin{:});
-                        
+            
             if isempty(input.ax)
                 input.ax = gca;
+            end
+            
+            hold_state = input.ax.NextPlot; 
+            
+            if input.hold
+                input.ax.NextPlot = 'add'; 
             end
             
             if isempty(input.pars)
@@ -329,56 +381,82 @@ classdef MCMC < handle
             end
             
             p1 = [obj.points.(input.pars{1})];
-            p1 = reshape(p1, [obj.num_steps, obj.num_chains]);
             s = [obj.points.counts];
-            s = reshape(s, [obj.num_steps, obj.num_chains]);
             
-            if length(input.pars)==1
+            if length(input.pars)==1 % just show the distribution of this one parameter I guess... 
+                
                 histogram(input.ax, p1);
                 
             elseif length(input.pars)==2
                 
                 p2 = [obj.points.(input.pars{2})];
-                p2 = reshape(p2, [obj.num_steps, obj.num_chains]);
-                p2 = p2(obj.num_burned:end,:);
+                                
+                scatter(input.ax, p1(obj.num_burned:end), p2(obj.num_burned:end), 20, s(obj.num_burned:end), 'o', 'filled');
                 
-                plot(input.ax, p1, p2, '.');
-                
+                if input.burn
+                    hold(input.ax, 'on'); 
+                    scatter(input.ax, p1(1:obj.num_burned), p2(1:obj.num_burned), 10, s(1:obj.num_burned), 'o');
+                end
+
+                % the X limits and labels are added in the end
                 ylabel(input.ax, input.pars{2});
                 input.ax.YLim = obj.gen.([input.pars{2} '_range']);
+
+                hcb = colorbar(input.ax); 
+                ylabel(hcb, 'number of repeats'); 
                 
             elseif length(input.pars)==3
                 
                 p2 = [obj.points.(input.pars{2})];
-                p2 = reshape(p2, [obj.num_steps, obj.num_chains]);
-                
                 p3 = [obj.points.(input.pars{3})];
-                p3 = reshape(p3, [obj.num_steps, obj.num_chains]);
+
+                h = scatter3(input.ax, p1(obj.num_burned:end), p2(obj.num_burned:end), p3(obj.num_burned:end), 20, s(obj.num_burned:end), 'o', 'filled');
                 
-                holding_pattern = input.ax.NextPlot;
-                
-                scatter3(input.ax, p1(obj.num_burned:end,1), p2(obj.num_burned:end,1), p3(obj.num_burned:end,1), 20+s(obj.num_burned:end,1), '.');
-                
-                input.ax.NextPlot = 'add';
-                
-                for ii = 2:size(p1,2)
-                    scatter3(input.ax, p1(obj.num_burned:end,ii), p2(obj.num_burned:end,ii), p3(obj.num_burned:end,ii), 20+s(obj.num_burned:end,ii), '.');
+                if input.burn
+                    hold(input.ax, 'on'); 
+                    h_burn = scatter3(input.ax, p1(1:obj.num_burned), p2(1:obj.num_burned), p3(1:obj.num_burned), 10, s(1:obj.num_burned), 'o');
                 end
                 
-                input.ax.NextPlot = holding_pattern;
-                
+                % the X limits and labels are added in the end
                 ylabel(input.ax, input.pars{2});
-                zlabel(input.ax, input.pars{3});
-                
                 input.ax.YLim = obj.gen.([input.pars{2} '_range']);
+                
+                zlabel(input.ax, input.pars{3});
                 input.ax.ZLim = obj.gen.([input.pars{3} '_range']);
+                
+                hcb = colorbar(input.ax); 
+                ylabel(hcb, 'number of repeats'); 
                 
             end
         
             xlabel(input.ax, input.pars{1});
-            input.ax.FontSize = 24;
+            input.ax.FontSize = input.font_size;
             
             input.ax.XLim = obj.gen.([input.pars{1} '_range']);
+            
+            input.ax.NextPlot = hold_state;
+            
+            h.ButtonDownFcn = @obj.callback_click_point; 
+            
+        end
+        
+        function callback_click_point(obj, hndl, ev)
+            
+            if obj.debug_bit, fprintf('clicked point at '); end
+            
+            for ii = 1:length(obj.par_list)
+                
+                obj.gen.lc.pars.(obj.par_list{ii}) = ev.IntersectionPoint(ii);
+                
+                if obj.debug_bit, fprintf('%s= %4.2f ', obj.par_list{ii}, ev.IntersectionPoint(ii)); end
+                
+            end
+            
+            obj.calcLikelihood; 
+            
+            obj.pick_point.copy_from(obj.gen.lc.pars); 
+            
+            if obj.debug_bit, fprintf('lkl= %4.2f\n', obj.pick_point.likelihood); end
             
         end
         
