@@ -230,6 +230,7 @@ classdef ShuffleBank < handle
             obj.b_range = input.impact_parameter; 
             obj.v_range = input.velocity./fsu2km; 
             
+            obj.applyRanges;
             
         end
         
@@ -249,6 +250,16 @@ classdef ShuffleBank < handle
             
         end
         
+        function applyRanges(obj)
+            
+            list = {'R', 'r', 'b', 'v'}; 
+            
+            for jj = 1:length(list)
+                obj.gen.([list{jj} '_range']) = obj.([list{jj} '_range']);
+            end
+            
+        end
+        
         function makeKernels(obj, varargin)
             
             input = util.text.InputVars;
@@ -263,10 +274,11 @@ classdef ShuffleBank < handle
             obj.gen.T = obj.T;
             obj.gen.W = obj.W;
             
-            
             obj.prog.start(input.number);
             
             counter = 0; 
+            
+            obj.applyRanges;
             
             for ii = 1:input.number
                 
