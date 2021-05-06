@@ -783,7 +783,7 @@ classdef Scheduler < handle
             
             if ~use_sim
 
-                for ii = 1:length(obj.targets_sim)
+                for ii = 1:length(obj.targets)
                     obj.targets(ii).finish_observation(time); % make sure all targets are stopped
                 end
 
@@ -802,7 +802,7 @@ classdef Scheduler < handle
                 
             else
                 
-                for ii = 1:length(obj.targets)
+                for ii = 1:length(obj.targets_sim)
                     obj.targets_sim(ii).finish_observation(time); % make sure all targets are stopped
                 end
                 

@@ -251,7 +251,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 
             end
             
-            if obj.ard.status==0
+            if isempty(obj.ard) || obj.ard.status==0
                 obj.connectArduino;
             end
             
@@ -1261,6 +1261,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
             
         end
         
+        function val = check_north_south(obj) % check if slew moves us from south part of the sky to north part of the sky
+        
+            val = obj.telDec_deg > obj.object.latitude && obj.objDec_deg < obj.object.latitude || ...
+                     obj.telDec_deg < obj.object.latitude && obj.objDec_deg > obj.object.latitude;
+        
+        end
+        
         function val = check_need_flip(obj) % check if target is on the other side of the pier
             
             if strcmp(obj.obj_pier_side, 'pierUnknown')
@@ -1327,6 +1334,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     error('dome_pc:mount:slew:prechecks_failed', 'Prechecks failed, aborting slew');
                 end
                 
+                if ~isempty(obj.gui) && obj.gui.check
+                    obj.gui.panel_slew.button_slew.control.Enable = 'off';
+                    obj.gui.panel_engineering.button_slew.control.Enable = 'off'; 
+                    obj.gui.panel_engineering.button_park.control.Enable = 'off'; 
+                end
+                
                 on_cleanup = onCleanup(@() obj.after_slew(input)); % make sure these things happen in any way the function is finished (error, return statement, ctrl+C, or normaly done)
                 
                 obj.brake_bit = 0;
@@ -1337,36 +1350,40 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 
                 if obj.check_need_flip % do pre-slews to manage to do the flip without getting stuck! 
                     
-                    if obj.telDec_deg<45 || obj.telDec_deg>45 % used to be limited to <30 or >60 but I think it is always a good idea to do this little dance
-                        
-                        if obj.brake_bit, return; end % in case user clicked stop!
-                        
-                        if strcmp(obj.pier_side, 'pierEast') % telescope is pointing West
-                            obj.slewWithoutPrechecks(obj.hndl.RightAscension-0.5, 45); % do a pre-slew to dec +70 so we can make the flip! 
-                        elseif strcmp(obj.pier_side, 'pierWest') % telescope pointing East
-                            obj.slewWithoutPrechecks(obj.hndl.RightAscension+0.75, 45); % do a pre-slew to dec +70 so we can make the flip! 
-                            % we must move the RA a bit to the East, in
-                            % case we are close to meridian, the mount would
-                            % "prefer west" and do a flip on its own. 
-                        end
-                        
-                        try 
-                            if strcmp(obj.obj_pier_side, 'pierEast') % object is on the WEST SIDE!
-                                if obj.brake_bit, return; end % in case user clicked stop!
-                                obj.slewWithoutPrechecks(mod(obj.object.LST_deg/15+4,24), 45); % do a second preslew to the same Dec with RA that is easier to flip from
-                            elseif strcmp(obj.obj_pier_side, 'pierWest') % object is on the EAST SIDE!
-                                if obj.brake_bit, return; end % in case user clicked stop!
-                                obj.slewWithoutPrechecks(mod(obj.object.LST_deg/15-4,24), 45); % do a second preslew to the same Dec with RA that is easier to flip from
-                            end
-                        catch ME
-                            util.text.date_printf('Could not complete the second pre-slew:'); 
-                            warning(ME.getReport); 
-                        end
-                        
+                    if obj.brake_bit, return; end % in case user clicked stop!
+
+                    if strcmp(obj.pier_side, 'pierEast') % telescope is pointing West
+                        obj.slewWithoutPrechecks(obj.hndl.RightAscension-0.5, 45); % do a pre-slew to dec +70 so we can make the flip! 
+                    elseif strcmp(obj.pier_side, 'pierWest') % telescope pointing East
+                        obj.slewWithoutPrechecks(obj.hndl.RightAscension+0.75, 45); % do a pre-slew to dec +70 so we can make the flip! 
+                        % we must move the RA a bit to the East, in
+                        % case we are close to meridian, the mount would
+                        % "prefer west" and do a flip on its own. 
                     end
-                    
+
+                    try 
+                        if strcmp(obj.obj_pier_side, 'pierEast') % object is on the WEST SIDE!
+                            if obj.brake_bit, return; end % in case user clicked stop!
+                            obj.slewWithoutPrechecks(mod(obj.object.LST_deg/15+4,24), 45); % do a second preslew to the same Dec with RA that is easier to flip from
+                        elseif strcmp(obj.obj_pier_side, 'pierWest') % object is on the EAST SIDE!
+                            if obj.brake_bit, return; end % in case user clicked stop!
+                            obj.slewWithoutPrechecks(mod(obj.object.LST_deg/15-4,24), 45); % do a second preslew to the same Dec with RA that is easier to flip from
+                        end
+                    catch ME
+                        util.text.date_printf('Could not complete the second pre-slew:'); 
+                        warning(ME.getReport); 
+                    end
+
                     % other things to do before a flip...?
                     
+                end
+                
+                if obj.check_north_south
+                    
+                    if obj.brake_bit, return; end % in case user clicked stop!
+
+                    obj.slewWithoutPrechecks(obj.telRA_deg/15, obj.object.latitude); % do a preslew to the same RA but with DE that is overhead
+
                 end
                 
                 if obj.brake_bit, return; end % in case user clicked stop!
@@ -1557,7 +1574,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                 obj.resetRate;
                 
                 obj.audio.stop;
-            
+                
+                if ~isempty(obj.gui) && obj.gui.check
+                    obj.gui.panel_slew.button_slew.control.Enable = 'on';
+                    obj.gui.panel_engineering.button_slew.control.Enable = 'on'; 
+                    obj.gui.panel_engineering.button_park.control.Enable = 'on'; 
+                end
+                
         end
         
         function restore_object(obj)
