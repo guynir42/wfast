@@ -321,7 +321,7 @@ classdef LightCurve < handle
     
     methods % plotting tools
        
-        function plot(obj, varargin)
+        function h = plot(obj, varargin)
             
             import util.text.print_vec;
             
@@ -332,6 +332,7 @@ classdef LightCurve < handle
             input.input_var('width', 2, 'line width');
             input.input_var('hold', false); 
             input.input_var('legend', false);
+            input.input_var('font_size', 16); 
             input.scan_vars(varargin{:});
             
             if isempty(obj.flux)
@@ -398,6 +399,8 @@ classdef LightCurve < handle
 %             legend(input.ax, leg_str, 'Location','SouthWest');
             
             input.ax.NextPlot = hold_state;
+            
+            input.ax.FontSize = input.font_size; 
             
             if input.legend
                 legend(input.ax, 'Location', 'SouthEast');

@@ -11,7 +11,7 @@ E_p = E_r*x; % visible photon energy (multiple values!)
 wavelength = 505e-7; % middle of our filter (in cm)
 bandwidth = 210e-7; % width of the filter (in cm)
 aperture = 55; % cm
-threshold = 2500; % number of photons needed for a detection (assumes gaussian PSF with sigma=1.2 and peak count>256)
+threshold = 1500; % number of photons needed for a detection (assumes gaussian PSF with sigma=1.2 and peak count>256)
 field_of_view = 7; % deg^2
 
 obs_hours = 800; % for equipartition, needs 800 hours... 

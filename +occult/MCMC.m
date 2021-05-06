@@ -15,7 +15,6 @@ classdef MCMC < handle
         init_point@occult.Parameters; % keep track of the initial point 
         true_point@occult.Parameters; % if the data is simulated and the true value is known
         best_point@occult.Parameters;
-        pick_point@occult.Parameters;
 
         points@occult.Parameters; % a chain of trial points
         
@@ -37,15 +36,23 @@ classdef MCMC < handle
     
     properties % switches/controls
         
-        num_steps = 1000; 
-        num_burned = 100; 
+        num_steps = 1000; % total number of steps (including burn-in)
+        num_burned = 100; % number of steps to burn at the begining of each chain
         
-        step_sizes = [0.1, 0.1, 1];
-        circ_bounds = [0 1 0]; 
+        step_sizes = [0.1, 0.1, 1]; % in order of parameters: step size for each parameter
+        circ_bounds = [0 1 0]; % in order of parameters: which par gets a circular boundary condition
         
         par_list = {'r', 'b', 'v'}; % these parameters are chosen randomly each step. The rest are taken from the generator's parameters
         
+        use_bank = true; % use a filter bank (needs to be loaded manually!) to find an initial position (otherwise chose random starting point)
+        
+        use_priors = false; % a general switch to turn on/off the use of prior functions        
         prior_functions = {}; % can input a cell array with a different function per parameter (leave empty for uniform prior). min/max values are taken from generator
+        
+        plot_every = 1; % when plotting, how many steps go by between plots (set to 0 for no plotting)
+        
+        show_chain_pars = {'r', 'b', 'b'}; % which parameters are shown, by default, when plotting the chain
+        show_posterior_pars = {'r', 'v'}; % which parameters are shown, by default, when plotting posteriors
         
         debug_bit = 1;
         
@@ -59,7 +66,9 @@ classdef MCMC < handle
     
     properties(Hidden=true)
 
-        version = 1.02;
+        brake_bit = 1; % set to 0 when running, set to 1 to stop run
+        
+        version = 1.03;
         
     end
     
@@ -75,9 +84,10 @@ classdef MCMC < handle
             
                 obj.gen = occult.CurveGenerator;
                 obj.init_point = occult.Parameters; 
-                obj.true_point = occult.Parameters; 
+                
+%                 obj.true_point = occult.Parameters; 
                 obj.best_point = occult.Parameters; 
-                obj.pick_point = occult.Parameters; 
+
                 
                 obj.prog = util.sys.ProgressBar;
                 
@@ -95,7 +105,7 @@ classdef MCMC < handle
             
             obj.init_point = occult.Parameters;
             obj.best_point = occult.Parameters;
-            obj.pick_point = occult.Parameters;
+%             obj.pick_point = occult.Parameters;
             
             obj.counter = 0; 
             obj.num_successes = 0;
@@ -107,9 +117,30 @@ classdef MCMC < handle
     
     methods % getters
         
+        function val = getSummary(obj)
+            
+            val = ''; % to be continued
+            
+        end
+        
+        function val = getProgress(obj)
+            
+            val = sprintf('chain: %d / %d points | %s', obj.counter, obj.num_steps, obj.prog.show); 
+            
+        end
+        
     end
     
     methods % setters
+        
+        function set.input_flux(obj, val)
+            
+            if ~isequal(obj.input_flux, val)
+                obj.input_flux = val;
+                obj.true_point = occult.Parameters.empty; 
+            end
+            
+        end
         
     end
     
@@ -148,7 +179,26 @@ classdef MCMC < handle
             obj.gen.getLightCurves;
             obj.input_flux = obj.gen.lc.flux;
             
+            obj.true_point = occult.Parameters;
             obj.true_point.copy_from(obj.gen.lc.pars); 
+            
+            if ~isempty(obj.gui) && obj.gui.check
+                obj.gui.updateLightcurves; 
+            end
+            
+        end
+        
+        function useSimulatedNoisyInput(obj, varargin)
+            
+            obj.gen.getLightCurves;
+            obj.input_flux = obj.gen.lc.flux_noisy;
+            
+            obj.true_point = occult.Parameters;
+            obj.true_point.copy_from(obj.gen.lc.pars); 
+            
+            if ~isempty(obj.gui) && obj.gui.check
+                obj.gui.updateLightcurves; 
+            end
             
         end
         
@@ -160,12 +210,19 @@ classdef MCMC < handle
             
             obj.points(obj.num_steps,1) = occult.Parameters; 
             
+            if ~isempty(obj.gui) && obj.gui.check
+                cla(obj.gui.axes_chain);
+                cla(obj.gui.axes_lightcurve);
+            end
+            
         end
         
         function finishup(obj)
             
             obj.points = obj.points(1:obj.counter); 
             obj.prog.finish;
+            
+            obj.brake_bit = 1; 
             
         end
         
@@ -289,25 +346,35 @@ classdef MCMC < handle
             if input.plot
                 
                 if isempty(input.ax)
-                    input.ax = gca;
+                    if ~isempty(obj.gui) && obj.gui.check
+                        input.ax = obj.gui.axes_chain; 
+                    else
+                        input.ax = gca;
+                    end
                 end
                 
             end
             
             obj.prog.start(obj.num_steps);
 
-            if isempty(obj.bank)
-                obj.gotoRandomInitialPoint;
-            else
+            if obj.use_bank && ~isempty(obj.bank)
                 obj.gotoBestTemplateInitialPoint; 
+            else
+                obj.gotoRandomInitialPoint;
             end
             
             obj.calcLikelihood; % get the first point likelihood/chi2
 
             obj.points(1).copy_from(obj.gen.lc.pars); % automatically accept first point... 
             
+            obj.brake_bit = 0;
+            
+            obj.counter = 1; 
+            
             for jj = 2:obj.num_steps
 
+                if obj.brake_bit, break; end
+                
                 obj.prog.showif(jj);
 
                 obj.takeStep; % move the generator to a nearby random point
@@ -339,9 +406,20 @@ classdef MCMC < handle
                 
                 obj.counter = obj.counter + 1;
                 
-                if input.plot
-                    obj.plot; 
+                if input.plot && obj.plot_every>0 && (obj.plot_every==1 || mod(obj.counter, obj.plot_every)==1)
+                    
+                    obj.plot('burn', 1, 'ax', input.ax); 
+                    
+                    if ~isempty(obj.gui) && obj.gui.check
+                        obj.gui.updateLightcurves; 
+                    end
+                    
                     drawnow;
+                    
+                end
+                                
+                if ~isempty(obj.gui) && obj.gui.check
+                    obj.gui.update;
                 end
                 
             end
@@ -355,15 +433,21 @@ classdef MCMC < handle
         function plot(obj, varargin)
             
             input = util.text.InputVars;
-            input.input_var('pars', []); 
+            input.input_var('pars', obj.show_chain_pars); 
             input.input_var('burn', false); 
             input.input_var('ax', [], 'axes', 'axis');
             input.input_var('font_size', 18); 
-            input.input_var('hold', false);             
+            input.input_var('hold', false); 
             input.scan_vars(varargin{:});
             
             if isempty(input.ax)
-                input.ax = gca;
+                
+                if ~isempty(obj.gui) && obj.gui.check
+                    input.ax = obj.gui.axes_chain; 
+                else
+                    input.ax = gca;
+                end
+                
             end
             
             hold_state = input.ax.NextPlot; 
@@ -373,15 +457,28 @@ classdef MCMC < handle
             end
             
             if isempty(input.pars)
-                input.pars = obj.par_list(1:min(3,length(obj.par_list)));
+                input.pars = obj.par_list(1:min(3,length(obj.par_list))); % just show the first 3 pars
             end
             
             if ischar(input.pars)
                 input.pars = {input.pars};
             end
             
-            p1 = [obj.points.(input.pars{1})];
-            s = [obj.points.counts];
+            lkl = [obj.points.likelihood]';
+            
+            p1 = [obj.points.(input.pars{1})]';
+            p1 = p1(1:size(lkl,1),:); 
+            
+            sz = ones(size(lkl)); 
+            
+            N = min(obj.counter, obj.num_burned); 
+            if input.burn
+                sz(1:N) = 5;
+            else
+                sz(1:N) = NaN;
+            end
+            
+            sz(N+1:end) = 20; 
             
             if length(input.pars)==1 % just show the distribution of this one parameter I guess... 
                 
@@ -389,13 +486,15 @@ classdef MCMC < handle
                 
             elseif length(input.pars)==2
                 
+                error('need to fix this option to be more like 3 pars...'); 
+                
                 p2 = [obj.points.(input.pars{2})];
                                 
-                scatter(input.ax, p1(obj.num_burned:end), p2(obj.num_burned:end), 20, s(obj.num_burned:end), 'o', 'filled');
+                scatter(input.ax, p1(obj.num_burned:end), p2(obj.num_burned:end), 20, counts(obj.num_burned:end), 'o', 'filled');
                 
                 if input.burn
                     hold(input.ax, 'on'); 
-                    scatter(input.ax, p1(1:obj.num_burned), p2(1:obj.num_burned), 10, s(1:obj.num_burned), 'o');
+                    scatter(input.ax, p1(1:obj.num_burned), p2(1:obj.num_burned), 10, counts(1:obj.num_burned), 'o');
                 end
 
                 % the X limits and labels are added in the end
@@ -407,16 +506,24 @@ classdef MCMC < handle
                 
             elseif length(input.pars)==3
                 
-                p2 = [obj.points.(input.pars{2})];
-                p3 = [obj.points.(input.pars{3})];
-
-                h = scatter3(input.ax, p1(obj.num_burned:end), p2(obj.num_burned:end), p3(obj.num_burned:end), 20, s(obj.num_burned:end), 'o', 'filled');
+                p2 = [obj.points.(input.pars{2})]';
+                p2 = p2(1:size(lkl,1),:); 
                 
-                if input.burn
-                    hold(input.ax, 'on'); 
-                    h_burn = scatter3(input.ax, p1(1:obj.num_burned), p2(1:obj.num_burned), p3(1:obj.num_burned), 10, s(1:obj.num_burned), 'o');
+                p3 = [obj.points.(input.pars{3})]';
+                p3 = p3(1:size(lkl,1),:); 
+                
+                h = findobj(input.ax, 'Type', 'Scatter'); 
+                
+                if isempty(h) || ~isvalid(h)
+                    h = scatter3(input.ax, p1, p2, p3, sz, lkl, 'o', 'filled');
+                else
+                    h.XData = p1; 
+                    h.YData = p2;
+                    h.ZData = p3;
+                    h.SizeData = sz;
+                    h.CData = lkl;
                 end
-                
+
                 % the X limits and labels are added in the end
                 ylabel(input.ax, input.pars{2});
                 input.ax.YLim = obj.gen.([input.pars{2} '_range']);
@@ -424,8 +531,9 @@ classdef MCMC < handle
                 zlabel(input.ax, input.pars{3});
                 input.ax.ZLim = obj.gen.([input.pars{3} '_range']);
                 
+                input.ax.CLim = [0 1]; 
                 hcb = colorbar(input.ax); 
-                ylabel(hcb, 'number of repeats'); 
+                ylabel(hcb, 'likelihood'); 
                 
             end
         
@@ -436,7 +544,9 @@ classdef MCMC < handle
             
             input.ax.NextPlot = hold_state;
             
-            h.ButtonDownFcn = @obj.callback_click_point; 
+            if ~isempty(h)
+                h.ButtonDownFcn = @obj.callback_click_point; 
+            end
             
         end
         
@@ -454,9 +564,140 @@ classdef MCMC < handle
             
             obj.calcLikelihood; 
             
-            obj.pick_point.copy_from(obj.gen.lc.pars); 
+            if obj.debug_bit, fprintf('lkl= %4.2f\n', obj.gen.lc.pars.likelihood); end
             
-            if obj.debug_bit, fprintf('lkl= %4.2f\n', obj.pick_point.likelihood); end
+            if ~isempty(obj.gui) && obj.gui.check
+                obj.gen.lc.plot('ax', obj.gui.axes_lightcurve); 
+            end
+            
+            if ~isempty(obj.gui) && obj.gui.check
+                obj.gui.updateLightcurves; 
+                obj.gui.update;
+            end
+            
+        end
+        
+        function showPosterior(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('pars', obj.show_posterior_pars); 
+            input.input_var('burn', false); 
+            input.input_var('ax', [], 'axes', 'axis');
+            input.input_var('font_size', 18); 
+            input.input_var('hold', false); 
+            input.scan_vars(varargin{:});
+            
+            if isempty(input.ax)
+                
+                if ~isempty(obj.gui) && obj.gui.check
+                    input.ax = obj.gui.axes_posterior; 
+                else
+                    input.ax = gca;
+                end
+                
+            end
+            
+            if isempty(input.pars)
+                error('Must specify which parameters to show!'); 
+            elseif isscalar(input.pars)
+                histogram(input.ax, [obj.points(1:obj.num_burned).(input.pars{1})]); 
+            elseif length(input.pars)==2
+                x = [obj.points(obj.num_burned+1:end).(input.pars{1})];
+                y = [obj.points(obj.num_burned+1:end).(input.pars{2})];
+                
+                idx_x = find(strcmp(input.pars{1}, obj.par_list), 1, 'first');
+                dx = obj.step_sizes(idx_x); 
+                
+                idx_y = find(strcmp(input.pars{2}, obj.par_list), 1, 'first');
+                dy = obj.step_sizes(idx_y); 
+                
+                [N, Ex, Ey] = histcounts2(x, y, 'BinWidth', [dx, dy], 'Normalization','probability');
+                N = N';
+                x = repmat(Ex(1:end-1)+dx/2, [size(N,1),1]);                 
+                y = repmat(Ey(1:end-1)'+dy/2, [1, size(N,2)]); 
+                
+                [M,c] = contour(input.ax, x, y, N, '-k'); 
+                
+            else % more than 2 pars
+                error('Must specify one or two parameters!'); 
+            end
+            
+            xlabel(input.ax, input.pars{1}); 
+            ylabel(input.ax, input.pars{2}); 
+
+            input.ax.FontSize = input.font_size; 
+
+            if ~isempty(obj.true_point)
+                
+                hold(input.ax, 'on'); 
+                
+                plot(input.ax, obj.true_point.(input.pars{1}), obj.true_point.(input.pars{2}), '+r', 'MarkerSize', 20); 
+                plot(input.ax, obj.true_point.(input.pars{1}), obj.true_point.(input.pars{2}), 'or', 'MarkerSize', 20); 
+                
+                hold(input.ax, 'off'); 
+                
+            end
+            
+        end
+        
+        function plotLightcurves(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('ax', [], 'axes', 'axis');
+            input.input_var('font_size', 16); 
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.ax)
+                
+                if ~isempty(obj.gui) && obj.gui.check
+                    input.ax = obj.gui.axes_lightcurve; 
+                else
+                    input.ax = gca;
+                end
+                
+            end
+            
+            obj.gen.getLightCurves;
+            t = obj.gen.lc.time;
+            f = obj.gen.lc.flux; 
+            
+            h = findobj(input.ax, 'Type', 'Line');
+            
+            if isempty(h) || ~isvalid(h(1))
+                delete(input.ax.Children); 
+                plot(input.ax, t, obj.input_flux, 'dk', 'LineWidth', 3, 'DisplayName', 'Input flux'); 
+                
+                obj.gen.lc.plot('ax', input.ax, 'hold', true, 'legend', true, 'noise', false, 'FontSize', input.font_size);
+                
+            else
+                h = h(1); % recover only the first plot (which is the model fit)
+                h.XData = t; 
+                h.YData = f; 
+            end
+            
+            delete(findobj(input.ax, 'Type', 'Text')); 
+            
+            title(input.ax, ''); 
+            input.ax.YLim = [0 1.2]; 
+            
+            chi2 = obj.gen.lc.pars.chi2;
+            dof = nnz(~isnan(obj.gen.lc.flux))-length(obj.par_list);
+            
+            text(input.ax, t(10), 0.6, sprintf('chi2 / dof = %4.2f / %d = %4.2f', ...
+                chi2, dof, chi2/dof), 'FontSize', input.font_size); 
+            
+            text(input.ax, t(10), 0.4, sprintf('likelihood= %g', ...
+                obj.gen.lc.pars.likelihood), 'FontSize', input.font_size); 
+            
+        end
+        
+        function makeGUI(obj)
+            
+            if isempty(obj.gui)
+                obj.gui = occult.gui.MCMC_GUI(obj); 
+            end
+            
+            obj.gui.make;
             
         end
         
