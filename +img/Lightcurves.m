@@ -97,6 +97,7 @@ classdef Lightcurves < handle
         fwhm_y_center; % must subtract this from the y positions when using the polynomial coeffs
         
         magnitudes; % keep a copy of the star magnitudes for doing statistics
+        colors; % the Bp-Rp color of each star
         
         zp_fit_results; % the fit results for the spatial fit to the zero point
         mean_zp; % the average ZP for each frame
@@ -123,6 +124,7 @@ classdef Lightcurves < handle
         
         % processing steps for fluxes_cal:
         use_airmass_correction = 1;
+        use_color_correction  = 1; 
         use_psf_correction = 0;
         use_zero_point = 1;
         zero_point_spatial_order = 2; % fit a polynomial to the ZP
@@ -1034,6 +1036,17 @@ classdef Lightcurves < handle
     
     methods % setters
         
+        function set.cat(obj, val)
+            
+            obj.cat = val;
+            
+            if ~isempty(obj.cat.data)
+                obj.magnitudes = obj.cat.magnitudes; 
+                obj.colors = obj.cat.data.Mag_BP - obj.cat.data.Mag_RP; 
+            end
+            
+        end
+        
         function set.frame_index(obj, val)
             
             if ~isequal(val, obj.frame_index)
@@ -1188,6 +1201,17 @@ classdef Lightcurves < handle
             
             if ~isequal(obj.use_airmass_correction, val)
                 obj.use_airmass_correction = val;
+                obj.fluxes_cal_ = [];
+                obj.clearPSD;
+                obj.clearRE;
+            end
+            
+        end
+        
+        function set.use_color_correction(obj, val)
+            
+            if ~isequal(obj.use_color_correction, val)
+                obj.use_color_correction = val;
                 obj.fluxes_cal_ = [];
                 obj.clearPSD;
                 obj.clearRE;
@@ -1679,7 +1703,11 @@ classdef Lightcurves < handle
                 
                 [L, b] = util.units.flux2lup(flux); % this also finds a reasonable estimate for the softening parameter b
                 
-                fr = util.fit.polyfit(obj.airmass_vector, L, 'order', 2, 'double', 1, 'sigma', 3); 
+%                 if obj.use_color_correction
+                    
+%                 else
+                    fr = util.fit.polyfit(obj.airmass_vector, L, 'order', 2, 'double', 1, 'sigma', 3); 
+%                 end
                 
                 model = [fr.ym]; 
                 
