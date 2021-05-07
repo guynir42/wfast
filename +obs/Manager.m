@@ -755,8 +755,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             obj.stop_t1; 
             obj.stop_t0;
             
-            stop(obj.mount.timer);
-            stop(obj.dome.timer); 
+            if ~isempty(obj.mount.timer)
+                stop(obj.mount.timer);
+            end
+            
+            if ~isempty(obj.dome.timer)
+                stop(obj.dome.timer); 
+            end
             
         end
         
@@ -1845,13 +1850,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     warning(ME.getReport);
                     obj.dome.status = 0;
                     obj.devices_report = 'Dome error!';
-                    obj.log.error(sprintf('Dome error!\n %s', ME.getReport('extended', 'hyperlinks', 'off')));
+                    obj.log.error(util.text.date_printf('Dome error!\n %s', ME.getReport('extended', 'hyperlinks', 'off')));
                 end
                 
                 if obj.dome.status==0
                     obj.devices_ok = 0;
                     obj.devices_report = 'Dome error!';
-                    obj.log.error('Dome error'); 
+                    obj.log.error(util.text.date_printf('Dome error')); 
                     return;
                 end
                 
@@ -1865,19 +1870,38 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                     warning(ME.getReport); 
                     obj.mount.status = 0; 
                     obj.devices_report = 'Mount error!';
-                    obj.log.error(sprintf('Mount error!\n %s', ME.getReport('extended', 'hyperlinks', 'off')));                    
+                    obj.log.error(util.text.date_printf('Mount error!\n %s', ME.getReport('extended', 'hyperlinks', 'off')));                    
                 end
                 
                 if obj.mount.status==0
                     obj.devices_ok = 0;
                     obj.devices_report = 'Mount error!';
-                    obj.log.error('Mount error!'); 
+                    obj.log.error(util.text.date_printf('Mount error!')); 
                     return;
                 end
                 
             end
             
             % add maybe checks for boltwood if we think it is critical?
+            if obj.use_weather
+                
+                try 
+                    obj.weather.update;
+                catch ME
+                    warning(ME.getReport); 
+                    obj.weather.status = 0; 
+                    obj.devices_report = 'Boltwood error!';
+                    obj.log.error(util.text.date_printf('Boltwood error!\n %s', ME.getReport('extended', 'hyperlinks', 'off')));                    
+                end
+                
+                if obj.dome.status==0
+                    obj.devices_ok = 0;
+                    obj.devices_report = 'Boltwood error!';
+                    obj.log.error(util.text.date_printf('Boltwood error!')); 
+                    return;
+                end
+                
+            end
             
         end
         

@@ -93,6 +93,8 @@ classdef Boltwood < handle
         
         function connect(obj) % Open Boltwood weather application. Also open connection to application if not already opened.
             
+            [ret, str] = system('taskkill /fi "imagename eq Clarity.exe" /f'); % force killing of the server.
+
             obj.hndl = actxserver('ClarityII.CloudSensorII');
             
             obj.update;
@@ -101,6 +103,8 @@ classdef Boltwood < handle
 
         function disconnect(obj)
             
+            [ret, str] = system('taskkill /fi "imagename eq ClarityII.exe" /f'); % force killing of the server.
+
             delete(obj.hndl);
             obj.hndl = [];
             
