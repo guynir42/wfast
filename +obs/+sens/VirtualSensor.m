@@ -98,7 +98,11 @@ classdef VirtualSensor < dynamicprops
             
             obj.status = 0;
             
+            try
             obj.data_struct = subsref(obj.owner.wise_data_struct, obj.subsref_struct);
+            catch ME
+                % pass
+            end
             
             if ~isempty(obj.data_struct)
                                 

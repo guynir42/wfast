@@ -560,26 +560,35 @@ classdef (CaseInsensitiveProperties) Target < handle
             end
             
             if isempty(obj.list_table)
-            % first get the most up-to-date target list into a table            
-            d = util.sys.WorkingDirectory(fullfile(getenv('DATA'), 'WFAST/target_lists/')); 
-            files = d.match([obj.list_filename '*']); % all files matching the filename + additional info like creation date
-            files = sort(files); % get the latest file last
-            
-            if isempty(files)
-                error('Could not find any files matching "%s". ', obj.list_filename); 
-            end
-            
-            obj.list_table = readtable(files{end}); 
-            obj.list_filename_loaded = files{end}; % keep track of the full name of the file we just loaded
-            
+                % first get the most up-to-date target list into a table            
+                d = util.sys.WorkingDirectory(fullfile(getenv('DATA'), 'WFAST/target_lists/')); 
+                files = d.match([obj.list_filename '*']); % all files matching the filename + additional info like creation date
+                files = sort(files); % get the latest file last
+
+                if isempty(files)
+                    error('Could not find any files matching "%s". ', obj.list_filename); 
+                end
+
+                obj.list_table = readtable(files{end}); 
+                obj.list_filename_loaded = files{end}; % keep track of the full name of the file we just loaded
+
             end
             
             T = obj.list_table; % shorthand
             
             time = datetime(T.LastObserved, 'TimeZone', 'UTC', 'Format', 'uuuu-MM-dd HH:mm:ss.sss'); % convert the text into datetime objects
-
+            
             T.LastObserved = time; 
 
+            for ii = 1:length(T.Properties.VariableNames)
+                
+                name = T.Properties.VariableNames{ii};
+                if iscell(T.(name))
+                    T.(name) = cellfun(@str2num, T.(name));
+                end
+                
+            end
+            
             %%%%%% choose the best target from this list %%%%%%
             
             % find the column names for sorting
