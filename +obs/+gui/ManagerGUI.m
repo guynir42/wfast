@@ -121,10 +121,12 @@ classdef ManagerGUI < handle
             obj.panel_devices.number = N;
             obj.panel_devices.addButton('button_dome', 'dome', 'push', 'dome', '', '', 1/3, '', '', 'dome status (click for dome GUI)');
             obj.panel_devices.addButton('button_mount', 'mount', 'push', 'mount', '', '', 1/3, '', '', 'mount status (click for mount GUI)');
-            obj.panel_devices.addButton('button_weather', 'weather.connect', 'push', 'BoltWood', '', '', 1/3, '', '', 'Boltwood weather stations status');
+            obj.panel_devices.addButton('button_weather', '', 'custom', 'BoltWood', '', '', 1/3, '', '', 'Boltwood weather stations status');
             obj.panel_devices.addButton('button_wind', 'wind', 'push', 'WindETH', '', '', 1/3, '', '', 'WindETH sensor status');
             obj.panel_devices.margin = [0.01 0.005];
             obj.panel_devices.make;
+            
+            obj.panel_devices.button_weather.Callback = @obj.callback_weather; 
             
             %%%%%%%%%%% panel telescope %%%%%%%%%%%%%%%
             
@@ -560,6 +562,21 @@ classdef ManagerGUI < handle
     end
                 
     methods % callbacks
+        
+        function callback_weather(obj, ~, ~)
+            
+            if obj.debug_bit>1, disp('Callback: weather station'); end
+            
+            obj.owner.weather.update;
+            pause(1); 
+            
+            if obj.owner.weather.status==0
+                obj.owner.weather.connect; 
+            end
+            
+            obj.update; 
+            
+        end
         
         function callback_twilight_mode(obj, ~, ~)
             
