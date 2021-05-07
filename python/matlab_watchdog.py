@@ -16,6 +16,20 @@ from datetime import datetime, timedelta
 import math
 import time
 
+def kill_autoslew():
+    list = [p for p in psutil.process_iter()]
+    
+    if "AstroOptikServer.exe" in (p.name() for p in list): # check if AstroOptikServe is in the list of running processes        
+        process = next((p for p in list if p.name()=='AstroOptikServer.exe'), None)
+        process.terminate()
+
+def kill_clarity():
+    list = [p for p in psutil.process_iter()]
+    
+    if "Clarity.exe" in (p.name() for p in list): # check if AstroOptikServe is in the list of running processes        
+        process = next((p for p in list if p.name()=='Clarity.exe'), None)
+        process.terminate()
+
 pid = None
 process = None
 
@@ -27,6 +41,8 @@ if "MATLAB.exe" in (p.name() for p in list): # check if matlab is in the list of
     pid = process.pid
 else:
     print('MATLAB is not working! Starting a new instance... ')
+    kill_autoslew()
+    kill_clarity()
     subprocess.Popen('matlab -useStartupFolderPref') # the optional argument tells matlab to start at the preferred startup folder defined in the preferences menu
     
 
@@ -75,9 +91,15 @@ if pid is not None:
                 
                 # start a new MATLAB instance... 
                 print('Starting up a new instance of MATLAB.')
+                kill_autoslew()
+                kill_clarity()
                 subprocess.Popen('matlab -useStartupFolderPref') # the optional argument tells matlab to start at the preferred startup folder defined in the preferences menu
     
                 
             else: 
                 print(f'MATLAB has updated "{os.environ["LOGFILE"]}" logfile {math.floor(dt/60)} minutes ago...')
         
+time.sleep(1)
+
+
+
