@@ -141,7 +141,7 @@ classdef Acquisition < file.AstroData
         use_print_timing = 0; % print a line each batch with the timing data for each part of the processing chain
         
         debug_bit = 1;
-        log_level = 5;
+        log_level = 1;
         
     end
     
@@ -3656,7 +3656,7 @@ classdef Acquisition < file.AstroData
                     cx = squeeze(util.stat.sum2(X.*abs(C2))./util.stat.sum2(abs(C2))); 
                     cy = squeeze(util.stat.sum2(Y.*abs(C2))./util.stat.sum2(abs(C2))); 
                     
-                    if N>=2 % at least 3 points above 5 sigma...
+                    if N>=2 % at least 2 points above 5 sigma...
                         
 %                         st = struct('filename', obj.buf.filename, 'batch_index', obj.batch_counter+1, 'frame_index', idx, ...
 %                             'peak', mx, 'mean', M, 'std', S, 'num_frames', N, 'flux', f, 'cx', cx, 'cy', cy, ...
