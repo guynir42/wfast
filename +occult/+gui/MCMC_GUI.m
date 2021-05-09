@@ -29,18 +29,17 @@ classdef MCMC_GUI < handle
         menu_options;
         
         panel_controls;
+        panel_simulations;
         panel_display; 
         
         panel_progress;
         
         panel_chain;
-        axes_chain;
+        axes_chain;        
+        axes_posterior;
         
         panel_lightcurve; 
         axes_lightcurve;
-        
-        panel_posterior;
-        axes_posterior;
         
         panel_close;
         button_close;
@@ -113,7 +112,7 @@ classdef MCMC_GUI < handle
             
             %%%%%%%%%%%%%%%%%%% LEFT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
-            N = 10; % number of buttons on left side
+            N = 12; % number of buttons on left side
             
             pos = N;
             
@@ -121,28 +120,41 @@ classdef MCMC_GUI < handle
             
             % Add buttons using obj.addButton(button_name, var_name='', type='', str1='', str2='', font_size='', split=1, color_on=[], color_off=[], tooltip)
             
-            num_buttons = 5;
+            num_buttons = 7;
             pos = pos-num_buttons;
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N 0.2 num_buttons/N], 'controls');
             obj.panel_controls.addButton('button_run', 'run', 'custom', 'RUN', '', '', [], '', '', 'start a new MCMC run'); 
+            obj.panel_controls.addButton('button_num_chains', 'num_chains', 'input', '', '', '', [], '', '', 'number of chains to run in parallel'); 
             obj.panel_controls.addButton('button_num_steps', 'num_steps', 'input', '', '', '', [], '', '', 'number of steps in the chain'); 
             obj.panel_controls.addButton('button_num_burn', 'num_burned', 'input', '', '', '', [], '', '', 'number of steps to burn in the beginning of the chain');
             obj.panel_controls.addButton('button_step_sizes', 'step_sizes', 'input', '', '', '', [], '', '', 'the step size for each parameter'); 
             obj.panel_controls.addButton('button_circ_bounds', 'circ_bounds', 'input', '', '', '', [], '', '', 'determine which parameter gets a circular boundary condition'); 
             obj.panel_controls.addButton('button_priors', 'use_bank', 'toggle', 'random start', 'using bank', '', 0.5, obj.color_on, '', 'use a random starting position or a template bank best kernel'); 
             obj.panel_controls.addButton('button_priors', 'use_priors', 'toggle', 'ignoring priors', 'using priors', '', 0.5, obj.color_on, '', 'apply the prior functions on some of the parameters'); 
-            obj.panel_controls.addButton('button_gen', 'gen', 'push', 'Generator GUI', '', '', [], '', '', 'show the generator GUI'); 
             obj.panel_controls.number = num_buttons;
             
             obj.panel_controls.make;
             obj.panel_controls.button_run.Callback = @obj.callback_run; 
             
+            %%%%%%%%%%% panel simulations %%%%%%%%%%%%%%%%%%
+            
+            num_buttons = 2;
+            pos = pos-num_buttons;
+            obj.panel_simulations = GraphicPanel(obj.owner, [0 pos/N 0.2 num_buttons/N], 'controls');
+            obj.panel_simulations.addButton('button_gen', 'gen', 'push', 'Generator GUI', '', '', 0.8, '', '', 'show the generator GUI'); 
+            obj.panel_simulations.addButton('button_use_lc', 'useSimulatedNoisyInput', 'push', 'input', '', '', 0.2, '', '', 'use the current generator LC as input'); 
+            obj.panel_simulations.addButton('button_random', '', 'custom', 'random seed', '', '', [], '', '', 'pick random pars for generator'); 
+            obj.panel_simulations.make;
+            
+            obj.panel_simulations.button_random.Callback = @obj.callback_random; 
+            
             %%%%%%%%%%% panel display %%%%%%%%%%%%%%%%%%
             
-            num_buttons = 5; 
+            num_buttons = 2; 
             pos = pos - num_buttons;
             obj.panel_display = GraphicPanel(obj.owner, [0 pos/N 0.2 num_buttons/N], 'display'); 
             obj.panel_display.addButton('button_every', 'plot_every', 'input', 'plot every= ', '', '', [], '', '', 'update the plot every N steps'); 
+            obj.panel_display.addButton('button_chains', 'show_num_chains', 'input', 'show= ', ' chains', '', [], '', '', 'how many (max) number of chains to display'); 
             
             obj.panel_display.number = num_buttons;
             obj.panel_display.make;
@@ -160,19 +172,14 @@ classdef MCMC_GUI < handle
             
             obj.axes_chain = axes('Parent', obj.panel_chain.panel, 'Position', [0.15 0.3 0.7 0.7]); 
             
+            obj.axes_posterior = axes('Parent', obj.panel_chain.panel, 'Position', [0.8 0.1 0.18 0.4]); 
+            
             %%%%%%%%%%% panel lightcurve %%%%%%%%%%%%%%%%%%
             
-            obj.panel_lightcurve = GraphicPanel(obj.owner, [0.2 0 0.6 4/N], 'lightcurve'); 
+            obj.panel_lightcurve = GraphicPanel(obj.owner, [0.2 0 0.8 3/N], 'lightcurve'); 
             obj.panel_lightcurve.make; 
             
             obj.axes_lightcurve = axes('Parent', obj.panel_lightcurve.panel); 
-            
-            %%%%%%%%%%% panel lightcurve %%%%%%%%%%%%%%%%%%
-            
-            obj.panel_posterior = GraphicPanel(obj.owner, [0.8 0 0.2 4/N], 'posterior'); 
-            obj.panel_posterior.make; 
-            
-            obj.axes_posterior = axes('Parent', obj.panel_posterior.panel); 
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
             
@@ -236,6 +243,16 @@ classdef MCMC_GUI < handle
             
         end
         
+        function callback_random(obj, ~, ~)
+            
+            if obj.debug_bit>1, disp('callback: random'); end
+            
+            obj.owner.getRandomLightcurve; 
+            obj.owner.useSimulatedNoisyInput;             
+            obj.updateLightcurves; 
+            
+        end
+        
         function callback_close(obj, ~, ~)
            
             if obj.debug_bit>1, disp('callback: close'); end
@@ -247,3 +264,11 @@ classdef MCMC_GUI < handle
     end
     
 end
+
+
+
+
+
+
+
+

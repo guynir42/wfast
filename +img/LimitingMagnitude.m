@@ -66,6 +66,9 @@ classdef LimitingMagnitude < handle
         max_mag = 18; % do not use stars fainter than this for any calculations (they are likely bad matches)
         use_find_twice = false; % run quick_find_stars again after adjusting the PSF sigma from the calculated width
         
+        use_col_median = false; % calculate the median of each column and subtract it before calculating the limmag
+        use_row_median = false; % calculate the median of each column and subtract it before calculating the limmag
+        
         camera = 'Balor'; % can choose Zyla if you really wanted to... 
         
         debug_bit = 1;
@@ -278,6 +281,8 @@ classdef LimitingMagnitude < handle
             
             obj.loadImages; 
             
+            obj.cleanupImages; 
+            
             obj.findStars;
             
             obj.runAstrometry;
@@ -359,6 +364,26 @@ classdef LimitingMagnitude < handle
             end
             
             if obj.debug_bit, fprintf('Loaded %d images\n', obj.num_sum); end
+            
+        end
+        
+        function cleanupImages(obj)
+            
+            if obj.use_col_median
+                
+                m = nanmedian(obj.I_final, 1); 
+                
+                obj.I_final = obj.I_final - m; 
+                
+            end
+            
+            if obj.use_row_median
+                
+                m = nanmedian(obj.I_final, 2); 
+                
+                obj.I_final = obj.I_final - m; 
+                
+            end
             
         end
         

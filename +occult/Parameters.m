@@ -53,9 +53,10 @@ classdef Parameters < handle
         is_updated = 0;
         is_noise_updated = 0;
         
-        chi2; % the results of fitting to this model 
-        likelihood; % the results of fitting to this model (translated to probability)
+        chi2 = NaN; % the results of fitting to this model 
+        likelihood = 0; % the results of fitting to this model (translated to probability)
         counts = 1; 
+        weight = 1; % this can be set to zero for repeated points... 
         
     end
     
@@ -114,7 +115,7 @@ classdef Parameters < handle
         default_snr;
         default_Niter;
         
-        version = 1.03;
+        version = 1.04;
         
     end
     
@@ -286,15 +287,23 @@ classdef Parameters < handle
         
         function val = printout(obj)
             
-            if obj.r2 && obj.d
-                val = sprintf('R=%4.2f | r= %4.2f | r2 = %4.2f | d= %4.2f | th= %4.2f', obj.R, obj.r, obj.r2, obj.d, obj.th); 
-            else
-                val = sprintf('R=%4.2f | r= %4.2f', obj.R, obj.r); 
+            N = length(obj.r);
+            
+            for ii = 1:N
+            
+                if any([obj.r2]>0) && any([obj.d]>0)
+                    val{ii} = sprintf('R=%4.2f | r= %4.2f | r2 = %4.2f | d= %4.2f | th= %4.2f', obj.R(ii), obj.r(ii), obj.r2(ii), obj.d(ii), obj.th(ii)); 
+                else
+                    val{ii} = sprintf('R=%4.2f | r= %4.2f', obj.R(ii), obj.r(ii)); 
+                end
+
+                val{ii} = sprintf('%s | b= %4.2f | v= %4.2f | t= %4.2f', val{ii}, obj.b(ii), obj.v(ii), obj.t(ii)); 
+
+                val{ii} = sprintf('%s | lkl= %g', val{ii}, obj.likelihood(ii)); 
+
             end
             
-            val = sprintf('%s | b= %4.2f | v= %4.2f | t= %4.2f', val, obj.b, obj.v, obj.t); 
-            
-            val = sprintf('%s | lkl= %g', val, obj.likelihood); 
+            val = val';
             
             if nargout==0
                 disp(val);
@@ -548,6 +557,8 @@ classdef Parameters < handle
         
         function copy_from(obj, other)
             
+            import util.text.print_vec; 
+            
             if isempty(other)
                 error('Got empty input!');
             end
@@ -556,23 +567,121 @@ classdef Parameters < handle
                 error('Must input an "occult.Parameters" object. Got "%s" instead...', class(other));
             end
             
-            obj.r = other.r;
-            obj.r2 = other.r2;
-            obj.d = other.d;
-            obj.th = other.th;
-            obj.R = other.R;
-            obj.b = other.b;
-            obj.v = other.v;
-            obj.t = other.t;
-            obj.T = other.T;
-            obj.f = other.f;
-            obj.W = other.W;
+            list = {'r', 'r2', 'd', 'th', 'R', 'b', 'v', 't', 'chi2', 'likelihood'}; 
             
-            obj.snr = other.snr;
-            obj.Niter = other.Niter;
+            if ~isscalar(obj) && ~isscalar(other) % both are non-scalar (should copy one value into one value)
+                
+                if length(obj)~=length(other)
+                    error('Size of "obj" (%d) and "other" (%d) must be the same!', length(obj), length(other)); 
+                end
+                
+                for ii = 1:length(obj)
+                    obj(ii).copy_from(other(ii)); % use scalar to scalar copy
+                end
+                
+            elseif ~isscalar(obj) && isscalar(other) && isscalar(other.r) % split the values to each "obj" member
+                
+                for ii = 1:length(obj)
+                    obj(ii).copy_from(other); % use scalar copy from the single "other" into each "obj" member 
+                end
+                
+            elseif ~isscalar(obj) && isscalar(other) && ~isscalar(other.r) % multiple values in a single "other" go one into each element of "obj"
             
-            obj.chi2 = other.chi2;
-            obj.likelihood = other.likelihood;
+                for ii = 1:length(obj) % copy from each element in "other" into different values in the single "obj"
+                
+                    for jj = 1:length(list)
+
+                        S1 = substruct('()', {ii}, '.', list{jj});
+                        S2 = substruct('.', list{jj}, '()', {ii});
+                        
+                        obj = subsasgn(obj, S1, subsref(other, S2)); 
+
+                    end
+                    
+                    % these must be all scalar
+                    obj(ii).T = other.T;
+                    obj(ii).f = other.f;
+                    obj(ii).W = other.W;
+
+                    obj(ii).snr = other.snr;
+                    obj(ii).Niter = other.Niter;
+
+                end
+                
+            elseif isscalar(obj) && ~isscalar(other) % split one value of a member of the vector "other" into a value of a single "obj"
+                
+                for ii = 1:length(other) % copy from each element in "other" into different values in the single "obj"
+                
+                    if length(other(ii).r)>1
+                        error('Cannot copy parameters of size %s from a vector of size %s', ...
+                            print_vec(size(other(ii).r)), print_vec(size(other))); 
+                    end
+                    
+                    for jj = 1:length(list)
+
+                        S1 = substruct('.', list{jj}, '()', {ii});
+                        S2 = substruct('()', {ii}, '.', list{jj});
+                        
+                        obj = subsasgn(obj, S1, subsref(other, S2)); 
+
+                    end
+                    
+                    % these must be all scalar
+                    % we'll assume they are all the same
+                    % if not, choose the last one... 
+                    obj.T = other(ii).T;
+                    obj.f = other(ii).f;
+                    obj.W = other(ii).W;
+
+                    obj.snr = other(ii).snr;
+                    obj.Niter = other(ii).Niter;
+
+                end
+                
+            elseif isscalar(obj) && isscalar(obj) % both are scalars, must match the number of values in each
+
+                if isscalar(obj.r) && ~isscalar(other.r)
+                    error('Cannot copy into scalar parameters of "obj" from "other" with pars of size %s', print_vec(size(other.r), 'x')); 
+                end
+                
+                if ~isequal(size(obj.r), size(other.r)) && ~isscalar(other.r) % "other" can contain scalar parameters, so they're copied to each parameter in "obj"
+                    error('Size mismatch for "obj" parameters (%s) and "other" parameters (%s)', ...
+                        util.text.print_vec(size(obj.r), 'x'), util.text.print_vec(size(other.r), 'x')); 
+                end
+
+                for ii = 1:length(obj.r)
+
+                    for jj = 1:length(list)
+
+                        if isscalar(obj.r)
+                            S1 = substruct('.', list{jj}, '()', {1});
+                        else
+                            S1 = substruct('.', list{jj}, '()', {ii});
+                        end
+
+                        if isscalar(other.r)
+                            S2 = substruct('.', list{jj}, '()', {1});
+                        else
+                            S2 = substruct('.', list{jj}, '()', {ii});
+                        end
+
+                        obj = subsasgn(obj, S1, subsref(other, S2)); 
+
+                    end
+
+                end
+                
+                % these must be all scalar
+                obj.T = other.T;
+                obj.f = other.f;
+                obj.W = other.W;
+
+                obj.snr = other.snr;
+                obj.Niter = other.Niter;
+               
+            else
+                error('This should not happen!')
+            end
             
         end
         
