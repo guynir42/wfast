@@ -152,6 +152,9 @@ classdef Parameters < handle
             obj.is_updated = 0;
             obj.is_noise_updated = 0;
             
+            obj.chi2 = NaN;
+            obj.likelihood = 0;
+            
         end
         
     end
