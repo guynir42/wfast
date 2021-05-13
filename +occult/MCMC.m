@@ -44,11 +44,11 @@ classdef MCMC < handle
         
         num_chains = 1; % can run multiple chains at the same time
         max_num_chains = 10; % using automated methods to choose starting points
-        num_steps = 1000; % total number of steps (including burn-in)
-        num_burned = 100; % number of steps to burn at the begining of each chain
+        num_steps = 10000; % total number of steps (including burn-in)
+        num_burned = 1000; % number of steps to burn at the begining of each chain
         
-        step_sizes = [0.1, 0.1, 1]; % in order of parameters: step size for each parameter
-        circ_bounds = [0 1 0]; % in order of parameters: which par gets a circular boundary condition
+        step_sizes = [0.25, 0.25, 3]; % in order of parameters: step size for each parameter
+        circ_bounds = [0 0 0]; % in order of parameters: which par gets a circular boundary condition
         
         par_list = {'r', 'b', 'v'}; % these parameters are chosen randomly each step. The rest are taken from the generator's parameters
         
@@ -266,7 +266,7 @@ classdef MCMC < handle
 %                 error('Must setup generator with all scalar parameters!');
 %             end
             
-            obj.points(obj.num_steps,obj.num_chains) = occult.Parameters; 
+%             obj.points(obj.num_steps,obj.num_chains) = occult.Parameters; 
             
             if ~isempty(obj.gui) && obj.gui.check
                 cla(obj.gui.axes_chain);
@@ -286,9 +286,16 @@ classdef MCMC < handle
             
             obj.brake_bit = 1; 
             
-            if ~isempty(obj.gui) && obj.gui.check && obj.counter>obj.num_burned
-                obj.showPosterior; 
+            if ~isempty(obj.gui) && obj.gui.check 
+                
+                obj.gui.update;
+                
+                if obj.counter>obj.num_burned
+                    obj.showPosterior; 
+                end
             end
+            
+            
             
         end
         
@@ -430,7 +437,7 @@ classdef MCMC < handle
             idx = L>2*base_likelihood;
             
             stats = regionprops3(idx);
-            
+                        
             points = occult.Parameters.empty;
             
             N = min(obj.max_num_chains, height(stats)); 
@@ -508,7 +515,19 @@ classdef MCMC < handle
             
             for ii = 1:length(chi2)
 
-                obj.gen.lc.pars.likelihood(ii) = chi2cdf(chi2(ii), nnz(~isnan(f1(:,ii)))-length(obj.par_list), 'upper'); % do we need to subtract these parameters from the dof??
+                L = chi2cdf(chi2(ii), nnz(~isnan(f1(:,ii)))-length(obj.par_list), 'upper'); % do we need to subtract these parameters from the dof??
+                
+                if obj.use_priors
+                    for jj = 1:length(obj.prior_functions)
+                        if ~isempty(obj.prior_functions{jj})
+                            values = obj.gen.(obj.par_list{jj});
+                            % multiply by the value of the function at the given point in parameter space
+                            L = L.*obj.prior_functions{jj}(values(ii)); 
+                        end
+                    end
+                end
+                
+                obj.gen.lc.pars.likelihood(ii) = L;
 
                 % likelihood is zero for parameters that are out of bounds
                 for jj = 1:length(obj.par_list)
@@ -538,7 +557,7 @@ classdef MCMC < handle
             import util.text.cs;
             
             input = util.text.InputVars;
-            input.input_var('plot', true);
+            input.input_var('plot', false);
             input.input_var('ax', [], 'axes', 'axis');
             input.scan_vars(varargin{:});
             
@@ -567,6 +586,9 @@ classdef MCMC < handle
 
             if cs(obj.initialization_method, 'search')
                 obj.init_point = obj.searchGoodPoints;
+                if isempty(obj.init_point)
+                    error('Could not find any good starting points...'); 
+                end
                 obj.num_chains = length(obj.init_point); 
             elseif cs(obj.initialization_method, 'bank')
                 obj.gotoBestTemplateInitialPoint; 
@@ -580,9 +602,9 @@ classdef MCMC < handle
             obj.gen.lc.pars.copy_from(obj.init_point); 
             
             obj.calcLikelihood; % get the first point likelihood/chi2
-            
-            obj.points = obj.points(:,1:obj.num_chains); % in case we start with fewer chains than we thought
-            
+
+            obj.points(obj.num_steps, obj.num_chains) = occult.Parameters; 
+
             obj.points(1,:).copy_from(obj.gen.lc.pars); % automatically accept first point... 
             
             obj.brake_bit = 0;
@@ -656,7 +678,7 @@ classdef MCMC < handle
             input = util.text.InputVars;
             input.input_var('pars', obj.show_posterior_pars); 
             input.input_var('success_ratio', 0.2); % minimal number of successes (relative to total steps) for a chain to be included
-            input.input_var('likelihood', 0.1); % minimal mean likelihood needed for a chain to be included
+            input.input_var('likelihood', 0.01); % minimal mean likelihood needed for a chain to be included
             input.input_var('weights', false, 'use_weights');
             input.input_var('burn', false); 
             input.scan_vars(varargin{:}); 

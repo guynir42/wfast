@@ -671,11 +671,23 @@ classdef RunSummary < handle
         
         function showDetectionRate(obj, varargin)
             
+            trig.RunSummary.showDetectionRateStatic(obj.sim_events, varargin{:}); 
+            
+        end
+        
+    end    
+    
+    methods(Static=true)
+        
+        
+        function ax_struct = showDetectionRateStatic(ev, varargin)
+            
             import util.text.cs;
             
             input = util.text.InputVars;
             input.input_var('distance', 'kbos'); % which population we want to probe? KBOs? Hills (inner Oort) or Oort?
             input.input_var('parent'); % parent can be figure or panel (default is gcf())
+            input.input_var('auto_ylim', true); % if false will set the percentages to 0-100% on all axis
             input.input_var('font_size', 18); % fonts on the axes
             input.scan_vars(varargin{:}); 
             
@@ -708,10 +720,11 @@ classdef RunSummary < handle
             ax_b = axes('Parent', input.parent, 'Position', [margin+(margin+width)*0 margin+(margin+height)*1 width height]); 
             ax_v = axes('Parent', input.parent, 'Position', [margin+(margin+width)*1 margin+(margin+height)*1 width height]); 
             
-            et = obj.sim_events([obj.sim_events.D]==input.distance); % events total
-            ep = obj.sim_events([obj.sim_events.D]==input.distance & [obj.sim_events.passed]); 
+            et = ev([ev.D]==input.distance); % events total
+            ep = ev([ev.D]==input.distance & [ev.passed]); 
             
             %%%%%%%% stellar radius R %%%%%%%%%%%%%%%%%%%%%
+            
             bin_size = max([et.R])/25;
             [N_R,E_R] = histcounts([et.R], 'BinWidth', bin_size); 
             bar(ax_R, E_R(1:end-1)+bin_size/2, N_R); 
@@ -723,9 +736,18 @@ classdef RunSummary < handle
             ylabel(ax_R, 'number of events'); 
             ax_R.YScale = 'log';
             
+            mn = max(floor(log10(min(N_R_passed))),-1); 
+            mx = ceil(log10(max(N_R)));
+            ax_R.YLim = 10.^([mn mx]); 
+            ax_R.YTick = 10.^(0:mx); 
+            
             yyaxis(ax_R, 'right'); 
             plot(ax_R, E_R(1:end-1)+bin_size/2, N_R_passed./N_R*100, '-*', 'LineWidth', 2); 
-            ax_R.YLim = [0.1 100]; 
+            
+            if input.auto_ylim==0
+                ax_R.YLim = [0.1 100]; 
+            end
+            
             grid(ax_R, 'on'); 
             ytickformat(ax_R, '%d%%'); 
             
@@ -734,6 +756,7 @@ classdef RunSummary < handle
             ax_R.FontSize = input.font_size;
             
             %%%%%%%% occulter radius r %%%%%%%%%%%%%%%%%%%%%
+            
             bin_size = 0.25;
             [N_r,E_r] = histcounts([et.r], 'BinWidth', bin_size); 
             bar(ax_r, E_r(1:end-1)+bin_size/2, N_r); 
@@ -745,9 +768,18 @@ classdef RunSummary < handle
             ylabel(ax_r, 'number of events'); 
             ax_r.YScale = 'log';
             
+            mn = max(floor(log10(min(N_r_passed))),-1); 
+            mx = ceil(log10(max(N_r)));
+            ax_r.YLim = 10.^([mn mx]); 
+            ax_r.YTick = 10.^(0:mx); 
+            
             yyaxis(ax_r, 'right'); 
             plot(ax_r, E_r(1:end-1)+bin_size/2, N_r_passed./N_r*100, '-*', 'LineWidth', 2); 
-            ax_r.YLim = [0.1 100]; 
+            
+            if input.auto_ylim==0
+                ax_r.YLim = [0.1 100]; 
+            end
+            
             grid(ax_r, 'on'); 
             ytickformat(ax_r, '%d%%'); 
             
@@ -757,6 +789,7 @@ classdef RunSummary < handle
             
             
             %%%%%%%% impact parameter b %%%%%%%%%%%%%%%%%%%%%
+            
             bin_size = 0.25;
             [N_b,E_b] = histcounts([et.b], 'BinWidth', bin_size); 
             bar(ax_b, E_b(1:end-1)+bin_size/2, N_b); 
@@ -768,9 +801,18 @@ classdef RunSummary < handle
             ylabel(ax_b, 'number of events'); 
             ax_b.YScale = 'log';
             
+            mn = max(floor(log10(min(N_b_passed))), -1); 
+            mx = ceil(log10(max(N_b)));
+            ax_b.YLim = 10.^([mn mx]); 
+            ax_b.YTick = 10.^(0:mx); 
+            
             yyaxis(ax_b, 'right'); 
             plot(ax_b, E_b(1:end-1)+bin_size/2, N_b_passed./N_b*100, '-*', 'LineWidth', 2); 
-            ax_b.YLim = [0 100]; 
+            
+            if input.auto_ylim==0
+                ax_b.YLim = [0.1 100]; 
+            end
+            
             grid(ax_b, 'on'); 
             ytickformat(ax_b, '%d%%'); 
             
@@ -780,6 +822,7 @@ classdef RunSummary < handle
             
             
             %%%%%%%% velocity v %%%%%%%%%%%%%%%%%%%%%
+            
 %             bin_size = 2.5;
             bin_size = max([et.v])/15;
             [N_v,E_v] = histcounts([et.v], 'BinWidth', bin_size); 
@@ -792,9 +835,19 @@ classdef RunSummary < handle
             ylabel(ax_v, 'number of events'); 
             ax_v.YScale = 'log';
             
+            mn = max(floor(log10(min(N_v_passed))), -1); 
+            mx = ceil(log10(max(N_v)));
+            ax_v.YLim = 10.^([mn mx]); 
+            ax_v.YTick = 10.^(0:mx); 
+            
+            
             yyaxis(ax_v, 'right'); 
             plot(ax_v, E_v(1:end-1)+bin_size/2, N_v_passed./N_v*100, '-*', 'LineWidth', 2); 
-            ax_v.YLim = [0 100]; 
+            
+            if input.auto_ylim==0
+                ax_v.YLim = [0.1 100]; 
+            end
+            
             grid(ax_v, 'on'); 
             ytickformat(ax_v, '%d%%'); 
             
@@ -802,9 +855,15 @@ classdef RunSummary < handle
 %             legend(ax_v, {'all events', 'passed events', 'percent'}, 'Location', 'NorthEast'); 
             ax_v.FontSize = input.font_size;
             
+            ax_struct.ax_R = ax_R;
+            ax_struct.ax_r = ax_r;
+            ax_struct.ax_b = ax_b;
+            ax_struct.ax_v = ax_v;
+            
         end
         
-    end    
+        
+    end
     
 end
 

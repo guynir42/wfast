@@ -1,5 +1,8 @@
 function h = show_snr_params(ev,varargin)
 % Usage: h = show_snr_params(ev,varargin)
+% Shows the distribution of detected and undetected simulated events "ev"
+% as a function of 2-3 parameters (default r and b). 
+% The color scale shows the detection S/N for each event. 
 
     if nargin==0, help('trig.show_snr_params'); return; end
     
