@@ -184,7 +184,7 @@ classdef MCMC_GUI < handle
             obj.panel_lightcurve.make; 
             
             obj.axes_lightcurve = axes('Parent', obj.panel_lightcurve.panel); 
-            obj.button_reset_lightcurves = GraphicButton(obj.panel_lightcurve.panel, [0.8 0.05 0.1 0.2], obj.owner, '', 'custom', 'Reset LCs'); 
+            obj.button_reset_lightcurves = GraphicButton(obj.panel_lightcurve.panel, [0.9 0.05 0.1 0.2], obj.owner, '', 'custom', 'Reset LCs'); 
             obj.button_reset_lightcurves.Callback = @obj.callback_reset_lightcurves;
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
@@ -260,7 +260,11 @@ classdef MCMC_GUI < handle
             if obj.debug_bit>1, disp('callback: reset lightcurves'); end
 
             cla(obj.axes_lightcurve); 
-            obj.owner.gen.lc.pars.copy_from(obj.owner.points(obj.owner.counter,:)); % reset generator to last point on the chain
+            
+            if ~isempty(obj.owner.points)
+                obj.owner.gen.lc.pars.copy_from(obj.owner.points(obj.owner.counter,:)); % reset generator to last point on the chain
+            end
+            
             obj.updateLightcurves;
             
             obj.update; 
