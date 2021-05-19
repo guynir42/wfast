@@ -883,6 +883,7 @@ classdef MCMC < handle
             input = util.text.InputVars;
             input.input_var('pars', obj.show_chain_pars); 
             input.input_var('burn', false); 
+            input.input_var('full_titles', false, 'titles'); 
             input.input_var('ax', [], 'axes', 'axis');
             input.input_var('font_size', 18); 
             input.input_var('hold', false); 
@@ -989,12 +990,20 @@ classdef MCMC < handle
                 input.ax.NextPlot = 'replace'; 
                 
                 % the X limits and labels are added in the end
-%                 ylabel(input.ax, obj.title_strings.(input.pars{2}));
-                ylabel(input.ax, input.pars{2});
+                if input.full_titles
+                    ylabel(input.ax, obj.title_strings.(input.pars{2}));
+                else
+                    ylabel(input.ax, input.pars{2});
+                end
+                
                 input.ax.YLim = obj.gen.([input.pars{2} '_range']);
                 
-%                 zlabel(input.ax, obj.title_strings.(input.pars{3}));
-                zlabel(input.ax, input.pars{3});
+                if input.full_titles
+                    zlabel(input.ax, obj.title_strings.(input.pars{3}));
+                else
+                    zlabel(input.ax, input.pars{3});
+                end
+                
                 input.ax.ZLim = obj.gen.([input.pars{3} '_range']);
                 
 %                 input.ax.CLim = [0 1]; 
@@ -1003,8 +1012,12 @@ classdef MCMC < handle
                 
             end
         
-%             xlabel(input.ax, obj.title_strings.(input.pars{1}));
-            xlabel(input.ax, input.pars{1});
+            if input.full_titles
+                xlabel(input.ax, obj.title_strings.(input.pars{1}));
+            else
+                xlabel(input.ax, input.pars{1});
+            end
+            
             input.ax.FontSize = input.font_size;
             
             input.ax.XLim = obj.gen.([input.pars{1} '_range']);
@@ -1200,13 +1213,13 @@ classdef MCMC < handle
 
                     if ~isempty(obj.true_point) && input.true_point
                         h_true = plot(input.ax, obj.true_point.(input.pars{1}).*[1 1], input.ax.YLim, '-g', 'LineWidth', 2); 
-                        h_true.DisplayName = sprintf('True point: %s= %4.2f', ...
+                        h_true.DisplayName = sprintf('True: %s= %4.1f', ...
                             input.pars{1}, obj.true_point.(input.pars{1}));
                     end
 
                     if ~isempty(obj.best_point) && input.best_point
                         h_best = plot(input.ax, obj.best_point.(input.pars{1}).*[1 1], input.ax.YLim, '--r', 'LineWidth', 2); 
-                        h_best.DisplayName = sprintf('Best point: %s= %4.2f', ...
+                        h_best.DisplayName = sprintf('Best: %s= %4.1f', ...
                             input.pars{1}, obj.best_point.(input.pars{1}));
                     end
 
@@ -1229,13 +1242,13 @@ classdef MCMC < handle
 
                     if ~isempty(obj.true_point) && input.true_point
                         h_true = plot(input.ax, input.ax.XLim, obj.true_point.(input.pars{1}).*[1 1], '-g', 'LineWidth', 2); 
-                        h_true.DisplayName = sprintf('True point: %s= %4.2f', ...
+                        h_true.DisplayName = sprintf('True: %s= %4.1f', ...
                             input.pars{1}, obj.true_point.(input.pars{1}));
                     end
 
                     if ~isempty(obj.best_point) && input.best_point
                         h_best = plot(input.ax, input.ax.XLim, obj.best_point.(input.pars{1}).*[1 1], '--r', 'LineWidth', 2); 
-                        h_best.DisplayName = sprintf('Best point: %s= %4.2f', ...
+                        h_best.DisplayName = sprintf('Best: %s= %4.1f', ...
                             input.pars{1}, obj.best_point.(input.pars{1}));
                     end
 
@@ -1247,8 +1260,21 @@ classdef MCMC < handle
                 
                 if input.legend
                     [med, lower, upper] = obj.getMedianAndBounds(input.pars{1}); 
-                    h.DisplayName = sprintf('%s= %4.2f_{-%4.2f}^{+%4.2f} (68%% CL)', ...
+                    h.DisplayName = sprintf('%s= %4.2f_{-%4.1f}^{+%4.1f}', ...
                         input.pars{1}, med, med-lower, upper-med); 
+                    if input.horizontal
+                        if med<mean(input.ax.YLim)
+                            l_pos = 'NorthEast'; 
+                        else
+                            l_pos = 'SouthEast'; 
+                        end
+                    else
+                        if med<mean(input.ax.XLim)
+                            l_pos = 'NorthEast'; 
+                        else
+                            l_pos = 'NorthWest'; 
+                        end
+                    end
                 end
                 
             elseif length(input.pars)==2
@@ -1294,7 +1320,7 @@ classdef MCMC < handle
                             input.pars{2}, obj.true_point.(input.pars{2}));
                     h_best2.HandleVisibility = 'off'; 
                 end
-
+                
             else % more than 2 pars
                 error('Must specify one or two parameters!'); 
             end
@@ -1317,7 +1343,7 @@ classdef MCMC < handle
             end
             
             if input.legend
-                legend(input.ax, 'Location', 'Best'); 
+                legend(input.ax, 'Location', l_pos); 
             end
             
         end
@@ -1338,7 +1364,7 @@ classdef MCMC < handle
                 return;
             end
             
-            clf(input.parent); 
+            delete(input.parent.Children); 
             
             %%%%%%%%%%%%%%%% DENSITY %%%%%%%%%%%%%%%%%%%%%%
             
@@ -1408,11 +1434,11 @@ classdef MCMC < handle
             
             if size(f,2)>1
                 h_true = plot(ax_lc, t, f(:,2), '-g', 'LineWidth', 2); 
-                h_true.DisplayName = sprintf('r= %4.2f | v= %4.2f', obj.true_point.r, obj.true_point.v); 
+                h_true.DisplayName = sprintf('r=%4.1f | v=%4.1f', obj.true_point.r, obj.true_point.v); 
             end
             
             h_best = plot(ax_lc, t, f(:,1), '--r', 'LineWidth', 2); 
-            h_best.DisplayName = sprintf('r= %4.2f | v= %4.2f', obj.best_point.r, obj.best_point.v); 
+            h_best.DisplayName = sprintf('r=%4.1f | v=%4.1f', obj.best_point.r, obj.best_point.v); 
             
             hold(ax_lc, 'off'); 
             
