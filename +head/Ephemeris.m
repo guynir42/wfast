@@ -239,6 +239,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             obj.constraints.input_var('time_limit', [], 'minimal_time_limit'); 
             obj.constraints.add_comment('time_limit', 'do not begin observing a target with less than this many hours left until the nearest limit'); 
             
+            obj.constraints.input_var('meridian', []); 
+            obj.constraints.add_comment('meridian', 'do not observe more than this many hours away from the meridian (in either direction)'); 
+            
             obj.constraints.input_var('moon', 50, 'moon_distance'); 
             obj.constraints.add_comment('moon', 'target must be this far away from the moon (degrees)'); 
             
@@ -1295,11 +1298,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             if obj.HA_deg>0 && util.text.cs(input.side, 'East'), obj.unobservable_reason = 'Western target'; return; end % target is on West side when only East is accepted
             
-            if obj.ALT_deg<input.altitude, obj.unobservable_reason = sprintf('Alt= %d<%d', round(obj.ALT_deg), round(input.altitude)); return; end % altitude is below defined limit
+            if ~isempty(input.altitude) && obj.ALT_deg<input.altitude, obj.unobservable_reason = sprintf('Alt= %d<%d', round(obj.ALT_deg), round(input.altitude)); return; end % altitude is below defined limit
             
             if isempty(obj.AIRMASS) || isnan(obj.AIRMASS), obj.unobservable_reason = 'Undefined airmass'; return; end % airmass is undefined 
             
-            if obj.AIRMASS>input.airmass, obj.unobservable_reason = sprintf('airmass=%4.2f>%4.2f', obj.AIRMASS, input.airmass); return; end % airmass is undefined
+            if ~isempty(input.airmass) && obj.AIRMASS>input.airmass, obj.unobservable_reason = sprintf('airmass=%4.2f>%4.2f', obj.AIRMASS, input.airmass); return; end % airmass is too high
+            
+            meridian_distance = abs(obj.HA_deg/15); 
+            
+            if ~isempty(input.meridian) && meridian_distance>input.meridian, obj.unobservable_reason = sprintf('meridian= %4.2f>%4.2f', meridian_distance, input.meridian); return; end
             
             % south limit!
             

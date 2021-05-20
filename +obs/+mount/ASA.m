@@ -302,61 +302,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                         
                         obj.owner.assist.scope_assistant = 0;
                         
-                        pause(1);
+                        pause(3);
                         
                         obj.owner.assist.scope_assistant = 1;
                         
-                        pause(3); 
+                        pause(5); 
                         
                         obj.ard.connect;
 
-                    end
-                    
-                    
-                    return; % short circuit this, we need to update to the new re-wiring! 
-                    
-                    if obj.ard.status==0
-                        
-                        RA = obj.telRA_deg; 
-                        DE = obj.telDec_deg; 
-                        side = obj.telHemisphere;
-                        
-                        % turn off the power to the mount to kill current to the USB hub powering the ScopeAssistant  (more info: https://www.digital-loggers.com/curl.html)
-                        [rc, rv] = system('curl -u admin:kbos http://192.168.1.104:8000/outlet?8=OFF');
-                        
-                        pause(3); 
-                        
-                        % turn the power back on
-                        [rc, rv] = system('curl -u admin:kbos http://192.168.1.104:8000/outlet?8=ON');
-
-                        pause(3); 
-                        
-                        % now reconnect the Autoslew software
-                        obj.connect; 
-                        
-                        pause(2); 
-                        
-                        if abs(RA - obj.telRA_deg)>1 || abs(DE - obj.telDec_deg)>1 || ~strcmp(side, obj.telHemisphere)
-                            error('dome_pc:mount:connect_arduino:coordinates_mismatch', 'Mount restart error: coordinates before: %s%s (%s) do not match coordinates after: %s%s (%s)', ...
-                                head.Ephemeris.deg2hour(RA), head.Ephemeris.deg2sex(DE), side, ...
-                                head.Ephemeris.deg2hour(obj.telRA_deg), head.Ephemeris.deg2sex(obj.telDec_deg), obj.telHemisphere); 
-                        end
-                        
-                        obj.ard.update;
-                        pause(1); 
-                        
-                        obj.ard.read_data; % explicitely call this because if the connectArduino() command is sent inside a timer, the timer blocks any BytesAvailableFcn callbacks!
-                        
-                        if obj.ard.status==0
-                            obj.ard.disconnect;
-                            obj.ard.connect;
-                        end
-
-                        obj.ard.update;
-                        pause(2); 
-                        
-                        util.text.date_printf('ard.status= %d', obj.ard.status); 
-                        
                     end
                     
                 catch ME

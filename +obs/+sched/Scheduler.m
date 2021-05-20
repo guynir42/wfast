@@ -160,6 +160,7 @@ classdef Scheduler < handle
                 
                 obj.map = sky_map;
                 
+                obj.ephem.makeConstraints; 
                 obj.ephem = obj.map.ephem; 
                 
                 obj.log = util.sys.Logger('Scheduler'); 

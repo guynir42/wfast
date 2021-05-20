@@ -1812,8 +1812,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 
                 if isempty(obj.latest_email_autostart_date)
 
-                    obj.sendToObserver(['Ready to open dome ' util.text.time2str(t)], ...
-                        sprintf('Weather data looks good for at least %d minutes. Consider opening for observations. ', round(good_times_minutes)), true); 
+                    str = ['Ready to open dome ' util.text.time2str(t)];
+                    observer_name = obj.getObserverName; 
+                    if ~strcmp(observer_name, '---')
+                        str = sprintf('%s (obs: %s)', str, observer_name);
+                    end
+                    
+                    obj.sendToObserver(str, sprintf('Weather data looks good for at least %d minutes. Consider opening for observations. ', round(good_times_minutes)), true); 
 
                     obj.latest_email_autostart_date = t;
 
