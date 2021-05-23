@@ -167,8 +167,11 @@ classdef ShuffleBank < handle
         
         function val = getBankName(obj)
             
-             val = sprintf('templates_%dAU_%dHz', floor(obj.D_au), floor(obj.f));
-            
+             if obj.f>1
+                 val = sprintf('templates_%dAU_%dHz', floor(obj.D_au), floor(obj.f));
+             else
+                 val = sprintf('templates_%dAU_%ds', floor(obj.D_au), floor(obj.T/1000));
+             end
         end
         
     end

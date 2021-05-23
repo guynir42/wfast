@@ -172,7 +172,7 @@ classdef PcSync < handle
                 try
 
                     if util.text.cs(obj.role, 'server')
-                        fprintf('Connecting to TCP/IP as server. There is no timeout! To break out hit Ctrl+C\n');
+                        util.text.date_printf('Connecting to TCP/IP as server. There is no timeout! To break out hit Ctrl+C');
                     end
                     
                     obj.disconnect;
@@ -254,10 +254,18 @@ classdef PcSync < handle
             byte_stream = getByteStreamFromArray(value);
             
             if strcmpi(rx_or_tx, 'tx') % primary transmission mode
+                
                 obj.raw_data_sent = uint8(sprintf('%s Message length is %010d\n', byte_stream, length(byte_stream)));
                 obj.checksum = util.oop.getHash(obj.raw_data_sent);
                 obj.waitForTransferStatus(obj.hndl_tx);
-                fwrite(obj.hndl_tx, obj.raw_data_sent);
+                
+                try
+                    fwrite(obj.hndl_tx, obj.raw_data_sent);
+                catch ME
+                    value % print on screen what we were trying to send... 
+                    rethrow(ME);
+                end
+                
             elseif strcmpi(rx_or_tx, 'rx') % reply only (e.g., sending back the hash of latest incoming data)
                 obj.waitForTransferStatus(obj.hndl_rx);
                 fwrite(obj.hndl_rx, sprintf('%s Message length is %010d\n', byte_stream, length(byte_stream))); 

@@ -727,7 +727,7 @@ classdef Deflator < file.AstroData
                 c = 1;
                 f1 = dir(file_src);
                 f2 = dir(new_file);
-                if f1.bytes>f2.bytes*5 % if source file (f1) is much bigger than new file (f2) that means f2 is not properly copied 
+                if f1.bytes>f2.bytes*50 % if source file (f1) is much bigger than new file (f2) that means f2 is not properly copied 
                     c = 0;
                 end
             else

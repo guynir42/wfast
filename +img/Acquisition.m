@@ -426,7 +426,7 @@ classdef Acquisition < file.AstroData
             obj.total_runtime = 2;
 %             obj.num_batches = 500;
             
-            obj.num_stars = 5000;
+            obj.num_stars = 10000;
             obj.cut_size = 15;
             obj.avoid_edges = 50;
             
