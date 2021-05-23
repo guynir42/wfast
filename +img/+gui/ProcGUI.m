@@ -129,7 +129,7 @@ classdef ProcGUI < handle
             obj.menu_cutouts.addButton('input_cut_size', '&Cut size', 'input', 'pars.cut_size', 'size of the cutout stamps (pixels)'); 
             obj.menu_cutouts.addButton('input_lock', '&Lock adjust', 'input_text', 'pars.lock_adjust', 'choose to lock the cutout adjustments to "all", "none" or "stars" only (those with GAIA match)'); 
             obj.menu_cutouts.addButton('button_use_check_flux', 'Check &Flux', 'toggle', 'pars.use_check_flux', 'check the flux each batch and call off analysis if the flux is lost multiple times'); 
-            obj.menu_cutouts.addButton('input_num_failed', '&Max failed batches', 'input', 'pars.max_failed_batches', 'how many batches in a row must fail to call off the analysis'); 
+            obj.menu_cutouts.addButton('input_num_failed', '&Max failed files', 'input', 'pars.max_failed_files', 'how many files in a row must fail to call off the analysis'); 
             
             obj.menu_save = MenuItem(obj, '&Save', 'menu'); 
             obj.menu_save.addButton('button_save', '&Save results', 'toggle', 'pars.use_save_results', 'automatically save lightcurves and other products to disk at end of run'); 
@@ -138,10 +138,15 @@ classdef ProcGUI < handle
             obj.menu_save.addButton('button_now', 'Save &Now', 'push', 'saveResults', 'save the results of the analysis into a processor folder right now', 1); 
             
             obj.menu_fits = MenuItem(obj, 'FITS', 'menu'); 
-            obj.menu_fits.addButton('button_save', '&Save FITS', 'toggle', 'pars.use_fits_save', 'save the calibrated images into FITS files');
-            obj.menu_fits.addButton('button_use_roid', '&Use Roi', 'toggle', 'pars.use_fits_roi', 'cut out a Region Of Interest before saving FITS files');
-            obj.menu_fits.addButton('input_roi', '&Region Of Interest', 'input', 'pars.fits_roi', 'define the Region Of Interest as [left, top, width, height]');
-            obj.menu_fits.addButton('button_flip', '&Flip images', 'toggle', 'pars.use_fits_flip', 'flip the images 180 degrees after getting ROI');
+            obj.menu_fits.addButton('button_save', '&Save FITS', 'toggle', 'pars.fits.use_save', 'save the calibrated images into FITS files');
+            obj.menu_fits.addButton('button_use_roi', 'Use &ROI', 'toggle', 'pars.fits.use_roi', 'cut out a Region Of Interest before saving FITS files');
+            obj.menu_fits.addButton('input_size', 'ROI &Size', 'input', 'pars.fits.roi_size', 'define the size of the Region Of Interest as scalar or [height,width] vector');
+            obj.menu_fits.addButton('input_coords', 'ROI &Coordinates', 'input_text', 'pars.fits.roi_coordinates', 'select the position of the Region Of Interest, use "header" to auto-center on object RA/Dec');
+            obj.menu_fits.addButton('button_flip', 'Flip &Image', 'toggle', 'pars.fits.use_flip', 'flip the FITS images 180 degrees after getting ROI');
+            obj.menu_fits.addButton('input_dir', '&Directory', 'input_text', 'pars.fits.directory', 'choose the name of the FITS files subfolder (or absolute path to any folder)');
+            obj.menu_fits.addButton('input_rename', 'File &Name', 'input_text', 'pars.fits.rename', 'rename each file to a new string + zero padded serial number');
+            obj.menu_fits.addButton('button_finding', '&Finding chart', 'toggle', 'pars.fits.use_finding', 'save a finding chart PNG along with the FITS images');
+            
             
             %%%%%%%%%%%%%%%%%%% LEFT SIDE %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -159,7 +164,7 @@ classdef ProcGUI < handle
             obj.panel_controls = GraphicPanel(obj.owner, [0 pos/N width num_buttons/N], 'controls', 1); % last input is for vertical (default)            
             obj.panel_controls.addButton('button_browse', 'browse', 'push', 'Browse', '', '', [], '', '', 'use the system dialog to find a folder with data files'); 
             obj.panel_controls.addButton('button_continue', 'cont', 'push', 'Continue run', '', '', [], '', '', 'continue the run from where it stopped, without resetting'); 
-            obj.panel_controls.addButton('input_num_batches', 'pars.num_batches', 'input', 'num_batches= ', '', '', [], '', '', 'how many batches we want this run to go for'); 
+            obj.panel_controls.addButton('input_num_files', 'pars.num_files', 'input', 'num_files= ', '', '', [], '', '', 'how many files we want this run to go for'); 
             obj.panel_controls.addButton('button_run', 'run', 'push', 'Start new run', '', '', [], '', '', 'start a new run, resetting the current results'); 
             obj.panel_controls.number = num_buttons;
             obj.panel_controls.margin = [0.02 0.03];
@@ -260,7 +265,7 @@ classdef ProcGUI < handle
             
             obj.panel_contrast.update;
             
-            obj.panel_controls.input_num_batches.String = sprintf('num_batches= %d', obj.owner.getNumBatches); 
+            obj.panel_controls.input_num_files.String = sprintf('num_files= %d', obj.owner.getNumFiles); 
             
             obj.owner.show('ax', obj.axes_image); 
             

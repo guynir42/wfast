@@ -64,6 +64,8 @@ classdef Processor < dynamicprops
         fits_roi_position = []; % center of the ROI x,y position in pixels
         fits_roi_size = []; % height and width of the ROI in pixels
                 
+        forced_cutout_motion_per_file = []; 
+        
         file_index = 1;
         failed_file_counter = 0;
         
@@ -135,6 +137,7 @@ classdef Processor < dynamicprops
             obj.pars.input_var('bad_match_min_snr', 30); obj.pars.add_comment('if an object has no GAIA match, it can be removed if its S/N is below this threshold'); 
             obj.pars.input_var('use_forced_photometry', true); obj.pars.add_comment('add a cutout at the given coordinates, even if there is no source found there'); 
             obj.pars.input_var('forced_extra_positions', {}); obj.pars.add_comment('to give additional positions (besides header RA/Dec)\n give coordinates as [RA,Dec] pairs (in deg) inside a cell array'); 
+            obj.pars.input_var('use_interp_forced', true, 6, 'use_interpolate_forced', 'interpolate_forced', 'interp_forced'); obj.pars.add_comment('check the position of the forced cutout at time of end of run, if it moves, move the cutout linearly with time'); 
             
             obj.pars.input_var('use_auto_load_cal', true, 6); obj.pars.add_comment('load calibration based on the date of the files'); 
             obj.pars.input_var('use_auto_aperture', true, 6); obj.pars.add_comment('lset the photometric aperture based on the measured psd width X3'); 
@@ -162,8 +165,8 @@ classdef Processor < dynamicprops
             obj.pars.fits.input_var('use_flip', false, 6); obj.pars.fits.add_comment('flip the image by 180 degrees before saving to FITS (this is done after cutting out the ROI'); 
             obj.pars.fits.input_var('use_coadd', false, 6); obj.pars.fits.add_comment('save FITS images of coadded images'); 
             obj.pars.fits.input_var('directory', 'FITS'); obj.pars.fits.add_comment('what to call the folder where FITS files are saved (relative to original file directory or absolute path'); 
-            obj.pars.fits.input_var('rename', ''); obj.pars.fits.add_comment('rename each FITS file to this string, followed by a zero padded serial number'); 
-            obj.pars.fits.input_var('finding', true); obj.pars.fits.add_comment('save a finding chart JPG of the first image'); 
+            obj.pars.fits.input_var('rename', '', 'name', 'filename'); obj.pars.fits.add_comment('rename each FITS file to this string, followed by a zero padded serial number'); 
+            obj.pars.fits.input_var('use_finding', true); obj.pars.fits.add_comment('save a finding chart PNG of the first image'); 
             
             obj.pars.input_var('header', {}, 'header corrections'); obj.pars.add_comment('cell array with keyword-value pairs to modify the header info from file'); 
             
@@ -649,11 +652,11 @@ classdef Processor < dynamicprops
             
             if obj.debug_bit>1, disp(obj.file_summary); end
             
-            obj.file_index = obj.file_index + 1;
-            
             if ~isempty(obj.gui)
                 obj.gui.update;
             end
+            
+            obj.file_index = obj.file_index + 1;
             
         end
         
@@ -677,9 +680,26 @@ classdef Processor < dynamicprops
                         xy = obj.cat.coo2xy(ra_dec(1), ra_dec(2)); 
 
                         obj.data.positions(end+1,:) = xy; % add another row to the coordinate list
-
+                        obj.data.forced_indices(end) = size(obj.data.positions,1); % keep track of indices of forced cutouts
                     end
-                
+                    
+                    obj.forced_cutout_motion_per_file = []; 
+                    
+                    if obj.pars.use_interp_forced
+                        
+                        e = util.oop.full_copy(obj.head.ephem); 
+                        e.timeTravelHours(obj.getNumFiles.*obj.head.EXPTIME/3600); % move this Ephemeris object forward to the end of the run
+                        e.resolve; 
+                        
+                        pos1 = obj.data.positions(end-length(obj.data_logs.forced_coordinates),:); 
+                        pos2 = obj.cat.coo2xy(e.RA_deg, e.Dec_deg);
+                        
+                        if sqrt(sum((pos1-pos2).^2))<min(size(obj.data.image_proc))
+                            obj.forced_cutout_motion_per_file = (pos2-pos1)/obj.getNumFiles; % should be a 2-vector
+                        end
+                        
+                    end
+                        
                 end
             
             end
@@ -880,7 +900,7 @@ classdef Processor < dynamicprops
             
             try
                                 
-                if obj.pars.fits.finding && obj.file_index==1
+                if obj.pars.fits.use_finding && obj.file_index==1
                     
                     f = figure('Name', 'finding chart', 'Position', [100 100 1000 1000]);
                     
@@ -1091,6 +1111,10 @@ classdef Processor < dynamicprops
                 error('dimensionality issue...'); 
             end
             
+            if ~isempty(obj.forced_cutout_motion_per_file)
+                obj.data.positions(obj.data.forced_indices(1), :) = obj.data.positions(obj.data.forced_indices(1), :) + obj.forced_cutout_motion_per_file;
+            end
+            
         end
         
         function val = checkFluxes(obj) % check that we can still see most of the stars, compared to the flux buffer
@@ -1127,8 +1151,8 @@ classdef Processor < dynamicprops
                 
                 if obj.debug_bit, disp('Lost star positions, using quick_align and doing photometry again...'); end
 
-                [~,shift] = util.img.quick_align(obj.data.image_proc, obj.data.ref_image);
-                obj.data.positions = double(obj.data.ref_positions + flip(shift));
+                [~,shift] = util.img.quick_align(obj.data.image_proc, obj.data_logs.ref_image);
+                obj.data.positions = double(obj.data_logs.ref_positions + flip(shift));
 
                 obj.data.cutouts = util.img.mexCutout(obj.data.image_proc, obj.data.positions, obj.pars.cut_size, NaN, NaN); % replace and fill up using NaNs (it is safe, the processed image is single precision
 
@@ -1219,26 +1243,41 @@ classdef Processor < dynamicprops
             end
             
             delete(findobj(input.ax, 'type', 'rectangle'));
-            if obj.pars.use_display_rect_text, delete(findobj(input.ax, 'type', 'text')); end
+            delete(findobj(input.ax, 'tag', 'clip number'));
             
             if ~isempty(obj.data.positions)
 
                 P = obj.data.positions;
 
                 for ii = 1:min(size(P,1), obj.pars.display_num_rect_stars)
-                    if obj.pars.use_display_rect_text, text(P(ii,1), P(ii,2), sprintf('clip %d', ii),'FontSize', 16, 'Parent', input.ax); end
                     
-                    if obj.data.stars.flag(ii)==2
-                        rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'yellow'); % yellow is for point sources
-                    elseif obj.data.stars.flag(ii)==3
-                        rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'green'); % green is for extended sources
-                    elseif obj.data.stars.flag(ii)==1
-                        rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'red'); % red is for saturated stars
-                    elseif ~isempty(obj.cat.magnitudes) && isnan(obj.cat.magnitudes(ii))
-                        rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'white'); % white is for no match to GAIA
+                    if ii<=size(obj.data.stars,1) && obj.data.stars.flag(ii)==2
+%                         rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'yellow'); 
+                        c = 'yellow'; % yellow is for point sources
+                    elseif ii<=size(obj.data.stars,1) && obj.data.stars.flag(ii)==3
+%                         rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'green'); 
+                        c = 'green'; % green is for extended sources
+                    elseif ii<=size(obj.data.stars,1) && obj.data.stars.flag(ii)==1
+%                         rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'red'); 
+                        c = 'red'; % red is for saturated stars
+                    elseif ii<=size(obj.data.stars,1) && ~isempty(obj.cat.magnitudes) && isnan(obj.cat.magnitudes(ii))
+%                         rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'white'); 
+                        c = 'white'; % white is for no match to GAIA
                     else    
-                        rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'black'); % black is good stars
+%                         rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'black'); 
+                        c = 'black'; % black is good stars
                     end
+                    
+                    if obj.pars.use_display_rect_text, text(P(ii,1), P(ii,2), sprintf('clip %d', ii),'FontSize', 16, 'Parent', input.ax, 'Color', c, 'Tag', 'clip number'); end
+                    rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', c)
+                    
+                end
+                
+                for ii = 1:length(obj.data.forced_indices)
+                    c = 'cyan'; 
+                    idx = obj.data.forced_indices(ii); 
+                    if obj.pars.use_display_rect_text, text(P(idx,1), P(idx,2), sprintf('forced %d', ii),'FontSize', 16, 'Parent', input.ax, 'Color', c, 'Tag', 'clip number'); end
+                    rectangle('Position', [P(idx,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', c); % cyan is for forced cutouts
                 end
                 
             end

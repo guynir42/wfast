@@ -1033,7 +1033,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             obj.constraints.scan_vars(varargin{:}); 
             
-            if cs(keyword, 'ecliptic', 'kbos')
+            if isempty(keyword)
+                % do nothing... 
+            elseif cs(keyword, 'ecliptic', 'kbos')
                 obj.keyword = 'ecliptic'; % dynamically allocate this field after setting the time
                 obj.gotoDefaultField(obj.name, varargin{:}); % do we need the varargin here?
             elseif cs(keyword, 'galactic')
