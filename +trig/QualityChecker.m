@@ -857,7 +857,7 @@ classdef QualityChecker < handle
             
         end
         
-        function val = calculateFluxCorrOldVersion(obj, flux, widths) % to be deprecated
+        function val = calculateFluxCorrFastMoreMemory(obj, flux, widths) 
             
             if nargin<3 || isempty(widths)
                 widths = 50; 
