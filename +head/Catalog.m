@@ -742,7 +742,12 @@ classdef Catalog < handle
             end
             
             if nargin<3 || isempty(Dec)
-                Dec = obj.head.DEC_DEG;
+                if length(RA)==2
+                    Dec = RA(2);
+                    RA = RA(1); 
+                else
+                    Dec = obj.head.DEC_DEG;
+                end
             end
             
             if ischar(RA)
@@ -753,7 +758,7 @@ classdef Catalog < handle
                 Dec = head.Ephemeris.sex2deg(Dec);
             end
             
-            xy = obj.head.wcs.coo2xy(RA, Dec); 
+            xy = obj.head.WCS.coo2xy(RA, Dec); 
             
         end
         

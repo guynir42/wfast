@@ -27,6 +27,10 @@ function [M,V] = im_stats(Im, varargin)
     input.input_var('output', 'median'); 
     input.scan_vars(varargin{:}); 
     
+    if isempty(Im)
+        error('Got an empty input!'); 
+    end
+    
     [C, P, D] = util.img.jigsaw(Im, 'partial', 0, varargin{:}); % get cutouts, positions of centers, and dimensions
     
     if cs(input.method, 'median')

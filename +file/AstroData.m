@@ -61,12 +61,15 @@ classdef AstroData < dynamicprops
         
     end
     
-%     properties(Access=private)
-%         
-%         positions_;
-%         positions_bg_;
-%         
-%     end
+    properties(Hidden=true)
+    
+        list_dynamic_props = {}; 
+        list_permanent_props = {'list_permanent_props', 'list_dynamic_props', ...
+            'positions', 'positions_bg', 'object_idx', ... 
+            'forced_indices', 'unlocked_indices', 'dynamic_indices', ...
+            'coordinates', 'magnitudes', 'temperatures'}; 
+        
+    end
     
     methods % constructor
         
@@ -101,6 +104,30 @@ classdef AstroData < dynamicprops
     end 
     
     methods % other utilities
+        
+        function addProp(obj, name, value, make_permanent)
+            
+            if nargin<3
+                value = [];
+            end
+            
+            if nargin<4 || isempty(make_permanent)
+                make_permanent = 0;
+            end
+            
+            if ~isprop(obj, name)
+                addprop(obj, name); 
+                obj.list_dynamic_props{end+1} = name; 
+                
+                if make_permanent
+                    obj.list_permanent_props{end+1} = name; % add to the list of things that don't get cleared each batch
+                end
+                
+            end
+            
+            obj.(name) = value; 
+            
+        end
         
 %         function takeFrom(obj, other)
 %             error('Do not use this!');
@@ -146,42 +173,62 @@ classdef AstroData < dynamicprops
         
         function clear(obj) % set to empty all the data products, and get ready for a new batch
             
-            obj.images = [];
+%             list = properties(obj);
+            list = properties(file.AstroData);
             
-            obj.timestamps = [];
-            obj.t_start = [];
-            obj.t_end = [];
-            obj.t_end_stamp = [];
-            obj.juldates = [];
+            for ii = 1:length(list)
+                
+%                 P = findprop(obj, list{ii});
+                
+%                 if ~isempty(P.DefiningClass) && isequal(P.DefiningClass.Name, 'file.AstroData') && ...
+                  if ~contains(list{ii}, obj.list_permanent_props) % also exclude some other properties
+                    obj.(list{ii}) = []; % clear everything, not including dynamic properties
+                end
+                
+            end
             
-            obj.cutouts = [];
+            % clear the dynamically allocated properties as well... 
+            for ii = 1:length(obj.list_dynamic_props)
+                obj.(obj.list_dynamic_props{ii}) = []; 
+            end
             
-            obj.positions = [];
-            obj.coordinates = [];
-            obj.magnitudes = [];
-            obj.temperatures = [];
-        
-            obj.cutouts_bg = [];
-            obj.positions_bg = [];
             
-            obj.stack = [];
-            obj.num_sum = [];
-            
-            obj.psfs = [];
-            obj.sampling_psf = [];
-            
-            obj.fluxes = [];
-            obj.errors = [];
-            obj.areas = [];
-            obj.backgrounds = [];
-            obj.variances = [];
-            obj.offsets_x = [];
-            obj.offsets_y = [];
-            obj.centroids_x = [];
-            obj.centroids_y = [];
-            obj.widths = [];
-            obj.bad_pixels = [];
-            obj.flags = [];
+%             obj.images = [];
+%             
+%             obj.timestamps = [];
+%             obj.t_start = [];
+%             obj.t_end = [];
+%             obj.t_end_stamp = [];
+%             obj.juldates = [];
+%             
+%             obj.cutouts = [];
+%             
+%             obj.positions = [];
+%             obj.coordinates = [];
+%             obj.magnitudes = [];
+%             obj.temperatures = [];
+%         
+%             obj.cutouts_bg = [];
+%             obj.positions_bg = [];
+%             
+%             obj.stack = [];
+%             obj.num_sum = [];
+%             
+%             obj.psfs = [];
+%             obj.sampling_psf = [];
+%             
+%             obj.fluxes = [];
+%             obj.errors = [];
+%             obj.areas = [];
+%             obj.backgrounds = [];
+%             obj.variances = [];
+%             obj.offsets_x = [];
+%             obj.offsets_y = [];
+%             obj.centroids_x = [];
+%             obj.centroids_y = [];
+%             obj.widths = [];
+%             obj.bad_pixels = [];
+%             obj.flags = [];
             
         end
                 

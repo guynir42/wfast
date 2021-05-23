@@ -120,13 +120,11 @@ classdef FigHandler < handle
                 
         function findFigure(obj, name, varargin)
         
-            import util.text.cs
-            
             list = get(groot, 'Children');
             
             for ii = 1:length(list)
                
-                if cs(list(ii).Name, name)
+                if strcmp(list(ii).Name, name)
                    
                     obj.fig = list(ii);
                     break;

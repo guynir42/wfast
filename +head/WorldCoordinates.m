@@ -1,5 +1,8 @@
 classdef WorldCoordinates < handle
-
+% Class to contain transformations between chip coordinates and sky coordinates. 
+%
+% Ref for TPV coeffs: https://fits.gsfc.nasa.gov/registry/tpvwcs/tpv.html
+    
     properties(Transient=true)
         
     end
@@ -101,6 +104,22 @@ classdef WorldCoordinates < handle
                 val = reshape(obj.CD, [2,2]); 
             else
                 val = [];
+            end
+            
+        end
+        
+        function val = get.PV(obj)
+            
+            if isempty(obj.PV)
+                val = obj.PV;
+            elseif isequal(size(obj.PV), [40,2])
+                val = obj.PV;
+            elseif isequal(size(obj.PV), [1,80])
+                obj.PV = reshape(obj.PV', [40,2]); % fix bug where sometimes the PV coeffs get shuffled
+                val = obj.PV; 
+            else
+                warning('PV coefficients size %dx%d is inconsistent with expected 40x2.', size(obj.PV,1), size(obj.PV,2)); 
+                val = obj.PV;
             end
             
         end
@@ -261,9 +280,29 @@ classdef WorldCoordinates < handle
                 Dec = head.Ephemeris.sex2deg(Dec);
             end
             
-            func = @(xy) sum(([RA, Dec] - obj.xy2coo(xy(1), xy(2)) ).^2); % minimization function
+            if length(RA)==2 && (nargin<3 || isempty(Dec))
+                Dec = RA(2); 
+                RA = RA(1); 
+            end
             
+%             func = @(xy) sum( abs( [RA, Dec] - obj.xy2coo(xy(1), xy(2)) ) ); % minimization function
+
+            func = @(xy) obj.dist_func(xy, RA, Dec); 
+
             XY = fminsearch(func, obj.CRPIX); % initial guess is middle of field 
+            
+        end
+        
+        function val = dist_func(obj, xy, RA, Dec)
+            
+            RA_Dec = obj.xy2coo(xy(1),xy(2)); 
+            
+            dRA = head.Ephemeris.angleDifference(RA, RA_Dec(1)); 
+            dDE = head.Ephemeris.angleDifference(Dec, RA_Dec(2)); 
+            
+            val = dRA.^2 + dDE.^2; 
+            
+%             fprintf('x= %f | y= %f | dRA= %f | dDE= %f | diff= %f\n', xy, dRA, dDE, val);
             
         end
         

@@ -119,6 +119,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         OBJDEC;
         OBJRA_DEG;
         OBJDEC_DEG;
+        OBJMAG; % keep track of the magnitude of the object, if known 
         
         % hardware (mount) coordinates
         TELRA; % telescope RA reported from hardware in sexagesimal hour string
@@ -313,6 +314,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
                 end
 
             end
+            
+        end
+        
+        function val = filter_range(obj)
+            
+            val = obj.FILT_WAVE + [-0.5 0.5].*obj.FILT_WIDTH;
             
         end
         
@@ -840,6 +847,22 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             end
             
         end
+        
+        function set.FILT_WAVE(obj, val)
+            
+            if ~isempty(obj.filter_obj)
+                obj.filter_obj.wavelength = val; 
+            end
+            
+        end
+        
+        function set.FILT_WIDTH(obj, val)
+            
+            if ~isempty(obj.filter_obj)
+                obj.filter_obj.bandwidth= val; 
+            end
+            
+        end
 
         % ephemeris
         function set.OBJECT(obj, val)
@@ -1069,7 +1092,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
             if ~isempty(obj.PIXSIZE), matlab.io.fits.writeKey(file_ptr, 'YPIXSZ',obj.PIXSIZE, 'microns'); end
             if ~isempty(obj.BINX), matlab.io.fits.writeKey(file_ptr, 'XBINNING',obj.BINX); end
             if ~isempty(obj.BINY), matlab.io.fits.writeKey(file_ptr, 'YBINNING',obj.BINY); end
-            if ~isempty(obj.FILTER), matlab.io.fits.writeKey(file_ptr, 'FILTER',obj.FILTER); end
+            if ~isempty(obj.FILTER), matlab.io.fits.writeKey(file_ptr, 'FILTER',obj.FILTER); end            
+            if ~isempty(obj.FILTER), matlab.io.fits.writeKey(file_ptr, 'FILT_WAVE',obj.FILT_WAVE); end
+            if ~isempty(obj.FILTER), matlab.io.fits.writeKey(file_ptr, 'FILT_WIDTH',obj.FILT_WIDTH); end
             if ~isempty(obj.TYPE), matlab.io.fits.writeKey(file_ptr, 'IMAGETYP', obj.TYPE); end
             if ~isempty(obj.FOCLEN), matlab.io.fits.writeKey(file_ptr, 'FOCALLEN',obj.FOCLEN*10, 'mm'); end
             if ~isempty(obj.APERTURE), matlab.io.fits.writeKey(file_ptr, 'APTDIA', obj.APERTURE*10, 'mm'); end

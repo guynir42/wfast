@@ -69,7 +69,7 @@ classdef InputGUI < handle
             obj.buttons = {};
             obj.menus = {};
             
-            obj.fig = util.plot.FigHandler('input parameters');
+            obj.fig = util.plot.FigHandler(sprintf('input parameters %s', obj.owner.input_object_name));
             obj.fig.clear;
             obj.fig.height = 10;
             obj.fig.width = 6;
@@ -94,7 +94,13 @@ classdef InputGUI < handle
             for ii = 1:N
                 
                 obj.panel_inputs.addButton(['button_' list{ii}], '', 'custom', list{ii}, '', '', 0.4, '', '', obj.owner.comment_dictionary.(list{ii}));
-                obj.panel_inputs.addButton(['input_' list{ii}], list{ii}, 'input generic', ' ', '', '', 0.6, '', '', obj.owner.comment_dictionary.(list{ii}));
+                if obj.owner.logical_dictionary.(list{ii})
+                    obj.panel_inputs.addButton(['input_' list{ii}], list{ii}, 'toggle', list{ii}, list{ii}, '', 0.6, obj.color_on, 'k', obj.owner.comment_dictionary.(list{ii}));
+                elseif isobject(obj.owner.(list{ii})) % obj.owner.nested_dictionary.(list{ii})
+                    obj.panel_inputs.addButton(['input_' list{ii}], list{ii}, 'push', 'Object GUI', '', '', 0.6, '', '', obj.owner.comment_dictionary.(list{ii}));
+                else
+                    obj.panel_inputs.addButton(['input_' list{ii}], list{ii}, 'input generic', ' ', '', '', 0.6, '', '', obj.owner.comment_dictionary.(list{ii}));
+                end
                 
             end
             

@@ -167,6 +167,7 @@ class Photometry{
 	
 	void parseInputs(int nrhs, const mxArray *prhs[]);
 	void ingestParameters(Parameters new_pars); 
+	void setupDefaultApertures(Parameters *this_pars);
 	mxArray *outputStruct(float **output, int num_fluxes=1); // wrap up the output matrices as a nice matlab style array
 	mxArray *outputAverages(); // add a struct with the average offsets and widths
 	mxArray *outputMetadataStruct(); // add a struct with some of the parameters and the different aperture masks used

@@ -28,7 +28,7 @@ classdef Filter < handle
     
     properties(Hidden=true)
         
-        version = 1.00; 
+        version = 1.01; 
 
     end
     
@@ -91,15 +91,19 @@ classdef Filter < handle
                 obj.bandwidth = 390;
                 obj.name = 'K';
             elseif cs(filter_type, 'F505W', 'luminance')
-                obj.wavelength = 550;
-                obj.bandwidth = 300;
+                obj.wavelength = 505;
+                obj.bandwidth = 105;
                 obj.name = 'F505W';
                 % add more filters! 
             elseif cs(filter_type, 'F510W', 'luminance')
-                obj.wavelength = 550;
-                obj.bandwidth = 300;
+                obj.wavelength = 505;
+                obj.bandwidth = 105;
                 obj.name = 'F510W';
-                % add more filters! 
+                % add more filters!
+            elseif cs(filter_type, 'F600W', 'luminance')
+                obj.wavelength = 600;
+                obj.bandwidth = 100;
+                obj.name = 'F510W';
             else
                 error(['Unknown filter: ' filter_type ' try U,B,V, etc.']);
             end

@@ -42,6 +42,10 @@ function [table_props, I_reduced] = quick_find_stars(I, varargin)
     input.input_var('unflagged', 0, 'flagged'); % only leave rows which have flag==0
     input.scan_vars(varargin{:});
     
+    if isempty(I)
+        error('Got an empty input!'); 
+    end
+    
     if isempty(input.edges)
         input.edges = input.dilate.*2;
     end

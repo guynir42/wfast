@@ -38,10 +38,19 @@ classdef InputVars < dynamicprops
 % >> func([10 12 9], [0.1 0.2 0.3], [0.1 0.2 0.3])
 % These two calls are equivalent when "use_ordered_numeric" is true.  
 % 
+% NESTED INPUTS: you can give as a default argument another InputVars object
+% which means you will be able to give a cell array with key-val pairs as an
+% input and that cell array will be parsed into a nested object. 
+% EXAMPLE: 
+% >> input.input_var('nested', util.text.InputVars); % subset of parameters 
+% Then the function can be called:
+% >> func('nested', {'sub_key1', sub_value1, 'sub_key2', sub_value2}, ...) 
+%
 
     properties(Hidden=true, Transient=true)
         
         graphic_user_interface; 
+        input_object_name = ''; % optional name to give to this object so it opens a GUI in a different figure
         
     end
 
@@ -50,6 +59,7 @@ classdef InputVars < dynamicprops
         alias_dictionary; % keep track of the names of each of the parameters
         default_dictionary; % keep track of the original values (defaults) 
         logical_dictionary; % keep track which parameter is logical (use parse_bool to scan inputs)
+        nested_dictionary; % keep track of which inputs are nested InputVars objects
         number_dictionary; % keep track of the minimal number of letters required for util.text.cs to match
         comment_dictionary; % keep a comment for some of the keywords
         
@@ -66,6 +76,7 @@ classdef InputVars < dynamicprops
             obj.alias_dictionary = struct;
             obj.default_dictionary = struct;
             obj.logical_dictionary = struct;
+            obj.nested_dictionary = struct; 
             obj.number_dictionary = struct;
             obj.comment_dictionary = struct;
             
@@ -136,13 +147,20 @@ classdef InputVars < dynamicprops
             obj.(name) = default_value;
             
             obj.default_dictionary.(name) = default_value;
-            
+                        
             if isa(default_value, 'logical')
                 obj.logical_dictionary.(name) = 1;
             else
                 obj.logical_dictionary.(name) = 0;
             end
-
+            
+            if isa(default_value, 'util.text.InputVars')
+                obj.nested_dictionary.(name) = 1; 
+                obj.(name).input_object_name = name; 
+            else
+                obj.nested_dictionary.(name) = 0; 
+            end
+            
             if nargin<4 || isempty(varargin)
                 obj.alias_dictionary.(name) = {};
                 obj.number_dictionary.(name) = []; % no restriction on the number of letters required for a match
@@ -162,7 +180,7 @@ classdef InputVars < dynamicprops
             end
             
             obj.comment_dictionary.(name) = ''; 
-                
+            
         end
         
         function add_comment(obj, name, comment)
@@ -213,9 +231,9 @@ classdef InputVars < dynamicprops
                 val = varargin{ii+1};
                 
                 if isnumeric(key)
-                    error(['Input keyword-value pair is broken. Expected string but got ' num2str(key(1:10)) ' instead'])
+                    error(['Input keyword-value pair is broken. Expected string but got ' num2str(key(1:min(length(key), 10))) ' instead']);
                 elseif ~ischar(key)
-                    error(['Input keyword-value pair is broken. Expected string but got ' class(key) ' instead'])
+                    error(['Input keyword-value pair is broken. Expected string but got ' class(key) ' instead']);
                 end
                 
                 if util.text.cs(key, 'print') && ischar(val) && util.text.cs(val, 'pars', 'parameters')
@@ -228,6 +246,16 @@ classdef InputVars < dynamicprops
                     if util.text.cs(key, [all_keys{jj}, obj.alias_dictionary.(all_keys{jj}), obj.number_dictionary.(all_keys{jj})])
                         if obj.logical_dictionary.(all_keys{jj})
                             obj.(all_keys{jj}) = util.text.parse_bool(val);
+                        elseif obj.nested_dictionary.(all_keys{jj})
+                            
+                            if isa(val, 'util.text.InputVars')
+                                obj.(all_keys{jj}) = val; % replace the InputVars with a new one
+                            elseif iscell(val)
+                                obj.(all_keys{jj}).scan_vars(val{:}); % scan the nested parameter list
+                            else
+                                error('Value given to nested InputVars is a "%s". Use a cell or another InputVars...', class(val)); 
+                            end
+                            
                         else
                             obj.(all_keys{jj}) = val;
                         end
@@ -266,7 +294,7 @@ classdef InputVars < dynamicprops
             
             for ii = 1:length(keys)
                 
-                val = obj.alias_dictionary.(keys(ii));
+                val = obj.alias_dictionary.(keys{ii});
                 
                 fprintf('%15s', keys{ii});
                 if isprop(obj, keys{ii})
@@ -278,6 +306,8 @@ classdef InputVars < dynamicprops
                         fprintf(' = "%s"', obj.(keys{ii}));
                     elseif islogical(obj.(keys{ii}))
                         fprintf(' = %d', obj.(keys{ii}));
+                    elseif isa(obj.(keys{ii}), 'util.text.InputVars')
+                        fprintf(' = InputVars'); 
                     end
                 end
                 

@@ -90,13 +90,20 @@ int parseIndex(int nrhs, const mxArray *prhs[]){ // choose index for persistent 
 	
 }
 
+void Photometry::setupDefaultApertures(Parameters *this_pars){
+	
+	this_pars->num_radii=3; 
+	this_pars->ap_radii[0]=3;
+	this_pars->ap_radii[1]=5;
+	this_pars->ap_radii[2]=7; 
+}
+
 Photometry::Photometry(){ // class constructor
 
 	// cannot instantiate an array in the header file!
 	// consider changing these defaults at some point... 
-	pars.ap_radii[0]=3;
-	pars.ap_radii[1]=5;
-	pars.ap_radii[2]=7; 
+	
+	setupDefaultApertures(&pars);
 	
 }
 
@@ -371,6 +378,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 	
 	// before parsing varargin, must setup defaults
 	Photometry::Parameters new_pars; 
+	setupDefaultApertures(&new_pars);
 	
 	for(int i=1;i<nrhs;i+=2){ // parse varargin
 		
@@ -386,11 +394,13 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			if(val==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
 			if(mxIsNumeric(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumeric", "Input %d to photometry is not numeric...", i+2);
 			
-			// temporary values
-			new_pars.ap_radii=(double*) mxGetData(val);
+			// temporary values			
 			new_pars.num_radii=(int) mxGetNumberOfElements(val);
-			std::sort(new_pars.ap_radii, new_pars.ap_radii+new_pars.num_radii); 
 			
+			if(new_pars.num_radii>0){
+				new_pars.ap_radii=(double*) mxGetData(val); 
+				std::sort(new_pars.ap_radii, new_pars.ap_radii+new_pars.num_radii); 
+			}
 		}
 		else if(cs(key, "gaussian", "sigma", "gauss_sigma")){
 			
@@ -428,14 +438,14 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			if(val==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
 			if(mxIsEmpty(val)) continue;
 			if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericSingle", "Input %d to photometry is not a numeric scalar!", i+2);
-			pars.gain=mxGetScalar(val);
+			new_pars.gain=mxGetScalar(val);
 			
 		}
 		else if(cs("key", "scintillation_fraction")){
 			if(val==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
 			if(mxIsEmpty(val)) continue;
 			if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericSingle", "Input %d to photometry is not a numeric scalar!", i+2);
-			pars.scintillation_fraction=mxGetScalar(val);
+			new_pars.scintillation_fraction=mxGetScalar(val);
 			
 		}
 		else if(cs(key, "resolution", "shift resolution")){
@@ -450,7 +460,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
 			else{
 				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
-				pars.num_threads=(int) mxGetScalar(val);
+				new_pars.num_threads=(int) mxGetScalar(val);
 			}
 			
 		}
@@ -458,7 +468,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			if(val==0 || mxIsEmpty(val)) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:notEnoughInputs", "Expected varargin pair for %s at input", key, i+2);
 			else{
 				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
-				pars.num_iterations=(int) mxGetScalar(val);
+				new_pars.num_iterations=(int) mxGetScalar(val);
 			}
 			
 		}
@@ -466,7 +476,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			if(val==0 || mxIsEmpty(val)) pars.use_raw=1; // if no input, assume positive
 			else{
 				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
-				pars.use_raw=parse_bool(val);
+				new_pars.use_raw=parse_bool(val);
 			}
 			
 		}
@@ -474,7 +484,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			if(val==0 || mxIsEmpty(val)) pars.use_centering_aperture=1; // if no input, assume positive
 			else{
 				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
-				pars.use_centering_aperture=parse_bool(val);
+				new_pars.use_centering_aperture=parse_bool(val);
 			}
 			
 		}
@@ -486,7 +496,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 				if(mxIsScalar(val) && (mxIsNumeric(val) || mxIsLogical(val))) value=(bool) mxGetScalar(val); 
 				else if(mxIsChar(val)) value=parse_bool(val); 
 				else mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry must be scalar or string", i+2);
-				pars.use_gaussian=value;
+				new_pars.use_gaussian=value;
 				
 			}
 			
@@ -499,7 +509,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 				if(mxIsScalar(val) && (mxIsNumeric(val) || mxIsLogical(val))) value=(bool) mxGetScalar(val); 
 				else if(mxIsChar(val)) value=parse_bool(val); 
 				else mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry must be scalar or string", i+2);
-				pars.use_apertures=value;
+				new_pars.use_apertures=value;
 				
 			}
 		}
@@ -511,7 +521,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 				if(mxIsScalar(val) && (mxIsNumeric(val) || mxIsLogical(val))) value=(bool) mxGetScalar(val); 
 				else if(mxIsChar(val)) value=parse_bool(val); 
 				else mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry must be scalar or string", i+2);
-				pars.use_forced=value;
+				new_pars.use_forced=value;
 				
 			}
 			
@@ -524,7 +534,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 				if(mxIsScalar(val) && (mxIsNumeric(val) || mxIsLogical(val))) value=(bool) mxGetScalar(val); 
 				else if(mxIsChar(val)) value=parse_bool(val); 
 				else mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry must be scalar or string", i+2);
-				pars.use_median=value;
+				new_pars.use_median=value;
 				
 			}
 			
@@ -537,7 +547,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 				if(mxIsScalar(val) && (mxIsNumeric(val) || mxIsLogical(val))) value=(bool) mxGetScalar(val); 
 				else if(mxIsChar(val)) value=parse_bool(val); 
 				else mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry must be scalar or string", i+2);
-				pars.use_positives=value;
+				new_pars.use_positives=value;
 				
 			}
 			
@@ -546,7 +556,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 			if(val==0 || mxIsEmpty(val)) pars.debug_bit=1; // if no input, assume positive
 			else{
 				if(mxIsNumeric(val)==0 || mxIsScalar(val)==0) mexErrMsgIdAndTxt("MATLAB:util:img:photometry:inputNotNumericScalar", "Input %d to photometry is not a numeric scalar...", i+2);
-				pars.debug_bit=(int) mxGetScalar(val);
+				new_pars.debug_bit=(int) mxGetScalar(val);
 			}
 			
 		}
@@ -622,6 +632,19 @@ void Photometry::ingestParameters(Photometry::Parameters new_pars){ // for each 
 		deleteMasks(); 
 		pars.resolution=new_pars.resolution;
 	}
+	
+	pars.gain = new_pars.gain;
+	pars.scintillation_fraction = new_pars.scintillation_fraction;
+	pars.num_threads = new_pars.num_threads;
+	pars.num_iterations = pars.num_iterations;
+	pars.use_raw = new_pars.use_raw;
+	pars.use_centering_aperture = new_pars.use_centering_aperture;
+	pars.use_gaussian = new_pars.use_gaussian;
+	pars.use_apertures = new_pars.use_apertures;
+	pars.use_forced = new_pars.use_forced;
+	pars.use_median = new_pars.use_median;
+	pars.use_positives = new_pars.use_positives;
+	
 	
 }
 
@@ -897,6 +920,9 @@ void Photometry::deleteGaussianMasks(){
 // ACTUAL CALCULATIONS!
 
 void Photometry::run(){ // run photometry on all cutouts! the results are put into various sub-arrays of "output"
+
+	// for(int i=0;i<pars.num_radii;i++) printf("%4.2f ", pars.ap_radii[i]);
+	// printf("\n");
 
 	if(pars.num_threads<=1){ // single threaded case
 		for(int j=0;j<num_cutouts;j++){ // number of cutouts
@@ -1448,7 +1474,7 @@ void Photometry::calculateForced(int j){
 
 int Photometry::getShiftIndex(float x, float y){ // find the index closest to the specific shift value x and y in the shift matrices (dx and dy)
 	
-	// first make sure there are not shifts that are too big or too small
+	// first make sure there are no shifts that are too big or too small
 	if(x<dx[0]) x=dx[0];
 	if(y<dy[0]) y=dy[0];
 	if(x>dx[num_shifts-1]) x=dx[num_shifts-1];
