@@ -1,10 +1,11 @@
-function M_out = mad2(M,varargin)
+function m = mad2(I, varargin)
+% Usage: m = mad2(I, varargin)
 % Finds the Median Absolute Deviation of an image (MAD). 
-% Usage: mad2(M, varargin)
 % More robust than variance/standard deviation. 
 %
-% Input: A matrix (can be 3D or 4D, using loops...). 
-% Output: The median (or mean) absolute deviation (can be 3D or 4D vector).
+% Input: A matrix of arbitrary dimensions. Calculates MAD for each 2D image. 
+% Output: The median (or mean) absolute deviation (3rd and higher dims are 
+% the same size as input).
 % OPTIONAL ARGUMENTS:
 %   -type: choose 'median' (default) or 'mean'
 %   -multiply or sigma: use this flag to multiply the return values to
@@ -14,10 +15,7 @@ function M_out = mad2(M,varargin)
     import util.text.cs;
     import util.text.parse_bool;
 
-    if nargin==0
-        help('util.stat.mad2');
-        return;
-    end
+    if nargin==0, help('util.stat.mad2'); return; end
 
     type = 1; % this is for 'median', 0 is for 'mean'
     sigma = 0;
@@ -40,20 +38,20 @@ function M_out = mad2(M,varargin)
         
     end
     
-    M_out = zeros(1,1,size(M,3), size(M,4));
-
-    for ii = 1:size(M,3)
-        for jj = 1:size(M,4)
-            single_image = M(:,:,ii,jj);
-            M_out(1,1,ii,jj) = mad(single_image(:), type);
-        end
+    S = size(I); 
+    
+    if ismatrix(I)
+        m = mad(I(:), type); 
+    else
+        I = reshape(I,[S(1).*S(2), 1, S(3:end)]); 
+        m = mad(I, type,1); 
     end
     
     if sigma % match to standard deviation (for normal dist. only!)
         if type
-            M_out = M_out*1.4826;
+            m = m*1.4826;
         else
-            M_out = M_out*1.253;
+            m = m*1.253;
         end
     end
     

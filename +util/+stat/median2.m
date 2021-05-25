@@ -1,20 +1,18 @@
-function M = median2(I)
-% Calculates the median of each image in the input matrix. 
-% Accepts 2D, 3D and 4D matrices. 
-% Outputs a 3D or 4D result. 
+function m = median2(I)
+% Usage: m = median2(I)
+% Calculate the median of each 2D image in the data input I (ignoring NaNs!). 
+% The output "m" will have the same dimensions as the input for all
+% dimensions higher than 2, 1st and 2nd dimensions are 1x1.  
 
-    if nargin==0
-        help('util.stat.median2');
-        return;
+    if nargin==0, help('util.stat.median2'); return; end
+    
+    S = size(I); 
+    
+    if ismatrix(I)
+        m = nanmedian(I(:)); % just find the global median
+    else
+        I = reshape(I, [S(1).*S(2), 1, S(3:end)]); 
+        m = nanmedian(I,1); 
     end
-
-    M = zeros(1,1,size(I,3), size(I,4), 'like', I);
-
-    for ii = 1:size(I,3)
-        for jj = 1:size(I,4)
-            single_image = I(:,:,ii,jj);
-            M(1,1,ii,jj) = nanmedian(single_image(:));
-        end
-    end
-
+    
 end
