@@ -1078,7 +1078,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                             if strcmp(ME.identifier, 'MATLAB:structRefFromNonStruct')
                                 RA = NaN;
                                 DEC = NaN; 
-                                util.text.date_printf('Could not resolve name "%s" with convert2equatorial()!', keyword);
+                                if obj.debug_bit, util.text.date_printf('Could not resolve name "%s" with convert2equatorial()!', keyword); end
                                 return; 
                             else
                                 RA = NaN;
@@ -1089,7 +1089,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                         end
                         
                         if isnan(RA) || isnan(DEC) % failed to resolve using JPL also
-                            util.text.date_printf('Could not resolve name "%s" with convert2equatorial()!', keyword);
+                            if obj.debug_bit, util.text.date_printf('Could not resolve name "%s" with convert2equatorial()!', keyword); end
                             return;
                         end
                         
@@ -1111,7 +1111,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                     end
                     
                     if isnan(RA) || isnan(DEC)
-                        util.text.date_printf('Could not resolve name "%s" with coo_resolver()!', keyword); 
+                        if obj.debug_bit, util.text.date_printf('Could not resolve name "%s" with coo_resolver()!', keyword); end
                         return;
                     end
 

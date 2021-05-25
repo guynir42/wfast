@@ -285,6 +285,16 @@ classdef CircularBuffer < dynamicprops
             end
             
         end
+       
+        function back(obj) % move the index and counter back one step (does not change the data, but prepares the object for a replacement matrix)
+            
+            obj.idx = obj.idx - 1;
+            if obj.idx<1
+                obj.idx = obj.N;
+            end
+            obj.counter = obj.counter - 1;
+            
+        end
         
     end
     

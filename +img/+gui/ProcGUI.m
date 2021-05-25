@@ -178,7 +178,7 @@ classdef ProcGUI < handle
             obj.panel_objects.addButton('button_calibration', 'cal', 'push', 'Calibration', '', '', 0.5, '', '', 'open the GUI for the calibration object'); 
             obj.panel_objects.addButton('button_reader', 'reader', 'push', 'Reader', '', '', 0.5, '', '', 'open the GUI for the file reader'); 
             obj.panel_objects.addButton('button_photometry', 'phot', 'push', 'Photometry', '', '', 0.5, '', '', 'open the GUI for photometry object'); 
-            obj.panel_objects.addButton('button_lightcurves', 'lightcurves', 'push', 'Lightcurves', '', '', 0.5, '', '', 'open the GUI for the lightcurves object'); 
+            obj.panel_objects.addButton('button_lightcurves', 'light', 'push', 'Lightcurves', '', '', 0.5, '', '', 'open the GUI for the lightcurves object'); 
             obj.panel_objects.addButton('button_pars', 'pars', 'push', 'Parameters', '', '', 0.5, '', '', 'open the GUI for parameters'); 
             obj.panel_objects.addButton('button_head', 'head', 'push', 'Header', '', '', 0.5, '', '', 'open the GUI for the header object'); 
             obj.panel_objects.number = num_buttons;

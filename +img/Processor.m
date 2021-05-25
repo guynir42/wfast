@@ -24,8 +24,15 @@ classdef Processor < dynamicprops
         pars@util.text.InputVars; % store all controls in this
         last_pars@util.text.InputVars; % parameters used in latest run
         
-        data@file.AstroData; % keep track of all the regular data objects, and can dynamically add more (clear all every file)
+        data@struct; % file.AstroData; % keep track of all the regular data objects, and can dynamically add more (clear all every file)
+        buffer@struct; % file.AstroData; % keep a few sets of data from previous files to calculate deeper stats
         data_logs@struct; % struct with data collected for all images across entire run 
+        
+        timings = struct; % collect how much time (seconds) each part of the analysis takes
+        
+        futures = {}; % used for running asynchronuous tasks
+        
+        func_handle; % generic function that takes as input the "data" object and modifies it, and also gets the "pars" object (can also give a cell of function handles)
         
         % ... add streak detection maybe?
         
@@ -33,12 +40,20 @@ classdef Processor < dynamicprops
     
     properties % inputs/outputs
         
-        timings = struct; % collect how much time (seconds) each part of the analysis takes
+        file_index = 1;
         
-        futures = {}; % used for running asynchronuous tasks
-        
-        func_handle; % generic function that takes as input the "data" object and modifies it, and also gets the "pars" object (can also give a cell of function handles)
+        to_process_index = 1; 
                 
+        % references for quick_align 
+        ref_image = [];
+        ref_positions = [];
+        
+        forced_coordinates = {};
+        forced_indices = []; 
+        
+        % table with find_stars results
+        stars; 
+        
     end
     
     properties % switches/controls
@@ -58,23 +73,24 @@ classdef Processor < dynamicprops
        
         brake_bit = 1; % when running, this is 0, when it is turned to 1 (e.g., by GUI) the run is paused
         
+        buf_idx = 1; % which buffer are we looking at right now
+        prev_buf_idx = 0; % previously processed buffer
+        
         phot_ap_idx = []; % index of photometric types ("aperture index")
         
         % these are interpreted from e.g., coordinates 
         fits_roi_position = []; % center of the ROI x,y position in pixels
         fits_roi_size = []; % height and width of the ROI in pixels
-                
+        
         forced_cutout_motion_per_file = []; 
         
-        file_index = 1;
         failed_file_counter = 0;
         
         backup_pars@util.text.InputVars;
         
         output_folder_name = ''; % folder containing the processed data and logs (e.g., process_2021-05-21)
         
-        
-        version = 1.01;
+        version = 1.02;
         
     end
     
@@ -107,7 +123,6 @@ classdef Processor < dynamicprops
 
                 obj.prog = util.sys.ProgressBar;
                 
-                obj.makeDataObject;
                 obj.makeParsObject;
                 obj.reset;
                 
@@ -127,6 +142,13 @@ classdef Processor < dynamicprops
             obj.pars.input_var('threshold', 5); obj.pars.add_comment('how many "sigma" above the noise'); 
             obj.pars.input_var('saturation', 5e4); obj.pars.add_comment('for a single image, if stack is read, this is multiplied by num_sum'); 
             obj.pars.input_var('use_bg_map', false, 6); obj.pars.add_comment('if true, will adjust each point in the stack by the interpolated b/g values, instead of the median value'); 
+            
+            obj.pars.input_var('use_coadds', true); obj.pars.add_comment('produce deeper coadds and use them for finding stars, CR mask, etc.'); 
+            obj.pars.input_var('coadd_size', 10); obj.pars.add_comment('how many files should be loaded into one coadd'); 
+            obj.pars.input_var('coadd_method', 'sum'); obj.pars.add_comment('how to coadd images, use "sum", "median", etc...'); 
+            
+            obj.pars.input_var('redo_photometry_distance', 2); obj.pars.add_comment('maximum pixel shift above which we redo photometry for that file'); 
+            obj.pars.input_var('realign_attempts', 2); obj.pars.add_comment('how many times to try to realign the positions before failing that file'); 
             
             obj.pars.input_var('lock_adjust', 'stars'); 
             obj.pars.add_comment(sprintf('which cutouts should be moved together (locked), which can move separately (unlocked).\n Choose "all", "none", or "stars" that only locks targets with GAIA magnitudes')); 
@@ -163,7 +185,7 @@ classdef Processor < dynamicprops
             obj.pars.fits.input_var('roi_position', [], 6); obj.pars.fits.add_comment('define the center point of the ROI as [x,y] in pixels');             
             obj.pars.fits.input_var('roi_coordinates', [], 6, 'roi_coords'); obj.pars.fits.add_comment('define the center of the ROI as [RA, Dec] in degrees. Or "header" to copy coordinates from the header.'); 
             obj.pars.fits.input_var('use_flip', false, 6); obj.pars.fits.add_comment('flip the image by 180 degrees before saving to FITS (this is done after cutting out the ROI'); 
-            obj.pars.fits.input_var('use_coadd', false, 6); obj.pars.fits.add_comment('save FITS images of coadded images'); 
+            obj.pars.fits.input_var('use_coadds', false, 6); obj.pars.fits.add_comment('save FITS images of coadded images'); 
             obj.pars.fits.input_var('directory', 'FITS'); obj.pars.fits.add_comment('what to call the folder where FITS files are saved (relative to original file directory or absolute path'); 
             obj.pars.fits.input_var('rename', '', 'name', 'filename'); obj.pars.fits.add_comment('rename each FITS file to this string, followed by a zero padded serial number'); 
             obj.pars.fits.input_var('use_finding', true); obj.pars.fits.add_comment('save a finding chart PNG of the first image'); 
@@ -178,17 +200,62 @@ classdef Processor < dynamicprops
             
         end
         
-        function makeDataObject(obj)
+        function data_out = makeDataStruct(obj)
             
-            obj.data = file.AstroData; 
-            obj.data.addProp('image_proc'); % image after calibration
-            obj.data.addProp('image_cut'); % image after calibration and removing cutouts 
-            obj.data.addProp('cutouts_sub'); % cutouts after background subtraction
-            obj.data.addProp('fwhm'); % FWHM for each cutout, in arcsec
-            obj.data.addProp('psf_width'); % best estimate for the average PSF width (gaussian sigma)
-            obj.data.addProp('stars'); % a table with the results from quick_find_stars
+            data_out = struct; % make a new struct
             
-            obj.data.addProp('forced_coordinates', {}); 
+            % these fields basically follow what is in file.AstroData, but it is easier to work with a struct
+            
+            data_out.images = []; % this is raw images and it is usually what we save on file
+        
+            data_out.timestamps = []; % output timestamps (if available)
+            data_out.t_start = []; % absolute date and time (UTC) when first image is taken
+            data_out.t_end = []; % absolute date and time (UTC) when batch is finished
+            data_out.t_end_stamp = []; % timestamp when batch is finished (hopefully, this is the same time that t_end is recorded). 
+         
+            data_out.juldates = []; % translation of timestamps to julian date using t_end_stamp
+        
+            data_out.stack  = [];% sum of the full frame image
+            data_out.num_sum = []; % if the images are summed, how many frames were added. If equal to 1, the sum is the same as the images. 
+        
+            data_out.cutouts = []; % this is raw cutouts and it is usually what we save on file
+            data_out.positions = []; % only for cutouts. a 2xN matrix (X then Y, N is the number of cutouts). 
+            data_out.object_idx = []; % what is the index of the object closest to the coordinates given
+            
+            data_out.image_proc = []; % image after calibration
+            data_out.image_cut = []; % image after calibration and removing cutouts 
+            data_out.cutouts_sub = []; % cutouts after background subtraction
+            data_out.positions_new = []; % positions after adjustments based on star positions
+            data_out.fwhm = []; % FWHM for each cutout, in arcsec
+            data_out.fwhm_interp = []; % FWHM intepolated using a 2D polynomial fit to the non-NaN FWHM values
+            data_out.psf_width = []; % best estimate for the average PSF width (gaussian sigma)
+            
+            data_out.exposure_time = []; 
+            data_out.file_index = []; 
+            
+            data_out.coadd_image = []; 
+            data_out.coadd_number = [];
+            data_out.coadd_exposure = []; 
+            
+        end
+        
+        function data_out = makeDataObject(obj) % to be deprecated! 
+            
+            data_out = file.AstroData; 
+            data_out.addProp('image_proc'); % image after calibration
+            data_out.addProp('image_cut'); % image after calibration and removing cutouts 
+            data_out.addProp('cutouts_sub'); % cutouts after background subtraction
+            data_out.addProp('positions_new'); % positions after adjustments based on star positions
+            data_out.addProp('fwhm'); % FWHM for each cutout, in arcsec
+            data_out.addProp('fwhm_interp'); % FWHM intepolated using a 2D polynomial fit to the non-NaN FWHM values
+            data_out.addProp('psf_width'); % best estimate for the average PSF width (gaussian sigma)
+            
+            data_out.addProp('exposure_time'); 
+            data_out.addProp('file_index'); 
+            
+            data_out.addProp('coadd_image'); 
+            data_out.addProp('coadd_number'); 
+            data_out.addProp('coadd_exposure'); 
             
         end
            
@@ -222,25 +289,21 @@ classdef Processor < dynamicprops
             % the index of the type of photometry
             obj.phot_ap_idx = [];
             
+            % buffer
+            obj.buffer = obj.makeDataStruct; % making a single (empty content) struct means we can later assign full data structures into this
+            
             % info about the run
             obj.data_logs = struct; 
             obj.data_logs.run_date = ''; % date when images were taken (date of beginning of night) in YYYY-MM-DD format
             obj.data_logs.camera = ''; % name of camera (can be e.g., Zyla or Balor)
             obj.data_logs.project = ''; % name of telescope/project (can be e.g., Kraar, LAST or WFAST)
-            obj.data_logs.forced_coordinates = {}; % a cell array with [RA,Dec] (in deg) of cutout added to the list (forced photometry)
             obj.data_logs.fwhm = []; % for each file get the median FWHM (in arcsec)
             obj.data_logs.background = []; % for each file get the median background value from all stars
-                        
-%             % related to find stars 
-%             obj.data.bg_mean = []; % background mean using im_stats (scalar or map)
-%             obj.data.bg_var = []; % background variance using im_stats (scalar or map)
-            
-            % references for quick_align 
-            obj.data_logs.ref_image = []; % save a copy of the first image in the run (used to quick_align)
-            obj.data_logs.ref_positions = []; % save a copy of the first positions in the run (used to quick_align)
+            obj.data_logs.variance = []; % for each file get the median variance value from all stars
             
             % counters
             obj.file_index = 1;
+            obj.to_process_index = 1;
             obj.failed_file_counter = 0;
             
             % parameters
@@ -252,6 +315,10 @@ classdef Processor < dynamicprops
             % clear data logs
             obj.data_logs = struct; 
             
+            % other stuff
+            obj.forced_coordinates = {}; 
+            obj.forced_indices = []; 
+            
             obj.clear;
             
         end
@@ -262,7 +329,7 @@ classdef Processor < dynamicprops
             obj.cat.clear;
             obj.reader.clear;
             
-            obj.data.clear; 
+            obj.data = struct.empty; % remove the handle
             
 %             obj.data.timestamps = []; % the time of the beginning of the acquisition of the image/stack 
 %             obj.data.juldates = []; % matched to global time
@@ -326,10 +393,15 @@ classdef Processor < dynamicprops
 
                     if obj.brake_bit, break; end
 
-                    obj.batch;
-
-                    obj.prog.showif(ii); 
-
+                    obj.load_data;
+                    
+                    drawnow; 
+                    
+                    if mod(obj.file_index - 1, obj.pars.coadd_size)==0 % finished collecting N files
+                        obj.calculateCoadds; 
+                        obj.process; % go over unprocessed files
+                    end
+                    
                 end
             
             catch ME
@@ -399,26 +471,9 @@ classdef Processor < dynamicprops
             
         end
         
-        function str = file_summary(obj)
-           
-            str = sprintf('file: %d/%d', obj.file_index, obj.getNumFiles); 
-            
-            offsets = obj.getAverageOffsets; 
-            fwhm = obj.getAverageFWHM; 
-            
-            if ~isempty(offsets)
-                str = sprintf('%s | dx= %4.2f | dy= %4.2f | FWHM= %4.2f"', str, offsets(1), offsets(2), fwhm); 
-            end
-            
-            if ~isempty(obj.head.AIRMASS)
-                str = sprintf('%s | a.m.= %4.2f', str, obj.head.AIRMASS); 
-            end
-            
-        end
-        
     end
     
-    methods(Hidden=true) % internal calculations
+    methods(Hidden=false) % internal processing
         
         function startup(obj, varargin)
             
@@ -490,7 +545,11 @@ classdef Processor < dynamicprops
             
         end
         
-        function batch(obj)
+        function load_data(obj)
+            
+            if obj.debug_bit>1
+                util.text.date_printf('Loading file number %d.', obj.file_index); 
+            end
             
             try % get the data
                 
@@ -499,6 +558,10 @@ classdef Processor < dynamicprops
                 t0 = tic;
                 
                 obj.reader.batch; % load the images from file
+
+                idx = mod(obj.file_index-1,obj.pars.coadd_size) + 1; % which buffer to fill                
+                idx_prev = mod(obj.file_index-2,obj.pars.coadd_size) + 1; % which buffer to fill
+                obj.data = obj.makeDataStruct; % dump the old data and construct a new object
                 
                 obj.data.images = obj.reader.images;
                 obj.data.stack = obj.reader.stack;
@@ -508,6 +571,9 @@ classdef Processor < dynamicprops
                 obj.data.t_start = obj.reader.t_start;
                 obj.data.t_end = obj.reader.t_end;
                 obj.data.t_end_stamp = obj.reader.t_end_stamp;
+                obj.data.exposure_time = obj.head.EXPTIME; 
+                
+                obj.data.file_index = obj.file_index; 
                 
                 if isempty(obj.data.juldates)
                     % recaclculate it from timestamps
@@ -528,7 +594,6 @@ classdef Processor < dynamicprops
             end
             
             % apply head corrections, if any
-
             for ii = 1:2:length(obj.pars.header)
 
                 if length(obj.pars.header)>ii
@@ -542,11 +607,18 @@ classdef Processor < dynamicprops
                 end
 
             end
-
-            %%%%%%%%%%%%%%%%%%%%% PROCESSING %%%%%%%%%%%%%%%%%%%%%
+            
+            % keep track of some header data for the whole run
+            list = {'airmass', 'alt', 'jd', 'sensor_temp', 'light', 'pressure', ...
+                'humid_out', 'wind_speed', 'wind_dir', 'temp_out', 'focus_pos'};
+            
+            for jj = 1:length(list)
+                s = substruct('.', list{jj}, '()', {obj.file_index,1}); 
+                obj.data_logs = subsasgn(obj.data_logs, s, obj.head.(list{jj})); 
+            end
             
             t0 = tic; %%%%%% run calibration on full-frame images %%%%%%%%
-            
+
             if ~isempty(obj.data.images)
                 obj.data.image_proc = obj.cal.input(obj.data.images); 
                 obj.data.num_sum = 1; 
@@ -555,242 +627,199 @@ classdef Processor < dynamicprops
             else
                 error('Could not find images or stack to process...'); 
             end
-            
+
             obj.addTimingData('calibration', toc(t0));
-            
-            if obj.file_index==1
-                obj.first_batch; 
+    
+            if idx_prev>1 && idx_prev<=length(obj.buffer)
+                obj.data.positions = obj.buffer(idx_prev).positions_new;
             end
             
-            t0 = tic; %%%%%% FITS save %%%%%%%
-            
-            if obj.pars.fits.use_save
-                obj.saveFITS; 
-            end
-            
-            obj.addTimingData('fits', toc(t0));
-            
-            t0 = tic; %%%%%% produce cutouts %%%%%%%%
-            
-            [obj.data.cutouts, obj.data.image_cut] = util.img.mexCutout(obj.data.image_proc, obj.data.positions, obj.pars.cut_size, NaN, NaN); % replace and fill up using NaNs (it is safe, the processed image is single precision
-            
-            N_stars = size(obj.data.cutouts,4); 
-            
-            obj.addTimingData('cutouts', toc(t0)); 
-            
-            t0 = tic; %%%%%% run photometry %%%%%%%%
-            
-            obj.phot.input(obj.data.cutouts, 'positions', obj.data.positions, 'timestamps', obj.data.timestamps, 'juldates', obj.data.juldates); 
-            
-            if isempty(obj.phot_ap_idx)
-                obj.phot_ap_idx = obj.find_phot_ap;
-            end
-            
-            obj.data.cutouts_sub = obj.data.cutouts - permute(obj.phot.backgrounds(:,:,obj.phot_ap_idx), [3,4,1,2]); % subtract the background from the cutouts
-            
-            obj.data_logs.background(obj.file_index,1) = util.stat.median2(obj.phot.backgrounds(:,:,obj.phot_ap_idx)); 
-            
-            obj.addTimingData('photometry', toc(t0)); 
-
-            if ~isempty(obj.phot.gui) && obj.phot.gui.check, obj.phot.gui.update; end
-
-            t0 = tic; %%%%%% adjust positions %%%%%%%%
-            
-            obj.adjustPositions; % use the centroids to push the cutouts a little, and the fluxes to check if we still see the stars (if not, call re-align)
-            
-            obj.flux_buf.input(obj.phot.fluxes(:,:,obj.phot_ap_idx)); % update the flux buffer (used to check the fluxes didn't suddenly disappear)
-            
-            obj.addTimingData('adjust_positions', toc(t0)); 
-
-            t0 = tic; %%%%%% calculate the FWHM %%%%%%
-            
-            idx = obj.pars.fwhm_indices; 
-            
-            idx(idx>N_stars) = []; % remove indices outside the bounds
-            
-            if length(idx)<20 % arbitratry cutoff
-                idx = 1:N_stars; % replace with just all stars instead
-            end
-            
-            C = obj.data.cutouts_sub(:,:,:,idx); % cutouts chosen for FWHM calculation
-            
-            w = NaN(1,N_stars); % all stars that were not chosen for calculation are set to NaN
-            w(idx) = util.img.fwhm(C, 'method', 'filters', 'defocus', obj.data.psf_width).*obj.head.SCALE; 
-            
-            obj.data.fwhm = w;
-            
-            obj.data_logs.fwhm(obj.file_index,1) = nanmedian(w); 
-            
-            obj.addTimingData('fwhm', toc(t0)); 
-
-            t0 = tic; %%%%%% put the data into the Lightcurves object %%%%%%%
-            
-            obj.light.index_flux = obj.phot_ap_idx; % tell this object which aperture index we want to use
-            obj.light.getData(obj.phot); 
-            if obj.light.gui.check, obj.light.gui.update; end
-            
-            obj.addTimingData('lightcurves', toc(t0)); 
-
-            t0 = tic; %%%%% run the custom function %%%%%%%%%%%%%
-            
-            if ~isempty(obj.func_handle)
-
-                if isa(obj.func_handle, 'function_handle')
-                    obj.func_handle(obj.data, obj.pars)
-                elseif iscell(obj.func_handle)
-                    for jj = 1:length(obj.func_handle)
-                        obj.func_handle{ii}(obj.data, obj.pars)
-                    end
-                end
-            end
-
-            obj.addTimingData('custom_func', toc(t0)); 
-
-            if obj.pars.use_save_results
-                obj.write_log; % by default it should save the file_summary() result
-            end
-            
-            if obj.debug_bit>1, disp(obj.file_summary); end
-            
-            if ~isempty(obj.gui)
-                obj.gui.update;
-            end
-            
+            obj.buffer(idx) = obj.data; % note that the stuct remaining in "data" is not to be used unless re-loaded from the buffer
+                
             obj.file_index = obj.file_index + 1;
             
         end
         
-        function first_batch(obj)
+        function setBufferIndices(obj)
             
-            t0 = tic; %%%%% find star positions %%%%%%%%%%
-            obj.findStars;
-            obj.addTimingData('find stars', toc(t0)); 
+            obj.prev_buf_idx = find([obj.buffer.file_index]==obj.to_process_index - 1); % last buffer index
+            obj.buf_idx = find([obj.buffer.file_index]==obj.to_process_index); % current buffer index we are processing
 
-            t0 = tic; %%%%% solve astrometry %%%%%%%%%%
-            if obj.pars.use_astrometry
-                obj.solveAstrometry;
+        end
+        
+        function process(obj)
+            
+            if length(obj.buffer)<obj.pars.coadd_size
+                return; % skip processing until buffer is full
+            end
+            
+            for ii = 1:obj.pars.coadd_size
                 
-                if obj.pars.use_forced_photometry
-                    
-                    obj.data_logs.forced_coordinates = horzcat({[obj.head.RA_DEG, obj.head.DEC_DEG]}, util.vec.torow(obj.pars.forced_extra_positions));
-
-                    for ii = 1:length(obj.data_logs.forced_coordinates)
-
-                        ra_dec = obj.data_logs.forced_coordinates{ii};
-                        xy = obj.cat.coo2xy(ra_dec(1), ra_dec(2)); 
-
-                        obj.data.positions(end+1,:) = xy; % add another row to the coordinate list
-                        obj.data.forced_indices(end) = size(obj.data.positions,1); % keep track of indices of forced cutouts
-                    end
-                    
-                    obj.forced_cutout_motion_per_file = []; 
-                    
-                    if obj.pars.use_interp_forced
-                        
-                        e = util.oop.full_copy(obj.head.ephem); 
-                        e.timeTravelHours(obj.getNumFiles.*obj.head.EXPTIME/3600); % move this Ephemeris object forward to the end of the run
-                        e.resolve; 
-                        
-                        pos1 = obj.data.positions(end-length(obj.data_logs.forced_coordinates),:); 
-                        pos2 = obj.cat.coo2xy(e.RA_deg, e.Dec_deg);
-                        
-                        if sqrt(sum((pos1-pos2).^2))<min(size(obj.data.image_proc))
-                            obj.forced_cutout_motion_per_file = (pos2-pos1)/obj.getNumFiles; % should be a 2-vector
-                        end
-                        
-                    end
-                        
+                if obj.to_process_index>obj.file_index
+                    break; % finished processing backlog in buffer
                 end
-            
-            end
-            
-            obj.addTimingData('astrometry', toc(t0));
-            
-            % store the first image to keep a record of the positions of all stars in case we need to re-align
-            obj.data_logs.ref_image = obj.data.image_proc;
-            obj.data_logs.ref_positions = obj.data.positions;
-            
-        end
-        
-        function val = find_folder_date(obj)
-            
-            base_dir = obj.reader.current_dir;
-
-            for ii = 1:3 % try to figure out this run's own date
-
-                [base_dir, end_dir] = fileparts(base_dir);
-
-                if isempty(end_dir), break; end
-
-                [idx1,idx2] = regexp(end_dir, '\d{4}-\d{2}-\d{2}');
-                if isempty(idx1), continue; end
-
-                val = end_dir(idx1:idx2);
-
-                if isempty(base_dir), break; end
-
-            end
-            
-        end
-        
-        function val = find_camera(obj)
-            
-            val = '';
-            
-            if ~isempty(obj.reader.filenames)
                 
-                f = lower(obj.reader.filenames{1});
+                if obj.debug_bit>1
+                    util.text.date_printf('Processing file number %d.', obj.to_process_index); 
+                end
+                
+                obj.setBufferIndices;
+                
+                obj.data = obj.buffer(obj.buf_idx); % create a separate copy of the data loading it into "data" struct
+                
+                if ~isempty(obj.prev_buf_idx) && obj.prev_buf_idx>0 && obj.prev_buf_idx<=length(obj.buffer) % if a previous buffer exists...
+                    obj.data.positions = obj.buffer(obj.prev_buf_idx).positions_new; % make sure to propagate the positions to the new buffer
+                end
+                
+                %%%%%%%%%%%%%%%%%%%%% PROCESSING %%%%%%%%%%%%%%%%%%%%%
 
-                if contains(f, {'balor'})
-                    val = 'Balor';
-                elseif contains(f, {'zyla'})
-                    val = 'Zyla';
+                if obj.pars.fits.use_save
+                    obj.saveFITS; 
                 end
 
-            end
-            
-        end
-        
-        function val = find_project(obj)
-            
-            val = '';
-            
-            if ~isempty(obj.reader.filenames)
+                obj.calculateCutouts; 
                 
-                f = lower(obj.reader.filenames{1});
+                obj.calculatePhotometry; 
+                
+                obj.calculatePositions; 
+                
+                obj.calculateFWHM; 
 
-                if contains(f, {'wfast'})
-                    val = 'WFAST';
-                elseif contains(f, {'kraar'})
-                    val = 'Kraar';
-                elseif contains(f, {'last'})
-                    val = 'LAST';
+                obj.calculateLightcurves; 
+                
+                if obj.pars.use_save_results
+                    obj.write_log; % by default it should save the file_summary() result
                 end
 
+                if obj.debug_bit>1, disp(obj.file_summary); end
+
+                if ~isempty(obj.gui)
+                    obj.gui.update;
+                end
+            
+                obj.prog.showif(obj.to_process_index);
+                
+                obj.buffer(obj.buf_idx) = obj.data; % store the results of all calculations back in the buffer
+                
+                obj.to_process_index = obj.to_process_index + 1; 
+                
+                drawnow;
+                
+            end % loop over buffer data
+            
+        end
+        
+        function calculateCoadds(obj)
+            
+            % make a deep coadd
+            if obj.debug_bit>1
+                util.text.date_printf('Making a deep coadd...'); 
             end
             
-        end
-        
-        function val = find_filter(obj)
+            t0 = tic; % make the deep coadd
             
-        end
-        
-        function val = find_phot_ap(obj)
+            obj.setBufferIndices;
             
-            if isempty(obj.data.psf_width)
-                val = [];
+            obj.data = obj.buffer(obj.buf_idx); 
+            
+            I = zeros([size(obj.data.image_proc), length(obj.buffer)], 'like', obj.data.image_proc); 
+            T = 0; % number of seconds total integration
+            N = 0; % number of images coadded
+            
+            for ii = 1:length(obj.buffer)
+                I(:,:,ii) = obj.buffer(ii).image_proc; 
+                T = T + obj.buffer(ii).exposure_time; 
+                N = N + 1; 
+            end
+            
+            if util.text.cs(obj.pars.coadd_method, 'sum')
+                obj.data.coadd_image = nansum(I,3); 
+            elseif util.text.cs(obj.pars.coadd_method, 'median')
+                obj.data.coadd_image = nanmedian(I,3); 
             else
-                a = floor(obj.data.psf_width.*3); 
-                val = find(strcmp(obj.phot.pars_struct.types, sprintf('forced %4.2f', a))); 
+                error('Unknown coadd method "%s". Use "sum" or "median", etc.', obj.pars.coadd_method); 
             end
             
+            % calculate cosmic ray mask here... 
+            
+            obj.data.coadd_number = N;
+            obj.data.coadd_exposure = T; 
+            
+            obj.addTimingData('coaddition', toc(t0));
+            
+            if isempty(obj.data.positions)
+                
+                obj.findStars;
+
+                if obj.pars.use_astrometry
+
+                    obj.solveAstrometry;
+
+                    if obj.pars.use_forced_photometry
+
+                        obj.forced_coordinates = horzcat({[obj.head.RA_DEG, obj.head.DEC_DEG]}, util.vec.torow(obj.pars.forced_extra_positions));
+
+                        for ii = 1:length(obj.forced_coordinates)
+
+                            ra_dec = obj.forced_coordinates{ii};
+                            xy = obj.cat.coo2xy(ra_dec(1), ra_dec(2)); 
+
+                            obj.data.positions(end+1,:) = xy; % add another row to the coordinate list
+                            obj.forced_indices(end+1) = size(obj.data.positions,1); % keep track of indices of forced cutouts
+
+                        end
+
+                        obj.forced_cutout_motion_per_file = []; 
+
+                        if obj.pars.use_interp_forced
+
+                            h = util.oop.full_copy(obj.head); 
+                            h.ephem.timeTravelHours(obj.getNumFiles.*obj.head.EXPTIME/3600); % move this Ephemeris object forward to the end of the run
+                            h.ephem.debug_bit = 0; 
+                            h.ephem.resolve; 
+
+                            pos1 = obj.data.positions(obj.forced_indices(1),:); 
+                            pos2 = obj.cat.coo2xy(h.RA_DEG, h.DEC_DEG);
+
+                            if sqrt(sum((pos1-pos2).^2))<min(size(obj.data.image_proc))
+                                obj.forced_cutout_motion_per_file = (pos2-pos1)/obj.getNumFiles; % should be a 2-vector
+                            end
+
+                        end
+
+                    end
+
+                end
+
+                % store the first image to keep a record of the positions of all stars in case we need to re-align
+                obj.ref_image = obj.data.image_proc;
+                obj.ref_positions = obj.data.positions;
+
+            end
+
+            obj.buffer(obj.buf_idx) = obj.data; 
+                            
         end
         
         function saveFITS(obj)
             
+            t0 = tic; 
+            
             %%%%% preprocessing of the image %%%%%%
             
-            I = double(obj.data.image_proc); 
+            if obj.pars.fits.use_coadds
+                
+                if isempty(obj.data.coadd_image)
+                    return; % not all buffers would have a coadd
+                end
+                
+                I = double(obj.data.coadd_image); 
+                N = obj.coadd_number;
+                
+            else
+                I = double(obj.data.image_proc); 
+                N = 1; 
+            end
             
             if obj.pars.fits.use_roi
 
@@ -876,7 +905,7 @@ classdef Processor < dynamicprops
             d = strrep(d, ' (Weizmann Institute)', ''); % remove the dropbox's annoying spaces and parenthesis that FITS cannot handle (must have a link set up "Dropbox" --> "Dropbox (Weizmann Institute)"
             
             if ~isempty(obj.pars.fits.rename)
-                filename = sprintf('%s_%04d', obj.pars.fits.rename, obj.file_index); 
+                filename = sprintf('%s_%04d', obj.pars.fits.rename, obj.to_process_index); 
             end
             
             filename = [filename, '.fits'];
@@ -894,13 +923,13 @@ classdef Processor < dynamicprops
             end
             
             fitswrite(I, fullname); 
-            obj.head.writeFITS(fullname, obj.data.timestamps(1), obj.data.num_sum);
+            obj.head.writeFITS(fullname, obj.data.timestamps(1), obj.data.num_sum*N);
             
-            %%%%%%%% try to save a finding chart %%%%%%%%%%%
+            %%%%%%%% additional housekeeping %%%%%%%%%%%
             
-            try
+            try % save a finding chart
                                 
-                if obj.pars.fits.use_finding && obj.file_index==1
+                if obj.pars.fits.use_finding && obj.to_process_index==1
                     
                     f = figure('Name', 'finding chart', 'Position', [100 100 1000 1000]);
                     
@@ -962,7 +991,432 @@ classdef Processor < dynamicprops
             catch ME
                 warning(ME.getReport); 
             end
+            
+            obj.addTimingData('fits', toc(t0));
+            
+        end
+        
+        function val = getAverageWidth(obj) % flux weighted average PSF width
+        
+            if isempty(obj.phot.widths)
+                val = [];
+            else
+                val = util.vec.weighted_average(obj.phot.widths(:,:,obj.phot_ap_idx), obj.phot.fluxes(:,:,obj.phot_ap_idx), 2);
+            end
+            
+        end
+        
+        function val = getAverageFWHM(obj) % flux weighted average PSF width
+        
+            if isempty(obj.data.fwhm)
+                val = [];
+            else
+                val = util.vec.weighted_average(obj.data.fwhm, obj.phot.fluxes(:,:,obj.phot_ap_idx), 2);
+            end
+            
+        end
+        
+        function val = getAverageOffsets(obj) % flux weighted average offsets [dx,dy]
+        
+            if isempty(obj.phot.offsets_x) || isempty(obj.phot.offsets_y)
+                val = [];
+            else
+                dx = util.vec.weighted_average(obj.phot.offsets_x(:,:,obj.phot_ap_idx), obj.phot.fluxes(:,:,obj.phot_ap_idx), 2);
+                dy = util.vec.weighted_average(obj.phot.offsets_y(:,:,obj.phot_ap_idx), obj.phot.fluxes(:,:,obj.phot_ap_idx), 2);
+                val = [dx, dy];
+            end
+            
+        end
+        
+        function findStars(obj)
+            
+            t0 = tic;
+            
+            obj.displayInfo('Finding stars.'); 
+            
+            if obj.pars.use_coadds
+                I = obj.data.coadd_image;
+                N = obj.data.coadd_number.*obj.data.num_sum; 
+            else
+                I = obj.data.image_proc; 
+                N = obj.data.num_sum; 
+            end
+            
+            T = util.img.quick_find_stars(I, 'psf', obj.pars.initial_guess_psf_width, 'number', obj.pars.num_stars_filter_kernel,...
+               'dilate', obj.pars.cut_size-5, 'saturation', obj.pars.saturation.*N, 'unflagged', 1); 
+            
+            % estimate the real PSF width from found stars
+            C = util.img.mexCutout(I, T.pos, obj.pars.cut_size, NaN, NaN); 
+            
+            s = util.img.photometry2(C, 'aperture', obj.pars.initial_guess_psf_width.*3, 'use_forced', 1); 
 
+            W = util.img.fwhm(C-permute(s.forced_photometry.background, [3,4,1,2]), ...
+                'method', 'filters', 'step_size', 0.01, 'min_size', 0.5, 'max_size', 4); % arbitrary range for getting an estimate of the PSF width
+            
+%             obj.data.psf_width = util.vec.weighted_average(s.forced_photometry.width, s.forced_photometry.flux, 2);
+            obj.data.psf_width = util.vec.weighted_average(W/2.355, s.forced_photometry.flux, 2);
+            
+            if obj.pars.use_auto_aperture
+                obj.phot.aperture = floor(obj.data.psf_width.*3);
+            end
+            
+            T = util.img.quick_find_stars(I, 'psf', obj.data.psf_width, 'number', obj.pars.num_stars,...
+               'dilate', obj.pars.cut_size-5, 'saturation', obj.pars.saturation.*N, 'sigma', obj.pars.threshold, 'unflagged', 0); 
+            
+            if isempty(T)
+                error('Could not find any stars using quick_find_stars!');
+            end
+
+            obj.data.positions = T.pos;
+            
+            obj.stars = T; % store a copy of this table
+
+            obj.addTimingData('find stars', toc(t0)); 
+            
+        end
+        
+        function solveAstrometry(obj)
+            
+            t0 = tic;
+            
+            obj.displayInfo('Running astrometry'); 
+            
+            if util.text.cs(obj.head.cam_name, 'balor')
+                obj.cat.input_rotation = -60; 
+            elseif util.text.cs(obj.head.cam_name, 'zyla')
+                obj.cat.input_rotation = 15; 
+            end
+
+            obj.cat.input(obj.stars); 
+
+            if obj.cat.success==0
+                error('Could not find astrometric solution!'); 
+            end
+
+            if obj.pars.use_remove_bad_matches
+
+                bad_idx = isnan(obj.cat.magnitudes) & obj.stars.snr<obj.pars.bad_match_min_snr;
+
+                obj.cat.data = obj.cat.data(~bad_idx, :); 
+                obj.cat.magnitudes = obj.cat.magnitudes(~bad_idx); 
+                obj.cat.coordinates = obj.cat.coordinates(~bad_idx, :); 
+                obj.cat.temperatures = obj.cat.temperatures(~bad_idx); 
+                obj.cat.positions = obj.cat.positions(~bad_idx, :); 
+                obj.data.positions = obj.data.positions(~bad_idx, :); 
+                obj.stars = obj.stars(~bad_idx, :); 
+
+            end
+            
+            if obj.cat.success
+                str = sprintf('Found astrometric solution: %s%s', head.Ephemeris.deg2hour(obj.cat.central_RA), head.Ephemeris.deg2sex(obj.cat.central_Dec)); 
+            else
+                str = 'Cannot find an astrometric solution!'; 
+            end
+
+            obj.displayInfo(str);
+            
+            obj.addTimingData('astrometry', toc(t0));
+            
+        end
+        
+        function calculateCutouts(obj)
+
+            t0 = tic; 
+            
+            [obj.data.cutouts, obj.data.image_cut] = util.img.mexCutout(obj.data.image_proc, ...
+                obj.data.positions, obj.pars.cut_size, NaN, NaN); % replace and fill up using NaNs (it is safe, the processed image is single precision
+
+            obj.addTimingData('cutouts', toc(t0)); 
+
+        end
+        
+        function calculatePhotometry(obj)
+            
+            t0 = tic; 
+
+            obj.phot.input(obj.data.cutouts, 'positions', obj.data.positions, 'timestamps', obj.data.timestamps, 'juldates', obj.data.juldates); 
+
+            if isempty(obj.phot_ap_idx)
+                obj.phot_ap_idx = obj.find_phot_ap;
+            end
+
+            obj.data.cutouts_sub = obj.data.cutouts - permute(obj.phot.backgrounds(:,:,obj.phot_ap_idx), [3,4,1,2]); % subtract the background from the cutouts
+
+            obj.data_logs.background(obj.to_process_index,1) = util.stat.median2(obj.phot.backgrounds(:,:,obj.phot_ap_idx)); 
+
+            obj.flux_buf.input(obj.phot.fluxes(:,:,obj.phot_ap_idx)); % update the flux buffer (used to check the fluxes didn't suddenly disappear)
+
+            if ~isempty(obj.phot.gui) && obj.phot.gui.check, obj.phot.gui.update; end
+            
+            obj.addTimingData('photometry', toc(t0)); 
+
+        end
+        
+        function calculatePositions(obj)
+            
+            t0 = tic; 
+
+            for ii = obj.pars.realign_attempts
+
+                if obj.checkFluxes
+                    obj.adjustPositions; % use the centroids to push the cutouts a little
+                else
+                    if obj.debug_bit, disp('Lost star positions, using quick_align...'); end
+                    obj.realignPositions; 
+                end
+
+                if any(median(abs(obj.data.positions - obj.data.positions_new))>=obj.pars.redo_photometry_distance) % new positions are too far (in x or y) from old positions
+
+                    obj.flux_buf.back; % roll back the index to put in new flux measurements
+                    
+                    obj.data.positions = obj.data.positions_new; % try again with updated positions
+                    
+                    obj.calculateCutouts;
+                    obj.calculatePhotometry;
+                    
+                else
+                    break; % if the positions did not change dramatically, no need for more iterations
+                end
+
+            end
+
+            obj.addTimingData('adjust_positions', toc(t0)); 
+            
+        end
+        
+        function adjustPositions(obj) % minor position adjustment based on photometric centroids
+            
+            import util.text.cs;
+
+            mean_offsets = obj.getAverageOffsets;
+            if any(isnan(mean_offsets))
+                mean_offsets = 0;
+            end
+            
+            dx = obj.phot.offsets_x(:,:,obj.phot_ap_idx)'; 
+            dx(isnan(dx)) = 0; 
+            dy = obj.phot.offsets_y(:,:,obj.phot_ap_idx)'; 
+            dy(isnan(dy)) = 0; 
+            
+            if cs(obj.pars.lock_adjust, 'all') || obj.pars.use_astrometry==0 % by default, "stars" is replaced by "all" when not running astrometry
+                obj.data.positions_new = double(obj.data.positions + mean_offsets);
+            elseif cs(obj.pars.lock_adjust, 'none')
+                obj.data.positions_new = double(obj.data.positions + [dx, dy]); % check dimensionality in case we have multiple apertures! 
+            elseif cs(obj.pars.lock_adjust, 'stars') % assume astrometry has succeeded
+                
+                star_idx = ~isnan(obj.cat.magnitudes); % all stars that have a non NaN magnitude in GAIA
+                
+                star_idx = vertcat(star_idx, ones(size(obj.data.positions,1)-length(star_idx),1)); % if positions is longer than the catalog (e.g., forced photometry)
+                
+                new_pos_free = double(obj.data.positions + [dx, dy]); % check dimensionality in case we have multiple apertures! 
+                
+                new_pos_lock = double(obj.data.positions + mean_offsets); 
+                
+                obj.data.positions_new = star_idx.*new_pos_lock + (~star_idx).*new_pos_free; % logical indexing to add the correct adjusted position to stars and non-stars
+                
+            else
+                error('Unknown "lock_adjust" option: "%s". Choose "all", "none" or "stars". ', obj.pars.lock_adjust); 
+            end
+            
+            if size(obj.data.positions,3)>1
+                error('dimensionality issue...'); 
+            end
+            
+            if ~isempty(obj.forced_cutout_motion_per_file)
+                obj.data.positions_new(obj.forced_indices(1), :) = obj.data.positions_new(obj.forced_indices(1), :) + obj.forced_cutout_motion_per_file;
+            end
+            
+        end
+        
+        function realignPositions(obj) % use the reference image and positions to realign
+            
+            [~,shift] = util.img.quick_align(obj.data.image_proc, obj.ref_image);
+            obj.data.positions_new = double(obj.ref_positions + flip(shift));
+            
+        end
+        
+        function val = checkFluxes(obj) % check that we can still see most of the stars, compared to the flux buffer
+            
+            if size(obj.flux_buf.data, 2)~=size(obj.phot.fluxes,2)
+                obj.flux_buf.reset;
+            end
+            
+            if is_empty(obj.flux_buf)
+                val = 1;
+            else
+                
+                mean_fluxes = obj.flux_buf.mean;
+                mean_fluxes(mean_fluxes<=0) = NaN;
+
+                new_fluxes = obj.phot.fluxes(:,:,obj.phot_ap_idx);
+                
+                % remove all points where the reference fluxes are NaN
+                new_fluxes(isnan(mean_fluxes)) = [];
+                mean_fluxes(isnan(mean_fluxes)) = [];
+
+                flux_lost = sum(new_fluxes<0.5*mean_fluxes)>0.5*numel(mean_fluxes); % lost half the flux in more than half the stars...
+                % want to add more tests...?
+
+                val = ~flux_lost;
+                
+            end
+            
+        end
+        
+        function calculateFWHM(obj)
+
+            t0 = tic;
+            
+            N_stars = size(obj.data.cutouts,4); 
+
+            idx = obj.pars.fwhm_indices; 
+
+            idx(idx>N_stars) = []; % remove indices outside the bounds
+
+            if length(idx)<20 % arbitratry cutoff
+                idx = 1:N_stars; % replace with just all stars instead
+            end
+
+            C = obj.data.cutouts_sub(:,:,:,idx); % cutouts chosen for FWHM calculation
+
+            pix = obj.head.SCALE; 
+            
+            w = NaN(1,N_stars); % all stars that were not chosen for calculation are set to NaN
+            w(idx) = util.img.fwhm(C, 'method', 'filters', 'defocus', obj.data.psf_width, ...                 
+                'step_size', 0.1./pix, 'min_size', 0.5.*pix, 'max_size', obj.pars.cut_size).*obj.head.SCALE; 
+
+            obj.data.fwhm = w;
+
+            fr = util.fit.surf_poly(obj.data.positions(idx,1), obj.data.positions(idx,2), w(idx)', 'sigma', 3, 'order', 2, 'double', 1); 
+            
+            obj.data.fwhm_interp = fr.func(obj.data.positions(:,1), obj.data.positions(:,2));
+            
+            obj.data_logs.fwhm(obj.to_process_index,1) = nanmedian(w); 
+
+            obj.addTimingData('fwhm', toc(t0)); 
+
+        end
+        
+        function calculateLightcurves(obj)
+            
+            t0 = tic;
+
+            obj.light.index_flux = obj.phot_ap_idx; % tell this object which aperture index we want to use
+            obj.light.getData(obj.phot); 
+            if obj.light.gui.check, obj.light.gui.update; end
+    
+            obj.addTimingData('lightcurves', toc(t0)); 
+
+        end
+        
+        function calculateFunction(obj)
+            
+            t0 = tic; 
+
+            if ~isempty(obj.func_handle)
+
+                if isa(obj.func_handle, 'function_handle')
+                    obj.func_handle(obj.data, obj.pars)
+                elseif iscell(obj.func_handle)
+                    for jj = 1:length(obj.func_handle)
+                        obj.func_handle{ii}(obj.data, obj.pars)
+                    end
+                end
+            end
+
+            obj.addTimingData('custom_func', toc(t0)); 
+            
+        end
+        
+    end
+    
+    methods(Hidden=true) % internal utility functions
+        
+        function val = find_folder_date(obj)
+            
+            base_dir = obj.reader.current_dir;
+
+            for ii = 1:3 % try to figure out this run's own date
+
+                [base_dir, end_dir] = fileparts(base_dir);
+
+                if isempty(end_dir), break; end
+
+                [idx1,idx2] = regexp(end_dir, '\d{4}-\d{2}-\d{2}');
+                if isempty(idx1), continue; end
+
+                val = end_dir(idx1:idx2);
+
+                if isempty(base_dir), break; end
+
+            end
+            
+        end
+        
+        function val = find_camera(obj)
+            
+            val = '';
+            
+            if ~isempty(obj.reader.filenames)
+                
+                f = lower(obj.reader.filenames{1});
+
+                if contains(f, {'balor'})
+                    val = 'Balor';
+                elseif contains(f, {'zyla'})
+                    val = 'Zyla';
+                end
+
+            end
+            
+        end
+        
+        function val = find_project(obj)
+            
+            val = '';
+            
+            if ~isempty(obj.reader.filenames)
+                
+                f = lower(obj.reader.filenames{1});
+
+                if contains(f, {'wfast'})
+                    val = 'WFAST';
+                elseif contains(f, {'kraar'})
+                    val = 'Kraar';
+                elseif contains(f, {'last'})
+                    val = 'LAST';
+                end
+
+            end
+            
+        end
+        
+        function val = find_filter(obj)
+            
+        end
+        
+        function val = find_phot_ap(obj)
+            
+            if isempty(obj.data.psf_width)
+                val = [];
+            else
+                a = floor(obj.data.psf_width.*3); 
+                val = find(strcmp(obj.phot.pars_struct.types, sprintf('forced %4.2f', a))); 
+            end
+            
+        end
+        
+        function addTimingData(obj, name, seconds)
+            
+            name = strtrim(name); 
+            name = strrep(name, ' ', '_'); 
+            
+            if ~isfield(obj.timings, name)
+                obj.timings.(name) = 0; 
+            end
+            
+            obj.timings.(name) = obj.timings.(name) + seconds; 
+            
         end
         
         function displayInfo(obj, str) % show the info on screen, write to log (if saving data) and show it on the GUI
@@ -1006,214 +1460,20 @@ classdef Processor < dynamicprops
             
         end
         
-        function val = getAverageWidth(obj) % flux weighted average PSF width
-        
-            if isempty(obj.phot.widths)
-                val = [];
-            else
-                val = util.vec.weighted_average(obj.phot.widths(:,:,obj.phot_ap_idx), obj.phot.fluxes(:,:,obj.phot_ap_idx), 2);
+        function str = file_summary(obj)
+           
+            str = sprintf('file: %d/%d', obj.to_process_index, obj.getNumFiles); 
+            
+            offsets = obj.getAverageOffsets; 
+            fwhm = obj.getAverageFWHM; 
+            
+            if ~isempty(offsets)
+                str = sprintf('%s | dx= %4.2f | dy= %4.2f | FWHM= %4.2f"', str, offsets(1), offsets(2), fwhm); 
             end
             
-        end
-        
-        function val = getAverageFWHM(obj) % flux weighted average PSF width
-        
-            if isempty(obj.data.fwhm)
-                val = [];
-            else
-                val = util.vec.weighted_average(obj.data.fwhm, obj.phot.fluxes(:,:,obj.phot_ap_idx), 2);
+            if ~isempty(obj.head.AIRMASS)
+                str = sprintf('%s | a.m.= %4.2f', str, obj.head.AIRMASS); 
             end
-            
-        end
-        
-        function val = getAverageOffsets(obj) % flux weighted average offsets [dx,dy]
-        
-            if isempty(obj.phot.offsets_x) || isempty(obj.phot.offsets_y)
-                val = [];
-            else
-                dx = util.vec.weighted_average(obj.phot.offsets_x(:,:,obj.phot_ap_idx), obj.phot.fluxes(:,:,obj.phot_ap_idx), 2);
-                dy = util.vec.weighted_average(obj.phot.offsets_y(:,:,obj.phot_ap_idx), obj.phot.fluxes(:,:,obj.phot_ap_idx), 2);
-                val = [dx, dy];
-            end
-            
-        end
-        
-        function findStars(obj)
-            
-            T = util.img.quick_find_stars(obj.data.image_proc, 'psf', obj.pars.initial_guess_psf_width, 'number', obj.pars.num_stars_filter_kernel,...
-               'dilate', obj.pars.cut_size-5, 'saturation', obj.pars.saturation.*obj.data.num_sum, 'unflagged', 1); 
-            
-            % estimate the real PSF width from found stars
-            C = util.img.mexCutout(obj.data.image_proc, T.pos, obj.pars.cut_size, NaN, NaN); 
-            
-            s = util.img.photometry2(C, 'aperture', obj.pars.initial_guess_psf_width.*3, 'use_forced', 1); 
-
-            W = util.img.fwhm(C-permute(s.forced_photometry.background, [3,4,1,2]), 'method', 'filters', 'defocus', obj.pars.initial_guess_psf_width); 
-            
-%             obj.data.psf_width = util.vec.weighted_average(s.forced_photometry.width, s.forced_photometry.flux, 2);
-            obj.data.psf_width = util.vec.weighted_average(W/2.355, s.forced_photometry.flux, 2);
-            
-            if obj.pars.use_auto_aperture
-                obj.phot.aperture = floor(obj.data.psf_width.*3);
-            end
-            
-            T = util.img.quick_find_stars(obj.data.image_proc, 'psf', obj.data.psf_width, 'number', obj.pars.num_stars,...
-               'dilate', obj.pars.cut_size-5, 'saturation', obj.pars.saturation.*obj.data.num_sum, 'sigma', obj.pars.threshold, 'unflagged', 0); 
-            
-            if isempty(T)
-                error('Could not find any stars using quick_find_stars!');
-            end
-
-            obj.data.positions = T.pos;
-            
-            obj.data.stars = T; % store a copy of this table
-
-        end
-        
-        function adjustPositions(obj)
-            
-            import util.text.cs;
-            
-            obj.checkRealign;
-
-            mean_offsets = obj.getAverageOffsets;
-            if any(isnan(mean_offsets))
-                mean_offsets = 0;
-            end
-            
-            dx = obj.phot.offsets_x(:,:,obj.phot_ap_idx)'; 
-            dx(isnan(dx)) = 0; 
-            dy = obj.phot.offsets_y(:,:,obj.phot_ap_idx)'; 
-            dy(isnan(dy)) = 0; 
-            
-            if cs(obj.pars.lock_adjust, 'all') || obj.pars.use_astrometry==0 % by default, "stars" is replaced by "all" when not running astrometry
-                
-                obj.data.positions = double(obj.data.positions + mean_offsets);
-            elseif cs(obj.pars.lock_adjust, 'none')
-                obj.data.positions = double(obj.data.positions + [dx, dy]); % check dimensionality in case we have multiple apertures! 
-            elseif cs(obj.pars.lock_adjust, 'stars') % assume astrometry has succeeded
-                
-                star_idx = ~isnan(obj.cat.magnitudes); % all stars that have a non NaN magnitude in GAIA
-                
-                star_idx = vertcat(star_idx, ones(size(obj.data.positions,1)-length(star_idx),1)); % if positions is longer than the catalog (e.g., forced photometry)
-                
-                new_pos_free = double(obj.data.positions + [dx, dy]); % check dimensionality in case we have multiple apertures! 
-                
-                new_pos_lock = double(obj.data.positions + mean_offsets); 
-                
-                obj.data.positions = star_idx.*new_pos_lock + (~star_idx).*new_pos_free; % logical indexing to add the correct adjusted position to stars and non-stars
-                
-            else
-                error('Unknown "lock_adjust" option: "%s". Choose "all", "none" or "stars". ', obj.pars.lock_adjust); 
-            end
-            
-            if size(obj.data.positions,3)>1
-                error('dimensionality issue...'); 
-            end
-            
-            if ~isempty(obj.forced_cutout_motion_per_file)
-                obj.data.positions(obj.data.forced_indices(1), :) = obj.data.positions(obj.data.forced_indices(1), :) + obj.forced_cutout_motion_per_file;
-            end
-            
-        end
-        
-        function val = checkFluxes(obj) % check that we can still see most of the stars, compared to the flux buffer
-            
-            if size(obj.flux_buf.data, 2)~=size(obj.phot.fluxes,2)
-                obj.flux_buf.reset;
-            end
-            
-            if is_empty(obj.flux_buf)
-                val = 1;
-            else
-                
-                mean_fluxes = obj.flux_buf.mean;
-                mean_fluxes(mean_fluxes<=0) = NaN;
-
-                new_fluxes = obj.phot.fluxes(:,:,obj.phot_ap_idx);
-                
-                % remove all points where the reference fluxes are NaN
-                new_fluxes(isnan(mean_fluxes)) = [];
-                mean_fluxes(isnan(mean_fluxes)) = [];
-
-                flux_lost = sum(new_fluxes<0.5*mean_fluxes)>0.5*numel(mean_fluxes); % lost half the flux in more than half the stars...
-                % want to add more tests...?
-
-                val = ~flux_lost;
-                
-            end
-            
-        end
-        
-        function checkRealign(obj) % check the stars are visible, if not, realign and re-do photometry
-            
-            if ~obj.checkFluxes
-                
-                if obj.debug_bit, disp('Lost star positions, using quick_align and doing photometry again...'); end
-
-                [~,shift] = util.img.quick_align(obj.data.image_proc, obj.data_logs.ref_image);
-                obj.data.positions = double(obj.data_logs.ref_positions + flip(shift));
-
-                obj.data.cutouts = util.img.mexCutout(obj.data.image_proc, obj.data.positions, obj.pars.cut_size, NaN, NaN); % replace and fill up using NaNs (it is safe, the processed image is single precision
-
-                obj.phot.input(obj.data.cutouts, 'positions', obj.data.positions, 'timestamps', obj.data.timestamps, 'juldates', obj.data.juldates); % run photometry again
-                if ~isempty(obj.phot.gui) && obj.phot.gui.check, obj.phot.gui.update; end
-
-            end
-            
-        end
-        
-        function solveAstrometry(obj)
-            
-            obj.displayInfo('Running astrometry'); 
-            
-            if util.text.cs(obj.head.cam_name, 'balor')
-                obj.cat.input_rotation = -60; 
-            elseif util.text.cs(obj.head.cam_name, 'zyla')
-                obj.cat.input_rotation = 15; 
-            end
-
-            obj.cat.input(obj.data.stars); 
-
-            if obj.cat.success==0
-                error('Could not find astrometric solution!'); 
-            end
-
-            if obj.pars.use_remove_bad_matches
-
-                bad_idx = isnan(obj.cat.magnitudes) & obj.data.stars.snr<obj.pars.bad_match_min_snr;
-
-                obj.cat.data = obj.cat.data(~bad_idx, :); 
-                obj.cat.magnitudes = obj.cat.magnitudes(~bad_idx); 
-                obj.cat.coordinates = obj.cat.coordinates(~bad_idx, :); 
-                obj.cat.temperatures = obj.cat.temperatures(~bad_idx); 
-                obj.cat.positions = obj.cat.positions(~bad_idx, :); 
-                obj.data.positions = obj.data.positions(~bad_idx, :); 
-                obj.data.stars = obj.data.stars(~bad_idx, :); 
-
-            end
-            
-            if obj.cat.success
-                str = sprintf('Found astrometric solution: %s%s', head.Ephemeris.deg2hour(obj.cat.central_RA), head.Ephemeris.deg2sex(obj.cat.central_Dec)); 
-            else
-                str = 'Cannot find an astrometric solution!'; 
-            end
-
-            obj.displayInfo(str);
-            disp(str); 
-
-        end
-        
-        function addTimingData(obj, name, seconds)
-            
-            name = strtrim(name); 
-            name = strrep(name, ' ', '_'); 
-            
-            if ~isfield(obj.timings, name)
-                obj.timings.(name) = 0; 
-            end
-            
-            obj.timings.(name) = obj.timings.(name) + seconds; 
             
         end
         
@@ -1227,6 +1487,10 @@ classdef Processor < dynamicprops
             input.input_var('ax', [], 'axes', 'axis');
             input.input_var('autodyn', false); 
             input.scan_vars(varargin{:});
+            
+            if isempty(obj.data)
+                return;
+            end
             
             if isempty(input.ax)
                 input.ax = gca;
@@ -1251,16 +1515,16 @@ classdef Processor < dynamicprops
 
                 for ii = 1:min(size(P,1), obj.pars.display_num_rect_stars)
                     
-                    if ii<=size(obj.data.stars,1) && obj.data.stars.flag(ii)==2
+                    if ii<=size(obj.stars,1) && obj.stars.flag(ii)==2
 %                         rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'yellow'); 
                         c = 'yellow'; % yellow is for point sources
-                    elseif ii<=size(obj.data.stars,1) && obj.data.stars.flag(ii)==3
+                    elseif ii<=size(obj.stars,1) && obj.stars.flag(ii)==3
 %                         rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'green'); 
                         c = 'green'; % green is for extended sources
-                    elseif ii<=size(obj.data.stars,1) && obj.data.stars.flag(ii)==1
+                    elseif ii<=size(obj.stars,1) && obj.stars.flag(ii)==1
 %                         rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'red'); 
                         c = 'red'; % red is for saturated stars
-                    elseif ii<=size(obj.data.stars,1) && ~isempty(obj.cat.magnitudes) && isnan(obj.cat.magnitudes(ii))
+                    elseif ii<=size(obj.stars,1) && ~isempty(obj.cat.magnitudes) && isnan(obj.cat.magnitudes(ii))
 %                         rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'white'); 
                         c = 'white'; % white is for no match to GAIA
                     else    
@@ -1273,11 +1537,13 @@ classdef Processor < dynamicprops
                     
                 end
                 
-                for ii = 1:length(obj.data.forced_indices)
-                    c = 'cyan'; 
-                    idx = obj.data.forced_indices(ii); 
+                for ii = 1:length(obj.forced_indices)
+                    c = 'magenta'; 
+                    idx = obj.forced_indices(ii); 
                     if obj.pars.use_display_rect_text, text(P(idx,1), P(idx,2), sprintf('forced %d', ii),'FontSize', 16, 'Parent', input.ax, 'Color', c, 'Tag', 'clip number'); end
-                    rectangle('Position', [P(idx,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', c); % cyan is for forced cutouts
+                    rectangle('Position', [P(idx,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', c); 
+                    rectangle('Position', [P(idx,:)-0.5-obj.pars.cut_size obj.pars.cut_size*2 obj.pars.cut_size*2], 'Parent', input.ax, 'EdgeColor', c, 'LineWidth', 3); 
+                    
                 end
                 
             end
