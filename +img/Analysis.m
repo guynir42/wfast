@@ -996,6 +996,10 @@ classdef Analysis < file.AstroData
                 input.worker = obj.findWorker;
             end
             
+            if ~isempty(obj.futures{input.worker}) && isvalid(obj.futures{input.worker})
+                delete(obj.futures{input.worker}); % deleting the future may release some memory (I hope?)
+            end
+            
             obj.futures{input.worker} = parfeval(obj.pool, @obj.run, double(input.output), 'reset', input.reset, 'logging', input.logging, 'save', input.save, 'overwrite', input.overwrite); 
             obj.futures_dir{input.worker} = obj.reader.dir.two_tail;
             obj.futures_analysis_folder{input.worker} = fullfile(obj.reader.dir.pwd, ['analysis_' char(datetime('now', 'TimeZone', 'UTC'), 'yyyy-MM-dd')]);
@@ -1084,6 +1088,7 @@ classdef Analysis < file.AstroData
                     if ~isa(obj.futures{ii}, 'parallel.Future') || ~isvalid(obj.futures{ii})...
                         || (strcmp(obj.futures{ii}.State, 'finished') && ~isempty(obj.futures{ii}.Error))
                     
+                        obj.futures{ii}.delete; 
                         obj.futures{ii} = []; 
                     
                     end
