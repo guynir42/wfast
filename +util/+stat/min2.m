@@ -10,3 +10,5 @@ function [mn, idx] = min2(I)
     if nargin==0, help('util.stat.min2'); return; end
     
     [mn, idx] = util.stat.max2(-I); 
+    
+    mn = - mn; 
