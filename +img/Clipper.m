@@ -270,7 +270,7 @@ classdef Clipper < handle
             if isempty(obj.start_pos)
                 obj.start_pos = val;
             end
-            if all(size(obj.positions)==size(val)) && all(obj.positions(:)==val(:))
+            if isequal(obj.positions, val)
                 return;
             end
             
