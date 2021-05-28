@@ -443,7 +443,25 @@ classdef Candidate < handle
             
         end
         
-        
+        function flux = getNormalizedFlux(obj, margin) % get a centered lightcurve, normalized to 1, with NaNs outside the event region (+margin)
+            
+            if nargin<2 || isempty(margin)
+                margin = 5;
+            end
+            
+            if isempty(obj.flux_raw)
+                flux = [];
+            else
+                flux = obj.flux_raw; 
+                flux = flux./obj.flux_mean; 
+                idx = false(size(flux)); 
+                idx(obj.time_range) = true; 
+                idx = imdilate(idx, ones(margin)); 
+                flux(~idx) = NaN; 
+                flux = circshift(flux, floor(size(flux,1)/2) + 1 - obj.time_index); 
+            end
+            
+        end
         
     end
     
