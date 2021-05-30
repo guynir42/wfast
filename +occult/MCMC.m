@@ -196,6 +196,10 @@ classdef MCMC < handle
                 
                 obj.input_flux = val;
                 
+                obj.gen.getLightCurves; 
+                
+                obj.input_flux = util.img.pad2size(obj.input_flux, [size(obj.gen.lc.flux,1),1], NaN); 
+                
                 if ~isempty(obj.gui) && obj.gui.check
                     cla(obj.gui.axes_lightcurve); 
                 end
@@ -494,7 +498,7 @@ classdef MCMC < handle
             end
             
             chi2 = nansum(((obj.input_flux - 1)/e).^2);
-            dof = length(obj.input_flux) - 3; % assume parameters are r,b,v, only
+            dof = nnz(~isnan(obj.input_flux)) - 3; % assume parameters are r,b,v, only
             
             base_likelihood = chi2cdf(chi2, dof, 'upper'); 
             
@@ -589,7 +593,7 @@ classdef MCMC < handle
             
             for ii = 1:length(chi2)
 
-                L = chi2cdf(chi2(ii), nnz(~isnan(f1(:,ii)))-length(obj.par_list), 'upper'); % do we need to subtract these parameters from the dof??
+                L = chi2cdf(chi2(ii), nnz(~isnan(f2))-length(obj.par_list), 'upper'); % do we need to subtract these parameters from the dof??
                 
                 if obj.use_priors
                     for jj = 1:length(obj.prior_functions)
@@ -634,6 +638,10 @@ classdef MCMC < handle
             input.input_var('plot', false);
             input.input_var('ax', [], 'axes', 'axis');
             input.scan_vars(varargin{:});
+            
+            if ~ismember('plot', input.list_scan_properties) && ~isempty(obj.gui) && obj.gui.check
+                input.plot = true; 
+            end
             
             if isempty(obj.input_flux)
                 error('Cannot run MCMC without an input flux! Use useSimulatedInput() or useSimulatedNoisyInput() or input a lightcurve manually.'); 
@@ -1102,8 +1110,8 @@ classdef MCMC < handle
             if isempty(h) || ~isvalid(h(1)) || N~=length(h)-1
                 
                 delete(input.ax.Children); 
-                
-                plot(input.ax, t, obj.input_flux, 'dk', 'LineWidth', 3, 'DisplayName', 'Input flux'); 
+                f_input = util.img.pad2size(obj.input_flux, [size(f,1),1], 1); 
+                plot(input.ax, t, f_input, 'dk', 'LineWidth', 3, 'DisplayName', 'Input flux'); 
                 
                 if ~isempty(obj.points) || ~isempty(obj.true_point)
                     h = obj.gen.lc.plot('ax', input.ax, 'hold', true, 'legend', true, 'noise', false, 'FontSize', input.font_size, 'number', N);
@@ -1138,7 +1146,7 @@ classdef MCMC < handle
             
             chi2 = obj.gen.lc.pars.chi2;
             
-            dof = nnz(~isnan(obj.gen.lc.flux(:,1)))-length(obj.par_list);
+            dof = nnz(~isnan(obj.input_flux))-length(obj.par_list);
             
             if ~isempty(obj.points)
                 text(input.ax, t(10), 0.3, sprintf('chi2 (dof=%d) = %s', ...
@@ -1369,7 +1377,7 @@ classdef MCMC < handle
             %%%%%%%%%%%%%%%% DENSITY %%%%%%%%%%%%%%%%%%%%%%
             
             ax_contour = axes('Parent', input.parent, 'Position', [0.1 0.15, 0.4 0.4]);             
-            obj.showPosterior('ax', ax_contour, 'font_size', input.font_size, 'inner', 0, 'title', 1, 'contour', 0);             
+            obj.showPosterior('ax', ax_contour, 'font_size', input.font_size, 'inner', 0, 'title', 1, 'contour', 0, varargin{:});             
             P = ax_contour.Position;
             
             if ax_contour.XLim(2)==ax_contour.XTick(end)
@@ -1394,7 +1402,7 @@ classdef MCMC < handle
             
             ax_vertical = axes('Parent', input.parent, 'Position', [P(1) P(2)+P(4) P(3) P(4)]); 
             obj.showPosterior('ax', ax_vertical, 'font_size', input.font_size, ...
-                'inner', 0, 'pars', 'r', 'Legend', 1); 
+                'inner', 0, 'pars', 'r', 'Legend', 1, varargin{:}); 
             ax_vertical.XTick = []; 
             xlabel(ax_vertical, ''); 
 
@@ -1407,7 +1415,7 @@ classdef MCMC < handle
             
             ax_horizontal = axes('Parent', input.parent, 'Position', [P(1)+P(3) P(2) P(3) P(4)]); 
             obj.showPosterior('ax', ax_horizontal, 'font_size', input.font_size, 'inner', 0, ...
-                'pars', 'v', 'horizontal', 1, 'Legend', 1); 
+                'pars', 'v', 'horizontal', 1, 'Legend', 1, varargin{:}); 
             ax_horizontal.YTick = []; 
             ylabel(ax_horizontal, ''); 
             
@@ -1427,7 +1435,7 @@ classdef MCMC < handle
             t = obj.gen.lc.time;
             f = obj.gen.lc.flux; 
                         
-            h = plot(ax_lc, t, obj.input_flux, 'kd', 'MarkerSize', 8, 'LineWidth', 2); 
+            h = plot(ax_lc, t, util.img.pad2size(obj.input_flux, size(t), 1), 'kd', 'MarkerSize', 8, 'LineWidth', 2); 
             h.DisplayName = 'input flux';
             
             hold(ax_lc, 'on'); 

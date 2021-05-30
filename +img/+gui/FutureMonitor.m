@@ -166,8 +166,6 @@ classdef FutureMonitor < handle
             
         end
         
-        
-        
         function callback_key_released(obj, hndl, event)
             
             obj.key_status_shift = 0;
@@ -224,7 +222,8 @@ classdef FutureMonitor < handle
             else
                 rep = questdlg('Delete this future?', sprintf('Delete future number %d?', idx), 'Yes', 'No', 'No'); 
                 if strcmp(rep, 'Yes')                    
-                    cancel(f); 
+                    cancel(f);
+                    delete(f); 
                     obj.owner.futures{idx} = [];
                 end
             end

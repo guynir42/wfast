@@ -150,6 +150,8 @@ classdef CurveGenerator < handle
         snr; % noise snr (can be scalar or vector of any length)
         num_noise_iterations; % how many noise iterations per snr
         
+        shift; % circshift applied to lightcurve to adjust rough position of the dip
+        
         num_display; % how many lightcurves to show
         num_display_noise; % how many noise iterations per lightcurve to show
         show_noise; % on/off for showing the noise
@@ -312,6 +314,12 @@ classdef CurveGenerator < handle
         function val = get.snr(obj)
             
             val = obj.lc.pars.snr;
+            
+        end
+        
+        function val = get.shift(obj)
+            
+            val = obj.lc.pars.shift;
             
         end
         
@@ -714,6 +722,12 @@ classdef CurveGenerator < handle
         function set.snr(obj, s)
             
             obj.lc.pars.snr = s;
+            
+        end
+        
+        function set.shift(obj, val)
+           
+            obj.lc.pars.shift = val; 
             
         end
         
@@ -1420,6 +1434,10 @@ classdef CurveGenerator < handle
 
             end
 
+            if obj.shift~=0
+                obj.lc.flux = circshift(obj.lc.flux, round(obj.shift));
+            end
+            
             if nargout>0
                 new_lc = occult.LightCurve(obj.lc);
             end
@@ -1518,6 +1536,69 @@ classdef CurveGenerator < handle
     end
     
     methods % additional calculations
+        
+        function lc = fitLightcurve(obj, flux_norm, varargin)
+        % Usage: lc = fitLightcurve(obj, flux_norm, varargin)
+        
+            if nargin<2, help('occult.CurveGenerator.fitLightcurve'); return; end
+            
+            input = util.text.InputVars; 
+            input.input_var('star_size', 1); 
+            input.input_var('occulter_size', 1); 
+            input.input_var('impact_parameter', 1); 
+            input.input_var('velocity', 20); 
+            input.input_var('shift', []); 
+            input.input_var('plot', false); 
+            input.input_var('pause', 0); 
+            input.input_var('ax', []); 
+            input.scan_vars(varargin{:}); 
+            
+            obj.reset; 
+            
+            if isempty(input.shift)
+                [~, idx] = nanmin(flux_norm); 
+                input.shift = idx - floor(length(flux_norm)/2) - 1; 
+            end
+            
+            b_init = [input.star_size, input.occulter_size, input.impact_parameter, input.velocity, input.shift]; % R, r, b, v, shift
+            
+            b_vector = fminsearch(@(b) obj.sum_residuals(flux_norm, b, input.plot, input.pause, input.ax), b_init); 
+            
+            obj.R = b_vector(1); 
+            obj.r = b_vector(2); 
+            obj.b = b_vector(3); 
+            obj.v = b_vector(4); 
+            obj.shift = b_vector(5);
+            
+        end
+        
+        function val = sum_residuals(obj, flux_norm, b_vector, plotting, pausing, ax)
+            
+            % assume b_vector contains R,r,b,v parameters and 5th is shift
+            obj.R = b_vector(1); 
+            obj.r = b_vector(2); 
+            obj.b = b_vector(3); 
+            obj.v = b_vector(4); 
+            obj.shift = b_vector(5); 
+            
+            obj.getLightCurves; 
+            
+            val = nansum( (flux_norm - obj.lc.flux).^2 );  
+            
+            if plotting
+                
+                if isempty(ax)
+                    ax = gca;
+                end
+                
+                plot(ax, 1:length(flux_norm), flux_norm, 'd', 1:length(flux_norm), obj.lc.flux, '-'); 
+                
+                pause(pausing); 
+                
+                
+            end
+            
+        end
         
         function val = detectionSNR(obj, varargin)
             

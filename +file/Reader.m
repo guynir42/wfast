@@ -410,6 +410,9 @@ classdef Reader < file.AstroData
             
             clear@file.AstroData(obj);
 
+            obj.positions = [];
+            obj.positions_bg = []; 
+            
 %             obj.input_filename = '';
             
         end

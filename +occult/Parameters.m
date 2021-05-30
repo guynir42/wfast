@@ -85,6 +85,8 @@ classdef Parameters < handle
         snr = 10; % noise snr (can be scalar or vector of any length)
         Niter = 1; % number of iterations of each noise snr value
         
+        shift = 0; % use circshift() to adjust position of the lightcurve
+        
     end
     
     properties(Hidden=true)
