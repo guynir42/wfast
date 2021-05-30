@@ -303,7 +303,12 @@ classdef Scanner < handle
             
         end
         
-        function cand = collectOccultations(obj)
+        function cand = collectEvents(obj, varargin)
+            
+            input = util.text.InputVars; 
+            input.input_var('real', true); 
+            input.input_var('type', 'occultation'); 
+            input.scan_vars(varargin{:}); 
             
             if ~isempty(obj.overview)
                 obj.calcOverview;
@@ -317,11 +322,22 @@ classdef Scanner < handle
                        obj.overview.folders(ii).analysis_folder, 'classified.mat');
                 
                 if exist(f, 'file')
+                    
                     L = load(f);
 
-                    new_cand = L.candidates([L.candidates.is_simulated]==0); 
-
+                    if input.real
+                        new_cand = L.candidates([L.candidates.is_simulated]==0); 
+                    else
+                        new_cand = L.candidates;
+                    end
+                    
+                    if ~isempty(input.type)
+                        idx = contains({new_cand.classification}', input.type);
+                        new_cand = new_cand(idx); 
+                    end
+                    
                     cand = vertcat(cand, new_cand); 
+                    
                 end
                 
             end
@@ -367,6 +383,7 @@ classdef Scanner < handle
             for ii = 1:length(obj.a.futures)
                 
                 if isa(obj.a.futures{ii}, 'parallel.FevalFuture') && ...
+                        isvalid(obj.a.futures{ii}) && ...
                         strcmp(obj.a.futures{ii}.State, 'finished') && ...
                         obj.a.futures{ii}.Read==0 && ...
                         isempty(obj.a.futures{ii}.Error) % unread, finished runs
