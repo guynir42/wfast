@@ -27,6 +27,7 @@ classdef ProcGUI < handle
     properties % gui stuff
         
         menu_options;
+        menu_coadds;
         menu_stars;
         menu_cutouts;
         menu_save;
@@ -111,6 +112,11 @@ classdef ProcGUI < handle
             obj.menu_options.addButton('button_calibration', '&Load calibration', 'toggle', 'pars.use_auto_load_cal', 'find the appropriate calibration file based on observation date'); 
             obj.menu_options.addButton('button_astrometry', '&Astrometry', 'toggle', 'pars.use_astrometry', 'run astrometry and save a new catalog file'); 
                         
+            obj.menu_coadds = MenuItem(obj, 'Co-&Adds', 'menu'); 
+            obj.menu_coadds.addButton('button_coadds', '&Use coadds', 'toggle', 'pars.use_coadds', 'coadd some images before finding stars, etc.'); 
+            obj.menu_coadds.addButton('input_coadd_size', 'Coadd &Size', 'input', 'pars.coadd_size', 'how many images to put into each coadd'); 
+            
+            
             obj.menu_stars = MenuItem(obj, '&Find Stars', 'menu'); 
             obj.menu_stars.addButton('input_num_stars', '&Num stars', 'input', 'pars.num_stars', 'maximum number of stars to track for photometry'); 
             obj.menu_stars.addButton('input_threshold', '&Threshold', 'input', 'pars.threshold', 'how much above the background noise the stars need to be to be detected'); 
