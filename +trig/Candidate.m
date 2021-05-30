@@ -551,6 +551,13 @@ classdef Candidate < handle
             f = obj.flux_raw(frame_idx);
             F = obj.flux_raw_all(frame_idx,:); 
             
+            % optionally subtract background
+            if isfield(obj.store_pars, 'use_detrend_background') && obj.store_pars.use_detrend_background
+                bg = obj.auxiliary_all(frame_idx,:,obj.aux_indices.backgrounds).*obj.auxiliary_all(frame_idx,:,obj.aux_indices.areas);
+                F = F - bg; 
+                f = f - bg(:,obj.star_index); 
+            end
+            
             % normalize both fluxes
             f = (f-nanmean(f)); 
             F = (F-nanmean(F)); 
@@ -901,10 +908,18 @@ classdef Candidate < handle
             f = obj.flux_raw;
             a = obj.auxiliary(:,obj.aux_indices.areas); 
             b = obj.auxiliary(:,obj.aux_indices.backgrounds); 
-            f2 = f - nanmedian(a.*b);
+            
+            if ~isempty(obj.store_pars) && isstruct(obj.store_pars) && ...
+                    isfield(obj.store_pars, 'use_detrend_background') && ...
+                    obj.store_pars.use_detrend_background
+                
+                f2 = f - a.*b; % subtract the background from each frame
+            else
+                f2 = f - nanmedian(a.*b); % subtract the average background to prevent adding too much noise
+            end
             
             h1 = plot(input.ax, x, f2, '-', 'LineWidth', 2, 'Color', [0.929 0.694 0.125]);
-            h1.DisplayName = 'raw flux';
+            h1.DisplayName = 'subtracted flux';
             
             input.ax.NextPlot = 'add';
             h2 = plot(input.ax, xk, obj.flux_mean*obj.kernel_lightcurve(~obj.is_positive), ':', 'LineWidth', 2, 'Color', input.ax.Colormap(4,:));
@@ -923,27 +938,27 @@ classdef Candidate < handle
                 end
             end
             
-            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%%%%%%%%%%%%%%% right axes %%%%%%%%%%%%%%%%%%%%%%%%%%%
             
             yyaxis(input.ax, 'right'); 
                         
             input.ax.NextPlot = 'replace';
             input.ax.ColorOrderIndex = 5;
             
-            h3 = plot(input.ax, x, obj.auxiliary(:,obj.aux_indices.backgrounds), '--', 'Color', [0.2 0.6 0.2]); 
+            aux = obj.auxiliary(:,obj.aux_indices.backgrounds);
+            B = nanmean(b); % average background level
+            aux = b./B; % normalize the background level to the average
+            
+            h3 = plot(input.ax, x, aux, '--', 'Color', [0.2 0.6 0.2]); 
             h3.DisplayName = 'background';
             
-            aux = obj.auxiliary(:,obj.aux_indices.backgrounds);
+            A = nanmean(a); % average aperture area
             
             input.ax.NextPlot = 'add';
             
             w = obj.auxiliary(:,obj.aux_indices.widths);
             
             w = w.*2.355; 
-            
-%             if ~isempty(obj.head) && ~isempty(obj.head.SCALE)
-%                 w = w.*obj.head.SCALE;
-%             end
             
             h4 = plot(input.ax, x, w, 'p', 'MarkerSize', 4, 'Color', [0.2 0.5 1]);
             h4.DisplayName = 'PSF FWHM';
@@ -996,14 +1011,17 @@ classdef Candidate < handle
             end
             
             mx = util.stat.max2(aux(obj.time_range,:));
+            mx = min(mx, 5); 
+            
             mn = util.stat.min2(aux(obj.time_range,:)); 
+            mn = max(mn, -5); 
             
             if ~isnan(mn) && ~isnan(mx)
                 input.ax.YLim = [mn-0.25.*abs(mn) mx+0.25.*abs(mx)]; 
             end
             
 %             ylabel(input.ax, 'pixels or count/pixel');
-            ylabel(input.ax, 'auxiliary data');
+            ylabel(input.ax, sprintf('auxiliary (B= %4.1f)', A.*B));
     
             input.ax.YAxis(2).Color = [0 0 0];
             
@@ -1013,7 +1031,7 @@ classdef Candidate < handle
             
             yyaxis(input.ax, 'left'); % go back to the left axis by default
             
-            ylabel(input.ax, 'raw flux [counts]');
+            ylabel(input.ax, 'flux [counts]');
             
             if input.equal_limits
                 mx = max(abs(obj.flux_raw - obj.flux_mean)); 
@@ -1465,6 +1483,16 @@ classdef Candidate < handle
             [idx, corr] = obj.findHighestCorrelations; % indices of stars that have highest correlations to this star
             
             flux = obj.flux_raw_all(:,idx); 
+            flux_trigger = obj.flux_raw; 
+            
+            % optionally subtract background
+            if isfield(obj.store_pars, 'use_detrend_background') && obj.store_pars.use_detrend_background
+                bg = obj.auxiliary_all(:,:,obj.aux_indices.backgrounds).*obj.auxiliary_all(:,:,obj.aux_indices.areas);
+                flux = flux - bg(:, idx);
+                
+                flux_trigger = flux_trigger - bg(:,obj.star_index); 
+                
+            end
             
             f = util.plot.FigHandler('Other stars, flux and position'); 
             f.clear;
@@ -1477,7 +1505,7 @@ classdef Candidate < handle
             
             hold(ax1, 'on');
             
-            h1 = plot(ax1, obj.flux_raw, 'LineWidth', 3);
+            h1 = plot(ax1, flux_trigger, 'LineWidth', 3);
             h1.DisplayName = sprintf('Candidate star, idx= %d', obj.star_index); 
             
             h2 = plot(ax1, flux, 'LineWidth', 1.5); 
@@ -1528,7 +1556,15 @@ classdef Candidate < handle
             
             if isempty(obj.stack)
                 filename = obj.filenames{obj.time_index}; 
-                obj.stack = h5read(filename, '/stack'); 
+                try
+                    obj.stack = h5read(filename, '/stack'); 
+                catch 
+                    try
+                        obj.stack = nansum(h5read(filename, '/images'),3); 
+                    catch
+                        disp('Could not find stacked or regular images...'); 
+                    end
+                end
             end
             
             f = util.plot.FigHandler('Stack image'); 

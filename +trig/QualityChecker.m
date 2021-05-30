@@ -936,7 +936,7 @@ classdef QualityChecker < handle
             if ndims(flux)>2
                 error('Can only handle 2D fluxes'); 
             end
-            
+                        
             flux = flux - nanmean(flux); % make sure the flux is normalized to zero
             
             F2 = flux.^2; % this should still be 2D

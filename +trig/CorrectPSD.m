@@ -35,6 +35,9 @@ classdef CorrectPSD < handle
         overlap = []; % take the default value
         num_points = 200; 
         
+        use_smoothing = false;
+        smoothing_sigma = 2; % width of gaussian kernel
+        
         debug_bit = 1;
         
     end
@@ -47,7 +50,7 @@ classdef CorrectPSD < handle
     
     properties(Hidden=true)
        
-        version = 1.00;
+        version = 1.01;
         
     end
     
@@ -143,6 +146,11 @@ classdef CorrectPSD < handle
             frame_rate = 1./dt; 
             
             [obj.power_spectrum, obj.freq] = pwelch(obj.flux_buffer, obj.window_size, obj.overlap, obj.num_points, frame_rate, 'twosided');
+            
+            if obj.use_smoothing
+                k = sum(util.shapes.gaussian(obj.smoothing_sigma),2); 
+                obj.power_spectrum = filter2(k, obj.power_spectrum); 
+            end
             
         end
         

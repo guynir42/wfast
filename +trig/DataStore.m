@@ -195,11 +195,22 @@ classdef DataStore < handle
     
     properties(Hidden=true)
         
+        % these keep values from the last 100 (=batch_size) frames, then move them into the relevant buffers
+        temp_cutouts;
+        temp_fluxes;
+        temp_detrend;
+        temp_auxiliary; 
+        temp_timestamps;
+        temp_juldates;
+        temp_filenames;
+        temp_frame_num;
+        temp_number_filled = 0; % how many frames were put into the temp buffers
+        
         size_snr_coeffs; % coefficients for a fit of stellar size to the stellar S/N (R = C(0) + C(1).*S + C(2).*S.^2 ...
         
         bad_ratios; % if there is a big difference between the flux in different apertures we disqualify those stars too (e.g., binaries)
         
-        version = 1.00;
+        version = 1.01;
         
     end
     
@@ -230,6 +241,7 @@ classdef DataStore < handle
             obj.pars = struct;
             
             % number of frames to keep for each type of calculation
+            obj.pars.batch_size = 100; % how many images to pile up together to make a single batch
             obj.pars.length_burn_in = 5e3; % this mininal number of frames is needed to start event finding! 
             obj.pars.length_psd = 1e4; % this many flux measurements used for calculating the PSD
             obj.pars.length_background = 2000; % this many flux/aux measurements used for calculating the variance of the background (outside the search region)
@@ -246,6 +258,9 @@ classdef DataStore < handle
             obj.pars.rate_function_general = @(R,S)-0.01885323-0.08533139.*R+0.02857720.*R.^2-0.00751534.*R.*S+0.02843841.*S-0.00019672.*S.^2; % off ecliptic results
             obj.pars.rate_function_center = @(R,S)-0.11843204-0.05204881.*R+0.02322934.*R.^2-0.01009914.*R.*S+0.04771756.*S-0.00088827.*S.^2; % galactic center results
             
+            obj.pars.use_detrend_background = false; % subtract the background for each star/frame before detrending
+            obj.pars.use_detrend_batch_fit = true; % remove linear fit to each individual batch
+
             obj.pars.use_remove_cosmic_rays = true; % get rid of intense cosmic rays before even inputting the flux into the buffers
             obj.pars.cosmic_ray_threshold = 8; % in units of S/N
 
@@ -295,6 +310,15 @@ classdef DataStore < handle
             
             obj.clear;
             
+            obj.temp_cutouts = [];
+            obj.temp_fluxes = [];
+            obj.temp_auxiliary = []; 
+            obj.temp_timestamps = [];
+            obj.temp_juldates = [];
+            obj.temp_filenames = [];
+            obj.temp_frame_num = [];
+            obj.temp_number_filled = 0; % how many frames were put into the temp buffers
+
         end
         
         function clear(obj)
@@ -345,6 +369,12 @@ classdef DataStore < handle
         function val = is_done_burn(obj)
             
             val = obj.frame_counter>obj.pars.length_burn_in;
+            
+        end
+        
+        function val = is_temp_full(obj)
+            
+            val = obj.temp_number_filled >= obj.pars.batch_size; 
             
         end
         
@@ -492,7 +522,7 @@ classdef DataStore < handle
                 error('This class cannot handle more than 3D auxiliary measurements!'); 
             end
             
-            obj.clear; % get rid of the data from last batch
+%             obj.clear; % get rid of the data from last batch
             
             obj.frame_counter = obj.frame_counter + size(obj.this_input.fluxes,1); % how many frames we processed
             
@@ -523,68 +553,81 @@ classdef DataStore < handle
                 
             end % we need to keep only good stars / aperture at the input level
             
+            obj.moveToTempBuffers; 
+            
+%             if obj.pars.use_remove_cosmic_rays
+%                 obj.removeCosmicRays;
+%             end
+%             
+%             obj.removeFluxNans; % we may as well interpolate the NaNs right here...
+%             
+%             obj.removeLinearFit; % put the detrended fluxes in this_input
+%             
+%             obj.storeBuffers; % store the new fluxes and timestamps
+%             
+%             obj.storeCutouts; % store the cutouts for the extended region only
+%             
+%             obj.storeAuxiliary; % store the new aux data
+%             
+%             obj.calcSubBuffers; % cut the background, extended and search regions from the relevant buffers
+%             
+%             if obj.is_done_burn
+%                 obj.checker.input(obj); % feed the data into the quality checker only after the burn-in is done
+%             end
+            
+        end
+        
+        function moveToTempBuffers(obj) % hold a few frames (e.g., 100) and then run the calculations
+            
+            ii = obj.temp_number_filled + 1; % where in the buffer to start putting the new data
+            Nframes = size(obj.this_input.fluxes,1); % how many frames of new data
+            Nstars = size(obj.this_input.fluxes,2); % how many stars in the new data
+            Napertures = size(obj.this_input.fluxes,3); % how many apertures were used in the calculation (should be 1 after burn in is done)
+            
+            obj.temp_cutouts(:,:,ii:ii+Nframes-1,:) = obj.this_input.cutouts; 
+            obj.temp_fluxes(ii:ii+Nframes-1,:,:) = obj.this_input.fluxes;
+            
+            obj.temp_timestamps(ii:ii+Nframes-1,1) = obj.this_input.timestamps;
+            obj.temp_juldates(ii:ii+Nframes-1,1) = obj.this_input.juldates;
+            obj.temp_filenames{ii:ii+Nframes-1,1} = obj.this_input.filename; 
+            obj.temp_frame_num(ii:ii+Nframes-1,1) = ii:ii+Nframes-1; 
+            
+            list = obj.aux_names;
+            new_aux = NaN(Nframes, Nstars, length(list), Napertures, 'like', obj.this_input.widths); % preallocate
+            
+            for jj = 1:length(list)
+                new_aux(:,:,jj,:) = permute(obj.this_input.(list{jj}), [1,2,4,3]); % allow multiple apertures (3D aux matrices from photometry)                           
+            end
+            
+            obj.temp_auxiliary(ii:ii+Nframes-1,:,:,:) = new_aux;
+            
+            obj.temp_number_filled = obj.temp_number_filled + Nframes; 
+            
+        end
+        
+        function calculate(obj) % call this each time that enough frames are added
+            
             if obj.pars.use_remove_cosmic_rays
                 obj.removeCosmicRays;
             end
             
             obj.removeFluxNans; % we may as well interpolate the NaNs right here...
             
-            obj.removeLinearFit; % put the detrended fluxes in this_input
+            obj.applyDetrend; % put the detrended fluxes in this_input
             
             obj.storeBuffers; % store the new fluxes and timestamps
             
             obj.storeCutouts; % store the cutouts for the extended region only
             
-            obj.storeAuxiliary; % store the new aux data
+            obj.temp_number_filled = 0; % get the temp buffers ready for another batch
+            
+%             obj.storeAuxiliary; % store the new aux data
             
             obj.calcSubBuffers; % cut the background, extended and search regions from the relevant buffers
             
             if obj.is_done_burn
                 obj.checker.input(obj); % feed the data into the quality checker only after the burn-in is done
             end
-            
-        end
-        
-        function calcSubBuffers(obj) % cut the background, extended and search regions from the relevant buffers
-            
-            % the extended batch region reaches from the end of the flux buffer back "length_extended"
-            extended_start_idx = max(1, size(obj.flux_buffer,1)-obj.pars.length_extended+1);
-            extended_start_idx_aux = max(1, size(obj.aux_buffer,1)-obj.pars.length_extended+1);
-            obj.extended_flux = obj.flux_buffer(extended_start_idx:end,:,:); 
-            obj.extended_detrend = obj.detrend_buffer(extended_start_idx:end,:,:); 
-            obj.extended_aux = obj.aux_buffer(extended_start_idx_aux:end,:,:,:);
-            obj.extended_timestamps = obj.timestamps_buffer(extended_start_idx:end); 
-            obj.extended_juldates = obj.juldates_buffer(extended_start_idx:end); 
-            obj.extended_filenames = obj.filename_buffer(extended_start_idx:end); 
-            obj.extended_frame_num= obj.frame_num_buffer(extended_start_idx:end); 
-            
-            % the search region is defined in the middle of the extended batch
-            margins = floor((obj.pars.length_extended - obj.pars.length_search)/2); 
-            
-            obj.search_start_idx = margins + 1; 
-            obj.search_end_idx = size(obj.extended_flux,1) - margins; 
-            obj.search_flux = obj.extended_flux(obj.search_start_idx:obj.search_end_idx,:,:); % cut the search region out of the extended batch
-            obj.search_detrend = obj.extended_detrend(obj.search_start_idx:obj.search_end_idx,:,:); % cut the search region out of the extended batch
-            
-            obj.search_timestamps = obj.extended_timestamps(obj.search_start_idx:obj.search_end_idx);
-            obj.search_juldates = obj.extended_juldates(obj.search_start_idx:obj.search_end_idx);
-            obj.search_filenames = obj.extended_filenames(obj.search_start_idx:obj.search_end_idx); 
-            obj.search_frame_num = obj.extended_frame_num(obj.search_start_idx:obj.search_end_idx); 
-            
-            obj.search_aux = obj.extended_aux(obj.search_start_idx:obj.search_end_idx,:,:,:); % cut the search region out of the extended batch
-            
-            % the background region goes back from the start of extended region up to "length_background" before that
-            background_start_idx = max(1, extended_start_idx-obj.pars.length_background);
-            background_end_idx = extended_start_idx-1;
-            obj.background_flux = obj.flux_buffer(background_start_idx:background_end_idx,:,:);
-            obj.background_detrend = obj.detrend_buffer(background_start_idx:background_end_idx,:,:);
-
-            obj.background_timestamps = obj.timestamps_buffer(background_start_idx:background_end_idx);
-            obj.background_juldates = obj.juldates_buffer(background_start_idx:background_end_idx);
-            obj.background_filenames = obj.filename_buffer(background_start_idx:background_end_idx);
-            obj.background_frame_num = obj.frame_num_buffer(background_start_idx:background_end_idx);
-            
-            obj.background_aux = obj.aux_buffer(background_start_idx:background_end_idx,:,:,:); % the size of the aux buffer is just big enough to get the background+extended regions
             
         end
         
@@ -666,13 +709,19 @@ classdef DataStore < handle
             obj.aux_buffer = obj.aux_buffer(:,obj.star_indices,:,obj.aperture_index); 
             obj.cutouts = obj.cutouts(:,:,:,obj.star_indices); 
             
+            obj.temp_fluxes = obj.temp_fluxes(:,obj.star_indices,obj.aperture_index);
+            obj.temp_auxiliary = obj.temp_auxiliary(:, obj.star_indices, :, obj.aperture_index);
+            obj.temp_cutouts = obj.temp_cutouts(:,:,:,obj.star_indices);
+            
         end
         
         function removeCosmicRays(obj) % gets rid of isolated spikes in the flux
             
             low_thresh = 3.5; % set the limit for the neighbors of cosmic rays to be some low value like 3.5 sigma
                 
-            f = obj.this_input.fluxes;
+%             f = obj.this_input.fluxes;
+            
+            f = obj.temp_fluxes; 
 
             noise = util.stat.rstd(f); 
             average = nanmedian(f); 
@@ -702,31 +751,29 @@ classdef DataStore < handle
 
             end % for ii in list
 
-            obj.this_input.fluxes(idx) = NaN; % replace the cosmic rays frames with NaNs 
+            obj.temp_fluxes(idx) = NaN; % replace the cosmic rays frames with NaNs 
             
         end
         
         function removeFluxNans(obj)
             
-            obj.this_input.fluxes = fillmissing(obj.this_input.fluxes, 'spline'); 
+            obj.temp_fluxes = fillmissing(obj.temp_fluxes, 'spline'); 
             
         end
         
-        function removeLinearFit(obj)
+        function applyDetrend(obj)
             
-            f = obj.this_input.fluxes; 
-
-            obj.this_input.detrend = util.series.detrend(f, 'iterations', 2); 
+            f = obj.temp_fluxes; 
             
-%             for ii = 1:size(f,3)
-%                 
-%                 fit_result = util.fit.polyfit(1:size(f,1), f(:,:,ii), 'order', 1, 'double', 1, 'sigma', 3, 'iterations', 2); 
-% 
-%                 f2 = f(:,:,ii) - [fit_result.ym]; % remove the fit
-% 
-%                 obj.this_input.detrend(:,:,ii) = f2; 
-% 
-%             end
+            if obj.pars.use_detrend_background
+                f = f - obj.temp_auxiliary(:,:,obj.aux_indices.backgrounds).*obj.temp_auxiliary(:,:,obj.aux_indices.areas); 
+            end
+            
+            if obj.pars.use_detrend_batch_fit
+                obj.temp_detrend = util.series.detrend(f, 'iterations', 2); 
+            else
+                obj.temp_detrend = f - nanmean(f,1); % instead just remove the mean value
+            end
             
         end
         
@@ -764,35 +811,28 @@ classdef DataStore < handle
         
         function storeBuffers(obj)
             
-            obj.flux_buffer = obj.appendData(obj.flux_buffer, single(obj.this_input.fluxes));
-            obj.detrend_buffer = obj.appendData(obj.detrend_buffer, single(obj.this_input.detrend)); 
-            obj.timestamps = vertcat(obj.timestamps, single(obj.this_input.timestamps)); % this tracks timestamps for the entire run
-            obj.timestamps_buffer = obj.appendData(obj.timestamps_buffer, single(obj.this_input.timestamps));
-            obj.juldates_buffer = obj.appendData(obj.juldates_buffer, obj.this_input.juldates); 
-            obj.filename_buffer = obj.appendData(obj.filename_buffer, repmat({obj.this_input.filename}, [length(obj.this_input.timestamps), 1])); 
-            obj.frame_num_buffer = obj.appendData(obj.frame_num_buffer, single(1:length(obj.this_input.timestamps))'); % assume the frame numbers are just run continuously from 1->number of frames in batch
-            
-%             if size(obj.flux_buffer,1)>obj.pars.length_psd % only save the recent data
-%                 obj.flux_buffer = obj.flux_buffer(end-obj.pars.length_psd+1:end,:,:); 
-%                 obj.detrend_buffer = obj.detrend_buffer(end-obj.pars.length_psd+1:end,:,:); 
-%                 obj.timestamps_buffer = obj.timestamps_buffer(end-obj.pars.length_psd+1:end); 
-%                 obj.juldates_buffer = obj.juldates_buffer(end-obj.pars.length_psd+1:end); 
-%                 obj.filename_buffer = obj.filename_buffer(end-obj.pars.length_psd+1:end); 
-%                 obj.frame_num_buffer = obj.frame_num_buffer(end-obj.pars.length_psd+1:end); 
-%             end
-            
+            obj.flux_buffer = obj.appendData(obj.flux_buffer, single(obj.temp_fluxes));
+            obj.detrend_buffer = obj.appendData(obj.detrend_buffer, single(obj.temp_detrend)); 
+            obj.aux_buffer = obj.appendData(obj.aux_buffer, single(obj.temp_auxiliary));             
+            obj.timestamps = vertcat(obj.timestamps, single(obj.temp_timestamps)); % this tracks timestamps for the entire run
+            obj.timestamps_buffer = obj.appendData(obj.timestamps_buffer, single(obj.temp_timestamps));
+            obj.juldates_buffer = obj.appendData(obj.juldates_buffer, obj.temp_juldates); 
+%             obj.filename_buffer = obj.appendData(obj.filename_buffer, repmat({obj.this_input.filename}, [length(obj.this_input.timestamps), 1])); 
+            obj.filename_buffer = obj.appendData(obj.filename_buffer, obj.temp_filenames); 
+%             obj.frame_num_buffer = obj.appendData(obj.frame_num_buffer, single(1:length(obj.this_input.timestamps))'); % assume the frame numbers are just run continuously from 1->number of frames in batch
+            obj.frame_num_buffer = obj.appendData(obj.frame_num_buffer, single(obj.temp_frame_num)); 
             
         end
         
         function storeCutouts(obj)
             
             try
-            obj.cutouts = cat(3, obj.cutouts, obj.this_input.cutouts);
+                obj.cutouts = cat(3, obj.cutouts, obj.temp_cutouts);
             catch ME
                 if strcmp(ME.identifier, 'MATLAB:nomem')
                     util.text.date_printf('Out of memory while storing cutouts! Trying again...'); 
                     pause(30); 
-                    obj.cutouts = cat(3, obj.cutouts, obj.this_input.cutouts);
+                    obj.cutouts = cat(3, obj.cutouts, obj.temp_cutouts);
                 else    
                     rethrow(ME);
                 end
@@ -819,22 +859,46 @@ classdef DataStore < handle
             
         end
         
-        function storeAuxiliary(obj)
+        function calcSubBuffers(obj) % cut the background, extended and search regions from the relevant buffers
             
-            list = obj.aux_names;
-            new_aux = NaN(size(obj.this_input.errors,1), size(obj.this_input.widths,2), length(list), size(obj.this_input.widths,3), 'like', obj.this_input.widths); % preallocate
+            % the extended batch region reaches from the end of the flux buffer back "length_extended"
+            extended_start_idx = max(1, size(obj.flux_buffer,1)-obj.pars.length_extended+1);
+            extended_start_idx_aux = max(1, size(obj.aux_buffer,1)-obj.pars.length_extended+1);
+            obj.extended_flux = obj.flux_buffer(extended_start_idx:end,:,:); 
+            obj.extended_detrend = obj.detrend_buffer(extended_start_idx:end,:,:); 
+            obj.extended_aux = obj.aux_buffer(extended_start_idx_aux:end,:,:,:);
+            obj.extended_timestamps = obj.timestamps_buffer(extended_start_idx:end); 
+            obj.extended_juldates = obj.juldates_buffer(extended_start_idx:end); 
+            obj.extended_filenames = obj.filename_buffer(extended_start_idx:end); 
+            obj.extended_frame_num = obj.frame_num_buffer(extended_start_idx:end); 
             
-            for ii = 1:length(list)
-                new_aux(:,:,ii,:) = permute(obj.this_input.(list{ii}), [1,2,4,3]); % allow multiple apertures (3D aux matrices from photometry) 
-            end
+            % the search region is defined in the middle of the extended batch
+            margins = floor((obj.pars.length_extended - obj.pars.length_search)/2); 
             
-            obj.aux_buffer = obj.appendData(obj.aux_buffer, new_aux); 
+            obj.search_start_idx = margins + 1; 
+            obj.search_end_idx = size(obj.extended_flux,1) - margins; 
+            obj.search_flux = obj.extended_flux(obj.search_start_idx:obj.search_end_idx,:,:); % cut the search region out of the extended batch
+            obj.search_detrend = obj.extended_detrend(obj.search_start_idx:obj.search_end_idx,:,:); % cut the search region out of the extended batch
             
-%             obj.aux_buffer = vertcat(obj.aux_buffer, new_aux); % add the new auxiliary data
-% 
-%             if size(obj.aux_buffer,1)>obj.pars.length_psd % make sure to only save the recent data
-%                 obj.aux_buffer = obj.aux_buffer(end-(obj.pars.length_psd)+1:end,:,:,:); 
-%             end
+            obj.search_timestamps = obj.extended_timestamps(obj.search_start_idx:obj.search_end_idx);
+            obj.search_juldates = obj.extended_juldates(obj.search_start_idx:obj.search_end_idx);
+            obj.search_filenames = obj.extended_filenames(obj.search_start_idx:obj.search_end_idx); 
+            obj.search_frame_num = obj.extended_frame_num(obj.search_start_idx:obj.search_end_idx); 
+            
+            obj.search_aux = obj.extended_aux(obj.search_start_idx:obj.search_end_idx,:,:,:); % cut the search region out of the extended batch
+            
+            % the background region goes back from the start of extended region up to "length_background" before that
+            background_start_idx = max(1, extended_start_idx-obj.pars.length_background);
+            background_end_idx = extended_start_idx-1;
+            obj.background_flux = obj.flux_buffer(background_start_idx:background_end_idx,:,:);
+            obj.background_detrend = obj.detrend_buffer(background_start_idx:background_end_idx,:,:);
+
+            obj.background_timestamps = obj.timestamps_buffer(background_start_idx:background_end_idx);
+            obj.background_juldates = obj.juldates_buffer(background_start_idx:background_end_idx);
+            obj.background_filenames = obj.filename_buffer(background_start_idx:background_end_idx);
+            obj.background_frame_num = obj.frame_num_buffer(background_start_idx:background_end_idx);
+            
+            obj.background_aux = obj.aux_buffer(background_start_idx:background_end_idx,:,:,:); % the size of the aux buffer is just big enough to get the background+extended regions
             
         end
         

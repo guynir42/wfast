@@ -191,7 +191,8 @@ classdef EventFinder < handle
             obj.pars.use_psd_correction = 1; % use welch on a flux buffer to correct red noise
             obj.pars.use_std_filtered = 1; % normalize variance of filtered flux of each kernel to the average of previous batches (averaging size is set by length_background in the store)
             obj.pars.use_detrend_after_psd = 1; % apply another linear detrend after PSD correction
-            
+            obj.pars.use_detrend_batch_fit = true; % detrend by doing a linear fit to frames from each batch separately
+
             obj.pars.use_prefilter = 1; % filter all stars on a smaller bank, using a lower threshold, and then only vet the survivors with the full filter bank
             obj.pars.pre_threshold = 5.0; % threshold for the pre-filter
             
@@ -398,6 +399,50 @@ classdef EventFinder < handle
     
     methods % setters
         
+        function setupLowCadenceMode(obj)
+            
+            obj.psd.use_smoothing = true; 
+            
+            obj.pars.use_detrend_batch_fit = false;
+            
+            obj.store.pars.length_burn_in = 500; 
+            obj.store.pars.length_psd = 500; 
+            obj.store.pars.length_background = 500; 
+            
+            obj.store.pars.use_detrend_background = true; 
+            obj.store.pars.use_detrend_batch_fit = false;
+            
+            obj.store.checker.pars.thresh_background_intensity = 1000; 
+            obj.store.checker.pars.thresh_flux_corr = 6; 
+            obj.store.checker.pars.thresh_correlation = 6; 
+            
+            obj.store.checker.hours.snr_bin_max = 2000; 
+            obj.store.checker.hours.snr_bin_width = 1;
+            
+        end
+        
+        function setupHighCadenceMode(obj)
+            
+            obj.psd.use_smoothing = false; 
+            
+            obj.pars.use_detrend_batch_fit = true;
+            
+            obj.store.pars.length_burn_in = 5000; 
+            obj.store.pars.length_psd = 10000; 
+            obj.store.pars.length_background = 2000; 
+            
+            obj.store.pars.use_detrend_background = false; 
+            obj.store.pars.use_detrend_batch_fit = true;
+            
+            obj.store.checker.pars.thresh_background_intensity = 10; 
+            obj.store.checker.pars.thresh_flux_corr = 3; 
+            obj.store.checker.pars.thresh_correlation = 4; 
+            
+            obj.store.checker.hours.snr_bin_max = 40; 
+            obj.store.checker.hours.snr_bin_width = 0.5;
+            
+        end
+        
         function set.head(obj, val) % setting the header of this object also cascades down to the store and its sub-objects
             
             obj.head = val;
@@ -412,6 +457,23 @@ classdef EventFinder < handle
         
         function input(obj, varargin) % provide the photometric data as varargin pairs, or as a util.text.InputVar object, or as an img.Photometry object
             
+            if isempty(obj.head) % must have a header to uniquely identify candidates! 
+                error('Cannot find events without a header object...'); 
+            end
+
+            if isempty(obj.head.run_identifier) % must have a run identifier to tag each event
+                d = fileparts(obj.store.filename_buffer{1}); 
+                [d, run_name] = fileparts(d); 
+                [d, run_date] = fileparts(d); 
+                obj.head.run_identifier = fullfile(run_date, run_name); 
+            end
+            
+            if isempty(obj.bank) % lazy load the KBOs filter bank from file
+                obj.loadFilterBankKBOs; 
+            end
+            
+            obj.pars.analysis_time = util.text.time2str('now'); % keep a record of when the analysis was done
+
             obj.clear;
             
             if isempty(obj.store.star_sizes) && ~isempty(obj.cat) && ~isempty(obj.cat.success) && obj.cat.success
@@ -423,126 +485,114 @@ classdef EventFinder < handle
             
             obj.store.input(varargin{:}); % the store does the actual parsing and organizing of data into buffers
             
-            obj.pars.analysis_time = util.text.time2str('now'); % keep a record of when the analysis was done
+            if obj.store.is_temp_full
             
-            if isempty(obj.bank) % lazy load the KBOs filter bank from file
-                obj.loadFilterBankKBOs; 
-            end
+                obj.store.calculate; % produce all the different datasets in the store
             
-            if isempty(obj.head) % must have a header to uniquely identify candidates! 
-                error('Cannot find events without a header object...'); 
-            end
-            
-            if isempty(obj.head.run_identifier) % must have a run identifier to tag each event
-                d = fileparts(obj.store.filename_buffer{1}); 
-                [d, run_name] = fileparts(d); 
-                [d, run_date] = fileparts(d); 
-                obj.head.run_identifier = fullfile(run_date, run_name); 
-            end
-            
-            if obj.store.is_done_burn % do not do any more calculations until done with "burn-in" period
-                
-                %%%%%%%%%%%%%% PSD CORRECTION %%%%%%%%%%%%%%%
-                
-                if obj.pars.use_psd_correction
-                    try
-                        obj.psd.calcPSD(obj.store.detrend_buffer, obj.store.timestamps_buffer, obj.store.pars.length_extended, obj.store.pars.length_background*2); % first off, make the PSD correction for the current batch
-                    catch ME
-                        if strcmp(ME.identifier, 'MATLAB:nomem')
-                            util.text.date_printf('Out of memory while caclulating PSD! Trying again...');
-                            pause(30);
+                if obj.store.is_done_burn % do not do any more calculations until done with "burn-in" period
+
+                    %%%%%%%%%%%%%% PSD CORRECTION %%%%%%%%%%%%%%%
+
+                    if obj.pars.use_psd_correction
+                        try
                             obj.psd.calcPSD(obj.store.detrend_buffer, obj.store.timestamps_buffer, obj.store.pars.length_extended, obj.store.pars.length_background*2); % first off, make the PSD correction for the current batch
-                        else
-                            rethrow(ME);
-                        end
-                        
-                    end
-                end
-                
-                [obj.corrected_fluxes, obj.corrected_stds] = obj.correctFluxes(obj.store.extended_detrend); % runs either PSD correction or simple removal of linear fit to each lightcurve
-
-                %%%%%%%%%%% FILTER FOR KBOS %%%%%%%%%%%%%%
-                
-                [obj.latest_candidates, star_indices, best_snr] = obj.applyTemplateBank('kbos'); % by default use corrected_fluxes and correctd_stds given above
-                
-                obj.cand = vertcat(obj.cand, obj.latest_candidates); % store all the candidates that were found in the last batch
-                
-                obj.snr_values(end+1) = best_snr; 
-                
-                %%%%%%%%%%%%%% STAR HOURS %%%%%%%%%%%%%%
-                
-                % save the star hours, but also check if this batch is black-listed
-                if length(obj.latest_candidates(~[obj.latest_candidates.is_simulated]))>=obj.pars.limit_events_per_batch % this batch has too many events, need to mark them as black-listed! 
-
-                    for ii = 1:length(obj.latest_candidates)
-                        obj.latest_candidates(ii).notes{end+1} = sprintf('Batch is black listed with %d events', length(obj.latest_candidates)); 
-                        obj.latest_candidates(ii).kept = 0;
-                    end
-
-                    obj.store.saveHours(1); % the parameter 1 is used to mark this as a bad batch...
-
-                else
-                    obj.store.saveHours; % with no arguments it just counts the hours in this batch as good times
-                end
-
-                
-                %%%%%%%% MONITOR SPECIFIC STARS %%%%%%%%%%%%
-                
-                obj.monitor.input(obj.store.extended_timestamps, obj.store.extended_juldates, ... % track additional data on specific star indices
-                    obj.store.extended_flux, obj.store.extended_aux, obj.store.cutouts, obj.latest_candidates);
-                
-                %%%%%%%%% KEEP TRACK OF VARIANCE VALUES %%%%%%%%
-                
-                if obj.pars.use_keep_variances && ~obj.var_buf.is_empty % just like the var buffer, onlt for entire run (this accumulates to a big chunk of memory)
-                    obj.var_values = vertcat(obj.var_values, obj.var_buf.data(obj.var_buf.idx,:)); 
-                end
-                
-                %%%%%%%% OORT CLOUD %%%%%%%%%%%%%
-                
-                if isempty(obj.bank_oort) || isempty(obj.bank_oort_small) || isempty(obj.var_buf_oort) 
-                    obj.loadFilterBankOort; % lazy load the Oort filter bank from file
-                end
-
-                if obj.pars.use_oort && ~isempty(obj.bank_oort)
-                
-                    [oort_candidates, oort_star_indices] = obj.applyTemplateBank('oort'); % by default use corrected_fluxes and correctd_stds given above
-                                        
-                    star_indices = unique([star_indices; oort_star_indices]); % add the stars selected by the Oort prefilter / filter
-
-                    obj.cand = vertcat(obj.cand, oort_candidates);
-                    
-                end
-                
-                %%%%%%%%%%%% SIMULATIONS %%%%%%%%%%%%%%%
-                
-                if obj.pars.use_sim % simulated events are injected into the data and treated like real events
-
-                    star_indices_sim = obj.findStarsForSim(star_indices); % get stars that do not include any possible real candidates
-
-                    for ii = 1:obj.getNumSimulations % this number can be more than one, or less (then we randomly decide if to include a simulated event in this batch)
-                        
-                        [sim_cand, sim_ev] = obj.simulateSingleEvent(star_indices_sim); % each call to this function tries to add a single simulated event to a random star from the list                            
-                        
-                        if obj.pars.use_keep_simulated
-                            obj.cand = vertcat(obj.cand, sim_cand); % add the simulated events to the list of regular events
-                        end
-                        
-                        if ~isempty(sim_ev)
-                            
-                            % add this sim event struct to the list of events
-                            if isempty(obj.sim_events)
-                                obj.sim_events = sim_ev;
+                        catch ME
+                            if strcmp(ME.identifier, 'MATLAB:nomem')
+                                util.text.date_printf('Out of memory while caclulating PSD! Trying again...');
+                                pause(30);
+                                obj.psd.calcPSD(obj.store.detrend_buffer, obj.store.timestamps_buffer, obj.store.pars.length_extended, obj.store.pars.length_background*2); % first off, make the PSD correction for the current batch
                             else
-                                obj.sim_events(end+1) = sim_ev;
+                                rethrow(ME);
                             end
 
                         end
-                        
                     end
 
-                end % use sim
-                
-            end % do not do any more calculations until done with "burn-in" period
+                    [obj.corrected_fluxes, obj.corrected_stds] = obj.correctFluxes(obj.store.extended_detrend); % runs either PSD correction or simple removal of linear fit to each lightcurve
+
+                    %%%%%%%%%%% FILTER FOR KBOS %%%%%%%%%%%%%%
+
+                    [obj.latest_candidates, star_indices, best_snr] = obj.applyTemplateBank('kbos'); % by default use corrected_fluxes and correctd_stds given above
+
+                    obj.cand = vertcat(obj.cand, obj.latest_candidates); % store all the candidates that were found in the last batch
+
+                    obj.snr_values(end+1) = best_snr; 
+
+                    %%%%%%%%%%%%%% STAR HOURS %%%%%%%%%%%%%%
+
+                    % save the star hours, but also check if this batch is black-listed
+                    if length(obj.latest_candidates(~[obj.latest_candidates.is_simulated]))>=obj.pars.limit_events_per_batch % this batch has too many events, need to mark them as black-listed! 
+
+                        for ii = 1:length(obj.latest_candidates)
+                            obj.latest_candidates(ii).notes{end+1} = sprintf('Batch is black listed with %d events', length(obj.latest_candidates)); 
+                            obj.latest_candidates(ii).kept = 0;
+                        end
+
+                        obj.store.saveHours(1); % the parameter 1 is used to mark this as a bad batch...
+
+                    else
+                        obj.store.saveHours; % with no arguments it just counts the hours in this batch as good times
+                    end
+
+                    %%%%%%%% MONITOR SPECIFIC STARS %%%%%%%%%%%%
+
+                    obj.monitor.input(obj.store.extended_timestamps, obj.store.extended_juldates, ... % track additional data on specific star indices
+                        obj.store.extended_flux, obj.store.extended_aux, obj.store.cutouts, obj.latest_candidates);
+
+                    %%%%%%%%% KEEP TRACK OF VARIANCE VALUES %%%%%%%%
+
+                    if obj.pars.use_keep_variances && ~obj.var_buf.is_empty % just like the var buffer, onlt for entire run (this accumulates to a big chunk of memory)
+                        obj.var_values = vertcat(obj.var_values, obj.var_buf.data(obj.var_buf.idx,:)); 
+                    end
+
+                    %%%%%%%% OORT CLOUD %%%%%%%%%%%%%
+
+                    if isempty(obj.bank_oort) || isempty(obj.bank_oort_small) || isempty(obj.var_buf_oort) 
+                        obj.loadFilterBankOort; % lazy load the Oort filter bank from file
+                    end
+
+                    if obj.pars.use_oort && ~isempty(obj.bank_oort)
+
+                        [oort_candidates, oort_star_indices] = obj.applyTemplateBank('oort'); % by default use corrected_fluxes and correctd_stds given above
+
+                        star_indices = unique([star_indices; oort_star_indices]); % add the stars selected by the Oort prefilter / filter
+
+                        obj.cand = vertcat(obj.cand, oort_candidates);
+
+                    end
+
+                    %%%%%%%%%%%% SIMULATIONS %%%%%%%%%%%%%%%
+
+                    if obj.pars.use_sim % simulated events are injected into the data and treated like real events
+
+                        star_indices_sim = obj.findStarsForSim(star_indices); % get stars that do not include any possible real candidates
+
+                        for ii = 1:obj.getNumSimulations % this number can be more than one, or less (then we randomly decide if to include a simulated event in this batch)
+
+                            [sim_cand, sim_ev] = obj.simulateSingleEvent(star_indices_sim); % each call to this function tries to add a single simulated event to a random star from the list                            
+
+                            if obj.pars.use_keep_simulated
+                                obj.cand = vertcat(obj.cand, sim_cand); % add the simulated events to the list of regular events
+                            end
+
+                            if ~isempty(sim_ev)
+
+                                % add this sim event struct to the list of events
+                                if isempty(obj.sim_events)
+                                    obj.sim_events = sim_ev;
+                                else
+                                    obj.sim_events(end+1) = sim_ev;
+                                end
+
+                            end
+
+                        end
+
+                    end % use sim
+
+                end % do not do any event finding until done with "burn-in" period
+
+            end % only do these calculations when the batch temporary buffer fills up
             
         end
         
@@ -660,10 +710,14 @@ classdef EventFinder < handle
     
     methods(Hidden=true) % internal methods
         
-        function [flux_out, std_out] = correctFluxes(obj, fluxes, star_indices) % star indices tells the PSD which stars were given in fluxes (default is all stars)
+        function [flux_out, std_out] = correctFluxes(obj, fluxes, star_indices, frame_numbers) % star indices tells the PSD which stars were given in fluxes (default is all stars)
             
             if nargin<3 || isempty(star_indices) % by default run the correction for all stars
                 star_indices = 1:size(fluxes,2);
+            end
+            
+            if nargin<4 || isempty(frame_numbers)
+                frame_numbers = obj.store.extended_frame_num; 
             end
             
             if obj.pars.use_psd_correction
@@ -671,13 +725,11 @@ classdef EventFinder < handle
                 flux_out = obj.psd.input(fluxes, 1, star_indices); 
                 
                 if obj.pars.use_detrend_after_psd
-                    flux_out = obj.removeTrendByBatches(flux_out); 
+                    flux_out = obj.removeTrendByBatches(flux_out, frame_numbers); 
                 end
                 
             else
                 flux_out = fluxes; 
-%                 flux_out = obj.removeLinearFit(fluxes, obj.store.extended_timestamps); 
-%                 flux_out = fillmissing(flux_out, 'linear'); 
             end
 
             std_out = nanstd(flux_out); 
@@ -700,29 +752,44 @@ classdef EventFinder < handle
             
         end
         
-        function flux_out = removeTrendByBatches(obj, flux)
+        function flux_out = removeTrendByBatches(obj, flux, frame_numbers)
+            
+            if nargin<3 || isempty(frame_numbers)
+                frame_numbers = obj.store.extended_frame_num;
+            end
             
             flux_out = flux; 
             
-            idx1 = find(obj.store.extended_frame_num==1); % indices where a new batch begins
-            idx2 = find(obj.store.extended_frame_num==obj.head.NAXIS3); % indices where the batch ends
+            if obj.pars.use_detrend_batch_fit
+            
+                idx1 = find(frame_numbers==1); % indices where a new batch begins
 
-            for ii = 1:length(idx1)
+                N = obj.head.NAXIS; 
+                if N==1, N = obj.store.pars.batch_size; end                
+                idx2 = find(frame_numbers==N); % indices where the batch ends
 
-                if length(idx2)<ii
-                    f = flux(idx1(ii):end,:); 
-                else
-                    f = flux(idx1(ii):idx2(ii),:); 
+                idx1 = idx1 + 0:N:size(flux,1); 
+
+                for ii = 1:length(idx1)
+
+                    if length(idx2)<ii
+                        f = flux(idx1(ii):end,:); 
+                    else
+                        f = flux(idx1(ii):idx2(ii),:); 
+                    end
+
+                    f = util.series.detrend(f, 'iterations', 2); % remove linear fit to the data
+
+                    if length(idx2)<ii
+                        flux_out(idx1(ii):end,:) = f; 
+                    else
+                        flux_out(idx1(ii):idx2(ii),:) = f; 
+                    end
+
                 end
-
-                f = util.series.detrend(f, 'iterations', 2); % remove linear fit to the data
-
-                if length(idx2)<ii
-                    flux_out(idx1(ii):end,:) = f; 
-                else
-                    flux_out(idx1(ii):idx2(ii),:) = f; 
-                end
-
+            
+            else
+                flux_out = flux_out - nanmean(flux_out,1); % if not doing fancy batch-by-batch subtraction just remove the mean flux
             end
             
         end
@@ -876,7 +943,7 @@ classdef EventFinder < handle
                 if isempty(var_buf) || var_buf.counter<N  % no buffer (or the buffer is not yet full), must calculate its own variance on the background
                     
                     if nargin<7 || isempty(bg_fluxes) % if we were not given a background flux, use the store
-                        [bg_fluxes, bg_stds] = obj.correctFluxes(obj.store.background_detrend(:,star_indices), star_indices); 
+                        [bg_fluxes, bg_stds] = obj.correctFluxes(obj.store.background_detrend(:,star_indices), star_indices, obj.store.background_frame_num); 
                     end
                     
                     try
@@ -1059,10 +1126,10 @@ classdef EventFinder < handle
             % save the parameters used by the finder, store and quality-checker
             c.finder_pars = obj.pars; 
             c.store_pars = obj.store.pars;
-            c.store_pars = obj.store.aperture_index; 
-            c.store_pars = obj.store.star_indices; 
-            c.store_pars = obj.store.star_sizes;
-            c.store_pars = obj.store.star_snr; 
+            c.store_pars.aperture_index = obj.store.aperture_index; 
+            c.store_pars.star_indices = obj.store.star_indices; 
+            c.store_pars.star_sizes = obj.store.star_sizes;
+            c.store_pars.star_snr = obj.store.star_snr; 
             c.checker_pars = obj.store.checker.pars;
             % add StarHours parameters?? 
             
@@ -1183,12 +1250,18 @@ classdef EventFinder < handle
                 throw_error = 1;
             end
             
-            frame_rate = floor(obj.head.FRAME_RATE); 
+            frame_rate = floor(obj.head.FRAMERATE); 
+            expT = floor(obj.head.EXPTIME);
             
             obj.bank = occult.ShuffleBank.empty; 
             obj.bank_small = occult.ShuffleBank.empty; 
             
-            f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_40AU_%dHz.mat', frame_rate));
+            if obj.head.FRAMERATE>1
+                f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_40AU_%dHz.mat', frame_rate));
+            else
+                f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_40AU_%ds.mat', expT));
+            end
+            
             if exist(f, 'file')
                 load(f, 'bank');
                 obj.bank = bank;
@@ -1196,7 +1269,12 @@ classdef EventFinder < handle
                 error('Cannot load template bank from file "%s"', f); 
             end
 
-            f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_40AU_%dHz_small.mat', frame_rate));
+            if obj.head.FRAMERATE>1
+                f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_40AU_%dHz_small.mat', frame_rate));
+            else
+                f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_40AU_%ds_small.mat', expT));
+            end
+            
             if exist(f, 'file')
                 load(f, 'bank');
                 obj.bank_small = bank;
@@ -1213,14 +1291,21 @@ classdef EventFinder < handle
             end
             
             frame_rate = floor(obj.head.FRAME_RATE); 
-            
+            expT = floor(obj.head.EXPTIME);
+
             obj.bank_oort = occult.ShuffleBank.empty; 
             obj.bank_oort_small = occult.ShuffleBank.empty; 
             
             for ii = 1:length(obj.pars.oort_distances)
 
-                f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_%dAU_%dHz.mat', ...
-                    floor(obj.pars.oort_distances(ii)), frame_rate));
+                if obj.head.FRAMERATE>1
+                    f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_%dAU_%dHz.mat', ...
+                        floor(obj.pars.oort_distances(ii)), frame_rate));
+                else
+                    f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_%dAU_%ds.mat', ...
+                        floor(obj.pars.oort_distances(ii)), expT));
+                end
+                    
                 if exist(f, 'file')
                     load(f, 'bank');
                     obj.bank_oort(ii) = bank;
@@ -1228,8 +1313,14 @@ classdef EventFinder < handle
                     error('Cannot load template bank from file "%s"', f); 
                 end
 
-                f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_%dAU_%dHz_small.mat', ...
-                    floor(obj.pars.oort_distances(ii)), frame_rate));
+                if obj.head.FRAMERATE>1
+                    f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_%dAU_%dHz_small.mat', ...
+                        floor(obj.pars.oort_distances(ii)), frame_rate));
+                else
+                    f = fullfile(getenv('DATA'), sprintf('WFAST/occultations/templates_%dAU_%ds_small.mat', ...
+                        floor(obj.pars.oort_distances(ii)), expT));
+                end
+                    
                 if exist(f, 'file')
                     load(f, 'bank');
                     obj.bank_oort_small(ii) = bank;
@@ -1307,7 +1398,7 @@ classdef EventFinder < handle
                 % get an estimate for the background of this flux:
                 if obj.pars.use_std_filtered % need to correct the filtered fluxes by their measured noise
 
-                    [bg_flux, bg_std] = obj.correctFluxes(obj.store.background_detrend(:,star_index_sim), star_index_sim); % run correction on the background region
+                    [bg_flux, bg_std] = obj.correctFluxes(obj.store.background_detrend(:,star_index_sim), star_index_sim, obj.store.background_frame_num); % run correction on the background region
                     background_ff = bank.input(bg_flux, bg_std); % filter the background flux also
                     bg_ff_std = nanstd(background_ff); 
 
@@ -1807,7 +1898,7 @@ classdef EventFinder < handle
                 input.axes = gca;
             end
             
-            j = obj.store.extended_juldates(end) + double(obj.store.timestamps - obj.store.extended_timestamps(end))/24/3600; 
+            j = obj.store.juldates_log(end) + double(obj.store.timestamps - obj.store.timestamps(end))/24/3600; 
             a = celestial.coo.airmass(j, obj.head.RA, obj.head.DEC, [obj.head.longitude, obj.head.latitude]./180.*pi);
             
             t = datetime(j, 'convertFrom', 'juliandate'); 

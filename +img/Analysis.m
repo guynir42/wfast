@@ -1382,33 +1382,31 @@ classdef Analysis < file.AstroData
             if isempty(obj.images) && isempty(obj.stack)
                 disp(['empty batch in filename: ' obj.thisFilename]);
                 return;
-            elseif ~isempty(obj.images) % we got images, need to produce cutouts, stack and positions outselves
+            elseif ~isempty(obj.images) && isempty(obj.stack) % we got images, need to produce the stack ourselves
                 
                 obj.num_sum = size(obj.images,3);
 %                 obj.stack = util.stat.sum_single(obj.images); % sum along the 3rd dimension directly into single precision
                 obj.stack = single(sum(obj.images,3));
-                obj.positions = obj.clip.positions;
-                obj.positions_bg = obj.clip_bg.positions;
-                
-            elseif ~isempty(obj.stack) % got stack (and assume we got cutouts and positions, too)
-                
-                obj.clip.positions = obj.positions;
-                obj.clip.cut_size = size(obj.cutouts,1);
-                
-                if ~isempty(obj.positions_bg)
-                    obj.clip_bg.positions = obj.positions_bg;
-                    obj.clip_bg.cut_size = size(obj.cutouts_bg,1);
-                end
-                
-                if isempty(obj.num_sum) 
-                    if ~isempty(obj.cutouts)
-                        obj.num_sum = size(obj.cutouts,3);
-                    else
-                        error('Unknown num_sum, and no cutouts to figure it out!');
-                    end
-                end
-                
+%                 obj.positions = obj.clip.positions;
+%                 obj.positions_bg = obj.clip_bg.positions;
             end
+            
+            obj.clip.positions = obj.positions;
+            obj.clip.cut_size = size(obj.cutouts,1);
+
+            if ~isempty(obj.positions_bg)
+                obj.clip_bg.positions = obj.positions_bg;
+                obj.clip_bg.cut_size = size(obj.cutouts_bg,1);
+            end
+
+            if isempty(obj.num_sum) 
+                if ~isempty(obj.cutouts)
+                    obj.num_sum = size(obj.cutouts,3);
+                else
+                    error('Unknown num_sum, and no cutouts to figure it out!');
+                end
+            end
+               
             
 %             if obj.use_cutout_adjustment
 %                 
