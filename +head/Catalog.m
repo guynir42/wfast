@@ -738,7 +738,7 @@ classdef Catalog < handle
             if nargin==0, help('head.Catalog.xy2coo'); return; end
 
             if nargin<2 || isempty(RA)
-                RA = obj.head.RA_DEG;
+                RA = obj.head.OBJRA_DEG;
             end
             
             if nargin<3 || isempty(Dec)
@@ -746,7 +746,7 @@ classdef Catalog < handle
                     Dec = RA(2);
                     RA = RA(1); 
                 else
-                    Dec = obj.head.DEC_DEG;
+                    Dec = obj.head.OBJDEC_DEG;
                 end
             end
             

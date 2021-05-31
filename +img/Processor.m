@@ -183,7 +183,7 @@ classdef Processor < dynamicprops
             obj.pars.fits.input_var('use_roi',false, 6); obj.pars.fits.add_comment('use a region of interest (ROI) to cut before saving the FITS'); 
             obj.pars.fits.input_var('roi_size', 512, 6); obj.pars.fits.add_comment('define the size of the ROI as scalar (square region) or [height,width] in pixels');
             obj.pars.fits.input_var('roi_position', [], 6); obj.pars.fits.add_comment('define the center point of the ROI as [x,y] in pixels');             
-            obj.pars.fits.input_var('roi_coordinates', [], 6, 'roi_coords'); obj.pars.fits.add_comment('define the center of the ROI as [RA, Dec] in degrees. Or "header" to copy coordinates from the header.'); 
+            obj.pars.fits.input_var('roi_coordinates', 'header', 6, 'roi_coords'); obj.pars.fits.add_comment('define the center of the ROI as [RA, Dec] in degrees. Or "header" to copy coordinates from the header.'); 
             obj.pars.fits.input_var('use_flip', false, 6); obj.pars.fits.add_comment('flip the image by 180 degrees before saving to FITS (this is done after cutting out the ROI'); 
             obj.pars.fits.input_var('use_coadds', false, 6); obj.pars.fits.add_comment('save FITS images of coadded images'); 
             obj.pars.fits.input_var('directory', 'FITS'); obj.pars.fits.add_comment('what to call the folder where FITS files are saved (relative to original file directory or absolute path'); 
