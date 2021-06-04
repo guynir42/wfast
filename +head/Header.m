@@ -76,7 +76,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Header < dynamicprops
         ZEROPOINT; % the conversion between flux and magnitude zero
         BACKGROUND; % the estimated number of counts per pixel from the background (per frame, not stacked!)
         
-        FILTER = 'F505W'; % optical filter installed on telescope
+%         FILTER = 'F505W'; % optical filter installed on telescope
+        FILTER = 'F600W'; % filter installed on 1/6/21
         
         NAXIS; % number of axes for the full frame images
         NAXIS1; % size of the y axis of the images

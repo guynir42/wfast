@@ -92,18 +92,18 @@ classdef Filter < handle
                 obj.name = 'K';
             elseif cs(filter_type, 'F505W', 'luminance')
                 obj.wavelength = 505;
-                obj.bandwidth = 105;
+                obj.bandwidth = 210;
                 obj.name = 'F505W';
                 % add more filters! 
             elseif cs(filter_type, 'F510W', 'luminance')
                 obj.wavelength = 505;
-                obj.bandwidth = 105;
+                obj.bandwidth = 210;
                 obj.name = 'F510W';
                 % add more filters!
             elseif cs(filter_type, 'F600W', 'luminance')
                 obj.wavelength = 600;
-                obj.bandwidth = 100;
-                obj.name = 'F510W';
+                obj.bandwidth = 200;
+                obj.name = 'F600W';
             else
                 error(['Unknown filter: ' filter_type ' try U,B,V, etc.']);
             end
