@@ -142,11 +142,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
        
         arduinos_switch = 6; % the outlet controlling the Arduinos
         
-        % the default alt-az is parking 2 (zenith west)
-        target_altitude = 90;
-        target_azimuth = 270;
-        default_target_altitude = 90;
-        default_target_azimuth = 270; 
+        % the default alt-az is due East for flat field in the evening
+        target_altitude = 45;
+        target_azimuth = 130;
+        default_target_altitude = 45;
+        default_target_azimuth = 130; 
         
         was_tracking = 0; % when pressing the NSEW buttons, to temporarily turn off tracking (and maybe bring it back on)
         default_move_rate; % move rate for the NSEW buttons (in degrees/second)
