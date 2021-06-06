@@ -13,11 +13,11 @@ end
 
 %% load the shuffle banks (the ones we use in the analysis)
 
-loaded_struct = load(fullfile(getenv('DATA'), '/WFAST/saved/FilterBankShuffle.mat'));
+loaded_struct = load(fullfile(getenv('DATA'), '/WFAST/occultations/templates_40AU_25Hz.mat'));
 
 big_bank = loaded_struct.bank;
 
-loaded_struct = load(fullfile(getenv('DATA'), '/WFAST/saved/FilterBankShuffleSmall.mat'));
+loaded_struct = load(fullfile(getenv('DATA'), '/WFAST/occultations/templates_40AU_25Hz_small.mat'));
 
 small_bank = loaded_struct.bank;
 
@@ -41,16 +41,18 @@ prog.start(N);
 
 for ii = 1:N % over random instances of gaussian noise
     
-    noise = normrnd(0, 0.1, 200, 1); % one lightcurve for all templates
+    noise = normrnd(0, 0.1, 201, 1); % one lightcurve for all templates
     
-    start_idx = ceil((200-S(1))/2);
-    end_idx = start_idx + S(1) - 1; 
+%     start_idx = ceil((201-S(1))/2);
+%     end_idx = start_idx + S(1) - 1; 
+    start_idx = 51;
+    end_idx = 150; 
     
     for jj = 1:N_templates % run over the bank matrix using a linearized index for dim 2-5
         
         [idx_R, idx_r, idx_b, idx_v] = ind2sub(S(2:end), jj);
         
-        LC = util.img.pad2size(sim_bank.bank(:,jj)-1, [200,1]); 
+        LC = util.img.pad2size(sim_bank.bank(:,jj)-1, [201,1]); 
         
         LC_noise = LC + noise; 
         

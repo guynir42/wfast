@@ -1,6 +1,7 @@
 %% this script shows some plots on the detection efficiency for different
 % event parameters, based on injection simulations. 
 % assumes you have loaded some simulated events in "ev" vector; 
+% e.g., load the events in "saved/overview_july.mat"
 
 ev = ev([ev.D]==40); % keep only KBO events (dropping the Oort cloud events)
 FWHM = zeros(size(ev)); 

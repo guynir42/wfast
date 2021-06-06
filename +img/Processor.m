@@ -393,6 +393,10 @@ classdef Processor < dynamicprops
 
                     if obj.brake_bit, break; end
 
+                    if obj.reader.is_finished
+                        return;
+                    end
+                    
                     obj.load_data;
                     
                     drawnow; 
@@ -614,7 +618,9 @@ classdef Processor < dynamicprops
             
             for jj = 1:length(list)
                 s = substruct('.', list{jj}, '()', {obj.file_index,1}); 
-                obj.data_logs = subsasgn(obj.data_logs, s, obj.head.(list{jj})); 
+                val = obj.head.(list{jj}); 
+                if isempty(val), val = NaN; end
+                obj.data_logs = subsasgn(obj.data_logs, s, val); 
             end
             
             t0 = tic; %%%%%% run calibration on full-frame images %%%%%%%%
@@ -630,12 +636,12 @@ classdef Processor < dynamicprops
 
             obj.addTimingData('calibration', toc(t0));
     
-            if idx_prev>1 && idx_prev<=length(obj.buffer)
+            if idx_prev>=1 && idx_prev<=length(obj.buffer)
                 obj.data.positions = obj.buffer(idx_prev).positions_new;
             end
             
             obj.buffer(idx) = obj.data; % note that the stuct remaining in "data" is not to be used unless re-loaded from the buffer
-                
+            
             obj.file_index = obj.file_index + 1;
             
         end

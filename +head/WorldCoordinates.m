@@ -108,7 +108,7 @@ classdef WorldCoordinates < handle
             
         end
         
-        function val = get.PV(obj)
+        function val = getReshapedPV(obj)
             
             if isempty(obj.PV)
                 val = obj.PV;
@@ -245,11 +245,13 @@ classdef WorldCoordinates < handle
                     R  = sqrt(x3.^2 + y3.^2); % units of degrees
             
                     [Xpowers, Ypowers] = head.WorldCoordinates.tpv_polydef;
-            
+                    
+                    PV = obj.getReshapedPV; 
+                    
                     % these lines assume PV is a 2x40 coefficients matrix with
                     % NaNs or zeros where there is no contribution to that polynomial
-                    Xout = sum(obj.PV(:,1).*x3.^Xpowers(:,1).*y3.^Xpowers(:,2).*R.^Xpowers(:,3), 1, 'omitnan');
-                    Yout = sum(obj.PV(:,2).*x3.^Ypowers(:,1).*y3.^Ypowers(:,2).*R.^Ypowers(:,3), 1, 'omitnan');
+                    Xout = sum(PV(:,1).*x3.^Xpowers(:,1).*y3.^Xpowers(:,2).*R.^Xpowers(:,3), 1, 'omitnan');
+                    Yout = sum(PV(:,2).*x3.^Ypowers(:,1).*y3.^Ypowers(:,2).*R.^Ypowers(:,3), 1, 'omitnan');
 
                 else
                     error('Unknown CTYPE1 "%s". Use tpv instead...', obj.CTYPE1);
