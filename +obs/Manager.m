@@ -229,8 +229,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             delete(obj.t2);
             delete(obj.t1);
             
-            delete(m.mout); 
-            m.mount = []; 
+            delete(obj.mount); 
+            obj.mount = []; 
             
         end
         
@@ -1749,9 +1749,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 obj.latest_email_autostart_date = [];
             end
             
-            obj.matchRuntimes; 
-            obj.checkNowObserving; 
-            obj.updateUserPrompt; % make sure the "proceedToTarget" button is greyed out if weather is bad / dome is closed
+            try
+                obj.matchRuntimes; 
+                obj.checkNowObserving; 
+                obj.updateUserPrompt; % make sure the "proceedToTarget" button is greyed out if weather is bad / dome is closed
+            catch ME
+                
+            end 
             
             if ~isempty(obj.mount)
                 
@@ -1895,11 +1899,13 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 catch ME
                     warning(ME.getReport); 
                     obj.weather.status = 0; 
+                    obj.devices_ok = 0;
                     obj.devices_report = 'Boltwood error!';
-                    obj.log.error(util.text.date_printf('Boltwood error!\n %s', ME.getReport('extended', 'hyperlinks', 'off')));                    
+                    obj.log.error(util.text.date_printf('Boltwood error!\n %s', ME.getReport('extended', 'hyperlinks', 'off'))); 
+                    return; 
                 end
                 
-                if obj.dome.status==0
+                if obj.weather.status==0
                     obj.devices_ok = 0;
                     obj.devices_report = 'Boltwood error!';
                     obj.log.error(util.text.date_printf('Boltwood error!')); 

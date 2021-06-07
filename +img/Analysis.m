@@ -996,7 +996,7 @@ classdef Analysis < file.AstroData
                 input.worker = obj.findWorker;
             end
             
-            if ~isempty(obj.futures{input.worker}) && isvalid(obj.futures{input.worker})
+            if length(obj.futures)>=input.worker && ~isempty(obj.futures{input.worker}) && isvalid(obj.futures{input.worker})
                 delete(obj.futures{input.worker}); % deleting the future may release some memory (I hope?)
             end
             
