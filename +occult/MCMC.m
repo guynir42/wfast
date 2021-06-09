@@ -50,7 +50,7 @@ classdef MCMC < handle
         num_steps = 10000; % total number of steps (including burn-in)
         num_burned = 1000; % number of steps to burn at the begining of each chain
         
-        step_sizes = [0.25, 0.25, 3]; % in order of parameters: step size for each parameter
+        step_sizes = [0.5, 0.5, 3]; % in order of parameters: step size for each parameter
         circ_bounds = [0 0 0]; % in order of parameters: which par gets a circular boundary condition
         
         par_list = {'r', 'b', 'v'}; % these parameters are chosen randomly each step. The rest are taken from the generator's parameters
@@ -243,26 +243,30 @@ classdef MCMC < handle
         function setupQuickScan(obj)
             
             obj.use_priors = 0;
-            obj.initialization_method = 'search'; 
+            obj.initialization_method = 'random'; 
+            obj.gen.v_range = [0.2 30]; 
             obj.par_list = {'r'  'b'  'v'};
-            obj.step_sizes = [0.25 0.25 3];
+%             obj.step_sizes = [0.5 0.5 3];
             obj.circ_bounds = [0 0 0];
-            obj.num_steps = 10000;
-            obj.num_burned = 1000; 
+%             obj.num_steps = 10000;
+%             obj.num_burned = 1000; 
 
         end
         
         function setupDeepScan(obj)
             
             obj.par_list = {'r'  'b'  'v', 'R'};
-            obj.step_sizes = [0.25 0.25 3 0.1];
+            obj.step_sizes = [0.5 0.5 3 0.1];
+            
+            obj.initialization_method = 'random'; 
             obj.circ_bounds = [0 0 0 0];
+            
+            obj.gen.v_range = obj.input_v - [5.15 3.65]; % apply the range of KBO motion between circular and parabolic orbits
+            if obj.gen.v_range(1)<1, obj.gen.v_range(1) = 1; end % make sure the slowest velocity is not too slow
             obj.use_priors = 1; 
-            obj.prior_functions = {'', '', ...
-                @(v) exp( -(v-obj.input_v).^2 ./ (2.*obj.velocity_disp.^2) ), ...
-                @(R) exp( -(R-obj.input_R).^2 ./ (2.*(obj.input_R.*0.1).^2) ) }; 
-            obj.num_steps = 10000;
-            obj.num_burned = 1000; 
+            obj.prior_functions = {'', '', '', @(R) -(R-obj.input_R).^2 ./ (2.*(obj.input_R.*0.1).^2) }; 
+%             obj.num_steps = 10000;
+%             obj.num_burned = 1000; 
 
         end
         
@@ -590,17 +594,19 @@ classdef MCMC < handle
             chi2 = nansum(((f1-f2)./e).^2, 1); 
 
             obj.gen.lc.pars.chi2 = chi2;
+            obj.gen.lc.pars.dof = nnz(~isnan(f2))-length(obj.par_list);
             
             for ii = 1:length(chi2)
 
-                L = chi2cdf(chi2(ii), nnz(~isnan(f2))-length(obj.par_list), 'upper'); % do we need to subtract these parameters from the dof??
+%                 L = chi2cdf(chi2(ii),, 'upper'); % do we need to subtract these parameters from the dof??
+                L = -0.5.*chi2(ii); % moved to log-likelihood for better stability
                 
                 if obj.use_priors
                     for jj = 1:length(obj.prior_functions)
                         if ~isempty(obj.prior_functions{jj})
                             values = obj.gen.(obj.par_list{jj});
                             % multiply by the value of the function at the given point in parameter space
-                            L = L.*obj.prior_functions{jj}(values(ii)); 
+                            L = L + obj.prior_functions{jj}(values(ii)); 
                         end
                     end
                 end
@@ -713,7 +719,7 @@ classdef MCMC < handle
                     
 %                     ratio = obj.gen.lc.pars.likelihood(ii)./obj.points(jj-1,ii).likelihood; % compare the new potential point with the last point
 
-                    log_ratio = log(obj.gen.lc.pars.likelihood(ii)) - log(obj.points(jj-1,ii).likelihood);
+                    log_ratio = obj.gen.lc.pars.likelihood(ii) - obj.points(jj-1,ii).likelihood;
                     
                     if isnan(log_ratio) || log(rand)<log_ratio % if ratio is big, we are likely to take the new point
                         if length(obj.num_successes)<ii
@@ -721,6 +727,7 @@ classdef MCMC < handle
                         else
                             obj.num_successes(ii) = obj.num_successes(ii) + 1;
                         end
+                        
                         obj.points(jj,ii).counts = 1;
                         
                         if obj.best_point.likelihood<obj.points(jj,ii).likelihood % keep track of the best fit point
@@ -762,8 +769,8 @@ classdef MCMC < handle
         function [pass, likelihood, acceptance] = calcChainProps(obj, varargin)
 
             input = util.text.InputVars;
-            input.input_var('success_ratio', 0.1); % minimal number of successes (relative to total steps) for a chain to be included
-            input.input_var('likelihood', 0.01); % minimal mean likelihood needed for a chain to be included
+            input.input_var('success_ratio', 0.05); % minimal number of successes (relative to total steps) for a chain to be included
+            input.input_var('likelihood', 0); % minimal mean likelihood needed for a chain to be included
             input.scan_vars(varargin{:}); 
             
             idx = obj.num_burned:obj.counter; 
@@ -786,8 +793,8 @@ classdef MCMC < handle
             
             input = util.text.InputVars;
             input.input_var('pars', obj.show_posterior_pars); 
-            input.input_var('success_ratio', 0.1); % minimal number of successes (relative to total steps) for a chain to be included
-            input.input_var('likelihood', 0.01); % minimal mean likelihood needed for a chain to be included
+            input.input_var('success_ratio', 0.05); % minimal number of successes (relative to total steps) for a chain to be included
+            input.input_var('likelihood', 0); % minimal mean likelihood needed for a chain to be included
             input.input_var('weights', false, 'use_weights');
             input.input_var('burn', false); 
             input.input_var('oversample', 5); 

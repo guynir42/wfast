@@ -393,15 +393,14 @@ classdef Processor < dynamicprops
 
                     if obj.brake_bit, break; end
 
-                    if obj.reader.is_finished
-                        return;
+                    if ~obj.reader.is_finished
+                        obj.load_data;
                     end
-                    
-                    obj.load_data;
                     
                     drawnow; 
                     
-                    if mod(obj.file_index - 1, obj.pars.coadd_size)==0 % finished collecting N files
+                    if mod(obj.file_index - 1, obj.pars.coadd_size)==0 || ... % finished collecting N files
+                            obj.reader.is_finished % or if there are no more files
                         obj.calculateCoadds; 
                         obj.process; % go over unprocessed files
                     end
@@ -537,6 +536,7 @@ classdef Processor < dynamicprops
             
             obj.pars = obj.backup_pars; % restore the parameters of the original object before parsing inputs
             
+            obj.prog.current_number = obj.file_index - 1; 
             obj.prog.finish;
             
             obj.light.finishup;
@@ -671,6 +671,10 @@ classdef Processor < dynamicprops
                 
                 obj.setBufferIndices;
                 
+                if isempty(obj.buf_idx) % there are no buffers with data for this index (out of files maybe?)
+                    return;
+                end
+                
                 obj.data = obj.buffer(obj.buf_idx); % create a separate copy of the data loading it into "data" struct
                 
                 if ~isempty(obj.prev_buf_idx) && obj.prev_buf_idx>0 && obj.prev_buf_idx<=length(obj.buffer) % if a previous buffer exists...
@@ -757,6 +761,10 @@ classdef Processor < dynamicprops
                 
                 obj.findStars;
 
+                for ii = 1:length(obj.buffer)
+                    obj.buffer(ii).positions = obj.data.positions; 
+                end
+                
                 if obj.pars.use_astrometry
 
                     obj.solveAstrometry;

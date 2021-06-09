@@ -54,7 +54,8 @@ classdef Parameters < handle
         is_noise_updated = 0;
         
         chi2 = NaN; % the results of fitting to this model 
-        likelihood = 0; % the results of fitting to this model (translated to probability)
+        dof = NaN; % how many degrees of freedom were used in calculating chi2
+        likelihood = -NaN; % the results of fitting to this model (translated to probability)
         counts = 1; 
         weight = 1; % this can be set to zero for repeated points... 
         

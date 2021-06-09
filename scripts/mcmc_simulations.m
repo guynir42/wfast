@@ -5,22 +5,19 @@
 clear p; 
 
 ii = 1; p(ii) = occult.Parameters; 
-p(ii).R = 0.3; p(ii).r = 1.5; p(ii).b = 1; p(ii).v = 25; 
+p(ii).R = 0.3; p(ii).r = 1.5; p(ii).b = 1; p(ii).v = 20; 
 
-ii = 2; p(ii) = occult.Parameters; 
-p(ii).R = 2; p(ii).r = 1.5; p(ii).b = 1; p(ii).v = 15; 
+ii = ii + 1; p(ii) = occult.Parameters; 
+p(ii).R = 2; p(ii).r = 1.5; p(ii).b = 1; p(ii).v = 10; 
 
-ii = 3; p(ii) = occult.Parameters; 
-p(ii).R = 1; p(ii).r = 1.5; p(ii).b = 0; p(ii).v = 25; 
+ii = ii + 1;  p(ii) = occult.Parameters; 
+p(ii).R = 5; p(ii).r = 3; p(ii).b = 1; p(ii).v = 10; 
 
-ii = 4; p(ii) = occult.Parameters; 
-p(ii).R = 5; p(ii).r = 3; p(ii).b = 1; p(ii).v = 15; 
+ii = ii + 1;  p(ii) = occult.Parameters; 
+p(ii).R = 0.5; p(ii).r = 0.8; p(ii).b = 0.2; p(ii).v = 5; 
 
-ii = 5; p(ii) = occult.Parameters; 
-p(ii).R = 0.5; p(ii).r = 0.8; p(ii).b = 0.2; p(ii).v = 8; 
-
-ii = 6; p(ii) = occult.Parameters; 
-p(ii).R = 3; p(ii).r = 1.5; p(ii).b = 1; p(ii).v = 3; 
+ii = ii + 1;  p(ii) = occult.Parameters; 
+p(ii).R = 10; p(ii).r = 2.0; p(ii).b = 2; p(ii).v = 3; 
 
 
 if ~exist('g', 'var') || isempty(g) || ~isa(g, 'occult.CurveGenerator')
@@ -45,19 +42,23 @@ for ii = 1:length(p)
     mcmc(ii).input_errors = 1./g.snr; 
     mcmc(ii).true_point = util.oop.full_copy(p(ii)); 
     mcmc(ii).input_R = normrnd(p(ii).R, 0.1.*p(ii).R); % random error on the "true" R
-    mcmc(ii).input_v = normrnd(p(ii).v, 3.5); % random error on the "true" v
-    
-    
+    mcmc(ii).input_v = normrnd(p(ii).v + 4, 1); % random error on the "true" v, and also an offset of 4 FSU/s because MCMC expects us to input the Earth's velocity, without reducing the KBO motion
+        
 end
 
-save(fullfile(getenv('WFAST'), 'scripts/mcmc_start_points'), 'mcmc', 'p'); 
+%%
 
+save(fullfile(getenv('WFAST'), 'scripts/mcmc_start_points'), 'mcmc', 'p'); 
+% load(fullfile(getenv('WFAST'), 'scripts/mcmc_start_points')
 
 %% go over each point and run the MCMC
 
-for ii = 3 % 1:length(p)
+for ii = 1 % 1:length(p)
     
     mcmc(ii).reset;
+    mcmc(ii).num_chains = 10; 
+    mcmc(ii).num_burned = 1000;
+    mcmc(ii).num_steps = 1e4; 
     mcmc(ii).setupQuickScan; 
     mcmc(ii).run; 
     
@@ -67,7 +68,7 @@ end
 
 %% go over each point and run the MCMC, this time with R and with priors
 
-for ii = 4:6 % 1:length(p)
+for ii = 1 % 1:length(p)
 
     mcmc2(ii) = util.oop.full_copy(mcmc(ii)); 
     mcmc2(ii).reset; 
