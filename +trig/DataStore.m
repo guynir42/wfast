@@ -589,7 +589,8 @@ classdef DataStore < handle
             
             obj.temp_timestamps(ii:ii+Nframes-1,1) = obj.this_input.timestamps;
             obj.temp_juldates(ii:ii+Nframes-1,1) = obj.this_input.juldates;
-            obj.temp_filenames{ii:ii+Nframes-1,1} = obj.this_input.filename; 
+            if isempty(obj.temp_filenames), obj.temp_filenames = {}; end % make sure this is a cell array, even if it is empty... 
+            obj.temp_filenames(ii:ii+Nframes-1,1) = {obj.this_input.filename}; 
             obj.temp_frame_num(ii:ii+Nframes-1,1) = ii:ii+Nframes-1; 
             
             list = obj.aux_names;

@@ -25,7 +25,7 @@ function flux_det = detrend(flux, varargin)
         flux = flux(:,:); % linearize higher dimensions
     end
     
-    fr = util.fit.polyfit(1:size(flux,1), flux, 'double', 1, 'order', 1, varargin{:}); 
+    fr = util.fit.polyfit(1:size(flux,1), flux, 'double', 1, 'order', 1, 'nofunc', 1, varargin{:}); 
     
     flux_det = flux - [fr.ym]; 
     

@@ -10,6 +10,8 @@ function results = polyfit(x,y,varargin)
 %   -iterations: how many times to refit after removing outliers (default 3). 
 %   -variances: if you have the error^2 per sample, it can be given to the fitter
 %   -double: use double (64 bit) precision instead of single (32 bit). Default is false. 
+%   -nofunc: do not calculate a function handle for the output. This saves
+%            much time since the str2func is rather slow. Default false. 
 %   -plotting: make the fitter plot the results of each iteration for debugging. 
 %   -axes: what axes object to plot to. 
 %   -pause: length of pause after each plot. Default 0.3 seconds. 
@@ -22,6 +24,7 @@ function results = polyfit(x,y,varargin)
     input.input_var('iterations', 3); % how many iterations of removing outliers
     input.input_var('variances', []); % assume no covariance, only different variance per sample
     input.input_var('double', false); % use double precision
+    input.input_var('nofunc', false); % do not calculate a function handle from the coefficients (faster)
     input.input_var('plotting', false);
     input.input_var('axes', [], 'axis');
     input.input_var('pause', 0.3);
@@ -184,10 +187,13 @@ function results = polyfit(x,y,varargin)
         results(ii).v = vdata;
         results(ii).ym = y_model;            
         results(ii).bad_idx = bad_idx; 
-        if any(isnan(results(ii).coeffs))
-            results(ii).func = @(x) NaN.*x;
-        else
-            results(ii).func = str2func(['@(x) ' results(ii).model(4:end)]);
+        
+        if input.nofunc==0
+            if any(isnan(results(ii).coeffs))
+                results(ii).func = @(x) NaN.*x;
+            else
+                results(ii).func = str2func(['@(x) ' results(ii).model(4:end)]);
+            end
         end
         
         % get rid of white space and dot notation

@@ -598,7 +598,7 @@ classdef EventFinder < handle
         
         function finishup(obj) % call this at the end of the run 
             
-            if obj.pars.limit_events_per_star % check if any stars need to be black listed
+            if obj.pars.limit_events_per_star && ~isempty(obj.cand) % check if any stars need to be black listed
                 
                 real_events = ~[obj.cand.is_simulated] & ~[obj.cand.oort_template]; % don't include simulated events or Oort cloud triggers in the black list! 
 
@@ -764,7 +764,7 @@ classdef EventFinder < handle
             
                 idx1 = find(frame_numbers==1); % indices where a new batch begins
 
-                N = obj.head.NAXIS; 
+                N = obj.head.NAXIS3; 
                 if N==1, N = obj.store.pars.batch_size; end                
                 idx2 = find(frame_numbers==N); % indices where the batch ends
 
