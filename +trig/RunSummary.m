@@ -679,7 +679,6 @@ classdef RunSummary < handle
     
     methods(Static=true)
         
-        
         function ax_struct = showDetectionRateStatic(ev, varargin)
             
             import util.text.cs;
@@ -689,6 +688,7 @@ classdef RunSummary < handle
             input.input_var('parent'); % parent can be figure or panel (default is gcf())
             input.input_var('auto_ylim', true); % if false will set the percentages to 0-100% on all axis
             input.input_var('font_size', 18); % fonts on the axes
+            input.input_var('colors', {}); 
             input.scan_vars(varargin{:}); 
             
             if ischar(input.distance)
@@ -709,6 +709,14 @@ classdef RunSummary < handle
                 input.parent = gcf;
             end
             
+            if isempty(input.colors)
+                input.colors = {[0.2 0.2 0.9], [0.2 0.9 0.2], [1 0.0 0.0]};
+            elseif ischar(input.colors) && util.text.cs(input.colors, 'alternative')
+                input.colors = {[0.5 0.2 0.9], [0.9 0.9 0.0], [1 0.0 0.0]};
+            elseif ischar(input.colors) && util.text.cs(input.colors, 'monochrome')
+                input.colors = {[0.6 0.6 0.6], [0.3 0.3 0.3], [0 0 0]};
+            end
+            
             delete(input.parent.Children);
             
             height = 0.35;
@@ -727,10 +735,10 @@ classdef RunSummary < handle
             
             bin_size = max([et.R])/25;
             [N_R,E_R] = histcounts([et.R], 'BinWidth', bin_size); 
-            bar(ax_R, E_R(1:end-1)+bin_size/2, N_R); 
+            bar(ax_R, E_R(1:end-1)+bin_size/2, N_R, 'FaceColor', input.colors{1}); 
             hold(ax_R, 'on'); 
             N_R_passed = histcounts([ep.R], 'BinEdges', E_R); 
-            bar(ax_R, E_R(1:end-1)+bin_size/2, N_R_passed); 
+            bar(ax_R, E_R(1:end-1)+bin_size/2, N_R_passed, 'FaceColor', input.colors{2}); 
             hold(ax_R, 'off'); 
             xlabel(ax_R, 'stellar radius R [FSU]'); 
             ylabel(ax_R, 'number of events'); 
@@ -742,7 +750,7 @@ classdef RunSummary < handle
             ax_R.YTick = 10.^(0:mx); 
             
             yyaxis(ax_R, 'right'); 
-            plot(ax_R, E_R(1:end-1)+bin_size/2, N_R_passed./N_R*100, '-*', 'LineWidth', 2); 
+            plot(ax_R, E_R(1:end-1)+bin_size/2, N_R_passed./N_R*100, '-*', 'LineWidth', 2, 'Color', input.colors{3}); 
             
             if input.auto_ylim==0
                 ax_R.YLim = [0.1 100]; 
@@ -754,15 +762,16 @@ classdef RunSummary < handle
             yyaxis(ax_R, 'left'); 
 %             legend(ax_R, {'all events', 'passed events', 'percent'}, 'Location', 'NorthEast'); 
             ax_R.FontSize = input.font_size;
+            ax_R.YAxis(2).Color = input.colors{3}; 
             
             %%%%%%%% occulter radius r %%%%%%%%%%%%%%%%%%%%%
             
             bin_size = 0.25;
             [N_r,E_r] = histcounts([et.r], 'BinWidth', bin_size); 
-            bar(ax_r, E_r(1:end-1)+bin_size/2, N_r); 
+            bar(ax_r, E_r(1:end-1)+bin_size/2, N_r, 'FaceColor', input.colors{1}); 
             hold(ax_r, 'on'); 
             N_r_passed = histcounts([ep.r], 'BinEdges', E_r); 
-            bar(ax_r, E_r(1:end-1)+bin_size/2, N_r_passed); 
+            bar(ax_r, E_r(1:end-1)+bin_size/2, N_r_passed, 'FaceColor', input.colors{2}); 
             hold(ax_r, 'off'); 
             xlabel(ax_r, 'occulter radius r [FSU]'); 
             ylabel(ax_r, 'number of events'); 
@@ -774,7 +783,7 @@ classdef RunSummary < handle
             ax_r.YTick = 10.^(0:mx); 
             
             yyaxis(ax_r, 'right'); 
-            plot(ax_r, E_r(1:end-1)+bin_size/2, N_r_passed./N_r*100, '-*', 'LineWidth', 2); 
+            plot(ax_r, E_r(1:end-1)+bin_size/2, N_r_passed./N_r*100, '-*', 'LineWidth', 2, 'Color', input.colors{3}); 
             
             if input.auto_ylim==0
                 ax_r.YLim = [0.1 100]; 
@@ -786,16 +795,17 @@ classdef RunSummary < handle
             yyaxis(ax_r, 'left'); 
 %             legend(ax_r, {'all events', 'passed events', 'percent'}, 'Location', 'NorthEast'); 
             ax_r.FontSize = input.font_size;
-            
+            ax_r.YAxis(2).Color = input.colors{3}; 
+
             
             %%%%%%%% impact parameter b %%%%%%%%%%%%%%%%%%%%%
             
             bin_size = 0.25;
             [N_b,E_b] = histcounts([et.b], 'BinWidth', bin_size); 
-            bar(ax_b, E_b(1:end-1)+bin_size/2, N_b); 
+            bar(ax_b, E_b(1:end-1)+bin_size/2, N_b, 'FaceColor', input.colors{1}); 
             hold(ax_b, 'on'); 
             N_b_passed = histcounts([ep.b], 'BinEdges', E_b); 
-            bar(ax_b, E_b(1:end-1)+bin_size/2, N_b_passed); 
+            bar(ax_b, E_b(1:end-1)+bin_size/2, N_b_passed, 'FaceColor', input.colors{2}); 
             hold(ax_b, 'off'); 
             xlabel(ax_b, 'impact parameter b [FSU]'); 
             ylabel(ax_b, 'number of events'); 
@@ -807,7 +817,7 @@ classdef RunSummary < handle
             ax_b.YTick = 10.^(0:mx); 
             
             yyaxis(ax_b, 'right'); 
-            plot(ax_b, E_b(1:end-1)+bin_size/2, N_b_passed./N_b*100, '-*', 'LineWidth', 2); 
+            plot(ax_b, E_b(1:end-1)+bin_size/2, N_b_passed./N_b*100, '-*', 'LineWidth', 2, 'Color', input.colors{3}); 
             
             if input.auto_ylim==0
                 ax_b.YLim = [0.1 100]; 
@@ -819,17 +829,18 @@ classdef RunSummary < handle
             yyaxis(ax_b, 'left'); 
 %             legend(ax_b, {'all events', 'passed events', 'percent'}, 'Location', 'NorthEast'); 
             ax_b.FontSize = input.font_size;
-            
+            ax_b.YAxis(2).Color = input.colors{3}; 
+
             
             %%%%%%%% velocity v %%%%%%%%%%%%%%%%%%%%%
             
 %             bin_size = 2.5;
             bin_size = max([et.v])/15;
             [N_v,E_v] = histcounts([et.v], 'BinWidth', bin_size); 
-            bar(ax_v, E_v(1:end-1)+bin_size/2, N_v); 
+            bar(ax_v, E_v(1:end-1)+bin_size/2, N_v, 'FaceColor', input.colors{1}); 
             hold(ax_v, 'on'); 
             N_v_passed = histcounts([ep.v], 'BinEdges', E_v); 
-            bar(ax_v, E_v(1:end-1)+bin_size/2, N_v_passed); 
+            bar(ax_v, E_v(1:end-1)+bin_size/2, N_v_passed, 'FaceColor', input.colors{2}); 
             hold(ax_v, 'off'); 
             xlabel(ax_v, 'velocity v [FSU/s]'); 
             ylabel(ax_v, 'number of events'); 
@@ -839,10 +850,10 @@ classdef RunSummary < handle
             mx = ceil(log10(max(N_v)));
             ax_v.YLim = 10.^([mn mx]); 
             ax_v.YTick = 10.^(0:mx); 
-            
+
             
             yyaxis(ax_v, 'right'); 
-            plot(ax_v, E_v(1:end-1)+bin_size/2, N_v_passed./N_v*100, '-*', 'LineWidth', 2); 
+            plot(ax_v, E_v(1:end-1)+bin_size/2, N_v_passed./N_v*100, '-*', 'LineWidth', 2, 'Color', input.colors{3}); 
             
             if input.auto_ylim==0
                 ax_v.YLim = [0.1 100]; 
@@ -854,6 +865,7 @@ classdef RunSummary < handle
             yyaxis(ax_v, 'left'); 
 %             legend(ax_v, {'all events', 'passed events', 'percent'}, 'Location', 'NorthEast'); 
             ax_v.FontSize = input.font_size;
+            ax_v.YAxis(2).Color = input.colors{3}; 
             
             ax_struct.ax_R = ax_R;
             ax_struct.ax_r = ax_r;
@@ -861,7 +873,6 @@ classdef RunSummary < handle
             ax_struct.ax_v = ax_v;
             
         end
-        
         
     end
     

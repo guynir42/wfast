@@ -50,7 +50,7 @@ x(x<5) = [];
 fr = util.fit.polyfit(x,y, 'order', 1, 'double', 1); 
 
 h4 = plot(ax1, sort(fr.x), fr.func(sort(fr.x)), ':g', 'LineWidth', 3); 
-h4.DisplayName = sprintf('fit: y=%4.2f*x + %4.2f', fr.coeffs(2), fr.coeffs(1)); 
+h4.DisplayName = sprintf('fit: y=%4.2fx + %4.2f', fr.coeffs(2), fr.coeffs(1)); 
 hold(ax1, 'off');
 
 ax1.XLim = snr_range;

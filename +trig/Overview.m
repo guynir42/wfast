@@ -1343,11 +1343,13 @@ classdef Overview < handle
                 line = '-----------------------------+-------------------+------------------- \n';
                 ending = newline;
                 code = @(str) str;
+                percent = '%'; 
             elseif cs(input.format, 'latex')
                 sep = '&';
                 line = ['\\hline' newline]; 
                 ending = ['\\' newline]; 
                 code = @(str) sprintf('\\code{%s}', str); 
+                percent = '\%'; 
             else
                 error('Unknown "format" option "%s". Use "text" or "latex" instead...', input.format); 
             end
@@ -1375,7 +1377,7 @@ classdef Overview < handle
                 exc_h = exc/3600;
                 exc_p = exc/total*100; 
                 
-                fprintf('%-28s %s %8.2f (%5.2f%%) %s %8.2f (%5.2f%%) %s', code(obj.cut_names{ii}), sep, inc_h, inc_p, sep, exc_h, exc_p, ending);
+                fprintf('%-28s %s %8.2f (%5.2f%s) %s %8.2f (%5.2f%s) %s', code(obj.cut_names{ii}), sep, inc_h, inc_p, percent, sep, exc_h, exc_p, percent, ending);
                 
                 
             end
@@ -1385,11 +1387,11 @@ classdef Overview < handle
             stars_h = stars/3600;
             stars_p = stars/total*100;
             
-            fprintf('%-28s %s %8.2f (%5.2f%%) %s         ---       %s', code('Bad stars'), sep, stars_h, stars_p, sep, ending); 
+            fprintf('%-28s %s %8.2f (%5.2f%s) %s         ---       %s', code('Bad stars'), sep, stars_h, stars_p, percent, sep, ending); 
             
             fprintf(line); 
             
-            fprintf('%-28s %s %8.1fh (%5.2f%%) out of %8.1fh   %s', 'good/total star hours', sep, useful/3600, useful/total.*100, total/3600, ending); % always show it as hours!  
+            fprintf('%-28s %s %8.1fh (%5.2f%s) out of %8.1fh   %s', 'good/total star hours', sep, useful/3600, useful/total.*100, percent, total/3600, ending); % always show it as hours!  
 
             
         end
