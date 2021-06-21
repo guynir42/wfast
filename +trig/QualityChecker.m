@@ -928,6 +928,9 @@ classdef QualityChecker < handle
         end
         
         function val = calculateFluxCorr(obj, flux, widths)
+            %
+            % flux  - a 2D matrix of (time x star)
+            % width - vector of time scales (e.g., [10 25 50])
             
             if nargin<3 || isempty(widths)
                 widths = 50; 
