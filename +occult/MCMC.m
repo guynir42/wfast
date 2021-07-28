@@ -50,8 +50,8 @@ classdef MCMC < handle
         num_steps = 10000; % total number of steps (including burn-in)
         num_burned = 1000; % number of steps to burn at the begining of each chain
         
-        step_sizes = [0.5, 0.5, 3]; % in order of parameters: step size for each parameter
-        circ_bounds = [0 0 0]; % in order of parameters: which par gets a circular boundary condition
+        step_sizes = [0.25, 0.25, 1, 0.1]; % in order of parameters: step size for each parameter
+        circ_bounds = [0 0 0 0]; % in order of parameters: which par gets a circular boundary condition
         
         par_list = {'r', 'b', 'v'}; % these parameters are chosen randomly each step. The rest are taken from the generator's parameters
         
@@ -60,7 +60,7 @@ classdef MCMC < handle
         initialization_method = 'search'; 
 
         use_priors = false; % a general switch to turn on/off the use of prior functions        
-        prior_functions = {}; % can input a cell array with a different function per parameter (leave empty for uniform prior). min/max values are taken from generator
+        prior_log_functions = {}; % can input a cell array with a different function per parameter (leave empty for uniform prior). min/max values are taken from generator
         
         plot_every = 1; % when plotting, how many steps go by between plots (set to 0 for no plotting)
         show_num_chains = 4; % the maximum number of chains to show on the plot
@@ -90,13 +90,13 @@ classdef MCMC < handle
         brake_bit = 1; % set to 0 when running, set to 1 to stop run
         
         % save when we run sampleGridLikelihood
-        likelihood_map; 
+        log_likelihood_map; 
         map_r;
         map_b;
         map_v;
         map_R; 
         
-        version = 1.05;
+        version = 1.06;
         
     end
     
@@ -160,9 +160,9 @@ classdef MCMC < handle
             
         end
         
-        function resetLikelihoodMap(obj)
+        function resetLogLikelihoodMap(obj)
             
-            obj.likelihood_map = []; 
+            obj.log_likelihood_map = []; 
             obj.map_r = [];
             obj.map_b = [];
             obj.map_v = [];
@@ -204,7 +204,7 @@ classdef MCMC < handle
                     cla(obj.gui.axes_lightcurve); 
                 end
                 
-                obj.resetLikelihoodMap;
+                obj.resetLogLikelihoodMap;
                 
             end
             
@@ -216,7 +216,7 @@ classdef MCMC < handle
                 
                 obj.input_R = val;
                 
-                obj.resetLikelihoodMap; 
+                obj.resetLogLikelihoodMap; 
                 
             end
             
@@ -256,20 +256,35 @@ classdef MCMC < handle
         function setupDeepScan(obj)
             
             obj.par_list = {'r'  'b'  'v', 'R'};
-            obj.step_sizes = [0.5 0.5 3 0.1];
+            obj.step_sizes = [0.25 0.25 1 0.1];
             
             obj.initialization_method = 'random'; 
             obj.circ_bounds = [0 0 0 0];
+            obj.gen.R_range = [0 10]; 
             
-            obj.gen.v_range = obj.input_v - [5.15 3.65]; % apply the range of KBO motion between circular and parabolic orbits
-            if obj.gen.v_range(1)<1, obj.gen.v_range(1) = 1; end % make sure the slowest velocity is not too slow
             obj.use_priors = 1; 
-            obj.prior_functions = {'', '', '', @(R) -(R-obj.input_R).^2 ./ (2.*(obj.input_R.*0.1).^2) }; 
+            obj.prior_log_functions = {'', '', '', @(R) -(R-obj.input_R).^2 ./ (2.*(obj.input_R.*0.1).^2) }; 
 %             obj.num_steps = 10000;
 %             obj.num_burned = 1000; 
 
         end
         
+        function setupNarrowVelocityPrior(obj) % TODO: allow user input to change the range or input physical parameters
+        
+            obj.gen.v_range = obj.input_v - [5.15 3.65]; % apply the range of KBO motion between circular and parabolic orbits (in FSU/s)
+            if obj.gen.v_range(1)<1, obj.gen.v_range(1) = 1; end % make sure the slowest velocity is not too slow
+            
+            obj.step_sizes(3) = 0.1; 
+            
+        end
+        
+        function setupWideVelocityPrior(obj)
+            
+            obj.gen.v_range = [1 30]; 
+            obj.step_sizes(3) = 1;
+            
+        end
+                
     end
     
     methods % calculations
@@ -430,6 +445,8 @@ classdef MCMC < handle
                 end
                 
                 obj.gen.lc.pars.chi2(ii) = NaN;
+                obj.gen.lc.pars.ndof(ii) = NaN; 
+                obj.gen.lc.pars.logl(ii) = NaN; 
                 obj.gen.lc.pars.likelihood(ii) = 0; 
     
             end 
@@ -440,7 +457,7 @@ classdef MCMC < handle
             
         end
                 
-        function [likelihood, r, b, v, R] = sampleGridLikelihood(obj, varargin)
+        function [log_likelihood, r, b, v, R] = sampleGridLikelihood(obj, varargin)
             
             if isempty(obj.input_flux)
                 error('Cannot run MCMC without an input flux! Use useSimulatedInput() or useSimulatedNoisyInput() or input a lightcurve manually.'); 
@@ -473,19 +490,19 @@ classdef MCMC < handle
             obj.gen.b = B(:); % linearize to get all options
             obj.gen.v = V(:); % linearize to get all options
             
-            likelihood = NaN(length(r), length(b), length(v)); 
+            log_likelihood = NaN(length(r), length(b), length(v)); 
             
             for ii = 1:length(r)
                 
                 obj.gen.r = r(ii); 
                 
-                L = obj.calcLikelihood; 
+                LL = obj.calcLikelihood; 
                 
-                likelihood(ii,:,:) = reshape(L, [length(b), length(v)]); 
+                log_likelihood(ii,:,:) = reshape(LL, [length(b), length(v)]); 
                 
             end
             
-            obj.likelihood_map = likelihood;
+            obj.log_likelihood_map = log_likelihood;
             obj.map_r = r;
             obj.map_b = b;
             obj.map_v = v;
@@ -502,21 +519,22 @@ classdef MCMC < handle
             end
             
             chi2 = nansum(((obj.input_flux - 1)/e).^2);
-            dof = nnz(~isnan(obj.input_flux)) - 3; % assume parameters are r,b,v, only
+            ndof = nnz(~isnan(obj.input_flux)) - 3; % assume parameters are r,b,v, only
             
-            base_likelihood = chi2cdf(chi2, dof, 'upper'); 
-            
-            if isempty(obj.likelihood_map)
-                [L, r, b, v, R] = obj.sampleGridLikelihood(varargin{:});
+%             base_likelihood = chi2cdf(chi2, ndof, 'upper'); 
+            logl_base = -0.5*chi2;
+
+            if isempty(obj.log_likelihood_map)
+                [LL, r, b, v, R] = obj.sampleGridLikelihood(varargin{:});
             else
-                L = obj.likelihood_map; 
+                LL = obj.log_likelihood_map; 
                 r = obj.map_r;
                 b = obj.map_b;
                 v = obj.map_v;
                 R = obj.map_R; 
             end
             
-            idx = L>2*base_likelihood;
+            idx = LL>base_likelihood+log(2);
             
             stats = regionprops3(idx);
                         
@@ -552,24 +570,35 @@ classdef MCMC < handle
 
                     if obj.circ_bounds(jj)
 
-                        if subsref(obj.gen, S)>range(2)
-                            delta = subsref(obj.gen, S) - range(2);
-                            obj.gen = subsasgn(obj.gen, S, range(1) + delta); % circle back the rest of the way from the lower bound
-                        elseif subsref(obj.gen, S)<range(1)
-                            delta = range(1) - subsref(obj.gen, S);
-                            obj.gen = subsasgn(obj.gen, S, range(2) - delta); % circle back the rest of the way from the upper bound
+                        for ii = 1:1000
+                            
+                            if subsref(obj.gen, S)>range(2)
+                                delta = subsref(obj.gen, S) - range(2);
+                                obj.gen = subsasgn(obj.gen, S, range(1) + delta); % circle back the rest of the way from the lower bound
+                            elseif subsref(obj.gen, S)<range(1)
+                                delta = range(1) - subsref(obj.gen, S);
+                                obj.gen = subsasgn(obj.gen, S, range(2) - delta); % circle back the rest of the way from the upper bound
+                            else
+                                break; % not out of bounds! 
+                            end
+                            
                         end
 
                     else % reflect back
                         
-                        if subsref(obj.gen, S)>range(2)
-                            delta = subsref(obj.gen, S) - range(2);
-                            obj.gen = subsasgn(obj.gen, S, range(2) - delta); % reflect the next point off the upper edge of the range
-                        elseif subsref(obj.gen, S)<range(1)
-                            delta = range(1) - subsref(obj.gen, S);
-                            obj.gen = subsasgn(obj.gen, S, range(1) + delta); % leave the point at the lower edge of the range
+                        for ii = 1:1000
+                            
+                            if subsref(obj.gen, S)>range(2)
+                                delta = subsref(obj.gen, S) - range(2);
+                                obj.gen = subsasgn(obj.gen, S, range(2) - delta); % reflect the next point off the upper edge of the range
+                            elseif subsref(obj.gen, S)<range(1)
+                                delta = range(1) - subsref(obj.gen, S);
+                                obj.gen = subsasgn(obj.gen, S, range(1) + delta); % leave the point at the lower edge of the range
+                            else
+                                break; % not out of bounds! 
+                            end
+                            
                         end
-
                     end 
 
                 end % for ii (num_chains)
@@ -578,7 +607,7 @@ classdef MCMC < handle
 
         end
         
-        function L = calcLikelihood(obj)
+        function LL = calcLikelihood(obj)
             
             obj.gen.getLightCurves; 
             
@@ -594,24 +623,25 @@ classdef MCMC < handle
             chi2 = nansum(((f1-f2)./e).^2, 1); 
 
             obj.gen.lc.pars.chi2 = chi2;
-            obj.gen.lc.pars.dof = nnz(~isnan(f2))-length(obj.par_list);
+            obj.gen.lc.pars.ndof = sum(~isnan(f1),1)-length(obj.par_list);
             
             for ii = 1:length(chi2)
 
-%                 L = chi2cdf(chi2(ii),, 'upper'); % do we need to subtract these parameters from the dof??
-                L = -0.5.*chi2(ii); % moved to log-likelihood for better stability
+%                 L = chi2cdf(chi2(ii),, 'upper'); % do we need to subtract these parameters from the ndof??
+                LL = -0.5.*chi2(ii); % moved to log-likelihood for better stability
                 
                 if obj.use_priors
-                    for jj = 1:length(obj.prior_functions)
-                        if ~isempty(obj.prior_functions{jj})
+                    for jj = 1:length(obj.prior_log_functions)
+                        if ~isempty(obj.prior_log_functions{jj})
                             values = obj.gen.(obj.par_list{jj});
                             % multiply by the value of the function at the given point in parameter space
-                            L = L + obj.prior_functions{jj}(values(ii)); 
+                            LL = LL + obj.prior_log_functions{jj}(values(ii)); % assume prior functions give log as well 
                         end
                     end
                 end
                 
-                obj.gen.lc.pars.likelihood(ii) = L;
+                obj.gen.lc.pars.logl(ii) = LL; 
+                obj.gen.lc.pars.likelihood(ii) = exp(LL);
 
                 % likelihood is zero for parameters that are out of bounds
                 for jj = 1:length(obj.par_list)
@@ -622,6 +652,7 @@ classdef MCMC < handle
                     range = obj.gen.([obj.par_list{jj} '_range']); 
 
                     if value<range(1) || value>range(2)
+                        obj.gen.lc.pars.logl(ii) = -Inf; 
                         obj.gen.lc.pars.likelihood(ii) = 0;
                         break; % no need to check other parameters
                     end
@@ -631,7 +662,7 @@ classdef MCMC < handle
             end
             
             if nargout>0
-                L = obj.gen.lc.pars.likelihood;
+                LL = obj.gen.lc.pars.logl;
             end
 
         end
@@ -719,7 +750,7 @@ classdef MCMC < handle
                     
 %                     ratio = obj.gen.lc.pars.likelihood(ii)./obj.points(jj-1,ii).likelihood; % compare the new potential point with the last point
 
-                    log_ratio = obj.gen.lc.pars.likelihood(ii) - obj.points(jj-1,ii).likelihood;
+                    log_ratio = obj.gen.lc.pars.logl(ii) - obj.points(jj-1,ii).logl;
                     
                     if isnan(log_ratio) || log(rand)<log_ratio % if ratio is big, we are likely to take the new point
                         if length(obj.num_successes)<ii
@@ -730,7 +761,7 @@ classdef MCMC < handle
                         
                         obj.points(jj,ii).counts = 1;
                         
-                        if obj.best_point.likelihood<obj.points(jj,ii).likelihood % keep track of the best fit point
+                        if obj.counter>obj.num_burned && obj.best_point.logl<obj.points(jj,ii).logl % keep track of the best fit point
                             obj.best_point.copy_from(obj.points(jj,ii)); 
                         end
 
@@ -748,7 +779,7 @@ classdef MCMC < handle
                 
                 if input.plot && obj.plot_every>0 && (obj.plot_every==1 || mod(obj.counter, obj.plot_every)==1)
                     
-                    obj.plot('burn', 1, 'ax', input.ax); 
+                    obj.plot('burn', 1, 'ax', input.ax, 'sparse', obj.plot_every); 
                     
                     if ~isempty(obj.gui) && obj.gui.check
                         obj.gui.updateLightcurves; 
@@ -770,8 +801,12 @@ classdef MCMC < handle
 
             input = util.text.InputVars;
             input.input_var('success_ratio', 0.05); % minimal number of successes (relative to total steps) for a chain to be included
-            input.input_var('likelihood', 0); % minimal mean likelihood needed for a chain to be included
+            input.input_var('likelihood', []); % minimal mean likelihood needed for a chain to be included
             input.scan_vars(varargin{:}); 
+            
+            if isempty(input.likelihood)
+                input.likelihood = -Inf; 
+            end
             
             idx = obj.num_burned:obj.counter; 
             
@@ -781,8 +816,8 @@ classdef MCMC < handle
                 likelihood(ii) = nanmean([obj.points(idx,ii).likelihood]);
                 
                 if ~isempty(input.success_ratio)
-                    pass(ii) = acceptance(ii) > input.success_ratio && ... 
-                        likelihood(ii) > input.likelihood;
+                    pass(ii) = acceptance(ii) >= input.success_ratio && ... 
+                        likelihood(ii) >= input.likelihood;
                 end
                 
             end
@@ -794,7 +829,7 @@ classdef MCMC < handle
             input = util.text.InputVars;
             input.input_var('pars', obj.show_posterior_pars); 
             input.input_var('success_ratio', 0.05); % minimal number of successes (relative to total steps) for a chain to be included
-            input.input_var('likelihood', 0); % minimal mean likelihood needed for a chain to be included
+            input.input_var('likelihood', []); % minimal mean likelihood needed for a chain to be included
             input.input_var('weights', false, 'use_weights');
             input.input_var('burn', false); 
             input.input_var('oversample', 5); 
@@ -822,7 +857,7 @@ classdef MCMC < handle
 %                 
 %             end
 
-            idx2 = obj.calcChainProps('success', input.success_ratio, 'likelihood', input.likelihood); 
+            idx2 = find(obj.calcChainProps('success', input.success_ratio, 'likelihood', input.likelihood)); 
             
             x = [obj.points(idx1, idx2).(input.pars{1})];
             y = [obj.points(idx1, idx2).(input.pars{2})];
@@ -898,6 +933,7 @@ classdef MCMC < handle
             input = util.text.InputVars;
             input.input_var('pars', obj.show_chain_pars); 
             input.input_var('burn', false); 
+            input.input_var('sparse', []); % show only one point every N points
             input.input_var('full_titles', false, 'titles'); 
             input.input_var('ax', [], 'axes', 'axis');
             input.input_var('font_size', 18); 
@@ -930,6 +966,12 @@ classdef MCMC < handle
             
             if ischar(input.pars)
                 input.pars = {input.pars};
+            end
+            
+            if isempty(input.sparse)
+                step = 1;
+            else
+                step = input.sparse; 
             end
             
             sz = ones(obj.counter, 1); 
@@ -975,19 +1017,21 @@ classdef MCMC < handle
                 
                 N = min(obj.num_chains, obj.show_num_chains); 
                 
+                sz = sz(1:step:obj.counter);
+                
                 for ii = 1:N
 
-                    p1 = [obj.points(1:obj.counter,ii).(input.pars{1})]';
-                    p2 = [obj.points(1:obj.counter,ii).(input.pars{2})]';
-                    p3 = [obj.points(1:obj.counter,ii).(input.pars{3})]';
-                    lkl = [obj.points(1:obj.counter,ii).likelihood]';
+                    p1 = [obj.points(1:step:obj.counter,ii).(input.pars{1})]';
+                    p2 = [obj.points(1:step:obj.counter,ii).(input.pars{2})]';
+                    p3 = [obj.points(1:step:obj.counter,ii).(input.pars{3})]';
+                    lkl = [obj.points(1:obj.counter,ii).likelihood]'; % used only for calculating the mean likelihood of each chain
                     
                     if isempty(h) || length(h)~=N || ~isvalid(h(ii))
                         N_colors = size(input.ax.ColorOrder,1);
                         col_idx = mod(ii-1, N_colors) + 1; 
                         sha_idx = floor((ii-1)/N_colors) + 1; 
                         h(ii) = scatter3(input.ax, p1, p2, p3, sz, input.ax.ColorOrder(col_idx,:), shapes{sha_idx}, 'filled');
-                        h(ii).DisplayName = sprintf('Chain %d (acc=%3.1f%%, lkl=%4.2f)', ...
+                        h(ii).DisplayName = sprintf('Chain %d (acc=%3.1f%%, lkl=%4.2g)', ...
                             ii, 100*obj.num_successes(ii)./obj.counter, nanmean(lkl(obj.num_burned+1:end,1))); 
                         input.ax.NextPlot = 'add';                 
                     else
@@ -995,7 +1039,7 @@ classdef MCMC < handle
                         h(N-ii+1).YData = p2;
                         h(N-ii+1).ZData = p3;
                         h(N-ii+1).SizeData = sz;
-                        h(N-ii+1).DisplayName = sprintf('Chain %d (acc=%3.1f%%, lkl=%4.2f)', ...
+                        h(N-ii+1).DisplayName = sprintf('Chain %d (acc=%3.1f%%, lkl=%4.2g)', ...
                             ii, 100*obj.num_successes(ii)./obj.counter, nanmean(lkl(obj.num_burned+1:end,1),1)); 
                         input.ax.NextPlot = 'add';  
                     end
@@ -1153,17 +1197,18 @@ classdef MCMC < handle
             
             chi2 = obj.gen.lc.pars.chi2;
             
-            dof = nnz(~isnan(obj.input_flux))-length(obj.par_list);
+            ndof = nnz(~isnan(obj.input_flux))-length(obj.par_list);
             
             if ~isempty(obj.points)
                 text(input.ax, t(10), 0.3, sprintf('chi2 (dof=%d) = %s', ...
-                    dof, print_vec(round(chi2(1:N)), ', ')), 'FontSize', input.font_size); 
+                    ndof, print_vec(round(chi2(1:N)), ', ')), 'FontSize', input.font_size); 
 
                 text(input.ax, t(10), 0.1, sprintf('chi2/dof = %s', ...
-                    print_vec(round(chi2(1:N)./dof,1), ', ')), 'FontSize', input.font_size); 
+                    print_vec(round(chi2(1:N)./ndof,1), ', ')), 'FontSize', input.font_size); 
 
                 text(input.ax, t(10), -0.1, sprintf('likelihood= %s', ...
-                    print_vec(obj.gen.lc.pars.likelihood(1:N))), 'FontSize', input.font_size); 
+                    sprintf('10^{%4.1f} ',obj.gen.lc.pars.logl(1:N)./log(10))),...
+                    'FontSize', input.font_size); 
             end
             
         end
@@ -1366,6 +1411,7 @@ classdef MCMC < handle
         function showResults(obj, varargin)
             
             input = util.text.InputVars;
+            input.input_var('best', false); 
             input.input_var('parent', []); 
             input.input_var('font_size', 18); 
             input.scan_vars(varargin{:});
@@ -1383,25 +1429,26 @@ classdef MCMC < handle
             
             %%%%%%%%%%%%%%%% DENSITY %%%%%%%%%%%%%%%%%%%%%%
             
-            ax_contour = axes('Parent', input.parent, 'Position', [0.1 0.15, 0.4 0.4]);             
-            obj.showPosterior('ax', ax_contour, 'font_size', input.font_size, 'inner', 0, 'title', 1, 'contour', 0, varargin{:});             
-            P = ax_contour.Position;
+            ax_density = axes('Parent', input.parent, 'Position', [0.1 0.15, 0.4 0.4]);             
+            obj.showPosterior('ax', ax_density, 'font_size', input.font_size, 'inner', 0, ...
+                'title', 1, 'contour', 0, 'best', input.best, varargin{:});
+            P = ax_density.Position;
             
-            if ax_contour.XLim(2)==ax_contour.XTick(end)
-                ax_contour.XTick(end) = [];
+            if ax_density.XLim(2)==ax_density.XTick(end)
+                ax_density.XTick(end) = [];
             end
             
-            if ax_contour.YLim(2)==ax_contour.YTick(end)
-                ax_contour.YTick(end) = [];
+            if ax_density.YLim(2)==ax_density.YTick(end)
+                ax_density.YTick(end) = [];
             end
             
-            low_y = ax_contour.YTick(2); 
-            low_x = ax_contour.XTick(1); 
-            high_x = ax_contour.XLim(2)*0.95; 
+            low_y = ax_density.YTick(2); 
+            low_x = ax_density.XTick(1); 
+            high_x = ax_density.XLim(2)*0.95; 
             
             N = sum(obj.calcChainProps);
             
-            text(ax_contour, high_x, low_y, sprintf('%d points\n %d chains', obj.num_steps*N, N), ...
+            text(ax_density, high_x, low_y, sprintf('%d points\n %d chains', obj.num_steps*N, N), ...
                 'FontSize', input.font_size, 'HorizontalAlignment', 'right', 'FontWeight', 'bold'); 
             
             
@@ -1409,7 +1456,7 @@ classdef MCMC < handle
             
             ax_vertical = axes('Parent', input.parent, 'Position', [P(1) P(2)+P(4) P(3) P(4)]); 
             obj.showPosterior('ax', ax_vertical, 'font_size', input.font_size, ...
-                'inner', 0, 'pars', 'r', 'Legend', 1, varargin{:}); 
+                'inner', 0, 'pars', 'r', 'Legend', 1, 'best', input.best, varargin{:}); 
             ax_vertical.XTick = []; 
             xlabel(ax_vertical, ''); 
 
@@ -1422,7 +1469,7 @@ classdef MCMC < handle
             
             ax_horizontal = axes('Parent', input.parent, 'Position', [P(1)+P(3) P(2) P(3) P(4)]); 
             obj.showPosterior('ax', ax_horizontal, 'font_size', input.font_size, 'inner', 0, ...
-                'pars', 'v', 'horizontal', 1, 'Legend', 1, varargin{:}); 
+                'pars', 'v', 'horizontal', 1, 'Legend', 1, 'best', input.best, varargin{:}); 
             ax_horizontal.YTick = []; 
             ylabel(ax_horizontal, ''); 
             
@@ -1452,8 +1499,10 @@ classdef MCMC < handle
                 h_true.DisplayName = sprintf('r=%4.1f | v=%4.1f', obj.true_point.r, obj.true_point.v); 
             end
             
-            h_best = plot(ax_lc, t, f(:,1), '--r', 'LineWidth', 2); 
-            h_best.DisplayName = sprintf('r=%4.1f | v=%4.1f', obj.best_point.r, obj.best_point.v); 
+            if input.best
+                h_best = plot(ax_lc, t, f(:,1), '--r', 'LineWidth', 2); 
+                h_best.DisplayName = sprintf('r=%4.1f | v=%4.1f', obj.best_point.r, obj.best_point.v); 
+            end
             
             hold(ax_lc, 'off'); 
             
@@ -1465,6 +1514,8 @@ classdef MCMC < handle
             ax_lc.XAxisLocation='Bottom';
 %             xtickformat(ax_lc, '%ds'); 
             
+            ax_lc.XLim = [-1 1.5].*1; 
+
             xlabel(ax_lc, 'time [s]'); 
             ylabel(ax_lc, 'Flux [normalized]'); 
             

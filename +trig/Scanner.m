@@ -81,6 +81,7 @@ classdef Scanner < handle
             else
                 if obj.debug_bit>1, fprintf('Scanner constructor v%4.2f\n', obj.version); end
                 obj.makeAnalysisObject; 
+                obj.overview = trig.Overview; 
             end
             
         end

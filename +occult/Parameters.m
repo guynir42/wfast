@@ -54,8 +54,9 @@ classdef Parameters < handle
         is_noise_updated = 0;
         
         chi2 = NaN; % the results of fitting to this model 
-        dof = NaN; % how many degrees of freedom were used in calculating chi2
-        likelihood = -NaN; % the results of fitting to this model (translated to probability)
+        ndof = NaN; % number of degrees of freedom that were used in calculating chi2
+        logl = NaN; % log liklihood
+        likelihood = NaN; % the results of fitting to this model (translated to probability)
         counts = 1; 
         weight = 1; % this can be set to zero for repeated points... 
         
@@ -573,7 +574,7 @@ classdef Parameters < handle
                 error('Must input an "occult.Parameters" object. Got "%s" instead...', class(other));
             end
             
-            list = {'r', 'r2', 'd', 'th', 'R', 'b', 'v', 't', 'chi2', 'likelihood'}; 
+            list = {'r', 'r2', 'd', 'th', 'R', 'b', 'v', 't', 'chi2', 'ndof', 'logl', 'likelihood'}; 
             
             if ~isscalar(obj) && ~isscalar(other) % both are non-scalar (should copy one value into one value)
                 
@@ -597,11 +598,11 @@ classdef Parameters < handle
                 
                     for jj = 1:length(list)
 
-                        S1 = substruct('()', {ii}, '.', list{jj});
+                        S1 = substruct('()', {1}, '.', list{jj});
                         S2 = substruct('.', list{jj}, '()', {ii});
                         
-                        obj = subsasgn(obj, S1, subsref(other, S2)); 
-
+                        obj(ii) = subsasgn(obj(ii), S1, subsref(other, S2)); 
+                        
                     end
                     
                     % these must be all scalar

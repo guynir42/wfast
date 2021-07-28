@@ -53,10 +53,12 @@ save(fullfile(getenv('WFAST'), 'scripts/mcmc_start_points'), 'mcmc', 'p');
 
 %% go over each point and run the MCMC
 
-for ii = 1 % 1:length(p)
+for ii = 2:length(p)
     
+    mcmc(ii).makeGUI
+    mcmc(ii).plot_every = 100; 
     mcmc(ii).reset;
-    mcmc(ii).num_chains = 10; 
+    mcmc(ii).num_chains = 4; 
     mcmc(ii).num_burned = 1000;
     mcmc(ii).num_steps = 1e4; 
     mcmc(ii).setupQuickScan; 
@@ -64,20 +66,21 @@ for ii = 1 % 1:length(p)
     
 end
 
-% mcmc(ii).makeGUI
+% go over each point and run the MCMC, this time with R and with priors
 
-%% go over each point and run the MCMC, this time with R and with priors
-
-for ii = 1 % 1:length(p)
+for ii = 2:length(p)
 
     mcmc2(ii) = util.oop.full_copy(mcmc(ii)); 
+    mcmc2(ii).makeGUI
     mcmc2(ii).reset; 
+    mcmc2(ii).num_chains = 4; 
     mcmc2(ii).setupDeepScan; 
+    mcmc2(ii).gen.R_range = [0 10]; 
+    mcmc2(ii).step_sizes(3) = 0.5; 
     mcmc2(ii).run; 
     
 end
 
-% mcmc2(ii).makeGUI
 
 %%
 

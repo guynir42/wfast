@@ -87,6 +87,9 @@ classdef Candidate < handle
         store_pars; % parameters defining the DataStore object
         checker_pars; % parameters defining the QualityChecker object
         
+        mcmc_wide_v@occult.MCMC; % results of an MCMC run with a wide velocity prior
+        mcmc_narrow_v@occult.MCMC; % results of an MCMC run with a narrow velocity prior around the expected star's velocity
+        
     end
     
     properties % inputs/outputs
@@ -463,6 +466,35 @@ classdef Candidate < handle
             
         end
         
+        function val = getEclipticLatitutde(obj)
+            
+            if isempty(obj.star_props) || ~isa(obj.star_props, 'table') ...
+                    || ~ismember('RA', obj.star_props.Properties.VariableNames) ...
+                    || ~ismember('Dec', obj.star_props.Properties.VariableNames) 
+                val = [];
+            else
+                out_coord = celestial.coo.coco([obj.star_props.RA, obj.star_props.Dec], 'J2000', 'e', 'd', 'd');
+                val = out_coord(2); 
+            end
+            
+        end
+        
+        function val = getShadowVelocity(obj)
+            
+            if isempty(obj.star_props) || ~isa(obj.star_props, 'table') ...
+                    || ~ismember('RA', obj.star_props.Properties.VariableNames) ...
+                    || ~ismember('Dec', obj.star_props.Properties.VariableNames) 
+                val = [];
+            else
+                e = head.Ephemeris; 
+                e.RA_deg = obj.star_props.RA;
+                e.Dec_deg = obj.star_props.Dec;
+                val = e.getShadowVelocity; 
+                val = sqrt(sum(val.^2));                 
+            end
+            
+        end
+        
     end
     
     methods % setters
@@ -645,6 +677,58 @@ classdef Candidate < handle
             val =1; % if we didn't short circuit anywhere, the events are the same
             
         end
+        
+        function runMCMC(obj, varargin)
+            
+            input = util.text.InputVars; 
+            input.input_var('velocity_prior', 'wide'); % can also choose "narrow"
+            input.input_var('chains', 4, 'num_chains', 'number_chains'); 
+            input.input_var('plot', false); % load up an MCMC GUI for the run
+            input.scan_vars(varargin{:}); 
+            
+            if util.text.cs(input.velocity_prior, 'wide')
+                use_wide = 1;
+                wide_str = 'wide'; 
+            elseif util.text.cs(input.velocity_prior, 'narrow')
+                use_wide = 0;
+                narrow_str = 'narrow'; 
+            else
+                error('Unknown velocity prior option "%s". Use "wide" or "narrow"...', input.velocity_prior);
+            end
+            
+            mcmc = occult.MCMC; 
+            mcmc.input_flux = obj.flux_raw./obj.flux_mean;
+            mcmc.input_flux = circshift(mcmc.input_flux, 100-obj.time_index); % center the peak
+            mcmc.input_errors = obj.flux_std./obj.flux_mean; 
+            mcmc.input_R = obj.star_props.FresnelSize; 
+            mcmc.input_v = obj.getShadowVelocity; 
+            
+            mcmc.setupDeepScan; 
+            mcmc.num_chains = input.chains; 
+            
+            if use_wide
+                mcmc.setupWideVelocityPrior;
+            else
+                mcmc.setupNarrowVelocityPrior; 
+            end
+            
+            if input.plot
+                mcmc.makeGUI;
+                drawnow;
+            end
+            
+            if obj.debug_bit, fprintf('Running MCMC with %s velocity prior.\n', wide_str); end
+            
+            mcmc.run;
+            
+            if use_wide
+                obj.mcmc_wide_v = mcmc;
+            else
+                obj.mcmc_narrow_v = mcmc; 
+            end
+            
+        end
+        
         
     end
     
