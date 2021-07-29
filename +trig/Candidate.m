@@ -127,12 +127,23 @@ classdef Candidate < handle
         flux_detrended; % fluxes for all stars, after removing linear fit from each batch
         flux_corrected; % fluxes for all stars, corrected by PSD or by removing linear fit
         flux_filtered; % flux after matched-filtering, for the peak star and kernel
+        aperture_index; % which aperture was used in the original photometry analysis (the index is for all types of photometry, including gaussian, as listed in head.PHOT_PARS)
+        aperture_radius; % the size (in pixels) of the forced aperture chosen in the original analysis
+        
+        flux_unforced; % flux with aperture photometry used instead of forced, for the trigger star and nearest aperture to what was used in forced (loaded on demand)
+        flux_unforced_all; % flux with aperture photometry used instead of forced, for all stars and multiple apertures (loaded on demand)
+        unforced_aperture_sizes; % the radius of the apertures used, for the recalculated non-forced apertures, in units of pixels
+        unforced_aperture_index; % which of the above apertures was chosen (closest match to the original, forced aperture size)
+        unforced_aperture_radius; % the radius (in pixels) of the chosen aperture
+        
         psd; % power spectral density for this star only
         freq_psd; % frequency values for the PSD
         
         auxiliary; % values of auxiliary measurements (e.g., background, offsets) for all stars and all frames in the extended region
         aux_names; % cell array with the names of each auxiliary
         aux_indices; % struct with a field for each auxiliary name, containing the index in the big matrix
+        aux_unforced; % auxiliary data using aperture photometry for the specific star and aperture size (loaded on demand)
+        aux_unforced_all; % auxiliary data using aperture photometry for all stars and apertures (loaded on demand)
         
         relative_dx; % the offsets_x for this star, minus the flux weighted mean offsets_x of all stars
         relative_dy; % the offsets_x for this star, minus the flux weighted mean offsets_x of all stars
@@ -190,6 +201,7 @@ classdef Candidate < handle
         flux_corrected_all; % the corrected flux (over the exteneded region) for all stars
         auxiliary_all; % the auxiliary data (for the extended region) for all stars
         cutouts_all; % the cutouts for all stars (in the extended region)
+        global_star_indices; % the indices of the stars chosen by the DataStore to be above some threshold
         
         search_start_idx; % the frame index inside the extended region, where the search region starts (often this is 51)
         search_end_idx; % the frame index inside the extended region, where the search region ends (often this is 150)
@@ -197,13 +209,14 @@ classdef Candidate < handle
         kern_extra; % any other kernels that passed the lower threshold for kernels
         star_extra; % any other stars that passed the lower threshold for stars
         
-        version = 1.01;
+        version = 1.02;
         
     end
     
     properties(Hidden=true, Transient=true) % lazy loaded heavy stuff like the stack image
         
         stack; 
+        calibration;
         
     end
     
@@ -729,6 +742,153 @@ classdef Candidate < handle
             
         end
         
+        function loadUnforcedPhotometry(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('apertures', obj.head.PHOT_PARS.aperture_radius, 'radius', 'radii'); 
+            input.input_var('annulus', obj.head.PHOT_PARS.annulus_radii)
+            input.input_var('folder', [], 'root'); 
+            input.scan_vars(varargin{:}); 
+            
+            %%% verify the filenames with the right path %%%
+            
+            f = unique(obj.filenames); % get the unique set of filenames where the data is saved
+            
+            if isempty(input.folder) 
+                
+                if ~exist(fileparts(f{1}), 'dir')
+                    error('Cannot find folder "%s". Use the "folder" optional input to specify the root folder', fileparts(f{1})); 
+                end
+                
+            else % the base folder is not the one in the saved filenames (e.g., the root folder was moved)
+               
+                if ~ischar(input.folder) || ~exist(input.folder, 'dir')
+                    error('Illegal input to "folder" option. Must be a string with a valid path'); 
+                end
+                    
+                for ii = 1:length(f)
+                    
+                    [path, file_name, ext] = fileparts(f{ii}); 
+                    [path, run_name] = fileparts(path); 
+                    [path, run_date] = fileparts(path); 
+                    
+                    f{ii} = fullfile(input.folder, run_date, run_name, [file_name ext]); 
+                    
+                end
+                
+            end
+            
+            if obj.version<1.02 % addresses bug where we saved the wrong filenames (for file numbers N-1 and N we saved numbers N and N+1)
+                for ii = 1:length(f)-1
+                    f{ii+1} = f{ii}; 
+                end
+                
+                d = util.sys.WorkingDirectory(fileparts(f{1})); 
+                file_list = d.files([], 1); % get the files with the full path
+                idx = find(strcmp(file_list, f{1})); 
+                f{1} = file_list{idx-1}; 
+            end
+            
+            
+            %%% figure out the original aperture %%% 
+            
+            if isempty(obj.global_star_indices) || isempty(obj.aperture_index) || isempty(obj.aperture_radius) || isempty(obj.store_pars) || ~isstruct(obj.store_pars)
+                % reload the store pars from the summary file
+                t = datetime(obj.analysis_time(1:10), 'Format', 'yyyy-MM-dd'); 
+                base_dir = fileparts(f{end});
+                
+                for ii = 1:100
+                    
+                    test_dir = fullfile(base_dir, sprintf('analysis_%s', t));
+                    
+                    if exist(test_dir, 'dir')
+                        break;
+                    end
+                    
+                    t = t - 1; % remove one day
+                    
+                end
+                
+                if ~exist(test_dir, 'dir')
+                    error('Could not load analysis folder for recovering the "store_pars"'); 
+                end
+                    
+                finder_filename = fullfile(test_dir, 'finder.mat');
+                load(finder_filename); 
+                obj.store_pars = finder.store.pars; 
+                obj.store_pars.aperture_index = finder.store.aperture_index;
+                obj.store_pars.star_sizes = finder.store.star_sizes;
+                obj.store_pars.star_snrs = finder.store.star_snr;
+                
+                obj.global_star_indices = finder.store.star_indices; 
+                obj.aperture_index = finder.store.aperture_index;
+                obj.aperture_radius = util.text.extract_numbers(obj.head.PHOT_PARS.types{obj.aperture_index}); 
+                obj.aperture_radius = obj.aperture_radius{1}; % extract_numbers() gives a cell array
+                
+            end
+            
+            
+            %%% now load the data and run the photometry %%%
+            
+            if isempty(obj.calibration)
+                obj.calibration = img.Calibration; 
+                obj.calibration.loadByDate(obj.head.RUNSTART(1:10), obj.head.INST, obj.head.PROJECT); 
+            end
+            
+            F = []; % raw flux
+            A = []; % auxiliary data
+            
+            for ii = 1:length(f) % go over files
+                
+                C = h5read(f{ii}, '/cutouts'); 
+                P = h5read(f{ii}, '/positions'); 
+                C = obj.calibration.input(C, 'pos', P); 
+                
+                if isempty(input.apertures) || isempty(input.annulus)
+                    error('Could not find the original aperture or annulus radii'); 
+                end
+                
+                s = util.img.photometry2(C, 'use_aperture', 1, 'resolution', 2, 'annulus', input.annulus, 'aperture', input.apertures); 
+                S = s.apertures_photometry; 
+%                 S = s.forced_photometry; % debug only! 
+                
+                F = vertcat(F, S.flux); 
+                
+                A_new = [];
+                for jj = 1:length(obj.aux_names)
+                    if util.text.cs('offsets_', obj.aux_names{jj})
+                        A_new = cat(3, A_new, permute(S.(['offset_' obj.aux_names{jj}(end)]), [1,2,4,3])); 
+                    elseif strcmp(obj.aux_names{jj}, 'centroids_x')
+                        A_new = cat(3, A_new, P(:,1)' + permute(S.offset_x, [1,2,4,3])); 
+                    elseif strcmp(obj.aux_names{jj}, 'centroids_y')
+                        A_new = cat(3, A_new, P(:,2)' + permute(S.offset_y, [1,2,4,3])); 
+                    elseif isfield(S, obj.aux_names{jj})
+                        A_new = cat(3, A_new, permute(S.(obj.aux_names{jj}), [1, 2, 4, 3]));
+                    elseif isfield(S, obj.aux_names{jj}(1:end-1))
+                        A_new = cat(3, A_new, permute(S.(obj.aux_names{jj}(1:end-1)), [1, 2, 4, 3]));                        
+                    elseif isfield(S, obj.aux_names{jj}(1:end-2))
+                        A_new = cat(3, A_new, permute(S.(obj.aux_names{jj}(1:end-2)), [1, 2, 4, 3]));
+                    else
+                        error('Could not match name "%s" with any fields in the photometry output', obj.aux_names{jj}); 
+                    end
+                end
+                
+                A = vertcat(A, A_new); 
+                
+            end
+            
+            new_radii = s.parameters.aperture_radius; 
+            obj.unforced_aperture_sizes = new_radii; 
+            
+            [~, obj.unforced_aperture_index] = min(abs(obj.aperture_radius - new_radii)); % find the closest aperture to what was used in the forced photometry
+            
+            obj.flux_unforced_all = F; 
+            obj.flux_unforced = F(:,obj.star_index_global, obj.unforced_aperture_index); 
+            
+            obj.aux_unforced_all = A; 
+            obj.aux_unforced = A(:,obj.star_index_global, :, obj.unforced_aperture_index); 
+            
+        end
         
     end
     
@@ -1679,6 +1839,34 @@ classdef Candidate < handle
             for ii = 1:length(ax)
                 ax{ii}.CLim = [mn,mx]; 
             end
+            
+        end
+        
+        function plotApertureDifferences(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('ax', [], 'axes', 'axis'); 
+            input.input_var('font_size', 16); 
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(obj.flux_unforced)
+                obj.loadUnforcedPhotometry; % this may fail if not given the root folder explicitely (call this function with arguments, then plot!)
+            end
+                
+            if isempty(input.ax)
+                input.ax = gca;
+            end
+            
+            t = obj.timestamps;
+            f1 = obj.flux_raw; 
+            f2 = obj.flux_unforced;
+            
+            plot(input.ax, t, f1, t, f2, 'LineWidth', 1.5); 
+            
+            xlabel(input.ax, 'Time [s]'); 
+            ylabel(input.ax, 'Raw flux [counts]'); 
+            
+            input.ax.FontSize = input.font_size; 
             
         end
         

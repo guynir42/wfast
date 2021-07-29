@@ -345,6 +345,16 @@ classdef Scanner < handle
             
         end
         
+        function runs = findStalledRuns(obj)
+            
+            r = obj.getAllRuns;
+            
+            idx = [r.was_processed] & ~[r.has_summary]; 
+            
+            runs = {r(idx).identifier}'; 
+            
+        end
+        
     end
     
     methods % internal utilities

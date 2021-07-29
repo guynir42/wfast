@@ -367,7 +367,7 @@ classdef DataStore < handle
             if isempty(obj.head.PHOT_PARS)
                 val = [];
             else
-                val = obj.head.PHOT_PARS.aperture_radius(obj.aperture_index); 
+                val = obj.head.PHOT_PARS.aperture_radius(obj.aperture_index); % this is no longer used, the aperture index is from all types of aperture, including gaussian (see aperture_type())
             end
             
         end

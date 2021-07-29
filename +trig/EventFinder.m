@@ -1059,10 +1059,12 @@ classdef EventFinder < handle
             % save the parameters used by the finder, store and quality-checker
             c.finder_pars = obj.pars; 
             c.store_pars = obj.store.pars;
-            c.store_pars = obj.store.aperture_index; 
-            c.store_pars = obj.store.star_indices; 
-            c.store_pars = obj.store.star_sizes;
-            c.store_pars = obj.store.star_snr; 
+            c.store_pars.aperture_index = obj.store.aperture_index; 
+            c.store_pars.star_indices = obj.store.star_indices; 
+            c.store_pars.star_sizes = obj.store.star_sizes;
+            c.store_pars.star_snrs = obj.store.star_snr;
+            c.global_star_indices = obj.store.star_indices; 
+            c.aperture_index = obj.store.aperture_index; 
             c.checker_pars = obj.store.checker.pars;
             % add StarHours parameters?? 
             
