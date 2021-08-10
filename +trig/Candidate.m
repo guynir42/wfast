@@ -695,7 +695,7 @@ classdef Candidate < handle
             
             input = util.text.InputVars; 
             input.input_var('velocity_prior', 'wide'); % can also choose "narrow"
-            input.input_var('chains', 4, 'num_chains', 'number_chains'); 
+            input.input_var('chains', 10, 'num_chains', 'number_chains'); 
             input.input_var('plot', false); % load up an MCMC GUI for the run
             input.scan_vars(varargin{:}); 
             
@@ -704,7 +704,7 @@ classdef Candidate < handle
                 wide_str = 'wide'; 
             elseif util.text.cs(input.velocity_prior, 'narrow')
                 use_wide = 0;
-                narrow_str = 'narrow'; 
+                wide_str = 'narrow'; 
             else
                 error('Unknown velocity prior option "%s". Use "wide" or "narrow"...', input.velocity_prior);
             end
@@ -1867,6 +1867,8 @@ classdef Candidate < handle
             ylabel(input.ax, 'Raw flux [counts]'); 
             
             input.ax.FontSize = input.font_size; 
+            
+            legend(input.ax, {'forced', 'aperture'}, 'Location', 'SouthEast'); 
             
         end
         

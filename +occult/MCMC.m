@@ -50,10 +50,10 @@ classdef MCMC < handle
         num_steps = 10000; % total number of steps (including burn-in)
         num_burned = 1000; % number of steps to burn at the begining of each chain
         
-        step_sizes = [0.25, 0.25, 1, 0.1]; % in order of parameters: step size for each parameter
+        step_sizes = [0.25 0.25 3 0.1]; % in order of parameters: step size for each parameter
         circ_bounds = [0 0 0 0]; % in order of parameters: which par gets a circular boundary condition
         
-        par_list = {'r', 'b', 'v'}; % these parameters are chosen randomly each step. The rest are taken from the generator's parameters
+        par_list = {'r', 'b', 'v', 'R'}; % these parameters are chosen randomly each step. The rest are taken from the generator's parameters
         
 %         use_bank = true; % use a filter bank (needs to be loaded manually!) to find an initial position (otherwise chose random starting point)
         
@@ -62,7 +62,7 @@ classdef MCMC < handle
         use_priors = false; % a general switch to turn on/off the use of prior functions        
         prior_log_functions = {}; % can input a cell array with a different function per parameter (leave empty for uniform prior). min/max values are taken from generator
         
-        plot_every = 1; % when plotting, how many steps go by between plots (set to 0 for no plotting)
+        plot_every = 100; % when plotting, how many steps go by between plots (set to 0 for no plotting)
         show_num_chains = 4; % the maximum number of chains to show on the plot
         
         show_chain_pars = {'r', 'b', 'v'}; % which parameters are shown, by default, when plotting the chain
@@ -256,7 +256,7 @@ classdef MCMC < handle
         function setupDeepScan(obj)
             
             obj.par_list = {'r'  'b'  'v', 'R'};
-            obj.step_sizes = [0.25 0.25 1 0.1];
+            obj.step_sizes = [0.25 0.25 3 0.1];
             
             obj.initialization_method = 'random'; 
             obj.circ_bounds = [0 0 0 0];
@@ -1358,8 +1358,10 @@ classdef MCMC < handle
                     imagesc(input.ax, x(1,:), y(:,1), N); 
                     axis(input.ax, 'xy'); 
                     colormap(flip(gray)); 
+                    input.ax.CLim = [0 prctile(N(:), 98)]; 
                 end
 
+                
                 input.ax.XLim = obj.gen.([input.pars{1} '_range']); 
                 input.ax.YLim = obj.gen.([input.pars{2} '_range']); 
                 

@@ -1328,6 +1328,79 @@ classdef Overview < handle
             
         end
         
+        function showStarSNR(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('distance', 40, 'distance_au', 'dist_au'); 
+            input.input_var('log', true, 'logarithm'); 
+            input.input_var('axes', [], 'axis'); 
+            input.input_var('font_size', 18); 
+            input.scan_vars(varargin{:}); 
+            
+            if ischar(input.distance)
+                
+                if cs(input.distance, 'kbos', 'kuiper belt objects')
+                    input.distance = 40; 
+                elseif cs(input.distance, 'hills cloud', 'inner oort')
+                    input.distance = 3000; 
+                elseif cs(input.distance, 'oort cloud')
+                    input.distance = 10000; 
+                else
+                    error('Unknown "distance" option "%s". Use a numeric value in AU, or "KBOs", "Hills" or "Oort"', input.distance); 
+                end
+                
+            end
+            
+            if isempty(input.axes)
+                input.axes = gca;
+            end
+            
+            ev = obj.sim_events([obj.sim_events.D]==input.distance); 
+            
+            cla(input.axes); 
+            
+            h1 = histogram(input.axes, [ev.star_snr], 'BinEdges', 0:0.5:30, 'FaceColor', 'b'); 
+            
+            hold(input.axes, 'on'); 
+            
+            h2 = histogram(input.axes, [ev([ev.passed]).star_snr], 'BinEdges', 0:0.5:30, 'FaceColor', 'r'); 
+            
+            hold(input.axes, 'off'); 
+            
+            xlabel(input.axes, 'Star S/N per sampling');
+            ylabel(input.axes, 'Number of events'); 
+            
+            if input.log
+                input.axes.YScale = 'log';
+            else
+                input.axes.YScale = 'linear';
+            end
+            
+            input.axes.YLim(1) = 0.5; 
+            input.axes.YLim(2) = max(h1.Values).*1.5; 
+            
+            yyaxis(input.axes, 'right'); 
+            
+            y = h2.Values./h1.Values.*100; 
+            x = h1.BinEdges(1:end-1)+h1.BinWidth/2; 
+            
+            h3 = plot(input.axes, x, y, '-xg', 'LineWidth', 2, 'MarkerSize', 10); 
+            
+            input.axes.YAxis(2).Color = h3.Color; 
+            
+            ytickformat(input.axes, '%d%%'); 
+            input.axes.YLim = [0 100]; 
+            
+            yyaxis(input.axes, 'left'); 
+            
+            input.axes.FontSize = input.font_size; 
+            
+            hl = legend(input.axes, {'Total', 'Detected', 'Fraction'}, 'Location', 'NorthEast'); 
+            hl.FontSize = input.font_size - 2;
+            
+            
+        end
+        
         function printReport(obj, varargin)
             
             import util.text.cs;
