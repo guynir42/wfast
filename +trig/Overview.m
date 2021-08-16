@@ -1328,9 +1328,10 @@ classdef Overview < handle
             
         end
         
-        function showStarSNR(obj, varargin)
+        function showSimulated(obj, varargin)
             
             input = util.text.InputVars;
+            input.input_var('parameter', 'star_snr'); 
             input.input_var('distance', 40, 'distance_au', 'dist_au'); 
             input.input_var('log', true, 'logarithm'); 
             input.input_var('axes', [], 'axis'); 
@@ -1355,19 +1356,46 @@ classdef Overview < handle
                 input.axes = gca;
             end
             
+            if strcmp(input.parameter, 'star_snr')
+                label_str = 'Star S/N per sampling'; 
+                bins = 0:0.5:30; 
+            elseif strcmp(input.parameter, 'r')
+                label_str = 'Occulter radius [FSU]'; 
+                bins = 0:0.1:2; 
+            elseif strcmp(input.parameter, 'R')
+                label_str = 'Stellar radius [FSU]'; 
+                bins = 0:0.2:10; 
+            elseif strcmp(input.parameter, 'b')
+                label_str = 'Impact parameter [FSU]'; 
+                bins = 0:0.1:2; 
+            elseif strcmp(input.parameter, 'v')
+                label_str = 'Velocity [FSU s^{-1}]';
+                bins = 0:2:30;
+            elseif strcmp(input.parameter, 'depth')
+                label_str = 'Occultation depth [relative]';
+                bins = 0:0.05:1;
+                if ~isfield(obj.sim_events, 'depth')
+                    for ii = 1:length(obj.sim_events)
+                        obj.sim_events(ii).depth = min(obj.sim_events(ii).fluxes.template); 
+                    end
+                end
+            else
+                error('Unknown parameter input "%s". Use "star_snr" or "r" or "b" etc...', input.parameter); 
+            end
+            
             ev = obj.sim_events([obj.sim_events.D]==input.distance); 
             
             cla(input.axes); 
             
-            h1 = histogram(input.axes, [ev.star_snr], 'BinEdges', 0:0.5:30, 'FaceColor', 'b'); 
+            h1 = histogram(input.axes, [ev.(input.parameter)], 'BinEdges', bins, 'FaceColor', 'b'); 
             
             hold(input.axes, 'on'); 
             
-            h2 = histogram(input.axes, [ev([ev.passed]).star_snr], 'BinEdges', 0:0.5:30, 'FaceColor', 'r'); 
+            h2 = histogram(input.axes, [ev([ev.passed]).(input.parameter)], 'BinEdges',bins, 'FaceColor', 'r'); 
             
             hold(input.axes, 'off'); 
             
-            xlabel(input.axes, 'Star S/N per sampling');
+            xlabel(input.axes, label_str);
             ylabel(input.axes, 'Number of events'); 
             
             if input.log
