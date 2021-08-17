@@ -25,7 +25,7 @@ classdef Analysis < file.AstroData
 % There are actually a lot more parameters that can be changed in this 
 % object. They are specified in the "switches/controls" block. 
 % Many other parameters for specific searches are saved inside the relevant
-% objects, e.g., the trig.EventFinder object "finder" defines many parameters
+% objects, e.g., the tno.EventFinder object "finder" defines many parameters
 % for the KBO/Oort cloud search. 
 % 
 % The run starts with a call to startup() and ends with finishup(). 
@@ -86,7 +86,7 @@ classdef Analysis < file.AstroData
         
         model_psf@img.ModelPSF;
         
-        finder@trig.EventFinder;
+        finder@tno.EventFinder;
         
         sky_pars;
         
@@ -280,7 +280,7 @@ classdef Analysis < file.AstroData
                 
                 obj.model_psf = img.ModelPSF;
                 
-                obj.finder = trig.EventFinder;
+                obj.finder = tno.EventFinder;
 %                 obj.finder.loadFilterBank;
                 
                 obj.cutout_store = learn.CutoutStorage; 
