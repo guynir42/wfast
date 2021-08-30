@@ -238,13 +238,6 @@ classdef DataStore < handle
 
             obj.pars.use_threshold = true; % use the minimal S/N to keep out bad stars and not even store them
             obj.pars.threshold = 3; % stars with S/N lower than this are disqualified after the burn-in period!
-            obj.pars.use_rate_function = false; % also disqualify stars with low detection rate (based on S/N and Fresnel size)
-            obj.pars.minimal_rate = 0.06; % rate threshold
-            obj.pars.minimal_snr = 10; % stars above this S/N are picked regardless of their theoretical rate
-            obj.pars.maximal_size = 5; % stars bigger than this are removed no matter what their rate is (unless they pass the above threshold)
-            obj.pars.rate_function = []; 
-            obj.pars.rate_function_general = @(R,S)-0.01885323-0.08533139.*R+0.02857720.*R.^2-0.00751534.*R.*S+0.02843841.*S-0.00019672.*S.^2; % off ecliptic results
-            obj.pars.rate_function_center = @(R,S)-0.11843204-0.05204881.*R+0.02322934.*R.^2-0.01009914.*R.*S+0.04771756.*S-0.00088827.*S.^2; % galactic center results
             
             obj.pars.use_remove_cosmic_rays = true; % get rid of intense cosmic rays before even inputting the flux into the buffers
             obj.pars.cosmic_ray_threshold = 8; % in units of S/N
@@ -252,16 +245,6 @@ classdef DataStore < handle
             obj.pars.use_reject_gaussian_photometry = true; 
             
             obj.reset;
-            
-        end
-        
-        function setupRateFunction(obj, galactic_center)
-            
-            if galactic_center
-                obj.pars.rate_function = obj.pars.rate_function_center; 
-            else
-                obj.pars.rate_function = obj.pars.rate_function_general; 
-            end
             
         end
         

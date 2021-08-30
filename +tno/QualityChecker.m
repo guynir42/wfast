@@ -379,10 +379,6 @@ classdef QualityChecker < handle
             
             if obj.pars.use_flux_corr
                 
-                obj.cut_names{end+1} = 'flux_corr_10'; 
-                obj.cut_thresholds(end+1) = obj.pars.thresh_flux_corr;
-                obj.cut_two_sided(end+1) = false;
-                
                 obj.cut_names{end+1} = 'flux_corr_25'; 
                 obj.cut_thresholds(end+1) = obj.pars.thresh_flux_corr;
                 obj.cut_two_sided(end+1) = false;
@@ -660,9 +656,20 @@ classdef QualityChecker < handle
             end
             
             try 
-                obj.flux_corr = obj.calculateFluxCorr(obj.extended_detrend, [10 25 50]); % can also give multiple time scales to run the correlation (default is 50)
+                obj.flux_corr = obj.calculateFluxCorrSampling(obj.extended_detrend, [25 50], 1000); 
             catch ME
-                
+                 if strcmp(ME.identifier, 'MATLAB:nomem')
+
+                    util.text.date_printf('Out of memory error... pasuing for 10s and trying again');
+                    
+                    pause(10); 
+                    
+                    obj.flux_corr = obj.calculateFluxCorrSampling(obj.extended_detrend, [25 50], 1000);
+                    
+                else
+                    rethrow(ME);
+                end
+                    
             end
             
             aux = zeros(size(f,1),size(f,2),length(obj.pars.corr_types), 'like', f); 
@@ -782,9 +789,8 @@ classdef QualityChecker < handle
             end
             
             if obj.pars.use_flux_corr
-                obj.cut_values_matrix(:,:,obj.cut_indices.flux_corr_10) = obj.flux_corr(:,:,1); 
-                obj.cut_values_matrix(:,:,obj.cut_indices.flux_corr_25) = obj.flux_corr(:,:,2); 
-                obj.cut_values_matrix(:,:,obj.cut_indices.flux_corr_50) = obj.flux_corr(:,:,3); 
+                obj.cut_values_matrix(:,:,obj.cut_indices.flux_corr_25) = obj.flux_corr(:,:,1); 
+                obj.cut_values_matrix(:,:,obj.cut_indices.flux_corr_50) = obj.flux_corr(:,:,2); 
             end
             
             if obj.pars.use_correlations
@@ -969,6 +975,142 @@ classdef QualityChecker < handle
                     corr_value = prctile(FC, 95, 2); % get the points with the 95th percentile correlation 
 
                     val(:,ii,jj) = corr_value; 
+
+                end
+                
+            end
+            
+        end
+        
+        function val = calculateFluxCorrSampling(obj, flux, widths, num_stars)
+            % Calculate the cross correlation between fluxes of different
+            % stars over intervals of size "widths" (can be a vector of 
+            % width values). 
+            % Inputs:
+            %   *flux: a 2D matrix of (time x star)
+            %   *widths: a scalar or vector of time scales (e.g., [25 50])
+            %   *num_stars: maximum number of stars to test each flux
+            %               against. If smaller than number of fluxes it is 
+            %               ignored. Default is all fluxes. 
+            %
+            % Use formula for rho_ij from: https://www.sciencedirect.com/topics/earth-and-planetary-sciences/cross-correlation
+            
+            if nargin<3 || isempty(widths)
+                widths = 50; 
+            end
+            
+            if nargin<4 || isempty(num_stars)
+                num_stars = size(flux,2); 
+            end
+            
+            if num_stars>size(flux,2)
+                num_stars = size(flux,2); 
+            end
+            
+            if ndims(flux)>2
+                error('Can only handle 2D fluxes'); 
+            end
+            
+            val = zeros([size(flux), length(widths)], 'like', flux); % preallocate enough room for multiple widths
+            
+            for ii = 1:length(widths)
+
+                w = widths(ii); 
+                midpoints = floor(w/2):w:size(flux,1); % indices of mid points of intervals for xcorr calculation
+                best_corr = zeros(length(midpoints), size(flux,2)); 
+                
+                for jj = 1:length(midpoints)
+                    
+                    idx = midpoints(jj)-floor(w/2)+1:midpoints(jj)+ceil(w/2); % which indices to pull out from the flux matrix
+                    
+                    f = flux(idx, :); 
+                    
+                    f = f - nanmean(f,1); 
+                    fp = permute(f(:,1:num_stars), [1,3,2]); % turn 2nd dim into 3rd, and truncate the number of fluxes
+                    
+                    f2 = f.^2; 
+                    f2p = permute(f2(:,1:num_stars), [1,3,2]); % turn 2nd dim into 3rd, and truncate the number of fluxes
+                    
+                    FC = nansum(f.*fp, 1)./sqrt(nansum(f2,1).*nansum(f2p,1)).*sqrt(w); % full 3D matrix (3rd dim is shorter than 2nd if using num_stars)
+                                       
+                    for kk = 1:size(flux,2)
+                        FC(1,kk,kk) = 0; % remove auto-correlations (should be all equal to 1 anyway)
+                    end
+                    
+                    % should we include anti-correlations (by setting abs() first)?
+                    best_corr(jj,:) = prctile(FC, 95, 3); % get the points with the 95th percentile correlation from all stars in the 3rd dim, for each sampling point
+                                        
+                end % for jj (time jumps)
+                
+                InterpObj = griddedInterpolant({midpoints, 1:size(flux,2)}, best_corr);
+                val(:,:,ii) = InterpObj({1:size(flux,1), 1:size(flux,2)});  
+                
+            end % for ii (over widths)
+            
+        end
+        
+        function val = calculateFluxCorrSamplingNotWorking(obj, flux, widths, num_stars)
+            %
+            % flux  - a 2D matrix of (time x star)
+            % width - vector of time scales (e.g., [10 25 50])
+            % num_stars - maximum number of stars to test each flux
+            % against. If smaller than number of fluxes it is ignored. 
+            % Default is all fluxes. 
+            
+            if nargin<3 || isempty(widths)
+                widths = 50; 
+            end
+            
+            if nargin<4 || isempty(num_stars)
+                num_stars = size(flux,2); 
+            end
+            
+            if num_stars>size(flux,2)
+                num_stars = size(flux,2); 
+            end
+            
+            if ndims(flux)>2
+                error('Can only handle 2D fluxes'); 
+            end
+            
+            flux = flux - nanmean(flux); % make sure the flux is normalized to zero
+            
+            f2 = flux.^2; % this should still be 2D
+            
+            val = zeros([size(flux), length(widths)], 'like', flux); % preallocate enough room for multiple widths
+            
+            for jj = 1:length(widths)
+
+                w = widths(jj); 
+  
+%                 f2_bin = util.series.binning(f2(:,1:num_stars), w); 
+                % replace the above line with quick binning:
+                f2_bin = reshape(f2, [w, floor(size(f2,1)/w), size(f2,2)]);
+                f2_bin = nanmean(f2_bin, 1); 
+                f2_bin = permute(f2_bin, [2,3,1]); 
+                
+                for ii = 1:size(flux,2)
+            
+                    ff = flux(:,ii).*flux(:,1:num_stars); % multiply one column in "flux" with all others
+
+                    idx = ceil(w/2):w:size(ff,1); % places in the ligtcurve where you want to calculate the correlations/moving mean 
+
+%                     ff_bin = util.series.binning(ff, w); 
+                    % replace the above line with quick binning:
+                    ff_bin = reshape(ff, [w, floor(size(ff,1)/w), size(ff,2)]);
+                    ff_bin = nanmean(ff_bin, 1); 
+                    ff_bin = permute(ff_bin, [2,3,1]); 
+                    
+                    FC = ff_bin./sqrt(f2_bin(:,ii).*f2_bin(:,1:num_stars)).*sqrt(w); % flux correlations
+                    
+                    FC(f2_bin(:,1:num_stars)<0) = 0; % remove places where the denominator is negative
+
+                    FC(:,ii) = 0; % ignore self correlations
+                    
+                    % should we include anti-correlations (by setting abs() first)?
+                    corr_value = prctile(FC, 95, 2); % get the points with the 95th percentile correlation 
+                    InterpObj = griddedInterpolant(idx, corr_value);
+                    val(:,ii,jj) = InterpObj(1:size(ff,1));  
 
                 end
                 

@@ -419,21 +419,22 @@ classdef Scanner < handle
                 
             end
             
-            % get the next folder that needs analysis
-            r = run.Folder.scan('folder', obj.root_folder, 'start', obj.date_start, ...
-                'end', obj.date_end, 'next', 'unprocessed', 'process_date', obj.date_process);
-            
-            if isempty(r)
-                report = 'Could not find a folder to run'; 
-                return;
-            end
-            
             worker_idx = obj.a.findWorkerUnread; % get a worker even if it was not read out
 %             worker_idx = obj.a.findWorker; % get a worker even if it was not read out
             
             if isempty(worker_idx) % if we could find a free worker
                 report = 'Could not find a free worker!'; 
-            else % we can run this folder now! 
+            else % we can run a folder on a free worker
+                
+                % get the next folder that needs analysis
+                r = run.Folder.scan('folder', obj.root_folder, 'start', obj.date_start, ...
+                    'end', obj.date_end, 'next', 'unprocessed', 'process_date', obj.date_process);
+
+                if isempty(r)
+                    report = 'Could not find a folder to run'; 
+                    return;
+                end
+                
                 obj.a.reader.dir.cd(r.folder); 
                 obj.a.reader.loadFiles; 
                 obj.a.async_run('worker', worker_idx, 'reset', 1, 'logging', 1, 'save', 1, 'output', 0); 

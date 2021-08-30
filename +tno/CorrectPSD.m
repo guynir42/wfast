@@ -124,10 +124,12 @@ classdef CorrectPSD < handle
             M = nanmedian(flux_buffer); 
             S = mad(flux_buffer); 
             
-            flux_buffer(abs(flux_buffer-M)./S > 5) = NaN; % remove outliers
+            outlier_idx = abs(flux_buffer-M)./S > 5;
+            flux_buffer(outlier_idx) = NaN; % remove outliers
             
             obj.flux_buffer = flux_buffer - nanmean(flux_buffer);
-            obj.flux_buffer = fillmissing(obj.flux_buffer, 'linear'); 
+            obj.flux_buffer(outlier_idx) = 0; % remove these NaNs after subtracting the mean
+%             obj.flux_buffer = fillmissing(obj.flux_buffer, 'linear'); % this in unecessary if we already remove NaNs at input time
             
             obj.timestamps = timestamps;
             

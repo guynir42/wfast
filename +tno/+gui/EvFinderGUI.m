@@ -148,9 +148,7 @@ classdef EvFinderGUI < handle
             
             obj.menu_pars.menu_store.addButton('button_threshold', '&Use star threshold', 'toggle', 'store.pars.use_threshold', 'remove events with low S/N after finishing the burn-in', 1);
             obj.menu_pars.menu_store.addButton('input_threshold', 'star &Threshold', 'input', 'store.pars.threshold', 'threshold for removing events');
-            obj.menu_pars.menu_store.addButton('button_rate', 'Use rate function', 'toggle', 'store.pars.use_rate_function', 'remove events with low detection rate based on S/N and stellar size');
-            obj.menu_pars.menu_store.addButton('input_rate', 'Minimal &Rate', 'input', 'store.pars.minimal_rate', 'minimal rate for each star to pass');
-
+            
             obj.menu_pars.menu_store.addButton('button_aperture', 'Aperture', 'info', 'store.aperture_type', '', 1);
             
             %%%%%%%%%%% checker menu %%%%%%%%%%%%%%%

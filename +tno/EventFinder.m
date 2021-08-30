@@ -419,8 +419,6 @@ classdef EventFinder < handle
                 obj.store.star_sizes = obj.cat.data.FresnelSize;
             end
             
-            obj.store.setupRateFunction(obj.head.is_galactic_center); % choose the rate function based on coordinates being in or out of the galactic center
-            
             obj.store.input(varargin{:}); % the store does the actual parsing and organizing of data into buffers
             
             obj.pars.analysis_time = util.text.time2str('now'); % keep a record of when the analysis was done

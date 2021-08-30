@@ -71,7 +71,7 @@ classdef Photometry < handle
         use_centering = 1;
         use_gaussian = 1;
         use_concat_gaussian = 1; % add the gaussian photometry along with the rest
-        use_aperture = 0; % no need to do aperture because forced is much better
+        use_aperture = 1; 
         use_forced = 1;
         use_best_offsets = 1; % if this is true, keep the offsets from gaussian even if using aperture/forced 
         use_best_widths = 1; % if this is true, keep the widths from gaussian even if using aperture/forced BUT correct them for the use of an added gaussian! 
@@ -389,6 +389,11 @@ classdef Photometry < handle
             end
             
             if obj.use_new_method 
+                
+                if isempty(obj.cutouts)
+                    util.text.date_printf('An empty array given to Photometry object.'); 
+                    return; 
+                end
                 
                 [s, a] = util.img.photometry2(single(obj.cutouts), 'iterations', double(obj.iterations), ...
                     'radii', double(obj.aperture), 'annulus', double([obj.annulus, obj.annulus_outer]), 'sigma', double(obj.gauss_sigma), ...

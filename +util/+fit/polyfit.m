@@ -10,6 +10,8 @@ function results = polyfit(x,y,varargin)
 %   -iterations: how many times to refit after removing outliers (default 3). 
 %   -variances: if you have the error^2 per sample, it can be given to the fitter
 %   -double: use double (64 bit) precision instead of single (32 bit). Default is false. 
+%   -quick: when true, save time by not calling fillmissing and not
+%           returning a function handle. Default is false. 
 %   -plotting: make the fitter plot the results of each iteration for debugging. 
 %   -axes: what axes object to plot to. 
 %   -pause: length of pause after each plot. Default 0.3 seconds. 
@@ -22,6 +24,7 @@ function results = polyfit(x,y,varargin)
     input.input_var('iterations', 3); % how many iterations of removing outliers
     input.input_var('variances', []); % assume no covariance, only different variance per sample
     input.input_var('double', false); % use double precision
+    input.input_var('quick', false); % when true, save time by not calling fillmissing and not returning a function handle
     input.input_var('plotting', false);
     input.input_var('axes', [], 'axis');
     input.input_var('pause', 0.3);
@@ -87,7 +90,9 @@ function results = polyfit(x,y,varargin)
         xdata(isinf(xdata)) = NaN;
         ydata(isinf(ydata)) = NaN;
         
-        xdata = fillmissing(xdata, 'linear'); % there shouldn't be any NaNs in the xdata!
+        if ~input.quick
+            xdata = fillmissing(xdata, 'linear'); % there shouldn't be any NaNs in the xdata!
+        end
         
         bad_idx = isnan(xdata) | isnan(ydata) | isnan(vdata) | isinf(xdata) | isinf(ydata) | isinf(vdata);
 
@@ -184,10 +189,13 @@ function results = polyfit(x,y,varargin)
         results(ii).v = vdata;
         results(ii).ym = y_model;            
         results(ii).bad_idx = bad_idx; 
-        if any(isnan(results(ii).coeffs))
-            results(ii).func = @(x) NaN.*x;
-        else
-            results(ii).func = str2func(['@(x) ' results(ii).model(4:end)]);
+        
+        if ~input.quick
+            if any(isnan(results(ii).coeffs))
+                results(ii).func = @(x) NaN.*x;
+            else
+                results(ii).func = str2func(['@(x) ' results(ii).model(4:end)]);
+            end
         end
         
         % get rid of white space and dot notation
