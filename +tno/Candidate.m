@@ -130,6 +130,9 @@ classdef Candidate < handle
         aperture_index; % which aperture was used in the original photometry analysis (the index is for all types of photometry, including gaussian, as listed in head.PHOT_PARS)
         aperture_radius; % the size (in pixels) of the forced aperture chosen in the original analysis
         
+        flux_extra; % keep track of alternative apertures (e.g., unforced or gaussian)
+        extra_aperture_indices; % which fluxes were taken (use head.PHOT_PARS.types to get more info)
+        
         flux_unforced; % flux with aperture photometry used instead of forced, for the trigger star and nearest aperture to what was used in forced (loaded on demand)
         flux_unforced_all; % flux with aperture photometry used instead of forced, for all stars and multiple apertures (loaded on demand)
         unforced_aperture_sizes; % the radius of the apertures used, for the recalculated non-forced apertures, in units of pixels

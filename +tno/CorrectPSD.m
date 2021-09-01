@@ -128,8 +128,14 @@ classdef CorrectPSD < handle
             flux_buffer(outlier_idx) = NaN; % remove outliers
             
             obj.flux_buffer = flux_buffer - nanmean(flux_buffer);
-            obj.flux_buffer(outlier_idx) = 0; % remove these NaNs after subtracting the mean
-%             obj.flux_buffer = fillmissing(obj.flux_buffer, 'linear'); % this in unecessary if we already remove NaNs at input time
+%             obj.flux_buffer(outlier_idx) = 0; % remove these NaNs after subtracting the mean
+
+            if isempty(obj.power_spectrum)
+                obj.flux_buffer = fillmissing(obj.flux_buffer, 'linear'); % this in unecessary if we already remove NaNs at input time
+            else
+                nan_indices = find(sum(isnan(obj.flux_buffer),1)); 
+                obj.inpaintNaNs(nan_indices); 
+            end
             
             obj.timestamps = timestamps;
             
@@ -145,6 +151,42 @@ classdef CorrectPSD < handle
             frame_rate = 1./dt; 
             
             [obj.power_spectrum, obj.freq] = pwelch(obj.flux_buffer, obj.window_size, obj.overlap, obj.num_points, frame_rate, 'twosided');
+            
+        end
+        
+        function f_sim = inpaintNaNs(obj, star_indices)
+        % generate a simulated flux from a randomized instance of the PSD 
+        % FFTd back to time-domain, and use that to in-paint any NaN values
+        % in the flux buffer.
+            
+            if nargin<2 || isempty(star_indices)
+                star_indices = 1:size(obj.flux_buffer,2);
+            end
+            
+            f_real = obj.flux_buffer(:,star_indices); 
+            s_real = nanstd(f_real,[],1); 
+            
+            P = obj.power_spectrum(:,star_indices); 
+            f_sim = real(fft(sqrt(P).*exp(1i*pi*rand(size(P))))); 
+            s_sim = nanstd(f_sim,[],1); 
+            
+            f_sim = f_sim.*s_real./s_sim; % normalize by the overall noise level
+            
+            f_inpaint = zeros(size(f_real), 'like', f_real); 
+            
+            start_index = size(f_real,1) - size(f_sim,1) + 1;
+            
+            if start_index<1 % the simulated data is bigger than the flux buffer! 
+                f_sim = f_sim(2-start_index:end,:); 
+                start_index = 1; 
+            end
+            
+            f_inpaint(start_index:end,:) = f_sim; 
+            
+            frame_indices = isnan(f_real);
+            f_real(frame_indices) = f_inpaint(frame_indices); % replace all NaNs inside the selected star LCs
+            
+            obj.flux_buffer(:,star_indices) = f_real; % return the adjusted LCs into the buffer
             
         end
         

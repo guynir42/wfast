@@ -696,15 +696,15 @@ classdef QualityChecker < handle
                 end
                 
                 try
-                    if nnz(isnan(f))
-                        disp('The flux has NaN values...'); 
-                    end
+%                     if nnz(isnan(f))
+%                         disp('The flux has NaN values...'); 
+%                     end
                     
-                    for jj = 1:size(aux,3)
-                        if nnz(isnan(aux(:,:,jj)))
-                            fprintf('The %s have NaN values...\n', obj.aux_names{jj});
-                        end
-                    end
+%                     for jj = 1:size(aux,3)
+%                         if nnz(isnan(aux(:,:,jj)))
+%                             fprintf('The %s have NaN values...\n', obj.aux_names{jj});
+%                         end
+%                     end
                     
                     obj.correlations(:,:,:,ii) = util.series.correlation(obj.extended_detrend, aux, obj.pars.corr_timescales(ii)).*norm; 
                     

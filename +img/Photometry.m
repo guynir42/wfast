@@ -70,7 +70,6 @@ classdef Photometry < handle
         use_basic = 1;
         use_centering = 1;
         use_gaussian = 1;
-        use_concat_gaussian = 1; % add the gaussian photometry along with the rest
         use_aperture = 1; 
         use_forced = 1;
         use_best_offsets = 1; % if this is true, keep the offsets from gaussian even if using aperture/forced 
@@ -405,135 +404,54 @@ classdef Photometry < handle
                 obj.phot_apertures = a; % keep the aperture masks as well
                 obj.pars_struct = s.parameters;
                 obj.pars_struct.types = {}; 
+                                
+                list1 = {'fluxes', 'areas', 'errors', 'backgrounds', 'variances', 'offsets_x', 'offsets_y', 'widths', 'bad_pixels', 'flags'}; 
+                list2 = {'flux', 'area', 'error', 'background', 'variance', 'offset_x', 'offset_y', 'width', 'bad_pixels', 'flag'}; 
                 
                 if isfield(s, 'raw_photometry')
 
-                    obj.fluxes_basic = s.raw_photometry.flux;
-                    obj.areas_basic = s.raw_photometry.area;
-                    obj.errors_basic = s.raw_photometry.error;
-                    obj.backgrounds_basic = s.raw_photometry.background;
-                    obj.variances_basic = s.raw_photometry.variance;
-                    obj.offsets_x_basic = s.raw_photometry.offset_x;
-                    obj.offsets_y_basic = s.raw_photometry.offset_y;
-                    obj.widths_basic = s.raw_photometry.width;
-                    obj.bad_pixels_basic = s.raw_photometry.bad_pixels;
-                    obj.flags_basic = s.raw_photometry.flag;
-
-                    if ~isempty(obj.positions)
-                        obj.centroids_x_basic = obj.offsets_x_basic + obj.positions(:,1)';
-                        obj.centroids_y_basic = obj.offsets_y_basic + obj.positions(:,2)';
+                    for ii = 1:length(list1)
+                        obj.(sprintf('%s_basic', list1{ii})) = s.raw_photometry.(list2{ii}); 
                     end
-
-                    % update the newest values
-                    obj.fluxes = obj.fluxes_basic;
-                    obj.areas = obj.areas_basic;
-                    obj.errors = obj.errors_basic;
-                    obj.backgrounds = obj.backgrounds_basic;
-                    obj.variances = obj.variances_basic;
-                    obj.offsets_x = obj.offsets_x_basic;
-                    obj.offsets_y = obj.offsets_y_basic;
-                    obj.widths = obj.widths_basic;
-                    obj.bad_pixels = obj.bad_pixels_basic;
-                    obj.flags = obj.flags_basic;
-                
-                    obj.pars_struct.types{1} = 'raw'; 
+                    
+                    for ii = 1:length(list1)
+                        obj.(list1{ii}) = cat(3, obj.(list1{ii}), s.raw_photometry.(list2{ii})); % append to the general outputs
+                    end
+                    
+                    obj.pars_struct.types{end+1} = 'raw'; 
                     
                 end
                 
-                if obj.use_aperture || obj.use_forced || obj.use_gaussian
-                    obj.pars_struct.types = {}; 
-                end
-                
-                if obj.use_gaussian
+                if isfield(s, 'gaussian_photometry')
 
-                    obj.fluxes_gauss = s.gaussian_photometry.flux;
-                    obj.areas_gauss = s.gaussian_photometry.area;
-                    obj.errors_gauss = s.gaussian_photometry.error;
-                    obj.backgrounds_gauss = s.gaussian_photometry.background;
-                    obj.variances_gauss = s.gaussian_photometry.variance;
-                    obj.offsets_x_gauss = s.gaussian_photometry.offset_x;
-                    obj.offsets_y_gauss = s.gaussian_photometry.offset_y;
-                    obj.widths_gauss = s.gaussian_photometry.width;
-                    obj.bad_pixels_gauss = s.gaussian_photometry.bad_pixels;
-                    obj.flags_gauss = s.gaussian_photometry.flag;
-
+                    for ii = 1:length(list1)
+                        obj.(sprintf('%s_gauss', list1{ii})) = s.gaussian_photometry.(list2{ii}); 
+                    end
+                    
+                    for ii = 1:length(list1)
+                        obj.(list1{ii}) = cat(3, obj.(list1{ii}), s.gaussian_photometry.(list2{ii})); % append to the general outputs
+                    end
+                    
                     % this correction comes from the fact we are multiplying a Gaussian by another Gaussian...
                     good_widths = obj.widths_gauss<obj.gauss_sigma; 
                     obj.widths_gauss = real(obj.gauss_sigma.*obj.widths_gauss./sqrt(obj.gauss_sigma.^2-obj.widths_gauss.^2));  
                     obj.widths_gauss(~good_widths) = NaN; % the measured width should not be larger than the gaussian tapered aperture. If it is, put NaN instead!
                     
-                    if ~isempty(obj.positions)
-                        obj.centroids_x_gauss = obj.offsets_x_gauss + obj.positions(:,1)';
-                        obj.centroids_y_gauss = obj.offsets_y_gauss + obj.positions(:,2)';
-                    end
+                    obj.widths(:,:,end) = obj.widths_gauss; % update with corrected width
                     
-                    % update the newest values
-                    obj.fluxes = obj.fluxes_gauss;
-                    obj.areas = obj.areas_gauss;
-                    obj.errors = obj.errors_gauss;
-                    obj.backgrounds = obj.backgrounds_gauss;
-                    obj.variances = obj.variances_gauss;
-                    obj.offsets_x = obj.offsets_x_gauss;
-                    obj.offsets_y = obj.offsets_y_gauss;
-                    obj.widths = obj.widths_gauss; 
-
-                    obj.bad_pixels = obj.bad_pixels_gauss;
-                    obj.flags = obj.flags_gauss;
-                    
-                    obj.pars_struct.types{1} = sprintf('gaussian %4.2f', obj.gauss_sigma); 
+                    obj.pars_struct.types{end+1} = sprintf('gaussian %4.2f', obj.gauss_sigma); 
                     
                 end
                 
-                if obj.use_aperture || obj.use_forced
-                    obj.pars_struct.types = {}; 
-                end
-                
-                if obj.use_aperture
-
-                    obj.fluxes_ap = s.apertures_photometry.flux;
-                    obj.areas_ap = s.apertures_photometry.area;
-                    obj.errors_ap = s.apertures_photometry.error;
-                    obj.backgrounds_ap = s.apertures_photometry.background;
-                    obj.variances_ap = s.apertures_photometry.variance;
-                    obj.offsets_x_ap = s.apertures_photometry.offset_x;
-                    obj.offsets_y_ap = s.apertures_photometry.offset_y;
-                    obj.widths_ap = s.apertures_photometry.width;
-                    obj.bad_pixels_ap = s.apertures_photometry.bad_pixels;
-                    obj.flags_ap = s.apertures_photometry.flag;
-
-                    if ~isempty(obj.positions)
-                        obj.centroids_x_ap = obj.offsets_x_ap + obj.positions(:,1)';
-                        obj.centroids_y_ap = obj.offsets_y_ap + obj.positions(:,2)';
-                    end 
-                    
-                    % update the newest values
-                    obj.fluxes = obj.fluxes_ap;
-                    obj.areas = obj.areas_ap;
-                    obj.errors = obj.errors_ap;
-                    obj.backgrounds = obj.backgrounds_ap;
-                    obj.variances = obj.variances_ap;
-                    
-                    if obj.use_gaussian % if we used gaussian and "use_best_offsets/widths" then save the gaussian offsets/widths instead of these new values
-                        
-                        if obj.use_best_offsets
-                            obj.offsets_x = repmat(obj.offsets_x_gauss, [1 1 size(obj.fluxes,3)]); 
-                            obj.offsets_y = repmat(obj.offsets_y_gauss, [1 1 size(obj.fluxes,3)]); 
-                        else
-                            obj.offsets_x = obj.offsets_x_ap;
-                            obj.offsets_y = obj.offsets_y_ap;
-                        end
-                        
-                        if obj.use_best_widths
-                            obj.widths = repmat(obj.widths_gauss, [1 1 size(obj.fluxes,3)]); 
-                            obj.flags = repmat(obj.flags_gauss, [1 1 size(obj.fluxes,3)]); 
-                        else
-                            obj.widths = obj.widths_ap; % obj.gauss_sigma.*obj.widths_ap./sqrt(obj.gauss_sigma.^2-obj.widths_ap.^2); 
-                            obj.flags = obj.flags_ap;
-                        end
-                        
+                if isfield(s, 'apertures_photometry')
+    
+                    for ii = 1:length(list1)
+                        obj.(sprintf('%s_ap', list1{ii})) = s.apertures_photometry.(list2{ii}); 
                     end
                     
-                    obj.bad_pixels = obj.bad_pixels_ap;
+                    for ii = 1:length(list1)
+                        obj.(list1{ii}) = cat(3, obj.(list1{ii}), s.apertures_photometry.(list2{ii})); % append to the general outputs
+                    end
                     
                     for ii = 1:length(obj.aperture)
                         obj.pars_struct.types{end+1} = sprintf('aperture %4.2f', obj.aperture(ii));
@@ -541,53 +459,15 @@ classdef Photometry < handle
                     
                 end
                 
-                if obj.use_forced
+                if isfield(s, 'forced_photometry')
                     
-                    obj.fluxes_forced = s.forced_photometry.flux;
-                    obj.areas_forced = s.forced_photometry.area;
-                    obj.errors_forced = s.forced_photometry.error;
-                    obj.backgrounds_forced = s.forced_photometry.background;
-                    obj.variances_forced = s.forced_photometry.variance;
-                    obj.offsets_x_forced = s.forced_photometry.offset_x;
-                    obj.offsets_y_forced = s.forced_photometry.offset_y;
-                    obj.widths_forced = s.forced_photometry.width;
-                    obj.bad_pixels_forced = s.forced_photometry.bad_pixels;
-                    obj.flags_forced = s.forced_photometry.flag;
-
-                    if ~isempty(obj.positions)
-                        obj.centroids_x_forced = obj.offsets_x_forced + obj.positions(:,1)';
-                        obj.centroids_y_forced = obj.offsets_y_forced + obj.positions(:,2)';
-                    end 
-                    
-                    % update the newest values including all apertures and the forced results 
-                    obj.fluxes = cat(3, obj.fluxes_ap, obj.fluxes_forced);
-                    obj.areas = cat(3, obj.areas_ap, obj.areas_forced);
-                    obj.errors = cat(3, obj.errors_ap, obj.errors_forced);
-                    obj.backgrounds = cat(3, obj.backgrounds_ap, obj.backgrounds_forced);
-                    obj.variances = cat(3, obj.variances_ap, obj.variances_forced);
-                    
-                    if obj.use_gaussian % if we used gaussian and "use_best_offsets/widths" then save the gaussian offsets/widths instead of these new values
-                        
-                        if obj.use_best_offsets
-                            obj.offsets_x = cat(3, obj.offsets_x_ap, repmat(obj.offsets_x_gauss, [1 1 size(obj.fluxes,3)])); 
-                            obj.offsets_y = cat(3, obj.offsets_y_ap, repmat(obj.offsets_y_gauss, [1 1 size(obj.fluxes,3)])); 
-                        else
-                            obj.offsets_x = cat(3, obj.offsets_x_ap, obj.offsets_x_forced);
-                            obj.offsets_y = cat(3, obj.offsets_y_ap, obj.offsets_y_forced);
-                        end
-                        
-                        if obj.use_best_widths
-                            obj.widths = cat(3, obj.widths_ap, repmat(obj.widths_gauss, [1 1 size(obj.fluxes,3)])); 
-                            obj.flags = cat(3, obj.flags_ap, repmat(obj.flags_gauss, [1 1 size(obj.fluxes,3)])); 
-                        else
-                            obj.widths = cat(3, obj.widths_ap, obj.widths_forced);
-                            obj.flags = cat(3, obj.flags_ap, obj.flags_forced);
-                        end
-                        
+                    for ii = 1:length(list1)
+                        obj.(sprintf('%s_ap', list1{ii})) = s.apertures_photometry.(list2{ii}); 
                     end
                     
-                    obj.bad_pixels = cat(3, obj.bad_pixels_ap, obj.bad_pixels_forced); 
-%                     obj.flags = cat(3, obj.flags_ap, obj.flags_forced);
+                    for ii = 1:length(list1)
+                        obj.(list1{ii}) = cat(3, obj.(list1{ii}), s.apertures_photometry.(list2{ii})); % append to the general outputs
+                    end
                     
                     for ii = 1:length(obj.aperture)
                         obj.pars_struct.types{end+1} = sprintf('forced %4.2f', obj.aperture(ii));
@@ -595,24 +475,23 @@ classdef Photometry < handle
                     
                 end
                 
-                if obj.use_concat_gaussian && obj.use_gaussian && ( obj.use_aperture || obj.use_forced || ~isempty(s.raw_photometry) )
-                    
-                    obj.fluxes = cat(3, obj.fluxes_gauss, obj.fluxes);
-                    obj.areas = cat(3, obj.areas_gauss, obj.areas);
-                    obj.errors = cat(3, obj.errors_gauss, obj.errors);
-                    obj.backgrounds = cat(3, obj.backgrounds_gauss, obj.backgrounds);
-                    obj.variances = cat(3, obj.variances_gauss, obj.variances);
-                    obj.offsets_x = cat(3, obj.offsets_x_gauss, obj.offsets_x);
-                    obj.offsets_y = cat(3, obj.offsets_y_gauss, obj.offsets_y);
-                    obj.widths = cat(3, obj.widths_gauss, obj.widths);
-                    obj.flags = cat(3, obj.flags_gauss, obj.flags); 
-                    obj.bad_pixels = cat(3, obj.bad_pixels_gauss, obj.bad_pixels);
-                    
-                    obj.pars_struct.types = [sprintf('gaussian %4.2f', obj.gauss_sigma) obj.pars_struct.types]; 
-                    
+                if obj.use_gaussian % if we used gaussian and "use_best_offsets/widths" then save the gaussian offsets/widths instead of these new values
+                        
+                    if obj.use_best_offsets
+                        obj.offsets_x = repmat(obj.offsets_x_gauss, [1 1 size(obj.fluxes,3)]); 
+                        obj.offsets_y = repmat(obj.offsets_y_gauss, [1 1 size(obj.fluxes,3)]); 
+                    end
+
+                    if obj.use_best_widths
+                        obj.widths = repmat(obj.widths_gauss, [1 1 size(obj.fluxes,3)]);
+                        obj.flags = repmat(obj.flags_gauss, [1 1 size(obj.fluxes,3)]); 
+                    end
+
                 end
                 
-                if ~isempty(obj.positions) % should maybe remove this and add centroids alongside the offsets inside the above code?
+                % add the cetroids as the position of the center of light
+                % relative to the entire sensor array (beyond the cutouts)
+                if ~isempty(obj.positions) 
                     obj.centroids_x = obj.offsets_x + obj.positions(:,1)';
                     obj.centroids_y = obj.offsets_y + obj.positions(:,2)';
                 end
@@ -640,7 +519,9 @@ classdef Photometry < handle
                 
             end
             
-            obj.updateAverages;
+            if ~isempty(obj.fluxes)
+                obj.updateAverages;
+            end
             
             if ~isempty(obj.gui) && obj.gui.check
                 obj.gui.update;

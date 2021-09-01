@@ -437,6 +437,7 @@ classdef Acquisition < file.AstroData
 
     end
     
+    
     methods % reset/clear
         
         function reset(obj)

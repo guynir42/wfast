@@ -156,6 +156,7 @@ classdef DataStore < handle
         extended_juldates; % for each timestamp calculate the julian date
         extended_filenames = {}; % a cell array the same length as the timestamps, with the filename of the source of each measurement
         extended_frame_num = []; % frame inside each file
+        extended_fluxes_extra; % any other apertures we want to save (e.g., unforced aperture, gaussian) or other sizes of apertures, for quality assurance of events
         
         search_start_idx; % starting index for the search region out of the EXTENDED BATCH!
         search_end_idx;  % end index for the search region out of the EXTENDED BATCH!
@@ -196,6 +197,8 @@ classdef DataStore < handle
     properties(Hidden=true)
         
         size_snr_coeffs; % coefficients for a fit of stellar size to the stellar S/N (R = C(0) + C(1).*S + C(2).*S.^2 ...
+        
+        extra_fluxes_indices; % vector of indices that we want to keep as extras
         
         bad_ratios; % if there is a big difference between the flux in different apertures we disqualify those stars too (e.g., binaries)
         
@@ -238,11 +241,14 @@ classdef DataStore < handle
 
             obj.pars.use_threshold = true; % use the minimal S/N to keep out bad stars and not even store them
             obj.pars.threshold = 3; % stars with S/N lower than this are disqualified after the burn-in period!
+
+            obj.pars.extra_flux_types = {'aperture'}; 
             
             obj.pars.use_remove_cosmic_rays = true; % get rid of intense cosmic rays before even inputting the flux into the buffers
             obj.pars.cosmic_ray_threshold = 8; % in units of S/N
 
             obj.pars.use_reject_gaussian_photometry = true; 
+            obj.pars.use_reject_aperture_photometry = true; 
             
             obj.reset;
             
@@ -261,7 +267,7 @@ classdef DataStore < handle
             obj.filename_buffer = {};
             obj.frame_num_buffer = []; 
             obj.frame_counter = 0; 
-        
+            obj.extended_fluxes_extra = [];
             obj.calcAuxIndices;
             
             obj.star_indices = []; 
@@ -438,7 +444,7 @@ classdef DataStore < handle
                         obj.this_input.(list{ii}) = varargin{1}.(list{ii}); 
                     end
                 end
-               
+                
             else % just make an input object and parse the varargin pairs
                 obj.this_input = obj.makeInputVars;
                 obj.this_input.scan_vars(varargin{:}); 
@@ -484,7 +490,10 @@ classdef DataStore < handle
                 if isempty(obj.star_indices) % only do this once, at the first batch after the burn-in is done
                     obj.calcGoodStarsAndApertures; % this produces the star indices and finds the best aperture
                     obj.dumpBadStarsAndAperturesFromBuffer; % this reduces the flux and aux buffers to only the good stars and the best aperture
+                    obj.parseExtraFluxes; % find the indices for extra fluxes we want to save
                 end
+                
+                obj.storeExtraFluxes; % take the extra fluxes before we get rid of them
                 
                 obj.this_input.fluxes = obj.this_input.fluxes(:,obj.star_indices,obj.aperture_index); % get rid of unwanted stars and apertures
                 
@@ -593,6 +602,11 @@ classdef DataStore < handle
                 num_passed = num_passed.*not_gaussian; % get rid of these apertures
             end
             
+            if obj.pars.use_reject_aperture_photometry
+                not_aperture = cellfun(@isempty, regexp(obj.head.PHOT_PARS.types, 'aperture.*')); % which aperture indices refer to aperture photometry
+                num_passed = num_passed.*not_aperture; % get rid of these apertures
+            end
+            
             [~,obj.aperture_index] = max(num_passed, [], 2); % pick the best aperture
             
             passed = passed(:,obj.aperture_index); % keep only the stars on the column of the best aperture
@@ -614,19 +628,7 @@ classdef DataStore < handle
             passed = passed & ~obj.bad_ratios; 
             
             obj.star_snr = obj.star_snr(:,obj.aperture_index); % keep the S/N from the chosen aperture only
-            
-            if obj.pars.use_rate_function
-                
-                obj.star_rates = obj.pars.rate_function(obj.star_sizes, obj.star_snr); % this gives the rate for all stars
-                
-                % the stars in "passed" already qualified to the regular threshold
-                % so we apply additional conditions on top of the previous ones
-                passed2 = obj.star_snr>obj.pars.minimal_snr | (obj.star_rates>obj.pars.minimal_rate & obj.star_sizes<obj.pars.maximal_size );
-                
-                passed = passed & passed2; 
-                
-            end
-            
+                        
             obj.star_indices = find(passed)'; 
             
             % also get the fit of stellar S/N to size
@@ -648,6 +650,46 @@ classdef DataStore < handle
             obj.detrend_buffer = obj.detrend_buffer(:,obj.star_indices,obj.aperture_index); 
             obj.aux_buffer = obj.aux_buffer(:,obj.star_indices,:,obj.aperture_index); 
             obj.cutouts = obj.cutouts(:,:,:,obj.star_indices); 
+            
+        end
+        
+        function parseExtraFluxes(obj)
+            
+            obj.extra_fluxes_indices = []; 
+            
+            for ii = 1:length(obj.pars.extra_flux_types)
+                
+                s = obj.pars.extra_flux_types{ii}; 
+                
+                if ischar(s)
+
+                    idx = regexp(s, '\d+');
+
+                    if isempty(idx) % no number given, use the same number as the main flux
+                        
+                        % get the currently used aperture size
+                        ap_size = util.text.extract_numbers(obj.head.PHOT_PARS.types);
+                        ap_size = ap_size{obj.aperture_index}; 
+                        
+                        s = strip(s); % remove whitespace
+                        s = sprintf('%s %4.2f', s, ap_size);
+                        
+                        ap_index = find(strcmp(obj.head.PHOT_PARS.types, s)); 
+                        
+                        obj.extra_fluxes_indices(end+1,1) = ap_index;
+                        
+                    elseif idx==1 % number is given, without any text, use this as an index
+                        obj.extra_fluxes_indices(end+1,1) = str2double(s); % just assign it as an index
+                    else
+                        ap_index = find(strcmp(obj.head.PHOT_PARS.types, s)); 
+                        obj.extra_fluxes_indices(end+1,1) = ap_index;
+                    end
+
+                elseif isnumeric(s)
+                    obj.extra_fluxes_indices(end+1,1) = s; % just assign it as an index
+                end
+                
+            end
             
         end
         
@@ -818,6 +860,20 @@ classdef DataStore < handle
 %             if size(obj.aux_buffer,1)>obj.pars.length_psd % make sure to only save the recent data
 %                 obj.aux_buffer = obj.aux_buffer(end-(obj.pars.length_psd)+1:end,:,:,:); 
 %             end
+            
+        end
+        
+        function storeExtraFluxes(obj)
+            
+            if isempty(obj.extended_fluxes_extra)
+                obj.extended_fluxes_extra = obj.this_input.fluxes(:, obj.star_indices, obj.extra_fluxes_indices); 
+            else
+                obj.extended_fluxes_extra = vertcat(obj.extended_fluxes_extra, obj.this_input.fluxes(:, obj.star_indices, obj.extra_fluxes_indices)); 
+            end
+            
+            if size(obj.extended_fluxes_extra,1)>obj.pars.length_extended
+                obj.extended_fluxes_extra = obj.extended_fluxes_extra(end-obj.pars.length_extended+1:end,:,:); 
+            end
             
         end
         

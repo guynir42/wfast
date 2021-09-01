@@ -1010,7 +1010,9 @@ classdef EventFinder < handle
             c.flux_detrended = fluxes_detrended(:,c.star_index);
             c.flux_corrected = fluxes_corrected(:,c.star_index); 
             c.flux_filtered = fluxes_filtered(:,idx(2),idx(3));
-
+            c.flux_extra = obj.store.extended_fluxes_extra(:,c.star_index,:); % keep track of alternative apertures (e.g., unforced or gaussian)
+            c.extra_aperture_indices = obj.store.extra_fluxes_indices; % which photometry indices were saved 
+            
             % store data for all stars as reference
             c.flux_raw_all = fluxes_raw; 
             c.flux_detrended_all = fluxes_detrended; 
