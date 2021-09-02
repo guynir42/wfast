@@ -462,11 +462,11 @@ classdef Photometry < handle
                 if isfield(s, 'forced_photometry')
                     
                     for ii = 1:length(list1)
-                        obj.(sprintf('%s_ap', list1{ii})) = s.apertures_photometry.(list2{ii}); 
+                        obj.(sprintf('%s_forced', list1{ii})) = s.forced_photometry.(list2{ii}); 
                     end
                     
                     for ii = 1:length(list1)
-                        obj.(list1{ii}) = cat(3, obj.(list1{ii}), s.apertures_photometry.(list2{ii})); % append to the general outputs
+                        obj.(list1{ii}) = cat(3, obj.(list1{ii}), s.forced_photometry.(list2{ii})); % append to the general outputs
                     end
                     
                     for ii = 1:length(obj.aperture)
