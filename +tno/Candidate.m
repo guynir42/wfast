@@ -893,6 +893,14 @@ classdef Candidate < handle
             
         end
         
+        function applySimToExtraFlux(obj, store)
+            
+            % if simulated, must also apply simulation dip to flux_extra
+            df = obj.flux_raw - store.extended_flux(:,obj.star_index); 
+            obj.flux_extra = obj.flux_extra + df; 
+            
+        end
+        
     end
     
     methods % plotting tools / GUI

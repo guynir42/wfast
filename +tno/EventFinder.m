@@ -1341,6 +1341,7 @@ classdef EventFinder < handle
                 for ii = 1:length(all_cand)
                     all_cand(ii).is_simulated = 1; 
                     all_cand(ii).sim_pars = sim_pars; 
+                    all_cand(ii).applySimToExtraFlux(obj.store); 
                 end
                 
             else % no events were recovered
