@@ -142,7 +142,7 @@ classdef EventFinder < handle
         use_display_kept_candidates = 0; % GUI parameter, to show only kept events or all events (default)
         use_show_truth = 0; % if true, will show the field name/coords and for each candidate will reveal if it is simulated
         
-        version = 1.01;
+        version = 1.03;
         
     end
     
@@ -1049,6 +1049,7 @@ classdef EventFinder < handle
             % store the relative offsets for this star
             c.relative_dx = dx; 
             c.relative_dy = dy; 
+            c.average_offsets = obj.store.extended_average_offsets; % keep track of forced photometry offsets
             
             % get the observational parameters and the star parameters from astrometry/GAIA
             c.head = obj.head;

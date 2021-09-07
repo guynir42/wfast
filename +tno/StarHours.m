@@ -142,7 +142,7 @@ classdef StarHours < handle
        
         star_snr_dist; % output of histcounts2(). Should be 1 in the right star and S/N bin, and zeros elsewhere. 
         
-        version = 1.00;
+        version = 1.03;
         
     end
     

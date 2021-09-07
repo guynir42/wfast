@@ -47,7 +47,7 @@ classdef CorrectPSD < handle
     
     properties(Hidden=true)
        
-        version = 1.00;
+        version = 1.03;
         
     end
     

@@ -110,6 +110,7 @@ classdef Photometry < handle
     properties(Dependent=true)
         
         cut_size;
+        offset_averages
         
     end
     
@@ -334,6 +335,18 @@ classdef Photometry < handle
         function val = get.cut_size(obj)
             
             val = obj.cut_size_latest;
+            
+        end
+        
+        function val = get.offset_averages(obj)
+            
+            if isempty(obj.phot_struct) || ~isfield(obj.phot_struct, 'averages')
+                val = [];
+            else
+                x = obj.phot_struct.averages.offset_x(:,1); % all columns are the same for some reason...
+                y = obj.phot_struct.averages.offset_y(:,1); % all columns are the same for some reason...
+                val = [x, y]; 
+            end
             
         end
         

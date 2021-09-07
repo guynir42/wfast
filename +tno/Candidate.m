@@ -150,6 +150,7 @@ classdef Candidate < handle
         
         relative_dx; % the offsets_x for this star, minus the flux weighted mean offsets_x of all stars
         relative_dy; % the offsets_x for this star, minus the flux weighted mean offsets_x of all stars
+        average_offsets; % the average offset used for forced photometery (two-columns, for x and y, each row for each frame)
         
         cut_matrix; % the different cuts from the QualityChecker (for this star, on the extended region)
         cut_names; % a cell array with the names of the cuts, e.g., 'shakes', 'offset_size', 'corr_x_25',...
@@ -212,7 +213,7 @@ classdef Candidate < handle
         kern_extra; % any other kernels that passed the lower threshold for kernels
         star_extra; % any other stars that passed the lower threshold for stars
         
-        version = 1.02;
+        version = 1.03;
         
     end
     
