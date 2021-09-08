@@ -221,7 +221,7 @@ classdef Acquisition < file.AstroData
         
         cosmic_ray_mask_threshold = 1024;
         cosmic_ray_mask; 
-        cosmic_ray_peak_threshold = 256;
+        cosmic_ray_peak_threshold = 175;
         
         prev_fluxes; % fluxes measured in previous batch (for triggering)
         
@@ -3161,6 +3161,24 @@ classdef Acquisition < file.AstroData
                     end
                     
                     obj.num_cosmic_rays = obj.num_cosmic_rays + size(pos,1); % keep track of how many such events we found
+                    
+                    min_dist = 3; % two events must have BOTH x and y further than this (in pixels)
+                    
+                    % for each pair of too-close rows, put a NaN in the
+                    % flux column for the lower-flux row
+                    for ii = 1:size(pos,1)
+                        for jj = ii+1:size(pos,1)
+                            if pos(ii,2) - pos(jj,2) <= min_dist && pos(ii,3) - pos(jj,3) <= min_dist
+                                if pos(ii,1)>pos(jj,1) % the ii row is bigger, and neither is NaN
+                                    pos(jj,1) = NaN;
+                                elseif pos(jj,1)>pos(ii,1) % the jj row is bigger, and neiher is NaN
+                                    pos(ii,1) = NaN; 
+                                end
+                            end
+                        end
+                    end
+                    
+                    pos(isnan(pos(:,1)),:) = []; % remove NaN rows (duplicates)
                     
                     new_pos = ones(obj.num_dynamic_cutouts,1).*floor(size(obj.stack)/2); 
                     

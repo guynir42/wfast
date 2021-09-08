@@ -8,7 +8,7 @@
 #include <thread>
 #include <chrono>
 
-void find_peaks(unsigned short **array, unsigned short *images, size_t rows, size_t cols, int start_idx, int end_idx, bool *mask, unsigned char new_thresh, int max_number);
+void find_peaks(unsigned short **array, unsigned short *images, size_t rows, size_t cols, int start_idx, int end_idx, bool *mask, unsigned short threshold, int max_number);
 
 void mexFunction( int nlhs, mxArray *plhs[],
                   int nrhs, const mxArray *prhs[] ){
@@ -175,7 +175,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	
 } // end mex function
 
-void find_peaks(unsigned short **array, unsigned short *images, size_t rows, size_t cols, int start_idx, int end_idx, bool *mask, unsigned char threshold, int max_number){
+void find_peaks(unsigned short **array, unsigned short *images, size_t rows, size_t cols, int start_idx, int end_idx, bool *mask, unsigned short threshold, int max_number){
 
 	int counter=0;
 	
