@@ -185,7 +185,7 @@ classdef Candidate < handle
     
     properties(Hidden=true)
         
-        use_show_secrets = false; % this should be turned on only when debuggin (on the un-blinded set)
+        use_show_secrets = false; % this should be turned on only when debugging (on the un-blinded set)
         
         run_identifier = ''; % use this to find the files in the database. Format: <date folder>\<run_name_folder> e.g., 2020-09-07\ecliptic_run1
 
@@ -212,6 +212,12 @@ classdef Candidate < handle
         
         kern_extra; % any other kernels that passed the lower threshold for kernels
         star_extra; % any other stars that passed the lower threshold for stars
+        
+        highest_corr_indices = [];
+        highest_corr_values = []; 
+        highest_corr_fluxes = [];
+        highest_corr_number = [];
+        highest_corr_frames = [];
         
         version = 1.03;
         
@@ -596,14 +602,10 @@ classdef Candidate < handle
             
         end
         
-        function [star_idx, corr] = findHighestCorrelations(obj, number, frames)
+        function [star_idx, corr, fluxes] = findHighestCorrelations(obj, number, frames)
         % check the correlations to other stars' fluxes, with +-"frames"
         % around the time_index, and give the indices of the most
         % correlated stars (find "number" such matches). 
-        
-            if isempty(obj.flux_raw_all)
-                error('Must have "flux_raw_all" to calculate correlation with other star fluxes');
-            end
         
             if nargin<2 || isempty(number)
                 number = 3; 
@@ -613,24 +615,49 @@ classdef Candidate < handle
                 frames = 2*length(obj.time_range); 
             end
             
-            frame_idx = (-frames:frames) + obj.time_index; % plus/minus number of frames around peak
-            frame_idx(frame_idx<1 | frame_idx>size(obj.flux_raw,1)) = []; 
-            f = obj.flux_raw(frame_idx);
-            F = obj.flux_raw_all(frame_idx,:); 
+            if ~isempty(obj.highest_corr_fluxes) && ... % check if we can lazy load this
+                    isequal(obj.highest_corr_number, number) && ...
+                    isequal(obj.highest_corr_frames, frames)
+                
+                star_idx = obj.highest_corr_indices;
+                fluxes = obj.highest_corr_fluxes;
+                corr = obj.highest_corr_values;
+                
+            else
+
+                if isempty(obj.flux_raw_all)
+                    error('Must have "flux_raw_all" to calculate correlation with other star fluxes');
+                end
             
-            % normalize both fluxes
-            f = (f-nanmean(f)); 
-            F = (F-nanmean(F)); 
-%             
-%             C = nansum(f.*F)./length(idx); % normalized fluxes just give the correlation (up to number of samples)
-            
-            C = nansum(f.*F)./sqrt(nansum(f.^2).*nansum(F.^2)).*sqrt(length(frame_idx)); 
-            C(isnan(C)) = 0; 
-            [~, sort_idx] = sort(C); % sort, and get a list of the sorted indices
-            
-            star_idx = flip(sort_idx(end-number:end-1));
-            
-            corr = C(:,star_idx); 
+                frame_idx = (-frames:frames) + obj.time_index; % plus/minus number of frames around peak
+                frame_idx(frame_idx<1 | frame_idx>size(obj.flux_raw,1)) = []; 
+                f = obj.flux_raw(frame_idx);
+                F = obj.flux_raw_all(frame_idx,:); 
+
+                % normalize both fluxes
+                f = (f-nanmean(f)); 
+                F = (F-nanmean(F)); 
+    %             
+    %             C = nansum(f.*F)./length(idx); % normalized fluxes just give the correlation (up to number of samples)
+
+                C = nansum(f.*F)./sqrt(nansum(f.^2).*nansum(F.^2)).*sqrt(length(frame_idx)); 
+                C(isnan(C)) = 0; 
+                [~, sort_idx] = sort(C); % sort, and get a list of the sorted indices
+
+                star_idx = flip(sort_idx(end-number:end-1));
+
+                corr = C(:,star_idx); 
+                
+                fluxes = obj.flux_raw_all(:,star_idx); 
+                
+                % keep this to lazy load it later
+                obj.highest_corr_fluxes = fluxes;
+                obj.highest_corr_values = corr;
+                obj.highest_corr_indices = star_idx;
+                obj.highest_corr_number = number;
+                obj.highest_corr_frames = frames; 
+
+            end
             
         end
         
@@ -978,14 +1005,17 @@ classdef Candidate < handle
             
             margin_left = 0.05;
             
-            ax1 = axes('Parent', input.parent, 'Position', [margin_left 0.55 0.55 0.35]);
+            ax1 = axes('Parent', input.parent, 'Position', [margin_left 0.65 0.55 0.25]);
             obj.showRawFlux('ax', ax1, 'on_top', 1, 'equal', 0, 'title', 0);
             
-            ax2 = axes('Parent', input.parent, 'Position', [margin_left 0.2 0.55 0.35]);
-            obj.showFilteredFlux('ax', ax2, 'title', 0, 'cuts', input.cuts); 
+            ax2 = axes('Parent', input.parent, 'Position', [margin_left 0.40 0.55 0.25]);
+            obj.showOtherStars('ax', ax2);
             
-            ax3 = axes('Parent', input.parent, 'Position', [0.68 0.2 0.3 0.5]);
-            obj.showCutouts('ax', ax3);
+            ax3 = axes('Parent', input.parent, 'Position', [margin_left 0.15 0.55 0.25]);
+            obj.showFilteredFlux('ax', ax3, 'title', 0, 'cuts', input.cuts); 
+            
+            ax4 = axes('Parent', input.parent, 'Position', [0.68 0.2 0.3 0.5]);
+            obj.showCutouts('ax', ax4);
             
             %%%%%%%%%%%%%%%%%%%%%% popup panel %%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -1146,6 +1176,38 @@ classdef Candidate < handle
             
         end
         
+        function showTimeRange(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('ax', [], 'axes', 'axis');
+            input.input_var('font_size', 16);
+            input.input_var('color', 0.5*[1 1 1]);
+            input.input_var('alpha', 0.10); 
+            input.scan_vars(varargin{:}); 
+            
+            hold(input.ax, 'on'); 
+            
+            mn = input.ax.YLim(1); 
+            mx = input.ax.YLim(2); 
+            
+%             if strcmpi(input.ax.YScale, 'linear')
+%                 mx = mx*1.2;
+%             elseif strcmpi(input.ax.YScale, 'log')                
+% %                 mx = 10.^ceil(log10(mx));                 
+%                 mx = mx.*2;
+%             end
+            
+            h = area(input.ax, obj.time_range, ones(length(obj.time_range),1).*mx, mn, 'FaceColor', input.color, ...
+                'EdgeColor', 'none', 'FaceAlpha', input.alpha, 'DisplayName', 'Event Region'); 
+            
+%             input.ax.YLim(2) = mx;
+            
+            input.ax.Children = circshift(input.ax.Children, -1); % put the event region in the back
+            
+            hold(input.ax, 'off'); 
+            
+        end
+        
         function showRawFlux(obj, varargin)
             
             input = util.text.InputVars;
@@ -1176,13 +1238,23 @@ classdef Candidate < handle
             a = obj.auxiliary(:,obj.aux_indices.areas); 
             b = obj.auxiliary(:,obj.aux_indices.backgrounds); 
             f2 = f - nanmedian(a.*b);
+            f3 = obj.flux_extra - nanmedian(a.*b); 
             
-            h1 = plot(input.ax, x, f2, '-', 'LineWidth', 2, 'Color', [0.929 0.694 0.125]);
-            h1.DisplayName = 'raw flux';
+            cla(input.ax); 
             
             input.ax.NextPlot = 'add';
-            h2 = plot(input.ax, xk, obj.flux_mean*obj.kernel_lightcurve(~obj.is_positive), ':', 'LineWidth', 2, 'Color', input.ax.Colormap(4,:));
-            h2.DisplayName = 'best kernel';
+            
+            if ~isempty(f3)
+                h2 = plot(input.ax, x, f3, '-', 'LineWidth', 1.5, 'Color', [0.9290 0.694 0.1250]);
+                h2.DisplayName = 'unforced counts';                
+            end
+            
+            h1 = plot(input.ax, x, f2, '-', 'LineWidth', 3, 'Color', [0 0.4470 0.7410]);
+            h1.DisplayName = 'forced counts';
+            
+            
+%             h3 = plot(input.ax, xk, obj.flux_mean*obj.kernel_lightcurve(~obj.is_positive), ':', 'LineWidth', 2, 'Color', 'k');
+%             h3.DisplayName = 'best kernel';
             
             input.ax.NextPlot = 'replace';
             
@@ -1204,8 +1276,8 @@ classdef Candidate < handle
             input.ax.NextPlot = 'replace';
             input.ax.ColorOrderIndex = 5;
             
-            h3 = plot(input.ax, x, obj.auxiliary(:,obj.aux_indices.backgrounds), '--', 'Color', [0.2 0.6 0.2]); 
-            h3.DisplayName = 'background';
+            h4 = plot(input.ax, x, obj.auxiliary(:,obj.aux_indices.backgrounds), ':', 'Color', [ 0.8500 0.3250 0.0980], 'LineWidth', 1.5); 
+            h4.DisplayName = 'background';
             
             aux = obj.auxiliary(:,obj.aux_indices.backgrounds);
             
@@ -1219,18 +1291,18 @@ classdef Candidate < handle
 %                 w = w.*obj.head.SCALE;
 %             end
             
-            h4 = plot(input.ax, x, w, 'p', 'MarkerSize', 4, 'Color', [0.2 0.5 1]);
-            h4.DisplayName = 'PSF FWHM';
+            h5 = plot(input.ax, x, w, 'p', 'MarkerSize', 5, 'Color', [0.2 0.5 1]);
+            h5.DisplayName = 'PSF FWHM';
             
             aux = horzcat(aux, w); 
             
-            h5 = plot(input.ax, x, obj.relative_dx, 'x', 'MarkerSize', 7, 'Color', [1 0.3 0.2]);
-            h5.DisplayName = 'relative dx';
+            h6 = plot(input.ax, x, obj.relative_dx, 'x', 'MarkerSize', 7, 'Color', [1 0.3 0.2]);
+            h6.DisplayName = 'relative dx';
             
             aux = horzcat(aux, obj.relative_dx); 
             
-            h6 = plot(input.ax, x, obj.relative_dy, '+', 'MarkerSize', 6, 'Color', [0.8 0.3 0.4]);
-            h6.DisplayName = 'relative dy';
+            h7 = plot(input.ax, x, obj.relative_dy, '+', 'MarkerSize', 6, 'Color', [0.8 0.3 0.4]);
+            h7.DisplayName = 'relative dy';
             
             aux = horzcat(aux, obj.relative_dy); 
             
@@ -1299,6 +1371,61 @@ classdef Candidate < handle
 %                 input.ax.YTick = input.ax.YTick(2:end); 
             end
             
+            obj.showTimeRange('ax', input.ax); 
+            
+        end
+        
+        function showOtherStars(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('ax', [], 'axes', 'axis');
+            input.input_var('font_size', 16);
+            input.input_var('legend_pos', ''); 
+            input.scan_vars(varargin{:}); 
+            
+            [idx, corr, flux] = obj.findHighestCorrelations; % indices of stars that have highest correlations to this star
+            
+            h1 = plot(input.ax, obj.flux_raw, 'LineWidth', 3);
+            h1.DisplayName = sprintf('Candidate star, idx= %d', obj.star_index); 
+            
+            hold(input.ax, 'on'); 
+            
+            h2 = plot(input.ax, flux, 'LineWidth', 1.5); 
+            
+            for ii = 1:length(h2)
+                h2(ii).DisplayName = sprintf('idx= %d | corr= %4.2f | trig= %d', idx(ii), corr(ii), ismember(idx(ii), obj.star_extra)); 
+            end
+            
+            xlabel(input.ax, 'Frame index'); 
+            ylabel(input.ax, 'Raw flux'); 
+            
+            input.ax.FontSize = 14;
+            input.ax.YScale = 'log'; 
+            
+            hold(input.ax, 'off'); 
+            
+            if obj.is_positive
+                leg_pos_y = 'South'; 
+            else
+                leg_pos_y = 'North'; 
+            end
+            
+            if obj.time_index>=floor(length(obj.timestamps)/2)
+                leg_pos_x = 'West'; 
+            else
+                leg_pos_x = 'East'; 
+            end
+            
+            if isempty(input.legend_pos)
+                pos = [leg_pos_y leg_pos_x];
+            else
+                pos = input.legend_pos;
+            end
+            
+            legend(input.ax, 'Location', pos); 
+            
+            obj.showTimeRange('ax', input.ax); 
+            
         end
         
         function showFilteredFlux(obj, varargin)
@@ -1325,21 +1452,20 @@ classdef Candidate < handle
             end
             
             input.ax.NextPlot = 'replace';
-            h1 = plot(input.ax, x, obj.flux_filtered, 'LineWidth', 2);
+            h1 = plot(input.ax, x, obj.flux_filtered, 'LineWidth', 3, 'Color', [0.8500 0.3250 0.0980]);
             h1.DisplayName = 'filtered flux';
             
             input.ax.NextPlot = 'add';
-            range = obj.time_range;
-            if ~isempty(range)
-                h2 = plot(input.ax, x(range), obj.flux_filtered(range), 'LineWidth', 2);
-                h2.DisplayName = 'time range';
-            end
+%             range = obj.time_range;
+%             if ~isempty(range)
+%                 h2 = plot(input.ax, x(range), obj.flux_filtered(range), 'LineWidth', 2);
+%                 h2.DisplayName = 'time range';
+%             end
             
             f = obj.flux_corrected;
             s = nanstd(obj.flux_corrected); 
             
-            input.ax.ColorOrderIndex = 3;
-            h3 = plot(input.ax, x, f./s, '-');
+            h3 = plot(input.ax, x, f./s, '-', 'LineWidth', 3, 'Color', [0 0.4470 0.7410]);
             h3.DisplayName = 'corrected flux';
             
             sign = 1;
@@ -1347,7 +1473,7 @@ classdef Candidate < handle
                 sign = -1;
             end
 
-            h4 = plot(input.ax, xk, obj.kernel*5*sign, '--');
+            h4 = plot(input.ax, xk, obj.kernel*5*sign, '--m', 'LineWidth', 2);
             h4.DisplayName = 'best kernel';
             
             if obj.is_positive
@@ -1414,7 +1540,7 @@ classdef Candidate < handle
                 
                 vectors = [];
                 
-                colors = {'g', 'b', 'y'}; 
+                colors = {'g', 'm', 'y'}; 
                 
                 for ii = 1:length(hits)
                     
@@ -1468,6 +1594,8 @@ classdef Candidate < handle
                 yyaxis(input.ax, 'left');
                 
             end
+            
+            obj.showTimeRange('ax', input.ax); 
             
         end
         
@@ -1736,52 +1864,28 @@ classdef Candidate < handle
         
         function popupOtherStars(obj, ~, ~)
             
-            [idx, corr] = obj.findHighestCorrelations; % indices of stars that have highest correlations to this star
-            
-            flux = obj.flux_raw_all(:,idx); 
-            
             f = util.plot.FigHandler('Other stars, flux and position'); 
             f.clear;
             ax1 = axes('Parent', f.fig, 'Position', [0.1 0.2 0.88 0.75]); 
             
-            mx = nanmax([nanmax(obj.flux_raw), nanmax(flux)]).*2;
+            [idx, corr] = obj.findHighestCorrelations; % indices of stars that have highest correlations to this star
             
-            area(ax1, obj.time_range, ones(length(obj.time_range),1).*mx, 'FaceColor', 'g', ...
-                'EdgeColor', 'none', 'FaceAlpha', 0.25, 'DisplayName', 'Event region'); 
-            
-            hold(ax1, 'on');
-            
-            h1 = plot(ax1, obj.flux_raw, 'LineWidth', 3);
-            h1.DisplayName = sprintf('Candidate star, idx= %d', obj.star_index); 
-            
-            h2 = plot(ax1, flux, 'LineWidth', 1.5); 
-            
-            for ii = 1:length(h2)
-                h2(ii).DisplayName = sprintf('idx= %d | corr= %4.2f | trig= %d', idx(ii), corr(ii), ismember(idx(ii), obj.star_extra)); 
-            end
-            
-            xlabel(ax1, 'Frame index'); 
-            ylabel(ax1, 'Raw flux'); 
-            
-            ax1.FontSize = 14;
-            ax1.YScale = 'log'; 
-            
-            hold(ax1, 'off'); 
-            
-            legend(ax1, 'Location', 'NorthEastOutside'); 
+            obj.showOtherStars('ax', ax1, 'legend_pos', 'NorthEastOutside'); 
+
+            h = ax1.Children; 
             
             ax2 = axes('Parent', f.fig, 'Position', [0.73 0.1 0.25 0.5]); 
             
             x = nanmean(obj.auxiliary_all(:,:,obj.aux_indices.centroids_x)); 
             y = nanmean(obj.auxiliary_all(:,:,obj.aux_indices.centroids_y)); 
             
-            plot(ax2, x(obj.star_index), y(obj.star_index), 'x', 'Color', h1.Color, 'MarkerSize', 15); 
+            plot(ax2, x(obj.star_index), y(obj.star_index), 'x', 'Color', h(1).Color, 'MarkerSize', 15); 
             
             hold(ax2, 'on'); 
             
             for ii = 1:length(idx)
                 
-                plot(ax2, x(idx(ii)), y(idx(ii)), 'o', 'Color', h2(ii).Color, 'MarkerSize', 10); 
+                plot(ax2, x(idx(ii)), y(idx(ii)), 'o', 'Color', h(ii+1).Color, 'MarkerSize', 10); 
                 
             end
             
