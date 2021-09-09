@@ -1006,7 +1006,7 @@ classdef Candidate < handle
             margin_left = 0.05;
             
             ax1 = axes('Parent', input.parent, 'Position', [margin_left 0.65 0.55 0.25]);
-            obj.showRawFlux('ax', ax1, 'on_top', 1, 'equal', 0, 'title', 0);
+            obj.showRawFlux('ax', ax1, 'equal', 0, 'title', 0);
             
             ax2 = axes('Parent', input.parent, 'Position', [margin_left 0.40 0.55 0.25]);
             obj.showOtherStars('ax', ax2);
@@ -1016,6 +1016,18 @@ classdef Candidate < handle
             
             ax4 = axes('Parent', input.parent, 'Position', [0.68 0.2 0.3 0.5]);
             obj.showCutouts('ax', ax4);
+             
+            ax1.XLim = ax3.XLim;
+            ax1.XTickLabels = {};
+            xlabel(ax1, '');
+            
+            ax2.XLim = ax3.XLim;
+            ax2.XTickLabels = {};
+            xlabel(ax2, '');
+            
+            ax1.XGrid = 'on'; 
+            ax2.XGrid = 'on'; 
+            ax3.XGrid = 'on'; 
             
             %%%%%%%%%%%%%%%%%%%%%% popup panel %%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -1051,7 +1063,7 @@ classdef Candidate < handle
             info_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [margin_left 0.9 1-margin_left*2 0.1], 'title', 'info'); 
             
             button = uicontrol(info_panel, 'Style', 'text', 'string', strjoin({obj.printSummary, ['Star: ' obj.printStellarProps ' | Kernel: ' obj.printKernelProps]}, newline), ...
-                'Units', 'Normalized', 'Position', [0.02 0 0.88 1], 'FontSize', 14, 'HorizontalAlignment', 'Left'); 
+                'Units', 'Normalized', 'Position', [0.02 0 0.88 1], 'FontSize', 12, 'HorizontalAlignment', 'Left'); 
             
             if obj.use_show_secrets
                 button = uicontrol(info_panel, 'Style', 'pushbutton', 'string', 'reveal', ...
@@ -1071,9 +1083,9 @@ classdef Candidate < handle
             %%%%%%%%%%%%%%%%%%%%%% panel cuts %%%%%%%%%%%%%%%%%%%%%%%%%
             
             top_margins = 0.05; 
-            pos = margin_left;
+            pos = 0.04;
             
-            cuts_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [pos 0.0 0.2 0.1], 'title', 'cuts'); 
+            cuts_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [pos 0.0 0.22 0.1], 'title', 'cuts'); 
             
             if input.cuts
                 str = 'with cuts';
@@ -1099,7 +1111,7 @@ classdef Candidate < handle
             
             %%%%%%%%%%%%%%%%%%%%%% panel indexing %%%%%%%%%%%%%%%%%%%%%%%%%
             
-            pos = pos + 0.05 + cuts_panel.Position(3); 
+            pos = pos + 0.12 + cuts_panel.Position(3); 
             
             index_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [pos 0.0 0.4 0.1], 'title', 'controls'); 
             
@@ -1137,7 +1149,7 @@ classdef Candidate < handle
             
             %%%%%%%%%%%%%%%%%%%%%% panel classify %%%%%%%%%%%%%%%%%%%%%%%%%
             
-            pos = pos + 0.05 + index_panel.Position(3); 
+            pos = pos + 0.01 + index_panel.Position(3); 
             
             classify_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [pos 0.0 0.2 0.1], 'title', 'classify'); 
             
@@ -1216,7 +1228,6 @@ classdef Candidate < handle
             input.input_var('ax', [], 'axes', 'axis');
             input.input_var('font_size', 16);
             input.input_var('equal_limits', false); 
-            input.input_var('on_top', false); 
             input.scan_vars(varargin{:});
             
             if isempty(input.ax), input.ax = gca; end
@@ -1364,11 +1375,6 @@ classdef Candidate < handle
             if input.equal_limits
                 mx = max(abs(obj.flux_raw - obj.flux_mean)); 
                 input.ax.YLim = obj.flux_mean + [-1 1].*1.2.*mx;
-            end
-            
-            if input.on_top
-                input.ax.XTick = [];
-%                 input.ax.YTick = input.ax.YTick(2:end); 
             end
             
             obj.showTimeRange('ax', input.ax); 
