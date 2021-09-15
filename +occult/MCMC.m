@@ -1320,7 +1320,7 @@ classdef MCMC < handle
                 if ~input.horizontal % vertical option
                     
                     h = histogram(input.ax, [obj.points(1:obj.num_burned,:).(input.pars{1})]); 
-
+                    
                     x_title = input.pars{1};
                     if input.full_titles
                         x_title = obj.title_strings.(x_title);                    
@@ -1333,8 +1333,9 @@ classdef MCMC < handle
                     hold(input.ax, 'on'); 
 
                     if input.bounds
-                        h_low_bound = plot(input.ax, lower.*[1 1], input.ax.YLim, ':m', 'LineWidth', 2, 'HandleVisibility', 'off'); 
-                        h_high_bound = plot(input.ax, upper.*[1 1], input.ax.YLim, ':m', 'LineWidth', 2, 'HandleVisibility', 'off'); 
+                        h_bounds = area(input.ax, [lower upper], [1 1].*input.ax.YLim(2), ...
+                            'EdgeColor', 'none', 'FaceColor', 'm', 'FaceAlpha', 0.2); 
+                        h_middle = plot(input.ax, med.*[1 1], input.ax.YLim, ':m', 'LineWidth', 2); 
                     end
                     
                     if ~isempty(obj.true_point) && input.true_point
@@ -1350,6 +1351,11 @@ classdef MCMC < handle
                     end
                     
                     input.ax.XLim = obj.gen.([input.pars{1} '_range']); 
+                    
+                    input.ax.Children = circshift(input.ax.Children, 1); 
+                    
+                    h_bounds.HandleVisibility = 'off';
+                    h_middle.HandleVisibility = 'off';
                     
                 else % horizontal option
                     
@@ -1367,8 +1373,9 @@ classdef MCMC < handle
                     hold(input.ax, 'on'); 
 
                     if input.bounds
-                        h_low_bound = plot(input.ax, input.ax.XLim, lower.*[1 1], ':m', 'LineWidth', 2, 'HandleVisibility', 'off'); 
-                        h_high_bound = plot(input.ax, input.ax.XLim, upper.*[1 1], ':m', 'LineWidth', 2, 'HandleVisibility', 'off'); 
+                        h_bounds = area(input.ax, input.ax.XLim, upper.*[1 1], lower, ...
+                            'EdgeColor', 'None', 'FaceColor', 'm', 'FaceAlpha', 0.2); 
+                        h_middle = plot(input.ax, input.ax.XLim, med.*[1 1], ':m', 'LineWidth', 2); 
                     end
                     
                     if ~isempty(obj.true_point) && input.true_point
@@ -1385,9 +1392,15 @@ classdef MCMC < handle
 
                     input.ax.YLim = obj.gen.([input.pars{1} '_range']); 
                     
+                    input.ax.Children = circshift(input.ax.Children, 1); 
+                    
+                    h_bounds.HandleVisibility = 'off';
+                    h_middle.HandleVisibility = 'off';
+                    
                 end
                 
-                h.FaceColor = [0.3 0.3 0.3]; 
+                h.FaceAlpha = 1;
+                h.FaceColor = [1 1 1].*0.7; 
                 
                 if input.legend
                     
