@@ -280,7 +280,7 @@ classdef MCMC < handle
         
         function setupWideVelocityPrior(obj)
             
-            obj.gen.v_range = [1 30]; 
+            obj.gen.v_range = [1 40]; 
             obj.step_sizes(3) = 1;
             
         end
@@ -761,7 +761,7 @@ classdef MCMC < handle
                         
                         obj.points(jj,ii).counts = 1;
                         
-                        if obj.counter>obj.num_burned && obj.best_point.logl<obj.points(jj,ii).logl % keep track of the best fit point
+                        if obj.counter>obj.num_burned && ~(obj.best_point.logl>obj.points(jj,ii).logl) % keep track of the best fit point
                             obj.best_point.copy_from(obj.points(jj,ii)); 
                         end
 
@@ -893,7 +893,7 @@ classdef MCMC < handle
             
         end
         
-        function [med, lower, upper] = getMedianAndBounds(obj, par, percentile)
+        function [med, lower, upper] = getMedianAndBounds(obj, par, percentile, skip_burn)
             
             if nargin<3 || isempty(percentile)
                 percentile = 68; 
@@ -903,7 +903,16 @@ classdef MCMC < handle
                 percentile = percentile/100;
             end
             
-            values = [obj.points.(par)]; 
+            if nargin<4 || isempty(skip_burn)
+                skip_burn = 1;
+            end
+            
+            p = obj.points;
+            if skip_burn
+                p = p(1:obj.num_burned,:); 
+            end
+            
+            values = [p(:).(par)];
             N = length(values); 
             
             % for even N these will be the same
@@ -918,12 +927,61 @@ classdef MCMC < handle
             
             v_sort = sort(values); 
             
-            med = (v_sort(mid_idx1) + v_sort(mid_idx2))/2; % median value is the average of middle two elements, unless N is even, so they are the same element
+            med = (v_sort(mid_idx1) + v_sort(mid_idx2))/2; % median value is the average of middle two elements, unless N is odd, so they are the same element
             lower = v_sort(lower_idx); 
             upper = v_sort(upper_idx); 
             
         end
         
+        function [center, lower, upper] = getSmallestBounds(obj, par, percentile, skip_burn)
+            
+            if nargin<3 || isempty(percentile)
+                percentile = 68; 
+            end
+            
+            if percentile>1
+                percentile = percentile/100;
+            end
+            
+            if nargin<4 || isempty(skip_burn)
+                skip_burn = 1;
+            end
+            
+            p = obj.points;
+            if skip_burn
+                p = p(1:obj.num_burned,:); 
+            end
+            
+            values = [p(:).(par)];
+            N = length(values); 
+            
+            sorted_values = sort(values); 
+            
+            func = @(lb) obj.find_upper_bound(sorted_values, lb, percentile) - lb; % loss function: distance between lower and upper bounds
+            
+            lower_bound_guess = sorted_values(floor((1-percentile)/2.*N));
+            
+            lower = fminsearch(func, lower_bound_guess); 
+            upper = obj.find_upper_bound(sorted_values, lower, percentile); 
+            center = (upper+lower)/2; 
+                        
+        end
+        
+        function upper_bound = find_upper_bound(~, sorted_values, lower_bound, percentile)
+        
+            N = length(sorted_values);
+            idx_low = find(sorted_values>lower_bound, 1, 'first'); 
+            idx_high = ceil(idx_low+percentile*N); 
+            if idx_high<=N
+                upper_bound = sorted_values(idx_high); 
+            else
+                upper_bound = Inf;
+            end
+            
+%             fprintf('low: %4.2f | high: %4.2f\n', lower_bound, upper_bound); 
+            
+        end
+            
     end
     
     methods % plotting tools / GUI
@@ -1223,6 +1281,7 @@ classdef MCMC < handle
             input.input_var('contour', true); 
             input.input_var('inner_titles', true); 
             input.input_var('full_titles', false, 'titles'); 
+            input.input_var('bounds', true); 
             input.input_var('true_point', true); 
             input.input_var('best_point', true); 
             input.input_var('horizontal', false); 
@@ -1256,9 +1315,11 @@ classdef MCMC < handle
                 error('Must specify which parameters to show!'); 
             elseif isscalar(input.pars)
                 
-                if ~input.horizontal
+                [med, lower, upper] = obj.getSmallestBounds(input.pars{1}, 68, ~input.burn);
+            
+                if ~input.horizontal % vertical option
                     
-                    h = histogram(input.ax, [obj.points(1:obj.num_burned).(input.pars{1})]); 
+                    h = histogram(input.ax, [obj.points(1:obj.num_burned,:).(input.pars{1})]); 
 
                     x_title = input.pars{1};
                     if input.full_titles
@@ -1271,6 +1332,11 @@ classdef MCMC < handle
                     
                     hold(input.ax, 'on'); 
 
+                    if input.bounds
+                        h_low_bound = plot(input.ax, lower.*[1 1], input.ax.YLim, ':m', 'LineWidth', 2, 'HandleVisibility', 'off'); 
+                        h_high_bound = plot(input.ax, upper.*[1 1], input.ax.YLim, ':m', 'LineWidth', 2, 'HandleVisibility', 'off'); 
+                    end
+                    
                     if ~isempty(obj.true_point) && input.true_point
                         h_true = plot(input.ax, obj.true_point.(input.pars{1}).*[1 1], input.ax.YLim, '-g', 'LineWidth', 2); 
                         h_true.DisplayName = sprintf('True: %s= %4.1f', ...
@@ -1282,12 +1348,12 @@ classdef MCMC < handle
                         h_best.DisplayName = sprintf('Best: %s= %4.1f', ...
                             input.pars{1}, obj.best_point.(input.pars{1}));
                     end
-
+                    
                     input.ax.XLim = obj.gen.([input.pars{1} '_range']); 
                     
-                else
+                else % horizontal option
                     
-                    h = histogram(input.ax, [obj.points(1:obj.num_burned).(input.pars{1})], 'Orientation', 'Horizontal');
+                    h = histogram(input.ax, [obj.points(1:obj.num_burned,:).(input.pars{1})], 'Orientation', 'Horizontal');
                 
                     y_title = input.pars{1};
                     if input.full_titles
@@ -1300,6 +1366,11 @@ classdef MCMC < handle
                     
                     hold(input.ax, 'on'); 
 
+                    if input.bounds
+                        h_low_bound = plot(input.ax, input.ax.XLim, lower.*[1 1], ':m', 'LineWidth', 2, 'HandleVisibility', 'off'); 
+                        h_high_bound = plot(input.ax, input.ax.XLim, upper.*[1 1], ':m', 'LineWidth', 2, 'HandleVisibility', 'off'); 
+                    end
+                    
                     if ~isempty(obj.true_point) && input.true_point
                         h_true = plot(input.ax, input.ax.XLim, obj.true_point.(input.pars{1}).*[1 1], '-g', 'LineWidth', 2); 
                         h_true.DisplayName = sprintf('True: %s= %4.1f', ...
@@ -1319,7 +1390,7 @@ classdef MCMC < handle
                 h.FaceColor = [0.3 0.3 0.3]; 
                 
                 if input.legend
-                    [med, lower, upper] = obj.getMedianAndBounds(input.pars{1}); 
+                    
                     h.DisplayName = sprintf('%s= %4.2f_{-%4.1f}^{+%4.1f}', ...
                         input.pars{1}, med, med-lower, upper-med); 
                     if input.horizontal
