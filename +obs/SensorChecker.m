@@ -72,8 +72,8 @@ classdef SensorChecker < handle
         
         sun_max_alt = -5; 
         
-        use_wise_data = 1;
-        use_wise_safe_flag = 0;
+        use_wise_data = 1; % use other weather stations from around the Wise observatory
+        use_wise_safe_flag = 0; % use the Wise "safe flag" to shut down observatory (unreliable)
         
         show_day_frac = 0.2; % what fraction of a day to plot back on GUI
         

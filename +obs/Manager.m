@@ -125,6 +125,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
     
     properties(Hidden=true)
        
+        current_observer = ''; % updated at startup and at a call to t3
+        
         use_check_cam_connection = 1; % if true, will alert users if cam PC is offline more than 30 minutes
         
         latest_email_report_date = ''; % keep track of the last time we sent this, so we don't send multiple emails each day
@@ -204,6 +206,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             % add additional devices
             % ...
+            
+            obj.current_observer = obj.getObserverName;
             
             obj.connectSensorChecker; % create checker object that collects sensor data
             
@@ -974,6 +978,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 if isempty(obj.t2) || ~isvalid(obj.t2) || strcmp(obj.t2.Running, 'off')
                     obj.setup_t2;
                 end
+                
+                % update current observer
+                obj.current_observer = obj.getObserverName;
                 
                 % morning report! 
                 t = datetime('now', 'TimeZone', 'UTC');
