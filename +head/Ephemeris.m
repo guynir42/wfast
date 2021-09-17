@@ -945,8 +945,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 obj.galactic_longitude = out_coord(1);
                 obj.galactic_latitude = out_coord(2);
             else
-                obj.ecliptic_lambda = [];
-                obj.ecliptic_beta = [];
+                obj.galactic_longitude = [];
+                obj.galactic_latitude = [];
             end
             
         end
@@ -1037,10 +1037,20 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 % do nothing... 
             elseif cs(keyword, 'ecliptic', 'kbos')
                 obj.keyword = 'ecliptic'; % dynamically allocate this field after setting the time
-                obj.gotoDefaultField(obj.name, varargin{:}); % do we need the varargin here?
+                obj.gotoDefaultField(obj.keyword, varargin{:}); % do we need the varargin here?
+            elseif cs(keyword, 'off ecliptic')
+                obj.keyword = 'off ecliptic';
+                obj.gotoDefaultField('ecliptic', varargin{:}); 
+                if obj.Dec_deg<obj.latitude
+                    obj.Dec_deg = obj.Dec_deg + 10; % southern fields become more northern
+                else
+                    obj.Dec_deg = obj.Dec_deg - 10; % northern fields become more southern
+                end
+                obj.name = 'off ecliptic';
+                obj.updateSecondaryCoords; 
             elseif cs(keyword, 'galactic')
                 obj.keyword = 'galactic'; % dynamically allocate this field after setting the time
-                obj.gotoDefaultField(obj.name, varargin{:}); % do we need the varargin here?
+                obj.gotoDefaultField(obj.keyword, varargin{:}); % do we need the varargin here?
             elseif cs(keyword, 'moon')
                 obj.keyword = 'moon'; % dynamically allocate this field after setting the time
                 obj.updateMoon;
