@@ -569,7 +569,10 @@ classdef (CaseInsensitiveProperties) Target < handle
                     error('Could not find any files matching "%s". ', obj.list_filename); 
                 end
 
-                obj.list_table = readtable(files{end}); 
+                opts = detectImportOptions(files{end}); % automatically detect read options
+                opts = setvartype(opts, 'LastObserved', 'char'); % just read the dates as strings
+                obj.list_table = readtable(files{end}, opts); 
+                obj.list_table.LastObserved = datetime(obj.list_table.LastObserved, 'InputFormat', 'yyyy-MM-dd HH:mm:ss.SSS', 'TimeZone', 'UTC'); 
                 obj.list_filename_loaded = files{end}; % keep track of the full name of the file we just loaded
 
             end
