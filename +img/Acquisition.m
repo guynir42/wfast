@@ -451,7 +451,7 @@ classdef Acquisition < file.AstroData
             for ii = 1:length(list)
                 
                 if isobject(obj.(list{ii})) && ~isempty(obj.(list{ii})) && ismethod(obj.(list{ii}), 'reset') 
-                    if ~util.text.cs(list{ii}, 'sync', 'af')
+                    if ~util.text.cs(list{ii}, 'sync', 'af', 'head')
                         obj.(list{ii}).reset;
                     end
                 end
@@ -3168,7 +3168,7 @@ classdef Acquisition < file.AstroData
                     % flux column for the lower-flux row
                     for ii = 1:size(pos,1)
                         for jj = ii+1:size(pos,1)
-                            if pos(ii,2) - pos(jj,2) <= min_dist && pos(ii,3) - pos(jj,3) <= min_dist
+                            if abs(pos(ii,2) - pos(jj,2)) <= min_dist && abs(pos(ii,3) - pos(jj,3)) <= min_dist
                                 if pos(ii,1)>pos(jj,1) % the ii row is bigger, and neither is NaN
                                     pos(jj,1) = NaN;
                                 elseif pos(jj,1)>pos(ii,1) % the jj row is bigger, and neiher is NaN
