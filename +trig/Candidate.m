@@ -754,6 +754,11 @@ classdef Candidate < handle
             
             f = unique(obj.filenames); % get the unique set of filenames where the data is saved
             
+            for ii = 1:length(f)
+                f{ii} = strrep(f{ii}, '/', filesep); 
+                f{ii} = strrep(f{ii}, '\', filesep); 
+            end
+            
             if isempty(input.folder) 
                 
                 if ~exist(fileparts(f{1}), 'dir')
@@ -779,6 +784,7 @@ classdef Candidate < handle
             end
             
             if obj.version<1.02 % addresses bug where we saved the wrong filenames (for file numbers N-1 and N we saved numbers N and N+1)
+                
                 for ii = 1:length(f)-1
                     f{ii+1} = f{ii}; 
                 end
