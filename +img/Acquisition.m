@@ -76,7 +76,7 @@ classdef Acquisition < file.AstroData
         total_runtime; % how much run time we want for the next run 
         runtime_units = 'minutes';
         
-        use_focus_on_start = 1; % when true, will do a focus run every time the command to start a new run is given from PcSync
+        use_focus_on_start = []; % when true, will do a focus run every time the command to start a new run is given from PcSync. If false, will not focus. If empty, will decide based on checkIfNeedFocus()
         
         use_background = 0; % not sure if subtracting the background gives us anything?
         
@@ -244,6 +244,10 @@ classdef Acquisition < file.AstroData
         latest_command_pars = '';
         
         failed_batch_counter = 0;
+        
+        last_successful_focus_time = []; % datetime object from when the last time focus succeeded
+        last_successful_focus_RA = []; % telescope RA of last place where focus was successfull, in degrees
+        last_successful_focus_Dec = []; % telescope Dec of last place where focus was successfull, in degrees
         
         default_saturation_value;
         
@@ -2209,8 +2213,13 @@ classdef Acquisition < file.AstroData
                         
                         args = util.text.parse_inputs(obj.latest_command_pars);
                         
+                        need_focus = obj.use_focus_on_start;
+                        if isempty(need_focus)
+                            need_focus = obj.checkIfNeedFocus; 
+                        end
+                        
                         input = util.text.InputVars;
-                        input.input_var('focus', obj.use_focus_on_start, 'use_focus');
+                        input.input_var('focus', need_focus, 'use_focus');
                         input.input_var('mode', 'fast', 'cam_mode', 'camera_mode'); 
                         input.input_var('exp_time', [], 'exposure_time');
                         input.input_var('frame_rate', []); 
@@ -2237,7 +2246,11 @@ classdef Acquisition < file.AstroData
                             end
                             
                             success = obj.runFocus;
-                            if success==0
+                            if success
+                                obj.last_successful_focus_time = datetime('now', 'TimeZone', 'UTC'); 
+                                obj.last_successful_focus_RA = obj.dome_pc.incoming.TELRA_DEG;
+                                obj.last_successful_focus_Dec = obj.dome_pc.incoming.TELDEC_DEG;
+                            else
                                 error('cam_pc:acquisition:focus:no_good_point', 'Could not find a good focus point!'); 
                             end
                         end
@@ -2333,6 +2346,29 @@ classdef Acquisition < file.AstroData
                 obj.frame_rate = f;
             end
 
+        end
+        
+        function val = checkIfNeedFocus(obj)
+            
+            val = 1; 
+            
+            if isempty(obj.last_successful_focus_time) || ...
+                minutes(datetime('now', 'TimeZone', 'UTC') - obj.last_successful_focus_time) > 30
+                return;
+            end
+            
+            if isempty(obj.last_successful_focus_RA) || ...
+                    abs(obj.last_successful_focus_RA - obj.dome_pc.incoming.TELRA_DEG) > 10
+                return; 
+            end
+            
+            if isempty(obj.last_successful_focus_RA) || ...
+                    abs(obj.last_successful_focus_RA - obj.dome_pc.incoming.TELRA_DEG) > 10
+                return; 
+            end
+            
+            val = 0;
+            
         end
         
     end
