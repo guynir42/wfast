@@ -2199,7 +2199,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
         
         function checkNewTarget(obj, varargin) % this is called on t3
             
-            % maybe parse some varargin options?
+            input = util.text.InputVars;
+            input.input_var('dome_adjust', true); 
+            input.scan_vars(varargin{:}); 
             
             try 
 
@@ -2224,7 +2226,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 if obj.use_prompt_user
                     obj.makeUserPrompt; % ask the user for confirmation before continuing 
                 else
-                    obj.proceedToTarget; % just automatically move to next target
+                    obj.proceedToTarget(input.dome_adjust); % just automatically move to next target
                 end
         
             catch ME
@@ -2327,7 +2329,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
-        function proceedToTarget(obj, ~, ~)
+        function proceedToTarget(obj, need_dome_adjust, ~)
+            
+            if nargin<2 || isempty(need_dome_adjust) || ( ~isnumeric(need_dome_adjust) && ~islogical(need_dome_adjust) )
+                need_dome_adjust = 1; 
+            end
             
             if isempty(obj.sched.current)
 
@@ -2383,7 +2389,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
 %                adjust the dome position
                 obj.ephem.update;
                 if obj.use_adjust_dome && obj.ephem.sun.Alt<obj.checker.sun_max_alt && obj.checker.sensors_ok && obj.checker.light_ok ... 
-                        && obj.dome.is_closed==0 % only move dome when weather is good, sun is down, and dome is already open
+                        && need_dome_adjust && obj.dome.is_closed==0 % only move dome when weather is good, sun is down, and dome is already open
                     
                     obj.print_message(sprintf('Adjusting dome for viewing the %s side', obj.mount.objHemisphere)); 
                     

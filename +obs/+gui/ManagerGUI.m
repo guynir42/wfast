@@ -481,17 +481,25 @@ classdef ManagerGUI < handle
             obj.updateDomeStatusButtons;
             
             if obj.key_status_shift
+                
                 obj.panel_dome.button_close_west.String = 'Close West Full'; 
                 obj.panel_dome.button_open_west.String = 'Open West Full'; 
                 
                 obj.panel_dome.button_close_east.String = 'Close East Full';                 
                 obj.panel_dome.button_open_east.String = 'Open East Full'; 
+                
+                obj.panel_controls.button_proceed.String = 'Proceed without dome adjust';
+                
             else
+                
                 obj.panel_dome.button_close_west.String = 'Close West'; 
                 obj.panel_dome.button_open_west.String = 'Open West'; 
 
                 obj.panel_dome.button_close_east.String = 'Close East';                 
                 obj.panel_dome.button_open_east.String = 'Open East'; 
+                
+                obj.panel_controls.button_proceed.String = 'Proceed to target';
+                
             end
             
             if obj.owner.checker.use_twilight_mode
@@ -602,7 +610,7 @@ classdef ManagerGUI < handle
             if obj.debug_bit>1, disp('Callback: proceed to target'); end
             
             obj.owner.setup_t3; % setting up the timer means the next time it triggers is only X minutes after this call
-            obj.owner.checkNewTarget; 
+            obj.owner.checkNewTarget('dome_adjust', ~obj.key_status_shift); 
             
             obj.update;
             
@@ -619,7 +627,9 @@ classdef ManagerGUI < handle
                 
                 obj.panel_dome.button_close_east.String = 'Close East Full';                 
                 obj.panel_dome.button_open_east.String = 'Open East Full'; 
-                                
+                
+                obj.panel_controls.button_proceed.String = 'Proceed without dome adjust';
+                
             end
             
         end
@@ -632,7 +642,9 @@ classdef ManagerGUI < handle
 
             obj.panel_dome.button_close_east.String = 'Close East';                 
             obj.panel_dome.button_open_east.String = 'Open East'; 
-            
+
+            obj.panel_controls.button_proceed.String = 'Proceed to target';
+
         end
         
         function callback_prev_objects(obj, hndl, ~)
