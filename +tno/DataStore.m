@@ -283,6 +283,8 @@ classdef DataStore < handle
             obj.juldates_log = [];
             obj.fwhm_log = [];
             
+            obj.extra_fluxes_indices = []; 
+            
             obj.clear;
             
         end
@@ -487,15 +489,15 @@ classdef DataStore < handle
             
             obj.frame_counter = obj.frame_counter + size(obj.this_input.fluxes,1); % how many frames we processed
             
+            obj.storeExtraFluxes; % take the extra fluxes before we get rid of them
+                
             if obj.pars.use_threshold && obj.is_done_burn % we need to keep only good stars / aperture at the input level
                 
                 if isempty(obj.star_indices) % only do this once, at the first batch after the burn-in is done
                     obj.calcGoodStarsAndApertures; % this produces the star indices and finds the best aperture
-                    obj.dumpBadStarsAndAperturesFromBuffer; % this reduces the flux and aux buffers to only the good stars and the best aperture
                     obj.parseExtraFluxes; % find the indices for extra fluxes we want to save
+                    obj.dumpBadStarsAndAperturesFromBuffer; % this reduces the flux and aux buffers to only the good stars and the best aperture
                 end
-                
-                obj.storeExtraFluxes; % take the extra fluxes before we get rid of them
                 
                 obj.this_input.fluxes = obj.this_input.fluxes(:,obj.star_indices,obj.aperture_index); % get rid of unwanted stars and apertures
                 
@@ -652,6 +654,8 @@ classdef DataStore < handle
             obj.detrend_buffer = obj.detrend_buffer(:,obj.star_indices,obj.aperture_index); 
             obj.aux_buffer = obj.aux_buffer(:,obj.star_indices,:,obj.aperture_index); 
             obj.cutouts = obj.cutouts(:,:,:,obj.star_indices); 
+            
+            obj.extended_fluxes_extra = obj.extended_fluxes_extra(:,obj.star_indices,obj.extra_fluxes_indices); 
             
         end
         
@@ -872,10 +876,20 @@ classdef DataStore < handle
         
         function storeExtraFluxes(obj)
             
+            star_idx = obj.star_indices;
+            if isempty(star_idx)
+                star_idx = 1:size(obj.flux_buffer,2); 
+            end
+            
+            ap_idx = obj.extra_fluxes_indices;
+            if isempty(ap_idx)
+                ap_idx = 1:size(obj.flux_buffer,3);
+            end
+            
             if isempty(obj.extended_fluxes_extra)
-                obj.extended_fluxes_extra = obj.this_input.fluxes(:, obj.star_indices, obj.extra_fluxes_indices); 
+                obj.extended_fluxes_extra = obj.this_input.fluxes(:, star_idx, ap_idx); 
             else
-                obj.extended_fluxes_extra = vertcat(obj.extended_fluxes_extra, obj.this_input.fluxes(:, obj.star_indices, obj.extra_fluxes_indices)); 
+                obj.extended_fluxes_extra = vertcat(obj.extended_fluxes_extra, obj.this_input.fluxes(:, star_idx, ap_idx)); 
             end
             
             if size(obj.extended_fluxes_extra,1)>obj.pars.length_extended

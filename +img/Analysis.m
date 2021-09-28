@@ -1000,6 +1000,10 @@ classdef Analysis < file.AstroData
                 delete(obj.futures{input.worker}); % deleting the future may release some memory (I hope?)
             end
             
+            if isempty(obj.pool)
+                obj.pool = gcp;     
+            end
+            
             obj.futures{input.worker} = parfeval(obj.pool, @obj.run, double(input.output), 'reset', input.reset, 'logging', input.logging, 'save', input.save, 'overwrite', input.overwrite); 
             obj.futures_dir{input.worker} = obj.reader.dir.two_tail;
             obj.futures_analysis_folder{input.worker} = fullfile(obj.reader.dir.pwd, ['analysis_' char(datetime('now', 'TimeZone', 'UTC'), 'yyyy-MM-dd')]);
@@ -1046,7 +1050,11 @@ classdef Analysis < file.AstroData
                 obj.pool.IdleTimeout = 360;
             end
             
-            N = obj.pool.NumWorkers; 
+            if isempty(obj.pool)
+                N = 10;
+            else
+                N = obj.pool.NumWorkers; 
+            end
             
             if ~isempty(obj.max_num_workers) && obj.max_num_workers<N
                 N = obj.max_num_workers; 

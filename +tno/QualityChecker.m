@@ -231,27 +231,27 @@ classdef QualityChecker < handle
             obj.pars.use_repeating_columns = true; 
             obj.pars.use_flux_corr = true;
             obj.pars.use_correlations = true;
-
+            
             obj.pars.corr_types = {'b', 'x', 'y', 'r', 'w'}; % types of auxiliary we will use for correlations (r is derived from x and y)
-            obj.pars.corr_timescales = [10, 25, 50]; % number of frames to run each correlation sum
+            obj.pars.corr_timescales = [25, 50]; % number of frames to run each correlation sum
 
             obj.pars.thresh_delta_t = 0.3; % events where the difference in timestamps, relative to the mean time-step are disqualified
-            obj.pars.thresh_shakes = 5; % events where the mean offset r is larger than this are disqualified
-            obj.pars.thresh_defocus = 3; % events with PSF width above this value are disqualified
-            obj.pars.thresh_fwhm = 10; % batches with too big FWHM (from ModelPSF, in arcsec) are disqualified
-            obj.pars.thresh_slope = 5; % events where the slope is larger than this value (in abs. value) are disqualified
-            obj.pars.thresh_offset_size = 4; % events with offsets above this number are disqualified (after subtracting mean offsets)
-            obj.pars.thresh_linear_motion = 2; % events showing linear motion of the centroids are disqualified
+            obj.pars.thresh_shakes = 5.0; % events where the mean offset r is larger than this are disqualified
+            obj.pars.thresh_defocus = 3.0; % events with PSF width above this value are disqualified
+            obj.pars.thresh_fwhm = 10.0; % batches with too big FWHM (from ModelPSF, in arcsec) are disqualified
+            obj.pars.thresh_slope = 5.0; % events where the slope is larger than this value (in abs. value) are disqualified
+            obj.pars.thresh_offset_size = 4.0; % events with offsets above this number are disqualified (after subtracting mean offsets)
+            obj.pars.thresh_linear_motion = 2.0; % events showing linear motion of the centroids are disqualified
             obj.pars.thresh_background_intensity = 10; % events where the background per pixel is above this threshold are disqualified
-            obj.pars.thresh_flux_corr = 3.0; % events where the flux of one star has 95% percentile higher than this are disqualified
-            obj.pars.thresh_correlation = 4; % correlation max/min of flux (with e.g., background) with value above this disqualifies the region
+            obj.pars.thresh_flux_corr = 4.0; % events where the flux of one star has 95% percentile higher than this are disqualified
+            obj.pars.thresh_correlation = 4.0; % correlation max/min of flux (with e.g., background) with value above this disqualifies the region
 
-            obj.pars.thresh_tracking_error = 4; % for each event, post-detection, check correlation with other stars
+            obj.pars.thresh_tracking_error = 4.0; % for each event, post-detection, check correlation with other stars
             
             obj.pars.smoothing_slope = 50; % number of frames to average over when calculating slope
             obj.pars.distance_bad_rows_cols = 5; % how many pixels away from a bad row/column would we still disqualify a star? (on either side, inclusive)
             obj.pars.linear_timescale = 25; % timescale for linear_motion cut
-
+            obj.pars.use_linear_expand = true; % expand the linear motion filter using movmax after multiplying by the flux
             obj.pars.num_hist_edges = 200; % including 100 negative and 100 positive values
 
             obj.pars.bad_columns = []; % which columns are considered bad
@@ -635,15 +635,7 @@ classdef QualityChecker < handle
                 obj.near_bad_rows_cols = obj.near_bad_rows_cols | (abs(X-obj.pars.bad_columns(ii))<obj.pars.distance_bad_rows_cols);
             end
             
-            k = (-obj.pars.linear_timescale/2:obj.pars.linear_timescale/2)'; 
-            k = k./sqrt(sum(k.^2)); 
-            
-            LX = filter2(k, x - nanmean(x)); 
-            LY = filter2(k, y - nanmean(y)); 
-            
-            ff = filter2(ones(obj.pars.linear_timescale,1)./obj.pars.linear_timescale, (f-nanmean(f))./std(f)); % filter the normalized flux with a smoothing window
-            
-            obj.linear_motion = sqrt(LX.^2 + LY.^2).*ff; % linear motion is set to be proportional to the filtered flux
+            obj.linear_motion = obj.calculateLinearMotion(x,y,f); 
             
             obj.background_intensity = b; % just the background level
            
@@ -656,7 +648,8 @@ classdef QualityChecker < handle
             end
             
             try 
-                obj.flux_corr = obj.calculateFluxCorrSampling(obj.extended_detrend, [25 50], 1000); 
+                N_stars_max = 1000; 
+                obj.flux_corr = obj.calculateFluxCorrSampling(obj.extended_detrend, obj.pars.corr_timescales, N_stars_max); 
             catch ME
                  if strcmp(ME.identifier, 'MATLAB:nomem')
 
@@ -664,7 +657,7 @@ classdef QualityChecker < handle
                     
                     pause(10); 
                     
-                    obj.flux_corr = obj.calculateFluxCorrSampling(obj.extended_detrend, [25 50], 1000);
+                    obj.flux_corr = obj.calculateFluxCorrSampling(obj.extended_detrend, obj.pars.corr_timescales, N_stars_max);
                     
                 else
                     rethrow(ME);
@@ -863,6 +856,26 @@ classdef QualityChecker < handle
             
         end
         
+        function val = calculateLinearMotion(obj, x, y, f)
+           
+            k = (-obj.pars.linear_timescale/2:obj.pars.linear_timescale/2)'; 
+            k = k./sqrt(sum(k.^2)); 
+            
+            LX = filter2(k, x - nanmean(x)); 
+            LY = filter2(k, y - nanmean(y)); 
+            
+            ff = filter2(ones(obj.pars.linear_timescale,1)./obj.pars.linear_timescale, (f-nanmean(f))./std(f)); % filter the normalized flux with a smoothing window
+            
+            R = sqrt(LX.^2 + LY.^2);
+            
+            val = R.*ff; % linear motion is set to be proportional to the filtered flux
+
+             if obj.pars.use_linear_expand
+                val = movmax(val, obj.pars.linear_timescale, 1); 
+            end
+            
+        end
+        
         function val = calculateFluxCorrFastMoreMemory(obj, flux, widths) 
             
             if nargin<3 || isempty(widths)
@@ -1016,14 +1029,17 @@ classdef QualityChecker < handle
             for ii = 1:length(widths)
 
                 w = widths(ii); 
-                midpoints = floor(w/2):w:size(flux,1); % indices of mid points of intervals for xcorr calculation
+                step = floor(w/2);
+                midpoints = floor(step/2):step:size(flux,1)-floor(step/2)+1; % indices of mid points of intervals for xcorr calculation
                 best_corr = zeros(length(midpoints), size(flux,2)); 
                 
                 for jj = 1:length(midpoints)
                     
                     idx = midpoints(jj)-floor(w/2)+1:midpoints(jj)+ceil(w/2); % which indices to pull out from the flux matrix
                     
-                    f = flux(idx, :); 
+                    idx(idx<1 | idx>size(flux,1)) = []; % remove points outside the range
+                    
+                    f = flux(idx, :); % all flux points around midpoint number jj
                     
                     f = f - nanmean(f,1); 
                     fp = permute(f(:,1:num_stars), [1,3,2]); % turn 2nd dim into 3rd, and truncate the number of fluxes
@@ -1031,14 +1047,21 @@ classdef QualityChecker < handle
                     f2 = f.^2; 
                     f2p = permute(f2(:,1:num_stars), [1,3,2]); % turn 2nd dim into 3rd, and truncate the number of fluxes
                     
-                    FC = nansum(f.*fp, 1)./sqrt(nansum(f2,1).*nansum(f2p,1)).*sqrt(w); % full 3D matrix (3rd dim is shorter than 2nd if using num_stars)
+                    FC = nansum(f.*fp, 1)./sqrt(nansum(f2,1).*nansum(f2p,1)); % full 3D matrix (1st dim is scalar, 3rd dim is shorter than 2nd if using num_stars)
                                        
-                    for kk = 1:size(flux,2)
-                        FC(1,kk,kk) = 0; % remove auto-correlations (should be all equal to 1 anyway)
-                    end
+%                     for kk = 1:size(flux,2)
+%                         FC(1,kk,kk) = 0; % remove auto-correlations (should be all equal to 1 anyway)
+%                     end
                     
-                    % should we include anti-correlations (by setting abs() first)?
-                    best_corr(jj,:) = prctile(FC, 95, 3); % get the points with the 95th percentile correlation from all stars in the 3rd dim, for each sampling point
+                    FC_noise = mad(FC, [], 3); % a robust estimate of the noise
+
+                    FC_sort = sort(abs(FC./FC_noise),3, 'descend'); 
+                    num_highest_stars = 5; 
+                    if num_highest_stars+1 > size(FC_sort,3)
+                        num_highest_stars = size(FC_sort,3) - 1;
+                    end
+                    best_corr(jj,:) = FC_sort(1,:,num_highest_stars+1); % take Nth highest correlation (not including self correlations)
+%                     best_corr(jj,:) = prctile(FC, 95, 3); % get the points with the 95th percentile correlation from all stars in the 3rd dim, for each sampling point
                                         
                 end % for jj (time jumps)
                 

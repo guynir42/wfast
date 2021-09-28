@@ -105,7 +105,7 @@ classdef Folder < dynamicprops
     
     properties % objects
         
-        summary@run.Summary; 
+        summary@tno.Summary; 
         cat@head.Catalog; 
         
     end
@@ -188,7 +188,7 @@ classdef Folder < dynamicprops
             
             for ii = 1:numel(obj_vec)
                 
-                val(ii) = ~isempty(obj_vec(ii).expT) && obj_vec(ii).expT<=0.05; 
+                val(ii) = ~isempty(obj_vec(ii).expT) && obj_vec(ii).expT<=0.15; 
                 
             end
             
@@ -210,7 +210,7 @@ classdef Folder < dynamicprops
                 
                     file_details = dir(files{1}); 
                     
-                    val(ii) = file_details.bytes > 1e8; % files with more than 0.1 GB are probably full-frame! 
+                    val(ii) = file_details.bytes > 5e8; % files with more than 0.5 GB are probably full-frame! 
                 
                 end
                 
@@ -466,7 +466,7 @@ classdef Folder < dynamicprops
                     
                     new_obj.num_files = length(files); 
                     
-                    if isempty(files) % check if it an empty folder
+                    if isempty(files) % check if it is an empty folder
                         % do nothing? 
                     elseif regexp(run_folders{jj}, '^(dark|flat).*') % check if it is calibration
                         new_obj.is_calibration = 1; 
@@ -489,6 +489,7 @@ classdef Folder < dynamicprops
                                 for kk = 1:length(locations)
                                     try 
                                         h = util.oop.load(fullfile(d.pwd, 'A_README.txt'), 'location', locations{kk}); 
+                                        break;
                                     end
                                 end
 
@@ -645,7 +646,7 @@ classdef Folder < dynamicprops
                 fid = fopen(filename); 
                 on_cleanup = onCleanup(@() fclose(fid)); 
 
-                for ii = 1:1000
+                for ii = 1:10000
 
                     line = fgetl(fid); 
 
@@ -653,27 +654,33 @@ classdef Folder < dynamicprops
                         break;
                     end
 
-                    idx = regexp(line, '(expT|EXPTIME)', 'end');
+                    if isempty(expT) 
+                        idx = regexp(line, '(expT|EXPTIME)', 'end');
 
-                    if ~isempty(idx)
-                        expT = util.text.parse_value(line(idx+2:end));       
-                        continue;
+                        if ~isempty(idx)
+                            expT = util.text.parse_value(line(idx+2:end));       
+                            continue;
+                        end
                     end
                     
-                    idx = regexp(line, 'NAXIS3', 'end');
+                    if isempty(batch_size)
+                        idx = regexp(line, 'NAXIS3', 'end');
 
-                    if ~isempty(idx)
-                        batch_size = util.text.parse_value(line(idx+2:end));  
-                        continue;
+                        if ~isempty(idx)
+                            batch_size = util.text.parse_value(line(idx+2:end));  
+                            continue;
+                        end
                     end
                     
-                    idx = regexp(line, 'FRAMERATE', 'end');
+                    if isempty(frame_rate)
+                        idx = regexp(line, 'FRAMERATE', 'end');
 
-                    if ~isempty(idx)
-                        frame_rate = util.text.parse_value(line(idx+2:end));   
-                        continue;
+                        if ~isempty(idx)
+                            frame_rate = util.text.parse_value(line(idx+2:end));   
+                            continue;
+                        end
                     end
-
+                    
                     if ~isempty(expT) && ~isempty(frame_rate) && ~isempty(batch_size) 
                         break;
                     end
@@ -683,6 +690,7 @@ classdef Folder < dynamicprops
             catch ME
                 warning(ME.getReport); 
             end
+            
         end
         
         function val = default_process_date % the default minimal processing date for the new pipeline

@@ -251,9 +251,10 @@ classdef Scanner < handle
                 if obj.debug_bit, fprintf('ii= %d / %d. Loading summary from folder: %s\n', ii, length(all_runs), all_runs(ii).folder); end
                 
                 try
-                    all_runs(ii).loadSummary;
-%                     L = load(fullfile(all_runs(ii).folder, all_runs(ii).analysis_folder, 'summary.mat'));
-                    obj.overview.input(all_runs(ii).summary); 
+%                     all_runs(ii).loadSummary;
+%                     obj.overview.input(all_runs(ii).summary); 
+                    L = load(fullfile(all_runs(ii).folder, all_runs(ii).analysis_folder, 'summary.mat'));
+                    obj.overview.input(L.summary); 
                 catch ME
                     warning(ME.getReport); 
                 end
@@ -437,11 +438,12 @@ classdef Scanner < handle
                 
                 obj.a.reader.dir.cd(r.folder); 
                 obj.a.reader.loadFiles; 
-                obj.a.async_run('worker', worker_idx, 'reset', 1, 'logging', 1, 'save', 1, 'output', 0); 
+                obj.a.async_run('worker', worker_idx, 'reset', 1, 'logging', 1, 'save', 1, 'output', 1); 
                 run_id = util.text.run_id(obj.a.reader.current_dir); 
                 report = sprintf('Started new run on worker %d for folder %s', worker_idx, run_id);
                 if obj.debug_bit, fprintf('%s: %s\n', datetime('now', 'TimeZone', 'UTC'), report); end
                 success = 1; 
+                
             end
             
         end

@@ -1257,11 +1257,11 @@ classdef Candidate < handle
             
             if ~isempty(f3)
                 h2 = plot(input.ax, x, f3, '-', 'LineWidth', 1.5, 'Color', [0.9290 0.694 0.1250]);
-                h2.DisplayName = 'unforced counts';                
+                h2.DisplayName = 'unforced flux';                
             end
             
-            h1 = plot(input.ax, x, f2, '-', 'LineWidth', 3, 'Color', [0 0.4470 0.7410]);
-            h1.DisplayName = 'forced counts';
+            h1 = plot(input.ax, x, f2, '-', 'LineWidth', 2, 'Color', [0 0.4470 0.7410]);
+            h1.DisplayName = 'forced flux';
             
             
 %             h3 = plot(input.ax, xk, obj.flux_mean*obj.kernel_lightcurve(~obj.is_positive), ':', 'LineWidth', 2, 'Color', 'k');
@@ -1287,7 +1287,7 @@ classdef Candidate < handle
             input.ax.NextPlot = 'replace';
             input.ax.ColorOrderIndex = 5;
             
-            h4 = plot(input.ax, x, obj.auxiliary(:,obj.aux_indices.backgrounds), ':', 'Color', [ 0.8500 0.3250 0.0980], 'LineWidth', 1.5); 
+            h4 = plot(input.ax, x, obj.auxiliary(:,obj.aux_indices.backgrounds), ':', 'Color', [0.3250 0.8500 0.0980], 'LineWidth', 1.5); 
             h4.DisplayName = 'background';
             
             aux = obj.auxiliary(:,obj.aux_indices.backgrounds);
@@ -1389,14 +1389,18 @@ classdef Candidate < handle
             input.input_var('legend_pos', ''); 
             input.scan_vars(varargin{:}); 
             
-            [idx, corr, flux] = obj.findHighestCorrelations; % indices of stars that have highest correlations to this star
+            flux1 = obj.flux_raw;
+            flux1(flux1<=1) = NaN;
             
-            h1 = plot(input.ax, obj.flux_raw, 'LineWidth', 3);
+            [idx, corr, flux2] = obj.findHighestCorrelations; % indices of stars that have highest correlations to this star
+            flux2(flux2<=1) = NaN;
+            
+            h1 = plot(input.ax, flux1, 'LineWidth', 3);
             h1.DisplayName = sprintf('Candidate star, idx= %d', obj.star_index); 
             
             hold(input.ax, 'on'); 
             
-            h2 = plot(input.ax, flux, 'LineWidth', 1.5); 
+            h2 = plot(input.ax, flux2, 'LineWidth', 1.5); 
             
             for ii = 1:length(h2)
                 h2(ii).DisplayName = sprintf('idx= %d | corr= %4.2f | trig= %d', idx(ii), corr(ii), ismember(idx(ii), obj.star_extra)); 
@@ -1458,7 +1462,7 @@ classdef Candidate < handle
             end
             
             input.ax.NextPlot = 'replace';
-            h1 = plot(input.ax, x, obj.flux_filtered, 'LineWidth', 3, 'Color', [0.8500 0.3250 0.0980]);
+            h1 = plot(input.ax, x, obj.flux_filtered, 'LineWidth', 2, 'Color', [0.8500 0.3250 0.0980]);
             h1.DisplayName = 'filtered flux';
             
             input.ax.NextPlot = 'add';
@@ -1471,7 +1475,7 @@ classdef Candidate < handle
             f = obj.flux_corrected;
             s = nanstd(obj.flux_corrected); 
             
-            h3 = plot(input.ax, x, f./s, '-', 'LineWidth', 3, 'Color', [0 0.4470 0.7410]);
+            h3 = plot(input.ax, x, f./s, '-', 'LineWidth', 2, 'Color', [0 0.4470 0.7410]);
             h3.DisplayName = 'corrected flux';
             
             sign = 1;
@@ -1479,7 +1483,7 @@ classdef Candidate < handle
                 sign = -1;
             end
 
-            h4 = plot(input.ax, xk, obj.kernel*5*sign, '--m', 'LineWidth', 2);
+            h4 = plot(input.ax, xk, obj.kernel*5*sign, '--m', 'LineWidth', 1);
             h4.DisplayName = 'best kernel';
             
             if obj.is_positive
@@ -1885,17 +1889,19 @@ classdef Candidate < handle
             x = nanmean(obj.auxiliary_all(:,:,obj.aux_indices.centroids_x)); 
             y = nanmean(obj.auxiliary_all(:,:,obj.aux_indices.centroids_y)); 
             
-            plot(ax2, x(obj.star_index), y(obj.star_index), 'x', 'Color', h(1).Color, 'MarkerSize', 15); 
-            
             hold(ax2, 'on'); 
             
             for ii = 1:length(idx)
                 
-                plot(ax2, x(idx(ii)), y(idx(ii)), 'o', 'Color', h(ii+1).Color, 'MarkerSize', 10); 
+                plot(ax2, x(idx(ii)), y(idx(ii)), 'o', 'Color', h(length(idx)+1-ii).Color, 'MarkerSize', 10); 
                 
             end
             
+            plot(ax2, x(obj.star_index), y(obj.star_index), 'x', 'Color', h(length(idx)+1).Color, 'MarkerSize', 15); 
+            
             hold(ax2, 'off'); 
+            
+            box(ax2, 'on'); 
             
             ax2.XLim = [1 obj.head.NAXIS1]; 
             ax2.YLim = [1 obj.head.NAXIS2]; 

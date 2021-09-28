@@ -207,7 +207,7 @@ classdef EventFinder < handle
             obj.pars.num_sim_events_per_batch = 0.25; % fractional probability to add a simulated event into each new batch. 
             obj.pars.use_keep_simulated = true; % if false, the simulated events would not be kept with the list of detected candidates (for running massive amount of simualtions)
             obj.pars.sim_max_R = 10; % maximum value of stellar size for simulated events
-            
+            obj.pars.sim_power_law = 3.5; % KBO radius power law (use positive values but produce negative slope)
             obj.pars.sim_rescale_noise = true;
             
             obj.reset;
@@ -438,23 +438,46 @@ classdef EventFinder < handle
                 obj.head.run_identifier = fullfile(run_date, run_name); 
             end
             
+            if obj.pars.use_psd_correction
+                    
+                flux = obj.store.extended_detrend; 
+
+                if size(flux,1)>=obj.store.pars.length_extended % only start adding data to the PSD after 2 batches are loaded
+
+                    flux = flux(1:obj.store.pars.length_search,:); % grab the first frames from the 2-batch extended region
+
+                    obj.psd.frame_rate = 1./nanmedian(diff(obj.store.extended_timestamps)); 
+                    obj.psd.window_size = obj.store.pars.length_extended; 
+                    obj.psd.num_points = obj.store.pars.length_background*2;
+
+                    if size(flux,2) < size(obj.psd.flux_buffer,2)
+                        obj.psd.flux_buffer = obj.psd.flux_buffer(:,obj.store.star_indices); 
+                    end
+
+                    obj.psd.addToBuffer(flux, obj.store.pars.length_psd); 
+
+                end
+                
+            end
+            
             if obj.store.is_done_burn % do not do any more calculations until done with "burn-in" period
                 
                 %%%%%%%%%%%%%% PSD CORRECTION %%%%%%%%%%%%%%%
                 
                 if obj.pars.use_psd_correction
+                    
                     try
-                        obj.psd.calcPSD(obj.store.detrend_buffer, obj.store.timestamps_buffer, obj.store.pars.length_extended, obj.store.pars.length_background*2); % first off, make the PSD correction for the current batch
+                        obj.psd.calcPSD; % first off, make the PSD correction for the current batch
                     catch ME
                         if strcmp(ME.identifier, 'MATLAB:nomem')
                             util.text.date_printf('Out of memory while caclulating PSD! Trying again...');
                             pause(30);
-                            obj.psd.calcPSD(obj.store.detrend_buffer, obj.store.timestamps_buffer, obj.store.pars.length_extended, obj.store.pars.length_background*2); % first off, make the PSD correction for the current batch
+                            obj.psd.calcPSD; % try again to make the PSD correction for the current batch
                         else
                             rethrow(ME);
                         end
-                        
                     end
+
                 end
                 
                 [obj.corrected_fluxes, obj.corrected_stds] = obj.correctFluxes(obj.store.extended_detrend); % runs either PSD correction or simple removal of linear fit to each lightcurve
@@ -550,7 +573,7 @@ classdef EventFinder < handle
                 
                 real_events = ~[obj.cand.is_simulated] & ~[obj.cand.oort_template]; % don't include simulated events or Oort cloud triggers in the black list! 
 
-                N = histcounts([obj.cand(real_events).star_index], 'BinEdges', 1:size(obj.store.extended_flux,2)+1);
+                N = histcounts([obj.cand(real_events).star_index], 'BinEdges', 1:size(obj.store.flux_buffer,2)+1); % star index among the subset of stars in the analysis
 
                 idx = N>=obj.pars.limit_events_per_star;
 
@@ -1388,7 +1411,7 @@ classdef EventFinder < handle
 
             R_star = R_star*sqrt(bank.D_au./40); % adjust the stellar size in case the bank is for Hills/Oort cloud
 
-            r_occulter = util.stat.power_law_dist(3.0, 'min', bank.r_range(1), 'max', bank.r_range(2)); % occulter radius drawn from power law distribution
+            r_occulter = util.stat.power_law_dist(obj.pars.sim_power_law, 'min', bank.r_range(1), 'max', bank.r_range(2)); % occulter radius drawn from power law distribution
             
             b_par = bank.b_range(1) + rand*(diff(bank.b_range)); % impact parameter drawn from uniform distribution
             vel = bank.v_range(1) + rand*(diff(bank.v_range)); % velocity drawn from uniform distribution
