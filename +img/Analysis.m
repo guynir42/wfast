@@ -669,6 +669,7 @@ classdef Analysis < file.AstroData
                 end
 
                 cand = obj.finder.cand; 
+                cand.clearExtraData; % remove large arrays like auxiliary, flux and cutouts for all stars
                 
                 save(fullfile(obj.log_dir, 'candidates.mat'), 'cand', '-v7.3'); 
                 

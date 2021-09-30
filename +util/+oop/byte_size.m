@@ -12,7 +12,7 @@ function st = byte_size(obj, varargin)
     
     import util.text.cs;
 
-    if nargin==0, help('util.oop.bytes_summary'); return; end
+    if nargin==0, help('util.oop.byte_size'); return; end
     
     input = util.text.InputVars;
     input.input_var('recursion', 0, 'recursion_depth'); 

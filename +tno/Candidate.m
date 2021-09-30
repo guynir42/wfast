@@ -100,6 +100,7 @@ classdef Candidate < handle
         
         notes = {}; % anything added to the event, like failed cuts
         
+        positions; % 2-column matrix of positions of each star (from the chosen sub-set), x then y
         cutouts; % cutouts of the selected star, for the duration of the extended region
         kernel; % the lightcurve of the matched-filter kernel used 
         
@@ -687,7 +688,7 @@ classdef Candidate < handle
             
             for ii = 1:length(obj_vec)
 
-                obj_vec(ii).flux_raw_all = [];
+%                 obj_vec(ii).flux_raw_all = [];
                 obj_vec(ii).flux_detrended_all = []; 
                 obj_vec(ii).flux_corrected_all = [];
                 obj_vec(ii).auxiliary_all = [];
@@ -1891,9 +1892,12 @@ classdef Candidate < handle
             
             ax2 = axes('Parent', f.fig, 'Position', [0.73 0.1 0.25 0.5]); 
             
-            x = nanmean(obj.auxiliary_all(:,:,obj.aux_indices.centroids_x)); 
-            y = nanmean(obj.auxiliary_all(:,:,obj.aux_indices.centroids_y)); 
+%             x = nanmean(obj.auxiliary_all(:,:,obj.aux_indices.centroids_x)); 
+%             y = nanmean(obj.auxiliary_all(:,:,obj.aux_indices.centroids_y)); 
             
+            x = obj.positions(:,1); 
+            y = obj.positions(:,2); 
+
             hold(ax2, 'on'); 
             
             for ii = 1:length(idx)

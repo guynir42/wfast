@@ -1042,6 +1042,12 @@ classdef EventFinder < handle
             c.flux_corrected_all = fluxes_corrected; 
             c.auxiliary_all = obj.store.extended_aux; 
             
+            % keep track of each star's average position
+            x = nanmean(obj.store.extended_aux(:,:,obj.store.aux_indices.centroids_x),1)'; 
+            y = nanmean(obj.store.extended_aux(:,:,obj.store.aux_indices.centroids_y),1)'; 
+            
+            c.positions = [x,y];
+            
             idx = find(star_indices==c.star_index); % the index of the star inside the list of stars that passed the pre-filter
 %             c.filtered_flux_past_values = obj.background_ff(:,idx); % because we only have this background_ff for the subset of stars
             c.flux_buffer = obj.store.flux_buffer(:,c.star_index); % flux history for this star

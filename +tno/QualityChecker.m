@@ -108,7 +108,7 @@ classdef QualityChecker < handle
         background_intensity; % the background per pixel value (remove frames with star in annulus or when the sky is too bright)
         bad_pixels; % how many bad pixels are in the aperture
         repeating_columns; % how many columns are repeated for each frame/star
-        
+        aperture_difference; % the rms difference btw forced and unforced photometry, over the forced flux MAD error estimate
         flux_corr; % correlations of flux between stars
         
         mean_x; % the weighted average offset for all stars
@@ -132,6 +132,7 @@ classdef QualityChecker < handle
         background_timestamps; % timestamps for the background region
         
         extended_flux; % cutout of the flux from the flux_buffer extended around the search region
+        extended_fluxes_extra; % the same as "extended_flux" only for the extra photometry aperture (e.g., the unforced)
         extended_aux; % cutout of the aux from the aux_buffer extended around the search region 
         extended_detrend; % same flux, with a linear fit subtracted from each batch individually
         extended_timestamps; % timestamps for the extended batch region
@@ -229,6 +230,7 @@ classdef QualityChecker < handle
             obj.pars.use_photo_flag = false; 
             obj.pars.use_bad_pixels = true; 
             obj.pars.use_repeating_columns = true; 
+            obj.pars.use_aperture_difference = true;
             obj.pars.use_flux_corr = true;
             obj.pars.use_correlations = true;
             
@@ -243,6 +245,7 @@ classdef QualityChecker < handle
             obj.pars.thresh_offset_size = 4.0; % events with offsets above this number are disqualified (after subtracting mean offsets)
             obj.pars.thresh_linear_motion = 2.0; % events showing linear motion of the centroids are disqualified
             obj.pars.thresh_background_intensity = 10; % events where the background per pixel is above this threshold are disqualified
+            obj.pars.thresh_aperture_difference = 4.0; % regions where the forced/unforced photometry give different results are excluded
             obj.pars.thresh_flux_corr = 4.0; % events where the flux of one star has 95% percentile higher than this are disqualified
             obj.pars.thresh_correlation = 4.0; % correlation max/min of flux (with e.g., background) with value above this disqualifies the region
 
@@ -344,6 +347,12 @@ classdef QualityChecker < handle
             if obj.pars.use_background_intensity
                 obj.cut_names{end+1} = 'background_intensity'; 
                 obj.cut_thresholds(end+1) = obj.pars.thresh_background_intensity;
+                obj.cut_two_sided(end+1) = false;
+            end
+            
+            if obj.pars.use_aperture_difference
+                obj.cut_names{end+1} = 'aperture_difference'; 
+                obj.cut_thresholds(end+1) = obj.pars.thresh_aperture_difference;
                 obj.cut_two_sided(end+1) = false;
             end
             
@@ -641,6 +650,8 @@ classdef QualityChecker < handle
            
             obj.bad_pixels = p;
             
+            obj.aperture_difference = obj.calculateApertureDifference; 
+            
             if obj.pars.use_repeating_columns % we only trigger this if we have to, it takes a while to calculate
                 margins = floor((size(obj.extended_flux,1) - size(obj.search_flux,1))/2); % the margins on either edge of the search region
                 margins = margins- obj.pars.dilate_region; % make the margins smaller to allow dilation from outside the search region
@@ -759,6 +770,10 @@ classdef QualityChecker < handle
             
             if obj.pars.use_background_intensity
                 obj.cut_values_matrix(:,:,obj.cut_indices.background_intensity) = obj.background_intensity; 
+            end
+            
+            if obj.pars.use_aperture_difference
+                obj.cut_values_matrix(:,:,obj.cut_indices.aperture_difference) = obj.aperture_difference; 
             end
             
             if obj.pars.use_nan_flux
@@ -1141,6 +1156,12 @@ classdef QualityChecker < handle
             
         end
         
+        function val = calculateApertureDifference(obj)
+            
+            val = abs(obj.extended_flux - obj.extended_fluxes_extra)./mad(obj.extended_flux); 
+            
+        end
+        
         function ingestStore(obj, store) % parse the data from the store into similar containers in this object
             
             obj.background_flux = store.background_flux;
@@ -1149,6 +1170,7 @@ classdef QualityChecker < handle
             obj.background_timestamps = store.background_timestamps;
 
             obj.extended_flux = store.extended_flux;
+            obj.extended_fluxes_extra = store.extended_fluxes_extra;
             obj.extended_detrend = store.extended_detrend; 
             obj.extended_aux = store.extended_aux;
             obj.extended_timestamps = store.extended_timestamps;

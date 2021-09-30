@@ -166,7 +166,8 @@ classdef EvFinderGUI < handle
             obj.menu_pars.menu_checker.menu_apply.addButton('button_linear_motion', '&Linear motion', 'toggle', 'store.checker.pars.use_linear_motion', 'disqualify based on linear changes in the x/y offsets'); 
             obj.menu_pars.menu_checker.menu_apply.addButton('button_bg', '&Background', 'toggle', 'store.checker.pars.use_background_intensity', 'disqualify based on background count'); 
             obj.menu_pars.menu_checker.menu_apply.addButton('button_repeating', '&Repeating Columns', 'toggle', 'store.checker.pars.use_repeating_columns', 'disqualify data corruption: repeated columns'); 
-            obj.menu_pars.menu_checker.menu_apply.addButton('button_flux_Corr', '&Flux corr', 'toggle', 'store.checker.pars.use_flux_corr', 'disqualify based on flux correlations'); 
+            obj.menu_pars.menu_checker.menu_apply.addButton('button_aperture', '&Aperture difference', 'toggle', 'store.checker.pars.use_aperture_difference', 'disqualify regions where forced/unforced photometry differ'); 
+            obj.menu_pars.menu_checker.menu_apply.addButton('button_flux_corr', '&Flux corr', 'toggle', 'store.checker.pars.use_flux_corr', 'disqualify based on flux correlations'); 
             
             obj.menu_pars.menu_checker.menu_apply.addButton('button_nan_flux', '&NaN flux', 'toggle', 'store.checker.pars.use_nan_flux', 'disqualify based on NaN values in the flux', 1); 
             obj.menu_pars.menu_checker.menu_apply.addButton('button_nan_offsets', 'NaN &XY', 'toggle', 'store.checker.pars.use_nan_offsets', 'disqualify based on NaN values in the x/y offsets'); 
@@ -182,7 +183,8 @@ classdef EvFinderGUI < handle
             obj.menu_pars.menu_checker.menu_thresh.addButton('input_slope', 'Flu&X slope', 'input', 'store.checker.pars.thresh_slope', 'threshold for global linear changes in the average flux'); 
             obj.menu_pars.menu_checker.menu_thresh.addButton('input_offset_size', '&Offset size', 'input', 'store.checker.pars.thresh_offset_size', 'threshold for large offset size'); 
             obj.menu_pars.menu_checker.menu_thresh.addButton('input_linear_motion', '&Linear motion', 'input', 'store.checker.pars.thresh_linear_motion', 'threshold for linear changes in the x/y offsets'); 
-            obj.menu_pars.menu_checker.menu_thresh.addButton('input_bg', '&Background', 'input', 'store.checker.pars.thresh_background_intensity', 'threshold for background count');          
+            obj.menu_pars.menu_checker.menu_thresh.addButton('input_bg', '&Background', 'input', 'store.checker.pars.thresh_background_intensity', 'threshold for background count');
+            obj.menu_pars.menu_checker.menu_thresh.addButton('input_aperture', '&Aperture diff', 'input', 'store.checker.pars.thresh_aperture_difference', 'threshold for aperture difference');
             obj.menu_pars.menu_checker.menu_thresh.addButton('input_flux_corr', '&Flux corr', 'input', 'store.checker.pars.thresh_flux_corr', 'threshold for flux correlations');          
             obj.menu_pars.menu_checker.menu_thresh.addButton('input_corr', '&Correlations', 'input', 'store.checker.pars.thresh_correlation', 'threshold for correlations of the flux to some auxiliary data', 1); 
             
