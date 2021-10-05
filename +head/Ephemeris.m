@@ -561,7 +561,20 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
             ra = mod(obj.sun.RA+180,360); 
             dec = -obj.sun.Dec;
+                        
+        end
+        
+        function [ra, dec] = getEarthShadowCoords(obj, radius_km)
             
+            addpath(fullfile(getenv('DATA'), 'WFAST/extras/VSOP'))
+            
+            if nargin<2 || isempty(radius)
+                radius_km = 42164;
+            end
+            
+            [ra, dec] = celestial.SolarSys.earthShadowCoo(obj.JD, radius_km,...
+                    'GeoPos', [obj.longitude/180*pi, obj.latitude/180*pi, obj.elevation]); 
+                
         end
         
         function val = getAntiSolarDistance(obj)
@@ -1056,10 +1069,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 obj.updateMoon;
                 obj.RA = obj.moon.RA;
                 obj.Dec = obj.moon.Dec;
-            elseif cs(keyword, 'antisolar', 'anti-solar', 'earth shadow', 'earths shadow')
+            elseif cs(keyword, 'antisolar', 'anti-solar')
                 obj.keyword = 'antisolar';
                 obj.updateSun;
                 [obj.RA_deg, obj.Dec_deg] = obj.getAntiSolarPoint; 
+            elseif cs(keyword, 'shadow', 'earth shadow', 'earths shadow')
+                obj.keyword = 'shadow'; 
+                obj.updateSun; 
+                [obj.RA_deg, obj.Dec_deg] = obj.getEarthShadowCoords; % use the default radius of 42,000lm for geosynchronous satellites
             elseif cs(keyword, 'quadrature')
                 obj.keyword = 'quadrature';
                 obj.updateSun;
