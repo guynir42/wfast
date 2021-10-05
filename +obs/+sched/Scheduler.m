@@ -115,6 +115,7 @@ classdef Scheduler < handle
         filename = fullfile(getenv('DATA'), 'WFAST/target_lists/target_list.txt');
 %         filename = 'target_list.txt'; % use the GUI to select a better default file
         
+        distance_new_target = 2; % how far does the new target coordinates need to be to have it considered a new target? 
         max_sun_elevation = -10; % consider it night time when sun is this far below horizon
         max_wind = 30; % above this wind speed, we must only observe the East side
         use_stay_on_side = 0; % if this is true, must not choose any target on the flip side (user may choose to start on East side to avoid getting stuck on West when it is windy)
@@ -828,17 +829,14 @@ classdef Scheduler < handle
                 use_sim = 0;
             end
             
-%             thresh = 30/60; % let's take 30 arcminutes as the threshold for moving to a new field?
-            thresh = 1; % one degree threshold, on either RA or Dec, to consider this field as a separate field...
-            
             if ~use_sim
 
                 if isempty(obj.obs_history) || isempty(obj.obs_history(end).RA_deg) || isempty(obj.obs_history(end).Dec_deg)
                     val = 0; % no current coordinates, so it can't be close enough
                 elseif isempty(target.ephem.RA_deg) || isempty(target.ephem.Dec_deg) || isempty(obj.obs_history(end).RA_deg) || isempty(obj.obs_history(end).Dec_deg)
                     val = 0; 
-                elseif target.ephem.angleDifference(target.ephem.RA_deg, obj.obs_history(end).RA_deg)<thresh && ...
-                        abs(target.ephem.Dec_deg-obj.obs_history(end).Dec_deg)<thresh % both coordinates are close enough
+                elseif target.ephem.angleDifference(target.ephem.RA_deg, obj.obs_history(end).RA_deg)<obj.distance_new_target && ...
+                        abs(target.ephem.Dec_deg-obj.obs_history(end).Dec_deg)<obj.distance_new_target % both coordinates are close enough
                     val = 1; 
                 else % coordinates are too far, consider this a new target
                     val = 0; 
@@ -850,8 +848,8 @@ classdef Scheduler < handle
                     val = 0; % no current coordinates, so it can't be close enough
                 elseif isempty(target.ephem.RA_deg) || isempty(target.ephem.Dec_deg) || isempty(obj.obs_history_sim(end).RA_deg) || isempty(obj.obs_history_sim(end).Dec_deg)
                     val = 0; 
-                elseif target.ephem.angleDifference(target.ephem.RA_deg, obj.obs_history_sim(end).RA_deg)<thresh && ...
-                        abs(target.ephem.Dec_deg-obj.obs_history_sim(end).Dec_deg)<thresh % both coordinates are close enough
+                elseif target.ephem.angleDifference(target.ephem.RA_deg, obj.obs_history_sim(end).RA_deg)<obj.distance_new_target && ...
+                        abs(target.ephem.Dec_deg-obj.obs_history_sim(end).Dec_deg)<obj.distance_new_target % both coordinates are close enough
                     val = 1; 
                 else
                     val = 0; 
