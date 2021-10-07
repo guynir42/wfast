@@ -1009,6 +1009,8 @@ classdef Candidate < handle
             
             delete(input.parent.Children);
             
+            set(input.parent, 'KeyPressFcn', @obj_vec.callback_key); 
+            
             margin_left = 0.05;
             
             ax1 = axes('Parent', input.parent, 'Position', [margin_left 0.65 0.55 0.25]);
@@ -1059,10 +1061,10 @@ classdef Candidate < handle
                 'Callback', @obj.popupCutouts, 'UserData', input.parent, ...
                 'Tooltip', 'show more cutouts around the event center'); 
             
-            button = uicontrol(popup_panel, 'Style', 'pushbutton', 'string', '', ...
+            button = uicontrol(popup_panel, 'Style', 'pushbutton', 'string', 'flux buffer', ...
                 'Units', 'Normalized', 'Position', [0.75 0.0 0.25 1], 'FontSize', 14, ...
-                'Callback', '', 'UserData', input.parent, ...
-                'Tooltip', 'placeholder'); 
+                'Callback', @obj.popupFluxBuffer, 'UserData', input.parent, ...
+                'Tooltip', 'show the flux history for the star'); 
             
             %%%%%%%%%%%%%%%%%%%%%% panel info %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -1187,11 +1189,7 @@ classdef Candidate < handle
                 button.String = sprintf('%d/%d', N_class, N_total); 
                 button.(tool_tip_name) = sprintf('Cannot save. Only %d candidates have been classified out of %d', N_class, N_total); 
             end
-            
-            % TODO: notes section + add note button
-            % TODO: popup stack image (+load from file) 
-            % TODO: popup cutouts viewer
-            
+                        
         end
         
         function showTimeRange(obj, varargin)
@@ -1979,6 +1977,39 @@ classdef Candidate < handle
             
         end
         
+        function popupFluxBuffer(obj, ~, ~)
+            
+            f = util.plot.FigHandler('Cutout viewer'); 
+            f.width = 25;
+            f.height = 16;
+            f.clear;
+            
+            ax = axes('Parent', f.fig); 
+            
+            frames = 1:length(obj.flux_buffer);
+            
+            plot(ax, frames, obj.flux_buffer, '.', 'DisplayName', 'raw flux'); 
+            
+            flux_binned = util.series.binning(obj.flux_buffer, 100); 
+            flux_rms = util.series.binning(obj.flux_buffer, 100, 'func', 'std'); 
+            frames_binned = 1:100:length(obj.flux_buffer); 
+            
+            hold(ax, 'on'); 
+            
+            errorbar(ax, frames_binned, flux_binned, flux_rms, 'LineWidth', 2, 'DisplayName', 'binned flux'); 
+            
+            xlabel(ax, 'frame number');
+            ylabel(ax, 'flux [counts]');
+            ax.FontSize = 18; 
+            
+            legend(ax); 
+            
+            uicontrol(f.fig, 'Style', 'pushbutton', 'String', 'CLOSE WINDOW', ...
+                'Units', 'Normalized', 'Position', [0.2 0.8 0.2 0.08], ...
+                'Callback', @obj.callback_close_window, 'FontSize', 12);
+            
+        end
+        
         function plotApertureDifferences(obj, varargin)
             
             input = util.text.InputVars;
@@ -2012,6 +2043,26 @@ classdef Candidate < handle
     end
     
     methods % callbacks to the show() method
+        
+        function callback_key(obj, hndl, event)
+            
+            if isequal(event.EventName, 'KeyPress')
+                
+                new_hndl = struct('UserData', hndl); % as if this callback came from a button, whose UserData is the figure/parent
+                
+                if strcmpi(event.Character, 'N') % lower or upper case N (next)
+                    obj.callback_next(new_hndl); 
+                elseif strcmpi(event.Character, 'B') % lower or upper case B (back)
+                    obj.callback_prev(new_hndl); 
+                elseif strcmp(event.Character, 'C') % upper case C only (classify as occultation certain)
+                    classes = obj.getListOfClasses;
+                    new_hndl.Classification = classes{1}; 
+                    obj.callback_classify(new_hndl); 
+                end
+                
+            end
+            
+        end
         
         function callback_prev(obj, hndl, ~)
             
@@ -2191,7 +2242,11 @@ classdef Candidate < handle
             
             idx = hndl.UserData.UserData.index;
             
-            obj(idx).popupClassifier;
+            if isfield(hndl, 'Classification') && ~isempty(hndl.Classification)
+                obj(idx).classification = hndl.Classification; 
+            else
+                obj(idx).popupClassifier;
+            end
             
             if isempty(obj(idx).classification) % no classification, leave the same index
                 obj.show('parent', hndl.UserData);

@@ -1063,7 +1063,7 @@ classdef QualityChecker < handle
                     f2p = permute(f2(:,1:num_stars), [1,3,2]); % turn 2nd dim into 3rd, and truncate the number of fluxes
                     
                     FC = nansum(f.*fp, 1)./sqrt(nansum(f2,1).*nansum(f2p,1)); % full 3D matrix (1st dim is scalar, 3rd dim is shorter than 2nd if using num_stars)
-                                       
+                    FC(isnan(FC)) = 0; % NaNs come from all frames being zero -> zero norm -> can put zero correlations
 %                     for kk = 1:size(flux,2)
 %                         FC(1,kk,kk) = 0; % remove auto-correlations (should be all equal to 1 anyway)
 %                     end

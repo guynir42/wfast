@@ -287,6 +287,7 @@ classdef StarHours < handle
         
         function removeStars(obj, idx)
             
+            obj.losses_bad_stars = zeros(length(obj.snr_bin_edges)-1, length(obj.star_bin_edges)-1, 'single'); 
             obj.losses_bad_stars(:,idx) = obj.histogram(:,idx); % store the number of star seconds that were lost when we remove bad stars from the histograms
             
             % maybe replace NaN with zero? 
