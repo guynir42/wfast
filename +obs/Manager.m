@@ -396,6 +396,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             obj.email = obs.comm.Email;
             
+            if obj.debug_bit, util.text.date_printf('sending Email to report system restart!'); end
+            
+            obj.email.sendToAddress('Guy', 'subject', 'Dome-PC restarted', 'text', 'Dome-PC has been restarted')
+            
         end
         
     end
