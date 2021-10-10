@@ -3205,16 +3205,16 @@ classdef Acquisition < file.AstroData
                     for ii = 1:size(pos,1)
                         for jj = ii+1:size(pos,1)
                             if abs(pos(ii,2) - pos(jj,2)) <= min_dist && abs(pos(ii,3) - pos(jj,3)) <= min_dist
-                                if pos(ii,1)>pos(jj,1) % the ii row is bigger, and neither is NaN
-                                    pos(jj,1) = NaN;
-                                elseif pos(jj,1)>pos(ii,1) % the jj row is bigger, and neiher is NaN
-                                    pos(ii,1) = NaN; 
+                                if pos(ii,4)>pos(jj,4) % the ii row is bigger, and neither is NaN
+                                    pos(jj,4) = NaN;
+                                elseif pos(jj,4)>pos(ii,4) % the jj row is bigger, and neiher is NaN
+                                    pos(ii,4) = NaN; 
                                 end
                             end
                         end
                     end
                     
-                    pos(isnan(pos(:,1)),:) = []; % remove NaN rows (duplicates)
+                    pos(isnan(pos(:,4)),:) = []; % remove NaN rows (duplicates)
                     
                     new_pos = ones(obj.num_dynamic_cutouts,1).*floor(size(obj.stack)/2); 
                     
@@ -3718,6 +3718,7 @@ classdef Acquisition < file.AstroData
                         
                         flare = img.MicroFlare;
                         flare.file_index = obj.batch_counter+1;
+                        flare.pixel_thresh = obj.cosmic_ray_peak_threshold; 
 %                         flare.filename = obj.buf.filename; % the filename in the buffer does not get updated until we call save()
                         flare.folder = obj.buf.directory;
                         flare.serial = length(obj.micro_flares)+1;

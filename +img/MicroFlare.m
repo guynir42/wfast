@@ -594,7 +594,25 @@ classdef MicroFlare < handle
             out_vec = obj_vec([obj_vec.is_streaked]==0 & [obj_vec.is_bad_pos]==0); 
             
         end
+        
+        function out_vec = filterNoDuplicates(obj_vec)
+           
+            idx = false(size(obj_vec)); % positions of bad flares
             
+            for ii = 1:length(idx)
+               
+                obj = obj_vec(ii);
+                
+                frames = find(obj.flux-obj.mean > 5*obj.std); % frame indices where the flare is active
+                
+                idx(ii) = length(frames)>1 && all(diff(frames)==10); % all frame separations is exactly 10
+                
+            end
+            
+            out_vec = obj_vec(~idx);
+            
+        end
+        
         function groups = clusterFlares(obj_vec, speed)
             
             if nargin<2 || isempty(speed)
