@@ -414,7 +414,7 @@ classdef Scanner < handle
                         
                     end
 
-                    obj.a.futures{ii}.fetchOutputs; % make this unread (we can also dump this into a variable, containing a copy of the Analysis object)
+                    obj.a.futures{ii}.fetchOutputs; % make this read (we can also dump this into a variable, containing a copy of the Analysis object)
                     
                 end
                 
@@ -423,7 +423,7 @@ classdef Scanner < handle
             worker_idx = obj.a.findWorkerUnread; % get a worker even if it was not read out
 %             worker_idx = obj.a.findWorker; % get a worker even if it was not read out
             
-            if isempty(worker_idx) % if we could find a free worker
+            if isempty(worker_idx) % if we couldn't find a free worker
                 report = 'Could not find a free worker!'; 
             else % we can run a folder on a free worker
                 

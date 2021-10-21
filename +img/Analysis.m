@@ -1001,8 +1001,13 @@ classdef Analysis < file.AstroData
                 delete(obj.futures{input.worker}); % deleting the future may release some memory (I hope?)
             end
             
-            if isempty(obj.pool)
-                obj.pool = gcp;     
+%             if isempty(obj.pool)
+%                 obj.pool = gcp;     
+%             end
+           
+            if isempty(gcp('nocreate'))
+                obj.pool = parpool;
+                obj.pool.IdleTimeout = 360;
             end
             
             obj.futures{input.worker} = parfeval(obj.pool, @obj.run, double(input.output), 'reset', input.reset, 'logging', input.logging, 'save', input.save, 'overwrite', input.overwrite); 
@@ -1014,30 +1019,25 @@ classdef Analysis < file.AstroData
         
         function idx = findWorker(obj, varargin)
             
-            if isempty(gcp('nocreate'))
-                obj.pool = parpool;
-                obj.pool.IdleTimeout = 360;
-            end
-            
-            N = obj.pool.NumWorkers; 
-            
-            if ~isempty(obj.max_num_workers) && obj.max_num_workers<N
-                N = obj.max_num_workers; 
-            end
-            
             idx = [];
+            N = obj.max_num_workers;
+            if isempty(N), N = 10; end
             
             for ii = 1:N
                 
                 if length(obj.futures)<ii || ~isa(obj.futures{ii}, 'parallel.Future') || ~isvalid(obj.futures{ii})...
                         || ( strcmp(obj.futures{ii}.State, 'finished') && obj.futures{ii}.Read==1)
                     idx = ii;
-                    return;
+                    break;
                 end
                 
             end
             
-            if ii==N
+            if idx > obj.max_num_workers
+                idx = [];
+            end
+            
+            if isempty(idx)
                 error('Cannot find a free worker to run analysis...');
             end
             
@@ -1046,22 +1046,9 @@ classdef Analysis < file.AstroData
         
         function idx = findWorkerUnread(obj)
             
-            if isempty(gcp('nocreate'))
-                obj.pool = parpool;
-                obj.pool.IdleTimeout = 360;
-            end
-            
-            if isempty(obj.pool)
-                N = 10;
-            else
-                N = obj.pool.NumWorkers; 
-            end
-            
-            if ~isempty(obj.max_num_workers) && obj.max_num_workers<N
-                N = obj.max_num_workers; 
-            end
-            
             idx = [];
+            N = obj.max_num_workers;
+            if isempty(N), N = 10; end
             
             for ii = 1:N
                 
@@ -1077,9 +1064,13 @@ classdef Analysis < file.AstroData
 %                     end
                     
                     idx = ii;
-                    return;
+                    break;
                 end
                 
+            end
+            
+            if idx > obj.max_num_workers
+                idx = [];
             end
             
         end
@@ -1410,6 +1401,7 @@ classdef Analysis < file.AstroData
                 obj.clip.cut_size = size(obj.cutouts,1);
                 
                 if ~isempty(obj.positions_bg)
+                    obj.positions_bg = obj.positions_bg(:,:,1); % to fix bug where these positions were saved for each star
                     obj.clip_bg.positions = obj.positions_bg;
                     obj.clip_bg.cut_size = size(obj.cutouts_bg,1);
                 end
