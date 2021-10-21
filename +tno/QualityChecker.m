@@ -97,6 +97,8 @@ classdef QualityChecker < handle
         delta_t; % difference between average time-step (dt) and average time-step (usually 0.04s). 
         shakes; % the offset size for each star
         defocus; % the size of the PSF
+        fwhm; % from the ModelPSF (in arcsec)
+        instability; % long-time-scale variations of the flux buffer (e.g., clouds, shaking telescope)
         slope; % the slope at different points in the flux
         offset_size; % the size of the offset in each star
         
@@ -126,6 +128,7 @@ classdef QualityChecker < handle
         cut_indices;  % generate a struct using setupCuts()
         
         % these we get from the DataStore
+        flux_buffer; % full length of the fluxes for all stars as far back as we have it
         background_flux; % cut out the background flux for calculating the variance outside the search region
         background_detrend; % same flux, with a linear fit subtracted from each batch individually
         background_aux; % cut out the background aux for calculating the variance outside the search region
@@ -157,8 +160,6 @@ classdef QualityChecker < handle
         defocus_log = []; % track the defocus result for each batch
         mean_width_values; % track the mean width for all batches in this run
         mean_background_values;  % track the mean background for all batches in this run
-        
-        fwhm; % from the ModelPSF (in arcsec)
         
         debug_bit = 1;
         
@@ -219,7 +220,8 @@ classdef QualityChecker < handle
             obj.pars.use_delta_t = true;
             obj.pars.use_shakes = true;
             obj.pars.use_defocus = false;
-            obj.pars.use_fwhm = true; 
+            obj.pars.use_fwhm = true;             
+            obj.pars.use_instability = true;
             obj.pars.use_slope = true;
             obj.pars.use_near_bad_rows_cols = true;            
             obj.pars.use_offset_size = true;
@@ -241,6 +243,7 @@ classdef QualityChecker < handle
             obj.pars.thresh_shakes = 5.0; % events where the mean offset r is larger than this are disqualified
             obj.pars.thresh_defocus = 3.0; % events with PSF width above this value are disqualified
             obj.pars.thresh_fwhm = 10.0; % batches with too big FWHM (from ModelPSF, in arcsec) are disqualified
+            obj.pars.thresh_instability = 3.0; % when the flux buffer has long-time-scale variations
             obj.pars.thresh_slope = 5.0; % events where the slope is larger than this value (in abs. value) are disqualified
             obj.pars.thresh_offset_size = 4.0; % events with offsets above this number are disqualified (after subtracting mean offsets)
             obj.pars.thresh_linear_motion = 2.0; % events showing linear motion of the centroids are disqualified
@@ -317,6 +320,12 @@ classdef QualityChecker < handle
             if obj.pars.use_fwhm
                 obj.cut_names{end+1} = 'fwhm'; 
                 obj.cut_thresholds(end+1) = obj.pars.thresh_fwhm;
+                obj.cut_two_sided(end+1) = false;
+            end
+            
+            if obj.pars.use_instability
+                obj.cut_names{end+1} = 'instability'; 
+                obj.cut_thresholds(end+1) = obj.pars.thresh_instability;
                 obj.cut_two_sided(end+1) = false;
             end
             
@@ -448,6 +457,8 @@ classdef QualityChecker < handle
             obj.delta_t = []; 
             obj.shakes = [];
             obj.defocus = []; 
+            obj.fwhm = [];
+            obj.instability = []; 
             obj.slope = [];
             obj.offset_size = [];
             obj.nan_flux = [];
@@ -596,6 +607,10 @@ classdef QualityChecker < handle
             if obj.pars.use_defocus
                 obj.defocus = obj.calculateDefocus; 
                 obj.defocus_log = vertcat(obj.defocus_log, obj.defocus); 
+            end
+            
+            if obj.pars.use_instability
+                obj.instability = mad(obj.flux_buffer)./nanmedian(util.series.binning(obj.flux_buffer, size(obj.search_flux,1), 'func', 'std'));
             end
             
             obj.juldate_log = vertcat(obj.juldate_log, nanmean(obj.search_juldates)); % keep track of the julian date of each batch
@@ -750,6 +765,10 @@ classdef QualityChecker < handle
             
             if obj.pars.use_fwhm && ~isempty(obj.fwhm)
                 obj.cut_values_matrix(:,:,obj.cut_indices.fwhm) = obj.fwhm.*all_stars; 
+            end
+            
+            if obj.pars.use_instability
+                obj.cut_values_matrix(:,:,obj.cut_indices.instability) = obj.instability.*all_stars; 
             end
             
             if obj.pars.use_slope
@@ -1164,6 +1183,7 @@ classdef QualityChecker < handle
         
         function ingestStore(obj, store) % parse the data from the store into similar containers in this object
             
+            obj.flux_buffer = store.flux_buffer; 
             obj.background_flux = store.background_flux;
             obj.background_detrend = store.background_detrend; 
             obj.background_aux = store.background_aux;

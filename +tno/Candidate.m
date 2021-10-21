@@ -1009,7 +1009,9 @@ classdef Candidate < handle
             
             delete(input.parent.Children);
             
-            set(input.parent, 'KeyPressFcn', @obj_vec.callback_key); 
+            if isa(input.parent, 'matlab.ui.Figure')                
+                set(input.parent, 'KeyPressFcn', @obj_vec.callback_key); 
+            end
             
             margin_left = 0.05;
             
