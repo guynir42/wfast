@@ -281,19 +281,23 @@ classdef Overview < handle
             
             %%% ingest either Overview or RunSummary object %%%
 
-            if isa(summary, 'tno.Summary') && ~isempty(summary)
+            if isa(summary, 'tno.Summary') 
                 
-                if isempty(summary.head) || isempty(summary.head.ephem) || isempty(summary.head.ephem.ECL_lat)
-                    error('Summary object must have a valid header with an Ephemeris object / ecliptic latitude value!'); 
+                if ~isempty(summary)
+                
+                    if isempty(summary.head) || isempty(summary.head.ephem) || isempty(summary.head.ephem.ECL_lat)
+                        error('Summary object must have a valid header with an Ephemeris object / ecliptic latitude value!'); 
+                    end
+
+                    ecl = summary.head.ephem.ECL_lat; 
+                    vel = sqrt(sum(summary.head.ephem.getShadowVelocity.^2)); % in km/s
+                    snr = summary.snr_bin_edges;
+                    sizes = summary.size_bin_edges;
+
+                    inclusive = permute(summary.losses_inclusive, [1,2,5,4,3]); 
+                    exclusive = permute(summary.losses_exclusive, [1,2,5,4,3]); 
+
                 end
-                
-                ecl = summary.head.ephem.ECL_lat; 
-                vel = sqrt(sum(summary.head.ephem.getShadowVelocity.^2)); % in km/s
-                snr = summary.snr_bin_edges;
-                sizes = summary.size_bin_edges;
-                
-                inclusive = permute(summary.losses_inclusive, [1,2,5,4,3]); 
-                exclusive = permute(summary.losses_exclusive, [1,2,5,4,3]); 
                 
             elseif isa(summary, 'tno.Overview') && ~isempty(summary)
                 

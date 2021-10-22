@@ -253,7 +253,7 @@ classdef QualityChecker < handle
             obj.pars.thresh_correlation = 4.0; % correlation max/min of flux (with e.g., background) with value above this disqualifies the region
 
             obj.pars.thresh_tracking_error = 4.0; % for each event, post-detection, check correlation with other stars
-            
+            obj.pars.nth_highest_corr = 20; % when finding flux-flux correlations, measure the correlation of the Nth most correlated star
             obj.pars.smoothing_slope = 50; % number of frames to average over when calculating slope
             obj.pars.distance_bad_rows_cols = 5; % how many pixels away from a bad row/column would we still disqualify a star? (on either side, inclusive)
             obj.pars.linear_timescale = 25; % timescale for linear_motion cut
@@ -1090,7 +1090,7 @@ classdef QualityChecker < handle
                     FC_noise = mad(FC, [], 3); % a robust estimate of the noise
 
                     FC_sort = sort(abs(FC./FC_noise),3, 'descend'); 
-                    num_highest_stars = 5; 
+                    num_highest_stars = obj.pars.nth_highest_corr; 
                     if num_highest_stars+1 > size(FC_sort,3)
                         num_highest_stars = size(FC_sort,3) - 1;
                     end

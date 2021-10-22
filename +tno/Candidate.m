@@ -1981,7 +1981,7 @@ classdef Candidate < handle
         
         function popupFluxBuffer(obj, ~, ~)
             
-            f = util.plot.FigHandler('Cutout viewer'); 
+            f = util.plot.FigHandler('Flux buffer'); 
             f.width = 25;
             f.height = 16;
             f.clear;
