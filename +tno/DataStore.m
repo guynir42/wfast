@@ -9,7 +9,7 @@ classdef DataStore < handle
 % >> phot = img.Photometry;
 % >> phot.input(calibrated_cutouts, ...); 
 % >> store.input(phot); 
-% The last option is the prefered method to put data into the store. 
+% The last option is the prefered method to input data to the store. 
 %
 % The user-defined parameters of this class are saved as a struct "pars". 
 % These parameters are defined in the "reset/clear" methods block, inside
@@ -18,7 +18,7 @@ classdef DataStore < handle
 % Some notable parameters are:
 % -length_XXXX: see the definitions below. 
 % -threshold and use_threshold: this defines a cut on the stars to be kept 
-%  in the store after the burn-in period (see below). Default: 5 and true. 
+%  in the store after the burn-in period (see below). Default: 3 and true. 
 % -use_remove_cosmic_rays and cosmic_rays_threshold are used to get rid of
 %  cosmic ray spikes in the flux before even giving the data to any of the 
 %  other objects that use it (e.g., the PSD or the event calculcator). 
@@ -28,7 +28,7 @@ classdef DataStore < handle
 % Some definitions of time-scales:
 % -buffers: refer to the longest backlog of data. It is mostly used to get
 %  the Power Spectra Density (PSD) of each lightcurve. By default this buffer
-%  has a length of 5000 to 20,000 frames. 
+%  has a length of 5000 to 10,000 frames. 
 % -background region is not as long as the full buffer, but contains enough
 %  samples to calculate properties such as the mean and STD of each time series. 
 %  By default this includes the 2000 frames before (not including) the current
@@ -47,7 +47,7 @@ classdef DataStore < handle
 %  the different stars and make sure there is a minimal sample of flux in 
 %  the buffer to calculate a reliable PSD. During this period no events are 
 %  searched for, and all stars are used. 
-%  Once the period ends, we disqualify all stars with low S/N (default is 5) 
+%  Once the period ends, we disqualify all stars with low S/N (default is 3) 
 %  based on their flux during this period. 
 %  If multiple apertures have been used in the photometry, we choose the best
 %  one based on which aperture left us with the most stars. See note on 
@@ -79,11 +79,11 @@ classdef DataStore < handle
 % dim3 that tracks which type of auxiliary it is. The types of aux data are 
 % listed in the "aux_names" cell array, and can be indexed using "cut_indices":
 % >> widths=store.auxiliary(:,:,store.aux_indices.widths); 
-% This organizing of the auxiliary data is kept throughout this package. 
+% This organization of the auxiliary data is kept throughout this package. 
 % 
 % The threshold and the burn-in period: 
-% At the end of the burn in period we check the S/N of each star based on 
-% the flux and aux in the buffer. The threshold=5 is used to dump bad stars. 
+% At the end of the burn-in period we check the S/N of each star based on 
+% the flux and aux in the buffer. The threshold=3 is used to dump bad stars. 
 % The indices of stars that are kept are store in "star_indices" in order
 % to recover the original star index from the list of stars that have been 
 % loaded from file (e.g., to match a star to its catalog entry). 
@@ -95,7 +95,7 @@ classdef DataStore < handle
 % A note on multiple apertures:
 % If the photometry is done on multiple aperture radii, or using different
 % methods like individually aligned apertures vs. forced position apertrues, 
-% the store will can ingest these additional fluxes and auxiliary with an 
+% the store will ingest these additional fluxes and auxiliary with an 
 % extra dimension added in the end (dim3 for flux, dim4 for aux). 
 % This extra dimension is only used for the burn-in. After the burn-in is 
 % finished, when choosing the best stars, the store also chooses the best
@@ -104,7 +104,11 @@ classdef DataStore < handle
 % single aperture is ever provided. 
 % Like the list of good stars, the choice of aperture does not change during
 % the run, after it is decided at the end of the burn-in period. 
-% 
+% An additional fluxes_extra is used to save additional flux info needed for 
+% vetting candidates. Usually this keeps non-forced aperture photometry 
+% results (with the same size aperture as the forced) to compare the two
+% and rule out cases where false events happen due to aperture misalignment. 
+%
 % Plotting: use the plot() function to show the data in the buffer.
 % The parameters for this function are:
 %   -stars: which stars to show (default is 1:5). Stars are counted out of 

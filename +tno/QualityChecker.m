@@ -15,7 +15,7 @@ classdef QualityChecker < handle
 %     the number of star hours. 
 % (b) To disqualify event candidates that occur during bad times in the data. 
 %     Each candidate that crosses the threshold in the EventFinder can be
-%     checked agains the quality cuts in this object. If the peak of the 
+%     checked against the quality cuts in this object. If the peak of the 
 %     event coincides with times/stars that are marked as bad, then the 
 %     candidate is marked as un-kept. 
 %
@@ -42,10 +42,11 @@ classdef QualityChecker < handle
 %  cuts, whenever the value is non-zero they are considered to be triggered. 
 %  (b) The correlations cuts are all treated with a single use_correlations
 %  and thresh_correlations, event though they include multiple cuts. 
+%  This is also true for flux_corr_XXX. 
 % -corr_types and corr_timescales: the correlation cuts correlate the flux
 %  to one of the types of auxiliary (default is b, x, y, r, and w). 
 %  The timescales denote how many frames are used in calculating those 
-%  correlations, defaulting to 10, 25, and 50. 
+%  correlations, defaulting to 25, and 50. 
 % -bad_rows and bad_columns: indices of these rows and columns mark bad 
 %  regions in the sensor. They can be filled automatically using the 
 %  setupSensor() function. Make sure the header is up to date and contains
@@ -70,7 +71,7 @@ classdef QualityChecker < handle
 % -type: which cut should be displayed. Use the index or name. Default 1. 
 % -sum: if false, show the values for each star. If true, sum the data
 %       into a 1D histogram, showing the values for all stars together. 
-%       Default is false (show each star separately). 
+%       Default is true (show each star separately). 
 % -axes: which axes to draw into. Default is gca(). 
 % -font_size: to use on the axes. Default is 18. 
 % -log: show the values on a logarithmic scale. Default is true. 
@@ -1280,7 +1281,7 @@ classdef QualityChecker < handle
             
             input = util.text.InputVars;
             input.input_var('type', 1); 
-            input.input_var('sum', false);
+            input.input_var('sum', true);
             input.input_var('axes', [], 'axis'); 
             input.input_var('font_size', 18); 
             input.input_var('log', true, 'use_log'); 

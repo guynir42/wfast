@@ -1,7 +1,7 @@
 classdef Scanner < handle
 % This class overlooks analysis campaigns on multiple runs. 
 % There are a few different functions that can be run on different objects:
-% (a) Continuous analysis program: define a folder and possible start/end
+% (a) Continuous analysis program: define a root folder and start/end
 %     times and let the object push all runs into Analysis on parallel
 %     workers until all the runs in range were processed. 
 %     This is done using a timer and can be accomplished without graphics
@@ -9,21 +9,48 @@ classdef Scanner < handle
 %     The results of each Analysis run is saved in a sub-folder to be
 %     picked up later by this or other instances of Scanner. 
 %     Use startCampaign() to run. 
+%     If needed, use stop(timer) to pause the analysis campaign. 
 %
 % (b) Calculate the number of star-hours/coverage/number of detections from
-%     the results of a previous campaign. It will go over all folders in
-%     range and pick up the RunSummary objects. You can then use plotting
-%     tools to show the statistics:
+%     the results of a previous campaign using calcOverview(). 
+%     It will go over all folders in range and pick up the Summary objects. 
+%     You can then use plotting tools from the Overview class to see the
+%     results of the analysis campaign. 
 %
-% (c) Scanning event candidates for occultations: use showNextCandidates()
-%     to open a figure with the next batch of unclassified candidates.
-%     This can be done with a different Scanner object, on an instance with
+% (c) Scanning event candidates for occultations: use getNextCandidates()
+%     to load the resulting candidates from the next run in to this object's
+%     "candidates" vector. Then in a new figure, call obj.candidates.show
+%     to load the candidated scanning page. 
+%     This can be done in a different Scanner object, on an instance with
 %     graphics, and the saved (classified) candidates should be saved to
 %     file when done. 
-%     
-% Note: to choose the data folder Use chooseFolder(), chooseStartFolder() 
-%       and chooseEndFolder() to define the runs for analysis (default is  
-%       $DATA/WFAST/ and the range is all folders). 
+%     Once candidates are saved to file, the next call to getNextCandidates()
+%     would skip that run and move to the next one. 
+%
+% NOTE: before starting an analysis campaign, choose the root folder
+%       (including the year folder) and define start/end dates as strings 
+%       in the YYYY-MM-DD format (e.g., date_start='2020-04-23'). 
+% NOTE 2: To ignore previous analysis results (using outdated code maybe),
+%         you can define a "date_process". Any analysis folders created
+%         before that date (not including that date) would be ignored. 
+%         If you are starting a new analysis campaign, you should set this
+%         to the current date. 
+%
+% Additional useful methods:
+%   -getAllRuns(): call the Folder.scan() method to get all the runs in
+%                  range, which is often useful for debugging and doing
+%                  custom statistics on all run folders. 
+%   -collectEvents(): get all the classified candidates, either including
+%                     or excluding the simulated / non-occultation events.
+%                     The default is to only get the real occultations. 
+%   -findStalledRuns(): get a list of run folders where analysis has
+%                       started but not finished. Use this after a crash or
+%                       if you stopped the analysis mid-way. Runs that you
+%                       want to restart need to be reset to "not analyzed"
+%                       state, by deleting the analysis folder that was
+%                       left unfinished (i.e., it has analysis_log.txt and
+%                       analysis_parameters.txt but not summary.mat or
+%                       candidates.mat files). 
     
     
     properties(Transient=true)

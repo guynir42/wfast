@@ -1,5 +1,33 @@
 classdef Photometry < handle
-
+% A wrapper for the fast c++ photometry code in util.img.photometry2.
+% Use the input() method to provide cutouts and other useful information
+% and recover the results (flux and other auxiliary data like background)
+% from the properties of this object. 
+%
+% The functions useBalorDefaults() and useBalorDefaults() can be used to
+% quickly setup the object parameters to the defaults we use with the
+% different cameras. 
+%
+% The outputs are separated by the type of photometery: 
+%   -basic: just sum the counts in the square cutout. 
+%   -gaussian: use a gaussian tapering mask before summing the counts. 
+%   -aperture: use an individually placed circular aperture mask. 
+%   -forced: use a circular aperture placed by the flux-weighted average of
+%            all stars' centroids. 
+%
+% The final products are stored without qualifications (e.g., flux instead
+% of flux_gauss) contain the best values from all types of photometry,
+% e.g., flux from forced and centroids from gaussian. 
+% 
+% Besides the cutouts, some additional data can be passed to the input()
+% function that can help other classes down the line:
+%   -variance + gain: to get better error estimates
+%   -positions: to calculate centroids from offsets. 
+%   -timestamps, t_start, t_end, t_end_stamp: for timing lightcurves. 
+%   -juldates: for future reference and plotting. 
+%   -filename: for keeping track of where data came from . 
+% 
+    
     properties(Transient=true)
         
         gui;

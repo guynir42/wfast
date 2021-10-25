@@ -2,13 +2,17 @@ classdef CorrectPSD < handle
 % Calculate the Power Spectral Density of lightcurves, and apply a correction
 % to new lightcurves that are given to it. 
 % 
-% Use calcPSD() by giving it a long baseline flux matrix and timestamps. 
+% Use addToBuffer() with the detrended fluxes (and buffer length) to update
+% the flux buffer that is used to calculate the PSD. 
+% Use calcPSD() to produce an updated PSD estimate. 
 % Use input() with the new, short flux interval to get corrected fluxes. 
+% All fluxes are expected to be detrended (i.e., removed a linear fit). 
 % Handles 2D matrices where each column is a lightcurve for a different star. 
 % 
 % The object parameters, "window_size", "overlap" and "num_points" are passed
 % to the pwelch() function used to calculate the PSD. 
-% 
+% If the size of the buffer is smaller than the window_size, we use regular
+% FFT to get the power spectrum. If it is longer, we apply Welch's method. 
     
     
     properties(Transient=true)
@@ -98,7 +102,15 @@ classdef CorrectPSD < handle
     methods % calculations
         
         function flux_corrected = input(obj, flux, psd_power, star_indices)
-            
+        % Give a short interval of fluxes to be corrected. 
+        % INPUTS: 
+        %   -flux: must be detrended. Can be 2D. 
+        %   -psd_power: what power of the PSD to use when dividing in 
+        %               Fourier space (default is 1, but also 0.5 is
+        %               sometimes useful). Use 1 if you plan to match
+        %               filter the data. 
+        %   -star_indices: run the correction only on a subset of the stars. 
+        
             if nargin<3 || isempty(psd_power)
                 psd_power = 1; 
             end
@@ -119,7 +131,12 @@ classdef CorrectPSD < handle
         end
         
         function addToBuffer(obj, flux, buffer_size)
-            
+        % Add new fluxes (detrended!) to the buffer used to produce the PSD. 
+        % The buffer_size determines the maximum size of the buffer and
+        % when new data increase its size too much, it tosses out the
+        % oldest data (FIFO). 
+        % Any NaN values in the fluxes are removed at this stage. 
+        
             M = nanmedian(flux); 
             S = mad(flux); 
             

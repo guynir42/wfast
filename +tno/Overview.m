@@ -1,7 +1,7 @@
 classdef Overview < handle
 % Calculate some statistics on data collected from multiple runs. 
 % To generate this data, use the input() method, which accepts either 
-% Overview or RunSummary objects. It aggregates the star hours and simulated
+% Overview or Summary objects. It aggregates the star hours and simulated
 % events saved in such objects and builds multi-dimensional histograms. 
 %
 % To use these data, the following functions are most useful: 
@@ -27,7 +27,7 @@ classdef Overview < handle
 % calcCoverage() takes the efficiency and multiplies it by the star hours 
 % taken at different runs, summing over velocities (with different efficiency
 % for each velocity bin) and returns a matrix of coverage. 
-% Coverage is the number of square degress that were "scanned" by the survey, 
+% Coverage is the number of square degrees that were "scanned" by the survey, 
 % and is the reciprocal of the number of objects per square degree. 
 % This is given as a function of occulter radius and ecliptic latitude, 
 % because different star hours are collected at different latitudes, 
@@ -43,7 +43,7 @@ classdef Overview < handle
 % 
 % This object also contains a couple of CometModel objects to describe the 
 % size distribution of KBOs or Oort cloud objects. 
-% The "folders" object contains a vector of the RunFolder objects used to 
+% The "folders" object contains a vector of the Folder objects used to 
 % build up the Overview (if created using Scanner's calcOverview()). 
 % Two Overview objects can be combined using the input() method on one of them. 
 

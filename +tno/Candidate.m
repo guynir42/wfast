@@ -21,7 +21,7 @@ classdef Candidate < handle
 % Some events are marked as kept=1 and some kept=0. The unkept events have
 % been disqualified based on various conditions, mostly quality cuts and 
 % black lists. See the EventFinder and QualityChecker objects for more info. 
-% Each unkept candidate keeps a list of the cuts that triggered it's 
+% Each unkept candidate keeps a list of the cuts that triggered its 
 % removal, with the name and value of those cuts in "cut_hits", "cut_string"
 % and "cut_value". In addition, the user can add notes to the event, and
 % classify it into one of several categories (see getListOfClasses()). 

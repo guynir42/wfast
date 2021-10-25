@@ -13,8 +13,8 @@ classdef EventFinder < handle
 % >> finder.finishup(); 
 % 
 % The user-defined parameters of this class are saved as a struct "pars". 
-% These parameters are defined in the "reset/clear" methods block, inside
-% the resetPars() function. Refer to the inline docs for info on each parameter. 
+% These parameters are defined in the "reset/clear" methods block, in the 
+% resetPars() function. Refer to the inline docs for info on each parameter. 
 %
 % The finder does several things with the data:
 % 1) inputs them into the DataStore object "store". Which in turns feeds the
@@ -30,19 +30,22 @@ classdef EventFinder < handle
 %    it directly. 
 % 2) Data from the store is used to calculate the Power Spectral Density 
 %    (PSD) of the data using the CorrectPSD object "psd".
-%    This is applied to the fluxes in before searching for occultations. 
+%    This is applied to the fluxes before searching for occultations. 
 %    To skip using the PSD calculation (which is slow) set 
 %    pars.use_psd_correction=0. By default we use the PSD correction. 
 % 3) Feed the corrected fluxes and auxiliary data into a search algorithm. 
 %    This uses a matched-filter search using two filter banks saved as 
 %    occult.ShuffleBank objects called "bank" and "bank_small". 
-%    Another filter bank called "bank_oort" is used to store wider
-%    templates for finding Oort cloud objects (set use_oort=1). 
-%
+%    Additional filter banks called "bank_oort" and "bank_oort_small" are
+%    used to store wider templates for finding Oort cloud objects 
+%    (to use this, set use_oort=1). 
+% 4) Inject simulated events into real data to check the recovery
+%    efficiency of the pipeline and human vetters. 
 %    Set pars.use_sim = 0 to skip using simulated events (default is 1). 
 %    To determine how often simulated events are injected, set
 %    "pars.num_sim_events_per_batch" which can be a small fraction (the 
-%    default is 0.01, so only a few simulated events per run). 
+%    default is 0.25, which means many simulated events are injected, but 
+%    only a small fraction are saved). 
 % 
 % The output of the search is two-fold:
 % a) The data quality cuts values and the amount of accumulated star hours 
@@ -50,7 +53,7 @@ classdef EventFinder < handle
 %    the data over the run. You can get a summary of this information, along
 %    with header data and the parameters used in this run by each object by:
 %    >> finder.produceSummary; 
-%    which produces a RunSummary object. These objects can be collected for 
+%    which produces a Summary object. These objects can be collected for 
 %    multiple runs and used to, e.g., draw statistics on how much data has 
 %    been scanned for occultations. 
 % b) The occultation candidates that surpassed the threshold during the event
@@ -913,7 +916,7 @@ classdef EventFinder < handle
 
                     end
                     
-                    ff_std = nanstd(bg_filtered_fluxes); % STD correction from filtered background fluxes
+                    ff_std = nanstd(obj.removeOutliers(bg_filtered_fluxes)); % STD correction from filtered background fluxes
                     
                 else
                     ff_std = sqrt(var_buf.mean); % STD correction from var buffer
@@ -938,11 +941,23 @@ classdef EventFinder < handle
             
             if ~isempty(var_buf) % if we are using a var buffer, load the new results into it
                 
-                var_buf.input(nanvar(ff)); 
+                var_buf.input(nanvar(obj.removeOutliers(ff))); 
                 
             end
             
             ff = ff./ff_std; % apply the STD correction
+            
+        end
+        
+        function flux_out = removeOutliers(obj, flux, sigma)
+            
+            if nargin<3 || isempty(sigma)
+                sigma = 5;
+            end
+            
+            idx = abs(flux - nanmean(flux)) > sigma*nanstd(flux);
+            flux_out = flux;
+            flux_out(idx) = NaN; 
             
         end
             

@@ -4,7 +4,7 @@ classdef Folder < dynamicprops
 % The main method to use is the static scan() method:
 % >> r = run.Folder.scan(...); 
 % This returns a vector of Folder objects, one for each run in the 
-% main folder (by default scans <DATA>/WFAST/<year> for the current year).
+% root folder (by default scans <DATA>/WFAST/<year> for the current year).
 %
 % Optional Arguments to the scan() method:
 % -folder: specify which folder to scan. This must be a root folder with 
@@ -32,7 +32,7 @@ classdef Folder < dynamicprops
 %     this information leave the "next" argument empty (or don't give it). 
 %     This is useful for e.g., summing the total star hours in a given time
 %     range/observing season. 
-% (2) get the next folder that need to be processed or the next folder that
+% (2) get the next folder that needs to be processed or the next folder that
 %     needs to have its candidates classified. Use the "unprocessed" or 
 %     "unclassified" options to the "next" argument. 
 %     This is useful for automatically processing all folders or for pulling
@@ -95,10 +95,10 @@ classdef Folder < dynamicprops
 %                           has classified candidates (saved events) that
 %                           should be loaded into a database of events. 
 %   -summary: if the folder has an analysis folder (from the new pipeline)
-%             then there should be a RunSummart saved with the run. This
+%             then there should be a Summary object saved with the run. This
 %             is loaded into the Folder object for easy access to the 
 %             summary data, which includes runtime, star hours, header info
-%             and so on. See the definition of RunSummary. 
+%             and so on. See the definition of Summary. 
 % 
 % 
 

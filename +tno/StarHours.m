@@ -6,7 +6,7 @@ classdef StarHours < handle
 % the first argument to the input() function. The second optional input to  
 % this function, bad_batch=0, can be set to true to tell StarHours that the
 % incoming batch is completely disqualified. This can happen if e.g., there
-% are too many event candidates in a single batch (and it is black-listed). 
+% are too many event candidates in a single batch (i.e., it's black-listed). 
 % 
 % This object does not have many user-defined parameters. They are:
 % -snr_bin_min: minimal S/N values to store in the histogram. Default 5. 
@@ -24,7 +24,7 @@ classdef StarHours < handle
 %     their contribution to the star-time histograms. 
 % After the run is done and stars are removed, we can safely sum the data
 % into 1D histograms for different S/N bins only. This is done when these
-% histograms are transferred to the RunSummary object. 
+% histograms are transferred to the Summary object. 
 % 
 % The outputs from this object are:
 % -runtime: the total time, in seconds, that was processed (not including 
@@ -64,7 +64,7 @@ classdef StarHours < handle
 % -min_snr and max_snr: put limits on what to plot in the S/N range. The 
 %                       default is full bin range (snr_bin_min to snr_bin_max). 
 % -sum: if false, will show the values for each star individually (in 2D). 
-%       if true, will show the summed result for all stars. Default false. 
+%       if true, will show the summed result for all stars. Default true. 
 % -hours: translate the star-seconds to star-hours. Default true. 
 % -axes: which axes to plot into. Default is gca(). 
 % -font_size: for the axes and labels. Default is 18. 
@@ -577,7 +577,7 @@ classdef StarHours < handle
             input.input_var('max_snr', obj.snr_bin_max); 
             input.input_var('min_snr', obj.snr_bin_min); 
             input.input_var('rebin', []); % to be added later
-            input.input_var('sum', false);
+            input.input_var('sum', true);
             input.input_var('hours', true); 
             input.input_var('axes', [], 'axis'); 
             input.input_var('font_size', 18); 
