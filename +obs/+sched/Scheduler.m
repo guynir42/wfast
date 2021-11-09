@@ -829,14 +829,20 @@ classdef Scheduler < handle
                 use_sim = 0;
             end
             
+            reposition_angle = obj.distance_new_target; 
+            
+            if ~isempty(target.reposition_radius)
+                reposition_angle = target.reposition_radius;
+            end
+            
             if ~use_sim
 
                 if isempty(obj.obs_history) || isempty(obj.obs_history(end).RA_deg) || isempty(obj.obs_history(end).Dec_deg)
                     val = 0; % no current coordinates, so it can't be close enough
                 elseif isempty(target.ephem.RA_deg) || isempty(target.ephem.Dec_deg) || isempty(obj.obs_history(end).RA_deg) || isempty(obj.obs_history(end).Dec_deg)
                     val = 0; 
-                elseif target.ephem.angleDifference(target.ephem.RA_deg, obj.obs_history(end).RA_deg)<obj.distance_new_target && ...
-                        abs(target.ephem.Dec_deg-obj.obs_history(end).Dec_deg)<obj.distance_new_target % both coordinates are close enough
+                elseif target.ephem.angleDifference(target.ephem.RA_deg, obj.obs_history(end).RA_deg)<reposition_angle && ...
+                        abs(target.ephem.Dec_deg-obj.obs_history(end).Dec_deg)<reposition_angle % both coordinates are close enough
                     val = 1; 
                 else % coordinates are too far, consider this a new target
                     val = 0; 
@@ -848,8 +854,8 @@ classdef Scheduler < handle
                     val = 0; % no current coordinates, so it can't be close enough
                 elseif isempty(target.ephem.RA_deg) || isempty(target.ephem.Dec_deg) || isempty(obj.obs_history_sim(end).RA_deg) || isempty(obj.obs_history_sim(end).Dec_deg)
                     val = 0; 
-                elseif target.ephem.angleDifference(target.ephem.RA_deg, obj.obs_history_sim(end).RA_deg)<obj.distance_new_target && ...
-                        abs(target.ephem.Dec_deg-obj.obs_history_sim(end).Dec_deg)<obj.distance_new_target % both coordinates are close enough
+                elseif target.ephem.angleDifference(target.ephem.RA_deg, obj.obs_history_sim(end).RA_deg)<reposition_angle && ...
+                        abs(target.ephem.Dec_deg-obj.obs_history_sim(end).Dec_deg)<reposition_angle % both coordinates are close enough
                     val = 1; 
                 else
                     val = 0; 
