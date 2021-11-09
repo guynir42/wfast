@@ -62,6 +62,9 @@ classdef (CaseInsensitiveProperties) Target < handle
         priority = 1; % higher is more important (fractions are also acceptible). 
         decay_rate = []; % how fast priority decays per hour of observing time.
         
+        % moving to a new target
+        reposition_radius = []; % how much does this (dynamical) target need to move to warrant a slew (degrees) 
+        
         % instructions to mount/camera
         tracking = 1; % most targets need the telescope to be tracking 
         cam_mode = 'fast'; % choose "fast" for KBO type survey at 25Hz, or "slow" for deeper targets with 3 second exposures
@@ -129,6 +132,9 @@ classdef (CaseInsensitiveProperties) Target < handle
             obj.priority = 1; % higher is more important (fractions are also acceptible). 
             obj.decay_rate = []; % how fast priority decays per hour of observing time.
             
+            % moving to a new target
+            obj.reposition_radius = []; % how much does this (dynamical) target need to move to warrant a slew (degrees) 
+        
             % instructions to mount/camera
             obj.tracking = 1; % most targets need the telescope to be tracking 
             obj.cam_mode = 'fast'; % choose "fast" for KBO type survey at 25Hz, or "slow" for deeper targets with 3 second exposures
@@ -346,6 +352,8 @@ classdef (CaseInsensitiveProperties) Target < handle
                     obj.priority = val;
                 elseif cs(key, 'decay rate')
                     obj.decay_rate = val;
+                elseif cs(key, 'reposition radius')
+                    obj.reposition_radius = val; 
                 elseif cs(key, 'tracking')
                     obj.tracking = parse_bool(val);
                 elseif cs(key, 'cam_mode', 'camera mode', 'mode')

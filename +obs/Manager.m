@@ -1481,11 +1481,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
                 
                 if use_telegram
                     
-                    obj.sendTelegram(name, subject); 
-                    
                     if ~strcmpi(name, 'guy') % also send a message to Guy 
                         obj.sendTelegram('guy', subject); 
                     end
+                    
+                    obj.sendTelegram(name, subject); 
                     
                 end
                 
