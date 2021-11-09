@@ -49,6 +49,8 @@ classdef Acquisition < file.AstroData
         
         log@util.sys.Logger;
         
+        email@obs.comm.Email;
+        
         obs_log; % struct with observation time and number of files and other metadata for each target
         
         forced_targets = []; % structs with target parameters (at least RA/Dec) to add to the positions/cutouts/catalog
@@ -417,6 +419,8 @@ classdef Acquisition < file.AstroData
                 obj.log.newline; 
                 obj.log.input('Constructed new Acquisition object.'); 
                 
+                obj.constructEmail;
+                
 %                 obj.dome_pc.connect;
                 
             end
@@ -438,7 +442,17 @@ classdef Acquisition < file.AstroData
             obj.cut_size_bg = 32;
 
         end
-
+        
+        function constructEmail(obj)
+            
+            obj.email = obs.comm.Email;
+            
+            if obj.debug_bit, util.text.date_printf('sending Email to report system restart!'); end
+            
+            obj.email.sendToAddress('Guy', 'subject', 'Cam-PC restarted', 'text', 'Cam-PC has been restarted')
+            
+        end
+        
     end
     
     methods % reset/clear
