@@ -458,7 +458,7 @@ classdef QualityChecker < handle
             obj.delta_t = []; 
             obj.shakes = [];
             obj.defocus = []; 
-            obj.fwhm = [];
+%             obj.fwhm = []; % this is added before a call to input() so we leave it here
             obj.instability = []; 
             obj.slope = [];
             obj.offset_size = [];
@@ -611,7 +611,7 @@ classdef QualityChecker < handle
             end
             
             if obj.pars.use_instability
-                obj.instability = mad(obj.flux_buffer)./nanmedian(util.series.binning(obj.flux_buffer, size(obj.search_flux,1), 'func', 'std'));
+                obj.instability = mad(obj.flux_buffer, 1)./nanmedian(util.series.binning(obj.flux_buffer, size(obj.search_flux,1), 'func', 'std'));
             end
             
             obj.juldate_log = vertcat(obj.juldate_log, nanmean(obj.search_juldates)); % keep track of the julian date of each batch
@@ -670,7 +670,7 @@ classdef QualityChecker < handle
             
             if obj.pars.use_repeating_columns % we only trigger this if we have to, it takes a while to calculate
                 margins = floor((size(obj.extended_flux,1) - size(obj.search_flux,1))/2); % the margins on either edge of the search region
-                margins = margins- obj.pars.dilate_region; % make the margins smaller to allow dilation from outside the search region
+                margins = margins - obj.pars.dilate_region; % make the margins smaller to allow dilation from outside the search region
                 obj.repeating_columns = img.find_repeating_columns(obj.cutouts, 'margins', margins); % additional arguments may change the fraction of a column that is tested (for cutouts 50% is fine)
             end
             
@@ -1082,15 +1082,15 @@ classdef QualityChecker < handle
                     f2 = f.^2; 
                     f2p = permute(f2(:,1:num_stars), [1,3,2]); % turn 2nd dim into 3rd, and truncate the number of fluxes
                     
-                    FC = nansum(f.*fp, 1)./sqrt(nansum(f2,1).*nansum(f2p,1)); % full 3D matrix (1st dim is scalar, 3rd dim is shorter than 2nd if using num_stars)
+                    FC = nansum(f.*fp, 1)./sqrt(nansum(f2,1).*nansum(f2p,1)).*sqrt(w); % full 3D matrix (1st dim is scalar, 3rd dim is shorter than 2nd if using num_stars)
                     FC(isnan(FC)) = 0; % NaNs come from all frames being zero -> zero norm -> can put zero correlations
 %                     for kk = 1:size(flux,2)
 %                         FC(1,kk,kk) = 0; % remove auto-correlations (should be all equal to 1 anyway)
 %                     end
                     
-                    FC_noise = mad(FC, [], 3); % a robust estimate of the noise
+%                     FC_noise = mad(FC, 1, 3); % a robust estimate of the noise
 
-                    FC_sort = sort(abs(FC./FC_noise),3, 'descend'); 
+                    FC_sort = sort(abs(FC),3, 'descend'); 
                     num_highest_stars = obj.pars.nth_highest_corr; 
                     if num_highest_stars+1 > size(FC_sort,3)
                         num_highest_stars = size(FC_sort,3) - 1;
@@ -1178,7 +1178,7 @@ classdef QualityChecker < handle
         
         function val = calculateApertureDifference(obj)
             
-            val = abs(obj.extended_flux - obj.extended_fluxes_extra)./mad(obj.extended_flux); 
+            val = abs(obj.extended_flux - obj.extended_fluxes_extra)./mad(obj.extended_flux, 1); 
             
         end
         

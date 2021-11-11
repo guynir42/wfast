@@ -117,11 +117,14 @@ function val = fwhm(I, varargin)
     if cs(input.method, 'filters', 'templates') % all sorts of filter bank based calculations
         
         % g is a cell array of function handles, for each kind of template
-        g{1} = @(w) util.shapes.gaussian(w./2.355, 'size', S, 'norm', 2); % gaussian normalized for matched filtering 
+        conversion = 2.55; % =2*sqrt(2*log(2));
+        g{1} = @(w) util.shapes.gaussian(w./conversion, 'size', S, 'norm', 2); % gaussian normalized for matched filtering 
         l{1} = 'gaussians'; 
         
         for kk = 1:length(input.generalized)
-            g{end+1} = @(w) util.shapes.generalized_gaussian('sigma_x', w./2.355, 'size', S, 'norm', 2, 'power', input.generalized(kk));  
+            p = input.generalized(kk);
+            conversion = 2*(p*log(2)).^(1/p); % replace 2.355 with the correct factor
+            g{end+1} = @(w) util.shapes.generalized_gaussian('sigma_x', w./2.355, 'size', S, 'norm', 2, 'power', p);  
             l{end+1} = sprintf('generalized= %4.2f', input.generalized(kk)); 
         end
         

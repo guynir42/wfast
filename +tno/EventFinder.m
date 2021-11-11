@@ -411,7 +411,7 @@ classdef EventFinder < handle
         
     end
     
-    methods % calculations
+    methods % interface methods
         
         function input(obj, varargin) % provide the photometric data as varargin pairs, or as a util.text.InputVar object, or as an img.Photometry object
             
@@ -637,12 +637,13 @@ classdef EventFinder < handle
             s.size_snr_coeffs = obj.store.size_snr_coeffs;
             
             
-            FWHM = obj.store.checker.defocus_log*2.355*obj.head.SCALE; 
-            if ~isempty(FWHM)
-                s.fwhm_edges = 0:0.1:round(nanmax(FWHM)*10)/10;
-                s.fwhm_hist = histcounts(FWHM, 'BinEdges', s.fwhm_edges);             
-                s.fwhm_hist = s.fwhm_hist.*nanmedian(diff(obj.store.checker.juldate_log))*24*3600;
-            end
+%             FWHM = obj.store.checker.defocus_log*2.355*obj.head.SCALE;
+% 
+%             if ~isempty(FWHM)
+%                 s.fwhm_edges = 0:0.1:round(nanmax(FWHM)*10)/10;
+%                 s.fwhm_hist = histcounts(FWHM, 'BinEdges', s.fwhm_edges);             
+%                 s.fwhm_hist = s.fwhm_hist.*nanmedian(diff(obj.store.checker.juldate_log))*24*3600;
+%             end
             
             s.seeing_log = obj.store.fwhm_log; 
             s.juldates_log = obj.store.juldates_log; 
@@ -682,7 +683,7 @@ classdef EventFinder < handle
         
     end
     
-    methods(Hidden=true) % internal methods
+    methods(Hidden=true) % internal calculation methods
         
         function [flux_out, std_out] = correctFluxes(obj, fluxes, star_indices) % star indices tells the PSD which stars were given in fluxes (default is all stars)
             
@@ -900,7 +901,7 @@ classdef EventFinder < handle
                 if isempty(var_buf) || var_buf.counter<N  % no buffer (or the buffer is not yet full), must calculate its own variance on the background
                     
                     if nargin<7 || isempty(bg_fluxes) % if we were not given a background flux, use the store
-                        [bg_fluxes, bg_stds] = obj.correctFluxes(obj.store.background_detrend(:,star_indices), star_indices); 
+                        [bg_fluxes, bg_stds] = obj.correctFluxes(obj.removeOutliers(obj.store.background_detrend(:,star_indices)), star_indices); 
                     end
                     
                     try
@@ -1077,8 +1078,8 @@ classdef EventFinder < handle
             % store some statistics on this star's raw flux
             A = obj.store.background_aux(:,c.star_index, obj.store.aux_indices.areas); 
             B = obj.store.background_aux(:,c.star_index, obj.store.aux_indices.backgrounds); 
-            c.flux_mean = nanmean(obj.store.background_flux(:,c.star_index)-A.*B); 
-            c.flux_std = nanstd(obj.store.background_flux(:,c.star_index)); 
+            c.flux_mean = nanmedian(obj.store.background_flux(:,c.star_index)-A.*B); 
+            c.flux_std = mad(obj.store.background_flux(:,c.star_index), 1)./0.6745; % match the MAD to STD using sqrt(2)*erfinv(0.5)
             
             % save the auxiliary data (like background and offsets)
             c.auxiliary = permute(obj.store.extended_aux(:,c.star_index,:), [1,3,2]); 
@@ -1094,6 +1095,7 @@ classdef EventFinder < handle
             c.relative_dx = dx; 
             c.relative_dy = dy; 
             c.average_offsets = obj.store.extended_average_offsets; % keep track of forced photometry offsets
+%             c.fwhm = obj.store.checker.fwhm;
             
             % get the observational parameters and the star parameters from astrometry/GAIA
             c.head = obj.head;
@@ -1354,7 +1356,7 @@ classdef EventFinder < handle
                 % get an estimate for the background of this flux:
                 if obj.pars.use_std_filtered % need to correct the filtered fluxes by their measured noise
 
-                    [bg_flux, bg_std] = obj.correctFluxes(obj.store.background_detrend(:,star_index_sim), star_index_sim); % run correction on the background region
+                    [bg_flux, bg_std] = obj.correctFluxes(obj.removeOutliers(obj.store.background_detrend(:,star_index_sim)), star_index_sim); % run correction on the background region
                     background_ff = bank.input(bg_flux, bg_std); % filter the background flux also
                     bg_ff_std = nanstd(background_ff); 
 
