@@ -7,6 +7,13 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
 % OUTPUTS: -results: a struct containing the ocefficients etc. 
 %          -surf_image: a map of the surface using the fit results. 
 %
+% NOTE: the coefficients will be organized by order, then from x's highest
+%       power to y's highest power. E.g., for order=2:
+%       coeffs= {'','x','y','x.^2','x.*y','y.^2'}
+%       For order=3: 
+%       {'','x','y','x.^2','x.*y','y.^2','x.^3','x.^2.*y','x.*y.^2','y.^3'}
+%
+%
 % OPTIONAL PARAMETERS:
 %   -weights: give the relative weight foreach measurement, or a single
 %             value for all measurements. Will be used as weights for the

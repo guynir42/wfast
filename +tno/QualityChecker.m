@@ -629,8 +629,9 @@ classdef QualityChecker < handle
             
             r = sqrt(x.^2 + y.^2); % size of offsets
             
-            rr = cat(3,r,circshift(r,1),circshift(r,-1)); % pile up the r matrices with a small shift 
-            obj.offset_size = min(rr,[],3); % find the minimal offset in unshifted, and slightly shifted matrices (e.g., the smallest value out of nearest neighbors)
+%             rr = cat(3,r,circshift(r,1),circshift(r,-1)); % pile up the r matrices with a small shift 
+%             obj.offset_size = min(rr,[],3); % find the minimal offset in unshifted, and slightly shifted matrices (e.g., the smallest value out of nearest neighbors)
+            obj.offset_size = movmin(r, 3); % find the smallest value out of nearest neighbors
             
             obj.shakes = util.vec.weighted_average(r,F.^2,2); % the average offset size (weighted by the flux squared, making it more reliable as it uses bright stars)
 
@@ -1178,7 +1179,7 @@ classdef QualityChecker < handle
         
         function val = calculateApertureDifference(obj)
             
-            val = abs(obj.extended_flux - obj.extended_fluxes_extra)./mad(obj.extended_flux, 1); 
+            val = movmin(abs(obj.extended_flux - obj.extended_fluxes_extra)./mad(obj.extended_flux, 1), 2, 'omitnan'); 
             
         end
         
@@ -1267,7 +1268,7 @@ classdef QualityChecker < handle
                 val = 0; 
             end
             
-            if obj.pars.use_fwhm && ~isempty(obj.fwhm) && obj.fwhm>2*obj.pars.thresh_fwhm
+            if obj.pars.use_fwhm && ~isempty(obj.fwhm) && nanmedian(obj.fwhm(:))>2*obj.pars.thresh_fwhm
                 val = 0; 
             end
             

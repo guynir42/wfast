@@ -174,8 +174,8 @@ classdef Analysis < file.AstroData
         use_display_flip = 0;
         display_num_rect_stars = 30;
         
-        use_fwhm_stop = false;
-        max_fwhm_stop = 10; % if seeing is worse than this number (in arcsec) quit the run
+%         use_fwhm_stop = false;
+%         max_fwhm_stop = 10; % if seeing is worse than this number (in arcsec) quit the run
         
         brake_bit = 1;
         debug_bit = 1;
@@ -427,16 +427,6 @@ classdef Analysis < file.AstroData
                 val = obj.reader.getNumBatches;
             else
                 val = min([obj.num_batches_limit, obj.reader.getNumBatches]);
-            end
-            
-        end
-        
-        function val = seeing(obj)
-            
-            if isempty(obj.head)
-                val = obj.FWHM.*1.24;
-            else
-                val = obj.FWHM.*obj.head.SCALE;
             end
             
         end

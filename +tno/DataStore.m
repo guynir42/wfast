@@ -255,6 +255,8 @@ classdef DataStore < handle
             obj.pars.use_reject_gaussian_photometry = true; 
             obj.pars.use_reject_aperture_photometry = true; 
             
+            obj.pars.use_fwhm_per_star = true;
+            
             obj.reset;
             
         end
@@ -472,7 +474,14 @@ classdef DataStore < handle
             end
             
             if length(varargin)>1 && isa(varargin{2}, 'img.ModelPSF') % can also pick up the FWHM from the ModelPSF
-                obj.checker.fwhm = varargin{2}.fwhm; 
+                if obj.pars.use_fwhm_per_star
+                    obj.checker.fwhm = varargin{2}.fwhm_per_star'; 
+                    if ~isempty(obj.star_indices)
+                        obj.checker.fwhm = obj.checker.fwhm(1, obj.star_indices); % keep only the chosen stars
+                    end
+                else
+                    obj.checker.fwhm = varargin{2}.fwhm; 
+                end
                 obj.fwhm_log = vertcat(obj.fwhm_log, varargin{2}.fwhm); 
                 obj.juldates_log = vertcat(obj.juldates_log, obj.head.get_juldates(mean(obj.this_input.timestamps))); % keep a log of the julian dates of the middle of each batch as well
             end
@@ -660,6 +669,10 @@ classdef DataStore < handle
             obj.cutouts = obj.cutouts(:,:,:,obj.star_indices); 
             
             obj.extended_fluxes_extra = obj.extended_fluxes_extra(:,obj.star_indices,obj.extra_fluxes_indices); 
+            
+            if size(obj.checker.fwhm, 2)>1
+                obj.checker.fwhm = obj.checker.fwhm(1, obj.star_indices); % keep only the chosen stars
+            end
             
         end
         

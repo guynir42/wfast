@@ -240,6 +240,104 @@ classdef CorrectPSD < handle
     
     methods % plotting tools / GUI
         
+        function plot(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('stars', 1:10, 'indices'); 
+            input.input_var('ax', [], 'axes', 'axis'); 
+            input.input_var('font_size', 16); 
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.ax)
+                input.ax = gca;
+            end
+            
+            p = obj.power_spectrum; 
+            f = obj.freq;
+            
+            N = floor(size(f,1)/2) + 1;
+            p = p(1:N,:);
+            f = f(1:N);
+            
+            input.stars(input.stars>size(p,2)) = []; % remove star indices outside the number of stars in the object
+            
+            semilogy(input.ax, f, p(:,input.stars), '-x');
+            
+            xlabel(input.ax, 'Frequency [1/cadence]'); 
+            ylabel(input.ax, 'Power'); 
+            input.ax.FontSize = input.font_size;
+            
+        end
+        
+        function demo(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('pause', 0.3); 
+            input.input_var('parent', [], 'figure'); 
+            input.input_var('font_size', 16); 
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.parent)
+                input.parent = gcf;
+            end
+            
+            delete(input.parent.Children); 
+            
+            ax1 = axes('Parent', input.parent, 'Position', [0.1, 0.15, 0.45, 0.8]);
+            ax2 = axes('Parent', input.parent, 'Position', [0.6, 0.15, 0.45, 0.8]);
+            
+            f = [];
+            bbuf = [];
+            obj.reset;
+            
+            for ii = 1:100
+                
+                if ~isempty(f)
+                    old_f = f(end-100+1:end);
+                else
+                    old_f = [];
+                end
+                
+                f = vertcat(old_f, normrnd(util.series.red_noise(100, 1), 2));
+                
+                if ~isempty(obj.power_spectrum)
+                    f2 = obj.input(f); 
+                    b2 = obj.input(bbuf); 
+                else
+                    f2 = NaN(length(f),1); 
+                    b2 = [];
+                end
+                
+                % add the new flux to the PSD buffer
+                obj.addToBuffer(f, 5000); 
+                obj.calcPSD; 
+                
+                % add the new flux to the background buffer
+                bbuf = vertcat(bbuf, f); 
+                if size(bbuf,1)>2000, bbuf = bbuf(end-2000+1:end); end
+                
+                % show the input and output flux
+                plot(ax1, 1:length(f), f, 1:length(f2), f2); 
+                
+                text(ax1, 30, 2, sprintf('batch= %02d', ii), ...
+                    'FontSize', input.font_size);
+                
+                text(ax1, 150, -1, sprintf('RMS= %4.2f / %4.2f', std(f2), std(b2)), ...
+                    'FontSize', input.font_size, 'HorizontalAlignment', 'Right'); 
+                
+                xlabel(ax1, 'frames'); 
+                ylabel(ax2, 'flux'); 
+                ax1.FontSize = input.font_size; 
+                
+                % also show the power spectrum evolving
+                obj.plot('font_size', input.font_size, 'ax', ax2);
+                pause(input.pause); 
+                
+            end
+            
+            
+        end
+        
     end    
     
 end
