@@ -485,6 +485,58 @@ classdef Scanner < handle
     
     methods % plotting tools / GUI
         
+        function addNextCandidatesButton(obj, fig)
+            
+            if nargin<2 || isempty(fig)
+                fig = gcf;
+            end
+            
+            uicontrol(fig, 'String', util.text.unicode('recycle'), ...
+                'Units', 'Normalized', 'Position', [0.95 0.9 0.045 0.09], ...
+                'Callback', @obj.callback_next_candidates, ...
+                'FontSize', 24); 
+            
+        end
+        
+        function callback_next_candidates(obj, hndl, ~)
+            
+            if nargin<2 || isempty(hndl)
+                hndl = [];
+            end
+            
+            if ~isempty(hndl)
+                hndl.BackgroundColor = 'green'; 
+                hndl.String = 'loading...'; 
+                hndl.FontSize = 10; 
+                drawnow;
+            end
+            
+            t = tic;
+            
+            val = obj.getNextCandidates;
+            
+            fprintf('Load candidates time: %4.2f\n', toc(t)); 
+            
+            if val
+                
+                if isempty(hndl)
+                    fig = gcf;
+                else
+                    fig = hndl.Parent;
+                end
+                
+                obj.candidates.show('index', 1, 'scanner', obj); 
+                obj.addNextCandidatesButton(fig); 
+                
+            else
+                
+                util.text.date_printf('Could not find any unclassified candidates!'); 
+                
+            end
+            
+            
+        end
+        
     end    
     
 end

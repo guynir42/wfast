@@ -946,6 +946,7 @@ classdef Candidate < handle
             input.input_var('kept', [], 'show_kept'); % if true, filter only the kept events when pressing the prev/next buttons
             input.input_var('cuts', []); % additional cut types to show on the flux plot
             input.input_var('duplicates', []); % skip duplicate events when classifying
+            input.input_var('scanner', []); % link back to the scanner object to load next candidates
             input.input_var('parent', []); % parent graphic object to plot to (figure or panel, default is gcf())
             input.input_var('font_size', 18);
             input.scan_vars(varargin{:});
@@ -986,6 +987,14 @@ classdef Candidate < handle
                 end
             end
             
+            if isempty(input.scanner) % default value
+                if ~isempty(input.parent.UserData) && isfield(input.parent.UserData, 'scanner')
+                    input.scanner = input.parent.UserData.scanner; 
+                else
+                    input.scanner = [];
+                end
+            end
+            
             if isempty(input.parent.UserData)
                 input.parent.UserData = struct('number', length(obj_vec), 'index', input.index, ...
                     'show_kept', input.kept, 'show_cuts', input.cuts, 'skip_duplicates', input.duplicates); % add other state variables here
@@ -994,6 +1003,8 @@ classdef Candidate < handle
                 input.parent.UserData.index = input.index;
                 input.parent.UserData.show_kept = input.kept;
                 input.parent.UserData.show_cuts = input.cuts; 
+                input.parent.UserData.skip_duplicates = input.duplicates;
+                input.parent.UserData.scanner = input.scanner;
                 % and add them here too
             end
             
@@ -1191,7 +1202,13 @@ classdef Candidate < handle
                 button.String = sprintf('%d/%d', N_class, N_total); 
                 button.(tool_tip_name) = sprintf('Cannot save. Only %d candidates have been classified out of %d', N_class, N_total); 
             end
-                        
+                
+            %%%%%%%%%%%%%%%%%%%% NEXT CANDIDATES %%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            if ~isempty(input.scanner) && isa(input.scanner, 'run.Scanner')
+                input.scanner.addNextCandidatesButton(input.parent);
+            end
+            
         end
         
         function showTimeRange(obj, varargin)
