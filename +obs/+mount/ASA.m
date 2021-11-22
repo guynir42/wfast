@@ -1070,6 +1070,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
 
                 if obj.use_accelerometer
                     % is it better to rely on the timer for these checks??
+                    if isempty(obj.ard)
+                        util.text.date_printf('Arduino object is empty...'); 
+                        return;
+                    end
+                    
                     ok = obj.ard.update;
 
                     if obj.ard.ALT<obj.ard.alt_limit || ok==0

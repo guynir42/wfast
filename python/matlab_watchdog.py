@@ -93,7 +93,7 @@ if pid is not None:
                 print('Starting up a new instance of MATLAB.')
                 kill_autoslew()
                 kill_clarity()
-                subprocess.Popen('matlab -useStartupFolderPref') # the optional argument tells matlab to start at the preferred startup folder defined in the preferences menu
+                subprocess.Popen('matlab -softwareopengl -useStartupFolderPref') # the optional argument tells matlab to start at the preferred startup folder defined in the preferences menu
     
                 
             else: 
