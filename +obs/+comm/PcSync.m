@@ -262,8 +262,10 @@ classdef PcSync < handle
                 try
                     fwrite(obj.hndl_tx, obj.raw_data_sent);
                 catch ME
+                    util.text.date_printf('Failed attempt to send values to hndl_tx. Error: %s\nValue: ', ME.getReport); 
                     value % print on screen what we were trying to send... 
-                    rethrow(ME);
+                    util.text.date_printf('Retrying send. '); 
+                    fwrite(obj.hndl_tx, obj.raw_data_sent);
                 end
                 
             elseif strcmpi(rx_or_tx, 'rx') % reply only (e.g., sending back the hash of latest incoming data)
