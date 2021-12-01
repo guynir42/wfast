@@ -572,50 +572,21 @@ classdef Analysis < file.AstroData
             if size(obj.fluxes,2)>=10, f(2) = obj.fluxes(1,10); end
             if size(obj.fluxes,2)>=100, f(3) = obj.fluxes(1,100); end
 
-            fprintf(fid, '%s: ', read_date);
-            fprintf(fid, 'Batch: %04d, ObsDate: %s, Flux: [% 9.1f % 8.1f % 7.1f]', obj.batch_counter+1, obs_date, f(1), f(2), f(3));
-            fprintf(fid, '%s\n', str); 
             
-%             if isempty(str)
-%                 ev_str = '';
-% 
-%                 for ii = 1:length(obj.finder.last_events)
-% 
-%                     if obj.finder.last_events(ii).keep
-%                         star_str = '*';
-%                     else
-%                         star_str = '';
-%                     end
-% 
-%                     ev_str = sprintf('%s%4.2f%s ', ev_str, obj.finder.last_events(ii).snr, star_str);
-% 
-%                 end
-% 
-%                 f = [0 0 0];
-%                 if ~isempty(obj.fluxes), f(1) = obj.fluxes(1,1); end
-%                 if size(obj.fluxes,2)>=10, f(2) = obj.fluxes(1,10); end
-%                 if size(obj.fluxes,2)>=100, f(3) = obj.fluxes(1,100); end
-% 
-%                 fprintf(fid, 'Batch: %04d, ObsDate: %s, Flux: [% 9.1f % 8.1f % 7.1f]', obj.batch_counter+1, obs_date, f(1), f(2), f(3));
-%                 
-%                 if ~isempty(obj.sky_pars)
-%                     if isfield(obj.sky_pars, 'zero_point'), zp = obj.sky_pars.zero_point; else, zp = NaN; end
-%     %                 if isfield(obj.sky_pars, 'noise_level'), nl = obj.sky_pars.noise_level; else, nl = NaN; end
-%                     if isfield(obj.sky_pars, 'limiting_mag'), lm = obj.sky_pars.limiting_mag; else, lm = NaN; end
-% 
-%                     fprintf(fid, ' | seeing: %4.2f" | back: %5.3f | area: %4.2f | zp: %6.4g | lim. mag: %4.2f', ...
-%                         obj.sky_pars.seeing, obj.sky_pars.background, obj.sky_pars.area, zp, lm);
-%                 end
-%                 
-%                 fprintf(fid, ' | Events S/N: [%s], ReadDate: %s\n', ev_str, read_date);
-%             
-%             else
-%                 fprintf(fid, '%s: %s\n', read_date, str);
-%             end
-            
-            % if there is no object-dump file, create one now! 
-            if ~exist(obj.log_obj, 'file')
-                util.oop.save(obj, obj.log_obj, 'hidden', 1); 
+            try
+
+                fprintf(fid, '%s: ', read_date);
+                fprintf(fid, 'Batch: %04d, ObsDate: %s, Flux: [% 9.1f % 8.1f % 7.1f]', obj.batch_counter+1, obs_date, f(1), f(2), f(3));
+                fprintf(fid, '%s\n', str); 
+
+                % if there is no object-dump file, create one now! 
+                if ~exist(obj.log_obj, 'file')
+                    util.oop.save(obj, obj.log_obj, 'hidden', 1); 
+                end
+
+            catch ME
+                util.text.date_printf('Problem writing log file!')
+                disp(ME.getReport);
             end
             
         end

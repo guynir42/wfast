@@ -293,7 +293,9 @@ classdef Scanner < handle
         function [success, report] = getNextCandidates(obj)
             
             % get the next folder that needs analysis
-            r = run.Folder.scan('folder', obj.root_folder, 'start', obj.date_start, ...
+            start = obj.getDateStartForCandidates; 
+            
+            r = run.Folder.scan('folder', obj.root_folder, 'start', start, ...
                 'end', obj.date_end, 'next', 'unclassified', 'process_date', obj.date_process);
             
             if isempty(r) || r.has_candidates==0
@@ -387,6 +389,16 @@ classdef Scanner < handle
     
     methods % internal utilities
         
+        function val = getDateStartForCandidates(obj)
+            
+            if isempty(obj.candidates)
+                val = obj.date_start;
+            else
+                val = obj.candidates(1).run_identifier(1:10);
+            end
+            
+        end
+        
         function setup_timer(obj, ~, ~)
             
             if ~isempty(obj.timer) && isa(obj.timer, 'timer') && isvalid(obj.timer)
@@ -465,7 +477,7 @@ classdef Scanner < handle
                 
                 obj.a.reader.dir.cd(r.folder); 
                 obj.a.reader.loadFiles; 
-                obj.a.async_run('worker', worker_idx, 'reset', 1, 'logging', 1, 'save', 1, 'output', 1); 
+                obj.a.async_run('worker', worker_idx, 'reset', 1, 'logging', 1, 'save', 1, 'output', 0); 
                 run_id = util.text.run_id(obj.a.reader.current_dir); 
                 report = sprintf('Started new run on worker %d for folder %s', worker_idx, run_id);
                 if obj.debug_bit, fprintf('%s: %s\n', datetime('now', 'TimeZone', 'UTC'), report); end

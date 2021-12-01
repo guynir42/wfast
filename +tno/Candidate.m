@@ -256,7 +256,7 @@ classdef Candidate < handle
                 'edge effect', 'bad pixel', ...
                 'bad aperture', 'normalization', ...
                 'cosmic ray', 'tracking error', ...
-                'artefact', 'mystery'};
+                'artefact', 'flickering'};
             
         end
         
@@ -949,6 +949,7 @@ classdef Candidate < handle
             input.input_var('scanner', []); % link back to the scanner object to load next candidates
             input.input_var('parent', []); % parent graphic object to plot to (figure or panel, default is gcf())
             input.input_var('font_size', 18);
+            input.input_var('timing_log', false); % print the runtime for each part of this function
             input.scan_vars(varargin{:});
             
             if isempty(input.parent)
@@ -1026,18 +1027,29 @@ classdef Candidate < handle
             
             margin_left = 0.05;
             
+            t0 = tic;
             ax1 = axes('Parent', input.parent, 'Position', [margin_left 0.65 0.55 0.25]);
             obj.showRawFlux('ax', ax1, 'equal', 0, 'title', 0);
+            t_raw = toc(t0); t0 = tic;
             
             ax2 = axes('Parent', input.parent, 'Position', [margin_left 0.40 0.55 0.25]);
             obj.showOtherStars('ax', ax2);
+            t_others = toc(t0); t0 = tic;
             
             ax3 = axes('Parent', input.parent, 'Position', [margin_left 0.15 0.55 0.25]);
             obj.showFilteredFlux('ax', ax3, 'title', 0, 'cuts', input.cuts); 
+            t_filter = toc(t0); t0 = tic;
             
             ax4 = axes('Parent', input.parent, 'Position', [0.68 0.2 0.3 0.5]);
-            obj.showCutouts('ax', ax4);
-             
+            t = timerfind('Type', 'timer', 'Name', 'cutouts-plot-timer');
+            stop(t)
+            delete(t);
+            t = timer('ExecutionMode', 'singleShot', 'Name', 'cutouts-plot-timer', ...
+                'StartDelay', 3, 'TimerFcn', {@obj.callback_slow_plot, ax4});
+            start(t);
+%             obj.showCutouts('ax', ax4);
+            t_cutouts = toc(t0); t0 = tic;
+            
             ax1.XLim = ax3.XLim;
             ax1.XTickLabels = {};
             xlabel(ax1, '');
@@ -1202,11 +1214,20 @@ classdef Candidate < handle
                 button.String = sprintf('%d/%d', N_class, N_total); 
                 button.(tool_tip_name) = sprintf('Cannot save. Only %d candidates have been classified out of %d', N_class, N_total); 
             end
-                
+            
+            t_buttons = toc(t0); t0 = tic;
+            
             %%%%%%%%%%%%%%%%%%%% NEXT CANDIDATES %%%%%%%%%%%%%%%%%%%%%%%%%%
             
             if ~isempty(input.scanner) && isa(input.scanner, 'run.Scanner')
                 input.scanner.addNextCandidatesButton(input.parent);
+            end
+            
+            t_next = toc(t0);
+            
+            if input.timing_log
+                fprintf('t_raw= %4.2f | t_others= %4.2f | t_filter= %4.2f | t_cutouts= %4.2f | t_buttons= %4.2f | t_next= %4.2f\n', ...
+                    t_raw, t_others, t_filter, t_cutouts, t_buttons, t_next); 
             end
             
         end
@@ -2063,7 +2084,20 @@ classdef Candidate < handle
     
     methods % callbacks to the show() method
         
+        function callback_slow_plot(obj, varargin)
+            
+%             disp('callback_slow_plot'); 
+            if isvalid(varargin{3})
+                obj.showCutouts('ax', varargin{3}); 
+            end
+            
+        end
+        
         function callback_key(obj, hndl, event)
+            
+            if ~isvalid(hndl)
+                return;
+            end
             
             if isequal(event.EventName, 'KeyPress')
                 
@@ -2076,6 +2110,15 @@ classdef Candidate < handle
                 elseif strcmp(event.Character, 'C') % upper case C only (classify as occultation certain)
                     classes = obj.getListOfClasses;
                     new_hndl.Classification = classes{1}; 
+                    obj.callback_classify(new_hndl); 
+                elseif strcmp(event.Character, 'X')
+                    new_hndl.Classification = 'Normalization'; 
+                    obj.callback_classify(new_hndl); 
+                elseif strcmp(event.Character, 'S')
+                    new_hndl.Classification = 'Satellite'; 
+                    obj.callback_classify(new_hndl); 
+                elseif strcmp(event.Character, 'F')
+                    new_hndl.Classification = 'Flare'; 
                     obj.callback_classify(new_hndl); 
                 end
                 
