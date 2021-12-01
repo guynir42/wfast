@@ -218,7 +218,7 @@ classdef AnalysisGUI < handle
             obj.panel_info.addButton('button_directory', 'directory', 'info', ' ', '', 'small');
             obj.panel_info.addButton('button_filename', 'filename', 'info', ' ', '', 'small');
 %             obj.panel_info.addButton('button_fwhm', 'FWHM', 'info', 'FWHM= ', 'pix', '', 0.2); 
-            obj.panel_info.addButton('button_seeing', 'seeing', 'info', 'seeing= ', '"', 'edit', 0.2);
+            obj.panel_info.addButton('button_seeing', 'FWHM', 'info', 'seeing= ', '"', 'edit', 0.2);
             obj.panel_info.addButton('button_RA', 'head.RA', 'info', 'RA= ', '', 'edit', 0.2); 
             obj.panel_info.addButton('button_DE', 'head.DEC', 'info', 'DE= ', '', 'edit', 0.2); 
             obj.panel_info.addButton('button_exptime', 'head.EXPTIME', 'info', 'expT= ', 's', 'edit', 0.2); 

@@ -36,7 +36,9 @@ classdef ModelPSF < handle
         offsets_x;
         offsets_y;
         fluxes;
+        fluxes_all; % take all stars, not just the first num_stars
         positions;
+        positions_all; % take all stars, not just the first num_stars
         cutouts;
                
         cutouts_shifted;
@@ -45,6 +47,8 @@ classdef ModelPSF < handle
         
         fwhm; % arcsec
         fwhm_pix; % pixels
+        fwhm_per_star; % using the fit result (arcsec)
+        fwhm_per_star_pix; % using the fit result (pixels)
         
         m2x;
         m2y;
@@ -162,7 +166,10 @@ classdef ModelPSF < handle
             obj.offsets_x = input.offsets_x(:,1:N);
             obj.offsets_y = input.offsets_y(:,1:N);
             obj.fluxes = input.fluxes(:,1:N); 
+            obj.fluxes_all = input.fluxes;
+            
             if ~isempty(input.positions)
+                obj.positions_all = input.positions;
                 obj.positions = input.positions(1:N,:); 
             end
             
@@ -251,7 +258,7 @@ classdef ModelPSF < handle
             
             C = C - util.stat.corner_median(C); % can we figure out a better way to remove the background? 
             
-            w = util.img.fwhm(C, 'method', 'filters', 'defocus', 1, 'generalized', 5, 'step', 0.25, 'min_size', 1);
+            w = util.img.fwhm(C, 'method', 'filters', 'defocus', 1, 'generalized', 5, 'step', 0.25, 'min_size', 0.5);
             w = util.vec.tocolumn(w); 
             
             x = obj.positions(:,1); 
@@ -275,15 +282,96 @@ classdef ModelPSF < handle
             
             obj.fwhm_pix = obj.surf_coeffs(1);
             
+            obj.fwhm_per_star_pix = obj.estimateFWHMperStar(obj.positions_all(:,1), obj.positions_all(:,2));
+            
             if ~isempty(obj.head) && ~isempty(obj.head.SCALE)
                 obj.fwhm = obj.fwhm_pix.*obj.head.SCALE;
+                obj.fwhm_per_star = obj.fwhm_per_star_pix.*obj.head.SCALE;
             end
+            
+        end
+        
+        function w = estimateFWHMperStar(obj, x, y)
+        % for each x and y position, calculate the interpolated FWHM 
+        % based on the spatial fit coefficients. 
+                
+            X = x - obj.surf_fit.xc;
+            Y = y - obj.surf_fit.yc; 
+            c = obj.surf_coeffs; 
+            
+            w = c(1) + c(2)*X + c(3)*Y + c(4)*X.^2 + c(5)*X.*Y + c(6)*Y.^2;
             
         end
         
     end
     
     methods % plotting tools / GUI
+        
+        function show(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('ax', [], 'axes', 'axis'); 
+            input.input_var('font_size', 16); 
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.ax)
+                input.ax = gca;
+            end
+            
+            p = obj.positions_all;
+            p0 = obj.positions;
+            F = util.vec.tocolumn(nansum(obj.fluxes_all,1));
+            s = sqrt(abs(F)); % sizes equal to the weights used in the fit
+            s = 10*s/nanmedian(s); % renormalize the sizes
+            
+            [X,Y] = meshgrid(min(p(:,1)):max(p(:,1)), min(p(:,2)):max(p(:,2)));
+            
+            X = X - obj.surf_fit.xc;
+            Y = Y - obj.surf_fit.yc;
+            
+            c = obj.surf_coeffs;
+            
+            I = c(1) + c(2)*X + c(3)*Y + c(4)*X.^2 + c(5)*X.*Y + c(6)*Y.^2;
+            I = I*obj.head.SCALE;
+            
+            input.ax.NextPlot = 'replace';
+            
+            util.plot.show(I, 'ax', input.ax, 'font_size', input.font_size); 
+            
+            input.ax.NextPlot = 'add';
+            
+            scatter(input.ax, p(:,1), p(:,2), s, obj.fwhm_per_star, 'filled', 'MarkerEdgeColor', 'k'); 
+            
+            plot(input.ax, p0(:,1), p0(:,2), '+r'); 
+            
+            input.ax.NextPlot = 'replace';
+            
+            title(input.ax, ''); 
+            
+        end
+        
+        function plotResiduals(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('ax', [], 'axes', 'axis'); 
+            input.input_var('font_size', 16); 
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.ax)
+                input.ax = gca;
+            end
+            
+            input.ax.NextPlot = 'replace';
+            plot(input.ax, obj.surf_fit.v, 'xr'); 
+            
+            input.ax.NextPlot = 'add';
+            plot(input.ax, obj.surf_fit.vm, 'og'); 
+            
+            N = min(size(obj.positions_all,1), obj.num_stars); 
+            plot(input.ax, obj.fwhm_per_star_pix(1:N), 'k.'); 
+            input.ax.NextPlot = 'replace';
+            
+        end
         
     end    
     

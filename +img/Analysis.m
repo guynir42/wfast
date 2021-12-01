@@ -25,7 +25,7 @@ classdef Analysis < file.AstroData
 % There are actually a lot more parameters that can be changed in this 
 % object. They are specified in the "switches/controls" block. 
 % Many other parameters for specific searches are saved inside the relevant
-% objects, e.g., the trig.EventFinder object "finder" defines many parameters
+% objects, e.g., the tno.EventFinder object "finder" defines many parameters
 % for the KBO/Oort cloud search. 
 % 
 % The run starts with a call to startup() and ends with finishup(). 
@@ -86,7 +86,7 @@ classdef Analysis < file.AstroData
         
         model_psf@img.ModelPSF;
         
-        finder@trig.EventFinder;
+        finder@tno.EventFinder;
         
         sky_pars;
         
@@ -174,8 +174,8 @@ classdef Analysis < file.AstroData
         use_display_flip = 0;
         display_num_rect_stars = 30;
         
-        use_fwhm_stop = false;
-        max_fwhm_stop = 10; % if seeing is worse than this number (in arcsec) quit the run
+%         use_fwhm_stop = false;
+%         max_fwhm_stop = 10; % if seeing is worse than this number (in arcsec) quit the run
         
         brake_bit = 1;
         debug_bit = 1;
@@ -280,7 +280,7 @@ classdef Analysis < file.AstroData
                 
                 obj.model_psf = img.ModelPSF;
                 
-                obj.finder = trig.EventFinder;
+                obj.finder = tno.EventFinder;
 %                 obj.finder.loadFilterBank;
                 
                 obj.cutout_store = learn.CutoutStorage; 
@@ -431,16 +431,6 @@ classdef Analysis < file.AstroData
             
         end
         
-        function val = seeing(obj)
-            
-            if isempty(obj.head)
-                val = obj.FWHM.*1.24;
-            else
-                val = obj.FWHM.*obj.head.SCALE;
-            end
-            
-        end
-        
         function val = thisFilename(obj)
             
             if isempty(obj.reader)
@@ -582,50 +572,21 @@ classdef Analysis < file.AstroData
             if size(obj.fluxes,2)>=10, f(2) = obj.fluxes(1,10); end
             if size(obj.fluxes,2)>=100, f(3) = obj.fluxes(1,100); end
 
-            fprintf(fid, '%s: ', read_date);
-            fprintf(fid, 'Batch: %04d, ObsDate: %s, Flux: [% 9.1f % 8.1f % 7.1f]', obj.batch_counter+1, obs_date, f(1), f(2), f(3));
-            fprintf(fid, '%s\n', str); 
             
-%             if isempty(str)
-%                 ev_str = '';
-% 
-%                 for ii = 1:length(obj.finder.last_events)
-% 
-%                     if obj.finder.last_events(ii).keep
-%                         star_str = '*';
-%                     else
-%                         star_str = '';
-%                     end
-% 
-%                     ev_str = sprintf('%s%4.2f%s ', ev_str, obj.finder.last_events(ii).snr, star_str);
-% 
-%                 end
-% 
-%                 f = [0 0 0];
-%                 if ~isempty(obj.fluxes), f(1) = obj.fluxes(1,1); end
-%                 if size(obj.fluxes,2)>=10, f(2) = obj.fluxes(1,10); end
-%                 if size(obj.fluxes,2)>=100, f(3) = obj.fluxes(1,100); end
-% 
-%                 fprintf(fid, 'Batch: %04d, ObsDate: %s, Flux: [% 9.1f % 8.1f % 7.1f]', obj.batch_counter+1, obs_date, f(1), f(2), f(3));
-%                 
-%                 if ~isempty(obj.sky_pars)
-%                     if isfield(obj.sky_pars, 'zero_point'), zp = obj.sky_pars.zero_point; else, zp = NaN; end
-%     %                 if isfield(obj.sky_pars, 'noise_level'), nl = obj.sky_pars.noise_level; else, nl = NaN; end
-%                     if isfield(obj.sky_pars, 'limiting_mag'), lm = obj.sky_pars.limiting_mag; else, lm = NaN; end
-% 
-%                     fprintf(fid, ' | seeing: %4.2f" | back: %5.3f | area: %4.2f | zp: %6.4g | lim. mag: %4.2f', ...
-%                         obj.sky_pars.seeing, obj.sky_pars.background, obj.sky_pars.area, zp, lm);
-%                 end
-%                 
-%                 fprintf(fid, ' | Events S/N: [%s], ReadDate: %s\n', ev_str, read_date);
-%             
-%             else
-%                 fprintf(fid, '%s: %s\n', read_date, str);
-%             end
-            
-            % if there is no object-dump file, create one now! 
-            if ~exist(obj.log_obj, 'file')
-                util.oop.save(obj, obj.log_obj, 'hidden', 1); 
+            try
+
+                fprintf(fid, '%s: ', read_date);
+                fprintf(fid, 'Batch: %04d, ObsDate: %s, Flux: [% 9.1f % 8.1f % 7.1f]', obj.batch_counter+1, obs_date, f(1), f(2), f(3));
+                fprintf(fid, '%s\n', str); 
+
+                % if there is no object-dump file, create one now! 
+                if ~exist(obj.log_obj, 'file')
+                    util.oop.save(obj, obj.log_obj, 'hidden', 1); 
+                end
+
+            catch ME
+                util.text.date_printf('Problem writing log file!')
+                disp(ME.getReport);
             end
             
         end
@@ -669,6 +630,7 @@ classdef Analysis < file.AstroData
                 end
 
                 cand = obj.finder.cand; 
+                cand.clearExtraData; % remove large arrays like auxiliary, flux and cutouts for all stars
                 
                 save(fullfile(obj.log_dir, 'candidates.mat'), 'cand', '-v7.3'); 
                 
@@ -1000,6 +962,15 @@ classdef Analysis < file.AstroData
                 delete(obj.futures{input.worker}); % deleting the future may release some memory (I hope?)
             end
             
+%             if isempty(obj.pool)
+%                 obj.pool = gcp;     
+%             end
+           
+            if isempty(gcp('nocreate'))
+                obj.pool = parpool;
+                obj.pool.IdleTimeout = 360;
+            end
+            
             obj.futures{input.worker} = parfeval(obj.pool, @obj.run, double(input.output), 'reset', input.reset, 'logging', input.logging, 'save', input.save, 'overwrite', input.overwrite); 
             obj.futures_dir{input.worker} = obj.reader.dir.two_tail;
             obj.futures_analysis_folder{input.worker} = fullfile(obj.reader.dir.pwd, ['analysis_' char(datetime('now', 'TimeZone', 'UTC'), 'yyyy-MM-dd')]);
@@ -1009,30 +980,25 @@ classdef Analysis < file.AstroData
         
         function idx = findWorker(obj, varargin)
             
-            if isempty(gcp('nocreate'))
-                obj.pool = parpool;
-                obj.pool.IdleTimeout = 360;
-            end
-            
-            N = obj.pool.NumWorkers; 
-            
-            if ~isempty(obj.max_num_workers) && obj.max_num_workers<N
-                N = obj.max_num_workers; 
-            end
-            
             idx = [];
+            N = obj.max_num_workers;
+            if isempty(N), N = 10; end
             
             for ii = 1:N
                 
                 if length(obj.futures)<ii || ~isa(obj.futures{ii}, 'parallel.Future') || ~isvalid(obj.futures{ii})...
                         || ( strcmp(obj.futures{ii}.State, 'finished') && obj.futures{ii}.Read==1)
                     idx = ii;
-                    return;
+                    break;
                 end
                 
             end
             
-            if ii==N
+            if idx > obj.max_num_workers
+                idx = [];
+            end
+            
+            if isempty(idx)
                 error('Cannot find a free worker to run analysis...');
             end
             
@@ -1041,18 +1007,9 @@ classdef Analysis < file.AstroData
         
         function idx = findWorkerUnread(obj)
             
-            if isempty(gcp('nocreate'))
-                obj.pool = parpool;
-                obj.pool.IdleTimeout = 360;
-            end
-            
-            N = obj.pool.NumWorkers; 
-            
-            if ~isempty(obj.max_num_workers) && obj.max_num_workers<N
-                N = obj.max_num_workers; 
-            end
-            
             idx = [];
+            N = obj.max_num_workers;
+            if isempty(N), N = 10; end
             
             for ii = 1:N
                 
@@ -1068,9 +1025,13 @@ classdef Analysis < file.AstroData
 %                     end
                     
                     idx = ii;
-                    return;
+                    break;
                 end
                 
+            end
+            
+            if idx > obj.max_num_workers
+                idx = [];
             end
             
         end
@@ -1401,6 +1362,7 @@ classdef Analysis < file.AstroData
                 obj.clip.cut_size = size(obj.cutouts,1);
                 
                 if ~isempty(obj.positions_bg)
+                    obj.positions_bg = obj.positions_bg(:,:,1); % to fix bug where these positions were saved for each star
                     obj.clip_bg.positions = obj.positions_bg;
                     obj.clip_bg.cut_size = size(obj.cutouts_bg,1);
                 end
@@ -1724,6 +1686,7 @@ classdef Analysis < file.AstroData
 
             t = tic;
 
+            obj.phot.clear;
             obj.phot.input('images', obj.cutouts_sub, 'timestamps', obj.timestamps, 'filename', obj.reader.this_filename, ...
                 't_start', obj.t_start, 't_end', obj.t_end, 't_end_stamp', obj.t_end_stamp, ...
                 'juldates', obj.juldates, 'positions', obj.positions, 'variance', single(2.5)); % need to add the sky background too
