@@ -1024,7 +1024,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
-        function resolve(obj, keyword, varargin) % use the keyword to find the object RA/Dec
+        function resolver_type = resolve(obj, keyword, varargin) % use the keyword to find the object RA/Dec
         % Usage: resolve(obj, [name])
         % Resolve the name given (default is obj.keyword) to find the RA/Dec.
         % If name is one of the following keywords: "ecliptic", "galactic",
@@ -1037,6 +1037,11 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         %
         % OPTIONAL ARGUMENTS are passed directly to override observational
         % constraints when picking automatic fields. 
+        %
+        % OUTPUT: what kind of resolver was used, empty if failed to find a
+        %         match. If nargout>0 will not print outputs when failed to
+        %         find a match. Possible outputs are:
+        %         "internal", "simbad", "jpl", [] 
         
             import util.text.cs;
         
@@ -1044,10 +1049,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 keyword = obj.keyword;
             end
             
+            resolver_type = 'internal';
+            
             obj.constraints.scan_vars(varargin{:}); 
             
             if isempty(keyword)
-                % do nothing... 
+                resolver_type = [];
             elseif cs(keyword, 'ecliptic', 'kbos')
                 obj.keyword = 'ecliptic'; % dynamically allocate this field after setting the time
                 obj.gotoDefaultField(obj.keyword, varargin{:}); % do we need the varargin here?
@@ -1082,14 +1089,16 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 obj.updateSun;
                 obj.gotoQuadratureField; 
             else
-                
+                resolver_type = [];
                 obj.keyword = keyword;
                 
-                if ~isempty(which('celestial.coo.convert2equatorial', 'function')) % use Eran's IMPROVED name resolver
+                if ~isempty(which('VO.name.server_simbad', 'function')) % use Eran's IMPROVED name resolver
                     
                     try 
-                        [RA, DEC] = celestial.coo.convert2equatorial(keyword, [], 'JD', obj.JD, ...
-                            'ObsCoo', [obj.longitude, obj.latitude, obj.elevation], 'OutputUnits', 'deg', 'NameServer', 'simbad');
+%                         [RA, DEC] = celestial.coo.convert2equatorial(keyword, [], 'JD', obj.JD, ...
+%                             'ObsCoo', [obj.longitude, obj.latitude, obj.elevation], 'OutputUnits', 'deg', 'NameServer', 'simbad');
+                        [RA, DEC] = VO.name.server_simbad(keyword); 
+                        resolver_type = 'simbad';
                     catch ME
                         RA = NaN;
                         DEC = NaN; 
@@ -1099,13 +1108,21 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                     if isnan(RA) || isnan(DEC) % failed to resolve
                         
                         try
-                            [RA, DEC] = celestial.coo.convert2equatorial(keyword, [], 'JD', obj.JD, 'HorizonsObsCode', '097', ...
-                                'ObsCoo', [obj.longitude, obj.latitude, obj.elevation], 'OutputUnits', 'deg', 'NameServer', 'jpl');
+%                             [RA, DEC] = celestial.coo.convert2equatorial(keyword, [], 'JD', obj.JD, 'HorizonsObsCode', '097', ...
+%                                 'ObsCoo', [obj.longitude, obj.latitude, obj.elevation], 'OutputUnits', 'deg', 'NameServer', 'jpl');
+                            [JCat]=celestial.SolarSys.jpl_horizons('ObjectInd', keyword, 'StartJD', obj.JD-2, 'StopJD', obj.JD+2, 'StepSizeUnits', 'h', 'CENTER', '097');
+                            [RA,Dec] = Util.interp.interp_diff_longlat(JCat.Cat(:,JCat.Col.JD), [JCat.Cat(:,JCat.Col.RA),JCat.Cat(:,JCat.Col.Dec)], obj.JD);
+                            RA = RA * 180/pi;
+                            Dec = Dec * 180/pi;
+                            resolver_type = 'jpl';
                         catch ME
                             if strcmp(ME.identifier, 'MATLAB:structRefFromNonStruct')
                                 RA = NaN;
                                 DEC = NaN; 
-                                if obj.debug_bit, util.text.date_printf('Could not resolve name "%s" with convert2equatorial()!', keyword); end
+                                if obj.debug_bit && nargout==0
+                                    util.text.date_printf('Could not resolve name "%s" with convert2equatorial()!', keyword); 
+                                end
+                                resolver_type = [];
                                 return; 
                             else
                                 RA = NaN;
@@ -1116,7 +1133,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                         end
                         
                         if isnan(RA) || isnan(DEC) % failed to resolve using JPL also
-                            if obj.debug_bit, util.text.date_printf('Could not resolve name "%s" with convert2equatorial()!', keyword); end
+                            if obj.debug_bit && nargout==0
+                                util.text.date_printf('Could not resolve name "%s" with name resolvers!', keyword); 
+                            end
+                            resolver_type = [];
                             return;
                         end
                         
@@ -1138,7 +1158,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                     end
                     
                     if isnan(RA) || isnan(DEC)
-                        if obj.debug_bit, util.text.date_printf('Could not resolve name "%s" with coo_resolver()!', keyword); end
+                        if obj.debug_bit && nargout==0
+                            util.text.date_printf('Could not resolve name "%s" with coo_resolver()!', keyword); 
+                        end
                         return;
                     end
 

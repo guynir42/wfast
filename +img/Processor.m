@@ -462,7 +462,7 @@ classdef Processor < dynamicprops
         
         function str = printout(obj)
             
-            str = sprintf('file: %d/%d', obj.file_index, obj.getNumFiles); 
+            str = sprintf('file: %d/%d', obj.file_index - 1, obj.getNumFiles); 
             
             str = sprintf('%s | folder: %s', str, strrep(obj.reader.dir.two_tail, '\', ' \ ')); 
             
@@ -488,8 +488,8 @@ classdef Processor < dynamicprops
                 
                 obj.displayInfo(sprintf('Starting new run with %d files', obj.getNumFiles));
                 
-                obj.reset;
-                obj.prog.reset(obj.getNumFiles);
+                obj.reset; % delete all run-related data
+                obj.prog.reset(obj.getNumFiles); % start the timing from zero
             
                 obj.data_logs.run_date = obj.find_folder_date;
                 obj.data_logs.camera = obj.find_camera;
@@ -504,16 +504,16 @@ classdef Processor < dynamicprops
                     error('Cannot start a new run without loading darks into calibration object!');
                 end
 
-                if obj.pars.use_save_results
+                if obj.pars.use_save_results % save a folder with a summary of the results, lightcurves, etc. 
 
                     d = obj.pars.output_folder; 
 
-                    if isempty(d)
+                    if isempty(d) % no folder name defined, use the default
                         t = datetime('now', 'TimeZone', 'UTC'); 
                         d = fprintf('processor_%4d-%2d-%2d', t.Year, t.Month, t.Day); 
                     end
 
-                    obj.output_folder_name = fullfile(obj.reader.dir.cwd, d); 
+                    obj.output_folder_name = fullfile(obj.reader.dir.cwd, d); % put the folder along with data
 
                     if exist(obj.output_folder_name, 'dir') && obj.pars.use_overwrite==0
                         [~, d] = fileparts(obj.output_folder_name); 
@@ -524,9 +524,9 @@ classdef Processor < dynamicprops
 
             end
             
-            obj.prog.unpause;
+            obj.prog.unpause; % start counting time
             
-            obj.brake_bit = 0;
+            obj.brake_bit = 0; % set this to 1 (from GUI) to stop run
             
         end
         
@@ -542,10 +542,10 @@ classdef Processor < dynamicprops
             obj.light.finishup;
             
             if obj.pars.use_save_results
-                obj.saveResults;
+                obj.saveResults; % save to process folder
             end
             
-            if obj.debug_bit, fprintf('Finished run with %d files.\n', obj.file_index); end
+            if obj.debug_bit, fprintf('Finished run with %d files.\n', obj.file_index - 1); end
             
         end
         
@@ -564,9 +564,10 @@ classdef Processor < dynamicprops
                 obj.reader.batch; % load the images from file
 
                 idx = mod(obj.file_index-1,obj.pars.coadd_size) + 1; % which buffer to fill                
-                idx_prev = mod(obj.file_index-2,obj.pars.coadd_size) + 1; % which buffer to fill
+                idx_prev = mod(obj.file_index-2,obj.pars.coadd_size) + 1; % index of previous buffer
                 obj.data = obj.makeDataStruct; % dump the old data and construct a new object
                 
+                % copy the data from reader into the current buffer
                 obj.data.images = obj.reader.images;
                 obj.data.stack = obj.reader.stack;
                 obj.data.num_sum = obj.reader.num_sum;
@@ -580,7 +581,7 @@ classdef Processor < dynamicprops
                 obj.data.file_index = obj.file_index; 
                 
                 if isempty(obj.data.juldates)
-                    % recaclculate it from timestamps
+                    % TODO: recaclculate it from timestamps
                 end
                 
                 if size(obj.data.images,3)>1
@@ -590,14 +591,15 @@ classdef Processor < dynamicprops
                 obj.addTimingData('read', toc(t0)); 
                 
             catch ME
+                % skip this batch, report it, and continue!
                 warning(ME.getReport);
                 obj.failed_file_counter = obj.failed_file_counter + 1;
                 obj.file_index = obj.file_index + 1;
                 obj.reader.advanceFile;
-                return; % skip this batch, report it, and continue! 
+                return;  
             end
             
-            % apply head corrections, if any
+            % apply header corrections, if any
             for ii = 1:2:length(obj.pars.header)
 
                 if length(obj.pars.header)>ii
@@ -640,7 +642,7 @@ classdef Processor < dynamicprops
                 obj.data.positions = obj.buffer(idx_prev).positions_new;
             end
             
-            obj.buffer(idx) = obj.data; % note that the stuct remaining in "data" is not to be used unless re-loaded from the buffer
+            obj.buffer(idx) = obj.data; % note that the struct remaining in "data" is not to be used unless re-loaded from the buffer
             
             obj.file_index = obj.file_index + 1;
             
@@ -786,17 +788,25 @@ classdef Processor < dynamicprops
                         obj.forced_cutout_motion_per_file = []; 
 
                         if obj.pars.use_interp_forced
+                            % try to use name resolver to find moving targets
 
-                            h = util.oop.full_copy(obj.head); 
-                            h.ephem.timeTravelHours(obj.getNumFiles.*obj.head.EXPTIME/3600); % move this Ephemeris object forward to the end of the run
-                            h.ephem.debug_bit = 0; 
-                            h.ephem.resolve; 
+                            e = head.Ephemeris;
+                            e.name = obj.head.ephem.name;
+                            e.keyword = obj.head.ephem.keyword;
 
-                            pos1 = obj.data.positions(obj.forced_indices(1),:); 
-                            pos2 = obj.cat.coo2xy(h.RA_DEG, h.DEC_DEG);
-
-                            if sqrt(sum((pos1-pos2).^2))<min(size(obj.data.image_proc))
-                                obj.forced_cutout_motion_per_file = (pos2-pos1)/obj.getNumFiles; % should be a 2-vector
+                            if isequal(e.resolve, 'jpl') % only do this for moving targets
+                            
+                                pos1 = obj.cat.coo2xy(e.RA_deg, e.Dec_deg); 
+                                
+                                e.timeTravelHours(obj.getNumFiles.*obj.head.NAXIS3.*obj.head.EXPTIME/3600); % move this Ephemeris object forward to the end of the run
+                                e.resolve; 
+                                pos2 = obj.cat.coo2xy(e.RA_deg, e.Dec_deg); 
+    %                             pos1 = obj.data.positions(obj.forced_indices(1),:);
+%                                 pos2 = obj.cat.coo2xy(h.RA_DEG, h.DEC_DEG);
+                                
+                                if sqrt(sum((pos1-pos2).^2))<min(size(obj.data.image_proc))
+                                    obj.forced_cutout_motion_per_file = (pos2-pos1)/obj.getNumFiles; % should be a 2-vector
+                                end
                             end
 
                         end
@@ -1037,7 +1047,7 @@ classdef Processor < dynamicprops
             else
                 dx = util.vec.weighted_average(obj.phot.offsets_x(:,:,obj.phot_ap_idx), obj.phot.fluxes(:,:,obj.phot_ap_idx), 2);
                 dy = util.vec.weighted_average(obj.phot.offsets_y(:,:,obj.phot_ap_idx), obj.phot.fluxes(:,:,obj.phot_ap_idx), 2);
-                val = [dx, dy];
+                val = double([dx, dy]);
             end
             
         end
@@ -1148,7 +1158,7 @@ classdef Processor < dynamicprops
             
             t0 = tic; 
 
-            obj.phot.input(obj.data.cutouts, 'positions', obj.data.positions, 'timestamps', obj.data.timestamps, 'juldates', obj.data.juldates); 
+            obj.phot.input(obj.data.cutouts, 'positions', obj.data.positions, 'timestamps', nanmean(obj.data.timestamps), 'juldates', nanmean(obj.data.juldates)); 
 
             if isempty(obj.phot_ap_idx)
                 obj.phot_ap_idx = obj.find_phot_ap;
@@ -1281,10 +1291,11 @@ classdef Processor < dynamicprops
 
             t0 = tic;
             
+            % this should be put inside a ModelPSF object
             N_stars = size(obj.data.cutouts,4); 
 
             idx = obj.pars.fwhm_indices; 
-
+            
             idx(idx>N_stars) = []; % remove indices outside the bounds
 
             if length(idx)<20 % arbitratry cutoff
@@ -1292,7 +1303,7 @@ classdef Processor < dynamicprops
             end
 
             C = obj.data.cutouts_sub(:,:,:,idx); % cutouts chosen for FWHM calculation
-
+            
             pix = obj.head.SCALE; 
             
             w = NaN(1,N_stars); % all stars that were not chosen for calculation are set to NaN
@@ -1531,7 +1542,7 @@ classdef Processor < dynamicprops
                     
                     if ii<=size(obj.stars,1) && obj.stars.flag(ii)==2
 %                         rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'yellow'); 
-                        c = 'yellow'; % yellow is for point sources
+                        c = 'yellow'; % yellow is for narrow (CR like) sources
                     elseif ii<=size(obj.stars,1) && obj.stars.flag(ii)==3
 %                         rectangle('Position', [P(ii,:)-0.5-obj.pars.cut_size/2 obj.pars.cut_size obj.pars.cut_size], 'Parent', input.ax, 'EdgeColor', 'green'); 
                         c = 'green'; % green is for extended sources

@@ -1902,7 +1902,7 @@ classdef Analysis < file.AstroData
             
             if obj.use_stack_lightcurves
                 obj.light_stack.batch_timestamps(end+1,1) = T_mid; 
-                obj.light_stack.batch_midframe(end+1,1) = length(obj.light_stack.timestamps); % add half the frame number to the number of existing frames
+                obj.light_stack.batch_midframe(end+1,1) = length(obj.light_stack.timestamps); % one more frame
                 obj.light_stack.fwhm_coeffs_pix(end+1,:) = obj.model_psf.surf_coeffs';
                 obj.light_stack.fwhm_x_center = obj.model_psf.surf_fit.xc;
                 obj.light_stack.fwhm_y_center = obj.model_psf.surf_fit.yc;

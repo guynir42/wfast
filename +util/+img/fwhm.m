@@ -64,7 +64,9 @@ function val = fwhm(I, varargin)
 %   -min_size: the minimal filter size, in pixels. Default is 0.5 pixels. 
 %   -fft: use FFT convolution instead of filter2. Default false. 
 %
-%
+% TODO: add Moffat profiles. Refs:
+%       * https://academic.oup.com/mnras/article/328/3/977/1247204
+%       * https://ui.adsabs.harvard.edu/abs/1969A%26A.....3..455M/abstract
 
     import util.text.cs;
 
