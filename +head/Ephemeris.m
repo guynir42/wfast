@@ -91,6 +91,8 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         field_id; % numeric identifier for fileds inside a list/bank
         
+        resolver_type = ''; % which name resolver was used: internal, simbad, jpl, or empty when no resolver was found
+        
     end
     
     properties(Dependent=true)
@@ -1024,7 +1026,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
-        function resolver_type = resolve(obj, keyword, varargin) % use the keyword to find the object RA/Dec
+        function val = resolve(obj, keyword, varargin) % use the keyword to find the object RA/Dec
         % Usage: resolve(obj, [name])
         % Resolve the name given (default is obj.keyword) to find the RA/Dec.
         % If name is one of the following keywords: "ecliptic", "galactic",
@@ -1049,12 +1051,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 keyword = obj.keyword;
             end
             
-            resolver_type = 'internal';
+            obj.resolver_type = 'internal';
             
             obj.constraints.scan_vars(varargin{:}); 
             
             if isempty(keyword)
-                resolver_type = [];
+               obj. resolver_type = '';
             elseif cs(keyword, 'ecliptic', 'kbos')
                 obj.keyword = 'ecliptic'; % dynamically allocate this field after setting the time
                 obj.gotoDefaultField(obj.keyword, varargin{:}); % do we need the varargin here?
@@ -1089,7 +1091,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 obj.updateSun;
                 obj.gotoQuadratureField; 
             else
-                resolver_type = [];
+                obj.resolver_type = '';
                 obj.keyword = keyword;
                 
                 if ~isempty(which('VO.name.server_simbad', 'function')) % use Eran's IMPROVED name resolver
@@ -1098,7 +1100,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
 %                         [RA, DEC] = celestial.coo.convert2equatorial(keyword, [], 'JD', obj.JD, ...
 %                             'ObsCoo', [obj.longitude, obj.latitude, obj.elevation], 'OutputUnits', 'deg', 'NameServer', 'simbad');
                         [RA, DEC] = VO.name.server_simbad(keyword); 
-                        resolver_type = 'simbad';
+                        obj.resolver_type = 'simbad';
                     catch ME
                         RA = NaN;
                         DEC = NaN; 
@@ -1114,7 +1116,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                             [RA,Dec] = Util.interp.interp_diff_longlat(JCat.Cat(:,JCat.Col.JD), [JCat.Cat(:,JCat.Col.RA),JCat.Cat(:,JCat.Col.Dec)], obj.JD);
                             RA = RA * 180/pi;
                             Dec = Dec * 180/pi;
-                            resolver_type = 'jpl';
+                            obj.resolver_type = 'jpl';
                         catch ME
                             if strcmp(ME.identifier, 'MATLAB:structRefFromNonStruct')
                                 RA = NaN;
@@ -1122,7 +1124,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                                 if obj.debug_bit && nargout==0
                                     util.text.date_printf('Could not resolve name "%s" with convert2equatorial()!', keyword); 
                                 end
-                                resolver_type = [];
+                                obj.resolver_type = '';
                                 return; 
                             else
                                 RA = NaN;
@@ -1136,7 +1138,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                             if obj.debug_bit && nargout==0
                                 util.text.date_printf('Could not resolve name "%s" with name resolvers!', keyword); 
                             end
-                            resolver_type = [];
+                            obj.resolver_type = '';
                             return;
                         end
                         
@@ -1173,7 +1175,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             end
             
             obj.updateSecondaryCoords;
-            
+            val = obj.resolver_type;
             % if none of these succeed, the RA/Dec remains empty! 
             
         end

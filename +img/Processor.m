@@ -73,10 +73,12 @@ classdef Processor < dynamicprops
        
         brake_bit = 1; % when running, this is 0, when it is turned to 1 (e.g., by GUI) the run is paused
         
-        buf_idx = 1; % which buffer are we looking at right now
-        prev_buf_idx = 0; % previously processed buffer
+        buffer_index = 1; % which buffer are we looking at right now
+        prev_buffer_index = 0; % previously processed buffer
         
         phot_ap_idx = []; % index of photometric types ("aperture index")
+        
+        name_resolver@head.Ephemeris; % in case we want to resolve the object position
         
         % these are interpreted from e.g., coordinates 
         fits_roi_position = []; % center of the ROI x,y position in pixels
@@ -90,7 +92,7 @@ classdef Processor < dynamicprops
         
         output_folder_name = ''; % folder containing the processed data and logs (e.g., process_2021-05-21)
         
-        version = 1.02;
+        version = 1.03;
         
     end
     
@@ -191,10 +193,8 @@ classdef Processor < dynamicprops
             obj.pars.fits.input_var('use_finding', true); obj.pars.fits.add_comment('save a finding chart PNG of the first image'); 
             
             obj.pars.input_var('header', {}, 'header corrections'); obj.pars.add_comment('cell array with keyword-value pairs to modify the header info from file'); 
-            
+            obj.pars.input_var('resolve', true, 'use_resolver', 'reresolve'); obj.pars.add_comment('Use the name resolver to get up-to-date coordinates of object'); 
             obj.pars.input_var('func_pars', [], 'function parameters', 'func parameters', 'function pars'); obj.pars.add_comment('additional parameters to "func handle". Could be a struct.'); 
-            
-            
             
             obj.backup_pars = obj.pars; % a copy of the handle, pointing to the same object, used to restore the parameters at the end of each run
             
@@ -304,6 +304,7 @@ classdef Processor < dynamicprops
             % counters
             obj.file_index = 1;
             obj.to_process_index = 1;
+            obj.buffer_index = 1;
             obj.failed_file_counter = 0;
             
             % parameters
@@ -318,6 +319,8 @@ classdef Processor < dynamicprops
             % other stuff
             obj.forced_coordinates = {}; 
             obj.forced_indices = []; 
+            
+            obj.name_resolver = head.Ephemeris.empty;
             
             obj.clear;
             
@@ -370,6 +373,24 @@ classdef Processor < dynamicprops
             
         end
         
+        function val = getIndicesString(obj)
+            
+            val = sprintf('file: %d | process: %d | buffer: %d', ...
+                obj.file_index, obj.to_process_index, obj.buffer_index); 
+            
+        end
+        
+        function val = getNameResolver(obj) % lazy load an Ephemeris object with updated coordinates
+            
+            if isempty(obj.name_resolver)
+                obj.name_resolver = util.oop.full_copy(obj.head.ephem);
+                [~] = obj.name_resolver.resolve; % output to suppress printouts if failed to resolve
+            end
+            
+            val = obj.name_resolver;
+            
+        end
+        
     end
     
     methods % setters
@@ -396,13 +417,15 @@ classdef Processor < dynamicprops
                     if ~obj.reader.is_finished
                         obj.load_data;
                     end
-                    
+                    if ~isempty(obj.gui) && obj.gui.check
+                        obj.gui.update;
+                    end
                     drawnow; 
                     
                     if mod(obj.file_index - 1, obj.pars.coadd_size)==0 || ... % finished collecting N files
                             obj.reader.is_finished % or if there are no more files
                         obj.calculateCoadds; 
-                        obj.process; % go over unprocessed files
+                        obj.process; % go over any unprocessed files (using to_process_index)
                     end
                     
                 end
@@ -418,6 +441,7 @@ classdef Processor < dynamicprops
                 else % run has caught an error mid-way
                     rethrow(ME); 
                 end
+                
             end
             
         end
@@ -460,9 +484,19 @@ classdef Processor < dynamicprops
             
         end
         
-        function str = printout(obj)
+        function str = printout(obj, what_to_show)
             
-            str = sprintf('file: %d/%d', obj.file_index - 1, obj.getNumFiles); 
+            if nargin<2 || isempty(what_to_show)
+                what_to_show = 'file'; 
+            end
+            
+            if util.text.cs(what_to_show, 'file')
+                str = sprintf('file: %d/%d', obj.file_index - 1, obj.getNumFiles); 
+            elseif util.text.cs(what_to_show, 'processed', 'processing')
+                str = sprintf('proc: %d/%d', obj.to_process_index, obj.getNumFiles); 
+            else
+                error('Unknown value "%s" to "what_to_show". Use "file" or "processing" instead...', what_to_show); 
+            end
             
             str = sprintf('%s | folder: %s', str, strrep(obj.reader.dir.two_tail, '\', ' \ ')); 
             
@@ -496,7 +530,8 @@ classdef Processor < dynamicprops
                 obj.data_logs.project = obj.find_project;
 
                 if obj.pars.use_auto_load_cal
-                    obj.displayInfo(sprintf('Loading calibration file for date %s', obj.data_logs.run_date)); 
+                    obj.displayInfo(sprintf('Loading calibration file for date %s (%s/%s)', ...
+                        obj.data_logs.run_date, obj.data_logs.project, obj.data_logs.camera)); 
                     obj.cal.loadByDate(obj.data_logs.run_date, obj.data_logs.camera, obj.data_logs.project); 
                 end
 
@@ -551,9 +586,7 @@ classdef Processor < dynamicprops
         
         function load_data(obj)
             
-            if obj.debug_bit>1
-                util.text.date_printf('Loading file number %d.', obj.file_index); 
-            end
+            obj.displayInfo(obj.printout, 2); 
             
             try % get the data
                 
@@ -597,6 +630,13 @@ classdef Processor < dynamicprops
                 obj.file_index = obj.file_index + 1;
                 obj.reader.advanceFile;
                 return;  
+            end
+            
+            % apply name resolver, if needed
+            if obj.pars.resolve
+                e = obj.getNameResolver; % lazy load this
+                obj.head.RA_DEG = e.RA_deg;
+                obj.head.DEC_DEG = e.Dec_deg; 
             end
             
             % apply header corrections, if any
@@ -648,10 +688,10 @@ classdef Processor < dynamicprops
             
         end
         
-        function setBufferIndices(obj)
+        function setBufferIndices(obj) % set the buffer indices based on to_process_index
             
-            obj.prev_buf_idx = find([obj.buffer.file_index]==obj.to_process_index - 1); % last buffer index
-            obj.buf_idx = find([obj.buffer.file_index]==obj.to_process_index); % current buffer index we are processing
+            obj.prev_buffer_index = find([obj.buffer.file_index]==obj.to_process_index - 1); % last buffer index
+            obj.buffer_index = find([obj.buffer.file_index]==obj.to_process_index); % current buffer index we are processing
 
         end
         
@@ -667,20 +707,18 @@ classdef Processor < dynamicprops
                     break; % finished processing backlog in buffer
                 end
                 
-                if obj.debug_bit>1
-                    util.text.date_printf('Processing file number %d.', obj.to_process_index); 
-                end
+                obj.displayInfo(obj.printout('process'), 2); 
                 
-                obj.setBufferIndices;
+                obj.setBufferIndices; % set the buffer indices based on to_process_index
                 
-                if isempty(obj.buf_idx) % there are no buffers with data for this index (out of files maybe?)
+                if isempty(obj.buffer_index) % there are no buffers with data for this index (out of files maybe?)
                     return;
                 end
                 
-                obj.data = obj.buffer(obj.buf_idx); % create a separate copy of the data loading it into "data" struct
+                obj.data = obj.buffer(obj.buffer_index); % create a separate copy of the data loading it into "data" struct
                 
-                if ~isempty(obj.prev_buf_idx) && obj.prev_buf_idx>0 && obj.prev_buf_idx<=length(obj.buffer) % if a previous buffer exists...
-                    obj.data.positions = obj.buffer(obj.prev_buf_idx).positions_new; % make sure to propagate the positions to the new buffer
+                if ~isempty(obj.prev_buffer_index) && obj.prev_buffer_index>0 && obj.prev_buffer_index<=length(obj.buffer) % if a previous buffer exists...
+                    obj.data.positions = obj.buffer(obj.prev_buffer_index).positions_new; % make sure to propagate the positions to the new buffer
                 end
                 
                 %%%%%%%%%%%%%%%%%%%%% PROCESSING %%%%%%%%%%%%%%%%%%%%%
@@ -705,13 +743,13 @@ classdef Processor < dynamicprops
 
                 if obj.debug_bit>1, disp(obj.file_summary); end
 
-                if ~isempty(obj.gui)
+                if ~isempty(obj.gui) && obj.gui.check
                     obj.gui.update;
                 end
             
                 obj.prog.showif(obj.to_process_index);
                 
-                obj.buffer(obj.buf_idx) = obj.data; % store the results of all calculations back in the buffer
+                obj.buffer(obj.buffer_index) = obj.data; % store the results of all calculations back in the buffer
                 
                 obj.to_process_index = obj.to_process_index + 1; 
                 
@@ -723,16 +761,13 @@ classdef Processor < dynamicprops
         
         function calculateCoadds(obj)
             
-            % make a deep coadd
-            if obj.debug_bit>1
-                util.text.date_printf('Making a deep coadd...'); 
-            end
+            obj.displayInfo('Making a deep coadd...', 2); 
             
             t0 = tic; % make the deep coadd
             
             obj.setBufferIndices;
             
-            obj.data = obj.buffer(obj.buf_idx); 
+            obj.data = obj.buffer(obj.buffer_index); 
             
             I = zeros([size(obj.data.image_proc), length(obj.buffer)], 'like', obj.data.image_proc); 
             T = 0; % number of seconds total integration
@@ -790,23 +825,21 @@ classdef Processor < dynamicprops
                         if obj.pars.use_interp_forced
                             % try to use name resolver to find moving targets
 
-                            e = head.Ephemeris;
-                            e.name = obj.head.ephem.name;
-                            e.keyword = obj.head.ephem.keyword;
-
-                            if isequal(e.resolve, 'jpl') % only do this for moving targets
+                            e = obj.getNameResolver; % lazy load this
+                            
+                            if isequal(e.resolver_type, 'jpl') % only do this for moving targets
                             
                                 pos1 = obj.cat.coo2xy(e.RA_deg, e.Dec_deg); 
                                 
-                                e.timeTravelHours(obj.getNumFiles.*obj.head.NAXIS3.*obj.head.EXPTIME/3600); % move this Ephemeris object forward to the end of the run
-                                e.resolve; 
-                                pos2 = obj.cat.coo2xy(e.RA_deg, e.Dec_deg); 
-    %                             pos1 = obj.data.positions(obj.forced_indices(1),:);
-%                                 pos2 = obj.cat.coo2xy(h.RA_DEG, h.DEC_DEG);
+                                e2 = util.oop.full_copy(e); 
+                                e2.timeTravelHours(obj.getNumFiles.*obj.head.NAXIS3.*obj.head.EXPTIME/3600); % move this Ephemeris object forward to the end of the run
+                                e2.resolve; 
+                                pos2 = obj.cat.coo2xy(e2.RA_deg, e2.Dec_deg); 
                                 
                                 if sqrt(sum((pos1-pos2).^2))<min(size(obj.data.image_proc))
                                     obj.forced_cutout_motion_per_file = (pos2-pos1)/obj.getNumFiles; % should be a 2-vector
                                 end
+                                
                             end
 
                         end
@@ -821,7 +854,7 @@ classdef Processor < dynamicprops
 
             end
 
-            obj.buffer(obj.buf_idx) = obj.data; 
+            obj.buffer(obj.buffer_index) = obj.data; 
                             
         end
         
@@ -1056,7 +1089,7 @@ classdef Processor < dynamicprops
             
             t0 = tic;
             
-            obj.displayInfo('Finding stars.'); 
+            obj.displayInfo('Finding stars'); 
             
             if obj.pars.use_coadds
                 I = obj.data.coadd_image;
@@ -1444,16 +1477,28 @@ classdef Processor < dynamicprops
             
         end
         
-        function displayInfo(obj, str) % show the info on screen, write to log (if saving data) and show it on the GUI
+        function displayInfo(obj, str, debug_level) % show the info on screen, write to log (if saving data) and show it on the GUI
+            % if debug_level is given and it is higher than debug_bit, 
+            % we do not show the string on the terminal
+            if nargin<3 || isempty(debug_level)
+                debug_level = obj.debug_bit;
+            end
             
-            obj.write_log(util.text.date_printf(str)); 
+            if debug_level <= obj.debug_bit
+                now = datetime('now', 'TimeZone', 'UTC', 'Format', 'uuuu-MM-dd HH:mm:ss.sss'); 
+                disp([char(now) ': ' str]); 
+            end
+            
+            obj.write_log(str); 
             
             try 
                 
                 if ~isempty(obj.gui) && obj.gui.check
                     obj.gui.panel_info.button_info.String = str;
                 end
-            
+                
+                drawnow;
+                
             catch ME
                 warning(ME.getReport);
             end

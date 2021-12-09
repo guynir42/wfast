@@ -50,6 +50,8 @@ classdef ProcGUI < handle
         button_display_text;
         input_num_rect;
         button_expt;
+        button_indices;
+        panel_legend;
         
         axes_image;
     
@@ -97,7 +99,7 @@ classdef ProcGUI < handle
             obj.fig.clear;
             obj.fig.bottom = 5;
             obj.fig.height = 16;
-            obj.fig.width = 25;
+            obj.fig.width = 30;
             obj.fig.center;
 %             obj.fig.maximize;
             
@@ -208,7 +210,7 @@ classdef ProcGUI < handle
             %%%%%%%%%%% panel image %%%%%%%%%%%%%%%%%%
             
             obj.panel_info = GraphicPanel(obj.owner, [width (N-1)/N 1-width 1/N], 'info', 1); % last input is for vertical (default)    
-            obj.panel_info.addButton('button_info', 'printout', 'info'); 
+            obj.panel_info.addButton('button_info', 'printout', 'custom'); % no need to update this automatically, set to custom
             obj.panel_info.make;
             
             obj.panel_stop = GraphicPanel(obj.owner, [width 0 1-width 1/N], '', 1); % last input is for vertical (default)    
@@ -230,6 +232,12 @@ classdef ProcGUI < handle
             obj.input_num_rect.Tooltip = 'number of squares around stars to show'; 
             
             obj.button_expt = GraphicButton(obj.panel_image, [0.0 0.95 0.15 0.05], obj.owner, 'head.EXPTIME', 'info', 'T= ', 's'); 
+            
+            obj.button_indices = GraphicButton(obj.panel_image, [0.6 0.0 0.4 0.05], obj.owner, 'getIndicesString', 'info', ' '); 
+            
+            obj.panel_legend = uipanel('Title', 'legend', 'Position', [width, 0.2, 0.11, 0.3]); 
+            
+            obj.makeLegend;
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
             
@@ -254,7 +262,46 @@ classdef ProcGUI < handle
             obj.panel_contrast.ax = obj.axes_image;
             
         end
-                
+           
+        function makeLegend(obj)
+            
+            delete(obj.panel_legend.Children);
+            
+            N = 6;
+            color = 0.6;
+            
+            uicontrol(obj.panel_legend, 'Style', 'text', 'FontSize', obj.edit_font_size, ...
+                'ForegroundColor', 'black', 'String', 'normal stars', ...
+                'Units', 'Normalized', 'Position', [0.0 (N-1)/N 1.0 1/N], ...
+                'BackgroundColor', [1,1,1].*color); 
+            
+            uicontrol(obj.panel_legend, 'Style', 'text', 'FontSize', obj.edit_font_size, ...
+                'ForegroundColor', 'red', 'String', 'saturated', ...
+                'Units', 'Normalized', 'Position', [0.0 (N-2)/N 1.0 1/N], ... 
+                'BackgroundColor', [1,1,1].*color); 
+            
+            uicontrol(obj.panel_legend, 'Style', 'text', 'FontSize', obj.edit_font_size, ...
+                'ForegroundColor', 'green', 'String', 'extended source', ...
+                'Units', 'Normalized', 'Position', [0.0 (N-3)/N 1.0 1/N], ...
+                'BackgroundColor', [1,1,1].*color); 
+           
+            uicontrol(obj.panel_legend, 'Style', 'text', 'FontSize', obj.edit_font_size, ...
+                'ForegroundColor', 'yellow', 'String', 'narrow source', ...
+                'Units', 'Normalized', 'Position', [0.0 (N-4)/N 1.0 1/N], ...
+                'BackgroundColor', [1,1,1].*color); 
+            
+            uicontrol(obj.panel_legend, 'Style', 'text', 'FontSize', obj.edit_font_size, ...
+                'ForegroundColor', 'white', 'String', 'no Gaia match', ...
+                'Units', 'Normalized', 'Position', [0.0 (N-5)/N 1.0 1/N], ...
+                'BackgroundColor', [1,1,1].*color); 
+                        
+            uicontrol(obj.panel_legend, 'Style', 'text', 'FontSize', obj.edit_font_size, ...
+                'ForegroundColor', 'magenta', 'String', 'forced target', ...
+                'Units', 'Normalized', 'Position', [0.0 (N-6)/N 1.0 1/N], ...
+                'BackgroundColor', [1,1,1].*color); 
+            
+        end
+        
         function update(obj,~,~)
                         
             if ~obj.check
