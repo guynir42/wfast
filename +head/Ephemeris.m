@@ -91,7 +91,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         
         field_id; % numeric identifier for fileds inside a list/bank
         
-        resolver_type = ''; % which name resolver was used: internal, simbad, jpl, or empty when no resolver was found
+        type_resolver = ''; % which name resolver was used: internal, simbad, jpl, or empty when no resolver was found
         
     end
     
@@ -1051,12 +1051,12 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 keyword = obj.keyword;
             end
             
-            obj.resolver_type = 'internal';
+            obj.type_resolver = 'internal';
             
             obj.constraints.scan_vars(varargin{:}); 
             
             if isempty(keyword)
-               obj. resolver_type = '';
+               obj.type_resolver = '';
             elseif cs(keyword, 'ecliptic', 'kbos')
                 obj.keyword = 'ecliptic'; % dynamically allocate this field after setting the time
                 obj.gotoDefaultField(obj.keyword, varargin{:}); % do we need the varargin here?
@@ -1091,7 +1091,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                 obj.updateSun;
                 obj.gotoQuadratureField; 
             else
-                obj.resolver_type = '';
+                obj.type_resolver = '';
                 obj.keyword = keyword;
                 
                 if ~isempty(which('VO.name.server_simbad', 'function')) % use Eran's IMPROVED name resolver
@@ -1100,7 +1100,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
 %                         [RA, DEC] = celestial.coo.convert2equatorial(keyword, [], 'JD', obj.JD, ...
 %                             'ObsCoo', [obj.longitude, obj.latitude, obj.elevation], 'OutputUnits', 'deg', 'NameServer', 'simbad');
                         [RA, DEC] = VO.name.server_simbad(keyword); 
-                        obj.resolver_type = 'simbad';
+                        obj.type_resolver = 'simbad';
                     catch ME
                         RA = NaN;
                         DEC = NaN; 
@@ -1116,15 +1116,15 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                             [RA,Dec] = Util.interp.interp_diff_longlat(JCat.Cat(:,JCat.Col.JD), [JCat.Cat(:,JCat.Col.RA),JCat.Cat(:,JCat.Col.Dec)], obj.JD);
                             RA = RA * 180/pi;
                             Dec = Dec * 180/pi;
-                            obj.resolver_type = 'jpl';
+                            obj.type_resolver = 'jpl';
                         catch ME
                             if strcmp(ME.identifier, 'MATLAB:structRefFromNonStruct')
                                 RA = NaN;
                                 DEC = NaN; 
                                 if obj.debug_bit && nargout==0
-                                    util.text.date_printf('Could not resolve name "%s" with convert2equatorial()!', keyword); 
+                                    util.text.date_printf('Could not resolve name "%s" with celestial.SolarSys.jpl_horizons()!', keyword); 
                                 end
-                                obj.resolver_type = '';
+                                obj.type_resolver = '';
                                 return; 
                             else
                                 RA = NaN;
@@ -1138,7 +1138,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                             if obj.debug_bit && nargout==0
                                 util.text.date_printf('Could not resolve name "%s" with name resolvers!', keyword); 
                             end
-                            obj.resolver_type = '';
+                            obj.type_resolver = '';
                             return;
                         end
                         
@@ -1175,7 +1175,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             end
             
             obj.updateSecondaryCoords;
-            val = obj.resolver_type;
+            val = obj.type_resolver;
             % if none of these succeed, the RA/Dec remains empty! 
             
         end

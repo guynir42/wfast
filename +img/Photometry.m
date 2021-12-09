@@ -402,6 +402,8 @@ classdef Photometry < handle
             input.input_var('filename', ''); 
             input.scan_vars(varargin{:});
             
+            obj.clear;
+            
             if isa(input.cutouts, 'single')
                 obj.cutouts = input.cutouts;
             else

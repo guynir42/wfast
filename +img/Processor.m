@@ -24,8 +24,8 @@ classdef Processor < dynamicprops
         pars@util.text.InputVars; % store all controls in this
         last_pars@util.text.InputVars; % parameters used in latest run
         
-        data@struct; % file.AstroData; % keep track of all the regular data objects, and can dynamically add more (clear all every file)
-        buffer@struct; % file.AstroData; % keep a few sets of data from previous files to calculate deeper stats
+%         data@file.AstroData; % keep track of all the regular data objects, and can dynamically add more
+        buffers@file.AstroData; % keep a few sets of data from previous files to calculate deeper stats
         data_logs@struct; % struct with data collected for all images across entire run 
         
         timings = struct; % collect how much time (seconds) each part of the analysis takes
@@ -43,7 +43,15 @@ classdef Processor < dynamicprops
         file_index = 1;
         
         to_process_index = 1; 
-                
+        
+        % keep track of the current positions matrix
+        current_positions = []; % best estimate of the latest cutout positions 
+        new_positions = []; % new estimate using photometry centroids adjustment
+        coadd_image = []; % coadd multiple images into a deeper image
+        coadd_number = []; % how many files (single images or stacks) were added 
+        coadd_exposure = []; % the total exposure time of the stack
+        psf_width = []; % Gaussian sigma equivalent width (i.e., FWHM/2.355)
+        
         % references for quick_align 
         ref_image = [];
         ref_positions = [];
@@ -65,7 +73,7 @@ classdef Processor < dynamicprops
     
     properties(Dependent=true)
         
-        
+        data;
         
     end
     
@@ -200,7 +208,7 @@ classdef Processor < dynamicprops
             
         end
         
-        function data_out = makeDataStruct(obj)
+        function data_out = makeDataStruct(obj) % to be deprecated! 
             
             data_out = struct; % make a new struct
             
@@ -239,23 +247,23 @@ classdef Processor < dynamicprops
             
         end
         
-        function data_out = makeDataObject(obj) % to be deprecated! 
+        function data_out = makeDataObject(obj) 
             
             data_out = file.AstroData; 
             data_out.addProp('image_proc'); % image after calibration
             data_out.addProp('image_cut'); % image after calibration and removing cutouts 
             data_out.addProp('cutouts_sub'); % cutouts after background subtraction
-            data_out.addProp('positions_new'); % positions after adjustments based on star positions
             data_out.addProp('fwhm'); % FWHM for each cutout, in arcsec
             data_out.addProp('fwhm_interp'); % FWHM intepolated using a 2D polynomial fit to the non-NaN FWHM values
-            data_out.addProp('psf_width'); % best estimate for the average PSF width (gaussian sigma)
+%             data_out.addProp('psf_width'); % best estimate for the average PSF width (gaussian sigma)
             
             data_out.addProp('exposure_time'); 
             data_out.addProp('file_index'); 
             
-            data_out.addProp('coadd_image'); 
-            data_out.addProp('coadd_number'); 
-            data_out.addProp('coadd_exposure'); 
+            data_out.addProp('is_loaded'); 
+            data_out.is_loaded = false;
+            data_out.addProp('is_processed'); 
+            data_out.is_processed = false;
             
         end
            
@@ -290,8 +298,10 @@ classdef Processor < dynamicprops
             obj.phot_ap_idx = [];
             
             % buffer
-            obj.buffer = obj.makeDataStruct; % making a single (empty content) struct means we can later assign full data structures into this
-            
+%             obj.buffer = obj.makeDataStruct; % making a single (empty content) struct means we can later assign full data structures into this
+            obj.buffers = file.AstroData;
+            obj.buffer_index = 1;
+
             % info about the run
             obj.data_logs = struct; 
             obj.data_logs.run_date = ''; % date when images were taken (date of beginning of night) in YYYY-MM-DD format
@@ -301,10 +311,17 @@ classdef Processor < dynamicprops
             obj.data_logs.background = []; % for each file get the median background value from all stars
             obj.data_logs.variance = []; % for each file get the median variance value from all stars
             
+            % output data
+            obj.current_positions = []; 
+            obj.new_positions = [];
+            obj.coadd_image = [];
+            obj.coadd_number = [];
+            obj.coadd_exposure = [];
+            obj.psf_width = [];
+            
             % counters
             obj.file_index = 1;
             obj.to_process_index = 1;
-            obj.buffer_index = 1;
             obj.failed_file_counter = 0;
             
             % parameters
@@ -321,6 +338,7 @@ classdef Processor < dynamicprops
             obj.forced_indices = []; 
             
             obj.name_resolver = head.Ephemeris.empty;
+            obj.buffers = file.AstroData.empty;
             
             obj.clear;
             
@@ -332,8 +350,22 @@ classdef Processor < dynamicprops
             obj.cat.clear;
             obj.reader.clear;
             
-            obj.data = struct.empty; % remove the handle
+            if ~isempty(obj.data)
+                obj.data.clear;
+                obj.data.image_proc = [];
+                obj.data.image_cut = [];
+                obj.data.cutouts_sub = [];
+                obj.data.fwhm = [];
+                obj.data.fwhm_interp = [];
             
+                obj.data.exposure_time = [];
+                obj.data.file_index = [];
+                obj.data.is_loaded = false;
+                obj.data.is_processed = false;
+            end
+            
+%             obj.data = struct.empty; % remove the handle
+%             
 %             obj.data.timestamps = []; % the time of the beginning of the acquisition of the image/stack 
 %             obj.data.juldates = []; % matched to global time
 %             obj.data.image = []; % raw images or stack from file
@@ -347,6 +379,16 @@ classdef Processor < dynamicprops
     end
     
     methods % getters
+        
+        function val = get.data(obj)
+            
+            if isempty(obj.buffers) || isempty(obj.buffer_index)
+                val = file.AstroData.empty;
+            else
+                val = obj.buffers(obj.buffer_index); 
+            end
+            
+        end
         
         function val = getNumFiles(obj) % get the number of files we can read, given file list and the limit given in "pars"
             
@@ -417,9 +459,11 @@ classdef Processor < dynamicprops
                     if ~obj.reader.is_finished
                         obj.load_data;
                     end
+                    
                     if ~isempty(obj.gui) && obj.gui.check
                         obj.gui.update;
                     end
+                    
                     drawnow; 
                     
                     if mod(obj.file_index - 1, obj.pars.coadd_size)==0 || ... % finished collecting N files
@@ -457,7 +501,7 @@ classdef Processor < dynamicprops
         end
         
         function run_async(obj)
-            
+            % TODO: finish this
         end
     
         function stop(obj)
@@ -539,6 +583,10 @@ classdef Processor < dynamicprops
                     error('Cannot start a new run without loading darks into calibration object!');
                 end
 
+                for ii = 1:obj.pars.coadd_size
+                    obj.buffers(ii) = obj.makeDataObject;
+                end
+                
                 if obj.pars.use_save_results % save a folder with a summary of the results, lightcurves, etc. 
 
                     d = obj.pars.output_folder; 
@@ -590,15 +638,19 @@ classdef Processor < dynamicprops
             
             try % get the data
                 
+                % first, move the buffer index forward and clear the buffer
+                obj.buffer_index = mod(obj.file_index-1,obj.pars.coadd_size) + 1; % which buffer to fill                
+                obj.prev_buffer_index = mod(obj.file_index-2,obj.pars.coadd_size) + 1; % index of previous buffer
                 obj.clear; % get rid of existing datasets
+                
+%                 obj.data = obj.makeDataStruct; % dump the old data and construct a new object
+%                 if obj.buffer_index>length(obj.buffers)
+%                     obj.buffers(obj.buffer_index) = file.AstroData; % this immediately becomes "data"
+%                 end
                 
                 t0 = tic;
                 
                 obj.reader.batch; % load the images from file
-
-                idx = mod(obj.file_index-1,obj.pars.coadd_size) + 1; % which buffer to fill                
-                idx_prev = mod(obj.file_index-2,obj.pars.coadd_size) + 1; % index of previous buffer
-                obj.data = obj.makeDataStruct; % dump the old data and construct a new object
                 
                 % copy the data from reader into the current buffer
                 obj.data.images = obj.reader.images;
@@ -676,13 +728,18 @@ classdef Processor < dynamicprops
                 error('Could not find images or stack to process...'); 
             end
 
+            obj.data.is_loaded = true;
+            
             obj.addTimingData('calibration', toc(t0));
     
-            if idx_prev>=1 && idx_prev<=length(obj.buffer)
-                obj.data.positions = obj.buffer(idx_prev).positions_new;
-            end
+            % pass the positions from previous buffer to current buffer
+%             if obj.prev_buffer_index>=1 && obj.prev_buffer_index<=length(obj.buffers)
+%                 obj.data.positions = obj.buffers(obj.prev_buffer_index).positions_new;
+%             end
             
-            obj.buffer(idx) = obj.data; % note that the struct remaining in "data" is not to be used unless re-loaded from the buffer
+%             obj.buffer(idx) = obj.data; % note that the struct remaining in "data" is not to be used unless re-loaded from the buffer
+            
+            obj.prog.showif(obj.file_index);
             
             obj.file_index = obj.file_index + 1;
             
@@ -690,16 +747,25 @@ classdef Processor < dynamicprops
         
         function setBufferIndices(obj) % set the buffer indices based on to_process_index
             
-            obj.prev_buffer_index = find([obj.buffer.file_index]==obj.to_process_index - 1); % last buffer index
-            obj.buffer_index = find([obj.buffer.file_index]==obj.to_process_index); % current buffer index we are processing
+            % this doesn't work since file_index is a dynamically added property! 
+%             obj.prev_buffer_index = find([obj.buffers.file_index]==obj.to_process_index - 1); % last buffer index
+%             obj.buffer_index = find([obj.buffers.file_index]==obj.to_process_index); % current buffer index we are processing
+
+            for ii = 1:length(obj.buffers)
+                
+                if obj.buffers(ii).file_index==obj.to_process_index - 1
+                    obj.prev_buffer_index = ii;
+                end
+                
+                if obj.buffers(ii).file_index==obj.to_process_index
+                    obj.buffer_index = ii;
+                end
+                
+            end
 
         end
         
         function process(obj)
-            
-            if length(obj.buffer)<obj.pars.coadd_size
-                return; % skip processing until buffer is full
-            end
             
             for ii = 1:obj.pars.coadd_size
                 
@@ -707,19 +773,19 @@ classdef Processor < dynamicprops
                     break; % finished processing backlog in buffer
                 end
                 
-                obj.displayInfo(obj.printout('process'), 2); 
-                
                 obj.setBufferIndices; % set the buffer indices based on to_process_index
+                
+                obj.displayInfo(obj.printout('process'), 2); 
                 
                 if isempty(obj.buffer_index) % there are no buffers with data for this index (out of files maybe?)
                     return;
                 end
                 
-                obj.data = obj.buffer(obj.buffer_index); % create a separate copy of the data loading it into "data" struct
+%                 obj.data = obj.buffer(obj.buffer_index); % create a separate copy of the data loading it into "data" struct
                 
-                if ~isempty(obj.prev_buffer_index) && obj.prev_buffer_index>0 && obj.prev_buffer_index<=length(obj.buffer) % if a previous buffer exists...
-                    obj.data.positions = obj.buffer(obj.prev_buffer_index).positions_new; % make sure to propagate the positions to the new buffer
-                end
+%                 if ~isempty(obj.prev_buffer_index) && obj.prev_buffer_index>0 && obj.prev_buffer_index<=length(obj.buffers) % if a previous buffer exists...
+%                     obj.data.positions = obj.buffer(obj.prev_buffer_index).positions_new; % make sure to propagate the positions to the new buffer
+%                 end
                 
                 %%%%%%%%%%%%%%%%%%%%% PROCESSING %%%%%%%%%%%%%%%%%%%%%
 
@@ -737,6 +803,8 @@ classdef Processor < dynamicprops
 
                 obj.calculateLightcurves; 
                 
+                obj.data.is_processed = true;
+                
                 if obj.pars.use_save_results
                     obj.write_log; % by default it should save the file_summary() result
                 end
@@ -747,9 +815,9 @@ classdef Processor < dynamicprops
                     obj.gui.update;
                 end
             
-                obj.prog.showif(obj.to_process_index);
+%                 obj.prog.showif(obj.to_process_index);
                 
-                obj.buffer(obj.buffer_index) = obj.data; % store the results of all calculations back in the buffer
+%                 obj.buffer(obj.buffer_index) = obj.data; % store the results of all calculations back in the buffer
                 
                 obj.to_process_index = obj.to_process_index + 1; 
                 
@@ -765,47 +833,43 @@ classdef Processor < dynamicprops
             
             t0 = tic; % make the deep coadd
             
-            obj.setBufferIndices;
+            obj.setBufferIndices; % data should point to first buffer that needs processing
             
-            obj.data = obj.buffer(obj.buffer_index); 
+%             obj.data = obj.buffer(obj.buffer_index); 
             
-            I = zeros([size(obj.data.image_proc), length(obj.buffer)], 'like', obj.data.image_proc); 
+            I = zeros([size(obj.data.image_proc), length(obj.buffers)], 'like', obj.data.image_proc); 
             T = 0; % number of seconds total integration
             N = 0; % number of images coadded
             
-            for ii = 1:length(obj.buffer)
-                I(:,:,ii) = obj.buffer(ii).image_proc; 
-                T = T + obj.buffer(ii).exposure_time; 
+            for ii = 1:length(obj.buffers)
+                I(:,:,ii) = obj.buffers(ii).image_proc; 
+                T = T + obj.buffers(ii).exposure_time; 
                 N = N + 1; 
             end
             
             if util.text.cs(obj.pars.coadd_method, 'sum')
-                obj.data.coadd_image = nansum(I,3); 
+                obj.coadd_image = nansum(I,3); 
             elseif util.text.cs(obj.pars.coadd_method, 'median')
-                obj.data.coadd_image = nanmedian(I,3); 
+                obj.coadd_image = nanmedian(I,3); 
             else
                 error('Unknown coadd method "%s". Use "sum" or "median", etc.', obj.pars.coadd_method); 
             end
             
             % calculate cosmic ray mask here... 
             
-            obj.data.coadd_number = N;
-            obj.data.coadd_exposure = T; 
+            obj.coadd_number = N;
+            obj.coadd_exposure = T;
             
             obj.addTimingData('coaddition', toc(t0));
             
-            if isempty(obj.data.positions)
+            if isempty(obj.current_positions)
                 
                 obj.findStars;
-
-                for ii = 1:length(obj.buffer)
-                    obj.buffer(ii).positions = obj.data.positions; 
-                end
                 
                 if obj.pars.use_astrometry
 
                     obj.solveAstrometry;
-
+                    
                     if obj.pars.use_forced_photometry
 
                         obj.forced_coordinates = horzcat({[obj.head.RA_DEG, obj.head.DEC_DEG]}, util.vec.torow(obj.pars.forced_extra_positions));
@@ -815,8 +879,8 @@ classdef Processor < dynamicprops
                             ra_dec = obj.forced_coordinates{ii};
                             xy = obj.cat.coo2xy(ra_dec(1), ra_dec(2)); 
 
-                            obj.data.positions(end+1,:) = xy; % add another row to the coordinate list
-                            obj.forced_indices(end+1) = size(obj.data.positions,1); % keep track of indices of forced cutouts
+                            obj.current_positions(end+1,:) = xy; % add another row to the coordinate list
+                            obj.forced_indices(end+1) = size(obj.current_positions,1); % keep track of indices of forced cutouts
 
                         end
 
@@ -827,7 +891,7 @@ classdef Processor < dynamicprops
 
                             e = obj.getNameResolver; % lazy load this
                             
-                            if isequal(e.resolver_type, 'jpl') % only do this for moving targets
+                            if isequal(e.type_resolver, 'jpl') % only do this for moving targets
                             
                                 pos1 = obj.cat.coo2xy(e.RA_deg, e.Dec_deg); 
                                 
@@ -848,13 +912,9 @@ classdef Processor < dynamicprops
 
                 end
 
-                % store the first image to keep a record of the positions of all stars in case we need to re-align
-                obj.ref_image = obj.data.image_proc;
-                obj.ref_positions = obj.data.positions;
-
             end
 
-            obj.buffer(obj.buffer_index) = obj.data; 
+%             obj.buffer(obj.buffer_index) = obj.data; 
                             
         end
         
@@ -866,11 +926,11 @@ classdef Processor < dynamicprops
             
             if obj.pars.fits.use_coadds
                 
-                if isempty(obj.data.coadd_image)
+                if isempty(obj.coadd_image)
                     return; % not all buffers would have a coadd
                 end
                 
-                I = double(obj.data.coadd_image); 
+                I = double(obj.coadd_image); 
                 N = obj.coadd_number;
                 
             else
@@ -1092,8 +1152,8 @@ classdef Processor < dynamicprops
             obj.displayInfo('Finding stars'); 
             
             if obj.pars.use_coadds
-                I = obj.data.coadd_image;
-                N = obj.data.coadd_number.*obj.data.num_sum; 
+                I = obj.coadd_image;
+                N = obj.coadd_number.*obj.data.num_sum; 
             else
                 I = obj.data.image_proc; 
                 N = obj.data.num_sum; 
@@ -1111,20 +1171,24 @@ classdef Processor < dynamicprops
                 'method', 'filters', 'step_size', 0.01, 'min_size', 0.5, 'max_size', 4); % arbitrary range for getting an estimate of the PSF width
             
 %             obj.data.psf_width = util.vec.weighted_average(s.forced_photometry.width, s.forced_photometry.flux, 2);
-            obj.data.psf_width = util.vec.weighted_average(W/2.355, s.forced_photometry.flux, 2);
+            obj.psf_width = util.vec.weighted_average(W/2.355, s.forced_photometry.flux, 2);
             
             if obj.pars.use_auto_aperture
-                obj.phot.aperture = floor(obj.data.psf_width.*3);
+                obj.phot.aperture = floor(obj.psf_width.*3);
             end
             
-            T = util.img.quick_find_stars(I, 'psf', obj.data.psf_width, 'number', obj.pars.num_stars,...
+            T = util.img.quick_find_stars(I, 'psf', obj.psf_width, 'number', obj.pars.num_stars,...
                'dilate', obj.pars.cut_size-5, 'saturation', obj.pars.saturation.*N, 'sigma', obj.pars.threshold, 'unflagged', 0); 
             
             if isempty(T)
                 error('Could not find any stars using quick_find_stars!');
             end
 
-            obj.data.positions = T.pos;
+            obj.current_positions = T.pos;
+                            
+            % store the first image to keep a record of the positions of all stars in case we need to re-align
+            obj.ref_positions = T.pos;
+            obj.ref_image = I;
             
             obj.stars = T; % store a copy of this table
 
@@ -1159,7 +1223,7 @@ classdef Processor < dynamicprops
                 obj.cat.coordinates = obj.cat.coordinates(~bad_idx, :); 
                 obj.cat.temperatures = obj.cat.temperatures(~bad_idx); 
                 obj.cat.positions = obj.cat.positions(~bad_idx, :); 
-                obj.data.positions = obj.data.positions(~bad_idx, :); 
+                obj.current_positions = obj.current_positions(~bad_idx, :); 
                 obj.stars = obj.stars(~bad_idx, :); 
 
             end
@@ -1181,7 +1245,7 @@ classdef Processor < dynamicprops
             t0 = tic; 
             
             [obj.data.cutouts, obj.data.image_cut] = util.img.mexCutout(obj.data.image_proc, ...
-                obj.data.positions, obj.pars.cut_size, NaN, NaN); % replace and fill up using NaNs (it is safe, the processed image is single precision
+                obj.current_positions, obj.pars.cut_size, NaN, NaN); % replace and fill up using NaNs (it is safe, the processed image is single precision
 
             obj.addTimingData('cutouts', toc(t0)); 
 
@@ -1191,8 +1255,8 @@ classdef Processor < dynamicprops
             
             t0 = tic; 
 
-            obj.phot.input(obj.data.cutouts, 'positions', obj.data.positions, 'timestamps', nanmean(obj.data.timestamps), 'juldates', nanmean(obj.data.juldates)); 
-
+            obj.phot.input(obj.data.cutouts, 'positions', obj.current_positions, 'timestamps', nanmean(obj.data.timestamps), 'juldates', nanmean(obj.data.juldates)); 
+            
             if isempty(obj.phot_ap_idx)
                 obj.phot_ap_idx = obj.find_phot_ap;
             end
@@ -1222,11 +1286,11 @@ classdef Processor < dynamicprops
                     obj.realignPositions; 
                 end
 
-                if any(median(abs(obj.data.positions - obj.data.positions_new))>=obj.pars.redo_photometry_distance) % new positions are too far (in x or y) from old positions
+                if any(median(abs(obj.current_positions - obj.new_positions))>=obj.pars.redo_photometry_distance) % new positions are too far (in x or y) from old positions
 
                     obj.flux_buf.back; % roll back the index to put in new flux measurements
                     
-                    obj.data.positions = obj.data.positions_new; % try again with updated positions
+                    obj.current_positions = obj.new_positions; % try again with updated positions
                     
                     obj.calculateCutouts;
                     obj.calculatePhotometry;
@@ -1256,31 +1320,31 @@ classdef Processor < dynamicprops
             dy(isnan(dy)) = 0; 
             
             if cs(obj.pars.lock_adjust, 'all') || obj.pars.use_astrometry==0 % by default, "stars" is replaced by "all" when not running astrometry
-                obj.data.positions_new = double(obj.data.positions + mean_offsets);
+                obj.new_positions = double(obj.current_positions + mean_offsets);
             elseif cs(obj.pars.lock_adjust, 'none')
-                obj.data.positions_new = double(obj.data.positions + [dx, dy]); % check dimensionality in case we have multiple apertures! 
+                obj.new_positions = double(obj.current_positions + [dx, dy]); % check dimensionality in case we have multiple apertures! 
             elseif cs(obj.pars.lock_adjust, 'stars') % assume astrometry has succeeded
                 
                 star_idx = ~isnan(obj.cat.magnitudes); % all stars that have a non NaN magnitude in GAIA
                 
-                star_idx = vertcat(star_idx, ones(size(obj.data.positions,1)-length(star_idx),1)); % if positions is longer than the catalog (e.g., forced photometry)
+                star_idx = vertcat(star_idx, ones(size(obj.current_positions,1)-length(star_idx),1)); % if positions is longer than the catalog (e.g., forced photometry)
                 
-                new_pos_free = double(obj.data.positions + [dx, dy]); % check dimensionality in case we have multiple apertures! 
+                new_pos_free = double(obj.current_positions + [dx, dy]); % check dimensionality in case we have multiple apertures! 
                 
-                new_pos_lock = double(obj.data.positions + mean_offsets); 
+                new_pos_lock = double(obj.current_positions + mean_offsets); 
                 
-                obj.data.positions_new = star_idx.*new_pos_lock + (~star_idx).*new_pos_free; % logical indexing to add the correct adjusted position to stars and non-stars
+                obj.new_positions = star_idx.*new_pos_lock + (~star_idx).*new_pos_free; % logical indexing to add the correct adjusted position to stars and non-stars
                 
             else
                 error('Unknown "lock_adjust" option: "%s". Choose "all", "none" or "stars". ', obj.pars.lock_adjust); 
             end
             
-            if size(obj.data.positions,3)>1
+            if size(obj.current_positions,3)>1
                 error('dimensionality issue...'); 
             end
             
             if ~isempty(obj.forced_cutout_motion_per_file)
-                obj.data.positions_new(obj.forced_indices(1), :) = obj.data.positions_new(obj.forced_indices(1), :) + obj.forced_cutout_motion_per_file;
+                obj.new_positions(obj.forced_indices(1), :) = obj.new_positions(obj.forced_indices(1), :) + obj.forced_cutout_motion_per_file;
             end
             
         end
@@ -1288,7 +1352,7 @@ classdef Processor < dynamicprops
         function realignPositions(obj) % use the reference image and positions to realign
             
             [~,shift] = util.img.quick_align(obj.data.image_proc, obj.ref_image);
-            obj.data.positions_new = double(obj.ref_positions + flip(shift));
+            obj.new_positions = double(obj.ref_positions + flip(shift));
             
         end
         
@@ -1324,7 +1388,7 @@ classdef Processor < dynamicprops
 
             t0 = tic;
             
-            % this should be put inside a ModelPSF object
+            % TODO: this should be put inside a ModelPSF object
             N_stars = size(obj.data.cutouts,4); 
 
             idx = obj.pars.fwhm_indices; 
@@ -1340,14 +1404,14 @@ classdef Processor < dynamicprops
             pix = obj.head.SCALE; 
             
             w = NaN(1,N_stars); % all stars that were not chosen for calculation are set to NaN
-            w(idx) = util.img.fwhm(C, 'method', 'filters', 'defocus', obj.data.psf_width, ...                 
+            w(idx) = util.img.fwhm(C, 'method', 'filters', 'defocus', obj.psf_width, ...                 
                 'step_size', 0.1./pix, 'min_size', 0.5.*pix, 'max_size', obj.pars.cut_size).*obj.head.SCALE; 
 
             obj.data.fwhm = w;
 
-            fr = util.fit.surf_poly(obj.data.positions(idx,1), obj.data.positions(idx,2), w(idx)', 'sigma', 3, 'order', 2, 'double', 1); 
+            fr = util.fit.surf_poly(obj.current_positions(idx,1), obj.current_positions(idx,2), w(idx)', 'sigma', 3, 'order', 2, 'double', 1); 
             
-            obj.data.fwhm_interp = fr.func(obj.data.positions(:,1), obj.data.positions(:,2));
+            obj.data.fwhm_interp = fr.func(obj.current_positions(:,1), obj.current_positions(:,2));
             
             obj.data_logs.fwhm(obj.to_process_index,1) = nanmedian(w); 
 
@@ -1358,7 +1422,7 @@ classdef Processor < dynamicprops
         function calculateLightcurves(obj)
             
             t0 = tic;
-
+            
             obj.light.index_flux = obj.phot_ap_idx; % tell this object which aperture index we want to use
             obj.light.getData(obj.phot); 
             if obj.light.gui.check, obj.light.gui.update; end
@@ -1455,10 +1519,10 @@ classdef Processor < dynamicprops
         
         function val = find_phot_ap(obj)
             
-            if isempty(obj.data.psf_width)
+            if isempty(obj.psf_width)
                 val = [];
             else
-                a = floor(obj.data.psf_width.*3); 
+                a = floor(obj.psf_width.*3); 
                 val = find(strcmp(obj.phot.pars_struct.types, sprintf('forced %4.2f', a))); 
             end
             
@@ -1579,9 +1643,9 @@ classdef Processor < dynamicprops
             delete(findobj(input.ax, 'type', 'rectangle'));
             delete(findobj(input.ax, 'tag', 'clip number'));
             
-            if ~isempty(obj.data.positions)
+            if ~isempty(obj.current_positions)
 
-                P = obj.data.positions;
+                P = obj.current_positions;
 
                 for ii = 1:min(size(P,1), obj.pars.display_num_rect_stars)
                     

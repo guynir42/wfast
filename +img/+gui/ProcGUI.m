@@ -52,6 +52,7 @@ classdef ProcGUI < handle
         button_expt;
         button_indices;
         panel_legend;
+        panel_buffers;
         
         axes_image;
     
@@ -237,6 +238,12 @@ classdef ProcGUI < handle
             
             obj.panel_legend = uipanel('Title', 'legend', 'Position', [width, 0.2, 0.11, 0.3]); 
             
+            obj.panel_buffers = uipanel('Title', 'buffers', 'Position', [0.93 0.2 0.05 0.6]); 
+            for ii = 1:obj.owner.pars.coadd_size
+                uicontrol(obj.panel_buffers, 'Units', 'Normalized', 'Style', 'pushbutton', ...
+                    'Position', [0, (ii-1)/obj.owner.pars.coadd_size, 1, 1/obj.owner.pars.coadd_size]); 
+            end
+            
             obj.makeLegend;
             
             %%%%%%%%%%% panel close %%%%%%%%%%%%%%%%%%
@@ -320,10 +327,34 @@ classdef ProcGUI < handle
             
             obj.panel_controls.input_num_files.String = sprintf('num_files= %d', obj.owner.getNumFiles); 
             
+            obj.updateBufferPanel;
+            
             obj.owner.show('ax', obj.axes_image); 
             
         end
-                        
+        
+        function updateBufferPanel(obj)
+            
+            for ii = 1:obj.owner.pars.coadd_size
+                
+                color = 0.94*[1 1 1];
+                
+                if ii <= length(obj.owner.buffers)
+                    if obj.owner.buffers(ii).is_loaded
+                        color = 'green';
+                    end
+
+                    if obj.owner.buffers(ii).is_processed
+                        color = 'magenta';
+                    end
+                end
+                
+                obj.panel_buffers.Children(obj.owner.pars.coadd_size-ii+1).BackgroundColor = color;
+                
+            end
+            
+        end
+        
         function c = check(obj)
            
             c = ~isempty(obj) && ~isempty(obj.panel_close) && isvalid(obj.panel_close);
