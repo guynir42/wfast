@@ -1078,7 +1078,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) ASA < handle
                     ok = obj.ard.update;
 
                     if obj.ard.ALT<obj.ard.alt_limit || ok==0
-                        util.text.date_printf('ALT= %f', obj.ard.alt); 
+                        util.text.date_printf('ALT= %f', obj.ard.ALT); 
                         return;
                     end
 
