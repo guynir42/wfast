@@ -751,7 +751,12 @@ classdef Candidate < handle
             mcmc.input_flux = circshift(mcmc.input_flux, 100-obj.time_index); % center the peak
             mcmc.input_errors = obj.flux_std./obj.flux_mean; 
             mcmc.input_R = obj.star_props.FresnelSize; 
-            mcmc.input_v = obj.getShadowVelocity; 
+            
+            if ~obj.is_simulated
+                mcmc.input_v = obj.getShadowVelocity; 
+            else
+                mcmc.input_v = obj.sim_pars.v + 4.4; % shift by 4.4 to get the calculated limits of the prior around the true value
+            end
             
             mcmc.setupDeepScan; 
             mcmc.num_chains = input.chains; 
@@ -1168,7 +1173,7 @@ classdef Candidate < handle
             button = uicontrol(index_panel, 'Style', 'pushbutton', 'String', '-', 'FontSize', 20, ...
                 'Units', 'Normalized', 'Position', [0.2 top_margins 0.18 1-2*top_margins], ...
                 'Callback', @obj_vec.callback_prev, 'UserData', input.parent, ...
-                'Tooltip', 'go back to previous candidate'); 
+                'Tooltip', 'go back to previous candidate (key: b)'); 
             
             button = uicontrol(index_panel, 'Style', 'edit', 'String', sprintf('index= %d / %d', input.parent.UserData.index, length(obj_vec)), 'FontSize', 16, ...
                 'Units', 'Normalized', 'Position', [0.39 top_margins 0.4 1-2*top_margins], ...
@@ -1178,7 +1183,7 @@ classdef Candidate < handle
             button = uicontrol(index_panel, 'Style', 'pushbutton', 'String', '+', 'FontSize', 20, ...
                 'Units', 'Normalized', 'Position', [0.8 top_margins 0.18 1-2*top_margins], ...
                 'Callback', @obj_vec.callback_next, 'UserData', input.parent, ...
-                'Tooltip', 'go forward to next candidate'); 
+                'Tooltip', 'go forward to next candidate (key: n)'); 
             
             %%%%%%%%%%%%%%%%%%%%%% panel classify %%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -1190,7 +1195,12 @@ classdef Candidate < handle
                 'Units', 'Normalized', 'Position', [0.025 top_margins 0.45 1-2*top_margins], ...
                 'Callback', @obj_vec.callback_classify, 'UserData', input.parent); 
             
-            button.TooltipString = 'choose a classification for this candidate'; 
+            line1 = 'choose a classification for this candidate';
+            line2 = 'Use the following key shortcuts (shift+...)';
+            line3 = 'C: certain occultation, X: normalization,';
+            line4 = 'S: satellite, F: flare, T: tracking error';
+            
+            button.TooltipString = sprintf('%s\n%s\n%s\n%s', line1, line2, line3, line4); 
             
             button = uicontrol(classify_panel, 'Style', 'pushbutton', 'String', 'SAVE', 'FontSize', 20, ...
                 'Units', 'Normalized', 'Position', [0.525 top_margins 0.45 1-2*top_margins], ...
@@ -2112,13 +2122,16 @@ classdef Candidate < handle
                     new_hndl.Classification = classes{1}; 
                     obj.callback_classify(new_hndl); 
                 elseif strcmp(event.Character, 'X')
-                    new_hndl.Classification = 'Normalization'; 
+                    new_hndl.Classification = 'normalization'; 
                     obj.callback_classify(new_hndl); 
                 elseif strcmp(event.Character, 'S')
-                    new_hndl.Classification = 'Satellite'; 
+                    new_hndl.Classification = 'satellite'; 
                     obj.callback_classify(new_hndl); 
                 elseif strcmp(event.Character, 'F')
-                    new_hndl.Classification = 'Flare'; 
+                    new_hndl.Classification = 'flare'; 
+                    obj.callback_classify(new_hndl); 
+                elseif strcmp(event.Character, 'T')
+                    new_hndl.Classification = 'tracking error'; 
                     obj.callback_classify(new_hndl); 
                 end
                 

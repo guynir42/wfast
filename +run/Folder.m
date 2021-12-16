@@ -81,6 +81,8 @@ classdef Folder < dynamicprops
 %                          as many such files as the original stack/cutout
 %                          HDF5 files in the run. This is the new way to 
 %                          save the photometric results. 
+%   -has_microflares: only show folders where some micro flares were
+%                     detected and saved to file. 
 %   -isFastMode: method that tells which of a vector of Folder was 
 %                recorded in fast-mode (i.e., expT<0.05). 
 %   -readyForAnalysis: method that tells which of a vector of Folder 
@@ -107,6 +109,7 @@ classdef Folder < dynamicprops
         
         summary@tno.Summary; 
         cat@head.Catalog; 
+        head@head.Header;
         
     end
     
@@ -121,6 +124,8 @@ classdef Folder < dynamicprops
         expT = []; % exposure time loaded from the text file [s]
         frame_rate = []; % frame rate loaded from the text file [Hz]
         batch_size = []; % how many frames in each batch/file
+        RA_deg = []; % right ascention of field (degrees)
+        Dec_deg = []; % declination of field (degrees)
         
         is_calibration = 0; % this is true if the run folder starts with "dark" or "flat"
         is_full_frame = 0; % this is true if the individual files are larger than 100 MB, meaning there are multiple full-frame images saved (not stack+cutout, not single image)
@@ -132,7 +137,7 @@ classdef Folder < dynamicprops
         
         has_lightcurves_mat = 0; % has a single, giant lightcurves MAT file (old method)
         has_lightcurves_hdf5 = 0; % has individual batches in lightcurve HDF5 files (new method)
-        
+        has_microflares = 0; % have there been any flare detections saved in this folder
     end
     
     properties % switches/controls
@@ -336,6 +341,7 @@ classdef Folder < dynamicprops
             input.input_var('regexp', '', 'regular_expression'); % match run names to this regular expression
             input.input_var('glob', '', 'glob_expression', 'wildcard'); % match run names to this wildcard (glob) expression
             input.input_var('catalog', false); % pull the catalog file into each found object
+            input.input_var('header', false); % save the full header for each folder 
             input.input_var('debug_bit', 0); % verbosity of printouts
             input.scan_vars(varargin{:}); 
             
@@ -452,6 +458,12 @@ classdef Folder < dynamicprops
                         if isempty(regexp(run_name, regexptranslate('wildcard', input.glob), 'once')), continue; end
                     end
                     
+                    files = d.match('*.h5*'); % cell array with all HDF5 files in this folder
+                    
+                    if length(files) < input.files
+                        continue;
+                    end
+                    
                     new_obj = run.Folder; % new object added to the list, for this specific run
                     
                     % fill the identification info for this object
@@ -461,8 +473,6 @@ classdef Folder < dynamicprops
                     if ismember(new_obj.identifier(end), {'\', '/'}) % remove trailing slashes from the identifier
                         new_obj.identifier = new_obj.identifier(1:end-1);
                     end
-                    
-                    files = d.match('*.h5*'); % cell array with all HDF5 files in this folder
                     
                     new_obj.num_files = length(files); 
                     
@@ -478,45 +488,20 @@ classdef Folder < dynamicprops
                         %%%%%%%% get the exposure time %%%%%%%%%%
                     
                         if exist(fullfile(d.pwd, 'A_README.txt'), 'file') % if there is a text file at all... 
-                            
-                            [new_obj.expT, new_obj.frame_rate, new_obj.batch_size] = new_obj.getExposureTime(fullfile(d.pwd, 'A_README.txt')); 
-
-                            if isempty(new_obj.expT) || isempty(new_obj.frame_rate) || isempty(new_obj.batch_size) % no result, try getting the expT by loading the header
-
-                                h = []; 
-                                locations = {'/acquisition/head', '/acquisition/pars', '/camera/head', '/camera/pars'}; 
-
-                                for kk = 1:length(locations)
-                                    try 
-                                        h = util.oop.load(fullfile(d.pwd, 'A_README.txt'), 'location', locations{kk}); 
-                                        break;
-                                    end
-                                end
-
-                                if ~isempty(h)
-                                    new_obj.expT = h.EXPTIME;
-                                    new_obj.frame_rate = h.FRAMERATE;
-                                    new_obj.batch_size = h.NAXIS3;  
-                                end
-                                
-                            end
-                        
+                            [new_obj.expT, new_obj.frame_rate, new_obj.batch_size, new_obj.RA_deg, new_obj.Dec_deg] = new_obj.getParameters(fullfile(d.pwd, 'A_README.txt')); 
                         end
-                            
-                        if isempty(new_obj.expT) || isempty(new_obj.frame_rate) || isempty(new_obj.batch_size) % no result, try getting the expT by loading the header from HDF5
+                        
+                        if isempty(new_obj.expT) || isempty(new_obj.frame_rate) || isempty(new_obj.batch_size) || ...
+                            isempty(new_obj.RA_deg) || isempty(new_obj.Dec_deg) % no result, try getting the expT by loading the header
 
-                            if input.debug_bit, disp('Failed to load header from text file!'); end
-                            
-                            try
-                                h = util.oop.load(files{1}, 'location', '/header');
-                            catch 
-                                h = util.oop.load(files{1}, 'location', '/pars');
-                            end
+                            new_obj.head = new_obj.getHeader(files); % try to find the header from the README or HDF5 file
 
-                            if ~isempty(h)
-                                new_obj.expT = h.EXPTIME; 
-                                new_obj.frame_rate = h.FRAMERATE;
-                                new_obj.batch_size = h.NAXIS3; 
+                            if ~isempty(new_obj.head)
+                                new_obj.expT = new_obj.head.EXPTIME; 
+                                new_obj.frame_rate = new_obj.head.FRAMERATE;
+                                new_obj.batch_size = new_obj.head.NAXIS3; 
+                                new_obj.RA_deg = new_obj.head.RA_DEG; 
+                                new_obj.Dec_deg = new_obj.head.DEC_DEG; 
                             end
                             
                         end
@@ -531,6 +516,19 @@ classdef Folder < dynamicprops
                             end
                                 
                         end
+                        
+                        %%%%%%% load the header if it wasn't loaded already
+                        
+                        
+                        if input.header
+                            if isempty(new_obj.head)
+                                new_obj.head = new_obj.getHeader(files); % try to find the header from the README or HDF5 file
+                            end
+                        else
+                            new_obj.head = head.Header.empty; % get rid of header if we were not asked to fetch it
+                        end
+                        
+                        new_obj.has_microflares = exist(fullfile(d.pwd, 'micro_flares.mat'), 'file') > 0; 
                         
                         %%%%%%%% go into the analysis folders %%%%%%%%%
 
@@ -635,11 +633,13 @@ classdef Folder < dynamicprops
             
         end
         
-        function [expT, frame_rate, batch_size] = getExposureTime(filename) % scan a text file until finding expT or EXPTIME and read the value
+        function [expT, frame_rate, batch_size, RA, DE] = getParameters(filename) % scan a text file until finding all these parameters
             
             expT = []; % if we can't find the exposure time, return empty
             frame_rate = [];
             batch_size = [];
+            RA = [];
+            DE = [];
             
             try 
                 
@@ -681,7 +681,26 @@ classdef Folder < dynamicprops
                         end
                     end
                     
-                    if ~isempty(expT) && ~isempty(frame_rate) && ~isempty(batch_size) 
+                    if isempty(RA)
+                        idx = regexp(line, 'RA_DEG', 'end');
+
+                        if ~isempty(idx)
+                            frame_rate = util.text.parse_value(line(idx+2:end));   
+                            continue;
+                        end
+                    end
+                    
+                    if isempty(DE)
+                        idx = regexp(line, 'DEC_DEG', 'end');
+
+                        if ~isempty(idx)
+                            frame_rate = util.text.parse_value(line(idx+2:end));   
+                            continue;
+                        end
+                    end
+                    
+                    if ~isempty(expT) && ~isempty(frame_rate) && ...
+                            ~isempty(batch_size) && ~isempty(RA) && ~isempty(DE)
                         break;
                     end
                         
@@ -691,6 +710,32 @@ classdef Folder < dynamicprops
                 warning(ME.getReport); 
             end
             
+        end
+        
+        function h = getHeader(files)
+            
+            h = [];
+            
+            folder = fileparts(files{1}); 
+            
+            locations = {'/acquisition/head', '/acquisition/pars', '/camera/head', '/camera/pars'}; 
+            
+            for kk = 1:length(locations)
+                try 
+                    h = util.oop.load(fullfile(folder, 'A_README.txt'), 'location', locations{kk}); 
+                    break;
+                end
+            end
+            
+            if isempty(h)
+                try
+                    h = util.oop.load(files{1}, 'location', '/header');
+                catch 
+                    h = util.oop.load(files{1}, 'location', '/pars');
+                end
+
+            end
+
         end
         
         function val = default_process_date % the default minimal processing date for the new pipeline

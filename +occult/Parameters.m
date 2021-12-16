@@ -58,7 +58,10 @@ classdef Parameters < handle
         logl = NaN; % log liklihood
         likelihood = NaN; % the results of fitting to this model (translated to probability)
         counts = 1; 
-        weight = 1; % this can be set to zero for repeated points... 
+        weight = 1; % this can be set to zero for repeated points...
+        chain = 0; % which chain it was produced on
+        burn = 0; % is this part of the burn phase
+        good = 1; % is this a good point to use in parameter estimation
         
     end
     
