@@ -121,11 +121,11 @@ classdef Folder < dynamicprops
         analysis_date = []; % datetime object for the time when the analysis was done (date only)
         
         num_files = 0; % how many HDF5 files are in this folder
-        expT = []; % exposure time loaded from the text file [s]
-        frame_rate = []; % frame rate loaded from the text file [Hz]
-        batch_size = []; % how many frames in each batch/file
-        RA_deg = []; % right ascention of field (degrees)
-        Dec_deg = []; % declination of field (degrees)
+        expT = NaN; % exposure time loaded from the text file [s]
+        frame_rate = NaN; % frame rate loaded from the text file [Hz]
+        batch_size = NaN; % how many frames in each batch/file
+        RA_deg = NaN; % right ascention of field (degrees)
+        Dec_deg = NaN; % declination of field (degrees)
         
         is_calibration = 0; % this is true if the run folder starts with "dark" or "flat"
         is_full_frame = 0; % this is true if the individual files are larger than 100 MB, meaning there are multiple full-frame images saved (not stack+cutout, not single image)
@@ -485,7 +485,7 @@ classdef Folder < dynamicprops
                         new_obj.is_full_frame = 1; 
                     else % not calibration and not full-frame
                         
-                        %%%%%%%% get the exposure time %%%%%%%%%%
+                        %%%%%%%% get the parameters %%%%%%%%%%
                     
                         if exist(fullfile(d.pwd, 'A_README.txt'), 'file') % if there is a text file at all... 
                             [new_obj.expT, new_obj.frame_rate, new_obj.batch_size, new_obj.RA_deg, new_obj.Dec_deg] = new_obj.getParameters(fullfile(d.pwd, 'A_README.txt')); 
@@ -505,6 +505,12 @@ classdef Folder < dynamicprops
                             end
                             
                         end
+                        
+                        if isempty(new_obj.expT), new_obj.expT = NaN; end
+                        if isempty(new_obj.frame_rate), new_obj.frame_rate = NaN; end
+                        if isempty(new_obj.batch_size), new_obj.batch_size = NaN; end
+                        if isempty(new_obj.RA_deg), new_obj.RA_deg = NaN; end
+                        if isempty(new_obj.Dec_deg), new_obj.Dec_deg = NaN; end
                         
                         %%%%%%%% load the catalog file
                         
