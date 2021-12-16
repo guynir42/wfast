@@ -50,7 +50,7 @@ classdef MCMC < handle
         num_steps = 10000; % total number of steps (including burn-in)
         num_burned = 1000; % number of steps to burn at the begining of each chain
         
-        step_sizes = [0.25 0.25 3 0.1]; % in order of parameters: step size for each parameter
+        step_sizes = [0.1 0.1 3 0.1]; % in order of parameters: step size for each parameter
         circ_bounds = [0 0 0 0]; % in order of parameters: which par gets a circular boundary condition
         
         par_list = {'r', 'b', 'v', 'R'}; % these parameters are chosen randomly each step. The rest are taken from the generator's parameters
@@ -183,6 +183,47 @@ classdef MCMC < handle
         function val = getProgress(obj)
             
             val = sprintf('chain: %d / %d points | %s', obj.counter, obj.num_steps, obj.prog.show); 
+            
+        end
+        
+        function T = getTable(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('good', false); % only get good chains and skip points in the burn sample
+            input.scan_vars(varargin{:});
+            
+            p = obj.points;
+            
+            for ii = 1:size(p,2)
+                [p(:,ii).chain] = deal(ii); % make sure each point knows which chain it came from
+            end
+            
+            pass = obj.findGoodChains;
+            
+            if input.good
+                p = p(obj.num_burned+1:end, pass);
+            end
+            
+            R = [p.R]';
+            r = [p.r]';
+            b = [p.b]';
+            v = [p.v]';
+            chi2 = [p.chi2]';
+            ndof = [p.ndof]';
+            logl = [p.logl]';
+            likelihood = [p.likelihood]';
+            counts = [p.counts]';
+            weight = [p.weight]'; 
+            chain = [p.chain]'; 
+            
+            T = table(R,r,b,v,chi2,ndof,logl,likelihood,counts,weight,chain); 
+            
+            if ~input.good % add burn and good columns to the table
+                burn = [p.burn]';
+                good = [p.good]'; 
+                T2 = table(burn, good); 
+                T = [T,T2]; 
+            end
             
         end
         
@@ -510,7 +551,7 @@ classdef MCMC < handle
             
         end
         
-        function points = searchGoodPoints(obj, varargin)
+        function points = searchGoodPoints(obj, varargin) % find good starting points
             
             if ~isempty(obj.input_errors)
                 e = obj.input_errors;
@@ -822,6 +863,42 @@ classdef MCMC < handle
                 
             end
 
+        end
+        
+        function [pass, mean_chi2] = findGoodChains(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('sigma', 3); % how many MADs above the noise should outliers be
+            input.scan_vars(varargin{:}); 
+            
+            N = size(obj.points,2);
+            
+            mean_chi2 = zeros(1, N);
+            
+            for ii = 1:N
+                
+                mean_chi2(ii) = nanmean([obj.points(:,ii).chi2]); 
+                
+            end
+            
+            if N > 4
+                scat = mad(mean_chi2,1); % median deviation skips outliers
+                aver = median(mean_chi2); % median average skips outliers
+                pass = mean_chi2 - aver < scat * input.sigma; % low chi2 are also accepted, but high outliers are removed
+            else
+                pass = true(1,N); 
+            end
+            
+        end
+        
+        function flagBadPoints(obj)
+            
+            pass = obj.findGoodChains; 
+            
+            [obj.points(1:obj.num_burned, :).burn] = deal(true);
+            [obj.points(1:obj.num_burned, :).good] = deal(false);
+            [obj.points(:, ~pass).good] = deal(false);
+            
         end
         
         function [N, x, y] = calcPosterior(obj, varargin)
