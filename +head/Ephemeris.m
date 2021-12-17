@@ -1046,7 +1046,9 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
         %         "internal", "simbad", "jpl", [] 
         
             import util.text.cs;
-        
+            
+            val = '';
+            
             if nargin<2 || isempty(keyword)
                 keyword = obj.keyword;
             end
@@ -1163,6 +1165,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
                         if obj.debug_bit && nargout==0
                             util.text.date_printf('Could not resolve name "%s" with coo_resolver()!', keyword); 
                         end
+                        obj.type_resolver = '';                        
                         return;
                     end
 
