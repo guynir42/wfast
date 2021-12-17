@@ -1774,6 +1774,7 @@ classdef Lightcurves < handle
                     
                     M = obj.cat.magnitudes; 
                     f = flux; 
+                    M = vertcat(M, nan(size(f,2) - size(M,1),1)); % add NaN magnitudes to forced targets
                     f(f<=0) = NaN; % get rid of all negative flux values (complex magnitudes are no good)
                     zp = M + 2.5*log10(f)'; 
                     
@@ -2703,6 +2704,7 @@ classdef Lightcurves < handle
                 x = obj.magnitudes'; 
                 x(x>obj.show_mag_limit) = NaN;
                 used_mag = 1;
+                x = horzcat(x, nan(1, size(obj.local_RE,2) - size(x,2)));
             else
                 x = nanmean(obj.fluxes_cal_); % no magnitudes are given, use the average fluxes instead
                 used_mag = 0;

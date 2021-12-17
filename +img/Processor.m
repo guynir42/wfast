@@ -124,7 +124,7 @@ classdef Processor < dynamicprops
                 obj.cal = img.Calibration;
 
                 obj.phot = img.Photometry;
-                
+                obj.phot.aperture = [3, 5, 7]; 
                 obj.light = img.Lightcurves;
                 obj.light.head = obj.head;
                 obj.light.cat = obj.cat;
@@ -422,6 +422,17 @@ classdef Processor < dynamicprops
             
         end
         
+        function val = getParameterString(obj)
+        
+            str = {};
+            str{end+1} = sprintf('T= %4.4fs', obj.head.EXPTIME); 
+            str{end+1} = sprintf('ap: %s pix', util.text.print_vec(obj.phot.aperture, ', '));
+            str{end+1} = sprintf(' %d stars', size(obj.current_positions,1)); 
+            val = join(str, ' | '); 
+            val = val{1};
+            
+        end
+            
         function val = getNameResolver(obj) % lazy load an Ephemeris object with updated coordinates
             
             if isempty(obj.name_resolver)
@@ -884,6 +895,8 @@ classdef Processor < dynamicprops
 
                         end
 
+                        obj.ref_positions = obj.current_positions; % update the reference positions for re-align later
+                        
                         obj.forced_cutout_motion_per_file = []; 
 
                         if obj.pars.use_interp_forced
@@ -1174,7 +1187,7 @@ classdef Processor < dynamicprops
             obj.psf_width = util.vec.weighted_average(W/2.355, s.forced_photometry.flux, 2);
             
             if obj.pars.use_auto_aperture
-                obj.phot.aperture = floor(obj.psf_width.*3);
+                obj.phot.aperture = ceil(obj.psf_width.*[3, 5, 7]);
             end
             
             T = util.img.quick_find_stars(I, 'psf', obj.psf_width, 'number', obj.pars.num_stars,...
@@ -1522,8 +1535,10 @@ classdef Processor < dynamicprops
             if isempty(obj.psf_width)
                 val = [];
             else
-                a = floor(obj.psf_width.*3); 
-                val = find(strcmp(obj.phot.pars_struct.types, sprintf('forced %4.2f', a))); 
+%                 a = floor(obj.psf_width.*3); 
+%                 val = find(strcmp(obj.phot.pars_struct.types, sprintf('forced %4.2f', a))); 
+                val = find(~cellfun(@isempty,strfind(obj.phot.pars_struct.types, 'forced')));
+                val = val(end); % grab biggest aperture
             end
             
         end

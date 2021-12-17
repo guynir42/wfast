@@ -4,10 +4,10 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
 % 
 % INPUTS: give the x, y and value at each measured point. 
 %
-% OUTPUTS: -results: a struct containing the ocefficients etc. 
+% OUTPUTS: -results: a struct containing the ocefficients, etc. 
 %          -surf_image: a map of the surface using the fit results. 
 %
-% NOTE: the coefficients will be organized by order, then from x's highest
+% NOTE: the coefficients will be organized by order, then, from x's highest
 %       power to y's highest power. E.g., for order=2:
 %       coeffs= {'','x','y','x.^2','x.*y','y.^2'}
 %       For order=3: 
@@ -15,7 +15,7 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
 %
 %
 % OPTIONAL PARAMETERS:
-%   -weights: give the relative weight foreach measurement, or a single
+%   -weights: give the relative weight for each measurement, or a single
 %             value for all measurements. Will be used as weights for the
 %             fit and also for scaling the chi2 result. 
 %             The weights are treated as the inverse errors, and are
@@ -230,7 +230,12 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
         for jj = 1:input.iterations
 
             if length(nan_indices) + N >= size(x,1)
-                new_result = make_empty_result(coeff_names, coeff_powers_x, coeff_powers_y, x(:,ii), y(:,ii), v(:,ii), w(:,ii));
+                if isempty(w)
+                    w_temp = []; 
+                else
+                    w_temp = w(:,ii);
+                end
+                new_result = make_empty_result(coeff_names, coeff_powers_x, coeff_powers_y, x(:,ii), y(:,ii), v(:,ii), w_temp);
                 break;
             end
             
@@ -265,6 +270,8 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
             new_result.v = v(:,ii);
             if ~isempty(w)
                 new_result.w = w(:,ii);
+            else
+                new_result.w = [];
             end
             
             % produce the values at all x,y points based on the model
@@ -358,7 +365,7 @@ function [results, surf_image] = surf_poly(x,y,v,varargin)
         end % for jj (iterations)
         
         results(ii) = new_result;
-        
+       
     end % for ii (columns/value sets)
     
     if nargout>1 % create an image from the surface fit
@@ -410,6 +417,8 @@ function new_result = make_empty_result(coeff_names, coeff_powers_x, coeff_power
     new_result.v = v;
     if ~isempty(w)
         new_result.w = w;
+    else
+        new_result.w = [];
     end
     new_result.vm = NaN(size(v,1),1); 
 
@@ -417,6 +426,7 @@ function new_result = make_empty_result(coeff_names, coeff_powers_x, coeff_power
     new_result.chi2 = NaN;
     new_result.ndof = length(v) - length(coeffs); 
     new_result.var = NaN;
+    new_result.outlier_indices = [];
     
 end
 

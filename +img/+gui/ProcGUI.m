@@ -49,7 +49,7 @@ classdef ProcGUI < handle
         button_reset_axes;
         button_display_text;
         input_num_rect;
-        button_expt;
+        button_parameters;
         button_indices;
         panel_legend;
         panel_buffers;
@@ -232,7 +232,7 @@ classdef ProcGUI < handle
             obj.input_num_rect = GraphicButton(obj.panel_image, [0.15 0.0 0.2 0.05], obj.owner, 'pars.display_num_rect_stars', 'input', 'num cutouts= '); 
             obj.input_num_rect.Tooltip = 'number of squares around stars to show'; 
             
-            obj.button_expt = GraphicButton(obj.panel_image, [0.0 0.95 0.15 0.05], obj.owner, 'head.EXPTIME', 'info', 'T= ', 's'); 
+            obj.button_parameters = GraphicButton(obj.panel_image, [0.15 0.95 0.60 0.05], obj.owner, 'getParameterString', 'info', ' '); 
             
             obj.button_indices = GraphicButton(obj.panel_image, [0.6 0.0 0.4 0.05], obj.owner, 'getIndicesString', 'info', ' '); 
             
