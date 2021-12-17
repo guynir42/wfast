@@ -285,6 +285,77 @@ classdef Folder < dynamicprops
             
         end
         
+        function rsync(obj_vec, varargin) % copy files for all these folders into destination
+            
+            % NOTE: for this to work on windows you must add this to the path:
+            % D:\Dropbox (Weizmann Institute)\software\cwrsync\bin
+            % (choose the dropbox folder from the actual machine)
+            % for linux just make sure you have rsync on the path
+            
+            input =  util.text.InputVars;
+            input.input_var('destination', ''); % root folder where run identifiers folders are kept (e.g., <Dropbox>/DATA/WFAST/2021)
+            input.input_var('full', false); % if true, copy all content of of folders, if false copy only latest analysis folder
+            input.input_var('dry_run', false); % don't copy anything, just show the command
+            input.input_var('echo', false); % print out the command output from each rsync call
+            input.input_var('ignore_errors', false); % convert errors to warnings and keep going
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.destination)
+                error('Must provide a destination root folder'); 
+            end
+            
+            for ii = 1:length(obj_vec)
+                
+                obj = obj_vec(ii); 
+                origin = obj.folder;
+                target = fullfile(input.destination, obj.identifier);
+                
+                if ~exist(input.destination, 'dir')
+                    error('Could not find the destination folder %s', input.destination);
+                end
+                
+                if ~input.full % copy only the latest analysis folder
+                    origin = fullfile(origin, obj.analysis_folder); 
+                end
+                
+                if ispc
+                    
+                    origin = strrep(origin, '\', '/'); 
+                    origin = strrep(origin, ':', ''); 
+                    origin(1) = lower(origin(1)); 
+                    origin = ['/cygdrive/', origin]; 
+                    
+                    target = strrep(target, '\', '/'); 
+                    target = strrep(target, ':', '');
+                    target(1) = lower(target(1)); 
+                    target = ['/cygdrive/', target]; 
+                    
+                end
+                
+                comm = sprintf('rsync -vzza "%s" "%s"', origin, target);
+                if input.dry_run
+                    comm = [comm ' --dry-run']; 
+                end
+                
+                [status, cmdout] = system(comm); 
+                
+                if input.echo
+                    disp(cmdout);
+                end
+                
+                if status
+                    if input.ignore_errors
+                        warning('Failed to copy %s:\n %s', origin, cmdout);
+                    else
+                        error('Failed to copy %s:\n %s', origin, cmdout);
+                    end
+                end
+                
+            end
+            
+        end
+        
+        
     end
     
     methods(Static=true) % scan method lives here!
