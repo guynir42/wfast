@@ -491,7 +491,7 @@ classdef EventFinder < handle
                 
                 obj.cand = vertcat(obj.cand, obj.latest_candidates); % store all the candidates that were found in the last batch
                 
-                obj.snr_values(end+1) = best_snr; 
+%                 obj.snr_values(end+1) = best_snr; 
                 
                 %%%%%%%%%%%%%% STAR HOURS %%%%%%%%%%%%%%
                 
@@ -565,6 +565,10 @@ classdef EventFinder < handle
                     end
 
                 end % use sim
+                
+                obj.snr_values(end+1) = best_snr; % this used to be before the Oort cloud and sim, but then the batch counter was wrong! 
+                
+                
                 
             end % do not do any more calculations until done with "burn-in" period
             

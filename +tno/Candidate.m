@@ -1199,8 +1199,8 @@ classdef Candidate < handle
             line2 = 'Use the following key shortcuts (shift+...)';
             line3 = 'C: certain occultation, X: normalization,';
             line4 = 'S: satellite, F: flare, T: tracking error';
-            
-            button.TooltipString = sprintf('%s\n%s\n%s\n%s', line1, line2, line3, line4); 
+            line5 = 'A: bad aperture'; 
+            button.TooltipString = sprintf('%s\n%s\n%s\n%s\n%s', line1, line2, line3, line4, line5); 
             
             button = uicontrol(classify_panel, 'Style', 'pushbutton', 'String', 'SAVE', 'FontSize', 20, ...
                 'Units', 'Normalized', 'Position', [0.525 top_margins 0.45 1-2*top_margins], ...
@@ -2132,6 +2132,9 @@ classdef Candidate < handle
                     obj.callback_classify(new_hndl); 
                 elseif strcmp(event.Character, 'T')
                     new_hndl.Classification = 'tracking error'; 
+                    obj.callback_classify(new_hndl); 
+                elseif strcmp(event.Character, 'A')
+                    new_hndl.Classification = 'bad aperture'; 
                     obj.callback_classify(new_hndl); 
                 end
                 
