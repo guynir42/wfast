@@ -1251,6 +1251,46 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
         end
         
+        function weather_report = getWeatherFromNotebook(obj, date_now)
+            
+            if nargin<2 || isempty(date_now)
+                date_now = datetime(util.sys.date_dir('now'));
+            elseif ischar(date_now)
+                date_now = obj.parseDate(date_now); 
+            end
+            
+            fid = fopen(fullfile(getenv('DATA'), 'WFAST/logfiles/weather_notebook.txt')); 
+            on_cleanup = onCleanup(@() fclose(fid)); 
+            
+            weather_report = ''; 
+            this_date = []; % must read the first date off the list first
+            
+            for ii = 1:1e4
+                
+                tline = fgetl(fid); 
+                
+                if isnumeric(tline)
+                    break;
+                end
+                
+                if isempty(tline)
+                    continue;
+                end
+                
+                c = strsplit(tline, ' '); % split the date and name
+                date_str = strtrim(c{1});
+                this_report = strtrim(c{2}); 
+                
+                this_date = obj.parseDate(date_str, this_date); 
+                
+                if isequal(this_date, date_now)
+                    weather_report = this_report;
+                end
+                
+            end
+            
+        end
+        
         function makeObserverserList(obj, varargin)
             % do this later
         end
@@ -1337,7 +1377,14 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Manager < handle
             
             if ~isempty(obj.checker.last_night_total_hours) && ~isempty(obj.checker.last_night_good_hours)
                 
-                str = sprintf('%s\n\n <p style="font-size:14px"> Good weather: %4.1f out of %4.1f hours </p>\n', str, obj.checker.last_night_good_hours, obj.checker.last_night_total_hours); 
+                str = sprintf('%s\n\n <p style="font-size:14px"> Good weather: %4.1f out of %4.1f hours', str, obj.checker.last_night_good_hours, obj.checker.last_night_total_hours); 
+                
+                weather_note = obj.getWeatherFromNotebook;
+                if ~isempty(weather_note)
+                    str = sprintf('%s (sky: %s)', str, weather_note);
+                end
+                
+                str = sprintf('%s </p>\n', str); 
                 
             end
             
