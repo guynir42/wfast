@@ -296,7 +296,7 @@ classdef Folder < dynamicprops
             input.input_var('destination', ''); % root folder where run identifiers folders are kept (e.g., <Dropbox>/DATA/WFAST/2021)
             input.input_var('full', false); % if true, copy all content of of folders, if false copy only latest analysis folder
             input.input_var('dry_run', false); % don't copy anything, just show the command
-            input.input_var('echo', false); % print out the command output from each rsync call
+            input.input_var('echo', false, 'verbose'); % print out the command output from each rsync call
             input.input_var('ignore_errors', false); % convert errors to warnings and keep going
             input.scan_vars(varargin{:}); 
             
@@ -315,7 +315,27 @@ classdef Folder < dynamicprops
                 end
                 
                 if ~input.full % copy only the latest analysis folder
-                    origin = fullfile(origin, obj.analysis_folder); 
+                    if isempty(obj.analysis_folder)
+                        continue; 
+                    else
+                        origin = fullfile(origin, obj.analysis_folder); 
+                    end
+                end
+                
+                if length(dir(origin))<=2
+                    if input.echo
+                        disp('origin is an empty folder');
+                    end
+                    continue; 
+                end
+                
+                if ~exist(target, 'dir')
+                    if input.ignore_errors
+                        warning('target "%s" does not exist!', target); 
+                        continue; 
+                    else
+                        error('target "%s" does not exist!', target); 
+                    end
                 end
                 
                 if ispc
@@ -328,11 +348,12 @@ classdef Folder < dynamicprops
                     target = strrep(target, '\', '/'); 
                     target = strrep(target, ':', '');
                     target(1) = lower(target(1)); 
-                    target = ['/cygdrive/', target]; 
+                    target = ['/cygdrive/', target '/']; 
                     
                 end
                 
                 comm = sprintf('rsync -vzza "%s" "%s"', origin, target);
+                
                 if input.dry_run
                     comm = [comm ' --dry-run']; 
                 end

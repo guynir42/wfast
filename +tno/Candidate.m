@@ -1197,9 +1197,9 @@ classdef Candidate < handle
             
             line1 = 'choose a classification for this candidate';
             line2 = 'Use the following key shortcuts (shift+...)';
-            line3 = 'C: certain occultation, X: normalization,';
+            line3 = 'C: certain occultation, P: possible occultation,';
             line4 = 'S: satellite, F: flare, T: tracking error';
-            line5 = 'A: bad aperture'; 
+            line5 = 'A: bad aperture, X: normalization'; 
             button.TooltipString = sprintf('%s\n%s\n%s\n%s\n%s', line1, line2, line3, line4, line5); 
             
             button = uicontrol(classify_panel, 'Style', 'pushbutton', 'String', 'SAVE', 'FontSize', 20, ...
@@ -2118,8 +2118,10 @@ classdef Candidate < handle
                 elseif strcmpi(event.Character, 'B') % lower or upper case B (back)
                     obj.callback_prev(new_hndl); 
                 elseif strcmp(event.Character, 'C') % upper case C only (classify as occultation certain)
-                    classes = obj.getListOfClasses;
-                    new_hndl.Classification = classes{1}; 
+                    new_hndl.Classification = 'occultation certain'; 
+                    obj.callback_classify(new_hndl); 
+                elseif strcmp(event.Character, 'P')                     
+                    new_hndl.Classification = 'occultation possible'; 
                     obj.callback_classify(new_hndl); 
                 elseif strcmp(event.Character, 'X')
                     new_hndl.Classification = 'normalization'; 
