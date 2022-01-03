@@ -110,6 +110,7 @@ classdef Folder < dynamicprops
         summary@tno.Summary; 
         cat@head.Catalog; 
         head@head.Header;
+        classifications@struct;
         
     end
     
@@ -375,7 +376,110 @@ classdef Folder < dynamicprops
             end
             
         end
-        
+                
+        function getCandidateSummary(obj) % load classifications summary text file
+
+            obj.classifications = struct('all', [], 'real', [], 'sim', []); 
+
+            cls = tno.Candidate.getListOfClasses; 
+
+            for ii = 1:length(cls)
+                cls{ii} = strrep(cls{ii}, ' ', '_'); 
+            end
+            new_cell = cell(1,length(cls));
+            new_cell(:) = {0}; % put zeros everywhere
+            cls_arr = [cls;new_cell]; 
+            cls_struct = struct(cls_arr{:}); % each classname is followed by a zero
+            obj.classifications.all = cls_struct;
+            obj.classifications.real = cls_struct;
+            obj.classifications.sim = cls_struct;
+
+            if exist(fullfile(obj.folder, obj.analysis_folder, 'classified.txt'), 'file') % read classifications from file
+                
+                % read the text file
+                fid = fopen(fullfile(obj.folder, obj.analysis_folder, 'classified.txt'));
+                file_close = onCleanup(@() fclose(fid)); % make sure to close the file at the end
+                
+                for ii = 1:10000
+
+                    line = fgetl(fid); 
+
+                    if isnumeric(line)
+                        break;
+                    end
+                    
+                    line = strip(line); 
+                    if ~isempty(line)
+                        
+                        idx = regexp(line, ':', 'once'); % find the colon
+                        if ~isempty(idx) && length(line) > idx
+                            this_class = strip(line(1:idx-1));
+                            this_class = strrep(this_class, ' ', '_'); 
+                            if ismember(this_class, cls)
+                                numbers = str2num(line(idx+1:end));
+                                if ~isempty(numbers)
+                                    
+                                    obj.classifications.all.(this_class) = numbers(1); % first number is all events
+                                    
+                                    if isscalar(numbers) % no simulated events here
+                                        obj.classifications.real.(this_class) = numbers(1); 
+                                        obj.classifications.sim.(this_class) = 0; 
+                                    else % get the number of real vs. simualated
+                                        obj.classifications.real.(this_class) = numbers(1)-numbers(2); 
+                                        obj.classifications.sim.(this_class) = numbers(2); 
+                                    end
+                                    
+                                end
+                                
+                            end
+                        end
+                        
+                    end
+                    
+                end
+                
+            elseif exist(fullfile(obj.folder, obj.analysis_folder, 'classified.mat'), 'file')
+                
+                load(fullfile(obj.folder, obj.analysis_folder, 'classified.mat'));
+                
+                if ~isempty(candidates)
+                    
+                    for ii = 1:length(candidates)
+                        
+                        this_class = candidates(ii).classification;
+                        this_class = strrep(this_class, ' ', '_'); 
+                        obj.classifications.all.(this_class) = obj.classifications.all.(this_class) + 1;
+                        if candidates(ii).is_simulated
+                            obj.classifications.sim.(this_class) = obj.classifications.sim.(this_class) + 1;
+                        else
+                            obj.classifications.real.(this_class) = obj.classifications.real.(this_class) + 1;
+                        end
+                        
+                    end
+                    
+                end
+                
+                % write a text file for future reference
+                fid = fopen(fullfile(obj.folder, obj.analysis_folder, 'classified.txt'), 'wt');
+                file_close = onCleanup(@() fclose(fid)); % make sure to close the file at the end
+                
+                for ii = 1:length(cls)
+                    
+                    fprintf(fid, '%s : %d', strrep(cls{ii}, '_', ' '), obj.classifications.all.(cls{ii})); 
+                    
+                    if obj.classifications.sim.(cls{ii})
+                        fprintf(fid, ' (%d)', obj.classifications.sim.(cls{ii}));
+                    end
+                    
+                    fprintf(fid, '\n');
+                    
+                end
+                
+            else
+                error('Could not find any type of classified candidates file!'); 
+            end
+            
+        end
         
     end
     
@@ -666,12 +770,15 @@ classdef Folder < dynamicprops
                                     end
                                 end
 
-                                if exist(fullfile(d.pwd, 'candidates.mat'), 'file') % load the Candidate objects from the MAT-file
+                                if exist(fullfile(d.pwd, 'candidates.mat'), 'file') % candidate file exists
                                     new_obj.has_candidates = true;
                                 end
 
                                 if exist(fullfile(d.pwd, 'classified.mat'), 'file') % load the classified Candidates from the MAT-file
                                     new_obj.has_classified = true;
+                                    % load the Candidate objects from the
+                                    % MAT-file or from summary text file
+                                    new_obj.getCandidateSummary; 
                                 end
 
                                 if exist(fullfile(d.pwd, 'lightcurves.mat'), 'file') % check if there is a lightcurves MAT file

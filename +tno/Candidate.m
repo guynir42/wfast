@@ -249,17 +249,6 @@ classdef Candidate < handle
     
     methods % getters
         
-        function classes = getListOfClasses(obj)
-            
-            classes = {'occultation certain', 'occultation possible',...
-                'satellite', 'flare', ...
-                'edge effect', 'bad pixel', ...
-                'bad aperture', 'normalization', ...
-                'cosmic ray', 'tracking error', ...
-                'artefact', 'flickering'};
-            
-        end
-        
         function val = kernel_timestamps(obj)
             
             dt = median(diff(obj.timestamps));
@@ -698,10 +687,15 @@ classdef Candidate < handle
             
         end
         
-        function saveClassified(obj_vec, filename)
+        function saveClassified(obj_vec, filename, text_filename)
             
             if nargin<2 || isempty(filename)
                 filename = 'classified.mat';
+            end
+            
+            if nargin<3 || isempty(text_filename)
+                [path, name] = fileparts(filename);
+                text_filename = fullfile(path, [name '.txt']); 
             end
             
             candidates = obj_vec(~cellfun(@isempty, {obj_vec.classification}));
@@ -711,6 +705,31 @@ classdef Candidate < handle
             candidates.clearExtraData;
             
             save(filename, 'candidates', '-v7.3'); 
+            
+            % write a text file summarizing the number of classified events
+            % of each type and the number of simulated events of each class
+            fid = fopen(text_filename, 'wt');
+            file_close = onCleanup(@() fclose(fid)); % make sure to close the file at the end
+            
+            class_list = obj_vec.getListOfClasses; 
+            for ii = 1:length(class_list)
+
+                cls = {candidates.classification}';
+                sim = [candidates.is_simulated]'; 
+                
+                number_total = sum(ismember(cls, class_list{ii})); 
+                number_sim = sum(ismember(cls, class_list{ii}) & sim); 
+                
+                fprintf(fid, '%s : %d', class_list{ii}, number_total); 
+
+                if number_sim
+                    fprintf(fid, ' (%d)', number_sim);
+                end
+
+                fprintf(fid, '\n');
+
+            end
+
             
         end
         
@@ -2532,6 +2551,21 @@ classdef Candidate < handle
         function callback_close_window(~, hndl, ~)
             
             delete(hndl.Parent); 
+            
+        end
+        
+    end
+    
+    methods (Static=true)
+        
+        function classes = getListOfClasses
+            
+            classes = {'occultation certain', 'occultation possible',...
+                'satellite', 'flare', ...
+                'edge effect', 'bad pixel', ...
+                'bad aperture', 'normalization', ...
+                'cosmic ray', 'tracking error', ...
+                'artefact', 'flickering'};
             
         end
         
