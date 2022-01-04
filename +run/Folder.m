@@ -111,6 +111,7 @@ classdef Folder < dynamicprops
         cat@head.Catalog; 
         head@head.Header;
         classifications@struct;
+        classifications_oort@struct; 
         
     end
     
@@ -377,25 +378,37 @@ classdef Folder < dynamicprops
             
         end
                 
-        function getCandidateSummary(obj) % load classifications summary text file
+        function getCandidateSummary(obj, redo_text_files) % load classifications summary text file
 
-            obj.classifications = struct('all', [], 'real', [], 'sim', []); 
-
+            if nargin<2 || isempty(redo_text_files)
+                redo_text_files  = false;
+            end
+            
             cls = tno.Candidate.getListOfClasses; 
 
             for ii = 1:length(cls)
                 cls{ii} = strrep(cls{ii}, ' ', '_'); 
             end
+            
+            % make a struct with fields following the list of classes, and
+            % for each field put a zero value (no candidates). 
             new_cell = cell(1,length(cls));
             new_cell(:) = {0}; % put zeros everywhere
             cls_arr = [cls;new_cell]; 
             cls_struct = struct(cls_arr{:}); % each classname is followed by a zero
+            
+            % initialize each struct with the above defined class-struct
+            obj.classifications = struct('all', [], 'real', [], 'sim', []); 
             obj.classifications.all = cls_struct;
             obj.classifications.real = cls_struct;
             obj.classifications.sim = cls_struct;
+            obj.classifications_oort = struct('all', [], 'real', [], 'sim', []);
+            obj.classifications_oort.all = cls_struct;
+            obj.classifications_oort.real = cls_struct;
+            obj.classifications_oort.sim = cls_struct;
 
-            if exist(fullfile(obj.folder, obj.analysis_folder, 'classified.txt'), 'file') % read classifications from file
-                
+            if exist(fullfile(obj.folder, obj.analysis_folder, 'classified.txt'), 'file') && ... % read classifications from file
+                redo_text_files==0 % if "redo_text_files" is requested, skip to next option (overwrite this file)
                 % read the text file
                 fid = fopen(fullfile(obj.folder, obj.analysis_folder, 'classified.txt'));
                 file_close = onCleanup(@() fclose(fid)); % make sure to close the file at the end
@@ -409,29 +422,53 @@ classdef Folder < dynamicprops
                     end
                     
                     line = strip(line); 
-                    if ~isempty(line)
+                    if ~isempty(line) && line(1) ~= '%' % skip empty or commented rows
                         
                         idx = regexp(line, ':', 'once'); % find the colon
+                        
                         if ~isempty(idx) && length(line) > idx
+                            
                             this_class = strip(line(1:idx-1));
                             this_class = strrep(lower(this_class), ' ', '_'); 
+                            
                             if ismember(this_class, cls)
+                                
                                 numbers = str2num(line(idx+1:end));
+                                
                                 if ~isempty(numbers)
                                     
                                     obj.classifications.all.(this_class) = numbers(1); % first number is all events
                                     
                                     if isscalar(numbers) % no simulated events here
+                                        
                                         obj.classifications.real.(this_class) = numbers(1); 
                                         obj.classifications.sim.(this_class) = 0; 
+                                        
                                     else % get the number of real vs. simualated
+                                        
                                         obj.classifications.real.(this_class) = numbers(1)-numbers(2); 
                                         obj.classifications.sim.(this_class) = numbers(2); 
+                                        
+                                        if length(numbers) > 2 % oort cloud numbers as well
+                                            
+                                            obj.classifications_oort.all.(this_class) = numbers(3);
+                                            
+                                            if length(numbers) == 3 % no oort simulated events
+                                                obj.classifications_oort.real.(this_class) = numbers(3); 
+                                                obj.classifications_oort.sim.(this_class) = 0;
+                                            else % simulated oort events are found
+                                                obj.classifications_oort.real.(this_class) = numbers(3)-numbers(4); 
+                                                obj.classifications_oort.sim.(this_class) = numbers(4); 
+                                            end
+                                            
+                                        end
+                                        
                                     end
                                     
                                 end
                                 
                             end
+                            
                         end
                         
                     end
@@ -441,36 +478,42 @@ classdef Folder < dynamicprops
             elseif exist(fullfile(obj.folder, obj.analysis_folder, 'classified.mat'), 'file')
                 
                 load(fullfile(obj.folder, obj.analysis_folder, 'classified.mat'));
-                
-                if ~isempty(candidates)
+
+                for ii = 1:length(candidates)
                     
-                    for ii = 1:length(candidates)
-                        
-                        this_class = candidates(ii).classification;
-                        this_class = strrep(lower(this_class), ' ', '_'); 
+                    this_class = candidates(ii).classification;
+                    this_class = strrep(lower(this_class), ' ', '_');
+                    
+                    if candidates(ii).oort_template==0 % KBO candidate 
                         obj.classifications.all.(this_class) = obj.classifications.all.(this_class) + 1;
                         if candidates(ii).is_simulated
                             obj.classifications.sim.(this_class) = obj.classifications.sim.(this_class) + 1;
                         else
                             obj.classifications.real.(this_class) = obj.classifications.real.(this_class) + 1;
                         end
-                        
+                    else % oort cloud candidate
+                        obj.classifications_oort.all.(this_class) = obj.classifications_oort.all.(this_class) + 1;
+                        if candidates(ii).is_simulated
+                            obj.classifications_oort.sim.(this_class) = obj.classifications_oort.sim.(this_class) + 1;
+                        else
+                            obj.classifications_oort.real.(this_class) = obj.classifications_oort.real.(this_class) + 1;
+                        end    
                     end
-                    
                 end
-                
+
                 % write a text file for future reference
                 fid = fopen(fullfile(obj.folder, obj.analysis_folder, 'classified.txt'), 'wt');
                 file_close = onCleanup(@() fclose(fid)); % make sure to close the file at the end
                 
+                fprintf(fid, '%% Summary of candidate files %s\n', util.text.time2str('now'));
+                fprintf(fid, '%% Format: <all KBO events> (<sim KBO events>), <all Oort events> (<sim Oort events>)\n'); 
+                
                 for ii = 1:length(cls)
                     
                     fprintf(fid, '%s : %d', strrep(cls{ii}, '_', ' '), obj.classifications.all.(cls{ii})); 
-                    
-                    if obj.classifications.sim.(cls{ii})
-                        fprintf(fid, ' (%d)', obj.classifications.sim.(cls{ii}));
-                    end
-                    
+                    fprintf(fid, ' (%d)', obj.classifications.sim.(cls{ii}));
+                    fprintf(fid, ', %d', obj.classifications_oort.all.(cls{ii})); 
+                    fprintf(fid, ' (%d)', obj.classifications_oort.sim.(cls{ii}));
                     fprintf(fid, '\n');
                     
                 end
@@ -538,6 +581,7 @@ classdef Folder < dynamicprops
             input.input_var('glob', '', 'glob_expression', 'wildcard'); % match run names to this wildcard (glob) expression
             input.input_var('catalog', false); % pull the catalog file into each found object
             input.input_var('header', false); % save the full header for each folder 
+            input.input_var('redo_class_text_files', false); % if true, will re-load classified.mat and overwrite classified.txt
             input.input_var('debug_bit', 0); % verbosity of printouts
             input.scan_vars(varargin{:}); 
             
@@ -778,7 +822,7 @@ classdef Folder < dynamicprops
                                     new_obj.has_classified = true;
                                     % load the Candidate objects from the
                                     % MAT-file or from summary text file
-                                    new_obj.getCandidateSummary; 
+                                    new_obj.getCandidateSummary(input.redo_class_text_files); 
                                 end
 
                                 if exist(fullfile(d.pwd, 'lightcurves.mat'), 'file') % check if there is a lightcurves MAT file

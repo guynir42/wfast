@@ -711,25 +711,25 @@ classdef Candidate < handle
             fid = fopen(text_filename, 'wt');
             file_close = onCleanup(@() fclose(fid)); % make sure to close the file at the end
             
+            fprintf(fid, '%% Summary of candidate files %s\n', util.text.time2str('now'));
+            fprintf(fid, '%% Format: <all KBO events> (<sim KBO events>), <all Oort events> (<sim Oort events>)\n'); 
+                
             class_list = obj_vec.getListOfClasses; 
             for ii = 1:length(class_list)
 
                 cls = {candidates.classification}';
                 sim = [candidates.is_simulated]'; 
+                oort = [candidates.oort_template]';
                 
-                number_total = sum(ismember(cls, class_list{ii})); 
-                number_sim = sum(ismember(cls, class_list{ii}) & sim); 
+                number_total = sum(ismember(cls, class_list{ii}) & ~oort); 
+                number_sim = sum(ismember(cls, class_list{ii}) & ~oort & sim); 
+                number_total_oort = sum(ismember(cls, class_list{ii}) & oort); 
+                number_sim_oort = sum(ismember(cls, class_list{ii}) & oort & sim); 
                 
-                fprintf(fid, '%s : %d', class_list{ii}, number_total); 
-
-                if number_sim
-                    fprintf(fid, ' (%d)', number_sim);
-                end
-
-                fprintf(fid, '\n');
+                fprintf(fid, '%s : %d (%d), %d (%d)\n', class_list{ii}, number_total, ...
+                    number_sim, number_total_oort, number_sim_oort); 
 
             end
-
             
         end
         
