@@ -1,7 +1,5 @@
 %% this script takes some saved candidates and uses them to make plots for the KBO paper
 
-
-
 L1 = load(fullfile(getenv('DATA'), 'WFAST/2020/2020-06-07/ecliptic_run1/analysis_2020-10-19/candidates.mat')); 
 
 %% show a satellite passing
@@ -104,12 +102,12 @@ end
 util.sys.print(fullfile(getenv('WFAST'), 'scripts/plots/example_tracking_error'));
 
 
-%% load some more candidates 
+%% load some more candidates (outdated)
 
 L2 = load(fullfile(getenv('DATA'), 'WFAST/2020/2020-06-06/ecliptic_run2/analysis_2020-10-19/candidates.mat')); 
 
 
-%% show a good, certain occultation
+%% show a good, certain occultation (outdated)
 
 c = L2.cand(27);
 
@@ -157,13 +155,13 @@ sim_box = uicontrol(f3.fig, 'Style', 'text', 'String', sim_str, ...
     'Units', 'Normalized', 'Position', [0.65 0.05 0.32 0.1], ...
     'BackgroundColor', [1 1 1], 'FontSize', 18); 
 
-%% save plot
+%% save plot (outdated)
 
 util.sys.print(fullfile(getenv('WFAST'), 'scripts/plots/example_occultation_certain'));
 
 
 
-%% show a maybe, possible occultation
+%% show a maybe, possible occultation (outdated)
 
 c = L2.cand(43);
 
@@ -212,8 +210,67 @@ sim_box = uicontrol(f4.fig, 'Style', 'text', 'String', sim_str, ...
     'BackgroundColor', [1 1 1], 'FontSize', 18); 
 
 
-%% save plot
+%% save plot (outdated)
 
 util.sys.print(fullfile(getenv('WFAST'), 'scripts/plots/example_occultation_possible'));
+
+
+%% show a certain and possible occultation
+
+load(fullfile(getenv('DATA'), 'WFAST/saved/cand_possible')); 
+load(fullfile(getenv('DATA'), 'WFAST/saved/cand_certain')); 
+
+f5 = util.plot.FigHandler('occultations'); 
+f5.clear;
+f5.width = 36;
+f5.height = 18; 
+
+ax1 = axes('Parent', f5.fig); 
+
+hp = plot(ax1, cand_possible.flux_raw, 'LineWidth', 3, ...
+    'DisplayName', 'Possible occultation'); 
+
+ax1.FontSize = 18;
+xlabel(ax1, 'Frame number'); 
+ylabel(ax1, 'Flux (counts)'); 
+ax1.YLim = [0 500]; 
+
+cand_possible.showTimeRange('ax', ax1, 'color', hp.Color);
+
+ax1.Children = flip(ax1.Children); 
+
+yyaxis(ax1, 'right'); 
+
+hc = plot(ax1, cand_certain.flux_raw, 'LineWidth', 3, ...
+    'DisplayName', 'Certain occultation'); 
+
+ax1.YLim = [0 3000]; 
+
+cand_certain.showTimeRange('ax', ax1, 'color', hc.Color); 
+
+hl = legend(ax1, 'Location', 'East');
+hl.FontSize = 18;
+
+ax1.Children = flip(ax1.Children); 
+
+yyaxis(ax1, 'left'); 
+
+ax1.YAxis(1).Color = hp.Color;
+
+%% save plot
+
+util.sys.print(fullfile(getenv('WFAST'), 'scripts/plots/example_occultations'));
+
+
+
+
+
+
+
+
+
+
+
+
 
 

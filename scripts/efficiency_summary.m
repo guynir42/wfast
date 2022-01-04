@@ -106,10 +106,10 @@ cand = cand(~[cand.oort_template]);
 %% plot the efficiency
 
 occult_idx = contains({cand.classification}', 'occultation');
+possible_idx = contains({cand.classification}', 'occultation possible');
 s = [cand.snr]; 
-
-dE = 1; 
-E = 7.5:dE:18; 
+dE = 1; % edges step
+E = 7.5:dE:18; % bin edges
 
 f3 = util.plot.FigHandler('vetting'); 
 f3.clear;
@@ -130,9 +130,20 @@ N2 = histcounts(s(occult_idx), 'BinEdges', E);
 h2 = bar(ax, dE/2 + E(1:end-1), N2, dE*0.75, ...
     'DisplayName', 'Correctly classified', 'FaceColor', 'g'); 
 
+N3 = histcounts(s(possible_idx), 'BinEdges', E); 
+h3 = bar(ax, dE/2 + E(1:end-1), N3, dE*0.5, ...
+    'DisplayName', 'Possible occultations', 'FaceColor', 'y'); 
+
 hold(ax, 'off'); 
 
 ax.YScale = 'linear'; 
+
+for ii = 1:length(N1)
+    text(ax, dE/2+E(ii), N1(ii)+25, sprintf('  %d / %d', N2(ii), N1(ii)), ...
+        'Rotation', 0, 'HorizontalAlignment', 'Center', 'FontSize', 16, ...
+        'FontWeight', 'bold'); 
+%         'BackgroundColor', 0.9*[1 1 1]); 
+end
 
 xlabel(ax, 'Event S/N'); 
 ylabel(ax, 'Number of Events'); 
@@ -145,29 +156,36 @@ yyaxis(ax, 'right');
 % h = errorbar(ax, dE/2+E(1:end-1), N2./N1*100, (N2-N2lower)./N1*100, (N2upper-N2)./N1*100, ... 
 %     '-og', 'LineWidth', 3, 'DisplayName', 'Vetting efficiency'); 
 
-color = [0.25 0.85 0.4];
-color = 'r';
-h = plot(ax, dE/2+E(1:end-1), N2./N1*100, '--s', ...
-    'Color', color, 'MarkerSize', 15, 'MarkerFaceColor', color, ...
+ha = plot(ax, dE/2+E(1:end-1), N2./N1*100, '--s', ...
+    'Color', 'r', 'MarkerSize', 15, 'MarkerFaceColor', 'r', ...
     'LineWidth', 3.0, 'DisplayName', 'Vetting efficiency'); 
 
-ax.YLim = [98 100.1]; 
-
 ax.FontSize = 18;
-ax.YAxis(2).Color = h.Color;
+ax.YAxis(2).Color = ha.Color;
 ytickformat(ax, '%4.1g%%'); 
 hl = legend(ax, 'Location', 'NorthEast'); 
 hl.FontSize = 18;
-hl.Position(2) = 0.7;
+hl.Position(2) = 0.58;
+
+hold(ax, 'on'); 
+
+hb = plot(ax, dE/2+E(1:end-1), (N1-N3)./N1*100, '--v', ...
+    'Color', 'm', 'MarkerSize', 15, 'MarkerFaceColor', 'm', ...
+    'LineWidth', 3.0, 'DisplayName', 'Vetting certainty'); 
+
+ax.YLim = [82 102]; 
+
 yyaxis(ax, 'left'); 
 
 for ii = 1:length(N1)
-    text(ax, dE/2+E(ii), N1(ii)+25, sprintf(' %d / %d ', N2(ii), N1(ii)), ...
-        'Rotation', 0, 'HorizontalAlignment', 'Center', 'FontSize', 16, ...
-        'FontWeight', 'bold'); 
-%         'BackgroundColor', 0.9*[1 1 1]); 
+    if N3(ii)>0
+        text(ax, dE/2+E(ii), N3(ii)+25, sprintf('%d ', N3(ii)), ...
+            'Rotation', 0, 'HorizontalAlignment', 'Center', 'FontSize', 16, ...
+            'FontWeight', 'bold', 'Color', 'y'); 
+    end
 end
 
+hold(ax, 'off'); 
 
 %% save the plot
 
