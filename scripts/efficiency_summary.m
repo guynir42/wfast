@@ -86,7 +86,7 @@ f2.clear;
 f2.width = 36;
 f2.height = 18;
 
-trig.RunSummary.showDetectionRateStatic(ev, 'Parent', f2.fig); 
+tno.Summary.showDetectionRateStatic(ev, 'Parent', f2.fig); 
 
 
 
@@ -94,10 +94,82 @@ trig.RunSummary.showDetectionRateStatic(ev, 'Parent', f2.fig);
 
 util.sys.print(fullfile(getenv('WFAST'), 'scripts/plots/efficiency_fractions')); 
 
+%% show the number of events lost to the vetting process
+% load the events
+
+if ~exist('cand') || isempty(cand) || ~isa(cand, 'tno.Candidate')
+    cand = s.collectEvents('real', 'sim', 'class', ''); 
+end
+
+cand = cand(~[cand.oort_template]);
+
+%% plot the efficiency
+
+occult_idx = contains({cand.classification}', 'occultation');
+s = [cand.snr]; 
+
+dE = 1; 
+E = 7.5:dE:18; 
+
+f3 = util.plot.FigHandler('vetting'); 
+f3.clear;
+f3.width = 36;
+f3.height = 18; 
+
+ax = axes('Parent', f3.fig); 
+
+% h1 = histogram(ax, s, 'BinEdges', E); 
+N1 = histcounts(s, 'BinEdges', E); 
+h1 = bar(ax, dE/2 + E(1:end-1), N1, dE, ...
+    'DisplayName', 'All events', 'FaceColor', 'b'); 
+
+hold(ax, 'on'); 
+
+% h2 = histogram(ax, s(occult_idx), 'BinEdges', E); 
+N2 = histcounts(s(occult_idx), 'BinEdges', E); 
+h2 = bar(ax, dE/2 + E(1:end-1), N2, dE*0.75, ...
+    'DisplayName', 'Correctly classified', 'FaceColor', 'g'); 
+
+hold(ax, 'off'); 
+
+ax.YScale = 'linear'; 
+
+xlabel(ax, 'Event S/N'); 
+ylabel(ax, 'Number of Events'); 
+
+ax.YLim = [0, max(N1)*1.2]; 
+
+yyaxis(ax, 'right'); 
+
+% [N2lower, N2upper] = util.stat.poisson_errors(N2, 0.68); 
+% h = errorbar(ax, dE/2+E(1:end-1), N2./N1*100, (N2-N2lower)./N1*100, (N2upper-N2)./N1*100, ... 
+%     '-og', 'LineWidth', 3, 'DisplayName', 'Vetting efficiency'); 
+
+color = [0.25 0.85 0.4];
+color = 'r';
+h = plot(ax, dE/2+E(1:end-1), N2./N1*100, '--s', ...
+    'Color', color, 'MarkerSize', 15, 'MarkerFaceColor', color, ...
+    'LineWidth', 3.0, 'DisplayName', 'Vetting efficiency'); 
+
+ax.YLim = [98 100.1]; 
+
+ax.FontSize = 18;
+ax.YAxis(2).Color = h.Color;
+ytickformat(ax, '%4.1g%%'); 
+hl = legend(ax, 'Location', 'NorthEast'); 
+hl.FontSize = 18;
+hl.Position(2) = 0.7;
+yyaxis(ax, 'left'); 
+
+for ii = 1:length(N1)
+    text(ax, dE/2+E(ii), N1(ii)+25, sprintf(' %d / %d ', N2(ii), N1(ii)), ...
+        'Rotation', 0, 'HorizontalAlignment', 'Center', 'FontSize', 16, ...
+        'FontWeight', 'bold'); 
+%         'BackgroundColor', 0.9*[1 1 1]); 
+end
 
 
+%% save the plot
 
-
-
-
+util.sys.print(fullfile(getenv('WFAST'), 'scripts/plots/vetting_fractions')); 
 
