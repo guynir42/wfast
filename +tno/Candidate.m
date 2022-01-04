@@ -1066,8 +1066,12 @@ classdef Candidate < handle
             
             ax4 = axes('Parent', input.parent, 'Position', [0.68 0.2 0.3 0.5]);
             t = timerfind('Type', 'timer', 'Name', 'cutouts-plot-timer');
-            stop(t)
-            delete(t);
+            
+            if ~isempty(t)
+                stop(t)
+                delete(t);
+            end
+            
             t = timer('ExecutionMode', 'singleShot', 'Name', 'cutouts-plot-timer', ...
                 'StartDelay', 3, 'TimerFcn', {@obj.callback_slow_plot, ax4});
             start(t);

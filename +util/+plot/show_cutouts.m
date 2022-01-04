@@ -23,6 +23,7 @@ function ax = show_cutouts(C, varargin)
     input.input_var('oversample', [], 'oversampling'); % how much we want to interpolate to see more details
     input.input_var('type', 'heat') % can choose "heat" (regular image) or "surf" for 3D plot
     input.input_var('view', []); % pass a 2 or 3 vector to give the viewing angle on the surface plot
+    input.input_var('monochrome', false, 'greyscale', 'grayscale'); % replace the colormap with inverted monochrome
     input.input_var('color', 'red'); % of the text label
     input.input_var('parent', []); 
     input.scan_vars(varargin{:}); 
@@ -90,6 +91,11 @@ function ax = show_cutouts(C, varargin)
             util.plot.inner_title(sprintf('frame= %d', indices(counter)), 'ax', ax{counter}, 'color', input.color); 
             
             ax{counter}.UserData = indices(counter); 
+            
+            
+            if input.monochrome
+                colormap(ax{counter}, flip(gray));
+            end
             
             counter = counter + 1;
             
