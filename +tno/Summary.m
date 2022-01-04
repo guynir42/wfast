@@ -733,7 +733,7 @@ classdef Summary < handle
             
             %%%%%%%% stellar radius R %%%%%%%%%%%%%%%%%%%%%
             
-            bin_size = max([et.R])/25;
+            bin_size = max([et.R])/15;
             [N_R,E_R] = histcounts([et.R], 'BinWidth', bin_size); 
             bar(ax_R, E_R(1:end-1)+bin_size/2, N_R, 'FaceColor', input.colors{1}); 
             hold(ax_R, 'on'); 

@@ -414,7 +414,7 @@ classdef Folder < dynamicprops
                         idx = regexp(line, ':', 'once'); % find the colon
                         if ~isempty(idx) && length(line) > idx
                             this_class = strip(line(1:idx-1));
-                            this_class = strrep(this_class, ' ', '_'); 
+                            this_class = strrep(lower(this_class), ' ', '_'); 
                             if ismember(this_class, cls)
                                 numbers = str2num(line(idx+1:end));
                                 if ~isempty(numbers)
@@ -447,7 +447,7 @@ classdef Folder < dynamicprops
                     for ii = 1:length(candidates)
                         
                         this_class = candidates(ii).classification;
-                        this_class = strrep(this_class, ' ', '_'); 
+                        this_class = strrep(lower(this_class), ' ', '_'); 
                         obj.classifications.all.(this_class) = obj.classifications.all.(this_class) + 1;
                         if candidates(ii).is_simulated
                             obj.classifications.sim.(this_class) = obj.classifications.sim.(this_class) + 1;

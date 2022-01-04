@@ -244,10 +244,15 @@ classdef Scanner < handle
         end
         
         function all_runs = calcOverview(obj, varargin)
+        % Go over all runs in range, and produce a summary overview object
+        % that tells the efficiency and coverage (etc.) for the entire
+        % campaign (or parts of it). 
            
             input = util.text.InputVars;
-            input.input_var('runs', []); % optionally input the runs from previous calculations...
-            input.input_var('classified', false);
+            input.input_var('runs', []); % optionally input the runs from previous calculations, this can save some runtime
+            input.input_var('classified', false); % include only runs that have been scanned (where classified events were saved, even if zero events)
+            input.input_var('flickering', true, 'flickering mask'); % remove runs with too many "flickering" classifications
+            input.input_var('simulated', true, 'simulated mask'); % remove runs where not a single simulated event was saved (miss-classified still count as simulated events)
             input.scan_vars(varargin{:}); 
             
             if isempty(obj.overview)
@@ -269,6 +274,28 @@ classdef Scanner < handle
             
             if input.classified
                 all_runs = all_runs(logical([all_runs.has_classifieds])); 
+            end
+            
+            if input.flickering
+                good_idx = true(length(all_runs),1); 
+                for ii = 1:length(all_runs)
+                    good_idx(ii) = all_runs(ii).classifications.real.flickering < 2; % disqualify at 2 or more flickering events 
+                end
+                all_runs = all_runs(good_idx);
+            end
+            
+            if input.simulated
+                good_idx = true(length(all_runs),1); 
+                for ii = 1:length(all_runs)
+                    st = all_runs(ii).classifications.sim;
+                    fld = fields(st); 
+                    N = 0;
+                    for jj = 1:length(fld)
+                        N = N + st.(fld{jj});
+                    end
+                    good_idx(ii) = N > 0; % must have at least one triggered simulated event, with any classification
+                end
+                all_runs = all_runs(good_idx);
             end
             
             obj.overview.folders = all_runs; 
@@ -335,41 +362,107 @@ classdef Scanner < handle
         end
         
         function cand = collectEvents(obj, varargin)
+        % Get all classified candidate events from the range of runs, 
+        % filtering only those that match a certain classification and
+        % whether they are simulated or real. 
+        % If overview is empty, will internally call calcOverview() with
+        % varargin passed into it. 
+        % 
+        % OUTPUT: a list of classified candidates. 
+        %
+        % OPTIONAL ARGUMENTS:
+        %   -real: can be numeric or string. If string, choose one:
+        %           *all: get all events, simulated and real.
+        %           *sim: get only simulated events. 
+        %           *real: get onlt real events (this is default). 
+        %          If numeric, true means "real" and false means "all"
+        %          (note false does NOT mean "sim"). 
+        %   -class: which type of events should be loaded. This matches the
+        %           candidate classification with the following rules:
+        %           case is ignored, underscores and spaces are the same,
+        %           and partial matches (using contains()) are accepted. 
+        %           If you want all candidates, use an empty class. 
+        %           The default is "occultation" which matches both the
+        %           certain and the possible occultation classes. 
             
             input = util.text.InputVars; 
-            input.input_var('real', true); 
-            input.input_var('type', 'occultation'); 
+            input.input_var('real', 'real'); % choose "all", "sim", or "real"
+            input.input_var('class', 'occultation'); % find any candidates with a partial match (case insensitive, underscore=space) using contains()
             input.scan_vars(varargin{:}); 
             
-            if ~isempty(obj.overview)
-                obj.calcOverview;
+            if isnumeric(input.real) || islogical(input.real)
+                if input.real
+                    input.real = 'real';
+                else
+                    input.real = 'all'; % notice the "false" for this input is "all events"
+                end
+            end
+            input.real = lower(input.real);
+            if ~ismember(input.real, {'all', 'sim', 'real'})
+                error('Input "real" was given as "%s". Try "all", "sim" or "real"', input.real);
+            end
+            
+            if isempty(obj.overview)
+                obj.calcOverview(varargin{:});
             end
             
             cand = tno.Candidate.empty; 
             
             for ii = 1:length(obj.overview.folders)
                 
-                f = fullfile(obj.overview.folders(ii).folder, ...
-                       obj.overview.folders(ii).analysis_folder, 'classified.mat');
-                
-                if exist(f, 'file')
+                if obj.overview.folders(ii).has_classified
                     
-                    L = load(f);
-
-                    if input.real
-                        new_cand = L.candidates([L.candidates.is_simulated]==0); 
+                    cls = obj.overview.folders(ii).classifications.(input.real); % class struct
+                    
+                    fld = fields(cls); % list of classifications
+                    which_class = strrep(strip(lower(input.class)), ' ', '_'); % convert free text class to field name formatting
+                    
+%                     idx = cellfun(@(x) contains(x, which_class), fld);
+                    idx = contains(fld, which_class); 
+                    fld_match = fld(idx); % only these fields match
+                    
+                    if isempty(fld_match)
+                        continue;
                     else
-                        new_cand = L.candidates;
+                        N = 0;
+                        for jj = 1:length(fld_match)
+                            N = N + cls.(fld_match{jj}); % add any candidates with the matching classification
+                        end
                     end
                     
-                    if ~isempty(input.type)
-                        idx = contains({new_cand.classification}', input.type);
+                    if N==0
+                        continue;
+                    end
+                    
+                    f = fullfile(obj.overview.folders(ii).folder, ...
+                           obj.overview.folders(ii).analysis_folder, 'classified.mat');
+
+                    if ~exist(f, 'file')
+                        error('Cannot find classification file: %s', f); 
+                    end
+                        
+                    L = load(f);
+
+                    if strcmpi(input.real, 'all')
+                        new_cand = L.candidates;
+                    elseif strcmpi(input.real, 'real')
+                        new_cand = L.candidates([L.candidates.is_simulated]==0); 
+                    elseif strcmpi(input.real, 'sim')
+                        new_cand = L.candidates([L.candidates.is_simulated]==1); 
+                    else
+                        error('Input "real" was given as "%s". Try "all", "sim" or "real"', input.real);
+                    end
+                    
+                    if ~isempty(input.class)
+                        which_class = strrep(strip(lower(input.class)), '_', ' '); % convert free text class to event classification format
+                        idx = contains({new_cand.classification}', which_class);
                         new_cand = new_cand(idx); 
                     end
                     
                     cand = vertcat(cand, new_cand); 
                     
                 end
+                   
                 
             end
             
