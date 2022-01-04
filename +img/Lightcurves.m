@@ -113,6 +113,7 @@ classdef Lightcurves < handle
         % processing steps for fluxes_sub:
         use_subtract_backgrounds = 1; 
         use_background_median = 1;
+        use_background_fit = 0; % fit the background to a 2nd order polynomial for each frame
         
         % processing steps for fluxes_rem:
         minimal_length = 10; % minimal number of frames to run any analysis more comlicated than b/g removal
@@ -500,8 +501,20 @@ classdef Lightcurves < handle
                     if obj.use_subtract_backgrounds
                         
                         a = obj.areas(:,:,obj.index_flux_number); 
+                        b = NaN(size(a), 'like', a); 
                         
-                        if obj.use_background_median
+                        if obj.use_background_fit
+                            for ii = 1:size(a,1) % number of frames
+                                x = obj.centroids_x(ii,:,obj.index_flux_number); 
+                                y = obj.centroids_y(ii,:,obj.index_flux_number); 
+                                
+                                x = (x-nanmean(x))./nanstd(x); 
+                                y = (y-nanmean(y))./nanstd(y); 
+                                fr = util.fit.surf_poly(x,y,obj.backgrounds(ii,:,obj.index_flux_number), ...
+                                    'order', 2, 'iterations', 2, 'double', 1);
+                                b(ii,:) = fr.vm'; % the model values are used for each star. 
+                            end
+                        elseif obj.use_background_median
                             b = nanmedian(obj.backgrounds(:,:,obj.index_flux_number),2); 
                         else
                             b = obj.backgrounds(:,:,obj.index_flux_number); 
@@ -1114,6 +1127,17 @@ classdef Lightcurves < handle
             
             if ~isequal(obj.use_background_median, val)
                 obj.use_background_median = val;
+                obj.clearFluxes;
+                obj.clearPSD;
+                obj.clearRE;
+            end
+            
+        end
+        
+        function set.use_background_fit(obj, val)
+            
+            if ~isequal(obj.use_background_fit, val)
+                obj.use_background_fit = val;
                 obj.clearFluxes;
                 obj.clearPSD;
                 obj.clearRE;

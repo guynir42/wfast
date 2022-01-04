@@ -437,6 +437,7 @@ classdef Processor < dynamicprops
             
             if isempty(obj.name_resolver)
                 obj.name_resolver = util.oop.full_copy(obj.head.ephem);
+                obj.name_resolver.makeConstraints; 
                 [~] = obj.name_resolver.resolve; % output to suppress printouts if failed to resolve
             end
             
