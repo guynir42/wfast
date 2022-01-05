@@ -160,7 +160,7 @@ classdef Processor < dynamicprops
             obj.pars.input_var('redo_photometry_distance', 2); obj.pars.add_comment('maximum pixel shift above which we redo photometry for that file'); 
             obj.pars.input_var('realign_attempts', 2); obj.pars.add_comment('how many times to try to realign the positions before failing that file'); 
             
-            obj.pars.input_var('lock_adjust', 'stars'); 
+            obj.pars.input_var('lock_adjust', 'all'); 
             obj.pars.add_comment(sprintf('which cutouts should be moved together (locked), which can move separately (unlocked).\n Choose "all", "none", or "stars" that only locks targets with GAIA magnitudes')); 
             
             obj.pars.input_var('use_astrometry', true, 6); obj.pars.add_comment('make sure to solve the astrometry before continuing'); 
@@ -1291,7 +1291,7 @@ classdef Processor < dynamicprops
             
             t0 = tic; 
 
-            for ii = obj.pars.realign_attempts
+            for ii = 1:obj.pars.realign_attempts
 
                 if obj.checkFluxes
                     obj.adjustPositions; % use the centroids to push the cutouts a little

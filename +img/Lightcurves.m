@@ -2512,7 +2512,7 @@ classdef Lightcurves < handle
             if cs(obj.show_what, 'fluxes')
                 
                 if cs(obj.show_flux_type, 'raw')
-                    obj.addPlots(input.ax, obj.fluxes(:,:,obj.index_flux_number));
+                    obj.addPlots(input.ax, obj.fluxes);
                 elseif cs(obj.show_flux_type, 'sub')
                     obj.addPlots(input.ax, obj.fluxes_sub);
                 elseif cs(obj.show_flux_type, 'rem')
@@ -2666,7 +2666,11 @@ classdef Lightcurves < handle
             
             for ii = 1:length(idx_vec)
                 
-                data_star = data(:,idx_vec(ii));
+                if size(data,3)>1
+                    data_star = data(:,idx_vec(ii), obj.index_flux_number);
+                else
+                    data_star = data(:,idx_vec(ii));
+                end
                 
 %                 if obj.use_skip_flagged
 %                     data_star(logical(obj.flags(:,ii,obj.index_flux_number))) = NaN;

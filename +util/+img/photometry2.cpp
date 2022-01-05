@@ -588,7 +588,7 @@ void Photometry::parseInputs(int nrhs, const mxArray *prhs[]){ // take the cutou
 void Photometry::ingestParameters(Photometry::Parameters new_pars){ // for each parameter that has changed, need to re-allocate mask/output array
 
 	// update the aperture/forced radii
-	if(new_pars.num_radii!=pars.num_radii){ // different number of radii, must recreate the radii array
+	if(new_pars.num_radii>0 && new_pars.num_radii!=pars.num_radii){ // different number of radii, must recreate the radii array
 		deleteOutputArray(output_apertures); 
 		deleteOutputArray(output_forced); 
 		deleteApertureMasks();
@@ -598,7 +598,7 @@ void Photometry::ingestParameters(Photometry::Parameters new_pars){ // for each 
 		for(int j=0;j<pars.num_radii; j++) pars.ap_radii[j]=new_pars.ap_radii[j]; 
 	}
 	else{ // can re-use the same array
-		for(int j=0;j<pars.num_radii; j++){
+		for(int j=0;j<new_pars.num_radii; j++){
 			if(new_pars.ap_radii[j]!=pars.ap_radii[j]) deleteApertureMasks(); // at least one of the radii is different... need to re-allocate aperture masks!
 			pars.ap_radii[j]=new_pars.ap_radii[j];
 		}
@@ -1241,8 +1241,9 @@ void Photometry::calculate(int j){ // do the actual calculations on a single cut
 			width[j+num_cutouts*k]=getWidthFromMoments(m2x, m2y, mxy); 
 
 			if(k==0) bad_pixels[j]=aperture_indices[idx].size()-countNonNaNsIndices(image, aperture_indices, idx);
-			else bad_pixels[j+num_cutouts*k]+=aperture_indices[idx+num_shifts*k].size()
-			                                   -countNonNaNsIndices(image, aperture_indices, idx+num_shifts*k);
+			else bad_pixels[j+num_cutouts*k]=bad_pixels[j+num_cutouts*(k-1)] 
+												+ aperture_indices[idx+num_shifts*k].size()
+			                                    - countNonNaNsIndices(image, aperture_indices, idx+num_shifts*k);
 			
 			flag[j+num_cutouts*k]=checkMoments(offset_x[j], offset_y[j], width[j]); 
 
@@ -1404,9 +1405,10 @@ void Photometry::calculateForced(int j){
 		width[j+num_cutouts*k]=getWidthFromMoments(m2x, m2y, mxy); 
 
 		if(k==0) bad_pixels[j]=aperture_indices[idx].size()-countNonNaNsIndices(image, aperture_indices, idx);
-		else bad_pixels[j+num_cutouts*k]+=aperture_indices[idx+num_shifts*k].size()
-										   -countNonNaNsIndices(image, aperture_indices, idx+num_shifts*k);
-		
+		else bad_pixels[j+num_cutouts*k]=bad_pixels[j+num_cutouts*(k-1)] 
+												+ aperture_indices[idx+num_shifts*k].size()
+			                                    - countNonNaNsIndices(image, aperture_indices, idx+num_shifts*k);
+			
 		flag[j+num_cutouts*k]=checkMoments(offset_x[j], offset_y[j], width[j]); 
 
 	}// for k
