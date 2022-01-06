@@ -96,6 +96,7 @@ classdef Acquisition < file.AstroData
         % add switch to allow unlocking only some of the cutouts (e.g.,
         % those without a match to GAIA
         
+        use_save_row_column_averages = 1; % save the median of each row/column for each frame
         use_simple_photometry = 1; % use only sums on the cutouts instead of Photometry object for full cutouts (for now we keep this on, to maintain 25 Hz)
         use_store_photometry = 0; % store the photometric products in the Lightcurve object for entire run
         use_save_photometry = 1; % save the flux and other products in the HDF5 files along with the images
@@ -289,6 +290,7 @@ classdef Acquisition < file.AstroData
         use_arbitrary_pos_;
         use_cutouts_;
         use_adjust_cutouts_;
+        use_save_row_column_averages_;
         use_simple_photometry_;
         use_model_psf_;
         use_save_;
@@ -2417,6 +2419,7 @@ classdef Acquisition < file.AstroData
                 input.input_var('use_arbitrary_pos', []);
                 input.input_var('use_cutouts', []);
                 input.input_var('use_adjust_cutouts', []);
+                input.input_var('use_save_row_column_averages', []); 
                 input.input_var('use_simple_photometry', []);
                 input.input_var('use_model_psf', []);
                 input.input_var('use_save', [], 'save');
@@ -2490,6 +2493,7 @@ classdef Acquisition < file.AstroData
             obj.use_arbitrary_pos_ = obj.use_arbitrary_pos;
             obj.use_cutouts_ = obj.use_cutouts;
             obj.use_adjust_cutouts_ = obj.use_adjust_cutouts;
+            obj.use_save_row_column_averages_ = obj.use_save_row_column_averages;
             obj.use_simple_photometry_ = obj.use_simple_photometry;
             obj.use_model_psf_ = obj.use_model_psf;
             obj.use_save_ = obj.use_save;
@@ -2544,6 +2548,7 @@ classdef Acquisition < file.AstroData
             obj.use_arbitrary_pos = obj.use_arbitrary_pos_;
             obj.use_cutouts = obj.use_cutouts_;
             obj.use_adjust_cutouts = obj.use_adjust_cutouts_;
+            obj.use_save_row_column_averages = obj.use_save_row_column_averages_; 
             obj.use_simple_photometry = obj.use_simple_photometry_;
             obj.use_model_psf = obj.use_model_psf_;
             obj.use_save = obj.use_save_;
@@ -3064,6 +3069,9 @@ classdef Acquisition < file.AstroData
             str = sprintf('Finished calculating stack'); 
             if obj.log_level>4, obj.log.input(str); end
             
+            if obj.use_save_row_column_averages
+                obj.calcRowColumns;
+            end
             if obj.use_cutouts
                 
                 t_cut = tic;
@@ -3301,6 +3309,14 @@ classdef Acquisition < file.AstroData
                 end
                 
             end
+            
+        end
+        
+        function calcRowColumns(obj)
+            
+            N = size(obj.images,3); 
+            obj.column_averages = nanmedian(obj.stack_proc, 1)/N;
+            obj.row_averages = nanmedian(obj.stack_proc, 2)/N;
             
         end
         

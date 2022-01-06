@@ -64,6 +64,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		s->positions_bg.printout();
 		s->backgrounds.printout();
 		s->stack.printout();
+		s->column_averages.printout();
+		s->row_averages.printout(); 
 		s->psfs.printout();
 		
 		mexPrintf("debug= %d | deflate= %d | chunk= %d | async= %d \n\n", s->debug_bit, s->deflate, s->chunk_size, s->async_write);

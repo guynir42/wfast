@@ -27,6 +27,8 @@ void SaveDataHDF5::writeData(){ // write to file all the main data sets (images,
 	writeMatrix(file, cutouts_bg);
 	writeMatrix(file, positions_bg);
 	writeMatrix(file, stack);
+	writeMatrix(file, column_averages);
+	writeMatrix(file, row_averages);
 	writeMatrix(file, psfs);
 	
 	writeMatrix(file, fluxes);

@@ -27,6 +27,9 @@ classdef AstroData < dynamicprops
         stack % sum of the full frame image
         num_sum; % if the images are summed, how many frames were added. If equal to 1, the sum is the same as the images. 
         
+        column_averages; % median value of each column of the processed stack image
+        row_averages; % median value of each row of the processed stack image
+        
         cutouts; % this is raw cutouts and it is usually what we save on file
         positions; % only for cutouts. a 2xN matrix (X then Y, N is the number of cutouts). 
         object_idx; % what is the index of the object closest to the coordinates given

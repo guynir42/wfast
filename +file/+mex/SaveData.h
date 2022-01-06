@@ -55,6 +55,8 @@ class SaveData {
 	MyMatrix cutouts_bg;
 	MyMatrix positions_bg;
 	MyMatrix stack;
+	MyMatrix column_averages;
+	MyMatrix row_averages; 
 	MyMatrix psfs;
 	
 	MyMatrix fluxes;

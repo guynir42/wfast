@@ -72,6 +72,8 @@ void SaveData::parseVararginPairs(int N, const mxArray *vars[]){
 		
 		else if(cs(keyword, "stack")) stack.input("stack", value, 1);
 		else if(cs(keyword, "num_sum")) stack.attributes.push_back(MyAttribute("num_sum", value));
+		else if(cs(keyword, "column_averages")) column_averages.input("column_averages", value, 1); 
+		else if(cs(keyword, "row_averages")) row_averages.input("row_averages", value, 1); 
 		else if(cs(keyword, "psfs", 4)) psfs.input("psfs", value, 0);		
 		else if(cs(keyword, "sampling_psf",4)) psfs.attributes.push_back(MyAttribute("sampling_psf", value));
 		
@@ -160,6 +162,8 @@ void SaveData::readStruct(const mxArray *buf){
 	
 	names.push_back("stack");
 	names.push_back("num_sum");
+	names.push_back("column_averages"); 
+	names.push_back("row_averages"); 
 	names.push_back("psfs");
 	names.push_back("sampling_psf");
 	
@@ -216,6 +220,8 @@ void SaveData::readStruct(const mxArray *buf){
 			
 			else if(cs(keyword, "stack")) stack.input("stack", value, 1);
 			else if(cs(keyword, "num_sum")) stack.attributes.push_back(MyAttribute("num_sum", value));
+			else if(cs(keyword, "column_averages")) column_averages.input("column_averages", value, 1); 
+			else if(cs(keyword, "row_averages")) row_averages.input("row_averages", value, 1); 
 			else if(cs(keyword, "psfs", 4)) psfs.input("psfs", value, 0);		
 			else if(cs(keyword, "sampling_psf",4)) psfs.attributes.push_back(MyAttribute("psf_sampling", value));
 			
@@ -325,6 +331,7 @@ void SaveData::print_help(){
 	mexPrintf("-magnitudes: of each star in each cutout, based on some catalog.\n");
 	mexPrintf("-temperatures: of each star in each cutout, based on some catalog (degrees Kelvin).\n");
 	mexPrintf("-stack: sum of  full franme images (calibrated)\n");
+	mexPrintf("-row/column_averages: median of rows/columns of the processed stack image\n"); 
 	mexPrintf("-psfs: if PSF data is given from WFS or from simulation.\n");
 	mexPrintf("-fluxes: photometry data for each cutout. \n");
 	// mexPrintf("-buffer: BufferWheel object used to extract add-on metadata.\n");
