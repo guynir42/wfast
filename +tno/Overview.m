@@ -933,7 +933,7 @@ classdef Overview < handle
     
     methods % plotting tools / GUI
         
-        function showTotalHours(obj, varargin)
+        function h = showTotalHours(obj, varargin)
             
             input = util.text.InputVars;
             input.input_var('velocity', false); 
@@ -946,7 +946,7 @@ classdef Overview < handle
             end
             
             if input.velocity
-                imagesc(input.axes, obj.ecl_edges(1:end-1)+obj.ecl_bin_width/2, obj.vel_edges(1:end-1), squeeze(nansum(nansum(obj.star_seconds,1),2))'./3600);
+                h = imagesc(input.axes, obj.ecl_edges(1:end-1)+obj.ecl_bin_width/2, obj.vel_edges(1:end-1), squeeze(nansum(nansum(obj.star_seconds,1),2))'./3600);
                 c = colormap(input.axes);
                 c(1,:) = [1 1 1]; 
                 colormap(input.axes, c); 
@@ -961,7 +961,7 @@ classdef Overview < handle
                 input.axes.ColorScale = 'log';
                 
             else
-                bar(input.axes, obj.ecl_edges(1:end-1)+obj.ecl_bin_width/2, squeeze(nansum(nansum(nansum(obj.star_seconds,1),2),4))./3600,1);
+                h = bar(input.axes, obj.ecl_edges(1:end-1)+obj.ecl_bin_width/2, squeeze(nansum(nansum(nansum(obj.star_seconds,1),2),4))./3600,1);
                 xlabel(input.axes, 'ecliptic latitude [deg]'); 
                 ylabel(input.axes, 'total star hours'); 
             end

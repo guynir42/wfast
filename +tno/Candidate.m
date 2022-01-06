@@ -309,9 +309,9 @@ classdef Candidate < handle
             
             t = datetime(J, 'convertFrom', 'juliandate', 'TimeZone', 'UTC'); 
             
-            str = sprintf('id: %d | star: %d | frame= %d | batch= %d | time: %02d:%02d:%02d | event S/N= %4.2f | star S/N= %4.2f (%4.2f) | FWHM= %4.1f" | x/y= %d, %d ', ...
+            str = sprintf('id: %d | star: %d | frame= %d | batch= %d | time: %02d:%02d:%02d | event S/N= %4.2f | star S/N= %4.2f (%4.2f) | FWHM= %4.1f" | AM= %4.2f | x/y= %d, %d ', ...
                     obj.serial, obj.star_index, obj.time_index, obj.batch_number, hour(t), minute(t), round(second(t)), obj.snr, obj.star_current_snr, obj.star_snr, ...
-                    obj.fwhm, round(nanmean(obj.auxiliary(:,obj.aux_indices.centroids_x))), round(nanmean(obj.auxiliary(:,obj.aux_indices.centroids_y))));
+                    obj.fwhm, obj.airmass, round(nanmean(obj.auxiliary(:,obj.aux_indices.centroids_x))), round(nanmean(obj.auxiliary(:,obj.aux_indices.centroids_y))));
             
         end
         
@@ -322,6 +322,12 @@ classdef Candidate < handle
             else
                 val = obj.cut_matrix(1,obj.cut_indices.fwhm);
             end
+            
+        end
+        
+        function val = airmass(obj)
+            
+            val = obj.head.AIRMASS;
             
         end
         
@@ -956,6 +962,21 @@ classdef Candidate < handle
             % if simulated, must also apply simulation dip to flux_extra
             df = obj.flux_raw - store.extended_flux(:,obj.star_index); 
             obj.flux_extra = obj.flux_extra + df; 
+            
+        end
+        
+        function untangleHeaders(obj_vec)
+            
+            for ii = 1:length(obj_vec)
+                
+                obj = obj_vec(ii); 
+                
+                obj.head = util.oop.full_copy(obj.head); 
+                
+                % make sure the Ephemeris object is up-to-date
+                obj.head.ephem.time = datetime(obj.juldates(obj.time_index), 'convertFrom', 'juliandate', 'TimeZone', 'UTC');
+            
+            end
             
         end
         

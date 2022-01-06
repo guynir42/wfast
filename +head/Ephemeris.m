@@ -544,7 +544,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
-        function velocity_RA_Dec = getShadowVelocity(obj)
+        function velocity_RA_Dec = getShadowVelocity(obj) % in km/s
             
             v_shadow = -celestial.SolarSys.earth_vel_ron_vondrak(obj.JD, 'SI')/1000; % shadow velocity on the Earth in 3D space, equatorial coordinates (km/s)
             

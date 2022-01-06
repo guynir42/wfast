@@ -253,6 +253,7 @@ classdef Scanner < handle
             input.input_var('classified', false); % include only runs that have been scanned (where classified events were saved, even if zero events)
             input.input_var('flickering', true, 'flickering mask'); % remove runs with too many "flickering" classifications
             input.input_var('simulated', true, 'simulated mask'); % remove runs where not a single simulated event was saved (miss-classified still count as simulated events)
+            input.input_var('occultations', true, 'occultations mask'); % remove runs where there is more than one non-simulated occultation
             input.scan_vars(varargin{:}); 
             
             if isempty(obj.overview)
@@ -280,6 +281,16 @@ classdef Scanner < handle
                 good_idx = true(length(all_runs),1); 
                 for ii = 1:length(all_runs)
                     good_idx(ii) = all_runs(ii).classifications.real.flickering < 2; % disqualify at 2 or more flickering events 
+                end
+                all_runs = all_runs(good_idx);
+            end
+            
+            if input.occultations
+                good_idx = true(length(all_runs),1); 
+                for ii = 1:length(all_runs)
+                    N = all_runs(ii).classifications.real.occultation_certain;
+                    N = N + all_runs(ii).classifications.real.occultation_possible;
+                    good_idx(ii) = N < 2; % disqualify at 2 or more non simulated occultation events occur
                 end
                 all_runs = all_runs(good_idx);
             end
@@ -347,6 +358,8 @@ classdef Scanner < handle
                     
                 else
                 
+                    cand.untangleHeaders; % make sure each header is an independent object
+                    
                     for ii = 1:length(cand)
                         cand(ii).folder = fullfile(r.folder, r.analysis_folder); % make sure to update each candidate to know what folder it was loaded from! 
                     end
@@ -458,6 +471,8 @@ classdef Scanner < handle
                         idx = contains({new_cand.classification}', which_class);
                         new_cand = new_cand(idx); 
                     end
+                    
+                    new_cand.untangleHeaders; % make sure each header is an independent object
                     
                     cand = vertcat(cand, new_cand); 
                     

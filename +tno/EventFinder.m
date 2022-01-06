@@ -1102,7 +1102,7 @@ classdef EventFinder < handle
 %             c.fwhm = obj.store.checker.fwhm;
             
             % get the observational parameters and the star parameters from astrometry/GAIA
-            c.head = obj.head;
+            c.head = util.oop.full_copy(obj.head);
             if ~isempty(obj.cat) && obj.cat.success
                 c.star_props = obj.cat.data(c.star_index_global,:); % copy a table row from the catalog
             end
