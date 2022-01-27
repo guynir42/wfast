@@ -121,7 +121,7 @@ plot(ax4, juliandate(start(poss)), timestamps(poss)/3600, 'x', 'MarkerSize', 10,
 hold(ax4, 'on'); 
 
 plot(ax4, juliandate(start(cert)), timestamps(cert)/3600, 'x', 'MarkerSize', 10, 'LineWidth', 2.5, 'Color', hc.Color); 
-plot(ax4, juliandate(start(out_idx)), timestamps(out_idx)/3600, 'x', 'MarkerSize', 10, 'LineWidth', 1.5, 'Color', ho.Color); 
+plot(ax4, juliandate(start(out_idx)), timestamps(out_idx)/3600, 'o', 'MarkerSize', 10, 'LineWidth', 1.5, 'Color', ho.Color); 
 
 ustart = unique(start);
 
@@ -145,7 +145,7 @@ end
 
 hold(ax4, 'off'); 
 
-xlabel(ax4, 'Run start time'); 
+xlabel(ax4, 'Run start time [JD]'); 
 ylabel(ax4, 'Time since run start [hours]'); 
 ax4.FontSize = 18;
 

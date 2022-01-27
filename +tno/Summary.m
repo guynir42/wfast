@@ -64,6 +64,13 @@ classdef Summary < handle
         black_list_stars; % a vector of star numbers (from the full list of stars?)
         good_stars; % a list of the stars that passed the threshold after the burn-in period
         
+        % the relative flux variations of bright stars
+        flux_histograms; % (flux - mean(flux))/mean(flux) of bright stars
+        flux_histograms_log; % same as above, with logarithmic bins (base log2)
+        flux_edges; % bin edges of the above histograms
+        flux_edges_log; % bin edges for logarithmic histograms
+        flux_binning_factors; % use a box filter with these widths before histogramming (empty means no filtering)
+        
         % structs describing simulated events that passed/failed the threshold
         sim_events;
         

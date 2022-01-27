@@ -88,6 +88,13 @@ classdef Overview < handle
         cut_histograms; % accumualted values of different cuts for each value, summed over all stars (dim1 is values, dim2 is cut type)
         cut_bin_edges; % a vector with the bin edges for each cut (same dimensions as the histograms)
         
+        % the relative flux variations of bright stars
+        flux_histograms; % (flux - mean(flux))/mean(flux) of bright stars
+        flux_histograms_log; % same as above, with logarithmic bins (base log2)
+        flux_edges; % bin edges of the above histograms
+        flux_edges_log; % bin edges for logarithmic histograms
+        flux_binning_factors; % use a box filter with these widths before histogramming (empty means no filtering)
+        
         sim_events; % struct describing simulated events that passed/failed the threshold
 
         num_events_expected; % use simulations to estimate this
@@ -182,6 +189,12 @@ classdef Overview < handle
 
             obj.cut_histograms = []; 
             obj.cut_bin_edges = [];
+
+            obj.flux_histograms = [];
+            obj.flux_histograms_log = [];
+            obj.flux_edges = [];
+            obj.flux_edges_log = [];
+            obj.flux_binning_factors = [];
 
             obj.sim_events = [];
 
@@ -405,6 +418,51 @@ classdef Overview < handle
                 end % for jj (size)
                 
             end % for ii (snr)
+            
+            % if there are flux histograms, add them also
+            if ~isempty(summary.flux_histograms) % assume the edges and log hist are also filled! 
+                
+                if isempty(obj.flux_binning_factors)
+                    obj.flux_binning_factors = summary.flux_binning_factors;
+                end
+                
+                if isequal(obj.flux_binning_factors, summary.flux_binning_factors)
+                    
+                    if isempty(obj.flux_edges)
+                        obj.flux_edges = summary.flux_edges;
+                    end
+                    
+                    if isequal(obj.flux_edges, summary.flux_edges)
+                        if isempty(obj.flux_histograms)
+                            obj.flux_histograms = summary.flux_histograms;
+                        else
+                            obj.flux_histograms = obj.flux_histograms + summary.flux_histograms;
+                        end
+                    else
+                        warning('Mismatch of flux_edges!'); 
+                    end
+                    
+                    if isempty(obj.flux_edges_log)
+                        obj.flux_edges_log = summary.flux_edges_log;
+                    end
+                    
+                    if isequal(obj.flux_edges_log, summary.flux_edges_log)
+                        if isempty(obj.flux_histograms_log)
+                            obj.flux_histograms_log = summary.flux_histograms_log;
+                        else
+                            obj.flux_histograms_log = obj.flux_histograms_log + summary.flux_histograms_log;
+                        end
+                    else
+                        warning('Mismatch of flux_edges!'); 
+                    end
+                    
+                else
+                    warning('Mismatch of flux binning factors! (%s vs. %s)', ...
+                        util.text.print_vec(obj.flux_binning_factors, ', '), ...
+                        util.text.print_vec(summary.flux_binning_factors, ', '))
+                end
+                
+            end
             
             %%% accumulate the simulated events as well
             

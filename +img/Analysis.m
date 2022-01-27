@@ -154,7 +154,7 @@ classdef Analysis < file.AstroData
         use_save_full_lightcurves = 1; % save these full lightcurves for the entire run as a single MAT file (ONLY when use_full_lightcurves=1 and use_analysis_dir_save=1)
         use_save_batched_lightcurves = 1; % save each batch's photometric result in a separate file (ONLY when use_analysis_dir_save=1)
         use_stack_lightcurves = 1; % keep a lightcurves object for the stack images
-        
+                
         use_psf_model = 1;
         
         use_event_finding = 1;

@@ -125,6 +125,11 @@ classdef EventFinder < handle
         % but only by the S/N threshold. 
         sim_events; 
     
+        flux_histograms = [];
+        flux_histograms_log = [];
+        flux_edges = [];
+        flux_edges_log = [];
+        
         total_batches = []; % optionally give the finder the number of files/batches in this run
         
         debug_bit = 1;
@@ -206,6 +211,10 @@ classdef EventFinder < handle
 
             obj.pars.use_keep_variances = 1; % keep a copy of the variance of each star/kernel for the entire run (this may be a bit heavy on the memory)
 
+            obj.pars.use_save_histograms = true;
+            obj.pars.min_flux_histogram = 1e4;
+            obj.pars.flux_binning_factors = [1 3 5];
+        
             obj.pars.use_sim = 1; % add simulated events in a few batches randomly spread out in the whole run
             obj.pars.num_sim_events_per_batch = 0.25; % fractional probability to add a simulated event into each new batch. 
             obj.pars.use_keep_simulated = true; % if false, the simulated events would not be kept with the list of detected candidates (for running massive amount of simualtions)
@@ -246,6 +255,11 @@ classdef EventFinder < handle
             obj.sim_events = [];
             
             obj.total_batches = [];
+            
+            obj.flux_histograms = [];
+            obj.flux_histograms_log = [];
+            obj.flux_edges = [];
+            obj.flux_edges_log = [];
             
             obj.monitor.reset;
             
@@ -439,6 +453,10 @@ classdef EventFinder < handle
                 [d, run_name] = fileparts(d); 
                 [d, run_date] = fileparts(d); 
                 obj.head.run_identifier = fullfile(run_date, run_name); 
+            end
+            
+            if obj.pars.use_save_histograms
+                obj.calcHistograms;
             end
             
             if obj.pars.use_psd_correction
@@ -656,6 +674,11 @@ classdef EventFinder < handle
             b = [NaN(obj.store.pars.length_burn_in,1); b]; 
             s.background_log = util.series.binning(b, obj.store.pars.length_search); % should be the same size as the other logs, with some NaNs in the beginning for the burn in
             
+            s.flux_histograms = obj.flux_histograms;
+            s.flux_histograms_log = obj.flux_histograms_log;
+            s.flux_edges_log = obj.flux_edges_log;
+            s.flux_binning_factors = obj.pars.flux_binning_factors;
+            
             % load the content of the checker
             s.checker_pars = obj.store.checker.pars;
             s.cut_names = obj.store.checker.cut_names;
@@ -688,6 +711,64 @@ classdef EventFinder < handle
     end
     
     methods(Hidden=true) % internal calculation methods
+        
+        function calcHistograms(obj)
+            
+            f = obj.store.this_input.fluxes(:,:,end);
+            F = nanmean(f); 
+
+            idx = F > obj.pars.min_flux_histogram;
+
+            if isempty(obj.flux_edges)
+                obj.flux_edges = -5:0.01:5; 
+            end
+            
+            if isempty(obj.flux_edges_log)
+                obj.flux_edges_log = -3:0.01:3; 
+            end
+
+            f_norm = (f(:,idx) - F(idx)) / F(idx); 
+            f_ratio = f(:,idx) / F(idx); 
+            
+            b = obj.pars.flux_binning_factors;
+
+            if isempty(b)
+                b = 1;
+            end
+
+            if isempty(obj.flux_histograms)
+                obj.flux_histograms = zeros(length(obj.flux_edges)-1, length(b), 'uint64'); 
+            end
+            
+            if isempty(obj.flux_histograms_log)
+                obj.flux_histograms_log = zeros(length(obj.flux_edges_log)-1, length(b), 'uint64'); 
+            end
+
+            for ii = 1:length(b)
+                
+                if b(ii) > 1
+                    ff = filter2(ones(b(ii),1)/b(ii), f_norm);
+                else
+                    ff = f_norm;
+                end
+                
+                N = histcounts(ff, obj.flux_edges); 
+                
+                obj.flux_histograms(:,ii) = obj.flux_histograms(:,ii) + uint64(N'); 
+                
+                if b(ii) > 1
+                    ff = filter2(ones(b(ii),1)/b(ii), f_ratio);
+                else
+                    ff = f_ratio;
+                end
+                
+                N = histcounts(log2(ff), obj.flux_edges_log); 
+                
+                obj.flux_histograms_log(:,ii) = obj.flux_histograms_log(:,ii) + uint64(N'); 
+                
+            end
+            
+        end
         
         function [flux_out, std_out] = correctFluxes(obj, fluxes, star_indices) % star indices tells the PSD which stars were given in fluxes (default is all stars)
             
