@@ -345,7 +345,7 @@ classdef Scanner < handle
                 
                 if isempty(cand)
                     
-                    obj.candidates = cand;
+%                     obj.candidates = cand;
                     
                     candidates = cand; % the variable name needs to match Candidate.saveClassified()
                     
@@ -633,7 +633,13 @@ classdef Scanner < handle
             
             t = tic;
             
-            val = obj.getNextCandidates;
+            [val, report] = obj.getNextCandidates;
+            
+            if val==0 && strcmp(report, 'Found no candidates. Saving empty classified file. ')
+%                 val = obj.getNextCandidates; 
+                obj.callback_next_candidates(hndl);
+                return;
+            end
             
             fprintf('Load candidates time: %4.2f\n', toc(t)); 
             
@@ -651,7 +657,7 @@ classdef Scanner < handle
             else
                 
                 util.text.date_printf('Could not find any unclassified candidates!'); 
-                
+                obj.candidates = tno.Candidate.empty;
             end
             
             

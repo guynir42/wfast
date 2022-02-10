@@ -3,21 +3,19 @@ classdef MCMC < handle
     properties(Transient=true)
         
         gui;
+        gen@occult.CurveGenerator; % used to create lightcurves to fit to the measured
+        bank@occult.ShuffleBank; % for finding an initial guess
         
     end
     
     properties % objects
-        
-        gen@occult.CurveGenerator; % used to create lightcurves to fit to the measured
-        
-        bank@occult.ShuffleBank; % for finding an initial guess
         
         init_point@occult.Parameters; % keep track of the initial point 
         true_point@occult.Parameters; % if the data is simulated and the true value is known
         best_point@occult.Parameters;
 
         points@occult.Parameters; % a chain of trial points
-        
+        results@table; % translate the MCMC results from a matrix of points to a table
         prog@util.sys.ProgressBar; % print out the progress
 
     end
@@ -111,11 +109,14 @@ classdef MCMC < handle
                 if obj.debug_bit>1, fprintf('MCMC constructor v%4.2f\n', obj.version); end
             
                 obj.gen = occult.CurveGenerator;
+                
                 obj.init_point = occult.Parameters; 
                 
                 obj.best_point = occult.Parameters; 
                 
                 obj.prog = util.sys.ProgressBar;
+                
+                obj.results = table;
                 
                 obj.generateTitles;
                 
@@ -140,6 +141,7 @@ classdef MCMC < handle
         function reset(obj)
             
             obj.points = occult.Parameters.empty; 
+            obj.results = table.empty; 
             
             obj.init_point = occult.Parameters;
             obj.best_point = occult.Parameters;
@@ -174,6 +176,16 @@ classdef MCMC < handle
     
     methods % getters
         
+        function val = get.gen(obj)
+            
+            if isempty(obj.gen)
+                obj.gen = occult.CurveGenerator;
+            end
+            
+            val = obj.gen;
+            
+        end
+        
         function val = getSummary(obj)
             
             val = ''; % to be continued
@@ -186,7 +198,7 @@ classdef MCMC < handle
             
         end
         
-        function T = getTable(obj, varargin)
+        function T = getTable(obj, varargin) % depricated, replaced by pointsToTable
             
             input = util.text.InputVars;
             input.input_var('good', false); % only get good chains and skip points in the burn sample
@@ -223,6 +235,62 @@ classdef MCMC < handle
                 good = [p.good]'; 
                 T2 = table(burn, good); 
                 T = [T,T2]; 
+            end
+            
+        end
+        
+        function val = getResult(obj, name, skip_burn, chain_num)
+            
+            if nargin<3 || isempty(skip_burn)
+                skip_burn = true;
+            end
+            
+            if nargin<4 || isempty(chain_num)
+                chain_num = [];
+            end
+            
+            if ~isempty(obj.results)
+                
+                val = obj.results;
+                
+                if skip_burn
+                    val = val(val.burn==0,:);
+                end
+                
+                if ~isempty(chain_num)
+                    val = val(ismember(val.chain, chain_num),:);
+                end
+                
+                val = val.(name); 
+                
+            elseif ~isempty(obj.points)
+                
+                val = obj.points;
+                
+                if skip_burn
+                    val = val(obj.num_burned+1:end,:); 
+                end
+                
+                if ~isempty(chain_num)
+                    val = val(:,chain_num);
+                end
+                
+                val = [val.(name)]';
+                
+            else
+                val = [];
+            end
+            
+        end
+        
+        function val = getNumChains(obj)
+            
+            if ~isempty(obj.points)
+                val = size(obj.points,2);
+            elseif ~isempty(obj.results)
+                val = length(unique(obj.results.chain));
+            else
+                val = 0;
             end
             
         end
@@ -842,19 +910,17 @@ classdef MCMC < handle
 
             input = util.text.InputVars;
             input.input_var('success_ratio', 0.05); % minimal number of successes (relative to total steps) for a chain to be included
-            input.input_var('likelihood', []); % minimal mean likelihood needed for a chain to be included
+            input.input_var('likelihood', []); % minimal mean log-likelihood needed for a chain to be included
             input.scan_vars(varargin{:}); 
             
             if isempty(input.likelihood)
                 input.likelihood = -Inf; 
             end
             
-            idx = obj.num_burned:obj.counter; 
-            
-            for ii = 1:size(obj.points,2)
+            for ii = 1:obj.getNumChains
                 
                 acceptance(ii) = obj.num_successes(ii)./obj.counter;
-                likelihood(ii) = nanmean([obj.points(idx,ii).likelihood]);
+                likelihood(ii) = nanmean(obj.getResult('logl', true, ii));
                 
                 if ~isempty(input.success_ratio)
                     pass(ii) = acceptance(ii) >= input.success_ratio && ... 
@@ -871,14 +937,13 @@ classdef MCMC < handle
             input.input_var('sigma', 3); % how many MADs above the noise should outliers be
             input.scan_vars(varargin{:}); 
             
-            N = size(obj.points,2);
+            N = obj.getNumChains;
             
             mean_chi2 = zeros(1, N);
             
             for ii = 1:N
-                
-                mean_chi2(ii) = nanmean([obj.points(:,ii).chi2]); 
-                
+%                 mean_chi2(ii) = nanmean([obj.points(:,ii).chi2]); 
+                mean_chi2(ii) = nanmean(obj.getResults('chi2', true, ii)); 
             end
             
             if N > 4
@@ -888,16 +953,6 @@ classdef MCMC < handle
             else
                 pass = true(1,N); 
             end
-            
-        end
-        
-        function flagBadPoints(obj)
-            
-            pass = obj.findGoodChains; 
-            
-            [obj.points(1:obj.num_burned, :).burn] = deal(true);
-            [obj.points(1:obj.num_burned, :).good] = deal(false);
-            [obj.points(:, ~pass).good] = deal(false);
             
         end
         
@@ -912,33 +967,22 @@ classdef MCMC < handle
             input.input_var('oversample', 5); 
             input.scan_vars(varargin{:}); 
             
-            if obj.counter==0 || isempty(obj.points)
+            if obj.counter==0
                 N = 0;
                 x = [];
                 y = [];
                 return;
             end
             
-            if input.burn
-                idx1 = 1:obj.counter; 
-            else
-                idx1 = obj.num_burned:obj.counter; 
-            end
+            chain_num = find(obj.calcChainProps('success', input.success_ratio, 'likelihood', input.likelihood));
             
-%             for ii = 1:size(obj.points,2)
-%                 
-%                 if ~isempty(input.success_ratio)
-%                     idx2(ii) = obj.num_successes(ii)./obj.counter > input.success_ratio && ... 
-%                         nanmean([obj.points(idx1,ii).likelihood])> input.likelihood;
-%                 end
-%                 
-%             end
-
-            idx2 = find(obj.calcChainProps('success', input.success_ratio, 'likelihood', input.likelihood)); 
+            x = obj.getResult(input.pars{1}, ~input.burn, chain_num); 
+            y = obj.getResult(input.pars{2}, ~input.burn, chain_num); 
+            w = obj.getResult('weight', ~input.burn, chain_num); 
             
-            x = [obj.points(idx1, idx2).(input.pars{1})];
-            y = [obj.points(idx1, idx2).(input.pars{2})];
-            w = logical([obj.points(idx1, idx2).weight]);
+%             x = [obj.points(idx1, idx2).(input.pars{1})];
+%             y = [obj.points(idx1, idx2).(input.pars{2})];
+%             w = logical([obj.points(idx1, idx2).weight]);
             
             if input.weights
                 x = x(w);
@@ -984,12 +1028,14 @@ classdef MCMC < handle
                 skip_burn = 1;
             end
             
-            p = obj.points;
-            if skip_burn
-                p = p(1:obj.num_burned,:); 
-            end
+%             p = obj.points;
+%             if skip_burn
+%                 p = p(1:obj.num_burned,:); 
+%             end
+%             
+%             values = [p(:).(par)];
             
-            values = [p(:).(par)];
+            values = obj.getResult(par, skip_burn); 
             N = length(values); 
             
             % for even N these will be the same
@@ -1024,23 +1070,27 @@ classdef MCMC < handle
                 skip_burn = 1;
             end
             
-            p = obj.points;
-            if skip_burn
-                p = p(1:obj.num_burned,:); 
-            end
+%             p = obj.points;
+%             if skip_burn
+%                 p = p(1:obj.num_burned,:); 
+%             end
+%             
+%             values = [p(:).(par)];
+            values = obj.getResult(par, skip_burn); 
             
-            values = [p(:).(par)];
-            N = length(values); 
+            [lower, upper, center] = util.stat.dist_bounds(values, 'fraction', percentile); 
             
-            sorted_values = sort(values); 
-            
-            func = @(lb) obj.find_upper_bound(sorted_values, lb, percentile) - lb; % loss function: distance between lower and upper bounds
-            
-            lower_bound_guess = sorted_values(floor((1-percentile)/2.*N));
-            
-            lower = fminsearch(func, lower_bound_guess); 
-            upper = obj.find_upper_bound(sorted_values, lower, percentile); 
-            center = (upper+lower)/2; 
+%             N = length(values); 
+%             
+%             sorted_values = sort(values); 
+%             
+%             func = @(lb) obj.find_upper_bound(sorted_values, lb, percentile) - lb; % loss function: distance between lower and upper bounds
+%             
+%             lower_bound_guess = sorted_values(floor((1-percentile)/2.*N));
+%             
+%             lower = fminsearch(func, lower_bound_guess); 
+%             upper = obj.find_upper_bound(sorted_values, lower, percentile); 
+%             center = (upper+lower)/2; 
                         
         end
         
@@ -1058,7 +1108,45 @@ classdef MCMC < handle
 %             fprintf('low: %4.2f | high: %4.2f\n', lower_bound, upper_bound); 
             
         end
+        
+        function flagBadPoints(obj)
             
+            pass = obj.findGoodChains; 
+            
+            [obj.points(1:obj.num_burned, :).burn] = deal(true);
+            [obj.points(1:obj.num_burned, :).good] = deal(false);
+            [obj.points(:, ~pass).good] = deal(false);
+            
+        end
+        
+        function pointsToTable(obj)
+            
+            if ~isempty(obj.points)
+                
+                obj.flagBadPoints;
+                
+                names = [obj.par_list, {'chi2', 'ndof', 'logl', ...
+                    'counts', 'weight', 'chain', 'burn', 'good'}];
+                
+                obj.results = cell2table(cell(numel(obj.points), length(names)), ...
+                    'VariableNames', names);
+                
+                for ii = 1:size(obj.points,2)
+                    [obj.points(:,ii).chain] = deal(ii); % make sure each point knows which chain it came from
+                end
+                
+                [obj.points(1:obj.num_burned,:).burn] = deal(1); 
+                
+                for ii = 1:length(names)
+                    obj.results.(names{ii}) = [obj.points.(names{ii})]'; 
+                end
+                
+                obj.points = occult.Parameters.empty;
+                
+            end
+            
+        end
+        
     end
     
     methods % plotting tools / GUI
@@ -1155,7 +1243,7 @@ classdef MCMC < handle
                 sz = sz(1:step:obj.counter);
                 
                 for ii = 1:N
-
+                    % TODO: refactor to use the table not just the points
                     p1 = [obj.points(1:step:obj.counter,ii).(input.pars{1})]';
                     p2 = [obj.points(1:step:obj.counter,ii).(input.pars{2})]';
                     p3 = [obj.points(1:step:obj.counter,ii).(input.pars{3})]';
@@ -1366,7 +1454,7 @@ classdef MCMC < handle
             input.input_var('legend', false); 
             input.scan_vars(varargin{:});
             
-            if obj.counter==0 || isempty(obj.points)
+            if obj.counter==0
                 return;
             end
             
@@ -1396,7 +1484,8 @@ classdef MCMC < handle
             
                 if ~input.horizontal % vertical option
                     
-                    h = histogram(input.ax, [obj.points(1:obj.num_burned,:).(input.pars{1})]); 
+%                     h = histogram(input.ax, [obj.points(1:obj.num_burned,:).(input.pars{1})]); 
+                    h = histogram(input.ax, obj.getResult(input.pars{1}, true)); 
                     
                     x_title = input.pars{1};
                     if input.full_titles
@@ -1436,7 +1525,8 @@ classdef MCMC < handle
                     
                 else % horizontal option
                     
-                    h = histogram(input.ax, [obj.points(1:obj.num_burned,:).(input.pars{1})], 'Orientation', 'Horizontal');
+%                     h = histogram(input.ax, [obj.points(1:obj.num_burned,:).(input.pars{1})], 'Orientation', 'Horizontal');
+                    h = histogram(input.ax, obj.getResult(input.pars{1}, true), 'Orientation', 'Horizontal');
                 
                     y_title = input.pars{1};
                     if input.full_titles
@@ -1583,7 +1673,7 @@ classdef MCMC < handle
                input.parent = gcf;
             end
             
-            if obj.counter==0 || isempty(obj.points)
+            if obj.counter==0
                 disp('Cannot show results without any chains!'); 
                 return;
             end

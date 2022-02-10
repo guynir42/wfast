@@ -92,6 +92,12 @@ classdef Candidate < handle
         
     end
     
+    properties(Dependent=true)
+        
+        mcmc;
+        
+    end
+    
     properties % inputs/outputs
         
         serial; % each candidates's id in the run
@@ -248,6 +254,18 @@ classdef Candidate < handle
     end
     
     methods % getters
+        
+        function val = get.mcmc(obj)
+            
+            if ~isempty(obj.mcmc_narrow_v)
+                val = obj.mcmc_narrow_v;
+            elseif ~isempty(obj.mcmc_wide_v)
+                val = obj.mcmc_wide_v;
+            else
+                val = occult.MCMC.empty;
+            end
+            
+        end
         
         function val = kernel_timestamps(obj)
             

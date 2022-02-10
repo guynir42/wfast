@@ -762,7 +762,7 @@ classdef EventFinder < handle
                     ff = f_ratio;
                 end
                 
-                N = histcounts(log2(ff), obj.flux_edges_log); 
+                N = histcounts(log2(abs(ff)+1e-10), obj.flux_edges_log); 
                 
                 obj.flux_histograms_log(:,ii) = obj.flux_histograms_log(:,ii) + uint64(N'); 
                 
