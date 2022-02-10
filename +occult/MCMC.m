@@ -472,6 +472,11 @@ classdef MCMC < handle
             
 %             obj.points(obj.num_steps,obj.num_chains) = occult.Parameters; 
             
+            if obj.debug_bit
+                util.text.date_printf('Running MCMC with %d chains of %d points (%d burn)', ...
+                    obj.num_chains, obj.num_steps, obj.num_burned); 
+            end
+
             if ~isempty(obj.gui) && obj.gui.check
                 cla(obj.gui.axes_chain);
                 cla(obj.gui.axes_lightcurve);
@@ -483,7 +488,11 @@ classdef MCMC < handle
             
         end
         
-        function finishup(obj)
+        function finishup(obj, compress_to_table)
+            
+            if nargin<2 || isempty(compress_to_table)
+                compress_to_table = false;
+            end
             
             obj.points = obj.points(1:obj.counter, :); 
             obj.prog.finish;
@@ -499,7 +508,9 @@ classdef MCMC < handle
                 end
             end
             
-            
+            if compress_to_table
+                obj.pointsToTable;
+            end
             
         end
         
@@ -778,11 +789,19 @@ classdef MCMC < handle
 
         end
         
-        function run(obj, varargin)
+        function run_async(obj)
+            
+            obj.futures{end+1} = parfeval(@obj.run, 1, 'table', true); 
+            
+        end
+        
+        function obj = run(obj, varargin)
             
             import util.text.cs;
             
             input = util.text.InputVars;
+            input.input_var('reset', true);
+            input.input_var('table', false, 'output_table', 'table_results'); 
             input.input_var('plot', false);
             input.input_var('ax', [], 'axes', 'axis');
             input.scan_vars(varargin{:});
@@ -795,10 +814,13 @@ classdef MCMC < handle
                 error('Cannot run MCMC without an input flux! Use useSimulatedInput() or useSimulatedNoisyInput() or input a lightcurve manually.'); 
             end
             
-            obj.reset;
+            if input.reset
+                obj.reset;
+            end
+                
             obj.startup;
             
-            on_cleanup = onCleanup(@() obj.finishup); % make sure to wrap up: truncate the chain, shut down the progress bar
+            on_cleanup = onCleanup(@() obj.finishup(input.table)); % make sure to wrap up: truncate the chain, shut down the progress bar
             
             if input.plot
                 
@@ -905,7 +927,9 @@ classdef MCMC < handle
                 end
                 
             end
-                        
+            
+            
+            
         end
         
         function [pass, likelihood, acceptance] = calcChainProps(obj, varargin)

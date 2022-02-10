@@ -774,6 +774,7 @@ classdef Candidate < handle
         function runMCMC(obj, varargin)
             
             input = util.text.InputVars; 
+            input.input_var('async', false); % run in a parallel pool
             input.input_var('velocity_prior', 'wide'); % can also choose "narrow"
             input.input_var('chains', 10, 'num_chains', 'number_chains'); 
             input.input_var('plot', false); % load up an MCMC GUI for the run
@@ -817,12 +818,38 @@ classdef Candidate < handle
             
             if obj.debug_bit, fprintf('Running MCMC with %s velocity prior.\n', wide_str); end
             
-            mcmc.run;
+            if input.async
+                mcmc.run_async; 
+            else
+                mcmc.run;
+            end
             
             if use_wide
                 obj.mcmc_wide_v = mcmc;
             else
                 obj.mcmc_narrow_v = mcmc; 
+            end
+            
+        end
+        
+        function recoverAsyncMCMC(obj, varargin)
+            
+            input = util.text.InputVars; 
+            input.input_var('velocity_prior', 'wide'); % can also choose "narrow"
+            input.scan_vars(varargin{:}); 
+            
+            if util.text.cs(input.velocity_prior, 'wide')
+                mcmc = obj.mcmc_wide_v.futures{end}.fetchOutput;
+                if ~isempty(mcmc.results)
+                    obj.mcmc_wide_v = mcmc;
+                end
+            elseif util.text.cs(input.velocity_prior, 'narrow')
+                mcmc = obj.mcmc_wide_v.futures{end}.fetchOutput;
+                if ~isempty(mcmc.results)
+                    obj.mcmc_narrow_v = mcmc;
+                end
+            else
+                error('Unknown velocity prior option "%s". Use "wide" or "narrow"...', input.velocity_prior);
             end
             
         end
