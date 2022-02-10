@@ -5,6 +5,7 @@ classdef MCMC < handle
         gui;
         gen@occult.CurveGenerator; % used to create lightcurves to fit to the measured
         bank@occult.ShuffleBank; % for finding an initial guess
+        futures = {}; % a cell array of parallel toolbox futures for async runs
         
     end
     
@@ -951,8 +952,9 @@ classdef MCMC < handle
                 scat = mad(mean_chi2,1); % median deviation skips outliers
                 aver = median(mean_chi2); % median average skips outliers
                 pass = mean_chi2 - aver < scat * input.sigma; % low chi2 are also accepted, but high outliers are removed
+                pass = find(pass);
             else
-                pass = true(1,N); 
+                pass = 1:N; 
             end
             
         end
@@ -1114,7 +1116,11 @@ classdef MCMC < handle
             
         end
         
-        function pointsToTable(obj)
+        function pointsToTable(obj, keep_points)
+            
+            if nargin<2 || isempty(keep_points)
+                keep_points = false;
+            end
             
             if ~isempty(obj.points)
                 
@@ -1136,7 +1142,9 @@ classdef MCMC < handle
                     obj.results.(names{ii}) = [obj.points.(names{ii})]'; 
                 end
                 
-                obj.points = occult.Parameters.empty;
+                if ~keep_points
+                    obj.points = occult.Parameters.empty;
+                end
                 
             end
             
@@ -1247,7 +1255,7 @@ classdef MCMC < handle
                     p3 = [obj.points(1:step:obj.counter,ii).(input.pars{3})]';
 %                     lkl = [obj.points(1:obj.counter,ii).likelihood]'; % used only for calculating the mean likelihood of each chain
                     
-                    if pass(ii)
+                    if ismember(ii, pass)
                         accepted = 'accepted';
                     else
                         accepted = 'rejected';
@@ -1625,7 +1633,7 @@ classdef MCMC < handle
                 else
                     imagesc(input.ax, x(1,:), y(:,1), N); 
                     axis(input.ax, 'xy'); 
-                    colormap(flip(gray)); 
+                    colormap(input.ax, flip(gray)); 
                     input.ax.CLim = [0 prctile(N(:), 98)]; 
                 end
 
@@ -1718,7 +1726,7 @@ classdef MCMC < handle
             high_x = ax_density.XLim(2)*0.95; 
             
             pass = obj.findGoodChains;
-            N = sum(pass);
+            N = numel(pass);
             
             text(ax_density, high_x, low_y, sprintf('%d points\n %d chains', (obj.num_steps-obj.num_burned)*N, N), ...
                 'FontSize', input.font_size, 'HorizontalAlignment', 'right', 'FontWeight', 'bold'); 
