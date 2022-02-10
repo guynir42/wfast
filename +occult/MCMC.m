@@ -15,7 +15,8 @@ classdef MCMC < handle
         init_point@occult.Parameters; % keep track of the initial point 
         true_point@occult.Parameters; % if the data is simulated and the true value is known
         best_point@occult.Parameters;
-
+        posterior_point@occult.Parameters; % mode of marginal posterior of r,b,v and the real R
+        
         points@occult.Parameters; % a chain of trial points
         
         prog@util.sys.ProgressBar; % print out the progress
@@ -934,8 +935,8 @@ classdef MCMC < handle
 %                 
 %             end
 
-            idx2 = find(obj.calcChainProps('success', input.success_ratio, 'likelihood', input.likelihood)); 
-            
+%             idx2 = find(obj.calcChainProps('success', input.success_ratio, 'likelihood', input.likelihood)); 
+            idx2 = obj.findGoodChains; 
             x = [obj.points(idx1, idx2).(input.pars{1})];
             y = [obj.points(idx1, idx2).(input.pars{2})];
             w = logical([obj.points(idx1, idx2).weight]);
@@ -1010,7 +1011,7 @@ classdef MCMC < handle
             
         end
         
-        function [center, lower, upper] = getSmallestBounds(obj, par, percentile, skip_burn)
+        function [best, lower, upper] = getSmallestBounds(obj, par, percentile, skip_burn)
             
             if nargin<3 || isempty(percentile)
                 percentile = 68; 
@@ -1028,19 +1029,24 @@ classdef MCMC < handle
             if skip_burn
                 p = p(1:obj.num_burned,:); 
             end
+                        
+            p = p(:,obj.findGoodChains); % only take good chains
             
             values = [p(:).(par)];
-            N = length(values); 
             
-            sorted_values = sort(values); 
+            [lower, upper, best] = util.stat.dist_bounds(values, 'fraction', percentile); 
             
-            func = @(lb) obj.find_upper_bound(sorted_values, lb, percentile) - lb; % loss function: distance between lower and upper bounds
-            
-            lower_bound_guess = sorted_values(floor((1-percentile)/2.*N));
-            
-            lower = fminsearch(func, lower_bound_guess); 
-            upper = obj.find_upper_bound(sorted_values, lower, percentile); 
-            center = (upper+lower)/2; 
+%             N = length(values); 
+%             
+%             sorted_values = sort(values); 
+%             
+%             func = @(lb) obj.find_upper_bound(sorted_values, lb, percentile) - lb; % loss function: distance between lower and upper bounds
+%             
+%             lower_bound_guess = sorted_values(floor((1-percentile)/2.*N));
+%             
+%             lower = fminsearch(func, lower_bound_guess); 
+%             upper = obj.find_upper_bound(sorted_values, lower, percentile); 
+%             center = (upper+lower)/2; 
                         
         end
         
@@ -1122,6 +1128,9 @@ classdef MCMC < handle
             
             sz(N+1:end) = 20; 
             
+            % which chains are good?
+            [pass, mean_chi] = obj.findGoodChains;
+            
             if length(input.pars)==1 % just show the distribution of this one parameter I guess... 
                 
                 histogram(input.ax, p1);
@@ -1159,23 +1168,33 @@ classdef MCMC < handle
                     p1 = [obj.points(1:step:obj.counter,ii).(input.pars{1})]';
                     p2 = [obj.points(1:step:obj.counter,ii).(input.pars{2})]';
                     p3 = [obj.points(1:step:obj.counter,ii).(input.pars{3})]';
-                    lkl = [obj.points(1:obj.counter,ii).likelihood]'; % used only for calculating the mean likelihood of each chain
+%                     lkl = [obj.points(1:obj.counter,ii).likelihood]'; % used only for calculating the mean likelihood of each chain
                     
+                    if pass(ii)
+                        accepted = 'accepted';
+                    else
+                        accepted = 'rejected';
+                    end
+                    
+                    leg_str = sprintf('Chain %d (\\langle\\chi^2\\rangle=%3.1f, %s)', ii, mean_chi(ii), accepted);
                     if isempty(h) || length(h)~=N || ~isvalid(h(ii))
                         N_colors = size(input.ax.ColorOrder,1);
                         col_idx = mod(ii-1, N_colors) + 1; 
                         sha_idx = floor((ii-1)/N_colors) + 1; 
                         h(ii) = scatter3(input.ax, p1, p2, p3, sz, input.ax.ColorOrder(col_idx,:), shapes{sha_idx}, 'filled');
-                        h(ii).DisplayName = sprintf('Chain %d (acc=%3.1f%%, lkl=%4.2g)', ...
-                            ii, 100*obj.num_successes(ii)./obj.counter, nanmean(lkl(obj.num_burned+1:end,1))); 
+%                         h(ii).DisplayName = sprintf('Chain %d (acc=%3.1f%%, lkl=%4.2g)', ...
+%                             ii, 100*obj.num_successes(ii)./obj.counter, nanmean(lkl(obj.num_burned+1:end,1))); 
+                        h(ii).DisplayName =  leg_str;
                         input.ax.NextPlot = 'add';                 
                     else
                         h(N-ii+1).XData = p1; 
                         h(N-ii+1).YData = p2;
                         h(N-ii+1).ZData = p3;
                         h(N-ii+1).SizeData = sz;
-                        h(N-ii+1).DisplayName = sprintf('Chain %d (acc=%3.1f%%, lkl=%4.2g)', ...
-                            ii, 100*obj.num_successes(ii)./obj.counter, nanmean(lkl(obj.num_burned+1:end,1),1)); 
+                        
+%                         h(N-ii+1).DisplayName = sprintf('Chain %d (acc=%3.1f%%, lkl=%4.2g)', ...
+%                             ii, 100*obj.num_successes(ii)./obj.counter, nanmean(lkl(obj.num_burned+1:end,1),1)); 
+                        h(N-ii+1).DisplayName = leg_str;
                         input.ax.NextPlot = 'add';  
                     end
 
@@ -1348,7 +1367,7 @@ classdef MCMC < handle
             
         end
         
-        function showPosterior(obj, varargin)
+        function mode = showPosterior(obj, varargin)
             
             input = util.text.InputVars;
             input.input_var('pars', obj.show_posterior_pars); 
@@ -1360,7 +1379,7 @@ classdef MCMC < handle
             input.input_var('full_titles', false, 'titles'); 
             input.input_var('bounds', true); 
             input.input_var('true_point', true); 
-            input.input_var('best_point', true); 
+            input.input_var('best_point', false); 
             input.input_var('horizontal', false); 
             input.input_var('hold', false); 
             input.input_var('legend', false); 
@@ -1392,12 +1411,14 @@ classdef MCMC < handle
                 error('Must specify which parameters to show!'); 
             elseif isscalar(input.pars)
                 
-                [med, lower, upper] = obj.getSmallestBounds(input.pars{1}, 68, ~input.burn);
+                [mode, lower, upper] = obj.getSmallestBounds(input.pars{1}, 68, ~input.burn);
             
                 if ~input.horizontal % vertical option
                     
                     h = histogram(input.ax, [obj.points(1:obj.num_burned,:).(input.pars{1})]); 
                     
+                    hold(input.ax, 'on'); 
+
                     x_title = input.pars{1};
                     if input.full_titles
                         x_title = obj.title_strings.(x_title);                    
@@ -1405,19 +1426,21 @@ classdef MCMC < handle
 
                     y_title = 'Number of points'; 
 
-                    input.ax.YLim = input.ax.YLim;
+                    input.ax.YLim = input.ax.YLim; % this somehow makes the area and line plots fit the limits
                     
-                    hold(input.ax, 'on'); 
-
                     if input.bounds
-                        h_bounds = area(input.ax, [lower upper], [1 1].*input.ax.YLim(2), ...
-                            'EdgeColor', 'none', 'FaceColor', 'm', 'FaceAlpha', 0.2); 
-                        h_middle = plot(input.ax, med.*[1 1], input.ax.YLim, ':m', 'LineWidth', 2); 
+                        h_bounds = fill(input.ax, [lower upper upper lower], ...
+                            [[1 1].*input.ax.YLim(2) [1 1].*input.ax.YLim(1)], 'm', ...
+                             'EdgeColor', 'none', 'FaceAlpha', 0.2); 
+                        
+                        input.ax.Children = circshift(input.ax.Children, 1); 
+                        
+                        h_middle = plot(input.ax, mode.*[1 1], input.ax.YLim, ':m', 'LineWidth', 2.5); 
                     end
                     
                     if ~isempty(obj.true_point) && input.true_point
                         h_true = plot(input.ax, obj.true_point.(input.pars{1}).*[1 1], input.ax.YLim, '-g', 'LineWidth', 2); 
-                        h_true.DisplayName = sprintf('True: %s= %4.1f', ...
+                        h_true.DisplayName = sprintf('%s= %4.1f (true)', ...
                             input.pars{1}, obj.true_point.(input.pars{1}));
                     end
 
@@ -1429,10 +1452,8 @@ classdef MCMC < handle
                     
                     input.ax.XLim = obj.gen.([input.pars{1} '_range']); 
                     
-                    input.ax.Children = circshift(input.ax.Children, 1); 
-                    
                     h_bounds.HandleVisibility = 'off';
-                    h_middle.HandleVisibility = 'off';
+%                     h_middle.HandleVisibility = 'off';
                     
                 else % horizontal option
                     
@@ -1445,19 +1466,23 @@ classdef MCMC < handle
 
                     x_title = 'Number of points'; 
 
-                    input.ax.XLim = input.ax.XLim;
+                    input.ax.XLim = input.ax.XLim; % this somehow makes the area and line plots fit the limits
                     
                     hold(input.ax, 'on'); 
 
                     if input.bounds
-                        h_bounds = area(input.ax, input.ax.XLim, upper.*[1 1], lower, ...
-                            'EdgeColor', 'None', 'FaceColor', 'm', 'FaceAlpha', 0.2); 
-                        h_middle = plot(input.ax, input.ax.XLim, med.*[1 1], ':m', 'LineWidth', 2); 
+                        h_bounds = fill(input.ax, [[1 1].*input.ax.XLim(2) [1 1].*input.ax.XLim(1)],...
+                            [lower upper upper lower], 'm', ...
+                             'EdgeColor', 'none', 'FaceAlpha', 0.2); 
+                        
+                        input.ax.Children = circshift(input.ax.Children, 1); 
+                        
+                        h_middle = plot(input.ax, input.ax.XLim, mode.*[1 1], ':m', 'LineWidth', 2.5); 
                     end
                     
                     if ~isempty(obj.true_point) && input.true_point
                         h_true = plot(input.ax, input.ax.XLim, obj.true_point.(input.pars{1}).*[1 1], '-g', 'LineWidth', 2); 
-                        h_true.DisplayName = sprintf('True: %s= %4.1f', ...
+                        h_true.DisplayName = sprintf('%s= %4.1f (true)', ...
                             input.pars{1}, obj.true_point.(input.pars{1}));
                     end
 
@@ -1469,10 +1494,10 @@ classdef MCMC < handle
 
                     input.ax.YLim = obj.gen.([input.pars{1} '_range']); 
                     
-                    input.ax.Children = circshift(input.ax.Children, 1); 
+%                     input.ax.Children = circshift(input.ax.Children, 1); 
                     
                     h_bounds.HandleVisibility = 'off';
-                    h_middle.HandleVisibility = 'off';
+%                     h_middle.HandleVisibility = 'off';
                     
                 end
                 
@@ -1481,16 +1506,19 @@ classdef MCMC < handle
                 
                 if input.legend
                     
-                    h.DisplayName = sprintf('%s= %4.2f_{-%4.1f}^{+%4.1f}', ...
-                        input.pars{1}, med, med-lower, upper-med); 
+                    h.DisplayName = 'marginal posterior'; 
+                    h_middle.DisplayName = sprintf('%s= %4.2f_{-%4.1f}^{+%4.1f}', ...
+                        input.pars{1}, mode, mode-lower, upper-mode); 
+                    h_bounds.DisplayName = '68% confidence';
+                    
                     if input.horizontal
-                        if med<mean(input.ax.YLim)
+                        if mode<mean(input.ax.YLim)
                             l_pos = 'NorthEast'; 
                         else
                             l_pos = 'SouthEast'; 
                         end
                     else
-                        if med<mean(input.ax.XLim)
+                        if mode<mean(input.ax.XLim)
                             l_pos = 'NorthEast'; 
                         else
                             l_pos = 'NorthWest'; 
@@ -1566,7 +1594,8 @@ classdef MCMC < handle
             end
             
             if input.legend
-                legend(input.ax, 'Location', l_pos); 
+                hl = legend(input.ax, 'Location', l_pos); 
+                hl.FontSize = input.font_size - 4;
             end
             
         end
@@ -1609,16 +1638,17 @@ classdef MCMC < handle
             low_x = ax_density.XTick(1); 
             high_x = ax_density.XLim(2)*0.95; 
             
-            N = sum(obj.calcChainProps);
+            pass = obj.findGoodChains;
+            N = sum(pass);
             
-            text(ax_density, high_x, low_y, sprintf('%d points\n %d chains', obj.num_steps*N, N), ...
+            text(ax_density, high_x, low_y, sprintf('%d points\n %d chains', (obj.num_steps-obj.num_burned)*N, N), ...
                 'FontSize', input.font_size, 'HorizontalAlignment', 'right', 'FontWeight', 'bold'); 
             
             
             %%%%%%%%%%%%%%%% VERTICAL %%%%%%%%%%%%%%%%%%%%%%
             
             ax_vertical = axes('Parent', input.parent, 'Position', [P(1) P(2)+P(4) P(3) P(4)]); 
-            obj.showPosterior('ax', ax_vertical, 'font_size', input.font_size, ...
+            mode_r = obj.showPosterior('ax', ax_vertical, 'font_size', input.font_size, ...
                 'inner', 0, 'pars', 'r', 'Legend', 1, 'best', input.best, varargin{:}); 
             ax_vertical.XTick = []; 
             xlabel(ax_vertical, ''); 
@@ -1631,7 +1661,7 @@ classdef MCMC < handle
             %%%%%%%%%%%%%%%% HORIZONTAL %%%%%%%%%%%%%%%%%%%%%%
             
             ax_horizontal = axes('Parent', input.parent, 'Position', [P(1)+P(3) P(2) P(3) P(4)]); 
-            obj.showPosterior('ax', ax_horizontal, 'font_size', input.font_size, 'inner', 0, ...
+            mode_v = obj.showPosterior('ax', ax_horizontal, 'font_size', input.font_size, 'inner', 0, ...
                 'pars', 'v', 'horizontal', 1, 'Legend', 1, 'best', input.best, varargin{:}); 
             ax_horizontal.YTick = []; 
             ylabel(ax_horizontal, ''); 
@@ -1641,37 +1671,67 @@ classdef MCMC < handle
                 ax_horizontal.XTick(idx) = [];
             end
             
+            %%%%%%%%%%%%%%%% mode point %%%%%%%%%%%%%%%%%%%%%%
+            
+            % linear fit r and b
+            p = obj.points(obj.num_burned+1:end,pass); 
+            fr = util.fit.polyfit([p.r], [p.b], 'order', 1, 'iterations', 2, 'double', 1);
+            mode_b = fr.func(mode_r); 
+            
+            obj.posterior_point = occult.Parameters;
+            obj.posterior_point.R = obj.input_R;
+            obj.posterior_point.r = mode_r;
+            obj.posterior_point.b = mode_b;
+            obj.posterior_point.v = mode_v; 
+            
+            hold(ax_density, 'on'); 
+            
+            plot(ax_density, mode_r, mode_v, 'm+', 'MarkerSize', 18, 'LineWidth', 3.5); 
+            plot(ax_density, mode_r*[1 1], ax_density.YLim, 'm:', 'LineWidth', 1.5); 
+            plot(ax_density, ax_density.XLim, mode_v*[1 1], 'm:', 'LineWidth', 1.5); 
+
+            hold(ax_density, 'off'); 
+            
             %%%%%%%%%%%%%%%% LIGHTCURVE %%%%%%%%%%%%%%%%%%%%%%
             
             margin_x = 0.025;
             margin_y = 0.1;
             ax_lc = axes('Parent', input.parent, 'Position', [P(1)+P(3)+margin_x P(2)+P(4)+margin_y P(3)-margin_x P(4)-margin_y]); 
             obj.gen.reset;
-            obj.gen.lc.pars.copy_from([obj.best_point, obj.true_point]); 
+            obj.gen.lc.pars.copy_from([obj.posterior_point, obj.true_point]); 
             obj.gen.getLightCurves; 
             t = obj.gen.lc.time;
             f = obj.gen.lc.flux; 
                         
             h = plot(ax_lc, t, util.img.pad2size(obj.input_flux, size(t), 1), 'kd', 'MarkerSize', 8, 'LineWidth', 2); 
             h.DisplayName = 'input flux';
+            h.HandleVisibility = 'off'; 
             
             hold(ax_lc, 'on'); 
             
             if size(f,2)>1
                 h_true = plot(ax_lc, t, f(:,2), '-g', 'LineWidth', 2); 
-                h_true.DisplayName = sprintf('r=%4.1f | v=%4.1f', obj.true_point.r, obj.true_point.v); 
+                h_true.DisplayName = sprintf('r=%4.1f, b=%4.1f, v=%4.1f', ...
+                    obj.true_point.r, obj.true_point.b, obj.true_point.v); 
+                
             end
             
-            if input.best
-                h_best = plot(ax_lc, t, f(:,1), '--r', 'LineWidth', 2); 
-                h_best.DisplayName = sprintf('r=%4.1f | v=%4.1f', obj.best_point.r, obj.best_point.v); 
-            end
+            h_posterior = plot(ax_lc, t, f(:,1), '--m', 'LineWidth', 2); 
+            h_posterior.DisplayName = sprintf('r=%4.1f, b=%4.1f, v=%4.1f', ...
+                obj.posterior_point.r, obj.posterior_point.b, obj.posterior_point.v); 
+            
+            
+%             if input.best
+%                 h_best = plot(ax_lc, t, f(:,1), '--r', 'LineWidth', 2); 
+%                 h_best.DisplayName = sprintf('r=%4.1f | v=%4.1f', obj.best_point.r, obj.best_point.v); 
+%             end
             
             hold(ax_lc, 'off'); 
             
             ax_lc.FontSize = input.font_size;
             
-            legend(ax_lc, 'Location', 'SouthEast'); 
+            hl = legend(ax_lc, 'Location', 'SouthEast'); 
+            hl.FontSize = input.font_size - 4; 
             
             ax_lc.YAxisLocation='Right';
             ax_lc.XAxisLocation='Bottom';
