@@ -508,8 +508,15 @@ classdef MCMC < handle
                 end
             end
             
+            compressed = '';
             if compress_to_table
                 obj.pointsToTable;
+                compressed = 'Results compressed to table.'; 
+            end
+            
+            if obj.debug_bit
+                util.text.date_printf('Completed MCMC run with %d chains of %d points (%d burn). %s', ...
+                    obj.num_chains, obj.num_steps, obj.num_burned, compressed); 
             end
             
         end
