@@ -94,6 +94,7 @@ classdef Overview < handle
         flux_edges; % bin edges of the above histograms
         flux_edges_log; % bin edges for logarithmic histograms
         flux_binning_factors; % use a box filter with these widths before histogramming (empty means no filtering)
+        airmass_edges; % airmass histogram bin edges for summing flux values
         
         sim_events; % struct describing simulated events that passed/failed the threshold
 
@@ -389,7 +390,7 @@ classdef Overview < handle
             end
             
             for mm = 1:length(vel)-1
-                idx4(mm) = find(obj.vel_edges<=vel(kk),1,'last'); 
+                idx4(mm) = find(obj.vel_edges<=vel(mm),1,'last'); 
             end
             
             % now do the mega-loop binning
@@ -420,46 +421,64 @@ classdef Overview < handle
             end % for ii (snr)
             
             % if there are flux histograms, add them also
-            if ~isempty(summary.flux_histograms) % assume the edges and log hist are also filled! 
+            if ~isempty(summary.flux_histograms) && ... % assume the edges and log hist are also filled! 
+                ~isempty(summary.head) && ~isempty(summary.head.AIRMASS) % cannot add histograms without knowing the airmass
+            
+                if isempty(obj.airmass_edges)
+                    obj.airmass_edges = 1:0.1:4; % default edges
+                end
                 
                 if isempty(obj.flux_binning_factors)
                     obj.flux_binning_factors = summary.flux_binning_factors;
                 end
                 
-                if isequal(obj.flux_binning_factors, summary.flux_binning_factors)
-                    
-                    if isempty(obj.flux_edges)
-                        obj.flux_edges = summary.flux_edges;
-                    end
-                    
-                    if isequal(obj.flux_edges, summary.flux_edges)
-                        if isempty(obj.flux_histograms)
-                            obj.flux_histograms = summary.flux_histograms;
-                        else
-                            obj.flux_histograms = obj.flux_histograms + summary.flux_histograms;
+                a = summary.head.AIRMASS;
+                idx = find(a > obj.airmass_edges, 1, 'last'); 
+                
+                if ~isempty(idx) && a < obj.airmass_edges(end) % airmass must be inside histogram limits 
+                
+                    if isequal(obj.flux_binning_factors, summary.flux_binning_factors)
+
+                        if isempty(obj.flux_edges)
+                            obj.flux_edges = summary.flux_edges;
                         end
-                    else
-                        warning('Mismatch of flux_edges!'); 
-                    end
-                    
-                    if isempty(obj.flux_edges_log)
-                        obj.flux_edges_log = summary.flux_edges_log;
-                    end
-                    
-                    if isequal(obj.flux_edges_log, summary.flux_edges_log)
-                        if isempty(obj.flux_histograms_log)
-                            obj.flux_histograms_log = summary.flux_histograms_log;
+
+                        if isequal(obj.flux_edges, summary.flux_edges)
+
+                            if isempty(obj.flux_histograms)
+                                obj.flux_histograms = zeros([size(summary.flux_histograms), length(obj.airmass_edges)-1], ...
+                                    'like', summary.flux_histograms); 
+                            end
+
+                            obj.flux_histograms(:,:,idx) = obj.flux_histograms(:,:,idx) + summary.flux_histograms;
+
                         else
-                            obj.flux_histograms_log = obj.flux_histograms_log + summary.flux_histograms_log;
+                            warning('Mismatch of flux_edges!'); 
                         end
+
+                        if isempty(obj.flux_edges_log)
+                            obj.flux_edges_log = summary.flux_edges_log;
+                        end
+
+                        if isequal(obj.flux_edges_log, summary.flux_edges_log)
+
+                            if isempty(obj.flux_histogram_logs)
+                                obj.flux_histograms_log = zeros([size(summary.flux_histograms_log), length(obj.airmass_edges)-1], ...
+                                    'like', summary.flux_histograms_log); 
+                            end
+
+                            obj.flux_histograms_log(:,:,idx) = obj.flux_histograms_log(:,:,idx) + summary.flux_histograms_log;
+                            
+                        else
+                            warning('Mismatch of flux_edges_log!'); 
+                        end
+
                     else
-                        warning('Mismatch of flux_edges!'); 
+                        warning('Mismatch of flux binning factors! (%s vs. %s)', ...
+                            util.text.print_vec(obj.flux_binning_factors, ', '), ...
+                            util.text.print_vec(summary.flux_binning_factors, ', '))
                     end
-                    
-                else
-                    warning('Mismatch of flux binning factors! (%s vs. %s)', ...
-                        util.text.print_vec(obj.flux_binning_factors, ', '), ...
-                        util.text.print_vec(summary.flux_binning_factors, ', '))
+                
                 end
                 
             end
