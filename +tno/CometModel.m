@@ -226,7 +226,8 @@ classdef CometModel < handle
             r = util.vec.tocolumn(input.r_edges);
             r = r(1:end-1) + diff(r)/2; 
             
-            [N, N_l, N_u] = obj.numDensityCumulative(input.r_edges, input.power_law_range); 
+%             [N, N_l, N_u] = obj.numDensityCumulative(input.r_edges, input.power_law_range); 
+            [N, N_l, N_u] = obj.numDensityIntervals(input.r_edges, input.power_law_range); 
             
             [h_line, h_shade] = util.plot.shaded(r, N, [N-N_l, N_u-N], 'axes', input.axes); 
             

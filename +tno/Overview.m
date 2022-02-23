@@ -592,7 +592,7 @@ classdef Overview < handle
             
         end
         
-        function [coverage, cov_lower, cov_upper, E, E_l, E_u, N_total, N_passed, v_weights] = calcCoverage(obj, r_edges, distance_au)
+        function [coverage, cov_lower, cov_upper, E, E_l, E_u, N_total, N_passed, v_weights] = calcCoverage(obj, varargin)
         % Get the coverage: the number of square degrees scanned out of the 
         % entire sky, for a given occulter radius and ecliptic latitude. 
         % 
@@ -615,76 +615,87 @@ classdef Overview < handle
         %       dim2 is ecliptic latitude. 
         
         
+            input = util.text.InputVars;
+            input.use_ordered_numeric = 1;
+            input.input_var('r_edges', []); 
+            input.input_var('distance_au', 40); 
+            input.input_var('efficiency', []); % override the calcEfficiency with a scalar or matrix of new values
+            input.scan_vars(varargin{:}); 
+        
             if isempty(obj.star_seconds)
                 disp('No star seconds have been accumulated yet!'); 
                 coverage = []; 
                 return;
             end
             
-            if nargin<3 || isempty(distance_au)
-                distance_au = 40; 
-            end
-            
-            if ischar(distance_au)
+            if ischar(input.distance_au)
                 
-                if cs(distance_au, 'kbos', 'kuiper belt objects')
-                    distance_au = 40; 
-                elseif cs(distance_au, 'hills cloud', 'inner oort')
-                    distance_au = 3000; 
-                elseif cs(distance_au, 'oort cloud')
-                    distance_au = 10000; 
+                if cs(input.distance_au, 'kbos', 'kuiper belt objects')
+                    input.distance_au = 40; 
+                elseif cs(input.distance_au, 'hills cloud', 'inner oort')
+                    input.distance_au = 3000; 
+                elseif cs(input.distance_au, 'oort cloud')
+                    input.distance_au = 10000; 
                 else
-                    error('Unknown "distance" option "%s". Use a numeric value in AU, or "KBOs", "Hills" or "Oort"', distance_au); 
+                    error('Unknown "distance" option "%s". Use a numeric value in AU, or "KBOs", "Hills" or "Oort"', input.distance_au); 
                 end
                 
             end
             
-            if nargin<2 || isempty(r_edges)                
-                r_edges = obj.default_r_edges_fsu./obj.km2fsu(distance_au); 
+            if isempty(input.r_edges)                
+                input.r_edges = obj.default_r_edges_fsu./obj.km2fsu(input.distance_au); 
             end
             
             % the result should have 2D (dim1 velocity and dim2 occulter radius)
-            [N_total, N_passed] = obj.calcEfficiency(r_edges, distance_au);
-            
-            E = N_passed./N_total; 
-            E(N_total==0) = NaN; % where there are no events at all, efficiency is NaN
-%             E = fillmissing(E, 'next'); 
-            
-            
-            [N_passed_lower, N_passed_upper] = util.stat.poisson_errors(N_passed, .32); 
-            
-            E_l = N_passed_lower./N_total; 
-            E_l(N_total==0) = NaN; % where there are no events at all, efficiency is NaN
-%             E_l = fillmissing(E_l, 'next'); 
-            
-            
-            E_u = N_passed_upper./N_total; 
-            E_u(N_total==0) = NaN; % where there are no events at all, efficiency is NaN
-%             E_u = fillmissing(E_u, 'next'); 
-            
-            
-%             E = ones(size(E)); % debugging only
+            if ~isempty(input.efficiency)
+                E = input.efficiency;
+                if isscalar(E)
+                    E = ones(1, length(input.r_edges)-1)*E;
+                end
+                E_u = E;
+                E_l = E; % TODO: allow user to input efficiency uncertainties.
+            else
+                [N_total, N_passed] = obj.calcEfficiency(input.r_edges, input.distance_au);
 
+                E = N_passed./N_total; 
+                E(N_total==0) = NaN; % where there are no events at all, efficiency is NaN
+    %             E = fillmissing(E, 'next'); 
+
+
+                [N_passed_lower, N_passed_upper] = util.stat.poisson_errors(N_passed, .32); 
+
+                E_l = N_passed_lower./N_total; 
+                E_l(N_total==0) = NaN; % where there are no events at all, efficiency is NaN
+    %             E_l = fillmissing(E_l, 'next'); 
+
+
+                E_u = N_passed_upper./N_total; 
+                E_u(N_total==0) = NaN; % where there are no events at all, efficiency is NaN
+    %             E_u = fillmissing(E_u, 'next'); 
+
+    %             E = ones(size(E)); % debugging only
+            end
+            
             T = nansum(nansum(obj.star_seconds,1),2); % star-seconds integrated over all S/N and stellar sizes
             T = permute(T, [4,1,3,2]); % arrange velocity into the 1st dim, leave dim 2 as scalar (for r) and dim 3 for ecl 
             
             v_shift = 0; % add a shift for e.g., KBO intrinsic orbital velocity (in km/s)
-            v = obj.km2fsu(distance_au).*(obj.vel_edges(1:end-1)+obj.vel_bin_width/2 - v_shift); % velocity bin centers, translated from km/s to FSU/s
+            v = obj.km2fsu(input.distance_au).*(obj.vel_edges(1:end-1)+obj.vel_bin_width/2 - v_shift); % velocity bin centers, translated from km/s to FSU/s
             v = abs(util.vec.tocolumn(v)); % put it on the same dimension as the matrices and take the abs() in case we got negative velocities
             
             b = 2.*obj.b_max; % the range of impact parameters, integrated from -b_max to +b_max
             
             coverage = nansum(fillmissing(E, 'next').*T.*b.*v, 1); % integral of efficiency and time and impact parameter, for each velocity
             coverage = permute(coverage, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
-            coverage = coverage.*obj.fsu2deg2(distance_au); 
+            coverage = coverage.*obj.fsu2deg2(input.distance_au); 
             
             cov_lower = nansum(fillmissing(E_l, 'next').*T.*b.*v, 1); % integral of efficiency and time and impact parameter, for each velocity
             cov_lower = permute(cov_lower, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
-            cov_lower = cov_lower.*obj.fsu2deg2(distance_au); 
+            cov_lower = cov_lower.*obj.fsu2deg2(input.distance_au); 
             
             cov_upper = nansum(fillmissing(E_u, 'next').*T.*b.*v, 1); % integral of efficiency and time and impact parameter, for each velocity
             cov_upper = permute(cov_upper, [2,3,1]); % remove the velocity dimension we've integrated on, and leave radius and ecliptic latitute
-            cov_upper = cov_upper.*obj.fsu2deg2(distance_au); 
+            cov_upper = cov_upper.*obj.fsu2deg2(input.distance_au); 
             
             v_weights = permute(T, [1,3,2]); % dim 1 is velocity, dim 2 is ecliptic latitude
             
@@ -1317,6 +1328,8 @@ classdef Overview < handle
             input.input_var('ecl', [-5,5], 'ecliptic latitude', 'ecliptic limits'); 
             input.input_var('r_edges', []);
             input.input_var('distance', 40, 'distance_au', 'dist_au'); 
+            input.input_var('efficiency', []); 
+            input.input_var('print_numbers', false);
             input.input_var('log', true, 'logarithm'); 
             input.input_var('axes', [], 'axis'); 
             input.input_var('font_size', 18); 
@@ -1359,10 +1372,10 @@ classdef Overview < handle
                 input.r_edges = obj.default_r_edges_fsu./obj.km2fsu(input.distance); 
             end
             
-            r = util.vec.tocolumn(input.r_edges);
-            r = r(1:end-1) + diff(r)/2; 
+            re = util.vec.tocolumn(input.r_edges);
+            r = re(1:end-1) + diff(re)/2; 
             
-            [coverage, cov_lower, cov_upper] = obj.calcCoverage(input.r_edges, input.distance);
+            [coverage, cov_lower, cov_upper] = obj.calcCoverage(input.r_edges, input.distance, input.efficiency);
             
             star_hours = obj.star_seconds(:,:,ecl_idx1:ecl_idx2,:); 
             star_hours = nansum(star_hours(:))./3600; 
@@ -1371,26 +1384,57 @@ classdef Overview < handle
             C_l = nansum(cov_lower(:,ecl_idx1:ecl_idx2),2); 
             C_u = nansum(cov_upper(:,ecl_idx1:ecl_idx2),2); 
             
+            dC_l = C - C_l;
+            dC_u = C_u - C;
+            dr_l = r - re(1:end-1);
+            dr_u = re(2:end) - r; 
+            
             if isempty(input.axes)
                 input.axes = gca;
             end
             
-%             errorbar(input.axes, r, 1./C, 1./C-1./C_l, 1./C_u-1./C); 
-            
             hold_state = input.axes.NextPlot;
 
-            h_cov = plot(input.axes, r, 1./C, '-', 'LineWidth', 3); 
+            h_cov = errorbar(input.axes, r, 1./C, dC_l./C.^2, dC_u./C.^2, dr_l, dr_u, ...
+                'LineWidth', 2); 
+            
             h_cov.DisplayName = sprintf('Inverse coverage (%d star hours)', round(star_hours));
             
             input.axes.NextPlot = 'add';
-            
-            h_c_u = plot(input.axes, r, 1./C_u, '--', 'LineWidth', 1.5); 
-            h_c_u.DisplayName = '1\sigma confidence interval'; 
-            
-            h_c_l = plot(input.axes, r, 1./C_l, '--', 'LineWidth', 1.5, 'Color', h_c_u.Color); 
-            h_c_l.HandleVisibility = 'off'; 
+
+%             h_cov = plot(input.axes, r, 1./C, '-', 'LineWidth', 3); 
+%             h_cov.DisplayName = sprintf('Inverse coverage (%d star hours)', round(star_hours));
+%             
+%             input.axes.NextPlot = 'add';
+%             
+%             h_c_u = plot(input.axes, r, 1./C_u, '--', 'LineWidth', 1.5); 
+%             h_c_u.DisplayName = '1\sigma confidence interval'; 
+%             
+%             h_c_l = plot(input.axes, r, 1./C_l, '--', 'LineWidth', 1.5, 'Color', h_c_u.Color); 
+%             h_c_l.HandleVisibility = 'off'; 
             
             comets.show('r_edges', input.r_edges); 
+            
+            if input.print_numbers
+                
+                [n, n_l, n_u] = comets.numDensityIntervals(input.r_edges);
+                dn_l = n - n_l;
+                dn_u = n_u - n;
+                
+                N = n .* C; 
+                dN_l = sqrt((C.*dn_l).^2 + (n.*dC_l).^2); 
+                dN_u = sqrt((C.*dn_u).^2 + (n.*dC_u).^2); 
+                
+                for ii = 1:length(r)
+                    
+                    text(input.axes, double(r(ii)), double(1./C(ii)), ...
+                        sprintf(' N= %.2f^{+%.3f}_{-%.3f}', N(ii), dN_u(ii), dN_l(ii)), ...
+                        'FontSize', 14, 'Rotation', 90, 'VerticalAlignment', 'Bottom'); 
+                    
+                end
+                
+                
+            end
             
             input.axes.NextPlot = hold_state;
             

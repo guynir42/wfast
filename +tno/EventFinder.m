@@ -675,6 +675,7 @@ classdef EventFinder < handle
             s.background_log = util.series.binning(b, obj.store.pars.length_search); % should be the same size as the other logs, with some NaNs in the beginning for the burn in
             
             s.flux_histograms = obj.flux_histograms;
+            s.flux_edges = obj.flux_edges;
             s.flux_histograms_log = obj.flux_histograms_log;
             s.flux_edges_log = obj.flux_edges_log;
             s.flux_binning_factors = obj.pars.flux_binning_factors;
