@@ -88,6 +88,8 @@ classdef Analysis < file.AstroData
         
         finder@tno.EventFinder;
         
+        flux_hist@img.FluxHistogram; 
+        
         sky_pars;
         
         cutout_store@learn.CutoutStorage; 
@@ -158,6 +160,8 @@ classdef Analysis < file.AstroData
         use_psf_model = 1;
         
         use_event_finding = 1;
+        
+        use_flux_histograms = 0; 
         
         use_auto_load_cal = 1;
         
@@ -296,6 +300,8 @@ classdef Analysis < file.AstroData
 %                 obj.lightcurves.head = obj.head;
                 obj.lightcurves.cat = obj.cat;
                 obj.light_stack.cat = obj.cat;
+                
+                obj.flux_hist = img.FluxHistogram;
                 
                 util.oop.save_defaults(obj); % make sure each default_XXX property is updated with the current XXX property value. 
                 
@@ -906,6 +912,10 @@ classdef Analysis < file.AstroData
             
             obj.brake_bit = 0;
             
+            if obj.use_flux_histograms
+                obj.flux_hist.startup(obj.num_batches);
+            end  
+            
             if obj.use_audio
                 try obj.audio.playTakeForever; catch ME, warning(ME.getReport); end
             end
@@ -922,7 +932,13 @@ classdef Analysis < file.AstroData
             
             obj.prog.finish;
             
-            obj.finder.finishup;
+            if obj.use_event_finding
+                obj.finder.finishup;
+            end
+            
+            if obj.use_flux_histograms
+                obj.flux_hist.finishup;
+            end
             
             obj.brake_bit = 1;
             
@@ -1305,6 +1321,12 @@ classdef Analysis < file.AstroData
 %                             warning(ME.getReport); 
                             rethrow(ME); 
                         end
+                    end
+                    
+                    if obj.use_flux_histograms
+                        
+                        obj.analysisFluxHistogram; 
+                        
                     end
                     
                     if obj.use_cutouts_store
@@ -1929,6 +1951,27 @@ classdef Analysis < file.AstroData
             if ~isempty(obj.finder.gui) && obj.finder.gui.check
                 obj.finder.gui.update;
             end
+            
+        end
+        
+        function analysisFluxHistogram(obj)
+            
+            %%%%%%%%%%%%%%%%%%%%% Flux histograms %%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            t = tic;
+            
+            airmass = obj.head.AIRMASS;
+            
+            flux = obj.phot.fluxes(:,:,end); % is there a smarter way to choose the 3rd index? 
+            a = obj.phot.areas(:,:,end); 
+            b = obj.phot.backgrounds(:,:,end); 
+            B = nanmean(a.*b, 2); % global average background (can we do better using a spatial model?)
+            flux = flux - B;
+            
+            obj.flux_hist.input(flux, obj.juldates, airmass);
+            
+            if obj.debug_bit>1, fprintf('Time to stack flux histograms: %f seconds\n', toc(t)); end
+
             
         end
         

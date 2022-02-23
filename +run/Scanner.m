@@ -389,12 +389,12 @@ classdef Scanner < handle
         %           *sim: get only simulated events. 
         %           *real: get onlt real events (this is default). 
         %          If numeric, true means "real" and false means "all"
-        %          (note false does NOT mean "sim"). 
+        %          (note false does NOT mean "sim"). Default is "real". 
         %   -class: which type of events should be loaded. This matches the
         %           candidate classification with the following rules:
         %           case is ignored, underscores and spaces are the same,
         %           and partial matches (using contains()) are accepted. 
-        %           If you want all candidates, use an empty class. 
+        %           If you want all candidates, use an empty string. 
         %           The default is "occultation" which matches both the
         %           certain and the possible occultation classes. 
             
