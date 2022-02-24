@@ -151,6 +151,7 @@ classdef Analysis < file.AstroData
         
         use_analysis_dir_save = 0; % do we want to save analysis results
         use_analysis_dir_log = 0; % do we want analysis log file
+        use_hist_flux_save = 0; % do we want to save the flux histogram object
         
         use_full_lightcurves = 0; % use the Lightcurves object to hold all the fluxes and other measurements for the entire run
         use_save_full_lightcurves = 1; % save these full lightcurves for the entire run as a single MAT file (ONLY when use_full_lightcurves=1 and use_analysis_dir_save=1)
@@ -234,12 +235,13 @@ classdef Analysis < file.AstroData
         log_dir; % where to save the analysis results and log file
         log_name; % name of log file
         log_obj; % name of object text dump
+        flux_hist_dir; % name of folder for saving flux histogram
         
         prev_average_width;
         
         num_batches_limit;
         
-        version = 1.06;
+        version = 1.07;
         
     end
     
@@ -335,6 +337,7 @@ classdef Analysis < file.AstroData
             
             obj.use_analysis_dir_save = 0;
             obj.use_analysis_dir_log = 0;
+            obj.use_hist_flux_save = 0; 
             
             obj.failed_batch_counter = 0;
             
@@ -713,6 +716,14 @@ classdef Analysis < file.AstroData
             
         end
         
+        function saveFluxHistograms(obj)
+            
+            fullname = fullfile(obj.flux_hist_dir, 'FluxHist.mat'); 
+            flux_hist = obj.flux_hist;
+            save(fullname, 'flux_hist'); 
+            
+        end
+        
         function print_futures(obj)
             
             for ii = 1:length(obj.futures)
@@ -1083,7 +1094,8 @@ classdef Analysis < file.AstroData
                 input = util.text.InputVars;
                 input.input_var('reset', false); % reset the object before running (i.e., start a new run)
                 input.input_var('logging', []); % create log files in the analysis folder
-                input.input_var('save', []); % save the events and lightcurves from this run
+                input.input_var('save', []); % save the events and lightcurves or flux histograms from this run
+                input.input_var('flux_save', []); % save flux histograms
                 input.input_var('overwrite', false); % if true, will quietly delete previous analysis folder from current date (otherwise, throws an error)
 %                 input.input_var('diary', false); % save standard output to file
                 input.scan_vars(varargin{:});
@@ -1156,7 +1168,7 @@ classdef Analysis < file.AstroData
                 obj.log_dir = fullfile(obj.reader.dir.pwd, ['analysis_' char(log_time, 'yyyy-MM-dd')]);
                 obj.log_name = fullfile(obj.log_dir, 'analysis_log.txt');
                 obj.log_obj = fullfile(obj.log_dir, 'analysis_parameters.txt');
-
+                
                 if obj.use_analysis_dir_log || obj.use_analysis_dir_save
                     
                     % must check pre existing analysis folder for the same
@@ -1174,6 +1186,24 @@ classdef Analysis < file.AstroData
 
                 end
 
+                if ~isempty(input.flux_save) && obj.use_flux_histograms
+                    obj.use_hist_flux_save = 1;
+                end
+                
+                if obj.use_hist_flux_save
+                    obj.flux_hist_dir = fullfile(obj.reader.dir.pwd, ['flux_hist_' char(log_time, 'yyyy-MM-dd')]);
+                    if obj.batch_counter==0
+                        if exist(obj.flux_hist_dir, 'dir') && input.overwrite==0
+                            error('Folder %s already exists! Is this run already being processed?', obj.flux_hist_dir);
+                        elseif exist(obj.flux_hist_dir, 'dir') && input.overwrite
+                            rmdir(obj.flux_hist_dir, 's'); 
+                            mkdir(obj.flux_hist_dir);
+                        else
+                            mkdir(obj.flux_hist_dir);
+                        end
+                    end
+                end
+                
 %                 if obj.use_analysis_dir_log && input.diary
 %                     diary(fullfile(obj.log_dir, 'diary.txt')); 
 %                 end
@@ -1223,6 +1253,10 @@ classdef Analysis < file.AstroData
                         obj.saveSummary;
                     end
 
+                    if obj.use_hist_flux_save
+                        obj.saveFluxHistograms;
+                    end
+                    
                 end
 
             catch ME
@@ -1239,6 +1273,10 @@ classdef Analysis < file.AstroData
 
                     if obj.use_analysis_dir_log
                         obj.saveSummary;
+                    end
+                   
+                    if obj.use_hist_flux_save
+                        obj.saveFluxHistograms;
                     end
                     
                 end

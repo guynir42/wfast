@@ -5,7 +5,7 @@ classdef FluxHistogram < handle
         batch_number = 1; % index of current batch
         juldates; % julian date of each batch
         airmass; % airmass of each batch
-        flux_frac; % 2D matrix, dim 1 is batch/juldate/airmass, dim2 is number of epochs in each fractional-flux deviation interval
+        flux_linear; % 2D matrix, dim 1 is batch/juldate/airmass, dim2 is number of epochs in each fractional-flux deviation interval
         edges_linear; % edges of the flux histogram
         flux_log; % 2D matrix, dim 1 is batch/juldate/airmass, dim2 is number of epochs in each log-flux deviation interval
         edges_log; % edges of the log-flux histogram
@@ -58,7 +58,7 @@ classdef FluxHistogram < handle
             obj.batch_number = 1;
             obj.juldates = [];
             obj.airmass = [];
-            obj.flux_frac = [];
+            obj.flux_linear = [];
             obj.edges_linear = [];
             obj.flux_log = [];
             obj.edges_log = [];
@@ -71,13 +71,13 @@ classdef FluxHistogram < handle
         
         function val = getLinearEdges(obj)
             
-            val = -1:0.01:1;
+            val = -2:0.01:2;
             
         end
         
         function val = getLogEdges(obj)
             
-            val = -0.1:0.001:0.1;
+            val = -0.5:0.001:0.5;
             
         end
         
@@ -109,7 +109,7 @@ classdef FluxHistogram < handle
                     obj.edges_linear = obj.getLinearEdges;
                 end
 
-                obj.flux_frac = NaN(num_batches, length(obj.edges_linear) - 1, length(obj.binning_factors));
+                obj.flux_linear = NaN(num_batches, length(obj.edges_linear) - 1, length(obj.binning_factors));
 
                 if isempty(obj.edges_log)
                     obj.edges_log = obj.getLogEdges;
@@ -123,7 +123,7 @@ classdef FluxHistogram < handle
         
         function finishup(obj)
             
-            obj.flux_frac = obj.flux_frac(1:obj.batch_number - 1,:,:); 
+            obj.flux_linear = obj.flux_linear(1:obj.batch_number - 1,:,:); 
             obj.flux_log = obj.flux_log(1:obj.batch_number - 1,:,:); 
             
         end
@@ -161,9 +161,9 @@ classdef FluxHistogram < handle
                 
                 N = histcounts(flux_dev(:), obj.edges_linear);
 
-                obj.flux_frac(obj.batch_number, :, ii) = N; 
+                obj.flux_linear(obj.batch_number, :, ii) = N; 
 
-                flux_log = log10(FF./mean_F);
+                flux_log = log10(abs((FF+0.001)./mean_F));
                 N = histcounts(flux_log(:), obj.edges_log);
 
                 obj.flux_log(obj.batch_number, :, ii) = N; 

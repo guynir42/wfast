@@ -140,6 +140,11 @@ classdef Folder < dynamicprops
         has_lightcurves_mat = 0; % has a single, giant lightcurves MAT file (old method)
         has_lightcurves_hdf5 = 0; % has individual batches in lightcurve HDF5 files (new method)
         has_microflares = 0; % have there been any flare detections saved in this folder
+        
+        flux_hist_folder = ''; % name of folder with flux histograms
+        flux_hist_date = ''; % date when this folder was generated
+        has_flux_hist = 0; % has a flux_hist folder with a FluxHist.mat file
+        has_flux_hist_folder = 0; % has a flux_hist folder (empty or not)
     end
     
     properties % switches/controls
@@ -765,7 +770,6 @@ classdef Folder < dynamicprops
                         
                         %%%%%%% load the header if it wasn't loaded already
                         
-                        
                         if input.header
                             if isempty(new_obj.head)
                                 new_obj.head = new_obj.getHeader(files); % try to find the header from the README or HDF5 file
@@ -838,7 +842,39 @@ classdef Folder < dynamicprops
                             end % processing time
                             
                         end % has analysis folders
+                        
+                        %%%%%%%% go into the flux hist folders %%%%%%%%%
+                        
+                        d.cd(root); % go back to root, then move down
+                        d.cd(list{ii}); % move into the date folder
+                        d.cd(run_folders{jj});
+                        flux_hist_folders = sort(d.match_folders('flux_hist_*')); % get the folders in ascending time order
+                        
+                        % no flux hist has been found for this folder yet
+                        new_obj.flux_hist_folder = ''; 
+                        new_obj.flux_hist_date = ''; 
+                        
+                        if ~isempty(flux_hist_folders)
+                            
+                            [~, new_obj.flux_hist_folder] = fileparts(flux_hist_folders{end});
+                            
+                            new_obj.flux_hist_date = datetime(new_obj.flux_hist_folder(11:end)); % chop off the word "flux_hist_" and turn it into a datetime
 
+                            new_obj.process_date = input.process_date; % remember the limiting date for considering analysis folders (not the actual date when it was analyized!)
+                            
+                            if new_obj.flux_hist_date>=input.process_date % there is a flux hist folder that is up-to-date enough to use it:
+                                
+                                new_obj.has_flux_hist_folder = true; 
+                                
+                                % what happens if the folder is there but there is no file...? 
+                                if exist(fullfile(flux_hist_folders{end}, 'FluxHist.mat'), 'file')
+                                    new_obj.has_flux_hist = true;
+                                end
+                                
+                            end % flux hist processing time
+                            
+                        end % has flux hist folders
+                        
                     end  % check if there are files and if the folder is for calibration
                     
                     if input.debug_bit, new_obj.printout; end
@@ -854,6 +890,11 @@ classdef Folder < dynamicprops
                         if new_obj.was_processed && new_obj.has_candidates && ~new_obj.has_classified
                             obj_vec = new_obj;
                             return; 
+                        end
+                    elseif cs(input.next, 'flux_hist') % only interested in the first instance that doesn't have a flux histogram
+                        if new_obj.has_flux_hist_folder==0
+                            obj_vec = new_obj;
+                            return;
                         end
                     end
 
