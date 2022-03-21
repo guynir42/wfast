@@ -316,9 +316,8 @@ classdef Scanner < handle
                 if obj.debug_bit, fprintf('ii= %d / %d. Loading summary from folder: %s\n', ii, length(all_runs), all_runs(ii).folder); end
                 
                 try
-%                     all_runs(ii).loadSummary;
-%                     obj.overview.input(all_runs(ii).summary); 
                     L = load(fullfile(all_runs(ii).folder, all_runs(ii).analysis_folder, 'summary.mat'));
+                    all_runs(ii).summary = L.summary;
                     obj.overview.input(L.summary); 
                 catch ME
                     warning(ME.getReport); 

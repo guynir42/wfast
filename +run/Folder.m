@@ -529,6 +529,12 @@ classdef Folder < dynamicprops
             
         end
         
+        function finder = loadFinder(obj)
+            
+            load(fullfile(obj.folder, obj.analysis_folder, 'finder.mat')); 
+            
+        end
+        
     end
     
     methods(Static=true) % scan method lives here!
