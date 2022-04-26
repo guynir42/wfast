@@ -537,6 +537,29 @@ classdef Candidate < handle
             
         end
         
+        function [depth, bg, number] = getOccultationDepth(obj)
+            
+            outside_values = obj.flux_raw;
+            outside_values(obj.time_range) = [];
+            
+            inside_values = obj.flux_raw(obj.time_range); 
+            
+            bg = nanmedian(outside_values); 
+            depth = bg - nanmin(inside_values); 
+            
+%             fprintf('bg= %4.2f | depth= %4.2f\n', bg, depth); 
+            
+            depth = depth / bg;
+            
+            if nargout >= 3
+                
+                sd = nanstd(outside_values);
+                number = sum(bg - inside_values > 3 * sd); 
+                
+            end
+            
+        end
+        
     end
     
     methods % setters

@@ -106,7 +106,7 @@ classdef EventFinder < handle
     properties % inputs/outputs
         
         snr_values; % best S/N of the filtered fluxes, saved for each batch (use this to determine the ideal threshold)
-        
+        kernel_scores; % table of batch number, star S/N and kernel best score for each batch for stars passing the prefilter. 
         var_values; % keep track of the variance of each star/kernel over the length of the run (only when use_keep_variances=1)
         
         corrected_fluxes; % extended flux after correction (by PSD or by removing linear fit)
@@ -505,7 +505,9 @@ classdef EventFinder < handle
 
                 %%%%%%%%%%% FILTER FOR KBOS %%%%%%%%%%%%%%
                 
-                [obj.latest_candidates, star_indices, best_snr] = obj.applyTemplateBank('kbos'); % by default use corrected_fluxes and correctd_stds given above
+                [obj.latest_candidates, star_indices, best_snr, new_scores] = obj.applyTemplateBank('kbos'); % by default use corrected_fluxes and correctd_stds given above
+                
+                obj.kernel_scores = vertcat(obj.kernel_scores, new_scores); 
                 
                 obj.cand = vertcat(obj.cand, obj.latest_candidates); % store all the candidates that were found in the last batch
                 
@@ -838,7 +840,7 @@ classdef EventFinder < handle
             
         end
         
-        function [candidates_all, star_indices_all, best_snr_all] = applyTemplateBank(obj, bank_name, fluxes_det, fluxes_corr, stds)
+        function [candidates_all, star_indices_all, best_snr_all, scores_all] = applyTemplateBank(obj, bank_name, fluxes_det, fluxes_corr, stds)
         % do a prefilter (optional) and then a filter and then find candidates. 
         % INPUTS: 
         %   -bank_name: a string: "kbos" or "oort". 
@@ -864,6 +866,7 @@ classdef EventFinder < handle
             candidates_all = tno.Candidate.empty;
             star_indices_all = [];
             best_snr_all = 0;
+            scores_all = []; 
             
             if nargin<2 || isempty(bank_name)
                 bank_name = 'kbos';
@@ -896,6 +899,7 @@ classdef EventFinder < handle
             for ii = 1:length(bank)
             
                 candidates = tno.Candidate.empty;
+                scores = [];
                 
                 if obj.pars.use_prefilter % use a small filter bank and only send the best stars to the big bank
 
@@ -929,13 +933,36 @@ classdef EventFinder < handle
                     if length(star_indices)==size(fluxes_corr,2) % if all stars passed prefilter (or when skipping pre-filter)
                         star_indices = [candidates.star_index]; % only keep stars that triggered
                     end
+                    
+                    if nargout >= 4
+                        % the kernel response
+                        time_indices = obj.store.search_start_idx:obj.store.search_end_idx;
+                        kernel_best = nanmax(filtered_fluxes(time_indices, :, :), [], 1);
+                        kernel_best = permute(kernel_best, [3,2,1]); % get rid of reduced first index
+                        
+                        % the star S/N
+                        A = obj.store.background_aux(:,star_indices, obj.store.aux_indices.areas); 
+                        B = obj.store.background_aux(:,star_indices, obj.store.aux_indices.backgrounds); 
+                        flux = obj.store.background_flux(:,star_indices)-A.*B; % background corrected flux
+                        flux_mean = nanmedian(flux, 1); 
+                        flux_std = mad(flux, 1)./0.6745; % match the MAD to STD using sqrt(2)*erfinv(0.5)
+                        star_snr = (flux_mean./flux_std)';
+                        
+                        % the batch number
+                        batch_number = ones(length(star_snr), 1) * obj.batch_counter; 
+                        
+                        scores = table(batch_number,star_snr,kernel_best, ...
+                            'VariableNames', {'batch_number', 'star_snr', 'kernel_scores'});
+                        
+                    end
 
                 end % if no stars passed the pre-filter, we will just skip to the next batch
             
                 candidates_all = vertcat(candidates_all, candidates); 
                 star_indices_all = unique([star_indices_all; star_indices]); 
                 best_snr_all = nanmax(best_snr_all, best_snr); 
-            
+                scores_all = vertcat(scores_all, scores);
+                
             end
             
         end
