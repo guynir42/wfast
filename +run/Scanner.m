@@ -414,7 +414,7 @@ classdef Scanner < handle
                 error('Input "real" was given as "%s". Try "all", "sim" or "real"', input.real);
             end
             
-            if isempty(obj.overview)
+            if isempty(obj.overview) || isempty(obj.overview.folders)
                 obj.calcOverview(varargin{:});
             end
             

@@ -34,9 +34,12 @@ classdef CorrectPSD < handle
     
     properties % switches/controls
 
-        window_size = 100;
+        window_size = 100; % should be a little shorter than the analysis window
         overlap = []; % take the default value
-        num_points = 200; 
+        num_points = 200; % could be modified by finder to size of background buffer
+        use_median_welch = 0; % use median adding of different welch windows
+        use_buffer_outlier_removal = 1; % remove outliers from the flux buffer, not just from each incoming batch
+        use_low_freq_reduction = 0; % set all low frequencies to the PSD maximum (out of all low frequencies)
         
         debug_bit = 1;
         
@@ -137,26 +140,50 @@ classdef CorrectPSD < handle
         % oldest data (FIFO). 
         % Any NaN values in the fluxes are removed at this stage. 
         
-            M = nanmedian(flux); 
-            S = mad(flux); 
+            obj.flux_buffer = vertcat(obj.flux_buffer, flux); % add the new fluxes
+
+            if size(obj.flux_buffer,1)>buffer_size
+                obj.flux_buffer = obj.flux_buffer(end-buffer_size+1:end,:); % remove old fluxes from start of buffer
+            end
             
-            outlier_idx = abs(flux-M)./S > 5;
-            flux(outlier_idx) = NaN; % remove outliers
+            if obj.use_buffer_outlier_removal
+                obj.flux_buffer = obj.removeOutliers(obj.flux_buffer); 
+            end
             
-            flux = flux - nanmean(flux); % remove the mean value after removing outliers
+            obj.calcPSD;
             
+        end
+        
+        function flux = removeOutliers(obj, flux, varargin)
+        % remove 3.5 sigma outliers and replace them with the 
+        % inpainted random values from the existing PSD.
+        
+            input = util.text.InputVars;
+            input.use_ordered_numeric = 1;
+            input.input_var('sigma', 3.5); 
+            input.input_var('iterations', 2); 
+            input.scan_vars(varargin{:}); 
+        
+            for ii = 1:input.iterations
+                
+                M = nanmedian(flux); 
+                S = mad(flux); 
+            
+                outlier_idx = abs(flux-M)./S > input.sigma;
+                flux(outlier_idx) = NaN; % remove outliers
+            
+                flux = flux - nanmean(flux); % remove the mean value after removing outliers
+            
+            end
+                
             if isempty(obj.power_spectrum)
                 flux(isnan(flux)) = 0; 
             else
-                nan_indices = find(sum(isnan(obj.flux_buffer),1));
-                flux = obj.inpaintNaNs(flux, nan_indices);
-                flux(isnan(flux)) = 0; % just to verify all NaNs were eliminated
-            end
-            
-            obj.flux_buffer = vertcat(obj.flux_buffer, flux); % add the new fluxes
-            
-            if size(obj.flux_buffer,1)>buffer_size
-                obj.flux_buffer = obj.flux_buffer(end-buffer_size+1:end,:); % remove old fluxes from start of buffer
+                bad_star_indices = find(sum(isnan(flux),1)); % only inpaint stars with any NaNs
+                if ~isempty(bad_star_indices)
+                    flux = obj.inpaintNaNs(flux, bad_star_indices);
+                    flux(isnan(flux)) = 0; % just to verify all NaNs were eliminated
+                end
             end
             
         end
@@ -174,8 +201,15 @@ classdef CorrectPSD < handle
             s_real = nanstd(obj.flux_buffer(:,star_indices),[],1); % the RMS of the real fluxes 
             
             P = obj.power_spectrum(:,star_indices); 
-            f_sim = real(fft(sqrt(P).*exp(1i*2*pi*rand(size(P))))); % draw random phases from the power spectrum to make simulated flux
-            s_sim = nanstd(f_sim,[],1); 
+            f_sim = [];
+            for ii = 1:10  % ten should be enough? 
+                f_sim = [f_sim; real(fft(sqrt(P).*exp(1i*2*pi*rand(size(P)))))]; % draw random phases from the power spectrum to make simulated flux
+                if size(f_sim, 1) >= size(f_real)
+                    break
+                end
+            end
+            
+            s_sim = nanstd(f_sim,[],1);
             
             f_sim = f_sim.*s_real./s_sim; % normalize by the overall noise level
             
@@ -193,11 +227,38 @@ classdef CorrectPSD < handle
         
         function calcPSD(obj)
             
-            if size(obj.flux_buffer,1)<obj.window_size
-                obj.power_spectrum = abs(fft(obj.flux_buffer).^2); 
+%             if obj.use_buffer_outlier_removal
+%                 flux = obj.removeOutliers(obj.flux_buffer); 
+%             end
+            
+            flux = obj.flux_buffer; 
+
+            if size(obj.flux_buffer,1) < obj.window_size
+                obj.power_spectrum = abs(fft(flux).^2); 
             else
-                [obj.power_spectrum, obj.freq] = pwelch(obj.flux_buffer, obj.window_size, obj.overlap, obj.num_points, obj.frame_rate, 'twosided');
+%                 [obj.power_spectrum, obj.freq] = pwelch(flux, obj.window_size, obj.overlap, obj.num_points, obj.frame_rate, 'twosided');
+                obj.power_spectrum = util.series.welch_ps(flux, 'window', obj.window_size,...
+                    'shape', 'welch', 'overlap', obj.overlap, 'median', obj.use_median_welch, ...
+                    'num_point', obj.num_points); 
+                obj.freq = linspace(0, obj.frame_rate, obj.num_points + 1)'; 
+                obj.freq = obj.freq(1:end-1);
+                
+                if obj.use_low_freq_reduction
+                
+                    ps_low = obj.power_spectrum(1:obj.window_size,:); % grab only the low end of the PSD
+                    [mx, idx] = max(ps_low); % low frequency's peak
+                    for ii = 1:length(idx)
+                        obj.power_spectrum(1:idx(ii),ii) = mx(ii); % all frequencies below this peak are set to equal the peak
+
+                        % do this for the low frequencies at the other end
+                        obj.power_spectrum(end-idx(ii)+1:end,ii) = mx(ii); % all frequencies above the peak are set to equal the peak
+
+                    end
+
+                end
+            
             end
+            
             
         end
         

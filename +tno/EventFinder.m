@@ -203,7 +203,7 @@ classdef EventFinder < handle
             obj.pars.use_prefilter = 1; % filter all stars on a smaller bank, using a lower threshold, and then only vet the survivors with the full filter bank
             obj.pars.pre_threshold = 5.0; % threshold for the pre-filter
             
-            obj.pars.use_oort = true; % use the Oort cloud template bank as well
+            obj.pars.use_oort = false; % use the Oort cloud template bank as well
             obj.pars.oort_distances = [3000]; % maybe add 1000 or 10,000 AU as well? 
             
             obj.pars.limit_events_per_batch = 5; % too many events in one batch will mark all events as black listed! 
@@ -261,7 +261,11 @@ classdef EventFinder < handle
             obj.flux_edges = [];
             obj.flux_edges_log = [];
             
+            obj.kernel_scores = []; 
+            
             obj.monitor.reset;
+            
+            obj.deleteBanks;
             
             obj.clear;
             
@@ -366,10 +370,10 @@ classdef EventFinder < handle
                 val = '';
             else
                 
-                val = sprintf('aperture: %s pix | annulus: %s pix | iterations: %d | var_buf: %d | PSD: %d ', ...
+                val = sprintf('aperture: %s pix | annulus: %s pix | iterations: %d | PSD: %d ', ...
                     util.text.print_vec(obj.head.PHOT_PARS.aperture_radius),...
                     util.text.print_vec(obj.head.PHOT_PARS.annulus_radii),...
-                    obj.head.PHOT_PARS.iterations, obj.pars.use_var_buf, obj.pars.use_psd_correction);
+                    obj.head.PHOT_PARS.iterations, obj.pars.use_psd_correction);
                 
             end
             
@@ -461,21 +465,36 @@ classdef EventFinder < handle
             
             if obj.pars.use_psd_correction
                     
-                flux = obj.store.extended_detrend; 
-
+                flux = obj.store.extended_detrend;
+                aperture_index = obj.store.aperture_index;
+                if isempty(aperture_index) || aperture_index > size(flux,3)
+                    % choose last flux aperture by default, 
+                    % or when flux is already only 2D, set aperture_index=1
+                    aperture_index = size(flux,3); 
+                end
+                
                 if size(flux,1)>=obj.store.pars.length_extended % only start adding data to the PSD after 2 batches are loaded
 
-                    flux = flux(1:obj.store.pars.length_search,:); % grab the first frames from the 2-batch extended region
+                    flux = flux(1:obj.store.pars.length_search,:,aperture_index); % grab the first frames from the 2-batch extended region
 
                     obj.psd.frame_rate = 1./nanmedian(diff(obj.store.extended_timestamps)); 
-                    obj.psd.window_size = obj.store.pars.length_extended; 
+%                     obj.psd.window_size = ceil(obj.store.pars.length_extended); 
                     obj.psd.num_points = obj.store.pars.length_background*2;
 
+                    % remove stars that didn't pass the threshold
                     if size(flux,2) < size(obj.psd.flux_buffer,2)
-                        obj.psd.flux_buffer = obj.psd.flux_buffer(:,obj.store.star_indices); 
+%                         obj.psd.flux_buffer = obj.psd.flux_buffer(:,obj.store.star_indices); 
+                        start_idx = size(obj.psd.flux_buffer,1) - obj.store.pars.length_psd;
+                        if start_idx < 1
+                            start_idx = 1;
+                        end
+                        obj.psd.flux_buffer = obj.store.flux_buffer(start_idx:end,:); 
+                        obj.psd.power_spectrum = obj.psd.power_spectrum(:,obj.store.star_indices); % only keep PSDs for current stars
+                        obj.psd.flux_buffer = obj.psd.removeOutliers(obj.psd.flux_buffer); % inpaint outliers with current PSD
+                        obj.psd.calcPSD; % update PSD using new flux aperture
+                    else
+                        obj.psd.addToBuffer(flux, obj.store.pars.length_psd); % also calculates the PSD
                     end
-
-                    obj.psd.addToBuffer(flux, obj.store.pars.length_psd); 
 
                 end
                 
@@ -485,21 +504,21 @@ classdef EventFinder < handle
                 
                 %%%%%%%%%%%%%% PSD CORRECTION %%%%%%%%%%%%%%%
                 
-                if obj.pars.use_psd_correction
-                    
-                    try
-                        obj.psd.calcPSD; % first off, make the PSD correction for the current batch
-                    catch ME
-                        if strcmp(ME.identifier, 'MATLAB:nomem')
-                            util.text.date_printf('Out of memory while caclulating PSD! Trying again...');
-                            pause(30);
-                            obj.psd.calcPSD; % try again to make the PSD correction for the current batch
-                        else
-                            rethrow(ME);
-                        end
-                    end
-
-                end
+%                 if obj.pars.use_psd_correction
+%                     
+%                     try
+%                         obj.psd.calcPSD; % first off, make the PSD correction for the current batch
+%                     catch ME
+%                         if strcmp(ME.identifier, 'MATLAB:nomem')
+%                             util.text.date_printf('Out of memory while caclulating PSD! Trying again...');
+%                             pause(30);
+%                             obj.psd.calcPSD; % try again to make the PSD correction for the current batch
+%                         else
+%                             rethrow(ME);
+%                         end
+%                     end
+% 
+%                 end
                 
                 [obj.corrected_fluxes, obj.corrected_stds] = obj.correctFluxes(obj.store.extended_detrend); % runs either PSD correction or simple removal of linear fit to each lightcurve
 
@@ -510,8 +529,6 @@ classdef EventFinder < handle
                 obj.kernel_scores = vertcat(obj.kernel_scores, new_scores); 
                 
                 obj.cand = vertcat(obj.cand, obj.latest_candidates); % store all the candidates that were found in the last batch
-                
-%                 obj.snr_values(end+1) = best_snr; 
                 
                 %%%%%%%%%%%%%% STAR HOURS %%%%%%%%%%%%%%
                 
@@ -529,7 +546,6 @@ classdef EventFinder < handle
                     obj.store.saveHours; % with no arguments it just counts the hours in this batch as good times
                 end
 
-                
                 %%%%%%%% MONITOR SPECIFIC STARS %%%%%%%%%%%%
                 
                 obj.monitor.input(obj.store.extended_timestamps, obj.store.extended_juldates, ... % track additional data on specific star indices
@@ -537,8 +553,8 @@ classdef EventFinder < handle
                 
                 %%%%%%%%% KEEP TRACK OF VARIANCE VALUES %%%%%%%%
                 
-                if obj.pars.use_keep_variances && ~obj.var_buf.is_empty % just like the var buffer, onlt for entire run (this accumulates to a big chunk of memory)
-                    obj.var_values = vertcat(obj.var_values, obj.var_buf.data(obj.var_buf.idx,:)); 
+                if obj.pars.use_keep_variances && ~obj.var_buf.is_empty % just like the var buffer, only for entire run (this accumulates to a big chunk of memory)
+                    obj.var_values = vertcat(obj.var_values, obj.var_buf.data(obj.var_buf.idx,:,:)); 
                 end
                 
                 %%%%%%%% OORT CLOUD %%%%%%%%%%%%%
@@ -587,8 +603,6 @@ classdef EventFinder < handle
                 end % use sim
                 
                 obj.snr_values(end+1) = best_snr; % this used to be before the Oort cloud and sim, but then the batch counter was wrong! 
-                
-                
                 
             end % do not do any more calculations until done with "burn-in" period
             
@@ -858,6 +872,8 @@ classdef EventFinder < handle
         %                  either the pre-filter or (if all stars passed)
         %                  only the stars that triggered the full filter. 
         %   -best_snr_all: maximal S/N value measured from the filtered fluxes.
+        %   -scores_all: a table containing each kernel's best response for
+        %                each star that passed the prefilter.  
         %   
         % NOTE: if there are multiple template banks, it will run them in
         %       sequence and add up the results. The best S/N is max of all
@@ -951,7 +967,7 @@ classdef EventFinder < handle
                         % the batch number
                         batch_number = ones(length(star_snr), 1) * obj.batch_counter; 
                         
-                        scores = table(batch_number,star_snr,kernel_best, ...
+                        scores = table(batch_number, star_snr, kernel_best, ...
                             'VariableNames', {'batch_number', 'star_snr', 'kernel_scores'});
                         
                     end
@@ -1001,7 +1017,7 @@ classdef EventFinder < handle
             end
             
             if nargin<6 || isempty(var_buf)
-                var_buf = []; % not buffer is given, must calculate variance on background fluxes
+                var_buf = []; % no buffer is given, must calculate variance on background fluxes
             else
                 if var_buf.is_empty % we haven't used this since the last reset() call
                     var_buf.reset(N); 
