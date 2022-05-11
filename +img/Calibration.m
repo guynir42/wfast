@@ -150,6 +150,8 @@ classdef Calibration < handle
         dark_mask_var_max = []; % pixels with variance above this value are bad pixels. (see hidden variables for Zyla/Balor)
         dark_mask_var_min = 0.5; % pixels with variance below this are dead pixels
         
+        use_zero_pixels_flag = 1; % pixels with value zero are flagged with a NaN flag when applying dark (prevents very negative values)
+        
         use_remove_empty_frames = 1;
         use_remove_bad_rows_columns = 1; % if a row or column has more than 10% bad pixels, remove the whole row/column
         
@@ -1191,6 +1193,10 @@ classdef Calibration < handle
 %                 
 %             end
             
+            if obj.use_zero_pixels_flag % no pixels should have zero values
+                zeros_mask = I == 0;
+            end
+
             if ~isempty(input.clipper) % this means we are working with cutouts
                 
                 if ~isa(input.clipper, 'img.Clipper') && ~(isnumeric(input.clipper) && size(input.clipper, 2)==2)
@@ -1217,6 +1223,10 @@ classdef Calibration < handle
                 D = D*input.num_sum; % if we need to subtract multiple darks from a summed image...
                 if size(I,3)>1 % making sure the input images are summed 
                     I = sum(I,3); 
+                    if obj.use_zero_pixels_flag
+                        zeros_mask = sum(zeros_mask,3); 
+                        % should we remove these from the sum in a smarter way somehow? 
+                    end
                 end
             end
             
@@ -1228,6 +1238,12 @@ classdef Calibration < handle
             %%%%%%%%%%%%%%%%% SUBTRACT DARK %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
             I = I - D; % subtract the mean dark image
+            
+            %%%%%%%%%%%%%%%%% REMOVE ZERO PIXELS %%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            if obj.use_zero_pixels_flag
+                I(zeros_mask) = NaN;
+            end
             
             %%%%%%%%%%%%%%%%% DIVIDE BY FLAT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
