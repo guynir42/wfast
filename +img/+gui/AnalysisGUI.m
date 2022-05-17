@@ -315,6 +315,14 @@ classdef AnalysisGUI < handle
                 obj.panel_info.button_exptime.BackgroundColor = util.plot.GraphicButton.defaultColor;
             end
             
+            if ~isempty(obj.owner.num_batches_limit) && obj.owner.num_batches ~= obj.owner.reader.getNumBatches
+                obj.panel_controls.input_num_batches.BackgroundColor = 'red';
+                obj.panel_controls.input_num_batches.Tooltip = 'Number of batches, limited by user'; 
+            else
+                obj.panel_controls.input_num_batches.BackgroundColor = 'white';
+                obj.panel_controls.input_num_batches.Tooltip = 'Number of batches, limited by number of files'; 
+            end
+            
         end
                         
         function c = check(obj)
