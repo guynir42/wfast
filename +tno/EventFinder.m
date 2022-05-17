@@ -415,6 +415,16 @@ classdef EventFinder < handle
             
         end
         
+        function printNumDetections(obj)
+            
+            N = numel(obj.sim_events); 
+            P = sum([obj.sim_events.passed]);
+            [low, high] = util.stat.poisson_errors(P); % two sigma
+            
+            fprintf('Detected %d [%4.1f - %4.1f] out of %d events.\n', ...
+                P, low, high, N); 
+        end
+        
     end
     
     methods % setters
@@ -635,6 +645,8 @@ classdef EventFinder < handle
                         obj.cand(ii).kept = 0; 
                     end
 
+                    obj.cand(ii).best_snrs = obj.snr_values; % keep track of the best S/N during the whole run
+                    
                 end
 
             end % check if any stars need to be black listed

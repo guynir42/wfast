@@ -251,7 +251,7 @@ classdef QualityChecker < handle
             obj.pars.thresh_background_intensity = 10; % events where the background per pixel is above this threshold are disqualified
             obj.pars.thresh_aperture_difference = 4.0; % regions where the forced/unforced photometry give different results are excluded
             obj.pars.thresh_flux_corr = 4.0; % events where the flux of one star has 95% percentile higher than this are disqualified
-            obj.pars.thresh_correlation = 4.0; % correlation max/min of flux (with e.g., background) with value above this disqualifies the region
+            obj.pars.thresh_correlation = 3.5; % correlation max/min of flux (with e.g., background) with value above this disqualifies the region
 
             obj.pars.thresh_tracking_error = 4.0; % for each event, post-detection, check correlation with other stars
             obj.pars.nth_highest_corr = 20; % when finding flux-flux correlations, measure the correlation of the Nth most correlated star

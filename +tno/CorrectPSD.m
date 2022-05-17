@@ -41,6 +41,8 @@ classdef CorrectPSD < handle
         use_buffer_outlier_removal = 1; % remove outliers from the flux buffer, not just from each incoming batch
         use_low_freq_reduction = 0; % set all low frequencies to the PSD maximum (out of all low frequencies)
         
+        use_combined = 0; % add together the PSD for all stars to get a weighted average
+        
         debug_bit = 1;
         
     end
@@ -127,8 +129,11 @@ classdef CorrectPSD < handle
             S = size(flux); 
             ff = fft(util.img.pad2size(flux, [size(obj.power_spectrum,1) S(2:end)])); % zero pad the flux, then FFT it
             
-            ff_corrected = ff./(obj.power_spectrum(:,star_indices)).^psd_power;
-            
+            if obj.use_combined
+                ff_corrected = ff./sum(obj.power_spectrum, 2).^psd_power;
+            else
+                ff_corrected = ff./(obj.power_spectrum(:,star_indices)).^psd_power;
+            end
             flux_corrected = util.img.crop2size(real(ifft(ff_corrected)), S); 
             
         end

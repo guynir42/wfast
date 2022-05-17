@@ -174,7 +174,9 @@ classdef Candidate < handle
         
         batch_number;
         
-        snr;
+        snr; % S/N of the current detection
+        
+        best_snrs; % best S/N recorded during entire run, from all stars and all kernels
         
     end
     
