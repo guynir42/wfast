@@ -960,9 +960,10 @@ classdef EventFinder < handle
 
                     if length(star_indices)==size(fluxes_corr,2) % if all stars passed prefilter (or when skipping pre-filter)
                         star_indices = [candidates.star_index]; % only keep stars that triggered
+                        filtered_fluxes = filtered_fluxes(:,:,star_indices); % keep only flux from that star
                     end
                     
-                    if nargout >= 4
+                    if nargout >= 4 && ~isempty(star_indices)
                         % the kernel response
                         time_indices = obj.store.search_start_idx:obj.store.search_end_idx;
                         kernel_best = nanmax(filtered_fluxes(time_indices, :, :), [], 1);
@@ -1210,6 +1211,7 @@ classdef EventFinder < handle
             c.flux_buffer = obj.store.flux_buffer(:,c.star_index); % flux history for this star
             c.detrend_buffer = obj.store.detrend_buffer(:,c.star_index); % detrended flux history for this star
             c.timestamps_buffer = obj.store.timestamps_buffer; % timestamps for that duration
+            c.aux_buffer = permute(obj.store.aux_buffer(:,c.star_index,:), [1, 3, 2]); 
             
             if ~isempty(obj.psd.power_spectrum)
                 c.psd = obj.psd.power_spectrum(:,c.star_index); % the Power Spectral Density (PSD) for this star

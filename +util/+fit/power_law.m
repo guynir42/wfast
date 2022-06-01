@@ -37,9 +37,9 @@ function fr = power_law(x, y, varargin)
     
     if isempty(input.breaks) % single power law, just use linear least squares on the log of the data
         
-        [slope, norm, chi2, dof] = fit_single(x,y,input.errors, input.sigma, input.plot, input.axes, input.duration);
+        [slope, norms, chi2, dof] = fit_single(x,y,input.errors, input.sigma, input.plot, input.axes, input.duration);
         fr.slopes = slope; 
-        fr.norm = norm;
+        fr.norms = norms;
         fr.breaks = [];
         fr.chi2 = chi2;
         fr.dof = dof;

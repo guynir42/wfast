@@ -102,6 +102,7 @@ classdef QualityChecker < handle
         instability; % long-time-scale variations of the flux buffer (e.g., clouds, shaking telescope)
         slope; % the slope at different points in the flux
         offset_size; % the size of the offset in each star
+        mean_flux_norm; % the mean flux of all stars, savitzky-golay subtracted, divided by its (section averaged) STD
         
         nan_flux; % places where the flux is NaN
         nan_offsets; % places where the offset_x or offset_y is nan
@@ -112,6 +113,8 @@ classdef QualityChecker < handle
         bad_pixels; % how many bad pixels are in the aperture
         repeating_columns; % how many columns are repeated for each frame/star
         aperture_difference; % the rms difference btw forced and unforced photometry, over the forced flux MAD error estimate
+        rrms_25; % rolling RMS with window of 25 frames and internal hole of 10 frames
+        rrms_50; % rolling RMS with window of 50 frames and internal hole of 20 frames 
         flux_corr; % correlations of flux between stars
         
         mean_x; % the weighted average offset for all stars
@@ -130,6 +133,7 @@ classdef QualityChecker < handle
         
         % these we get from the DataStore
         flux_buffer; % full length of the fluxes for all stars as far back as we have it
+        aux_buffer; % full length of the auxiliary data for all stars for as far back as we have it
         background_flux; % cut out the background flux for calculating the variance outside the search region
         background_detrend; % same flux, with a linear fit subtracted from each batch individually
         background_aux; % cut out the background aux for calculating the variance outside the search region
@@ -226,6 +230,7 @@ classdef QualityChecker < handle
             obj.pars.use_slope = true;
             obj.pars.use_near_bad_rows_cols = true;            
             obj.pars.use_offset_size = true;
+            obj.pars.use_mean_flux_norm = true;
             obj.pars.use_linear_motion = true;
             obj.pars.use_background_intensity = true;
             obj.pars.use_nan_flux = false;
@@ -234,6 +239,7 @@ classdef QualityChecker < handle
             obj.pars.use_bad_pixels = true; 
             obj.pars.use_repeating_columns = true; 
             obj.pars.use_aperture_difference = true;
+            obj.pars.use_rolling_rms = false;
             obj.pars.use_flux_corr = true;
             obj.pars.use_correlations = true;
             
@@ -247,9 +253,11 @@ classdef QualityChecker < handle
             obj.pars.thresh_instability = 3.0; % when the flux buffer has long-time-scale variations
             obj.pars.thresh_slope = 5.0; % events where the slope is larger than this value (in abs. value) are disqualified
             obj.pars.thresh_offset_size = 4.0; % events with offsets above this number are disqualified (after subtracting mean offsets)
+            obj.pars.thresh_mean_flux_norm = 5.0; % times where the mean flux is very far from normal
             obj.pars.thresh_linear_motion = 2.0; % events showing linear motion of the centroids are disqualified
             obj.pars.thresh_background_intensity = 10; % events where the background per pixel is above this threshold are disqualified
             obj.pars.thresh_aperture_difference = 4.0; % regions where the forced/unforced photometry give different results are excluded
+            obj.pars.thresh_rolling_rms = 5.0; % regions where the rolling RMS is too high, compared to that star's mean RMS. 
             obj.pars.thresh_flux_corr = 4.0; % events where the flux of one star has 95% percentile higher than this are disqualified
             obj.pars.thresh_correlation = 3.5; % correlation max/min of flux (with e.g., background) with value above this disqualifies the region
 
@@ -348,6 +356,12 @@ classdef QualityChecker < handle
                 obj.cut_two_sided(end+1) = false;
             end
             
+            if obj.pars.use_mean_flux_norm
+                obj.cut_names{end+1} = 'mean_flux_norm'; 
+                obj.cut_thresholds(end+1) = obj.pars.thresh_mean_flux_norm;
+                obj.cut_two_sided(end+1) = true;
+            end
+            
             if obj.pars.use_linear_motion
                 obj.cut_names{end+1} = 'linear_motion'; 
                 obj.cut_thresholds(end+1) = obj.pars.thresh_linear_motion; 
@@ -394,6 +408,18 @@ classdef QualityChecker < handle
                 obj.cut_names{end+1} = 'repeating_columns'; 
                 obj.cut_thresholds(end+1) = 1; % maybe at some point we may want to only trigger on multiple repeated rows per cutout? 
                 obj.cut_two_sided(end+1) = false;
+            end
+            
+            if obj.pars.use_flux_corr
+                
+                obj.cut_names{end+1} = 'rolling_rms_25'; 
+                obj.cut_thresholds(end+1) = obj.pars.thresh_rolling_rms;
+                obj.cut_two_sided(end+1) = false;
+                
+                obj.cut_names{end+1} = 'rolling_rms_50'; 
+                obj.cut_thresholds(end+1) = obj.pars.thresh_rolling_rms;
+                obj.cut_two_sided(end+1) = false;
+                
             end
             
             if obj.pars.use_flux_corr
@@ -647,6 +673,8 @@ classdef QualityChecker < handle
             
             obj.slope = filter2(k, FN); 
 
+            obj.mean_flux_norm = obj.calculateMeanFluxNorm; 
+            
             obj.nan_flux = isnan(f); 
             obj.nan_offsets = isnan(x) | isnan(y);  
             obj.photo_flag = obj.extended_aux(:,:,obj.aux_indices.flags); 
@@ -675,6 +703,11 @@ classdef QualityChecker < handle
                 obj.repeating_columns = img.find_repeating_columns(obj.cutouts, 'margins', margins); % additional arguments may change the fraction of a column that is tested (for cutouts 50% is fine)
             end
             
+            % should the window and hole numbers be set as parameters?
+            if obj.pars.use_rolling_rms
+                obj.rrms_25 = obj.calculateRollingRMS([], [], 25, 10); 
+                obj.rrms_50 = obj.calculateRollingRMS([], [], 50, 20); 
+            end
             try 
                 N_stars_max = 1000; 
                 obj.flux_corr = obj.calculateFluxCorrSampling(obj.extended_detrend, obj.pars.corr_timescales, N_stars_max); 
@@ -784,6 +817,10 @@ classdef QualityChecker < handle
             if obj.pars.use_offset_size
                 obj.cut_values_matrix(:,:,obj.cut_indices.offset_size) = obj.offset_size;
             end
+            
+            if obj.pars.use_mean_flux_norm
+                obj.cut_values_matrix(:,:,obj.cut_indices.mean_flux_norm) = obj.mean_flux_norm.*all_stars;
+            end
 
             if obj.pars.use_linear_motion
                 obj.cut_values_matrix(:,:,obj.cut_indices.linear_motion) = obj.linear_motion; 
@@ -815,6 +852,11 @@ classdef QualityChecker < handle
             
             if obj.pars.use_repeating_columns
                 obj.cut_values_matrix(:,:,obj.cut_indices.repeating_columns) = obj.repeating_columns;
+            end
+            
+            if obj.pars.use_rolling_rms
+                obj.cut_values_matrix(:,:,obj.cut_indices.rolling_rms_25) = obj.rrms_25;
+                obj.cut_values_matrix(:,:,obj.cut_indices.rolling_rms_50) = obj.rrms_50;
             end
             
             if obj.pars.use_flux_corr
@@ -1183,9 +1225,141 @@ classdef QualityChecker < handle
             
         end
         
+        function val = calculateMeanFluxNorm(obj)
+            
+            % we are looking at the while buffer to be able to knwo the std
+            % over time, that may be fluctuating in the recent batch
+            f = obj.flux_buffer;
+            a = obj.aux_buffer(:,:,obj.aux_indices.areas); 
+            b = obj.aux_buffer(:,:,obj.aux_indices.areas); 
+            F = nanmean(f-a.*b, 2); 
+            
+            sg_order = 5;
+            sg_window = 51;
+            sg = sgolayfilt(double(F), sg_order, sg_window); 
+            
+            F2 = F - sg; % subtract the running fit using Savitsky-Golay
+            
+            noise = nanmedian(util.series.binning(F2, 100, 'func', 'std')); % std per bin, averaged without outliers
+            
+            val = (F2 - nanmean(F2)) ./ noise;
+            
+            val = val(end-size(obj.extended_flux,1)+1:end); % grab only the last values that overlap with the extended region
+            
+        end
+        
+        function val = calculateRollingRMS(obj, f_buf, f_test, window, hole)
+            
+            if nargin < 2 || isempty(f_buf)
+                f_buf = obj.flux_buffer;
+                a = obj.aux_buffer(:,:,obj.aux_indices.areas); 
+                b = obj.aux_buffer(:,:,obj.aux_indices.areas); 
+                f_buf = f_buf - a.*b;
+            end
+            
+            if nargin < 3 || isempty(f_test)
+                f_test = obj.extended_flux; 
+            end
+            
+            if nargin < 4 || isempty(window)
+                window = 50;  
+            end
+            
+            if nargin < 5 || isempty(hole)
+                hole = 20;
+            end
+            
+            if hole > window
+                error('window (%d) must be bigger than hole (%d)', window, hole);
+            end
+            
+            buf_length = size(f_buf, 1); 
+            out_length = size(f_test,1); 
+            
+            k = ones(window, 1); 
+            mid = floor(length(k)/2) + 1;
+            k(mid - ceil(hole/2) + 1:mid+floor(hole/2)) = 0; 
+            N = nnz(k); % should be window-hole
+            
+            mu_buf = filter2(k, f_buf) ./ filter2(k, ones(buf_length,1)); % rolling mean (with hole) 
+            sig_buf = filter2(k, f_buf.^2) - 2*filter2(k, f_buf).*mu_buf + filter2(k, ones(buf_length,1)).*mu_buf.^2; % rolling RMS (with hole)
+            sig_buf = sqrt(sig_buf./N);
+                  
+            mu_test = filter2(k, f_test) ./ filter2(k, ones(out_length,1)); % rolling mean (with hole)
+            sig_test = filter2(k, f_test.^2) - 2*filter2(k, f_test).*mu_test + filter2(k, ones(out_length,1)).*mu_test.^2; % rolling RMS (with hole)
+            sig_test = sqrt(sig_test./N);
+            
+            bg_sig = sig_buf(1:end-out_length,:); % choose everything in the past
+            target_sig = sig_test; % choose the current two batches
+            
+            val = (target_sig - median(bg_sig))./median(util.series.binning(bg_sig, 100, 'func', 'std')); 
+            
+        end
+        
+        function pass = checkCandidatesPassRollingRMS(obj, cand, window, hole, use_plot)
+            
+            if nargin < 3 || isempty(window)
+                window = 50; % change this to a parameter 
+            end
+            
+            if nargin < 4 || isempty(hole)
+                hole = 12; % change this to a parameter 
+            end
+            
+            if nargin < 5 || isempty(use_plot)
+                use_plot = 0;
+            end
+            
+            pass = false(size(cand)); % assume all fail when we start
+            
+            for ii = 1:length(cand)
+
+                f_buf = cand(ii).flux_buffer; 
+                
+                if ~isempty(cand(ii).aux_buffer)
+                    a = cand(ii).aux_buffer(:,cand(ii).aux_indices.areas); 
+                    b = cand(ii).aux_buffer(:,cand(ii).aux_indices.backgrounds); 
+                    f_buf = f_buf - a.*b;
+                end
+                
+                f_test = cand(ii).flux_raw;
+                if ~isempty(cand(ii).auxiliary)
+                    a = cand(ii).auxiliary(:,cand(ii).aux_indices.areas); 
+                    b = cand(ii).auxiliary(:,cand(ii).aux_indices.backgrounds); 
+                    f_test = f_test - a.*b;
+                end
+                
+                rrms = obj.calculateRollingRMS(f_buf, f_test, window, hole); 
+                bad_times = rrms > obj.pars.thresh_rolling_rms;
+                
+                if obj.pars.use_dilate
+                     bad_times = imdilate(bad_times, ones(1+2.*obj.pars.dilate_region,1));
+                end
+                
+                pass(ii) = ~bad_times(cand(ii).time_index); % is the event peak overlapping with bad times
+%                 pass = rrms;
+            end
+            
+            if use_plot
+                f = cand(ii).flux_raw;
+                f = (f - nanmean(f))./nanstd(f); 
+                t = 1:size(f,1); 
+                f2 = f;
+                f2(~bad_times) = NaN;
+                
+                plot(t, f, '-', t, rrms, 'g-',...
+                    t, obj.pars.thresh_rolling_rms * ones(size(f,1),1), 'm--', ...
+                    t, f2, '-r'); 
+                legend({'normalized flux', sprintf('rolling RMS (wind: %d, hole: %d)', window, hole), ...
+                     sprintf('threshold: %4.2f', obj.pars.thresh_rolling_rms), 'bad frames'}); 
+            end
+            
+        end
+        
         function ingestStore(obj, store) % parse the data from the store into similar containers in this object
             
             obj.flux_buffer = store.flux_buffer; 
+            obj.aux_buffer = store.aux_buffer; 
             obj.background_flux = store.background_flux;
             obj.background_detrend = store.background_detrend; 
             obj.background_aux = store.background_aux;
