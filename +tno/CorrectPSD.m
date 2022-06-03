@@ -134,6 +134,7 @@ classdef CorrectPSD < handle
             else
                 ff_corrected = ff./(obj.power_spectrum(:,star_indices)).^psd_power;
             end
+            
             flux_corrected = util.img.crop2size(real(ifft(ff_corrected)), S); 
             
         end

@@ -1051,6 +1051,49 @@ classdef Candidate < handle
             
         end
         
+        function [ff, fc] = getFilteredBackgroundBuffer(obj)
+                        
+            Nb = size(obj.psd,1)/2; % number of frames of background
+            Ne = size(obj.flux_raw,1); % number of frames of extended region
+            
+            % grab only the frames of the "background" area
+            fb = obj.detrend_buffer(end-Nb-Ne+1:end-Ne); 
+            
+            fb = fillmissing(fb, 'linear');  
+            
+            fb = fb - mean(fb); 
+            
+            fb_fourier = fft(util.img.pad2size(fb, size(obj.psd))); 
+            fbc_fourier = fb_fourier./obj.psd; 
+            fbc = util.img.crop2size(real(ifft(fbc_fourier)), size(fb)); 
+            
+            if obj.finder_pars.use_detrend_after_psd
+                fbc = util.series.detrend(fbc, 'iterations', 2);
+            end
+            
+            fbf = filter2(obj.kernel, fbc); 
+            
+            fbf_std = std(fbf); 
+            
+            % grab the frames of the extended region
+            fe = obj.detrend_buffer(end-Ne+1:end); 
+            fe = fillmissing(fe, 'linear'); 
+            fe = fe - mean(fe); 
+            fe_fourier = fft(util.img.pad2size(fe, size(obj.psd)));
+            fec_fourier = fe_fourier./obj.psd; 
+            fec = util.img.crop2size(real(ifft(fec_fourier)), size(fe));
+            
+%             fef = filter2(obj.kernel, fec); 
+
+            fc = [fbc; fec]; 
+            ff = filter2(obj.kernel, fc);  
+            ff = ff./fbf_std; 
+            
+            k_fourier = abs(fft(util.img.pad2size(obj.kernel, [Nb*2,1]))); 
+%             plot(1:Nb*2, abs(fbc_fourier), 1:Nb*2, k_fourier)
+            
+        end
+        
     end
     
     methods % plotting tools / GUI
@@ -1063,10 +1106,15 @@ classdef Candidate < handle
             input.input_var('cuts', []); % additional cut types to show on the flux plot
             input.input_var('duplicates', []); % skip duplicate events when classifying
             input.input_var('scanner', []); % link back to the scanner object to load next candidates
+            input.input_var('simulated', []); % if true will only show simulated, if false will show non-simulated. leave empty for both types
             input.input_var('parent', []); % parent graphic object to plot to (figure or panel, default is gcf())
             input.input_var('font_size', 18);
             input.input_var('timing_log', false); % print the runtime for each part of this function
             input.scan_vars(varargin{:});
+            
+            if ~isempty(input.simulated)
+                obj_vec = obj_vec([obj_vec.is_simulated]==input.simulated);
+            end
             
             if isempty(input.parent)
                 input.parent = gcf;
