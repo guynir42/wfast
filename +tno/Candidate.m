@@ -134,6 +134,7 @@ classdef Candidate < handle
         flux_detrended; % fluxes for all stars, after removing linear fit from each batch
         flux_corrected; % fluxes for all stars, corrected by PSD or by removing linear fit
         flux_filtered; % flux after matched-filtering, for the peak star and kernel
+        flux_filtered_bg; % flux after matched-filtering, for the peak star and kernel over the background region
         aperture_index; % which aperture was used in the original photometry analysis (the index is for all types of photometry, including gaussian, as listed in head.PHOT_PARS)
         aperture_radius; % the size (in pixels) of the forced aperture chosen in the original analysis
         
@@ -1057,7 +1058,7 @@ classdef Candidate < handle
             Ne = size(obj.flux_raw,1); % number of frames of extended region
             
             % grab only the frames of the "background" area
-            fb = obj.detrend_buffer(end-Nb-Ne+1:end-Ne); 
+            fb = obj.detrend_buffer(end-Nb+1:end-Ne); 
             
             fb = fillmissing(fb, 'linear');  
             
@@ -1089,7 +1090,7 @@ classdef Candidate < handle
             ff = filter2(obj.kernel, fc);  
             ff = ff./fbf_std; 
             
-            k_fourier = abs(fft(util.img.pad2size(obj.kernel, [Nb*2,1]))); 
+%             k_fourier = abs(fft(util.img.pad2size(obj.kernel, [Nb*2,1]))); 
 %             plot(1:Nb*2, abs(fbc_fourier), 1:Nb*2, k_fourier)
             
         end

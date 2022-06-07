@@ -101,6 +101,8 @@ classdef EventFinder < handle
         
         monitor@tno.StarMonitor; 
         
+        score_hist@tno.ScoreHistogram; 
+        
     end
     
     properties % inputs/outputs
@@ -172,6 +174,8 @@ classdef EventFinder < handle
                 obj.var_buf = util.vec.CircularBuffer; 
                 
                 obj.monitor = tno.StarMonitor; 
+                
+                obj.score_hist = tno.ScoreHistogram;
                 
                 obj.resetPars; 
                 
@@ -266,6 +270,8 @@ classdef EventFinder < handle
             obj.monitor.reset;
             
             obj.deleteBanks;
+            
+            obj.score_hist.reset;
             
             obj.clear;
             
@@ -456,6 +462,18 @@ classdef EventFinder < handle
             
             if isempty(obj.bank) % lazy load the KBOs filter bank from file
                 obj.loadFilterBankKBOs; 
+            end
+            
+            if isempty(obj.score_hist.counts)
+                
+                if obj.pars.use_prefilter
+                    obj.score_hist.bank = obj.bank_small;
+                else
+                    obj.score_hist.bank = obj.bank; % this may cause a memory overload! 
+                end
+                
+                obj.score_hist.initializeMatrix; 
+                
             end
             
             if isempty(obj.head) % must have a header to uniquely identify candidates! 
@@ -924,75 +942,90 @@ classdef EventFinder < handle
                 error('Unknown "bank_name" option "%s". Use "KBOs" or "Oort". ', bank_name); 
             end
             
-            for ii = 1:length(bank)
+            % we may need the star S/N
+            A = obj.store.background_aux(:,:, obj.store.aux_indices.areas); 
+            B = obj.store.background_aux(:,:, obj.store.aux_indices.backgrounds); 
+            flux = obj.store.background_flux - A.*B; % background corrected flux
+            flux_mean = nanmedian(flux, 1); 
+            flux_std = mad(flux, 1)./0.6745; % match the MAD to STD using sqrt(2)*erfinv(0.5)
+            star_snr = (flux_mean./flux_std)';
             
-                candidates = tno.Candidate.empty;
-                scores = [];
-                
-                if obj.pars.use_prefilter % use a small filter bank and only send the best stars to the big bank
+            candidates = tno.Candidate.empty;
+            scores = [];
 
-                    fluxes_filtered_small = obj.filterFluxes(fluxes_corr, stds, bank_small(ii), [], var_buf(ii)); 
+            if obj.pars.use_prefilter % use a small filter bank and only send the best stars to the big bank
 
-                    pre_snr = squeeze(util.stat.max2(fluxes_filtered_small)); % signal to noise peak for each star at any time and any filter kernel
+                fluxes_filtered_small = obj.filterFluxes(fluxes_corr, stds, bank_small, [], var_buf); 
 
-                    star_indices = find(pre_snr>=obj.pars.pre_threshold); % only stars that have shown promising response to the small filter bank are on this list 
+                pre_snr = squeeze(util.stat.max2(fluxes_filtered_small)); % signal to noise peak for each star at any time and any filter kernel
 
-                else % do not prefilter, just put all stars into the big filter bank
+                star_indices = find(pre_snr>=obj.pars.pre_threshold); % only stars that have shown promising response to the small filter bank are on this list 
 
-                    star_indices = util.vec.tocolumn(1:size(fluxes_corr,2)); % just list all the stars
-                    pre_snr = 0; 
-                    
+            else % do not prefilter, just put all stars into the big filter bank
+
+                star_indices = util.vec.tocolumn(1:size(fluxes_corr,2)); % just list all the stars
+                pre_snr = 0; 
+
+            end
+
+            best_snr = nanmax(pre_snr); % need to keep track what is the best S/N for this batch, regardless of which filter and regardless of if there were any candidates detected. 
+
+            if ~isempty(star_indices) % if no stars passed the pre-filter, we will just skip to the next batch (if no pre-filter is used, all stars will pass)
+
+                if obj.pars.use_prefilter
+                    var_buf_large_filter = []; % each batch we will have different stars at this stage, cannot use var_buf
+                else
+                    var_buf_large_filter = var_buf; % always use all stars, no problem applying the var buffer
                 end
 
-                best_snr = nanmax(pre_snr); % need to keep track what is the best S/N for this batch, regardless of which filter and regardless of if there were any candidates detected. 
+                [filtered_fluxes, ff_background] = obj.filterFluxes(fluxes_corr, stds, bank, star_indices, var_buf_large_filter); 
 
-                if ~isempty(star_indices) % if no stars passed the pre-filter, we will just skip to the next batch (if no pre-filter is used, all stars will pass)
+                [candidates, best_snr] = obj.searchForCandidates(obj.store.extended_flux, fluxes_det, fluxes_corr, filtered_fluxes, star_indices, ff_background, bank); % loop over the normalized filtered flux and find multiple events
 
-                    if obj.pars.use_prefilter
-                        var_buf_large_filter = []; % each batch we will have different stars at this stage, cannot use var_buf
-                    else
-                        var_buf_large_filter = var_buf(ii); % always use all stars, no problem applying the var buffer
-                    end
+                if length(star_indices)==size(fluxes_corr,2) % if all stars passed prefilter (or when skipping pre-filter)
+                    star_indices = [candidates.star_index]; % only keep stars that triggered
+                    filtered_fluxes = filtered_fluxes(:,:,star_indices); % keep only flux from that star
+                end
 
-                    [filtered_fluxes, ff_background] = obj.filterFluxes(fluxes_corr, stds, bank(ii), star_indices, var_buf_large_filter); 
+                if nargout >= 4 && ~isempty(star_indices)
+                    % the kernel response
+                    time_indices = obj.store.search_start_idx:obj.store.search_end_idx;
+                    kernel_best = nanmax(filtered_fluxes(time_indices, :, :), [], 1);
+                    kernel_best = permute(kernel_best, [3,2,1]); % get rid of reduced first index
 
-                    [candidates, best_snr] = obj.searchForCandidates(obj.store.extended_flux, fluxes_det, fluxes_corr, filtered_fluxes, star_indices, ff_background, bank(ii)); % loop over the normalized filtered flux and find multiple events
+                    % the batch number
+                    batch_number = ones(length(star_indices), 1) * obj.batch_counter; 
 
-                    if length(star_indices)==size(fluxes_corr,2) % if all stars passed prefilter (or when skipping pre-filter)
-                        star_indices = [candidates.star_index]; % only keep stars that triggered
-                        filtered_fluxes = filtered_fluxes(:,:,star_indices); % keep only flux from that star
-                    end
-                    
-                    if nargout >= 4 && ~isempty(star_indices)
-                        % the kernel response
-                        time_indices = obj.store.search_start_idx:obj.store.search_end_idx;
-                        kernel_best = nanmax(filtered_fluxes(time_indices, :, :), [], 1);
-                        kernel_best = permute(kernel_best, [3,2,1]); % get rid of reduced first index
-                        
-                        % the star S/N
-                        A = obj.store.background_aux(:,star_indices, obj.store.aux_indices.areas); 
-                        B = obj.store.background_aux(:,star_indices, obj.store.aux_indices.backgrounds); 
-                        flux = obj.store.background_flux(:,star_indices)-A.*B; % background corrected flux
-                        flux_mean = nanmedian(flux, 1); 
-                        flux_std = mad(flux, 1)./0.6745; % match the MAD to STD using sqrt(2)*erfinv(0.5)
-                        star_snr = (flux_mean./flux_std)';
-                        
-                        % the batch number
-                        batch_number = ones(length(star_snr), 1) * obj.batch_counter; 
-                        
-                        scores = table(batch_number, star_snr, kernel_best, ...
-                            'VariableNames', {'batch_number', 'star_snr', 'kernel_scores'});
-                        
-                    end
+                    scores = table(batch_number, star_snr(star_indices), kernel_best, ...
+                        'VariableNames', {'batch_number', 'star_snr', 'kernel_scores'});
 
-                end % if no stars passed the pre-filter, we will just skip to the next batch
+                end
+
+            end % if no stars passed the pre-filter, we will just skip to the next batch
+
+            % find the color for each star
+            color1 = obj.cat.data{:,obj.score_hist.color_columns{1}};
+            color2 = obj.cat.data{:,obj.score_hist.color_columns{2}};
+            star_colors = color1 - color2;
+            star_colors = star_colors(obj.store.star_indices); 
             
-                candidates_all = vertcat(candidates_all, candidates); 
-                star_indices_all = unique([star_indices_all; star_indices]); 
-                best_snr_all = nanmax(best_snr_all, best_snr); 
-                scores_all = vertcat(scores_all, scores);
-                
+            time_indices = obj.store.search_start_idx:obj.store.search_end_idx;
+            
+            flags = logical(sum(obj.store.checker.cut_flag_matrix(time_indices,:,:),3));
+            
+            % save the scores
+            if obj.pars.use_prefilter
+                ff = fluxes_filtered_small(time_indices,:,:);
+            else
+                ff = filtered_fluxes(time_indices,:,:);
             end
+            
+            obj.score_hist.input(ff, flags, star_snr, star_colors, obj.head.AIRMASS);
+                
+            candidates_all = vertcat(candidates_all, candidates); 
+            star_indices_all = unique([star_indices_all; star_indices]); 
+            best_snr_all = nanmax(best_snr_all, best_snr); 
+            scores_all = vertcat(scores_all, scores);
             
         end
         
@@ -1109,7 +1142,7 @@ classdef EventFinder < handle
             
         function [new_candidates, best_snr] = searchForCandidates(obj, fluxes_raw, fluxes_detrended, fluxes_corrected, fluxes_filtered, star_indices, filtered_flux_bg, bank, max_num_events) % loop over filtered fluxes, find above-threshold peaks, remove that area, then repeat
 
-            if nargin<8 || isempty(max_num_events)
+            if nargin<9 || isempty(max_num_events)
                 max_num_events = obj.pars.max_events;
             end
             
@@ -1312,16 +1345,16 @@ classdef EventFinder < handle
                     
                 end % the event occurs on one of the flagged frames/stars
                 
-            end % go oveer each cut and check if it applies to this event
+            end % go over each cut and check if it applies to this event
             
             c.calcTrackingErrorValue; % this gives the sum of the first three, I will instead focus on the 3rd star
             
 %             if c.corr_flux(3)>obj.store.checker.pars.thresh_tracking_error % too much correlations with other stars
-                str = sprintf('Correlation 3rd highest star: %4.2f', c.corr_flux(3)); 
-                str_idx = strcmp(str, c.notes);
-                if nnz(str_idx)==0
-                    c.notes{end+1} = str; 
-                end
+            str = sprintf('Correlation 3rd highest star: %4.2f', c.corr_flux(3)); 
+            str_idx = strcmp(str, c.notes);
+            if nnz(str_idx)==0
+                c.notes{end+1} = str; 
+            end
 %                 c.kept = 0; % I don't want to disqualify on this, but I
 %                 do want the scanner to see a warning, and judge for
 %                 themselves. 
