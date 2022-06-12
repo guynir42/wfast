@@ -1072,24 +1072,25 @@ classdef Candidate < handle
                 fbc = util.series.detrend(fbc, 'iterations', 2);
             end
             
-            fbf = filter2(obj.kernel, fbc); 
+            fbf = filter2(obj.kernel, fbc)./std(fbc); 
             
-            fbf_std = std(fbf); 
-            
-            % grab the frames of the extended region
-            fe = obj.detrend_buffer(end-Ne+1:end); 
-            fe = fillmissing(fe, 'linear'); 
-            fe = fe - mean(fe); 
-            fe_fourier = fft(util.img.pad2size(fe, size(obj.psd)));
-            fec_fourier = fe_fourier./obj.psd; 
-            fec = util.img.crop2size(real(ifft(fec_fourier)), size(fe));
-            
-%             fef = filter2(obj.kernel, fec); 
+%             fbf_std = std(fbf); 
+%             
+%             % grab the frames of the extended region
+%             fe = obj.detrend_buffer(end-Ne+1:end); 
+%             fe = fillmissing(fe, 'linear'); 
+%             fe = fe - mean(fe); 
+%             fe_fourier = fft(util.img.pad2size(fe, size(obj.psd)));
+%             fec_fourier = fe_fourier./obj.psd; 
+%             fec = util.img.crop2size(real(ifft(fec_fourier)), size(fe));
+%             
+%             fc = [fbc; fec]; 
+%             ff = filter2(obj.kernel, fc);  
+%             ff = ff./fbf_std; 
 
-            fc = [fbc; fec]; 
-            ff = filter2(obj.kernel, fc);  
-            ff = ff./fbf_std; 
-            
+                ff = fbf;
+                fc = fbc;
+
 %             k_fourier = abs(fft(util.img.pad2size(obj.kernel, [Nb*2,1]))); 
 %             plot(1:Nb*2, abs(fbc_fourier), 1:Nb*2, k_fourier)
             
@@ -1236,7 +1237,7 @@ classdef Candidate < handle
             popup_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [0.68 0.11 0.3 0.08], 'title', 'popups'); 
             
             button = uicontrol(popup_panel, 'Style', 'pushbutton', 'string', 'other stars', ...
-                'Units', 'Normalized', 'Position', [0.0 0.0 0.25 1], 'FontSize', 14, ...
+                'Units', 'Normalized', 'Position', [0/6 0.0 1/6 1], 'FontSize', 14, ...
                 'Callback', @obj.popupOtherStars, 'UserData', input.parent, ...
                 'Tooltip', 'Show the flux of other stars with high correlation to this star'); 
             
@@ -1245,20 +1246,25 @@ classdef Candidate < handle
                 button.BackgroundColor = 'r'; 
             end
             
-            button = uicontrol(popup_panel, 'Style', 'pushbutton', 'string', 'stack image', ...
-                'Units', 'Normalized', 'Position', [0.25 0.0 0.25 1], 'FontSize', 14, ...
+            button = uicontrol(popup_panel, 'Style', 'pushbutton', 'string', 'stack', ...
+                'Units', 'Normalized', 'Position', [1/6 0.0 1/6 1], 'FontSize', 14, ...
                 'Callback', @obj.popupStack, 'UserData', input.parent, ...
                 'Tooltip', 'Show the stack image for the event'); 
             
             button = uicontrol(popup_panel, 'Style', 'pushbutton', 'string', 'cutouts', ...
-                'Units', 'Normalized', 'Position', [0.50 0.0 0.25 1], 'FontSize', 14, ...
+                'Units', 'Normalized', 'Position', [2/6 0.0 1/6 1], 'FontSize', 14, ...
                 'Callback', @obj.popupCutouts, 'UserData', input.parent, ...
                 'Tooltip', 'show more cutouts around the event center'); 
             
             button = uicontrol(popup_panel, 'Style', 'pushbutton', 'string', 'flux buffer', ...
-                'Units', 'Normalized', 'Position', [0.75 0.0 0.25 1], 'FontSize', 14, ...
+                'Units', 'Normalized', 'Position', [3/6 0.0 1/6 1], 'FontSize', 14, ...
                 'Callback', @obj.popupFluxBuffer, 'UserData', input.parent, ...
                 'Tooltip', 'show the flux history for the star'); 
+            
+            button = uicontrol(popup_panel, 'Style', 'pushbutton', 'string', 'filtered', ...
+                'Units', 'Normalized', 'Position', [4/6 0.0 1/6 1], 'FontSize', 14, ...
+                'Callback', @obj.popupFilteredFlux, 'UserData', input.parent, ...
+                'Tooltip', 'show the flux history for the star');
             
             %%%%%%%%%%%%%%%%%%%%%% panel info %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -1410,7 +1416,6 @@ classdef Candidate < handle
             
             input = util.text.InputVars;
             input.input_var('ax', [], 'axes', 'axis');
-            input.input_var('font_size', 16);
             input.input_var('color', 0.5*[1 1 1]);
             input.input_var('alpha', 0.10); 
             input.scan_vars(varargin{:}); 
@@ -2221,6 +2226,73 @@ classdef Candidate < handle
             uicontrol(f.fig, 'Style', 'pushbutton', 'String', 'CLOSE WINDOW', ...
                 'Units', 'Normalized', 'Position', [0.2 0.8 0.2 0.08], ...
                 'Callback', @obj.callback_close_window, 'FontSize', 12);
+            
+        end
+        
+        function popupFilteredFlux(obj, ~, ~)
+            
+            f0 = util.plot.FigHandler('Filtered flux'); 
+            f0.width = 25;
+            f0.height = 16;
+            f0.clear;
+
+            ax1 = axes('Parent', f0.fig); 
+            
+            if ~isempty(obj.flux_filtered_bg) && 1
+                ff_bg = obj.flux_filtered_bg; 
+            else
+                ff_bg = obj.getFilteredBackgroundBuffer;
+            end
+            
+            bg_rms = nanstd(ff_bg); 
+            ff_bg = ff_bg./bg_rms;
+            
+            ff = [ff_bg; obj.flux_filtered];
+            
+            t = 1:length(ff);
+            t = t - obj.store_pars.length_background + obj.store_pars.length_extended; 
+            
+            plot(ax1, t, ff, 'DisplayName', 'Filtered flux'); 
+            
+            ylim = ax1.YLim;
+            obj.showTimeRange('ax', ax1, 'alpha', 0.4); 
+            ax1.YLim = ylim; 
+            
+            hold(ax1, 'on'); 
+            plot(ax1, [0,0], ylim, ':k', 'HandleVisibility', 'off');
+            
+            N = 50;
+            s = util.series.binning(ff_bg, N, 'func', 'std');
+            t2 = t(1):N:0; 
+            plot(ax1, t2, s, '-+r', 'DisplayName', 'Noise RMS'); 
+            plot(ax1, t2, ones(length(t2),1), 'g--', 'DisplayName', 'Ideal normalization');
+            
+            % this limits the RMS to be calculated in the 200 frames before the target batch
+            plot(ax1, -obj.store_pars.length_extended.*[1,1], ylim, ':k', 'DisplayName', sprintf('Region RMS: %4.3f', ...
+                nanstd(ff_bg(end-obj.store_pars.length_extended+1:end))));
+            
+            % these are only for the legend entries
+            plot(ax1, NaN, NaN, '-r', 'DisplayName', sprintf('Mean RMS: %4.3f', mean(s)));
+            plot(ax1, NaN, NaN, '-r', 'DisplayName', sprintf('Median RMS: %4.3f', median(s)));
+            plot(ax1, NaN, NaN, '--g', 'DisplayName', sprintf('Total Norm: %4.3f', bg_rms));
+            
+            hold(ax1, 'off'); 
+            
+            ax1.FontSize = 14;
+            xlabel(ax1, 'Frame number'); 
+            ylabel(ax1, 'Filtered Flux'); 
+            
+            if obj.is_positive
+                hl = legend(ax1, 'Location', 'NorthWest', 'NumColumns', 2);
+            else
+                hl = legend(ax1, 'Location', 'SouthWest', 'NumColumns', 2);
+            end
+            
+            hl.FontSize = 14;
+            
+%             uicontrol(f0.fig, 'Style', 'pushbutton', 'String', 'CLOSE WINDOW', ...
+%                 'Units', 'Normalized', 'Position', [0.2 0.5 0.2 0.08], ...
+%                 'Callback', @obj.callback_close_window, 'FontSize', 12);
             
         end
         

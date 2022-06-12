@@ -1541,8 +1541,8 @@ classdef EventFinder < handle
                     bg_ff_std = nanstd(background_ff); 
 
                     f_filt = f_filt./bg_ff_std; 
-
-                end % need to correct the filtered fluxes by their measured noise
+                    
+                end 
 
                 [candidate, best_snr(ii)] = obj.searchForCandidates(flux_sim, detrend_sim, f_corr, f_filt, star_index_sim, background_ff, all_banks(ii), 1); % try to find a single event on this single star
 

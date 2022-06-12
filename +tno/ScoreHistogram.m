@@ -23,6 +23,7 @@ classdef ScoreHistogram < handle
     properties % inputs/outputs
         
         counts; 
+        score_widths_per_kernel;
         
     end
     
@@ -83,6 +84,7 @@ classdef ScoreHistogram < handle
         function reset(obj)
             
             obj.counts = [];
+            obj.score_widths_per_kernel = [];
             
         end
         
@@ -227,7 +229,7 @@ classdef ScoreHistogram < handle
             elseif dim == 3
                 val = "Photometric S/N per frame";
             elseif dim == 4
-                val = obj.getColorString; 
+                val = strrep(obj.getColorString, 'Mag_', ' '); 
             elseif dim == 5 
                 val = "Airmass";
             else
@@ -254,6 +256,123 @@ classdef ScoreHistogram < handle
             
         end
         
+        function idx = getIndexFromValue(obj, value, edges_type)
+            
+            if isnan(value)
+                idx = [];
+                return;
+            end
+            if isprop(obj, [edges_type '_edges'])
+                edges = obj.([edges_type '_edges']); 
+            else
+                error('Unknown property %s. Use score_edges or airmass_edges, etc.', [edges_type '_edges']);
+            end
+            
+            idx = find(value >= edges, 1, 'last'); 
+            
+            if obj.use_overflow
+                
+                if isempty(idx) % must be below first edge
+                    idx = 1; % set to underflow
+                else
+                    idx = idx + 1; % one more for the overflow bin
+                end
+                
+            end
+            
+        end
+        
+        function val = getCounts(obj, varargin)
+            
+            input =util.text.InputVars;
+            input.input_var('score', []); 
+            input.input_var('kernel_indices', []); 
+            input.input_var('star_snr', []); 
+            input.input_var('star_color', []); 
+            input.input_var('airmass', []); 
+            input.input_var('abs', false); 
+            input.scan_vars(varargin{:});
+            
+            val = obj.counts;
+            
+            if ~isempty(input.airmass)
+                
+                idx = [];
+                for ii = 1:length(input.airmass)
+                    idx = [idx, obj.getIndexFromValue(input.airmass(ii), 'airmass')];
+                end
+                
+                if length(idx)==2 % select range
+                    val = val(:,:,:,:,idx(1):idx(2));
+                else % select one or more values individually
+                    val = val(:,:,:,:,idx);
+                end
+                
+            end
+            
+            if ~isempty(input.star_color)
+                
+                idx = [];
+                for ii = 1:length(input.star_color)
+                    idx = [idx, obj.getIndexFromValue(input.star_color(ii), 'star_color')];
+                end
+                
+                if length(idx)==2 % select range
+                    val = val(:,:,:,idx(1):idx(2),:);
+                else % select one or more values individually
+                    val = val(:,:,:,idx,:);
+                end
+                
+            end
+            
+            if ~isempty(input.star_snr)
+                
+                idx = [];
+                for ii = 1:length(input.star_snr)
+                    idx = [idx, obj.getIndexFromValue(input.star_snr(ii), 'star_snr')];
+                end
+                
+                if length(idx)==2 % select range
+                    val = val(:,:,idx(1):idx(2),:,:);
+                else % select one or more values individually
+                    val = val(:,:,idx,:,:);
+                end
+                
+            end
+            
+            if ~isempty(input.kernel_indices)
+                
+                idx = input.kernel_indices;
+                
+                if length(idx)==2 % select range
+                    val = val(:,idx(1):idx(2),:,:,:);
+                else % select one or more values individually
+                    val = val(:,idx,:,:,:);
+                end
+                
+            end
+            
+            if ~isempty(input.score)
+                
+                idx = [];
+                for ii = 1:length(input.score)
+                    idx = [idx, obj.getIndexFromValue(input.score(ii), 'score')];
+                end
+                
+                if length(idx)==2 % select range
+                    val = val(idx(1):idx(2),:,:,:,:);
+                else % select one or more values individually
+                    val = val(idx,:,:,:,:);
+                end
+                
+            end
+            
+            if input.abs
+                % TODO: finish this
+            end
+            
+        end
+        
     end
     
     methods % setters
@@ -275,29 +394,6 @@ classdef ScoreHistogram < handle
                 obj.counts = zeros(length(obj.score_centers), length(obj.kernel_indices), ...
                     length(obj.star_snr_centers), length(obj.star_color_centers), ...
                     length(obj.airmass_centers), data_type); 
-            end
-            
-        end
-        
-        function idx = getIndexFromValue(obj, value, edges_type)
-            
-            if isnan(value)
-                idx = [];
-                return;
-            end
-            
-            edges = obj.([edges_type '_edges']); 
-            
-            idx = find(value >= edges, 1, 'last'); 
-            
-            if obj.use_overflow
-                
-                if isempty(idx) % must be below first edge
-                    idx = 0; % set to underflow
-                else
-                    idx = idx + 1; % one more for the overflow bin
-                end
-                
             end
             
         end
@@ -331,9 +427,32 @@ classdef ScoreHistogram < handle
                     N = uint32(N); 
                 end
                 
-                obj.counts(:,:,snr_idx,color_idx,airmass_idx) = obj.counts(:,:,snr_idx,color_idx,airmass_idx) + N;
+                if snr_idx > 0 && snr_idx <= size(obj.counts,3) && ...
+                        color_idx > 0 && color_idx <= size(obj.counts,4) && ...
+                        airmass_idx > 0 && airmass_idx <= size(obj.counts,5)
+                    obj.counts(:,:,snr_idx,color_idx,airmass_idx) = obj.counts(:,:,snr_idx,color_idx,airmass_idx) + N;
+                end
                 
             end
+            
+        end
+        
+        function calculateWidths(obj, varargin)
+            
+            C = obj.getCounts(varargin{:}); 
+            C = sum(C(:,:,:),3); % sum over all dimensions except score and kernels
+            bins = obj.getCentersByDim(1); % get the score bin centers
+            W = zeros(size(obj.kernel_indices)); 
+            
+            for ii = 1:length(obj.kernel_indices)
+                
+                % maybe also keep track of mean and number of outliers?
+                [~, W(ii)] = util.stat.dist_sigma_clipping(bins, C(:,ii), ...
+                    'sigma', 3, 'iter', 2); 
+                
+            end
+            
+            obj.score_widths_per_kernel = W;
             
         end
         
@@ -378,11 +497,7 @@ classdef ScoreHistogram < handle
                 end
             end
             
-            
-            C = obj.counts; 
-            
-            
-            % slice only the ranges defined by the inputs
+            C = obj.getCounts(input.output_vars{:}); 
             
             % sum all dimensions not requested by plot
             CS = C; 
@@ -412,7 +527,17 @@ classdef ScoreHistogram < handle
                 end
                 
             elseif ismatrix(CS)
-                error('not yet implemented!'); 
+                h = imagesc(input.ax, obj.getCentersByDim(dims(2)), ...
+                    obj.getCentersByDim(dims(1)), double(CS)); 
+                xlabel(input.ax, obj.getNameByDim(dims(2)));
+                ylabel(input.ax, obj.getNameByDim(dims(1)));
+                colorbar(input.ax); 
+                if input.log
+                    input.ax.ColorScale = 'log';
+                end
+                
+                axis(input.ax, 'square');
+                
             else
                 error('Cannot plot more than 2 dimensions!'); 
             end

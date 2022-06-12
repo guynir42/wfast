@@ -643,10 +643,18 @@ classdef Analysis < file.AstroData
                 
                 save(fullfile(obj.log_dir, 'candidates.mat'), 'cand', '-v7.3'); 
                 
+                scores = obj.finder.score_hist;
+                
+                save(fullfile(obj.log_dir, 'scores.mat'), 'scores', '-v7.3'); 
+                
+                obj.finder.score_hist = tno.ScoreHistogram.empty;
+                
                 finder = obj.finder;
 
 %                 save(fullfile(obj.log_dir, ['finder_' name]), 'finder', '-v7.3');
                 save(fullfile(obj.log_dir, 'finder.mat'), 'finder', '-v7.3');
+                
+                obj.finder.score_hist = scores; % return the object after saving
                 
             catch ME
                 warning(ME.getReport);
