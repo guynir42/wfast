@@ -174,6 +174,12 @@ classdef ShuffleBank < handle
              end
         end
         
+        function val = getKernelWidths(obj)
+            
+            val = sum(abs(obj.kernels),1); % if kernel is gaussian, this is equivalent to FWHM 
+            
+        end
+        
     end
     
     methods % setters

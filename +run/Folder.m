@@ -139,6 +139,7 @@ classdef Folder < dynamicprops
         
         has_lightcurves_mat = 0; % has a single, giant lightcurves MAT file (old method)
         has_lightcurves_hdf5 = 0; % has individual batches in lightcurve HDF5 files (new method)
+        has_scores = 0; % has score histograms saved into a MAT file
         has_microflares = 0; % have there been any flare detections saved in this folder
         
         flux_hist_folder = ''; % name of folder with flux histograms
@@ -261,6 +262,24 @@ classdef Folder < dynamicprops
             for obj = obj_vec
                 L = load(fullfile(obj.folder, obj.analysis_folder, 'classified.mat')); 
                 val = vertcat(val, L.candidates); 
+            end
+            
+        end
+        function val = getScoreHistograms(obj_vec)
+            
+            val = [];
+            for ii = 1:length(obj_vec)
+                
+                if obj_vec(ii).has_scores
+                    L = load(fullfile(obj_vec(ii).folder, obj_vec(ii).analysis_folder, 'scores.mat'));
+                    if isempty(val)
+                        val = L.scores;
+                    else
+                        val = val.add(L.scores); 
+                    end
+                    
+                end
+                
             end
             
         end
@@ -799,6 +818,7 @@ classdef Folder < dynamicprops
                         new_obj.has_classified = false; 
                         new_obj.has_lightcurves_mat = false;
                         new_obj.has_lightcurves_hdf5 = false;
+                        new_obj.has_scores = false;
                         
                         if ~isempty(analysis_folders) % we found an analysis folder! 
 
@@ -845,6 +865,10 @@ classdef Folder < dynamicprops
                                     new_obj.has_lightcurves_hdf5 = true;
                                 end
 
+                                if exist(fullfile(d.pwd, 'scores.mat'), 'file') % score histogram exists
+                                    new_obj.has_scores = true;
+                                end
+                                
                             end % processing time
                             
                         end % has analysis folders

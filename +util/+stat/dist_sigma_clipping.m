@@ -27,7 +27,7 @@ function [mu, sigma, num_outliers] = dist_sigma_clipping(bins, counts, varargin)
         fr = fit(x, y, 'gauss1');
     
         mu = fr.b1;
-        sigma = fr.c1;
+        sigma = fr.c1 / sqrt(2); % gauss1 model does not include 0.5 in the formula! 
         
         bad_idx = abs(bins - mu)/sigma > input.sigma; 
         bad_idx = util.vec.tocolumn(bad_idx); 

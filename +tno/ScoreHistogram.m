@@ -31,7 +31,7 @@ classdef ScoreHistogram < handle
         
         score_edges = -20:0.1:20;
         star_snr_edges = 0:1:30;
-        star_color_edges = -2:0.1:2;
+        star_color_edges = -1:0.1:3;
         airmass_edges = 1:0.1:4;
         
         use_overflow = true;
@@ -117,7 +117,7 @@ classdef ScoreHistogram < handle
             if isempty(obj.bank)
                 val = [];
             else
-                val = 1./sum(abs(obj.bank.kernels)).^2;
+                val = obj.bank.getKernelWidths;
                 % we should normalize this to be equiv to FWHM or something
             end
             
@@ -411,6 +411,8 @@ classdef ScoreHistogram < handle
             airmass_idx = obj.getIndexFromValue(airmass, 'airmass'); 
             score_edges = obj.getEdges('score');
             
+            C = obj.counts(:,:,:,:,airmass_idx); 
+            
             % go over each star individually
             for ii = 1:size(filtered_flux)
                 
@@ -427,13 +429,15 @@ classdef ScoreHistogram < handle
                     N = uint32(N); 
                 end
                 
-                if snr_idx > 0 && snr_idx <= size(obj.counts,3) && ...
-                        color_idx > 0 && color_idx <= size(obj.counts,4) && ...
-                        airmass_idx > 0 && airmass_idx <= size(obj.counts,5)
-                    obj.counts(:,:,snr_idx,color_idx,airmass_idx) = obj.counts(:,:,snr_idx,color_idx,airmass_idx) + N;
+                if ~isempty(snr_idx) && snr_idx > 0 && snr_idx <= size(obj.counts,3) && ...
+                        ~isempty(color_idx) && color_idx > 0 && color_idx <= size(obj.counts,4) && ...
+                        ~isempty(airmass_idx) && airmass_idx > 0 && airmass_idx <= size(obj.counts,5)
+                    C(:,:,snr_idx,color_idx) = C(:,:,snr_idx,color_idx) + N;
                 end
                 
             end
+            
+            obj.counts(:,:,:,:,airmass_idx) = C;
             
         end
         
@@ -453,6 +457,28 @@ classdef ScoreHistogram < handle
             end
             
             obj.score_widths_per_kernel = W;
+            
+        end
+        
+        function new_obj = add(obj, other)
+            
+            if ~isa(other, 'tno.ScoreHistogram')
+                error('Can only add "tno.ScoreHistogram" objects. Got "%s" instead.', class(other));
+            end
+            
+            names = {'score_edges', 'kernel_indices', 'star_snr_edges', 'star_color_edges', 'airmass_edges', 'use_overflow', 'color_columns'};
+            
+            for ii = 1:length(names)
+                
+                if ~isequal(obj.(names{ii}), other.(names{ii}))
+                    error('Mismatch in %s.'); 
+                end
+                
+            end
+            
+            new_obj = util.oop.full_copy(obj);
+            new_obj.counts = obj.counts + other.counts;
+            
             
         end
         
@@ -547,6 +573,38 @@ classdef ScoreHistogram < handle
             if nargout == 0
                 clear h;
             end
+            
+        end
+        
+        function h = plotWidths(obj, varargin)
+           
+            input = util.text.InputVars;
+            input.input_var('ax', [], 'axes', 'axis'); 
+            input.input_var('log', true); 
+            input.input_var('font_size', 14); 
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(obj.counts)
+                error('Cannot plot with an empty counts matrix!');
+            end
+            
+            obj.calculateWidths(varargin{:}); 
+            
+            if isempty(input.ax)
+                input.ax = gca;
+            end
+            
+            h = plot(input.ax, obj.bank.getKernelWidths, obj.score_widths_per_kernel, 's'); 
+            
+            xlabel(input.ax, 'Kernel width');
+            ylabel(input.ax, 'Score width'); 
+            
+            input.ax.FontSize = input.font_size;
+            
+            if nargout == 0
+                clear h;
+            end
+            
             
         end
         
