@@ -414,7 +414,7 @@ classdef ScoreHistogram < handle
             C = obj.counts(:,:,:,:,airmass_idx); 
             
             % go over each star individually
-            for ii = 1:size(filtered_flux)
+            for ii = 1:size(filtered_flux, 3)
                 
                 ff = filtered_flux(:,:,ii); 
                 ff(flags(:,ii)) = NaN; % remove bad data
@@ -495,6 +495,7 @@ classdef ScoreHistogram < handle
             input.input_var('star_snr', []); 
             input.input_var('star_color', []); 
             input.input_var('airmass', []); 
+            input.input_var('norm', false); 
             input.input_var('abs', false); 
             input.input_var('ax', [], 'axes', 'axis'); 
             input.input_var('log', true); 
@@ -553,6 +554,13 @@ classdef ScoreHistogram < handle
                 end
                 
             elseif ismatrix(CS)
+                
+                if input.norm
+                    for ii = 1:size(CS,2)
+                        CS(:,ii) = CS(:,ii)./sum(CS(:,ii)); 
+                    end
+                end
+                
                 h = imagesc(input.ax, obj.getCentersByDim(dims(2)), ...
                     obj.getCentersByDim(dims(1)), double(CS)); 
                 xlabel(input.ax, obj.getNameByDim(dims(2)));
