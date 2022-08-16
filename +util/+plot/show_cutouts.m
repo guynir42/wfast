@@ -22,6 +22,8 @@ function ax = show_cutouts(C, varargin)
     input.input_var('star', 1); % which star to look at
     input.input_var('oversample', [], 'oversampling'); % how much we want to interpolate to see more details
     input.input_var('type', 'heat') % can choose "heat" (regular image) or "surf" for 3D plot
+    input.input_var('bias', []); % override the contrast limit lower value
+    input.input_var('dynamic_range', []); % override the contrast limit upper value
     input.input_var('view', []); % pass a 2 or 3 vector to give the viewing angle on the surface plot
     input.input_var('monochrome', false, 'greyscale', 'grayscale'); % replace the colormap with inverted monochrome
     input.input_var('color', 'red'); % of the text label
@@ -75,7 +77,7 @@ function ax = show_cutouts(C, varargin)
             end
             
             if cs(input.type, 'heat')
-                util.plot.show(cutout, 'ax', ax{counter}, 'fancy', 'off', 'auto', 1); 
+                util.plot.show(cutout, 'ax', ax{counter}, 'fancy', 'off', 'auto', 1, 'bias', input.bias, 'dyn', input.dynamic_range); 
             elseif cs(input.type, 'surface')
                 surf(ax{counter}, cutout, 'LineStyle', 'none'); 
                 if ~isempty(input.view)

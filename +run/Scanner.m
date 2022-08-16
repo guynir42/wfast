@@ -520,7 +520,7 @@ classdef Scanner < handle
             
             
             obj.timer = timer('BusyMode', 'drop', 'ExecutionMode', 'fixedRate', 'Name', 'scanner-timer', ...
-                'Period', 300, 'StartDelay', 5, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer);
+                'Period', 3600, 'StartDelay', 5, 'TimerFcn', @obj.callback_timer, 'ErrorFcn', @obj.setup_timer);
             
             start(obj.timer);
             

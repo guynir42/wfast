@@ -1020,8 +1020,12 @@ classdef EventFinder < handle
                 ff = filtered_fluxes(time_indices,:,:);
             end
             
-            obj.score_hist.input(ff, flags, star_snr, star_colors, obj.head.AIRMASS);
-                
+            try
+                obj.score_hist.input(ff, flags, star_snr, star_colors, obj.head.AIRMASS);
+            catch ME
+                warning(ME.getReport);
+            end
+            
             candidates_all = vertcat(candidates_all, candidates); 
             star_indices_all = unique([star_indices_all; star_indices]); 
             best_snr_all = nanmax(best_snr_all, best_snr); 

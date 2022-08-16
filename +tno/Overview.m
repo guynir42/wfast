@@ -462,7 +462,7 @@ classdef Overview < handle
 
                         if isequal(obj.flux_edges_log, summary.flux_edges_log)
 
-                            if isempty(obj.flux_histogram_logs)
+                            if isempty(obj.flux_histograms_log)
                                 obj.flux_histograms_log = zeros([size(summary.flux_histograms_log), length(obj.airmass_edges)-1], ...
                                     'like', summary.flux_histograms_log); 
                             end

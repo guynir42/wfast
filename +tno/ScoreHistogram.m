@@ -460,7 +460,11 @@ classdef ScoreHistogram < handle
             
         end
         
-        function new_obj = add(obj, other)
+        function new_obj = add(obj, other, use_copy)
+            
+            if nargin<3 || isempty(use_copy)
+                use_copy = false;
+            end
             
             if ~isa(other, 'tno.ScoreHistogram')
                 error('Can only add "tno.ScoreHistogram" objects. Got "%s" instead.', class(other));
@@ -476,9 +480,13 @@ classdef ScoreHistogram < handle
                 
             end
             
-            new_obj = util.oop.full_copy(obj);
-            new_obj.counts = obj.counts + other.counts;
+            if use_copy
+                new_obj = util.oop.full_copy(obj);
+            else
+                new_obj = obj;
+            end
             
+            new_obj.counts = obj.counts + other.counts;
             
         end
         
