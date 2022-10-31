@@ -2175,6 +2175,7 @@ classdef Candidate < handle
             f.clear;
             
             N = 2*length(obj.time_range); 
+            N = max(N, 49); 
             
             ax = util.plot.show_cutouts(obj.cutouts, 'frame', obj.time_index, 'number', N); 
             

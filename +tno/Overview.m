@@ -421,66 +421,70 @@ classdef Overview < handle
             end % for ii (snr)
             
             % if there are flux histograms, add them also
-            if ~isempty(summary.flux_histograms) && ... % assume the edges and log hist are also filled! 
-                ~isempty(summary.head) && ~isempty(summary.head.AIRMASS) % cannot add histograms without knowing the airmass
-            
-                if isempty(obj.airmass_edges)
-                    obj.airmass_edges = 1:0.1:4; % default edges
-                end
-                
-                if isempty(obj.flux_binning_factors)
-                    obj.flux_binning_factors = summary.flux_binning_factors;
-                end
-                
-                a = summary.head.AIRMASS;
-                idx = find(a > obj.airmass_edges, 1, 'last'); 
-                
-                if ~isempty(idx) && a < obj.airmass_edges(end) % airmass must be inside histogram limits 
-                
-                    if isequal(obj.flux_binning_factors, summary.flux_binning_factors)
+            if isa(summary, 'tno.Summary')            
+                if ~isempty(summary.flux_histograms) && ... % assume the edges and log hist are also filled! 
+                    ~isempty(summary.head) && ~isempty(summary.head.AIRMASS) % cannot add histograms without knowing the airmass
 
-                        if isempty(obj.flux_edges)
-                            obj.flux_edges = summary.flux_edges;
-                        end
-
-                        if isequal(obj.flux_edges, summary.flux_edges)
-
-                            if isempty(obj.flux_histograms)
-                                obj.flux_histograms = zeros([size(summary.flux_histograms), length(obj.airmass_edges)-1], ...
-                                    'like', summary.flux_histograms); 
-                            end
-
-                            obj.flux_histograms(:,:,idx) = obj.flux_histograms(:,:,idx) + summary.flux_histograms;
-
-                        else
-                            warning('Mismatch of flux_edges!'); 
-                        end
-
-                        if isempty(obj.flux_edges_log)
-                            obj.flux_edges_log = summary.flux_edges_log;
-                        end
-
-                        if isequal(obj.flux_edges_log, summary.flux_edges_log)
-
-                            if isempty(obj.flux_histograms_log)
-                                obj.flux_histograms_log = zeros([size(summary.flux_histograms_log), length(obj.airmass_edges)-1], ...
-                                    'like', summary.flux_histograms_log); 
-                            end
-
-                            obj.flux_histograms_log(:,:,idx) = obj.flux_histograms_log(:,:,idx) + summary.flux_histograms_log;
-                            
-                        else
-                            warning('Mismatch of flux_edges_log!'); 
-                        end
-
-                    else
-                        warning('Mismatch of flux binning factors! (%s vs. %s)', ...
-                            util.text.print_vec(obj.flux_binning_factors, ', '), ...
-                            util.text.print_vec(summary.flux_binning_factors, ', '))
+                    if isempty(obj.airmass_edges)
+                        obj.airmass_edges = 1:0.1:4; % default edges
                     end
-                
+
+                    if isempty(obj.flux_binning_factors)
+                        obj.flux_binning_factors = summary.flux_binning_factors;
+                    end
+
+                    a = summary.head.AIRMASS;
+                    idx = find(a > obj.airmass_edges, 1, 'last'); 
+
+                    if ~isempty(idx) && a < obj.airmass_edges(end) % airmass must be inside histogram limits 
+
+                        if isequal(obj.flux_binning_factors, summary.flux_binning_factors)
+
+                            if isempty(obj.flux_edges)
+                                obj.flux_edges = summary.flux_edges;
+                            end
+
+                            if isequal(obj.flux_edges, summary.flux_edges)
+
+                                if isempty(obj.flux_histograms)
+                                    obj.flux_histograms = zeros([size(summary.flux_histograms), length(obj.airmass_edges)-1], ...
+                                        'like', summary.flux_histograms); 
+                                end
+
+                                obj.flux_histograms(:,:,idx) = obj.flux_histograms(:,:,idx) + summary.flux_histograms;
+
+                            else
+                                warning('Mismatch of flux_edges!'); 
+                            end
+
+                            if isempty(obj.flux_edges_log)
+                                obj.flux_edges_log = summary.flux_edges_log;
+                            end
+
+                            if isequal(obj.flux_edges_log, summary.flux_edges_log)
+
+                                if isempty(obj.flux_histograms_log)
+                                    obj.flux_histograms_log = zeros([size(summary.flux_histograms_log), length(obj.airmass_edges)-1], ...
+                                        'like', summary.flux_histograms_log); 
+                                end
+
+                                obj.flux_histograms_log(:,:,idx) = obj.flux_histograms_log(:,:,idx) + summary.flux_histograms_log;
+
+                            else
+                                warning('Mismatch of flux_edges_log!'); 
+                            end
+
+                        else
+                            warning('Mismatch of flux binning factors! (%s vs. %s)', ...
+                                util.text.print_vec(obj.flux_binning_factors, ', '), ...
+                                util.text.print_vec(summary.flux_binning_factors, ', '))
+                        end
+
+                    end
                 end
-                
+            elseif isa(summary, 'tnoOverview')
+                 obj.flux_histograms =  obj.flux_histograms + summary.flux_histograms;
+                 obj.flux_histograms_log =  obj.flux_histograms_log + summary.flux_histograms_log;
             end
             
             %%% accumulate the simulated events as well
@@ -1332,7 +1336,7 @@ classdef Overview < handle
             input.input_var('print_numbers', false);
             input.input_var('log', true, 'logarithm'); 
             input.input_var('axes', [], 'axis'); 
-            input.input_var('font_size', 18); 
+            input.input_var('font_size', 20); 
             input.scan_vars(varargin{:}); 
             
             if length(input.ecl)~=2
@@ -1415,21 +1419,31 @@ classdef Overview < handle
             
             comets.show('r_edges', input.r_edges); 
             
+            [n, n_l, n_u] = comets.numDensityIntervals(input.r_edges);
+            dn_l = n - n_l;
+            dn_u = n_u - n;
+
+            N = n .* C; 
+            dN_l = sqrt((C.*dn_l).^2 + (n.*dC_l).^2); 
+            dN_u = sqrt((C.*dn_u).^2 + (n.*dC_u).^2); 
+            
+            % show the expected number of detections
+            NT = sum(N); % total N detections
+            [NL, NU] = util.stat.poisson_errors(NT, 0.025); % 95% sigma error in both directions
+            plot(input.axes, NaN, NaN, 'DisplayName', ...
+                sprintf('Total detections= %4.1f (%4.1f-%4.1f)', NT, NL, NU))
+            
             if input.print_numbers
-                
-                [n, n_l, n_u] = comets.numDensityIntervals(input.r_edges);
-                dn_l = n - n_l;
-                dn_u = n_u - n;
-                
-                N = n .* C; 
-                dN_l = sqrt((C.*dn_l).^2 + (n.*dC_l).^2); 
-                dN_u = sqrt((C.*dn_u).^2 + (n.*dC_u).^2); 
-                
+                    
                 for ii = 1:length(r)
                     
-                    text(input.axes, double(r(ii)), double(1./C(ii)), ...
+                    ht = text(input.axes, double(r(ii)), double(1./C(ii)), ...
                         sprintf(' N= %.2f^{+%.3f}_{-%.3f}', N(ii), dN_u(ii), dN_l(ii)), ...
-                        'FontSize', 14, 'Rotation', 90, 'VerticalAlignment', 'Bottom'); 
+                        'FontSize', 16, 'Rotation', 90, 'VerticalAlignment', 'Bottom'); 
+                    
+                    if ii == 1
+                        ht.HorizontalAlignment = 'Right';
+                    end
                     
                 end
                 

@@ -544,7 +544,7 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             
         end
         
-        function velocity_RA_Dec = getShadowVelocity(obj) % in km/s
+        function velocity_RA_Dec = getShadowVelocity(obj, total) % in km/s
             
             v_shadow = -celestial.SolarSys.earth_vel_ron_vondrak(obj.JD, 'SI')/1000; % shadow velocity on the Earth in 3D space, equatorial coordinates (km/s)
             
@@ -552,6 +552,10 @@ classdef (CaseInsensitiveProperties, TruncatedProperties) Ephemeris < handle
             vel_Dec = -v_shadow(2).*sind(obj.Dec_deg) + v_shadow(3).*cosd(obj.Dec_deg); % the V_y/V_z vector is rotated to the Earth's surface using the Dec angle, and only the Y component is taken
             
             velocity_RA_Dec = [vel_RA, vel_Dec]; 
+            
+            if total
+                velocity_RA_Dec = sqrt(sum(velocity_RA_Dec.^2));
+            end
             
         end
         
