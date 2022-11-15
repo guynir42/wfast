@@ -27,8 +27,6 @@ function [mu, sigma, values, N_exc] = sigma_clipping(values, varargin)
     
     if nargin==0, help('util.stat.sigma_clipping'); return; end
     
-    N_exc = 0; % number of excluded values
-    
     % add input checks on "values"
     values = values(:);
     values(isnan(values)) = [];
@@ -64,17 +62,25 @@ function [mu, sigma, values, N_exc] = sigma_clipping(values, varargin)
         ax = gca;
     end
     
+    N_prev = numel(values);
     values = values(~isnan(values));
     
+    % first iteration:
     mu = median(values, 'omitnan');
 %     sigma = fwhm(values);
     sigma = std(values, 'omitnan');
 %     N = sum(values>mu-Nsigma*sigma & values<mu+Nsigma*sigma);
+    
     values = values(values>mu-Nsigma*sigma & values<mu+Nsigma*sigma);
     N = numel(values);
+    N_exc = N_prev - N; % number of excluded values
     
     if isnan(mu)
         return; % silently give back a NaN if the inputs are all NaN!
+    end
+    
+    if N < 4
+        return;
     end
     
     for ii = 1:Niter_max
@@ -120,13 +126,14 @@ function [mu, sigma, values, N_exc] = sigma_clipping(values, varargin)
         
         keep_idx = values>mu-Nsigma*sigma & values<mu+Nsigma*sigma;
         
-        N_exc = N_exc + numel(values) - nnz(keep_idx); 
         values = values(keep_idx);
                 
         N = numel(values);        
         
+        N_exc = N_exc + N_prev - N;
+
         if N==N_prev || N<4
-            break;
+            return;
         end
         
     end
