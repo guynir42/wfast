@@ -135,7 +135,7 @@ hold(ax2, 'off');
 
 %% save the plot
 
-util.sys.print([data_dir, '/plots/efficiency']);
+util.sys.print([data_dir, '/plots/star_hours_snr_vel']);
 
 %% plot the efficiency
 
@@ -242,7 +242,13 @@ util.sys.print([data_dir, '/plots/coverage']);
 
 %% load the first event
 
+C1 = load([data_dir '/occultation_flux/occult_2020-07-01_fluxes']); 
 
+%% make sure it has an MCMC loaded
+
+if isempty(C1.occultation.mcmc_wide_v)
+    C1.occultation.runMCMC('async', 0, 'chains', 10); 
+end
 
 
 

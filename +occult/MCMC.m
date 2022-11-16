@@ -28,7 +28,7 @@ classdef MCMC < handle
         input_errors; % the rms error on the given flux
         
         input_R; % best estimate for the star's size
-        input_v; % best estimate for the fields' velocity
+        input_v; % best estimate for the field's velocity (FSU/s)
         
         counter = 0; 
         num_successes = 0; % number of steps that succeeded

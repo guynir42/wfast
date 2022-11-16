@@ -535,8 +535,7 @@ classdef Candidate < handle
                 e = head.Ephemeris; 
                 e.RA_deg = obj.star_props.RA;
                 e.Dec_deg = obj.star_props.Dec;
-                val = e.getShadowVelocity; 
-                val = sqrt(sum(val.^2));                 
+                val = e.getShadowVelocity(1); % km/s
             end
             
         end
@@ -824,7 +823,8 @@ classdef Candidate < handle
             mcmc.input_R = obj.star_props.FresnelSize; 
             
             if ~obj.is_simulated
-                mcmc.input_v = obj.getShadowVelocity; 
+                fsu = sqrt(600e-12 * 150e9 *40 / 2); % assume KBOs at 40AU giving 1.3 km per fsu
+                mcmc.input_v = obj.getShadowVelocity / fsu; 
             else
                 mcmc.input_v = obj.sim_pars.v + 4.4; % shift by 4.4 to get the calculated limits of the prior around the true value
             end
