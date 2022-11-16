@@ -1030,6 +1030,7 @@ classdef Overview < handle
             input = util.text.InputVars;
             input.input_var('velocity', false); 
             input.input_var('axes', [], 'axis'); 
+            input.input_var('losses', false);
             input.input_var('font_size', 18); 
             input.scan_vars(varargin{:}); 
             
@@ -1037,8 +1038,14 @@ classdef Overview < handle
                 input.axes = gca;
             end
             
+            if input.losses
+                data = obj.star_seconds_with_losses;
+            else
+                data = obj.star_seconds;
+            end
+            
             if input.velocity
-                h = imagesc(input.axes, obj.ecl_edges(1:end-1)+obj.ecl_bin_width/2, obj.vel_edges(1:end-1), squeeze(nansum(nansum(obj.star_seconds,1),2))'./3600);
+                h = imagesc(input.axes, obj.ecl_edges(1:end-1)+obj.ecl_bin_width/2, obj.vel_edges(1:end-1), squeeze(nansum(nansum(data,1),2))'./3600);
                 c = colormap(input.axes);
                 c(1,:) = [1 1 1]; 
                 colormap(input.axes, c); 
@@ -1051,9 +1058,10 @@ classdef Overview < handle
                 hc.FontSize = input.font_size;
                 
                 input.axes.ColorScale = 'log';
+                input.axes.YDir = 'normal';
                 
             else
-                h = bar(input.axes, obj.ecl_edges(1:end-1)+obj.ecl_bin_width/2, squeeze(nansum(nansum(nansum(obj.star_seconds,1),2),4))./3600,1);
+                h = bar(input.axes, obj.ecl_edges(1:end-1)+obj.ecl_bin_width/2, squeeze(nansum(nansum(nansum(data,1),2),4))./3600,1);
                 xlabel(input.axes, 'ecliptic latitude [deg]'); 
                 ylabel(input.axes, 'total star hours'); 
             end
@@ -1210,6 +1218,7 @@ classdef Overview < handle
             input.input_var('ecl', [-5,5], 'ecliptic latitude', 'ecliptic limits'); 
             input.input_var('r_edges', []);
             input.input_var('distance', 40, 'distance_au', 'dist_au'); 
+            input.input_var('velocity', true); 
             input.input_var('parent', [], 'figure'); 
             input.input_var('font_size', 18); 
             input.scan_vars(varargin{:}); 
@@ -1287,8 +1296,8 @@ classdef Overview < handle
             plot(ax1, r, E2*100, 'go', 'LineWidth', 2, 'DisplayName', 'weighted by velocities'); 
             
             for ii = 1:length(E1)
-                text(ax1, mean([r(ii),input.r_edges(ii)]), double(E1(ii)*100), sprintf('%d/%d', sum(N_passed(:,ii),1), sum(N_total(:,ii),1)), ...
-                    'FontSize', 14, 'Rotation', 90, 'HorizontalAlignment', 'left', 'Color', 'r'); 
+                text(ax1, mean([r(ii),input.r_edges(ii)]), double(E1(ii)*100), sprintf(' %d/%d', sum(N_passed(:,ii),1), sum(N_total(:,ii),1)), ...
+                    'FontSize', 16, 'Rotation', 90, 'HorizontalAlignment', 'left', 'Color', 'r'); 
             end
             
             hold(ax1, 'off'); 
@@ -1305,7 +1314,6 @@ classdef Overview < handle
                 ax1.XTick = ax1.XTick(2:end);
             end
             
-            ax1.YLim = [0 100]; 
             grid(ax1, 'on'); 
             
             ax1.FontSize = input.font_size; 
@@ -1315,15 +1323,18 @@ classdef Overview < handle
             
             %%%%% velocity distribution %%%%%
             
-            ax2 = axes('Parent', input.parent, 'Position', [0.175 0.55 0.3 0.3]); 
+            if input.velocity
+                ax1.YLim = [0 100]; 
             
-            bar(ax2, obj.vel_edges(1:end-1)-obj.vel_bin_width/2, v_weights/3600); 
-            
-            ylabel('Star hours'); 
-            xlabel('Velocity [km/s]'); 
-            
-            ax2.FontSize = input.font_size - 2;
-            
+                ax2 = axes('Parent', input.parent, 'Position', [0.175 0.55 0.3 0.3]); 
+
+                bar(ax2, obj.vel_edges(1:end-1)-obj.vel_bin_width/2, v_weights/3600); 
+
+                ylabel('Star hours'); 
+                xlabel('Velocity [km/s]'); 
+
+                ax2.FontSize = input.font_size - 2;
+            end
         end
         
         function showCoverage(obj, varargin)
@@ -1333,7 +1344,7 @@ classdef Overview < handle
             input.input_var('r_edges', []);
             input.input_var('distance', 40, 'distance_au', 'dist_au'); 
             input.input_var('efficiency', []); 
-            input.input_var('print_numbers', false);
+            input.input_var('print_numbers', false, 'numbers');
             input.input_var('log', true, 'logarithm'); 
             input.input_var('axes', [], 'axis'); 
             input.input_var('font_size', 20); 
@@ -1377,7 +1388,7 @@ classdef Overview < handle
             end
             
             re = util.vec.tocolumn(input.r_edges);
-            r = re(1:end-1) + diff(re)/2; 
+            r = (re(1:end-1) + re(2:end))/2; 
             
             [coverage, cov_lower, cov_upper] = obj.calcCoverage(input.r_edges, input.distance, input.efficiency);
             
@@ -1417,7 +1428,7 @@ classdef Overview < handle
 %             h_c_l = plot(input.axes, r, 1./C_l, '--', 'LineWidth', 1.5, 'Color', h_c_u.Color); 
 %             h_c_l.HandleVisibility = 'off'; 
             
-            comets.show('r_edges', input.r_edges); 
+            comets.show('r_edges', input.r_edges, 'axes', input.axes); 
             
             [n, n_l, n_u] = comets.numDensityIntervals(input.r_edges);
             dn_l = n - n_l;
@@ -1437,16 +1448,20 @@ classdef Overview < handle
                     
                 for ii = 1:length(r)
                     
-                    ht = text(input.axes, double(r(ii)), double(1./C(ii)), ...
-                        sprintf(' N= %.2f^{+%.3f}_{-%.3f}', N(ii), dN_u(ii), dN_l(ii)), ...
-                        'FontSize', 16, 'Rotation', 90, 'VerticalAlignment', 'Bottom'); 
-                    
                     if ii == 1
-                        ht.HorizontalAlignment = 'Right';
+                        alignment = 'Bottom';
+                        anchor = 1./C(ii);
+                    else
+                        alignment = 'Middle';
+                        anchor = 1./C(ii)+dC_u(ii)./C(ii).^2;
                     end
                     
+                    ht = text(input.axes, double(r(ii)), double(anchor), ...
+                        sprintf(' N= %.2f^{+%.3f}_{-%.3f} ', N(ii), dN_u(ii), dN_l(ii)), ...
+                        'FontSize', 16, 'Rotation', 90, 'VerticalAlignment', alignment, ...
+                        'HorizontalAlignment', 'Left'); 
+                    
                 end
-                
                 
             end
             
@@ -1564,6 +1579,92 @@ classdef Overview < handle
             
             hl = legend(input.axes, {'Total', 'Detected', 'Fraction'}, 'Location', 'NorthEast'); 
             hl.FontSize = input.font_size - 2;
+            
+            
+        end
+                
+        function [b_values, r_values, frac]= showDetectionContours(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('distance', 40, 'distance_au', 'dist_au'); 
+            input.input_var('step', 0.2); 
+            input.input_var('max_snr', 10); 
+            input.input_var('min_vel', 3); 
+            input.input_var('max_vel', 30); 
+            input.input_var('scale_r', 1, 7); 
+            input.input_var('scale_b', 1, 7); 
+            input.input_var('axes', [], 'axis'); 
+            input.input_var('font_size', 18); 
+            input.scan_vars(varargin{:}); 
+            
+            if ischar(input.distance)
+                
+                if cs(input.distance, 'kbos', 'kuiper belt objects')
+                    input.distance = 40; 
+                elseif cs(input.distance, 'hills cloud', 'inner oort')
+                    input.distance = 3000; 
+                elseif cs(input.distance, 'oort cloud')
+                    input.distance = 10000; 
+                else
+                    error('Unknown "distance" option "%s". Use a numeric value in AU, or "KBOs", "Hills" or "Oort"', input.distance); 
+                end
+                
+            end
+            
+            if isempty(input.axes)
+                input.axes = gca;
+            end
+                        
+            ev = obj.sim_events([obj.sim_events.D]==input.distance); 
+            
+            max_b = round(max([ev.b]/input.step))*input.step;
+            max_r = round(max([ev.r]/input.step))*input.step;
+            
+            b_edges = 0:input.step:max_b;
+            r_edges = 0:input.step:max_r; 
+            
+            b_values = (b_edges(1:end-1) + b_edges(2:end))/2;
+            r_values = (r_edges(1:end-1) + r_edges(2:end))/2;
+            
+            ev = ev([ev.star_snr] < input.max_snr); 
+            ev = ev([ev.v] >= input.min_vel & [ev.v] <= input.max_vel);
+            
+            total = zeros(length(b_values), length(r_values)); 
+            found = total;
+            
+            for ii = 1:length(b_edges)-1
+                
+                ev_temp = ev([ev.b] >= b_edges(ii) & [ev.b] < b_edges(ii+1));
+                
+                for jj = 1:length(r_edges)-1
+                    
+                    selected_ev = ev_temp([ev_temp.r] >= r_edges(jj) & [ev_temp.r] < r_edges(jj+1));
+                    if isempty(selected_ev) && jj > 1
+                        total(ii,jj) = total(ii,jj-1);
+                        found(ii,jj) = found(ii,jj-1); 
+                    else
+                        total(ii,jj) = numel(selected_ev);
+                        found(ii,jj) = nnz([selected_ev.passed]);
+                    end
+                end
+                
+            end
+            
+            frac = found./total;
+            frac(total==0) = NaN;
+            
+            cla(input.axes); 
+            
+            v = 10:20:90;
+            [C,h] = contour(r_values*input.scale_r, b_values*input.scale_b, frac*100, v, 'k');
+            clabel(C,h, v);
+
+            xlabel(input.axes, 'Occulter Radius [FSU]');
+            ylabel(input.axes, 'Impact Parameter [FSU]'); 
+            
+            input.axes.FontSize = input.font_size; 
+            
+%             hl = legend(input.axes, {'Total', 'Detected', 'Fraction'}, 'Location', 'NorthEast'); 
             
             
         end
