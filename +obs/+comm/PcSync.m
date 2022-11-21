@@ -36,7 +36,7 @@ classdef PcSync < handle
         
         max_reply_delay_minutes = 10; % how long should we wait to get a reply from the other computer
         
-        remote_ip = '192.168.1.103';
+        remote_ip = '10.23.1.33';
         remote_port_rx = 4012;
         remote_port_tx = 4013;
         role = '';
@@ -59,8 +59,8 @@ classdef PcSync < handle
         raw_data_rx_temp; % for broken up incoming messages
         raw_data_tx_temp;
         
-        default_client_remote_ip = '192.168.1.101';
-        default_server_remote_ip = '0.0.0.0';
+        default_client_remote_ip = '10.23.1.33'; % cam-pc
+        default_server_remote_ip = '0.0.0.0'; % accept from anywhere, or dome-pc
         
         default_server_remote_port_rx = 4012;
         default_server_remote_port_tx = 4013;

@@ -364,8 +364,7 @@ classdef Deflator < file.AstroData
                             
                             if obj.use_auto_backup
                                 util.text.date_printf('Copying file %s%s from %s to %s (backup).', name, ext, obj.src_subdir.pwd, obj.out_subdir_backup.pwd);
-                                copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir_backup.pwd, name, ext));
-                            
+                                copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir_backup.pwd, name, ext));                            
                             end
                             
                         end
@@ -377,6 +376,12 @@ classdef Deflator < file.AstroData
                             [~, name, ext] = fileparts(f{1});
                             util.text.date_printf('Copying file %s from %s to %s.', name, ext, obj.src_subdir.pwd, obj.out_subdir.pwd);
                             copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir.pwd, name, ext));
+                            
+                            if obj.use_auto_backup
+                                util.text.date_printf('Copying file %s%s from %s to %s (backup).', name, ext, obj.src_subdir.pwd, obj.out_subdir_backup.pwd);
+                                copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir_backup.pwd, name, ext));                            
+                            end
+                            
                         end
                     end
                     
@@ -386,6 +391,12 @@ classdef Deflator < file.AstroData
                             [~, name, ext] = fileparts(f{1});
                             util.text.date_printf('Copying file %s%s from %s to %s.', name, ext, obj.src_subdir.pwd, obj.out_subdir.pwd);
                             copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir.pwd, name, ext));
+                            
+                            if obj.use_auto_backup
+                                util.text.date_printf('Copying file %s%s from %s to %s (backup).', name, ext, obj.src_subdir.pwd, obj.out_subdir_backup.pwd);
+                                copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir_backup.pwd, name, ext));                            
+                            end
+                            
                         end
                     end
                     
@@ -395,6 +406,12 @@ classdef Deflator < file.AstroData
                             [~, name, ext] = fileparts(f{1});
                             util.text.date_printf('Copying file %s%s from %s to %s.', name, ext, obj.src_subdir.pwd, obj.out_subdir.pwd);
                             copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir.pwd, name, ext));
+                            
+                            if obj.use_auto_backup
+                                util.text.date_printf('Copying file %s%s from %s to %s (backup).', name, ext, obj.src_subdir.pwd, obj.out_subdir_backup.pwd);
+                                copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir_backup.pwd, name, ext));                            
+                            end
+                            
                         end
                     end
                     
@@ -404,6 +421,12 @@ classdef Deflator < file.AstroData
                             [~, name, ext] = fileparts(f{1});
                             util.text.date_printf('Copying file %s%s from %s to %s.', name, ext, obj.src_subdir.pwd, obj.out_subdir.pwd);
                             copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir.pwd, name, ext));
+                            
+                            if obj.use_auto_backup
+                                util.text.date_printf('Copying file %s%s from %s to %s (backup).', name, ext, obj.src_subdir.pwd, obj.out_subdir_backup.pwd);
+                                copyfile(sa(obj.src_subdir.pwd,name,ext), sa(obj.out_subdir_backup.pwd, name, ext));                            
+                            end
+                            
                         end
                     end
                     
