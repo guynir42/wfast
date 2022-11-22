@@ -244,19 +244,138 @@ util.sys.print([data_dir, '/plots/coverage']);
 
 C1 = load([data_dir '/occultation_flux/occult_2020-07-01_fluxes']); 
 
+%% show the lightcurve and cutouts
+
+f6 = util.plot.FigHandler('occult 2020-07-01');
+f6.width = 30;
+f6.height = 15;
+f6.clear;
+
+C1.occultation.showFluxCutouts('parent', f6.fig);
+
+
+%% save the plot
+
+util.sys.print([data_dir, '/plots/occult_2020-07-01']);
+
+
 %% make sure it has an MCMC loaded
 
-if isempty(C1.occultation.mcmc_wide_v)
-    C1.occultation.runMCMC('async', 0, 'chains', 10); 
+if isempty(C1.occultation.mcmc) || isempty(C1.occultation.mcmc.results)
+    C1.occultation.runMCMC('async', 1, 'chains', 10); 
 end
 
 
+f7 = util.plot.FigHandler('mcmc 2020-07-01');
+f7.width = 25;
+f7.height = 16;
+f7.clear;
 
 
+C1.occultation.mcmc.showResults('parent', f7.fig); 
+
+%% save the plot
+
+util.sys.print([data_dir, '/plots/mcmc_2020-07-01']);
+
+%% show the outlier analysis for event 1
 
 
+f8 = util.plot.FigHandler('outliers 2020-07-01');
+f8.width = 30;
+f8.height = 16;
+f8.clear;
+
+f = C1.flux(C1.frame_index - 2000:C1.frame_index + 2000, :, C1.aperture_index);
+C1.occultation.showOutlierAnalysis(f, 'parent', f8.fig, 'recalc', 1); 
 
 
+%% save the plot
+
+util.sys.print([data_dir, '/plots/outliers_2020-07-01']);
+
+
+%% save the occultation and all data along with it back to disk
+
+occultation = C1.occultation;
+star_index = C1.star_index;
+frame_index = C1.frame_index;
+aperture_index = C1.aperture_index;
+flux = C1.flux;
+time = C1.time;
+
+save([data_dir '/occultation_flux/occult_2020-07-01_fluxes'],...
+    'occultation', 'flux', 'time', 'frame_index', 'star_index', ...
+    'aperture_index', '-v7.3');
+
+
+%% load the second event
+
+C2 = load([data_dir '/occultation_flux/occult_2021-04-01_fluxes']); 
+
+%% show the lightcurve and cutouts
+
+f9 = util.plot.FigHandler('occult 2021-04-01');
+f9.width = 30;
+f9.height = 15;
+f9.clear;
+
+C2.occultation.showFluxCutouts('parent', f9.fig);
+
+
+%% save the plot
+
+util.sys.print([data_dir, '/plots/occult_2021-04-01']);
+
+
+%% make sure it has an MCMC loaded
+
+if isempty(C2.occultation.mcmc) || isempty(C2.occultation.mcmc.results)
+    C2.occultation.runMCMC('async', 0, 'chains', 10); 
+end
+
+
+f10 = util.plot.FigHandler('mcmc 2021-04-01');
+f10.width = 25;
+f10.height = 16;
+f10.clear;
+
+
+C2.occultation.mcmc.showResults('parent', f10.fig); 
+
+%% save the plot
+
+util.sys.print([data_dir, '/plots/mcmc_2020-07-01']);
+
+%% show the outlier analysis for event 1
+
+
+f8 = util.plot.FigHandler('outliers 2020-07-01');
+f8.width = 30;
+f8.height = 16;
+f8.clear;
+
+f = C1.flux(C1.frame_index - 2000:C1.frame_index + 2000, :, C1.aperture_index);
+C1.occultation.showOutlierAnalysis(f, 'parent', f8.fig, 'recalc', 1); 
+
+
+%% save the plot
+
+util.sys.print([data_dir, '/plots/outliers_2020-07-01']);
+
+
+%% save the occultation and all data along with it back to disk
+
+occultation = C1.occultation;
+star_index = C1.star_index;
+frame_index = C1.frame_index;
+aperture_index = C1.aperture_index;
+flux = C1.flux;
+time = C1.time;
+
+save([data_dir '/occultation_flux/occult_2020-07-01_fluxes'],...
+    'occultation', 'flux', 'time', 'frame_index', 'star_index', ...
+    'aperture_index', '-v7.3');
 
 
 
