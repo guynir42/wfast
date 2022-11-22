@@ -1185,8 +1185,9 @@ classdef Andor < file.AstroData
 
                     % save these parameters from hardware to save calls whenever we need to parse the raw data
 %                     [rc, obj.imageSizeBytes] = obs.cam.sdk.AT_GetInt(obj.hndl, 'ImageSizeBytes'); obs.cam.sdk.AT_CheckWarning(rc); % size of raw data buffer for single image
+                    
                     obj.imageSizeBytes = obs.cam.mex_new.get(obj.hndl, 'size');
-
+%                     obj.imageSizeBytes = 4128*4104*2;
                     % note width and height are flipped due to C -> matlab conventions
 %                     [rc, obj.AOIwidth_c] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOIWidth'); obs.cam.sdk.AT_CheckWarning(rc);
 %                     [rc, obj.AOIheight_c] = obs.cam.sdk.AT_GetInt(obj.hndl, 'AOIHeight'); obs.cam.sdk.AT_CheckWarning(rc);

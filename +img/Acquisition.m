@@ -21,6 +21,7 @@ classdef Acquisition < file.AstroData
         cam; % can be obs.cam.CameraControl or obs.cam.Andor
         reader@file.Reader;
 %         sim; % later add the class for the simulator        
+
         src; % can be camera, reader or simulator
         
         % image processing
@@ -451,7 +452,11 @@ classdef Acquisition < file.AstroData
             
             if obj.debug_bit, util.text.date_printf('sending Email to report system restart!'); end
             
-            obj.email.sendToAddress('Guy', 'subject', 'Cam-PC restarted', 'text', 'Cam-PC has been restarted')
+            try
+                obj.email.sendToAddress('Guy', 'subject', 'Cam-PC restarted', 'text', 'Cam-PC has been restarted')
+            catch ME
+                warning(ME.getReport())
+            end
             
         end
         
