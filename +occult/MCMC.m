@@ -1377,21 +1377,31 @@ classdef MCMC < handle
             
             if obj.debug_bit, fprintf('clicked point at '); end
             
-            p = obj.points(:); 
-            
-            deltas = zeros(length(p), length(obj.par_list)); 
+            if ~isempty(obj.results)
+                p = obj.results;
+                N = height(obj.results);
+            else
+                p = obj.points(:); 
+                N = length(p);
+            end
+            deltas = zeros(N, length(obj.par_list)); 
 
-            for ii = 1:length(obj.par_list)
-                deltas(:,ii) = ([p.(obj.par_list{ii})] - ev.IntersectionPoint(ii)).^2;
+            pars = obj.show_chain_pars;
+            for ii = 1:length(pars)
+                deltas(:,ii) = ([p.(pars{ii})] - ev.IntersectionPoint(ii)).^2;
             end
 
             deltas = sum(deltas,2); 
             
             [~, idx] = min(deltas); 
             
-            clicked_point = p(idx);
-            
-            chain_idx = floor((idx-1)/size(obj.points,1)) + 1;
+            if ~isempty(obj.results)
+                clicked_point = occult.Parameters(p(idx,:));
+                chain_idx = p{idx, 'chain'}; 
+            else
+                clicked_point = p(idx);
+                chain_idx = floor((idx-1)/size(obj.points,1)) + 1;
+            end
             
             obj.gen.lc.pars.reset; 
             obj.gen.lc.pars.copy_from(clicked_point); 
@@ -1432,7 +1442,7 @@ classdef MCMC < handle
             
             h = findobj(input.ax, 'Type', 'Line');
             
-            if ~isempty(obj.points) % there are active chains
+            if ~isempty(obj.points) || ~isempty(obj.results) % there are active chains
                 N = min(obj.num_chains, obj.show_num_chains); 
             elseif ~isempty(obj.true_point) % no chains, but we can show the true point
                 N = 1;
@@ -1446,7 +1456,7 @@ classdef MCMC < handle
                 f_input = util.img.pad2size(obj.input_flux, [size(f,1),1], 1); 
                 plot(input.ax, t, f_input, 'dk', 'LineWidth', 3, 'DisplayName', 'Input flux'); 
                 
-                if ~isempty(obj.points) || ~isempty(obj.true_point)
+                if ~isempty(obj.points) || ~isempty(obj.results) || ~isempty(obj.true_point)
                     h = obj.gen.lc.plot('ax', input.ax, 'hold', true, 'legend', true, 'noise', false, 'FontSize', input.font_size, 'number', N);
                 end
                 
