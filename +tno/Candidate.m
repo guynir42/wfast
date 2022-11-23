@@ -828,6 +828,9 @@ classdef Candidate < handle
             mcmc.input_flux = circshift(mcmc.input_flux, 100-obj.time_index); % center the peak
             mcmc.input_errors = obj.flux_std./obj.flux_mean; 
             mcmc.input_R = obj.star_props.FresnelSize; 
+            mcmc.gen.f = obj.head.FRAMERATE;
+            mcmc.gen.T = obj.head.EXPTIME;
+            mcmc.gen.W = length(obj.flux_raw) ./ obj.head.FRAMERATE;
             
             if ~obj.is_simulated
                 fsu = sqrt(600e-12 * 150e9 *40 / 2); % assume KBOs at 40AU giving 1.3 km per fsu

@@ -376,7 +376,9 @@ classdef MCMC < handle
             obj.gen.R_range = [0 10]; 
             
             obj.use_priors = 1; 
-            t_prior = @(t) -t.^2./2./40.^2; % gaussian with width 40ms
+            
+            t_sig = 100; 
+            t_prior = @(t) -t.^2./2./t_sig.^2; % gaussian with width t_sig
             R_prior = @(R) -(R-obj.input_R).^2 ./ (2.*(obj.input_R.*0.1).^2); % gaussian with width input_R/10
             obj.prior_log_functions = {'', '', '', t_prior, R_prior }; 
 
