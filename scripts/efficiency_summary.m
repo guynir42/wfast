@@ -97,7 +97,7 @@ util.sys.print(fullfile(getenv('WFAST'), 'scripts/plots/efficiency_fractions'));
 %% show the number of events lost to the vetting process
 % load the events
 
-if ~exist('cand') || isempty(cand) || ~isa(cand, 'tno.Candidate')
+if ~exist('cand', 'var') || isempty(cand) || ~isa(cand, 'tno.Candidate')
     cand = s.collectEvents('real', 'sim', 'class', ''); 
 end
 

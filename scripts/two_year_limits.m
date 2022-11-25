@@ -1,7 +1,7 @@
 % This script is used to make the plots that go into the occultation limits
 % paper for the W-FAST two year run (2020-2021)
 
-data_dir = 'D:\Dropbox\DATA\WFAST\two_year_results'; % need a better way to get this folder
+data_dir = fullfile(getenv('DATA'), 'WFAST\two_year_results'); % need a better way to get this folder
 
 %% load the overview first
 
