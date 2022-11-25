@@ -310,6 +310,9 @@ classdef Reader < file.AstroData
             obj.dataset_names.stack = {'stack', 'full_sum', 'images_sum', 'image_sum', 'summed_image', 'images_stack', 'image_stack'};
             obj.attribute_names.num_sum = {'num_sum'};
             
+            obj.dataset_names.column_averages = {'column_averages'};
+            obj.dataset_names.row_averages = {'row_averages'};
+            
             obj.dataset_names.psfs = {'psfs'};
             obj.attribute_names.psf_sampling = {'psf_sampling', 'psf_binning'};
 
@@ -891,6 +894,14 @@ classdef Reader < file.AstroData
                     elseif any(strcmp(data_name, obj.dataset_names.temperatures)) && all(data_size) % data_names.temperatures may be a cell array of different optional names
                         
                         obj.temperatures = h5read(filename, sa('/', data_name)); % read the entire "temperatures" dataset, if it exists
+                    
+                    elseif any(strcmp(data_name, obj.dataset_names.column_averages)) && all(data_size) % data_names.column_averages may be a cell array of different optional names
+                        
+                        obj.column_averages = h5read(filename, sa('/', data_name)); % read the entire "column_averages" dataset, if it exists
+                    
+                    elseif any(strcmp(data_name, obj.dataset_names.row_averages)) && all(data_size) % data_names.row_averages may be a cell array of different optional names
+                        
+                        obj.row_averages = h5read(filename, sa('/', data_name)); % read the entire "column_averages" dataset, if it exists
                         
                     elseif any(strcmp(data_name, obj.dataset_names.stack)) && all(data_size)
                         

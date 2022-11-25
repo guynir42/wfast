@@ -139,6 +139,19 @@ classdef Parameters < handle
             if ~isempty(varargin) && isa(varargin{1}, 'occult.Parameters')
                 if obj.debug_bit>1, fprintf('Parameters copy-constructor v%4.2f\n', obj.version); end
                 obj = util.oop.full_copy(varargin{1});
+            elseif ~isempty(varargin) && isa(varargin{1}, 'table')
+                if obj.debug_bit>1, fprintf('Parameters table row constructor v%4.2f\n', obj.version); end
+                if height(varargin{1}) > 1
+                    error('For now we cannot support table inputs with more than one row'); 
+                end
+                
+                for ii = 1:length(varargin{1}.Properties.VariableNames)
+                    name = varargin{1}.Properties.VariableNames{ii};
+                    if isprop(obj, name)
+                        obj.(name) = varargin{1}{1, name}; 
+                    end
+                end
+                
             else 
                 
                 util.oop.save_defaults(obj); % save default values into hidden variables

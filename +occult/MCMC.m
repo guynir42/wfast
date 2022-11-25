@@ -50,10 +50,10 @@ classdef MCMC < handle
         num_steps = 10000; % total number of steps (including burn-in)
         num_burned = 1000; % number of steps to burn at the begining of each chain
         
-        step_sizes = [0.1 0.1 3 0.1]; % in order of parameters: step size for each parameter
-        circ_bounds = [0 0 0 0]; % in order of parameters: which par gets a circular boundary condition
+        par_list = {'r', 'b', 'v', 't', 'R'}; % these parameters are chosen randomly each step. The rest are taken from the generator's parameters
         
-        par_list = {'r', 'b', 'v', 'R'}; % these parameters are chosen randomly each step. The rest are taken from the generator's parameters
+        step_sizes = [0.1 0.1 3 1 0.1]; % in order of parameters: step size for each parameter
+        circ_bounds = [0 0 0 0 0]; % in order of parameters: which par gets a circular boundary condition
         
 %         use_bank = true; % use a filter bank (needs to be loaded manually!) to find an initial position (otherwise chose random starting point)
         
@@ -366,17 +366,21 @@ classdef MCMC < handle
         
         function setupDeepScan(obj)
             
-            obj.par_list = {'r'  'b'  'v', 'R'};
-            obj.step_sizes = [0.25 0.25 3 0.1];
+            obj.par_list = {'r'  'b'  'v', 't', 'R'};
+            obj.step_sizes = [0.25 0.25 3 10 0.1];
             
             obj.initialization_method = 'random'; 
-            obj.circ_bounds = [0 0 0 0];
+            obj.circ_bounds = [0 0 0 0 0];
+            
+            obj.gen.t_range = [-1000, 1000];
             obj.gen.R_range = [0 10]; 
             
             obj.use_priors = 1; 
-            obj.prior_log_functions = {'', '', '', @(R) -(R-obj.input_R).^2 ./ (2.*(obj.input_R.*0.1).^2) }; 
-%             obj.num_steps = 10000;
-%             obj.num_burned = 1000; 
+            
+            t_sig = 100; 
+            t_prior = @(t) -t.^2./2./t_sig.^2; % gaussian with width t_sig
+            R_prior = @(R) -(R-obj.input_R).^2 ./ (2.*(obj.input_R.*0.1).^2); % gaussian with width input_R/10
+            obj.prior_log_functions = {'', '', '', t_prior, R_prior }; 
 
         end
         
@@ -1189,6 +1193,7 @@ classdef MCMC < handle
             
             input = util.text.InputVars;
             input.input_var('pars', obj.show_chain_pars); 
+            input.input_var('chains', obj.show_num_chains, 'num_chains', 'number_chains'); 
             input.input_var('burn', false); 
             input.input_var('sparse', []); % show only one point every N points
             input.input_var('full_titles', false, 'titles'); 
@@ -1275,16 +1280,25 @@ classdef MCMC < handle
                 
                 h = findobj(input.ax, 'Type', 'Scatter'); 
                 
-                N = min(obj.num_chains, obj.show_num_chains); 
+                N = min(obj.num_chains, input.chains); 
                 
                 sz = sz(1:step:obj.counter);
                 
                 for ii = 1:N
-                    % TODO: refactor to use the table not just the points
-                    p1 = [obj.points(1:step:obj.counter,ii).(input.pars{1})]';
-                    p2 = [obj.points(1:step:obj.counter,ii).(input.pars{2})]';
-                    p3 = [obj.points(1:step:obj.counter,ii).(input.pars{3})]';
+                    % use the table not just the points
+                    if ~isempty(obj.results)
+                        p1 = obj.results{obj.results.chain == ii, input.pars{1}};
+                        p2 = obj.results{obj.results.chain == ii, input.pars{2}};
+                        p3 = obj.results{obj.results.chain == ii, input.pars{3}};
+                        p1 = p1(1:step:obj.counter); 
+                        p2 = p2(1:step:obj.counter); 
+                        p3 = p3(1:step:obj.counter); 
+                    else % no table, use the points
+                        p1 = [obj.points(1:step:obj.counter,ii).(input.pars{1})]';
+                        p2 = [obj.points(1:step:obj.counter,ii).(input.pars{2})]';
+                        p3 = [obj.points(1:step:obj.counter,ii).(input.pars{3})]';
 %                     lkl = [obj.points(1:obj.counter,ii).likelihood]'; % used only for calculating the mean likelihood of each chain
+                    end
                     
                     if ismember(ii, pass)
                         accepted = 'accepted';
@@ -1365,21 +1379,31 @@ classdef MCMC < handle
             
             if obj.debug_bit, fprintf('clicked point at '); end
             
-            p = obj.points(:); 
-            
-            deltas = zeros(length(p), length(obj.par_list)); 
+            if ~isempty(obj.results)
+                p = obj.results;
+                N = height(obj.results);
+            else
+                p = obj.points(:); 
+                N = length(p);
+            end
+            deltas = zeros(N, length(obj.par_list)); 
 
-            for ii = 1:length(obj.par_list)
-                deltas(:,ii) = ([p.(obj.par_list{ii})] - ev.IntersectionPoint(ii)).^2;
+            pars = obj.show_chain_pars;
+            for ii = 1:length(pars)
+                deltas(:,ii) = ([p.(pars{ii})] - ev.IntersectionPoint(ii)).^2;
             end
 
             deltas = sum(deltas,2); 
             
             [~, idx] = min(deltas); 
             
-            clicked_point = p(idx);
-            
-            chain_idx = floor((idx-1)/size(obj.points,1)) + 1;
+            if ~isempty(obj.results)
+                clicked_point = occult.Parameters(p(idx,:));
+                chain_idx = p{idx, 'chain'}; 
+            else
+                clicked_point = p(idx);
+                chain_idx = floor((idx-1)/size(obj.points,1)) + 1;
+            end
             
             obj.gen.lc.pars.reset; 
             obj.gen.lc.pars.copy_from(clicked_point); 
@@ -1420,7 +1444,7 @@ classdef MCMC < handle
             
             h = findobj(input.ax, 'Type', 'Line');
             
-            if ~isempty(obj.points) % there are active chains
+            if ~isempty(obj.points) || ~isempty(obj.results) % there are active chains
                 N = min(obj.num_chains, obj.show_num_chains); 
             elseif ~isempty(obj.true_point) % no chains, but we can show the true point
                 N = 1;
@@ -1434,7 +1458,7 @@ classdef MCMC < handle
                 f_input = util.img.pad2size(obj.input_flux, [size(f,1),1], 1); 
                 plot(input.ax, t, f_input, 'dk', 'LineWidth', 3, 'DisplayName', 'Input flux'); 
                 
-                if ~isempty(obj.points) || ~isempty(obj.true_point)
+                if ~isempty(obj.points) || ~isempty(obj.results) || ~isempty(obj.true_point)
                     h = obj.gen.lc.plot('ax', input.ax, 'hold', true, 'legend', true, 'noise', false, 'FontSize', input.font_size, 'number', N);
                 end
                 
@@ -1723,7 +1747,7 @@ classdef MCMC < handle
             input = util.text.InputVars;
             input.input_var('best', false); 
             input.input_var('parent', []); 
-            input.input_var('font_size', 18); 
+            input.input_var('font_size', 16); 
             input.scan_vars(varargin{:});
             
             if isempty(input.parent)
@@ -1814,15 +1838,15 @@ classdef MCMC < handle
             %%%%%%%%%%%%%%%% LIGHTCURVE %%%%%%%%%%%%%%%%%%%%%%
             
             margin_x = 0.025;
-            margin_y = 0.1;
-            ax_lc = axes('Parent', input.parent, 'Position', [P(1)+P(3)+margin_x P(2)+P(4)+margin_y P(3)-margin_x P(4)-margin_y]); 
+            margin_y = 0.12;
+            ax_lc = axes('Parent', input.parent, 'Position', [P(1)+P(3)+margin_x, P(2)+P(4)+margin_y, P(3)-margin_x, P(4)-margin_y]); 
             obj.gen.reset;
             obj.gen.lc.pars.copy_from([obj.posterior_point, obj.true_point]); 
             obj.gen.getLightCurves; 
             t = obj.gen.lc.time;
             f = obj.gen.lc.flux; 
                         
-            h = plot(ax_lc, t, util.img.pad2size(obj.input_flux, size(t), 1), 'kd', 'MarkerSize', 8, 'LineWidth', 2); 
+            h = stairs(ax_lc, t, util.img.pad2size(obj.input_flux, size(t), 1), 'k', 'LineWidth', 1.5); 
             h.DisplayName = 'input flux';
             h.HandleVisibility = 'off'; 
             
@@ -1835,7 +1859,7 @@ classdef MCMC < handle
                 
             end
             
-            h_posterior = plot(ax_lc, t, f(:,1), '--m', 'LineWidth', 2); 
+            h_posterior = plot(ax_lc, t, f(:,1), '-m', 'LineWidth', 2); 
             h_posterior.DisplayName = sprintf('r=%4.1f, b=%4.1f, v=%4.1f', ...
                 obj.posterior_point.r, obj.posterior_point.b, obj.posterior_point.v); 
             
@@ -1849,14 +1873,14 @@ classdef MCMC < handle
             
             ax_lc.FontSize = input.font_size;
             
-            hl = legend(ax_lc, 'Location', 'SouthEast'); 
+            hl = legend(ax_lc, 'Location', 'NorthOutside'); 
             hl.FontSize = input.font_size - 4; 
             
             ax_lc.YAxisLocation='Right';
             ax_lc.XAxisLocation='Bottom';
 %             xtickformat(ax_lc, '%ds'); 
             
-            ax_lc.XLim = [-1 1.5].*1; 
+%             ax_lc.XLim = [-1 1.7].*1; 
 
             xlabel(ax_lc, 'time [s]'); 
             ylabel(ax_lc, 'Flux [normalized]'); 

@@ -230,7 +230,14 @@ classdef Candidate < handle
         highest_corr_number = [];
         highest_corr_frames = [];
         
-        version = 1.03;
+        % these are extra fluxes saved to calculate outlier prevalence
+        outlier_flux = [];
+        outlier_flux_smoothed = [];
+        outlier_mu = [];
+        outlier_sig = [];
+        outlier_numbers = [];
+        
+        version = 1.04;
         
     end
     
@@ -821,6 +828,9 @@ classdef Candidate < handle
             mcmc.input_flux = circshift(mcmc.input_flux, 100-obj.time_index); % center the peak
             mcmc.input_errors = obj.flux_std./obj.flux_mean; 
             mcmc.input_R = obj.star_props.FresnelSize; 
+            mcmc.gen.f = obj.head.FRAMERATE;
+            mcmc.gen.T = obj.head.EXPTIME;
+            mcmc.gen.W = length(obj.flux_raw) ./ obj.head.FRAMERATE;
             
             if ~obj.is_simulated
                 fsu = sqrt(600e-12 * 150e9 *40 / 2); % assume KBOs at 40AU giving 1.3 km per fsu
@@ -845,16 +855,16 @@ classdef Candidate < handle
             
             if obj.debug_bit, fprintf('Running MCMC with %s velocity prior.\n', wide_str); end
             
-            if input.async
-                mcmc.run_async; 
-            else
-                mcmc.run;
-            end
-            
             if use_wide
                 obj.mcmc_wide_v = mcmc;
             else
                 obj.mcmc_narrow_v = mcmc; 
+            end
+            
+            if input.async
+                mcmc.run_async; 
+            else
+                mcmc.run('table', 1);
             end
             
         end
@@ -2324,6 +2334,283 @@ classdef Candidate < handle
             input.ax.FontSize = input.font_size; 
             
             legend(input.ax, {'forced', 'aperture'}, 'Location', 'SouthEast'); 
+            
+        end
+        
+        function showFluxCutouts(obj, varargin)
+            
+            input = util.text.InputVars;
+            
+            input.input_var('number', 30, 'frames'); % number of frames to show, centered on event
+            input.input_var('rows', 3); % number of rows to split up cutouts
+            input.input_var('trim', 3); % how many pixels to trim from each side of the cutout
+            input.input_var('midpoint', 0.42); % division between flux plot and cutouts
+            input.input_var('monochrome', false); % use an inverted grayscale colormap
+            input.input_var('parent', []); % could be a figure handle, if empty use gcf
+            input.input_var('font_size', 16); % for axes
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.trim)
+                input.trim = 0;
+            end
+            
+            if isempty(input.parent) || ~isvalid(input.parent)
+                input.parent = gcf;
+            end
+            
+            clf(input.parent); 
+            
+            % the flux plot first
+            
+            left_margin = 0.1;
+            right_margin = 0.02;
+            bottom_margin = 0.15;
+            top_margin = 0.02;
+            
+            ax_flux = axes('Parent', input.parent, 'Position', [left_margin, bottom_margin, 1-left_margin-right_margin, input.midpoint - bottom_margin]); 
+            
+            stairs(ax_flux, obj.flux_raw, 'k', 'LineWidth', 2); 
+            
+            hold(ax_flux, 'on'); 
+            
+            mn = ax_flux.YLim(1); 
+            mx = ax_flux.YLim(2)*1.1; 
+            
+            start = obj.time_index - floor(input.number / 2);
+            finish = obj.time_index + floor((input.number + 1)/ 2) - 1;
+            
+            % area shown by cutouts
+            
+            h = area(ax_flux, start:finish, ones(input.number,1).*mx, mn, 'FaceColor', 0.5.*[1,1,1], ...
+                'EdgeColor', 'none', 'FaceAlpha', 0.2, 'DisplayName', 'Event Region'); 
+            
+            ax_flux.Children = circshift(ax_flux.Children, -1); % put the event region in the back
+            
+            hold(ax_flux, 'off'); 
+            
+            ax_flux.YLim = [mn, mx];
+            
+            ax_flux.FontSize = input.font_size;
+            xlabel(ax_flux, 'Frame number');
+            ylabel(ax_flux, 'Raw counts'); 
+            
+            % now for the cutouts
+            
+            num_per_row = ceil(input.number / input.rows);
+            
+            dx = (1 - left_margin - right_margin) / num_per_row;
+            ax_flux_top = ax_flux.Position(2) + ax_flux.Position(4);
+            
+            dy = (1 - ax_flux_top - top_margin*2) / input.rows;
+            y0 = ax_flux_top + top_margin - dy;
+            
+            ax_array = {};
+            
+            for ii = 1:input.number
+                
+                if mod(ii, num_per_row) == 1
+                    x0 = left_margin - dx; 
+                    y0 = y0 + dy;
+                end
+                
+                x0 = x0 + dx;
+                
+                ax_array{ii} = axes('Parent', input.parent, 'Position', [x0, y0, dx, dy]); 
+                               
+                C = obj.cutouts(:,:,start+ii-1);
+                C = C(input.trim + 1:end-input.trim,input.trim + 1:end-input.trim); 
+                
+                imagesc(ax_array{ii}, C); 
+                ax_array{ii}.XTick = [];
+                ax_array{ii}.YTick = [];
+                axis(ax_array{ii}, 'square');
+                if input.monochrome
+                    colormap(ax_array{ii}, flip(gray));
+                    color = 'black';
+                else
+                    color = 'white';
+                end
+                text(ax_array{ii}, 1,1, num2str(start + ii -1), 'FontSize', 10,...
+                    'FontWeight', 'Bold', 'VerticalAlignment', 'Top', 'Color', color); 
+                
+            end
+            
+            % set all cutouts to the same (median) limits            
+            mean_mn = nanmedian(util.stat.median2(obj.cutouts));
+            mean_mx = nanmedian(util.stat.max2(obj.cutouts));
+            
+            for ii = 1:input.number
+                ax_array{ii}.CLim = [mean_mn, mean_mx*0.9]; 
+            end
+            
+        end
+        
+        function N = showOutlierAnalysis(obj, flux, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('recalculate', false); % force recalculation of the smoothed flux and numbers
+            input.input_var('sg_order', 3); % order of the Savitzky-Golay filter
+            input.input_var('sg_window', 101); % window size of the the Savitzky-Golay filter
+            input.input_var('sigma', 3); % number of standard deviations for sigma-clipping
+            input.input_var('parent', []); % could be a figure handle, if empty use gcf
+            input.input_var('font_size', 16); % for axes
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(obj.outlier_flux) || input.recalculate
+                if nargin<2 || isempty(flux)
+                    error('Must supply a flux buffer!');
+                end
+                
+                if ~ismatrix(flux)
+                    error('Must supply a 2D flux, got a %s matrix', util.text.print_vec(size(flux), 'x'));
+                end
+                
+                obj.outlier_flux = flux;
+                
+            end
+            
+            f = obj.outlier_flux;
+            
+            % star_indices matches each flux column to a global star number
+            % (e.g., in the positions matrix)
+            if size(f,2) == 1 % single flux calculation
+                star_id = 1;
+            elseif size(f,2) == length(obj.store_pars.star_indices) % flux of the chosen stars only
+                star_id = obj.star_index; 
+            elseif size(f,2) == length(obj.store_pars.star_sizes) % all stars, need to remove some stars
+                star_id = obj.star_index;
+                f = f(:,obj.store_pars.star_indices);                
+            else
+                error('Mismatch of number of stars with star indices'); 
+            end
+            
+            if isempty(obj.outlier_flux_smoothed) || input.recalculate
+                fs = f - sgolayfilt(double(f), input.sg_order, input.sg_window); 
+                obj.outlier_flux_smoothed = fs;
+            else
+                fs = obj.outlier_flux_smoothed;
+            end
+            
+            if isempty(obj.outlier_numbers) || isempty(obj.outlier_mu) || ...
+                   isempty(obj.outlier_sig) || input.recalculate
+                mu = zeros(1, size(fs,2));
+                sig = mu;
+                N = mu;
+                for ii = 1:size(fs,2)
+                    [mu(ii),sig(ii),~,N(ii)] = util.stat.sigma_clipping(fs(:,ii), 'sigma', input.sigma);
+                end
+                
+                obj.outlier_mu = mu;
+                obj.outlier_sig = sig;
+                obj.outlier_numbers = N;
+                
+            else
+                mu = obj.outlier_mu;
+                sig = obj.outlier_sig;
+                N = obj.outlier_numbers;
+            end
+            
+            % star plotting here
+            if isempty(input.parent) || ~isvalid(input.parent)
+                input.parent = gcf;
+            end
+            
+            clf(input.parent);
+            
+            if length(N) > 1
+                left = 0.13;
+                right = 0.02;
+                bottom = 0.13;
+                top = 0.02;
+                width = (1-left-right*2) / 2;
+                height = (1-bottom-top*2) / 2;
+                
+                ax1 = axes('Parent', input.parent, 'Position', [left, 1-top-height, 1-left-right, height]);
+
+                plot(ax1, N, 'ok', 'DisplayName', 'all star outliers'); 
+                hold(ax1, 'on'); 
+                lims = ax1.YLim;
+                plot(ax1, [1,1]*obj.star_index, lims, '--', 'DisplayName',...
+                    'occultation star', 'LineWidth', 2); 
+                
+                per = 90;
+                many_outliers = prctile(N, per); 
+                plot(ax1, [1, length(N)], [1,1].*many_outliers, ':', 'DisplayName', ...
+                    sprintf('%d%% percentile: %d', per, many_outliers), 'LineWidth', 2);
+                
+                ylabel(ax1, 'Number of outliers'); 
+                ax1.FontSize = input.font_size;
+                legend(ax1);
+                ax1.XTick = [];
+                
+                hold(ax1, 'off'); 
+                
+                ax1.YLim = lims;
+                
+                ax2 = axes('Parent', input.parent, 'Position', [left, bottom, width, height]); 
+                
+                ax3 = axes('Parent', input.parent, 'Position', [left+width+right, bottom, width, height]);
+                x = obj.positions(:, 1); 
+                x0 = obj.positions(obj.star_index,1); 
+                y = obj.positions(:, 2); 
+                y0 = obj.positions(obj.star_index,2); 
+                
+                sz = (N <= many_outliers) * 1 + (N > many_outliers) * 30;
+                
+                scatter(ax3, x, y, sz, N, 'o', 'LineWidth', 2.0); 
+                colorbar(ax3); 
+                box(ax3, 'on'); 
+                axis(ax3, 'square'); 
+                
+                hold(ax3, 'on'); 
+                plot(ax3, x0, y0, 'rx', 'MarkerSize', 10); 
+                hold(ax3, 'off'); 
+                
+                xlabel(ax3, 'Outliers vs. position'); 
+                ax3.FontSize = input.font_size;
+                
+                ax3.XLim = [min(x), max(x)]; 
+                ax3.YLim = [min(y), max(y)]; 
+%                 ax3.XTick = [];
+%                 ax3.YTick = [];
+                
+            else
+                ax2 = axes('Parent', input.parent); 
+            end
+            
+            % this plot is the only one that is still relevant with a single flux
+            [counts, edges] = histcounts(fs(:,star_id), 100); 
+            centers = (edges(1:end-1) + edges(2:end))/2;
+            bar(ax2, centers, counts, 'DisplayName', 'Smoothed flux values');
+            xlabel(ax2, 'Filtered flux values');
+            ylabel(ax2, 'Number of epochs'); 
+            ax2.FontSize = input.font_size;
+            
+            hold(ax2, 'on'); 
+            
+            g = exp(-0.5.*((centers - mu(star_id))/sig(star_id)).^2); 
+            g = g./sum(g).*sum(counts); 
+            
+            plot(ax2, centers, g, '--r', 'LineWidth', 2, 'DisplayName', ...
+                sprintf('\\mu= %4.2f | \\sigma= %4.2f', mu(star_id), sig(star_id))); 
+            
+            ax2.YScale = 'log'; 
+            
+            lims = ax2.YLim;
+            
+            plot(ax2, [1,1].*input.sigma.*sig(star_id), lims, ':g', 'LineWidth', 2.5, ...
+                'DisplayName', sprintf('Limits at %d\\sigma', input.sigma));
+            plot(ax2, -[1,1].*input.sigma.*sig(star_id), lims, ':g', 'LineWidth', 2.5, ...
+                'HandleVisibility', 'off'); 
+            
+            plot(ax2, [NaN, NaN], [NaN, NaN], 'Marker', 'none', 'LineStyle', 'none', ...
+                'DisplayName', sprintf('Num. outliers= %d', N(star_id)));
+            
+            legend(ax2, 'Location', 'South'); 
+            
+            hold(ax2, 'off'); 
+            
+            ax2.YLim = lims;
             
         end
         

@@ -243,7 +243,7 @@ classdef GenGUI < handle
             obj.panel_t = GraphicPanel(obj.owner, [4/5 3/N 1/5 3/N], '', 1);
             obj.panel_t.addButton('text', '', 'custom', 'crossing time'); 
             obj.panel_t.addButton('reset', 'reset_t', 'push', util.text.unicode('recycle'), '', '', 0.15, '', '', 'Reset t to the default value');
-            obj.panel_t.addButton('value', 't', 'input', 't= ', 'ms', '', 0.85, '', '', 'Input a value for t, the subframe occultation crossing time');
+            obj.panel_t.addButton('value', 't', 'input', 't= ', 'ms', '', 0.85, '', '', 'Input a value for t, the occultation crossing time (in ms)');
             obj.panel_t.addButton('play', '', 'custom', util.text.unicode('play'), '', '', 0.15, '', '', 'Play an animation scanning through the range of parameter values');
             obj.panel_t.addButton('slider', '', 'custom', '', '', '', 0.85, '', '', 'Change the value of t, the subframe occultation crossing time');
             obj.panel_t.margin = [0.01 0.05];
