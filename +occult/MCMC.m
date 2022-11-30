@@ -373,14 +373,20 @@ classdef MCMC < handle
             obj.circ_bounds = [0 0 0 0 0];
             
             obj.gen.t_range = [-1000, 1000];
-            obj.gen.R_range = [0 10]; 
+            obj.gen.R_range = [0, 10]; 
             
             obj.use_priors = 1; 
             
+            r_prior = '';  % uniform prior in range
+            b_prior = '';  % uniform prior in range
+            v_low = 3.8; % FSU/s ~ 5 km/s
+            v_high = 25; % FSU/s ~ 32.5
+            v_width = 1.0; 
+            v_prior = @(v) -log(0.1 + exp((v - v_high)./v_width) + exp((v_low - v)./v_width)); % two sided exponential decay
             t_sig = 100; 
             t_prior = @(t) -t.^2./2./t_sig.^2; % gaussian with width t_sig
             R_prior = @(R) -(R-obj.input_R).^2 ./ (2.*(obj.input_R.*0.1).^2); % gaussian with width input_R/10
-            obj.prior_log_functions = {'', '', '', t_prior, R_prior }; 
+            obj.prior_log_functions = {r_prior, b_prior, v_prior, t_prior, R_prior}; 
 
         end
         
@@ -581,6 +587,7 @@ classdef MCMC < handle
                 obj.gen.lc.pars.ndof(ii) = NaN; 
                 obj.gen.lc.pars.logl(ii) = NaN; 
                 obj.gen.lc.pars.likelihood(ii) = 0; 
+                obj.gen.lc.pars.signal(ii) = NaN;
     
             end 
             
@@ -703,7 +710,7 @@ classdef MCMC < handle
 
                     if obj.circ_bounds(jj)
 
-                        for ii = 1:1000
+                        for kk = 1:1000
                             
                             if subsref(obj.gen, S)>range(2)
                                 delta = subsref(obj.gen, S) - range(2);
@@ -719,7 +726,7 @@ classdef MCMC < handle
 
                     else % reflect back
                         
-                        for ii = 1:1000
+                        for kk = 1:1000
                             
                             if subsref(obj.gen, S)>range(2)
                                 delta = subsref(obj.gen, S) - range(2);
@@ -740,7 +747,7 @@ classdef MCMC < handle
 
         end
         
-        function LL = calcLikelihood(obj)
+        function out_LL = calcLikelihood(obj)
             
             obj.gen.getLightCurves; 
             
@@ -753,6 +760,9 @@ classdef MCMC < handle
             f1 = obj.gen.lc.flux;
             f2 = obj.input_flux;
 
+            % calculate the S/N as well
+            obj.gen.lc.pars.signal = sqrt(nansum((f1-1).^2));
+            
             chi2 = nansum(((f1-f2)./e).^2, 1); 
 
             obj.gen.lc.pars.chi2 = chi2;
@@ -795,7 +805,7 @@ classdef MCMC < handle
             end
             
             if nargout>0
-                LL = obj.gen.lc.pars.logl;
+                out_LL = obj.gen.lc.pars.logl;
             end
 
         end
@@ -1161,7 +1171,7 @@ classdef MCMC < handle
                 
                 obj.flagBadPoints;
                 
-                names = [obj.par_list, {'chi2', 'ndof', 'logl', ...
+                names = [obj.par_list, {'chi2', 'ndof', 'logl', 'signal', ...
                     'counts', 'weight', 'chain', 'burn', 'good'}];
                 
                 obj.results = cell2table(cell(numel(obj.points), length(names)), ...
@@ -1405,6 +1415,8 @@ classdef MCMC < handle
                 chain_idx = floor((idx-1)/size(obj.points,1)) + 1;
             end
             
+            if obj.debug_bit, fprintf('chain %d with ', chain_idx); end
+            
             obj.gen.lc.pars.reset; 
             obj.gen.lc.pars.copy_from(clicked_point); 
 
@@ -1469,7 +1481,8 @@ classdef MCMC < handle
                     if ischar(input.color) || length(input.color)==3
                         h.Color = input.color;
                     elseif isscalar(input.color)
-                        h.Color = input.ax.ColorOrder(input.color,:);
+                        col_num = mod(input.color - 1, size(input.ax.ColorOrder,1)) + 1;
+                        h.Color = input.ax.ColorOrder(col_num,:);
                     end
 
                 end
@@ -1478,7 +1491,7 @@ classdef MCMC < handle
                 for ii = 1:N
                     h(N-ii+1).XData = t; 
                     h(N-ii+1).YData = f(:,ii); 
-                    h(N-ii+1).DisplayName = sprintf('r= %4.2f | b= %4.2f | v= %4.2f', obj.gen.r(ii), obj.gen.b(ii), obj.gen.v(ii)); 
+                    h(N-ii+1).DisplayName = sprintf('r= %4.2f | b= %4.2f | v= %4.2f | t= %4.1f', obj.gen.r(ii), obj.gen.b(ii), obj.gen.v(ii), obj.gen.t(ii)); 
                 end
             end
             
@@ -1493,7 +1506,12 @@ classdef MCMC < handle
             
             ndof = nnz(~isnan(obj.input_flux))-length(obj.par_list);
             
-            if ~isempty(obj.points)
+            signal = obj.gen.lc.pars.signal;
+            
+            if ~isempty(obj.points) || ~isempty(obj.results)
+                text(input.ax, t(10), 0.5, sprintf('signal = %s', ...
+                    print_vec(signal(1:N), ', ')), 'FontSize', input.font_size); 
+                
                 text(input.ax, t(10), 0.3, sprintf('chi2 (dof=%d) = %s', ...
                     ndof, print_vec(round(chi2(1:N)), ', ')), 'FontSize', input.font_size); 
 

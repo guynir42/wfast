@@ -810,6 +810,8 @@ classdef Candidate < handle
             input.input_var('async', false); % run in a parallel pool
             input.input_var('velocity_prior', 'wide'); % can also choose "narrow"
             input.input_var('chains', 10, 'num_chains', 'number_chains'); 
+            input.input_var('points', 10000, 'num_points', 'number_points', 'steps', 'num_steps', 'number_steps'); 
+            input.input_var('burn', 1000, 'num_burn', 'number_burn'); 
             input.input_var('plot', false); % load up an MCMC GUI for the run
             input.scan_vars(varargin{:}); 
             
@@ -841,6 +843,8 @@ classdef Candidate < handle
             
             mcmc.setupDeepScan; 
             mcmc.num_chains = input.chains; 
+            mcmc.num_steps = input.points;
+            mcmc.num_burned = input.burn;
             
             if use_wide
                 mcmc.setupWideVelocityPrior;

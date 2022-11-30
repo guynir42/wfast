@@ -57,6 +57,7 @@ classdef Parameters < handle
         ndof = NaN; % number of degrees of freedom that were used in calculating chi2
         logl = NaN; % log liklihood
         likelihood = NaN; % the results of fitting to this model (translated to probability)
+        signal = NaN; % the theoretical S/N for a template like this, assuming normal noise with sigma=mean flux (scale with photometric S/N)
         counts = 1; 
         weight = 1; % this can be set to zero for repeated points...
         chain = 0; % which chain it was produced on
@@ -174,6 +175,7 @@ classdef Parameters < handle
             
             obj.chi2 = NaN;
             obj.likelihood = 0;
+            obj.signal = NaN;
             
         end
         
@@ -322,11 +324,15 @@ classdef Parameters < handle
 
                 val{ii} = sprintf('%s | b= %4.2f | v= %4.2f | t= %4.2f', val{ii}, obj.b(ii), obj.v(ii), obj.t(ii)); 
 
-                val{ii} = sprintf('%s | lkl= %g', val{ii}, obj.likelihood(ii)); 
+                val{ii} = sprintf('%s | lkl= %g | signal= %4.2f', val{ii}, obj.likelihood(ii), obj.signal(ii)); 
 
             end
             
-            val = val';
+            if N == 1
+                val = val{1};
+            else
+                val = val';
+            end
             
             if nargout==0
                 disp(val);
@@ -590,7 +596,7 @@ classdef Parameters < handle
                 error('Must input an "occult.Parameters" object. Got "%s" instead...', class(other));
             end
             
-            list = {'r', 'r2', 'd', 'th', 'R', 'b', 'v', 't', 'chi2', 'ndof', 'logl', 'likelihood'}; 
+            list = {'r', 'r2', 'd', 'th', 'R', 'b', 'v', 't', 'chi2', 'ndof', 'logl', 'likelihood', 'signal'}; 
             
             if ~isscalar(obj) && ~isscalar(other) % both are non-scalar (should copy one value into one value)
                 
