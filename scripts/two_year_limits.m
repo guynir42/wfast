@@ -1,7 +1,7 @@
 % This script is used to make the plots that go into the occultation limits
 % paper for the W-FAST two year run (2020-2021)
 
-data_dir = fullfile(getenv('DATA'), 'WFAST\two_year_results'); % need a better way to get this folder
+data_dir = fullfile(getenv('DATA'), 'WFAST\two_year_results'); 
 
 %% load the overview first
 
@@ -242,7 +242,9 @@ util.sys.print([data_dir, '/plots/coverage']);
 
 %% load the first event
 
-C1 = load([data_dir '/occultation_flux/occult_2020-07-01_fluxes']); 
+event_filename = 'occultation_flux/occult_2020-07-01_fluxes';
+C1 = load(fullfile(data_dir, event_filename)); 
+C1.filename = event_filename; 
 
 %% show the lightcurve and cutouts
 
@@ -262,7 +264,7 @@ util.sys.print([data_dir, '/plots/occult_2020-07-01']);
 %% make sure it has an MCMC loaded
 
 if isempty(C1.occultation.mcmc) || isempty(C1.occultation.mcmc.results)
-    C1.occultation.runMCMC('async', 1, 'chains', 10); 
+    C1.occultation.runMCMC('async', 1, 'chains', 30, 'points', 20000, 'burn', 2000); 
 end
 
 
@@ -331,7 +333,7 @@ util.sys.print([data_dir, '/plots/occult_2021-04-01']);
 %% make sure it has an MCMC loaded
 
 if isempty(C2.occultation.mcmc) || isempty(C2.occultation.mcmc.results)
-    C2.occultation.runMCMC('async', 0, 'chains', 10); 
+    C2.occultation.runMCMC('async', 1, 'chains', 30, 'points', 20000, 'burn', 2000); 
 end
 
 
@@ -377,10 +379,27 @@ save([data_dir '/occultation_flux/occult_2020-07-01_fluxes'],...
     'occultation', 'flux', 'time', 'frame_index', 'star_index', ...
     'aperture_index', '-v7.3');
 
+%% load event number 3
+addpath(fullfile(getenv('WFAST'), 'scripts')); 
+ef3 = EventFlux('2021-04-03'); 
+ef3.load()
+
+%% show the lightcurve and cutouts
+
+ef3.showFluxCutouts;
 
 
+%% save the figure
 
+ef3.print;
 
+%% make sure it has an MCMC loaded
+
+if isempty(ef3.mcmc) || isempty(ef3.mcmc.results)
+    ef3.cand.runMCMC('async', 0, 'chains', 10, 'points', 20000, 'burn', 2000); 
+end
+
+ef3.showMCMC; 
 
 
 

@@ -41,6 +41,8 @@ classdef MCMC < handle
         
         title_strings; % a string translating the shorthands like 'r' to a title like 'Occulter radius [FSU]'
         
+        num_bounces = 0;
+        
     end
     
     properties % switches/controls
@@ -150,6 +152,7 @@ classdef MCMC < handle
             
             obj.counter = 0; 
             obj.num_successes = 0;
+            obj.num_bounces = 0;
             
             if ~isempty(obj.gui) && obj.gui.check
                 cla(obj.gui.axes_posterior); 
@@ -722,6 +725,8 @@ classdef MCMC < handle
                                 break; % not out of bounds! 
                             end
                             
+                            obj.num_bounces = obj.num_bounces + 1;
+                            
                         end
 
                     else % reflect back
@@ -737,6 +742,8 @@ classdef MCMC < handle
                             else
                                 break; % not out of bounds! 
                             end
+                            
+                            obj.num_bounces = obj.num_bounces + 1;
                             
                         end
                     end 
@@ -913,7 +920,7 @@ classdef MCMC < handle
                             obj.num_successes(ii) = obj.num_successes(ii) + 1;
                         end
                         
-                        obj.points(jj,ii).counts = 1;
+%                         obj.points(jj,ii).counts = 1;
                         
                         if obj.counter>obj.num_burned && ~(obj.best_point.logl>obj.points(jj,ii).logl) % keep track of the best fit point
                             obj.best_point.copy_from(obj.points(jj,ii)); 
@@ -921,8 +928,8 @@ classdef MCMC < handle
 
                     else % point is rejected, repeat the previous point
                         obj.points(jj,ii).copy_from(obj.points(jj-1,ii));
-                        obj.points(jj,ii).counts = obj.points(jj-1,ii).counts + 1;
-                        obj.points(jj,ii).weight = 0; % don't count these points! 
+%                         obj.points(jj,ii).counts = obj.points(jj-1,ii).counts + 1;
+%                         obj.points(jj,ii).weight = 0; % don't count these points! 
                     end
 
                 end
@@ -981,26 +988,42 @@ classdef MCMC < handle
         function [pass, mean_chi2] = findGoodChains(obj, varargin)
             
             input = util.text.InputVars;
+            input.input_var('signal', 3.5); % the median signal times stellar S/N should surpass this value
             input.input_var('sigma', 3); % how many MADs above the noise should outliers be
             input.scan_vars(varargin{:}); 
             
             N = obj.getNumChains;
             
             mean_chi2 = zeros(1, N);
+            mean_signal = zeros(1,N);
             
             for ii = 1:N
 %                 mean_chi2(ii) = nanmean([obj.points(:,ii).chi2]); 
                 mean_chi2(ii) = nanmean(obj.getResult('chi2', true, ii)); 
+                mean_signal(ii) = nanmedian(obj.getResult('signal', true, ii)); 
             end
             
             if N > 4
                 scat = mad(mean_chi2,1); % median deviation skips outliers
                 aver = median(mean_chi2); % median average skips outliers
                 pass = mean_chi2 - aver < scat * input.sigma; % low chi2 are also accepted, but high outliers are removed
+                
+                if ~isempty(obj.input_errors)
+                    e = obj.input_errors;
+                else
+                    e = 1./obj.gen.snr;
+                end
+                
+                if input.signal % not zero or empty
+                    pass = pass & mean_signal./e >= input.signal;
+                end
+                
                 pass = find(pass);
             else
                 pass = 1:N; 
             end
+            
+            
             
         end
         
@@ -1172,7 +1195,7 @@ classdef MCMC < handle
                 obj.flagBadPoints;
                 
                 names = [obj.par_list, {'chi2', 'ndof', 'logl', 'signal', ...
-                    'counts', 'weight', 'chain', 'burn', 'good'}];
+                    'chain', 'burn', 'good'}];
                 
                 obj.results = cell2table(cell(numel(obj.points), length(names)), ...
                     'VariableNames', names);

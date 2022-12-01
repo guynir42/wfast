@@ -833,6 +833,7 @@ classdef Candidate < handle
             mcmc.gen.f = obj.head.FRAMERATE;
             mcmc.gen.T = obj.head.EXPTIME;
             mcmc.gen.W = length(obj.flux_raw) ./ obj.head.FRAMERATE;
+%             mcmc.gen.snr = obj.star_snr; % to kill chains with low signal
             
             if ~obj.is_simulated
                 fsu = sqrt(600e-12 * 150e9 *40 / 2); % assume KBOs at 40AU giving 1.3 km per fsu
