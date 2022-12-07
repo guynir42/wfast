@@ -341,8 +341,12 @@ classdef Catalog < handle
             S.Col.X=1; S.Col.Y=2; S.Col.Mag_G=3; S.Col.ALPHAWIN_J2000=4; S.Col.DELTAWIN_J2000=5;
             S.ColCell = {'X', 'Y', 'Mag_G', 'ALPHAWIN_J2000', 'DELTAWIN_J2000'}; % make a false catalog 
             
-            addpath(fullfile(getenv('DATA'), 'GAIA/DR2')); % make sure astrometry can find GAIA
-
+            if ~isempty(getenv('GAIA'))
+                addpath(fullfile(getenv('GAIA'), 'DR2'));
+            else
+                addpath(fullfile(getenv('DATA'), 'GAIA/DR2')); % make sure astrometry can find GAIA
+            end
+            
             % scan a few values of RA/DE outside the values suggested by pars object
             
             if obj.use_telescope_coords && ~isempty(obj.head.TELRA_DEG) && ~isempty(obj.head.TELDEC_DEG)

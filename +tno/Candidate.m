@@ -827,12 +827,13 @@ classdef Candidate < handle
             
             mcmc = occult.MCMC; 
             mcmc.input_flux = obj.flux_raw./obj.flux_mean;
+            mcmc.input_flux = mcmc.input_flux - nanmedian(mcmc.input_flux) + 1; % make sure the mean flux is 1
             mcmc.input_flux = circshift(mcmc.input_flux, 100-obj.time_index); % center the peak
             mcmc.input_errors = obj.flux_std./obj.flux_mean; 
             mcmc.input_R = obj.star_props.FresnelSize; 
-            mcmc.gen.f = obj.head.FRAMERATE;
-            mcmc.gen.T = obj.head.EXPTIME;
-            mcmc.gen.W = length(obj.flux_raw) ./ obj.head.FRAMERATE;
+            mcmc.input_frame_rate = obj.head.FRAMERATE;
+            mcmc.input_exptime = obj.head.EXPTIME*1000; % convert to ms
+            mcmc.input_window = length(obj.flux_raw)./obj.head.FRAMERATE;
 %             mcmc.gen.snr = obj.star_snr; % to kill chains with low signal
             
             if ~obj.is_simulated
@@ -881,12 +882,12 @@ classdef Candidate < handle
             input.scan_vars(varargin{:}); 
             
             if util.text.cs(input.velocity_prior, 'wide')
-                mcmc = obj.mcmc_wide_v.futures{end}.fetchOutput;
+                mcmc = obj.mcmc_wide_v.futures{end}.fetchOutputs;
                 if ~isempty(mcmc.results)
                     obj.mcmc_wide_v = mcmc;
                 end
             elseif util.text.cs(input.velocity_prior, 'narrow')
-                mcmc = obj.mcmc_wide_v.futures{end}.fetchOutput;
+                mcmc = obj.mcmc_wide_v.futures{end}.fetchOutputs;
                 if ~isempty(mcmc.results)
                     obj.mcmc_narrow_v = mcmc;
                 end
@@ -2378,7 +2379,7 @@ classdef Candidate < handle
             
             hold(ax_flux, 'on'); 
             
-            mn = ax_flux.YLim(1); 
+            mn = ax_flux.YLim(1)*0.9; 
             mx = ax_flux.YLim(2)*1.1; 
             
             start = obj.time_index - floor(input.number / 2);
@@ -2540,6 +2541,8 @@ classdef Candidate < handle
                 
                 per = 90;
                 many_outliers = prctile(N, per); 
+                
+                plot_limit = prctile(N, 99); 
                 plot(ax1, [1, length(N)], [1,1].*many_outliers, ':', 'DisplayName', ...
                     sprintf('%d%% percentile: %d', per, many_outliers), 'LineWidth', 2);
                 
@@ -2551,6 +2554,7 @@ classdef Candidate < handle
                 hold(ax1, 'off'); 
                 
                 ax1.YLim = lims;
+                ax1.YLim(2) = max(plot_limit, N(star_id)*1.1);
                 
                 ax2 = axes('Parent', input.parent, 'Position', [left, bottom, width, height]); 
                 
@@ -2568,9 +2572,9 @@ classdef Candidate < handle
                 axis(ax3, 'square'); 
                 
                 hold(ax3, 'on'); 
-                plot(ax3, x0, y0, 'rx', 'MarkerSize', 10); 
+                plot(ax3, x0, y0, 'rx', 'MarkerSize', 15, 'LineWidth', 1.5); 
                 hold(ax3, 'off'); 
-                
+                ax3.CLim(2) = plot_limit;
                 xlabel(ax3, 'Outliers vs. position'); 
                 ax3.FontSize = input.font_size;
                 
@@ -2586,8 +2590,8 @@ classdef Candidate < handle
             % this plot is the only one that is still relevant with a single flux
             [counts, edges] = histcounts(fs(:,star_id), 100); 
             centers = (edges(1:end-1) + edges(2:end))/2;
-            bar(ax2, centers, counts, 'DisplayName', 'Smoothed flux values');
-            xlabel(ax2, 'Filtered flux values');
+            bar(ax2, centers, counts, 'DisplayName', 'Flux values');
+            xlabel(ax2, 'Flux values');
             ylabel(ax2, 'Number of epochs'); 
             ax2.FontSize = input.font_size;
             
@@ -2616,6 +2620,162 @@ classdef Candidate < handle
             hold(ax2, 'off'); 
             
             ax2.YLim = lims;
+            
+            if max(N) == N(star_id)
+                dispt('This star has the most outliers in the sample!'); 
+            end
+            
+        end
+        
+        function showNearestStars(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('number', 6); % number of stars to look for   
+            input.input_var('snr', 5); % minimal S/N for stars to be considered
+            input.input_var('height', 0.75); % height of the image box
+            input.input_var('monochrome', true); % use an inverted grayscale colormap
+            input.input_var('parent', []); % could be a figure handle, if empty use gcf
+            input.input_var('font_size', 16); % for axes
+            input.scan_vars(varargin{:}); 
+            
+            if isempty(input.number)
+                input.number = 6; 
+            end
+            
+            if isempty(input.parent) || ~isvalid(input.parent)
+                input.parent = gcf;
+            end
+                        
+            % find the nearest stars
+            x = double(obj.positions(:, 1)); 
+            y = double(obj.positions(:, 2)); 
+            
+            x0 = x(obj.star_index);
+            y0 = y(obj.star_index);
+            
+            r = sqrt((x-x0).^2 + (y-y0).^2); 
+            
+            % set infinite radius for stars with low S/N
+            if input.snr
+                S = obj.store_pars.star_snrs(obj.store_pars.star_indices); 
+                r(S<input.snr) = Inf;
+            end
+            [r_sort, idx] = sort(r); 
+            
+            idx = idx(2:1+input.number); % indices of nearest N stars
+            
+            % nearest neighbors' positions
+            xn = x(idx);
+            yn = y(idx); 
+            
+            % nearest neighbors' fluxes
+            fn = obj.flux_raw_all(:,idx); 
+            
+            % find the area of the image we need
+            margin_px = 10;
+            x_min = round(min(xn)) - margin_px;
+            x_max = round(max(xn)) + margin_px;
+            y_min = round(min(yn)) - margin_px;
+            y_max = round(max(yn)) + margin_px;
+            
+            % what is the width in arcsec? 
+            dx = x_max-x_min;
+            dy = y_max-y_min;
+            width = max(dx, dy); 
+            if width == dx
+                y_min = y_min - floor((width - dy)/2);
+                y_max = y_max + ceil((width - dy)/2);
+            else                
+                x_min = x_min - floor((width - dx)/2);
+                x_max = x_max + ceil((width - dx)/2);
+            end
+                        
+            width_bar = round(width * obj.head.SCALE / 60 / 2) / obj.head.SCALE * 60;
+            offset_px = width_bar / 10;
+            clf(input.parent); 
+            
+            % the flux plot first            
+            left_margin = 0.1;
+            right_margin = 0.02;
+            bottom_margin = 0.15;
+            top_margin = 0.02;
+            split = 0.65; 
+            
+            ax_flux = axes('Parent', input.parent); 
+            
+            stairs(ax_flux, obj.flux_raw, '-k', 'LineWidth', 2, 'DisplayName', 'occultation star'); 
+%             text(ax_flux, 5, nanmedian(obj.flux_raw)*1.5, 'occultation star', 'FontSize', input.font_size); 
+            
+            hold(ax_flux, 'on'); 
+            
+            hstairs = stairs(ax_flux, fn, 'LineWidth', 1.5); 
+            
+            for ii = 1:length(hstairs)
+                hstairs(ii).DisplayName = sprintf('Neighbor #%d', ii);
+%                 text(ax_flux, 5*ii, nanmedian(fn(:,ii))*1.5, sprintf('%d', ii), 'FontSize', input.font_size); 
+            end
+            
+            ax_flux.YScale = 'log'; 
+            
+            mn = ax_flux.YLim(1); 
+            mx = ax_flux.YLim(2)*1.1; 
+            
+            % event region            
+            area(ax_flux, obj.time_range, ones(length(obj.time_range),1).*mx, mn, 'FaceColor', 0.5.*[1,1,1], ...
+                'EdgeColor', 'none', 'FaceAlpha', 0.2, 'DisplayName', 'Event Region'); 
+            
+            ax_flux.Children = circshift(ax_flux.Children, -1); % put the event region in the back
+            
+            hold(ax_flux, 'off'); 
+            
+            ax_flux.YLim = [mn, mx];
+            
+            ax_flux.FontSize = input.font_size;
+            xlabel(ax_flux, 'Frame number');
+            ylabel(ax_flux, 'Raw counts'); 
+            
+            legend(ax_flux, 'Location', 'NorthEastOutside', 'NumColumns',2); 
+            ax_flux.Position = [left_margin, bottom_margin, split - left_margin - right_margin, 1-bottom_margin-top_margin];
+            % show the image
+            
+            ax_image = axes('Parent', input.parent, 'Position', [split+right_margin, bottom_margin, 1-split-right_margin*2, input.height-bottom_margin]); 
+                    
+            if isempty(obj.stack)
+                filename = obj.filenames{obj.time_index}; 
+                obj.stack = h5read(filename, '/stack'); 
+            end
+            
+            xval = x_min:x_max;
+            yval = y_min:y_max;
+            I = obj.stack(yval, xval);
+            util.plot.show(I, 'auto', 1, 'ax', ax_image, 'fancy', 0, 'xval', xval, 'yval', yval, 'mono', 1);
+            
+            hold(ax_image, 'on'); 
+            
+            plot(ax_image, x0, y0, 'ok', 'MarkerSize', 16);
+            text(ax_image, x0+5, y0, sprintf('occ. star'),...
+                    'Color', 'k', 'FontSize', input.font_size);
+                
+            x_mid = prctile(xn, 70); 
+            for ii = 1:length(hstairs)
+                plot(ax_image, xn(ii), yn(ii), 's', 'Color', hstairs(ii).Color, 'MarkerSize', 15); 
+                
+                if xn(ii) > x_mid                
+                    text(ax_image, xn(ii)-offset_px, yn(ii)-5, sprintf('#%d', ii),...
+                    'Color', hstairs(ii).Color, 'FontSize', input.font_size, ...
+                    'HorizontalAlignment', 'Right'); 
+                else
+                    text(ax_image, xn(ii)+offset_px, yn(ii)-5, sprintf('#%d', ii),...
+                    'Color', hstairs(ii).Color, 'FontSize', input.font_size); 
+                end
+            end
+            
+            bar_offset = offset_px * 2;
+            plot(ax_image, bar_offset + x_min + [0, width_bar], y_max - bar_offset + [0,0], 'k-', 'LineWidth', 4);  
+            text(ax_image, bar_offset + x_min + width_bar, y_max - bar_offset, sprintf(' %d'' ', round(width_bar * obj.head.SCALE / 60)), ...
+                'FontSize', input.font_size); 
+            
+            hold(ax_image, 'off'); 
             
         end
         

@@ -89,6 +89,14 @@ classdef EventFlux < handle
             end
         end
         
+        function val = get.star_index(obj)
+            if isempty(obj.raw_data)
+                val = [];
+            else
+                val = obj.raw_data.star_index;
+            end
+        end
+        
         function val = get.aperture_index(obj)
             if isempty(obj.raw_data)
                 val = [];
@@ -131,7 +139,7 @@ classdef EventFlux < handle
             frame_index = obj.frame_index;
             star_index = obj.star_index;
             aperture_index = obj.aperture_index;
-            save(fullfile(obj.base_dir, obj.filename), 'occultation', 'flux', 'time', 'frame_index', 'star_index', 'aperture_index')
+            save(fullfile(obj.base_dir, obj.filename), 'occultation', 'flux', 'time', 'frame_index', 'star_index', 'aperture_index', '-v7.3')
             
         end
         
@@ -174,6 +182,29 @@ classdef EventFlux < handle
             
         end
         
+        function fig = showNeighbors(obj, number)
+            
+            if nargin<2 || isempty(number)
+                number = [];
+            end
+            
+            obj.latest_plot_type = 'neighbors'; 
+            
+            fh = util.plot.FigHandler(sprintf('%s_%s', obj.latest_plot_type, obj.event_date));
+            fh.width = 30;
+            fh.height = 15;
+            fh.clear;
+
+            obj.cand.showNearestStars('parent', fh.fig, 'number', number);
+            
+            if nargout > 0
+                fig = fh.fig;
+            end
+            
+            obj.latest_figure = fh.fig;
+            
+        end
+        
         function fig = showMCMC(obj)
             
             obj.latest_plot_type = 'mcmc'; 
@@ -184,6 +215,32 @@ classdef EventFlux < handle
             fh.clear;
 
             obj.mcmc.showResults('parent', fh.fig); 
+            
+            if nargout > 0
+                fig = fh.fig;
+            end
+            
+            obj.latest_figure = fh.fig;
+            
+        end
+        
+        function fig = showOutliers(obj)
+            
+            obj.latest_plot_type = 'outliers'; 
+            
+            fh = util.plot.FigHandler(sprintf('%s_%s', obj.latest_plot_type, obj.event_date));
+            fh.width = 30;
+            fh.height = 15;
+            fh.clear;
+            
+            idx1 = obj.frame_index - 2000;
+            if idx1 < 1, edx1 = 1; end
+            
+            idx2 = obj.frame_index + 2000;
+            if idx2 > size(obj.flux, 1), idx2 = size(obj.flux, 1); end
+            
+            f = obj.flux(idx1:idx2, :, obj.aperture_index);
+            obj.cand.showOutlierAnalysis(f, 'parent', fh.fig, 'recalc', 1); 
             
             if nargout > 0
                 fig = fh.fig;

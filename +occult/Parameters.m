@@ -324,7 +324,7 @@ classdef Parameters < handle
 
                 val{ii} = sprintf('%s | b= %4.2f | v= %4.2f | t= %4.2f', val{ii}, obj.b(ii), obj.v(ii), obj.t(ii)); 
 
-                val{ii} = sprintf('%s | lkl= %g | signal= %4.2f', val{ii}, obj.likelihood(ii), obj.signal(ii)); 
+                val{ii} = sprintf('%s | logl= %g | signal= %4.2f', val{ii}, obj.logl(ii), obj.signal(ii)); 
 
             end
             
@@ -497,14 +497,14 @@ classdef Parameters < handle
             
             if ~isequal(val, obj.T)
                
-                Tf = 1./obj.f*1000;
+%                 Tf = 1./obj.f*1000;
                 
                 obj.T = val;
                 
-                if obj.T + obj.readout_time>Tf
-                    Tf = obj.T + obj.readout_time;
-                    obj.f = 1./Tf/1000;
-                end
+%                 if obj.T + obj.readout_time>Tf
+%                     Tf = obj.T + obj.readout_time;
+%                     obj.f = 1./Tf/1000;
+%                 end
                 
                 obj.is_updated = 0;
                 
@@ -520,13 +520,13 @@ classdef Parameters < handle
             
             if ~isequal(val, obj.f)
             
-                Tf = 1./val*1000; 
+%                 Tf = 1./val*1000; 
                 
                 obj.f = val;
                 
-                if obj.T + obj.readout_time>Tf
-                    obj.T = Tf - obj.readout_time;
-                end
+%                 if obj.T + obj.readout_time>Tf
+%                     obj.T = Tf - obj.readout_time;
+%                 end
                 
                 obj.is_updated = 0;
                 

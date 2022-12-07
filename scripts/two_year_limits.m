@@ -242,142 +242,178 @@ util.sys.print([data_dir, '/plots/coverage']);
 
 %% load the first event
 
-event_filename = 'occultation_flux/occult_2020-07-01_fluxes';
-C1 = load(fullfile(data_dir, event_filename)); 
-C1.filename = event_filename; 
+addpath(fullfile(getenv('WFAST'), 'scripts')); 
+ef1 = EventFlux('2020-07-01'); 
+ef1.load;
+
+% event_filename = 'occultation_flux/occult_2020-07-01_fluxes';
+% C1 = load(fullfile(data_dir, event_filename)); 
+% C1.filename = event_filename; 
 
 %% show the lightcurve and cutouts
 
-f6 = util.plot.FigHandler('occult 2020-07-01');
-f6.width = 30;
-f6.height = 15;
-f6.clear;
+% f6 = util.plot.FigHandler('occult 2020-07-01');
+% f6.width = 30;
+% f6.height = 15;
+% f6.clear;
+% 
+% C1.occultation.showFluxCutouts('parent', f6.fig);
 
-C1.occultation.showFluxCutouts('parent', f6.fig);
-
+ef1.showFluxCutouts; 
 
 %% save the plot
 
-util.sys.print([data_dir, '/plots/occult_2020-07-01']);
+% util.sys.print([data_dir, '/plots/occult_2020-07-01']);
+ef1.print;
 
+%% show the neighbors flux
+
+ef1.showNeighbors;
+
+%% save the plot
+
+ef1.print;
 
 %% make sure it has an MCMC loaded
 
-if isempty(C1.occultation.mcmc) || isempty(C1.occultation.mcmc.results)
-    C1.occultation.runMCMC('async', 1, 'chains', 30, 'points', 20000, 'burn', 2000); 
+if isempty(ef1.mcmc) || isempty(ef1.mcmc.results)
+    ef1.cand.runMCMC('async', 1, 'chains', 50, 'points', 20000, 'burn', 2000); 
 end
 
 
-f7 = util.plot.FigHandler('mcmc 2020-07-01');
-f7.width = 25;
-f7.height = 16;
-f7.clear;
+% f7 = util.plot.FigHandler('mcmc 2020-07-01');
+% f7.width = 25;
+% f7.height = 16;
+% f7.clear;
+% 
+% 
+% C1.occultation.mcmc.showResults('parent', f7.fig); 
 
-
-C1.occultation.mcmc.showResults('parent', f7.fig); 
+ef1.showMCMC;
 
 %% save the plot
 
-util.sys.print([data_dir, '/plots/mcmc_2020-07-01']);
+% util.sys.print([data_dir, '/plots/mcmc_2020-07-01']);
+
+ef1.print;
 
 %% show the outlier analysis for event 1
 
 
-f8 = util.plot.FigHandler('outliers 2020-07-01');
-f8.width = 30;
-f8.height = 16;
-f8.clear;
+% f8 = util.plot.FigHandler('outliers 2020-07-01');
+% f8.width = 30;
+% f8.height = 16;
+% f8.clear;
+% 
+% f = C1.flux(C1.frame_index - 2000:C1.frame_index + 2000, :, C1.aperture_index);
+% C1.occultation.showOutlierAnalysis(f, 'parent', f8.fig, 'recalc', 1); 
 
-f = C1.flux(C1.frame_index - 2000:C1.frame_index + 2000, :, C1.aperture_index);
-C1.occultation.showOutlierAnalysis(f, 'parent', f8.fig, 'recalc', 1); 
+ef1.showOutliers;
 
 
 %% save the plot
 
-util.sys.print([data_dir, '/plots/outliers_2020-07-01']);
-
+% util.sys.print([data_dir, '/plots/outliers_2020-07-01']);
+ef1.print;
 
 %% save the occultation and all data along with it back to disk
 
-occultation = C1.occultation;
-star_index = C1.star_index;
-frame_index = C1.frame_index;
-aperture_index = C1.aperture_index;
-flux = C1.flux;
-time = C1.time;
+% occultation = C1.occultation;
+% star_index = C1.star_index;
+% frame_index = C1.frame_index;
+% aperture_index = C1.aperture_index;
+% flux = C1.flux;
+% time = C1.time;
+% 
+% save([data_dir '/occultation_flux/occult_2020-07-01_fluxes'],...
+%     'occultation', 'flux', 'time', 'frame_index', 'star_index', ...
+%     'aperture_index', '-v7.3');
 
-save([data_dir '/occultation_flux/occult_2020-07-01_fluxes'],...
-    'occultation', 'flux', 'time', 'frame_index', 'star_index', ...
-    'aperture_index', '-v7.3');
-
+ef1.save;
 
 %% load the second event
 
-C2 = load([data_dir '/occultation_flux/occult_2021-04-01_fluxes']); 
+% C2 = load([data_dir '/occultation_flux/occult_2021-04-01_fluxes']); 
+
+addpath(fullfile(getenv('WFAST'), 'scripts')); 
+ef2 = EventFlux('2021-04-01'); 
+ef2.load;
 
 %% show the lightcurve and cutouts
 
-f9 = util.plot.FigHandler('occult 2021-04-01');
-f9.width = 30;
-f9.height = 15;
-f9.clear;
-
-C2.occultation.showFluxCutouts('parent', f9.fig);
-
+% f9 = util.plot.FigHandler('occult 2021-04-01');
+% f9.width = 30;
+% f9.height = 15;
+% f9.clear;
+% 
+% C2.occultation.showFluxCutouts('parent', f9.fig);
+ef2.showFluxCutouts;
 
 %% save the plot
 
-util.sys.print([data_dir, '/plots/occult_2021-04-01']);
+% util.sys.print([data_dir, '/plots/occult_2021-04-01']);
+ef2.print;
 
+%% show the neighbors flux
+
+ef2.showNeighbors;
+
+%% save the plot
+
+ef2.print;
 
 %% make sure it has an MCMC loaded
 
-if isempty(C2.occultation.mcmc) || isempty(C2.occultation.mcmc.results)
-    C2.occultation.runMCMC('async', 1, 'chains', 30, 'points', 20000, 'burn', 2000); 
+if isempty(ef2.mcmc) || isempty(ef2.mcmc.results)
+    ef2.cand.runMCMC('async', 1, 'chains', 50, 'points', 20000, 'burn', 2000); 
 end
 
 
-f10 = util.plot.FigHandler('mcmc 2021-04-01');
-f10.width = 25;
-f10.height = 16;
-f10.clear;
+% f10 = util.plot.FigHandler('mcmc 2021-04-01');
+% f10.width = 25;
+% f10.height = 16;
+% f10.clear;
+% 
+% C2.occultation.mcmc.showResults('parent', f10.fig); 
 
-
-C2.occultation.mcmc.showResults('parent', f10.fig); 
-
-%% save the plot
-
-util.sys.print([data_dir, '/plots/mcmc_2020-07-01']);
-
-%% show the outlier analysis for event 1
-
-
-f8 = util.plot.FigHandler('outliers 2020-07-01');
-f8.width = 30;
-f8.height = 16;
-f8.clear;
-
-f = C1.flux(C1.frame_index - 2000:C1.frame_index + 2000, :, C1.aperture_index);
-C1.occultation.showOutlierAnalysis(f, 'parent', f8.fig, 'recalc', 1); 
-
+ef2.showMCMC;
 
 %% save the plot
 
-util.sys.print([data_dir, '/plots/outliers_2020-07-01']);
+% util.sys.print([data_dir, '/plots/mcmc_2020-07-01']);
+ef2.print;
 
+%% show the outlier analysis for event 2
+
+% f8 = util.plot.FigHandler('outliers 2021-04-01');
+% f8.width = 30;
+% f8.height = 16;
+% f8.clear;
+% 
+% f = C2.flux(C1.frame_index - 2000:C1.frame_index + 2000, :, C1.aperture_index);
+% C2.occultation.showOutlierAnalysis(f, 'parent', f8.fig, 'recalc', 1); 
+
+ef2.showOutliers;
+
+%% save the plot
+
+% util.sys.print([data_dir, '/plots/outliers_2020-07-01']);
+ef2.print;
 
 %% save the occultation and all data along with it back to disk
 
-occultation = C1.occultation;
-star_index = C1.star_index;
-frame_index = C1.frame_index;
-aperture_index = C1.aperture_index;
-flux = C1.flux;
-time = C1.time;
+% occultation = C2.occultation;
+% star_index = C2.star_index;
+% frame_index = C2.frame_index;
+% aperture_index = C2.aperture_index;
+% flux = C2.flux;
+% time = C2.time;
+% 
+% save([data_dir '/occultation_flux/occult_2021-04-01_fluxes'],...
+%     'occultation', 'flux', 'time', 'frame_index', 'star_index', ...
+%     'aperture_index', '-v7.3');
 
-save([data_dir '/occultation_flux/occult_2020-07-01_fluxes'],...
-    'occultation', 'flux', 'time', 'frame_index', 'star_index', ...
-    'aperture_index', '-v7.3');
+ef2.save;
 
 %% load event number 3
 addpath(fullfile(getenv('WFAST'), 'scripts')); 
@@ -388,6 +424,14 @@ ef3.load()
 
 ef3.showFluxCutouts;
 
+%% save the figure
+
+ef3.print;
+
+%% show the nearest neighbors
+
+ef3.showNeighbors;
+
 
 %% save the figure
 
@@ -396,23 +440,201 @@ ef3.print;
 %% make sure it has an MCMC loaded
 
 if isempty(ef3.mcmc) || isempty(ef3.mcmc.results)
-    ef3.cand.runMCMC('async', 0, 'chains', 10, 'points', 20000, 'burn', 2000); 
+    ef3.cand.runMCMC('async', 1, 'chains', 50, 'points', 20000, 'burn', 2000); 
 end
 
 ef3.showMCMC; 
 
 
+%% save the figure
+
+ef3.print;
 
 
+%% show the outlier analysis for event 3
+
+ef3.showOutliers;
+
+%% save the plot
+
+ef3.print;
+
+%% load event number 4
+addpath(fullfile(getenv('WFAST'), 'scripts')); 
+ef4 = EventFlux('2021-04-11'); 
+ef4.load()
+
+%% show the lightcurve and cutouts
+
+ef4.showFluxCutouts;
+
+%% save the figure
+
+ef4.print;
+
+%% show the nearest neighbors
+
+ef4.showNeighbors;
 
 
+%% save the figure
+
+ef4.print;
+
+%% make sure it has an MCMC loaded
+
+if isempty(ef4.mcmc) || isempty(ef4.mcmc.results)
+    ef4.cand.runMCMC('async', 1, 'chains', 50, 'points', 20000, 'burn', 2000); 
+end
+
+ef4.showMCMC; 
 
 
+%% save the figure
+
+ef4.print;
 
 
+%% show the outlier analysis for event 4
+
+ef4.showOutliers;
+
+%% save the plot
+
+ef4.print;
+
+%% load event number 5
+addpath(fullfile(getenv('WFAST'), 'scripts')); 
+ef5 = EventFlux('2021-04-12'); 
+ef5.load()
+
+%% show the lightcurve and cutouts
+
+ef5.showFluxCutouts;
+
+%% save the figure
+
+ef5.print;
+
+%% show the nearest neighbors
+
+ef5.showNeighbors(4);
 
 
+%% save the figure
 
+ef5.print;
+
+%% make sure it has an MCMC loaded
+
+if isempty(ef5.mcmc) || isempty(ef5.mcmc.results)
+    ef5.cand.runMCMC('async', 1, 'chains', 50, 'points', 20000, 'burn', 2000); 
+end
+
+ef5.showMCMC; 
+
+
+%% save the figure
+
+ef5.print;
+
+
+%% show the outlier analysis for event 5
+
+ef5.showOutliers;
+
+%% save the plot
+
+ef5.print;
+
+
+%% load event number 6
+addpath(fullfile(getenv('WFAST'), 'scripts')); 
+ef6 = EventFlux('2021-04-16'); 
+ef6.load()
+
+%% show the lightcurve and cutouts
+
+ef6.showFluxCutouts;
+
+%% save the figure
+
+ef6.print;
+
+%% show the nearest neighbors
+
+ef6.showNeighbors(4);
+
+
+%% save the figure
+
+ef6.print;
+
+%% make sure it has an MCMC loaded
+
+if isempty(ef6.mcmc) || isempty(ef6.mcmc.results)
+    ef6.cand.runMCMC('async', 1, 'chains', 50, 'points', 20000, 'burn', 2000); 
+end
+
+ef6.showMCMC; 
+
+
+%% save the figure
+
+ef6.print;
+
+
+%% show the outlier analysis for event 6
+
+ef6.showOutliers;
+
+%% save the plot
+
+ef6.print;
+
+%% load event number 7
+addpath(fullfile(getenv('WFAST'), 'scripts')); 
+ef7 = EventFlux('2021-09-14'); 
+ef7.load()
+
+%% show the lightcurve and cutouts
+
+ef7.showFluxCutouts;
+
+%% save the figure
+
+ef6.print;
+
+%% show the nearest neighbors
+
+ef6.showNeighbors(4);
+
+
+%% save the figure
+
+ef6.print;
+
+%% make sure it has an MCMC loaded
+
+if isempty(ef6.mcmc) || isempty(ef6.mcmc.results)
+    ef6.cand.runMCMC('async', 1, 'chains', 50, 'points', 20000, 'burn', 2000); 
+end
+
+ef6.showMCMC; 
+
+
+%% save the figure
+
+ef6.print;
+
+
+%% show the outlier analysis for event 6
+
+ef6.showOutliers;
+
+%% save the plot
+
+ef6.print;
 
 
 

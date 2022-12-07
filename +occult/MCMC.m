@@ -29,7 +29,9 @@ classdef MCMC < handle
         
         input_R; % best estimate for the star's size
         input_v; % best estimate for the field's velocity (FSU/s)
-        
+        input_frame_rate = 25; % the frame rate used in the actual observations (Hz)
+        input_exptime = 39; % the exposure time used in the actual observations (ms)
+        input_window = 8; % the time window to simulate lightcurves (sec)
         counter = 0; 
         num_successes = 0; % number of steps that succeeded
         
@@ -185,6 +187,19 @@ classdef MCMC < handle
             
             if isempty(obj.gen)
                 obj.gen = occult.CurveGenerator;
+                obj.gen.f = obj.input_frame_rate;
+                obj.gen.T = obj.input_exptime;
+                obj.gen.W = obj.input_window;
+                
+                if ~isempty(obj.results)
+                    obj.gen.R = obj.results{end, 'R'}; 
+                    obj.gen.r = obj.results{end, 'r'};
+                    obj.gen.t = obj.results{end, 't'};
+                    obj.gen.b = obj.results{end, 'b'};
+                    obj.gen.v = obj.results{end, 'v'};
+                    % TODO: add an option using the points data
+                end
+                
             end
             
             val = obj.gen;
@@ -375,8 +390,8 @@ classdef MCMC < handle
             obj.initialization_method = 'random'; 
             obj.circ_bounds = [0 0 0 0 0];
             
-            obj.gen.t_range = [-1000, 1000];
-            obj.gen.R_range = [0, 10]; 
+%             obj.gen.t_range = [-1000, 1000];
+%             obj.gen.R_range = [0, 10]; 
             
             obj.use_priors = 1; 
             
@@ -394,7 +409,7 @@ classdef MCMC < handle
         end
         
         function setupNarrowVelocityPrior(obj) % TODO: allow user input to change the range or input physical parameters
-        
+            error('this does not get propagated to the generator, in async run because it is transient!')
             obj.gen.v_range = obj.input_v - [5.15 3.65]; % apply the range of KBO motion between circular and parabolic orbits (in FSU/s)
             if obj.gen.v_range(1)<1, obj.gen.v_range(1) = 1; end % make sure the slowest velocity is not too slow
             
@@ -404,7 +419,7 @@ classdef MCMC < handle
         
         function setupWideVelocityPrior(obj)
             
-            obj.gen.v_range = [1 40]; 
+%             obj.gen.v_range = [1 40]; 
             obj.step_sizes(3) = 1;
             
         end
@@ -497,6 +512,16 @@ classdef MCMC < handle
             
             obj.init_point(1,obj.num_chains) = occult.Parameters; 
             
+            for ii = 1:length(obj.init_point)
+                obj.init_point(ii).f = obj.input_frame_rate;
+                obj.init_point(ii).T = obj.input_exptime;
+                obj.init_point(ii).W = obj.input_window;
+            end
+            
+            obj.gen.f = obj.input_frame_rate;
+            obj.gen.T = obj.input_exptime;
+            obj.gen.W = obj.input_window;
+            
             obj.num_successes = zeros(1, obj.num_chains); 
             
         end
@@ -520,6 +545,8 @@ classdef MCMC < handle
                     obj.showPosterior; 
                 end
             end
+            
+            obj.points(end)
             
             compressed = '';
             if compress_to_table
@@ -694,6 +721,9 @@ classdef MCMC < handle
                 points(ii).b = b(pos(1)); 
                 points(ii).v = v(pos(3)); 
                 points(ii).R = R; 
+                points(ii).f = obj.input_frame_rate;
+                points(ii).T = obj.input_exptime;
+                points(ii).W = obj.input_window;                
                 
             end
             
@@ -768,7 +798,8 @@ classdef MCMC < handle
             f2 = obj.input_flux;
 
             % calculate the S/N as well
-            obj.gen.lc.pars.signal = sqrt(nansum((f1-1).^2));
+            mf1 = nanmean(f1); 
+            obj.gen.lc.pars.signal = sqrt(nansum((f1-mf1).^2));
             
             chi2 = nansum(((f1-f2)./e).^2, 1); 
 
@@ -990,6 +1021,7 @@ classdef MCMC < handle
             input = util.text.InputVars;
             input.input_var('signal', 3.5); % the median signal times stellar S/N should surpass this value
             input.input_var('sigma', 3); % how many MADs above the noise should outliers be
+            input.input_var('find', true); % convert logical index to integer list
             input.scan_vars(varargin{:}); 
             
             N = obj.getNumChains;
@@ -998,32 +1030,29 @@ classdef MCMC < handle
             mean_signal = zeros(1,N);
             
             for ii = 1:N
-%                 mean_chi2(ii) = nanmean([obj.points(:,ii).chi2]); 
                 mean_chi2(ii) = nanmean(obj.getResult('chi2', true, ii)); 
                 mean_signal(ii) = nanmedian(obj.getResult('signal', true, ii)); 
             end
             
-            if N > 4
-                scat = mad(mean_chi2,1); % median deviation skips outliers
-                aver = median(mean_chi2); % median average skips outliers
-                pass = mean_chi2 - aver < scat * input.sigma; % low chi2 are also accepted, but high outliers are removed
-                
-                if ~isempty(obj.input_errors)
-                    e = obj.input_errors;
-                else
-                    e = 1./obj.gen.snr;
-                end
-                
-                if input.signal % not zero or empty
-                    pass = pass & mean_signal./e >= input.signal;
-                end
-                
-                pass = find(pass);
+            if ~isempty(obj.input_errors)
+                e = obj.input_errors;
             else
-                pass = 1:N; 
+                e = 1./obj.gen.snr;
             end
             
+            if input.signal % not zero or empty
+                pass = mean_signal./e >= input.signal;
+            end
             
+            if N > 4
+                scat = mad(mean_chi2(pass),1); % median deviation skips outliers
+                aver = median(mean_chi2(pass)); % median average skips outliers
+                pass = pass & (mean_chi2 - aver < scat * input.sigma); % low chi2 are also accepted, but high outliers are removed
+            end
+            
+            if input.find
+                pass = find(pass);
+            end
             
         end
         
@@ -1033,7 +1062,7 @@ classdef MCMC < handle
             input.input_var('pars', obj.show_posterior_pars); 
             input.input_var('success_ratio', 0.05); % minimal number of successes (relative to total steps) for a chain to be included
             input.input_var('likelihood', []); % minimal mean likelihood needed for a chain to be included
-            input.input_var('weights', false, 'use_weights');
+%             input.input_var('weights', false, 'use_weights');
             input.input_var('burn', false); 
             input.input_var('oversample', 5); 
             input.scan_vars(varargin{:}); 
@@ -1049,16 +1078,12 @@ classdef MCMC < handle
         
             x = obj.getResult(input.pars{1}, ~input.burn, chain_num); 
             y = obj.getResult(input.pars{2}, ~input.burn, chain_num); 
-            w = obj.getResult('weight', ~input.burn, chain_num); 
+%             w = obj.getResult('weight', ~input.burn, chain_num); 
             
-%             x = [obj.points(idx1, idx2).(input.pars{1})];
-%             y = [obj.points(idx1, idx2).(input.pars{2})];
-%             w = logical([obj.points(idx1, idx2).weight]);
-
-            if input.weights
-                x = x(w);
-                y = y(w); 
-            end
+%             if input.weights
+%                 x = x(w);
+%                 y = y(w); 
+%             end
             
             idx_x = find(strcmp(input.pars{1}, obj.par_list), 1, 'first');
             dx = obj.step_sizes(idx_x)/input.oversample; 
@@ -1228,6 +1253,7 @@ classdef MCMC < handle
             input.input_var('pars', obj.show_chain_pars); 
             input.input_var('chains', obj.show_num_chains, 'num_chains', 'number_chains'); 
             input.input_var('burn', false); 
+            input.input_var('good', false); % only show chains that were not rejected
             input.input_var('sparse', []); % show only one point every N points
             input.input_var('full_titles', false, 'titles'); 
             input.input_var('ax', [], 'axes', 'axis');
@@ -1271,7 +1297,7 @@ classdef MCMC < handle
             
             sz = ones(obj.counter, 1); 
 %             colors = {'b', 'r', 'g', 'm'};
-            shapes = {'o', 'p', 's', 'v'}; 
+            shapes = {'o', 'p', 's', 'v', 'd', 'x', '^', '+'}; 
             
             N = min(obj.counter, obj.num_burned); 
             if input.burn
@@ -1283,7 +1309,7 @@ classdef MCMC < handle
             sz(N+1:end) = 20; 
             
             % which chains are good?
-            [pass, mean_chi] = obj.findGoodChains;
+            [pass, mean_chi] = obj.findGoodChains('find', false);
             
             if length(input.pars)==1 % just show the distribution of this one parameter I guess... 
                 
@@ -1311,13 +1337,18 @@ classdef MCMC < handle
                 
             elseif length(input.pars)==3
                 
-                h = findobj(input.ax, 'Type', 'Scatter'); 
+%                 h = findobj(input.ax, 'Type', 'Scatter'); 
                 
                 N = min(obj.num_chains, input.chains); 
                 
                 sz = sz(1:step:obj.counter);
                 
                 for ii = 1:N
+                    
+                    if input.good && ~pass(ii)
+                        continue;
+                    end
+                    
                     % use the table not just the points
                     if ~isempty(obj.results)
                         p1 = obj.results{obj.results.chain == ii, input.pars{1}};
@@ -1333,14 +1364,14 @@ classdef MCMC < handle
 %                     lkl = [obj.points(1:obj.counter,ii).likelihood]'; % used only for calculating the mean likelihood of each chain
                     end
                     
-                    if ismember(ii, pass)
+                    if pass(ii)
                         accepted = 'accepted';
                     else
                         accepted = 'rejected';
                     end
                     
                     leg_str = sprintf('Chain %d (\\langle\\chi^2\\rangle=%3.1f, %s)', ii, mean_chi(ii), accepted);
-                    if isempty(h) || length(h)~=N || ~isvalid(h(ii))
+%                     if isempty(h) || length(h)~=N || ~isvalid(h(ii))
                         N_colors = size(input.ax.ColorOrder,1);
                         col_idx = mod(ii-1, N_colors) + 1; 
                         sha_idx = floor((ii-1)/N_colors) + 1; 
@@ -1349,17 +1380,17 @@ classdef MCMC < handle
 %                             ii, 100*obj.num_successes(ii)./obj.counter, nanmean(lkl(obj.num_burned+1:end,1))); 
                         h(ii).DisplayName =  leg_str;
                         input.ax.NextPlot = 'add';                 
-                    else
-                        h(N-ii+1).XData = p1; 
-                        h(N-ii+1).YData = p2;
-                        h(N-ii+1).ZData = p3;
-                        h(N-ii+1).SizeData = sz;
-                        
-%                         h(N-ii+1).DisplayName = sprintf('Chain %d (acc=%3.1f%%, lkl=%4.2g)', ...
-%                             ii, 100*obj.num_successes(ii)./obj.counter, nanmean(lkl(obj.num_burned+1:end,1),1)); 
-                        h(N-ii+1).DisplayName = leg_str;
-                        input.ax.NextPlot = 'add';  
-                    end
+%                     else
+%                         h(N-ii+1).XData = p1; 
+%                         h(N-ii+1).YData = p2;
+%                         h(N-ii+1).ZData = p3;
+%                         h(N-ii+1).SizeData = sz;
+%                         
+% %                         h(N-ii+1).DisplayName = sprintf('Chain %d (acc=%3.1f%%, lkl=%4.2g)', ...
+% %                             ii, 100*obj.num_successes(ii)./obj.counter, nanmean(lkl(obj.num_burned+1:end,1),1)); 
+%                         h(N-ii+1).DisplayName = leg_str;
+%                         input.ax.NextPlot = 'add';  
+%                     end
 
                 end
                 
@@ -1401,7 +1432,9 @@ classdef MCMC < handle
             input.ax.NextPlot = hold_state;
             
             for ii = 1:length(h)
-                h(ii).ButtonDownFcn = @obj.callback_click_point; 
+                if isvalid(h(ii)) && isa(h(ii), 'matlab.graphics.chart.primitive.Scatter')
+                    h(ii).ButtonDownFcn = @obj.callback_click_point; 
+                end
             end
             
             legend(input.ax, 'Location', 'NorthEastOutside'); 

@@ -88,10 +88,10 @@ classdef CurveGenerator < handle
         r2_range = [0 1];
         d_range = [0.1 3];
         th_range = [0 180];
-        R_range = [0 20];
+        R_range = [0 10];
         b_range = [0 4];
-        v_range = [0.2 30];
-        t_range = [-100 100];
+        v_range = [1 30];
+        t_range = [-1000 1000];
         T_range = [1 1000];
         f_range = [1 100];
         W_range = [0.1 5];
