@@ -18,7 +18,7 @@ function ax = show_cutouts(C, varargin)
     
     input = util.text.InputVars;
     input.input_var('number', 1); % how many cutouts to show (around the key frame)
-    input.input_var('frame', 1); % which frame to plot around (key frame)
+    input.input_var('frame', 1, 'index'); % which frame to plot around (key frame)
     input.input_var('star', 1); % which star to look at
     input.input_var('oversample', [], 'oversampling'); % how much we want to interpolate to see more details
     input.input_var('type', 'heat') % can choose "heat" (regular image) or "surf" for 3D plot
@@ -87,8 +87,8 @@ function ax = show_cutouts(C, varargin)
                 error('Unknown "type" option "%s". Use "heat" or "surf". ', input.type); 
             end
             
-            lim_min = min(lim_min, ax{counter}.ZLim(1)); 
-            lim_max = max(lim_max, ax{counter}.ZLim(2)); 
+            lim_min = min(lim_min, ax{counter}.CLim(1)); 
+            lim_max = max(lim_max, ax{counter}.CLim(2)); 
             
             util.plot.inner_title(sprintf('frame= %d', indices(counter)), 'ax', ax{counter}, 'color', input.color); 
             
@@ -114,8 +114,8 @@ function ax = show_cutouts(C, varargin)
     end % for ii
     
     for ii = 1:length(ax)
-%         ax{ii}.ZLim = [lim_min, lim_max]; 
-        ax{ii}.ZLim(2) = lim_max; 
+        ax{ii}.CLim = [lim_min, lim_max]; 
+%         ax{ii}.CLim(2) = lim_max; 
     end
     
     if nargout==0

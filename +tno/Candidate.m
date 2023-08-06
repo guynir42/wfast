@@ -342,6 +342,8 @@ classdef Candidate < handle
                     obj.serial, obj.star_index, obj.time_index, obj.batch_number, hour(t), minute(t), round(second(t)), obj.snr, obj.star_current_snr, obj.star_snr, ...
                     obj.fwhm, obj.airmass, round(nanmean(obj.auxiliary(:,obj.aux_indices.centroids_x))), round(nanmean(obj.auxiliary(:,obj.aux_indices.centroids_y))));
             
+            str = sprintf('%s | alt/az= %d, %d ', str, round(obj.head.ALT), round(obj.head.AZ));
+                
         end
         
         function val = fwhm(obj)
@@ -401,6 +403,14 @@ classdef Candidate < handle
             
         end
         
+        function str = printSecrets(obj)
+            
+            str = sprintf('%s, v= %4.2f km/s, f= %dHz, ECL= %4.2fdeg', ...
+                obj.head.run_identifier, obj.head.ephem.getShadowVelocity(1), ...
+                round(obj.head.FRAMERATE), obj.head.ephem.ECL_lat); 
+            
+        end
+        
         function val = getStellarSize(obj)
             
             if ~isempty(obj.star_props) && ismember('Mag_BP', obj.star_props.Properties.VariableNames) && ~isnan(obj.star_props.Mag_BP) && ...
@@ -451,8 +461,8 @@ classdef Candidate < handle
                 ECL = obj.head.ephem.ECL_lat;
             end
             
-            v = obj.head.ephem.getShadowVelocity;
-            v = sqrt(sum(v.^2)); 
+            v = obj.head.ephem.getShadowVelocity(1);
+%             v = sqrt(sum(v.^2)); 
             
             str = sprintf('Run: "%s" | ecl lat= %4.1f deg \ncoords: %s %s | V= %d', strrep(obj.run_identifier, '\', '/'), ECL, RA, Dec, round(v)); 
             
@@ -466,6 +476,40 @@ classdef Candidate < handle
                 str = sprintf('SIM: R= %4.2f | r= %4.2f | b= %4.2f | v= %4.1f', ...
                     obj.sim_pars.R, obj.sim_pars.r, obj.sim_pars.b, obj.sim_pars.v); 
             end
+            
+        end
+        
+        function str = printTableSummary(obj)
+            
+            J = mean(obj.juldates); 
+            t = datetime(J, 'convertFrom', 'juliandate', 'TimeZone', 'UTC'); 
+            t.Format = 'yyyy-MM-dd HH:mm:ss';
+            str = sprintf('%s', t); 
+            
+            coordinates = '';
+            coordinates = [coordinates, head.Ephemeris.deg2hour(obj.star_props.RA)];
+            coordinates = [coordinates, head.Ephemeris.deg2sex(obj.star_props.Dec)];
+            
+            str = sprintf('%s & %s', str, coordinates); 
+            
+            str = sprintf('%s & %5.1f', str, obj.head.ephem.ECL_lat); 
+            
+            str = sprintf('%s & %5.2f', str, obj.snr); 
+            
+            str = sprintf('%s & %5.2f & %d & %4.1f & %5.2f', str, ...
+                obj.star_props.Mag_G, round(obj.star_props.Teff), ...
+                obj.star_props.FresnelSize, obj.star_current_snr); 
+            
+            str = sprintf('%s & %4d & %5.2f & %5.2f', str, ...
+                round(obj.head.FRAMERATE), obj.fwhm, obj.airmass); 
+            
+            str = sprintf('%s & %5.1f', str, obj.head.ephem.getShadowVelocity(1)); 
+            
+        end
+        
+        function str = printTableHeader(obj)
+            
+            str = ''; % TODO: finish this
             
         end
         
@@ -895,6 +939,8 @@ classdef Candidate < handle
                 error('Unknown velocity prior option "%s". Use "wide" or "narrow"...', input.velocity_prior);
             end
             
+            obj.mcmc.gen = occult.CurveGenerator.empty; % clear this up and reset it to the input f, T, and W
+            
         end
         
         function loadUnforcedPhotometry(obj, varargin)
@@ -1122,6 +1168,7 @@ classdef Candidate < handle
             input.input_var('index', []); % which event in the vector to plot (default is 1 or what was plotted previously)
             input.input_var('kept', [], 'show_kept'); % if true, filter only the kept events when pressing the prev/next buttons
             input.input_var('cuts', []); % additional cut types to show on the flux plot
+            input.input_var('secrets', []); % show additional info like obs date, ecliptic latitude, transverse velocity, frame rate
             input.input_var('duplicates', []); % skip duplicate events when classifying
             input.input_var('scanner', []); % link back to the scanner object to load next candidates
             input.input_var('simulated', []); % if true will only show simulated, if false will show non-simulated. leave empty for both types
@@ -1162,6 +1209,14 @@ classdef Candidate < handle
                 end
             end
             
+            if isempty(input.secrets) % default value
+                if ~isempty(input.parent.UserData) && isfield(input.parent.UserData, 'show_secrets')
+                    input.secrets = input.parent.UserData.show_secrets; 
+                else
+                    input.secrets = false;
+                end
+            end
+            
             if isempty(input.duplicates) % default value
                 if ~isempty(input.parent.UserData) && isfield(input.parent.UserData, 'skip_duplicates')
                     input.duplicates = input.parent.UserData.skip_duplicates; 
@@ -1179,13 +1234,14 @@ classdef Candidate < handle
             end
             
             if isempty(input.parent.UserData)
-                input.parent.UserData = struct('number', length(obj_vec), 'index', input.index, ...
+                input.parent.UserData = struct('number', length(obj_vec), 'index', input.index, 'use_secrets', input.secrets, ...
                     'show_kept', input.kept, 'show_cuts', input.cuts, 'skip_duplicates', input.duplicates); % add other state variables here
             else
                 input.parent.UserData.number = length(obj_vec); 
                 input.parent.UserData.index = input.index;
                 input.parent.UserData.show_kept = input.kept;
                 input.parent.UserData.show_cuts = input.cuts; 
+                input.parent.UserData.show_secrets = input.secrets;
                 input.parent.UserData.skip_duplicates = input.duplicates;
                 input.parent.UserData.scanner = input.scanner;
                 % and add them here too
@@ -1286,7 +1342,14 @@ classdef Candidate < handle
             
             info_panel = uipanel(input.parent, 'Units', 'Normalized', 'Position', [margin_left 0.9 1-margin_left*2 0.1], 'title', 'info'); 
             
-            button = uicontrol(info_panel, 'Style', 'text', 'string', strjoin({obj.printSummary, ['Star: ' obj.printStellarProps ' | Kernel: ' obj.printKernelProps]}, newline), ...
+            second_line = ['Star: ' obj.printStellarProps ' | Kernel: ' obj.printKernelProps];
+            if input.secrets
+                second_line = [second_line ' | Secrets: ' obj.printSecrets];
+            end
+            
+            info_str = strjoin({obj.printSummary, second_line}, newline);
+            
+            button = uicontrol(info_panel, 'Style', 'text', 'string', info_str, ...
                 'Units', 'Normalized', 'Position', [0.02 0 0.88 1], 'FontSize', 12, 'HorizontalAlignment', 'Left'); 
             
             if obj.use_show_secrets
@@ -2630,7 +2693,8 @@ classdef Candidate < handle
         function showNearestStars(obj, varargin)
             
             input = util.text.InputVars;
-            input.input_var('number', 6); % number of stars to look for   
+            input.input_var('number', 6); % number of stars to look for
+            input.input_var('offsets', false); % add arbitrary offsets to make the plots separate
             input.input_var('snr', 5); % minimal S/N for stars to be considered
             input.input_var('height', 0.75); % height of the image box
             input.input_var('monochrome', true); % use an inverted grayscale colormap
@@ -2670,6 +2734,25 @@ classdef Candidate < handle
             
             % nearest neighbors' fluxes
             fn = obj.flux_raw_all(:,idx); 
+            
+            if input.offsets % add some flux constants if plots are too close
+                mu0 = nanmean(log(obj.flux_raw), 1);
+                sig0 = nanstd(log(obj.flux_raw), [], 1); 
+                
+                mu_n = nanmean(log(fn), 1);
+                sig_n = nanstd(log(fn), [], 1);
+                
+                for ii = 1:size(fn, 2)
+                   
+                    if abs(mu0-mu_n(ii)) < sig0+sig_n(ii) * 4
+                        
+                        fn(:,ii) = fn(:, ii) * (ii+1); 
+                        
+                    end
+                    
+                end
+                
+            end
             
             % find the area of the image we need
             margin_px = 10;
@@ -2763,10 +2846,11 @@ classdef Candidate < handle
                 if xn(ii) > x_mid                
                     text(ax_image, xn(ii)-offset_px, yn(ii)-5, sprintf('#%d', ii),...
                     'Color', hstairs(ii).Color, 'FontSize', input.font_size, ...
-                    'HorizontalAlignment', 'Right'); 
+                    'HorizontalAlignment', 'Right', 'VerticalAlignment', 'middle'); 
                 else
                     text(ax_image, xn(ii)+offset_px, yn(ii)-5, sprintf('#%d', ii),...
-                    'Color', hstairs(ii).Color, 'FontSize', input.font_size); 
+                    'Color', hstairs(ii).Color, 'FontSize', input.font_size, ...
+                    'HorizontalAlignment', 'Left', 'VerticalAlignment', 'cap'); 
                 end
             end
             

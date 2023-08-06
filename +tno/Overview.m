@@ -624,6 +624,7 @@ classdef Overview < handle
             input.input_var('r_edges', []); 
             input.input_var('distance_au', 40); 
             input.input_var('efficiency', []); % override the calcEfficiency with a scalar or matrix of new values
+            input.input_var('ecl', [], 'ecliptic latitude', 'ecliptic limits'); 
             input.scan_vars(varargin{:}); 
         
             if isempty(obj.star_seconds)
@@ -703,6 +704,26 @@ classdef Overview < handle
             
             v_weights = permute(T, [1,3,2]); % dim 1 is velocity, dim 2 is ecliptic latitude
             
+            if ~isempty(input.ecl)
+            
+                if length(input.ecl)~=2
+                    error('Give the ecliptic latitude parameter as [min,max] values'); 
+                end    
+                
+                ecl_idx1 = find(obj.ecl_edges>=input.ecl(1), 1, 'first');
+                ecl_idx2 = find(obj.ecl_edges<input.ecl(2), 1, 'last') - 1;
+            
+                if isempty(ecl_idx1) || isempty(ecl_idx2) || ecl_idx1>ecl_idx2
+                    error('No data for the ecliptic latitude range %s', util.text.print_vec(input.ecl, ' to ')); 
+                end
+
+                % integrate over the relevant ecliptic latitudes
+                coverage = nansum(coverage(:,ecl_idx1:ecl_idx2),2);
+                cov_lower = nansum(cov_lower(:,ecl_idx1:ecl_idx2),2);
+                cov_upper = nansum(cov_upper(:,ecl_idx1:ecl_idx2),2); 
+                
+            end
+            
         end
         
         function [N, N_err] = numDetections(obj, varargin)
@@ -715,13 +736,6 @@ classdef Overview < handle
             
             if length(input.ecl)~=2
                 error('Give the ecliptic latitude parameter as [min,max] values'); 
-            end
-            
-            ecl_idx1 = find(obj.ecl_edges>=input.ecl(1), 1, 'first');
-            ecl_idx2 = find(obj.ecl_edges<input.ecl(2), 1, 'last') - 1;
-            
-            if isempty(ecl_idx1) || isempty(ecl_idx2) || ecl_idx1>ecl_idx2
-                error('No data for the ecliptic latitude range %s', util.text.print_vec(input.ecl, ' to ')); 
             end
             
             r = util.vec.tocolumn(input.r_edges);
@@ -753,15 +767,8 @@ classdef Overview < handle
                 input.r_edges = obj.default_r_edges_fsu./obj.km2fsu(input.distance); 
             end
             
-            [coverage, cov_lower, cov_upper] = obj.calcCoverage(input.r_edges, input.distance);
-            
-            % integrate over the relevant ecliptic latitudes
-            C = nansum(coverage(:,ecl_idx1:ecl_idx2),2);
-            C_l = nansum(cov_lower(:,ecl_idx1:ecl_idx2),2);
-            C_u = nansum(cov_upper(:,ecl_idx1:ecl_idx2),2); 
-            
-            [C_l,C,C_u]
-            
+            [C, C_l, C_u] = obj.calcCoverage('r_edges', input.r_edges, 'distance_au', input.distance, 'ecl', input.ecl);
+             
 %             C_p = C_u - C; % coverage plus 
 %             C_m = C - C_l; % coverage minus
             
@@ -785,7 +792,13 @@ classdef Overview < handle
 %             N_u = N + N_p;
             
         end
+        
+        function getScoreHistograms(obj)
             
+            
+            
+        end
+        
     end
     
     methods (Hidden=false) % internal calculations

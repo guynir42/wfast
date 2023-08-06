@@ -77,8 +77,14 @@ mn_geo = min(f(:,idx));
 
 ax.YLim = [mn_diff.*0.999 mx_diff*1.001]; 
 
-ax.YTick = [mn_diff, mn_geo, 0.994 0.997, mx_diff]; 
+ticks = [mn_diff, mn_geo, 0.994 0.997, mx_diff];
+tick_cell = {};
+for ii = 1:length(ticks)
+    tick_cell{ii} = sprintf('%4.3f', ticks(ii));
+end
 
+ax.YTick = ticks; 
+ax.YTickLabels = tick_cell;
 ax.YGrid = 'on';
 
 text(ax, -3, double((mn_geo+mn_diff)/2), sprintf('delta= %6.4f', mn_geo-mn_diff), 'FontSize', 16);

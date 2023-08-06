@@ -2,7 +2,7 @@ classdef EventFlux < handle
 
     properties
         
-        filename;
+        filename; 
         base_dir = fullfile(getenv('DATA'), 'WFAST\two_year_results\occultation_flux');
         raw_data;
         latest_plot_type = '';
@@ -117,6 +117,17 @@ classdef EventFlux < handle
                 end
             end
         end
+        
+        function val = getVelocity(obj)
+            
+            if isempty(obj.cand) || isempty(obj.head)
+                val = [];
+            else
+                val = obj.cand.head.ephem.getShadowVelocity(1); 
+            end
+            
+        end
+        
     end
     
     methods % loading/saving/calculations
@@ -182,10 +193,14 @@ classdef EventFlux < handle
             
         end
         
-        function fig = showNeighbors(obj, number)
+        function fig = showNeighbors(obj, number, add_offsets)
             
             if nargin<2 || isempty(number)
                 number = [];
+            end
+            
+            if nargin<3 || isempty(add_offsets)
+                add_offsets = false; 
             end
             
             obj.latest_plot_type = 'neighbors'; 
@@ -195,7 +210,7 @@ classdef EventFlux < handle
             fh.height = 15;
             fh.clear;
 
-            obj.cand.showNearestStars('parent', fh.fig, 'number', number);
+            obj.cand.showNearestStars('parent', fh.fig, 'number', number, 'offsets', add_offsets);
             
             if nargout > 0
                 fig = fh.fig;

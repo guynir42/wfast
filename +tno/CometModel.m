@@ -131,7 +131,59 @@ classdef CometModel < handle
         
     end
     
-    methods % reset/clear
+    methods % reset/clear/default setups
+        
+        function setup_schlichting(obj)
+            % ref: https://ui.adsabs.harvard.edu/abs/2012ApJ...761..150S/abstract
+
+            obj.index_power_law = 3.8; % differential power law
+            obj.index_lower = 3.6;
+            obj.index_upper = 4.0;
+        
+            obj.start_radius = 0.25; % km (this is where the normalization is defined)
+        
+            obj.normalization = 1.1e7; % number of objects above "start_radius"
+            obj.norm_lower = 0.4e7; % lower limit on normalization
+            obj.norm_upper = 2.6e7; % upper limit on normalization
+        
+            obj.distance = 40; % AU
+            
+        end
+        
+        function setup_arimatsu(obj)
+            % ref: https://ui.adsabs.harvard.edu/abs/2019NatAs...3..301A/abstract
+            
+            obj.index_power_law = 4.0; % differential power law
+            obj.index_lower = 3.0;
+            obj.index_upper = 4.5;
+        
+            obj.start_radius = 1.2; % km (this is where the normalization is defined)
+        
+            obj.normalization = 5.5e5; % number of objects above "start_radius"
+            obj.norm_lower = 5e5; % lower limit on normalization
+            obj.norm_upper = 6e5; % upper limit on normalization
+        
+            obj.distance = 40; % AU
+            
+        end
+        
+        function setup_fuentes(obj)
+            % ref: https://ui.adsabs.harvard.edu/abs/2009ApJ...696...91F/abstract
+            obj.index_power_law = 3.8; % differential power law
+            obj.index_lower = 3.6;
+            obj.index_upper = 4.0;
+        
+            obj.start_radius = 45; % km (this is where the normalization is defined)
+        
+            % the break radius is 45+-15, translate to N uncertainty using
+            % a power law with q=-4 we get x5 and x0.3 number of objects.
+            obj.normalization = 5.4; % number of objects above "start_radius"
+            obj.norm_lower = 1.7; % lower limit on normalization
+            obj.norm_upper = 27; % upper limit on normalization
+        
+            obj.distance = 40; % AU
+            
+        end
         
     end
     
@@ -203,12 +255,13 @@ classdef CometModel < handle
     
     methods % plotting tools / GUI
         
-        function show(obj, varargin)
+        function [h_line, h_shade] = show(obj, varargin)
             
             input = util.text.InputVars;
             input.input_var('r_edges', []); 
             input.input_var('power_law_range', true); 
             input.input_var('log', true, 'logarithm'); 
+            input.input_var('alpha', 0.25); % transparency of the grey uncertainty region
             input.input_var('axes', [], 'axis'); 
             input.input_var('font_size', 18); 
             input.scan_vars(varargin{:}); 
@@ -229,7 +282,7 @@ classdef CometModel < handle
 %             [N, N_l, N_u] = obj.numDensityCumulative(input.r_edges, input.power_law_range); 
             [N, N_l, N_u] = obj.numDensityIntervals(input.r_edges, input.power_law_range); 
             
-            [h_line, h_shade] = util.plot.shaded(r, N, [N-N_l, N_u-N], 'axes', input.axes); 
+            [h_line, h_shade] = util.plot.shaded(r, N, [N-N_l, N_u-N], 'axes', input.axes, 'alpha', input.alpha); 
             
             h_line.DisplayName = 'KBO model: N(>r)=N_0 r^{-q}';
             

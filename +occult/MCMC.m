@@ -160,12 +160,21 @@ classdef MCMC < handle
                 cla(obj.gui.axes_posterior); 
             end
             
-            obj.gen.reset;
+            obj.resetGenerator;
             
             if ~isempty(obj.true_point)
                 obj.gen.lc.pars.copy_from(obj.true_point);
                 obj.gen.getLightCurves;
             end
+            
+        end
+        
+        function resetGenerator(obj)
+            
+            obj.gen.reset;
+            obj.gen.f = obj.input_frame_rate;
+            obj.gen.T = obj.input_exptime;
+            obj.gen.W = obj.input_window;
             
         end
         
@@ -218,47 +227,6 @@ classdef MCMC < handle
             
         end
         
-        function T = getTable(obj, varargin) % depricated, replaced by pointsToTable
-            
-            input = util.text.InputVars;
-            input.input_var('good', false); % only get good chains and skip points in the burn sample
-            input.scan_vars(varargin{:});
-            
-            p = obj.points;
-            
-            for ii = 1:size(p,2)
-                [p(:,ii).chain] = deal(ii); % make sure each point knows which chain it came from
-            end
-            
-            pass = obj.findGoodChains;
-            
-            if input.good
-                p = p(obj.num_burned+1:end, pass);
-            end
-            
-            R = [p.R]';
-            r = [p.r]';
-            b = [p.b]';
-            v = [p.v]';
-            chi2 = [p.chi2]';
-            ndof = [p.ndof]';
-            logl = [p.logl]';
-            likelihood = [p.likelihood]';
-            counts = [p.counts]';
-            weight = [p.weight]'; 
-            chain = [p.chain]'; 
-            
-            T = table(R,r,b,v,chi2,ndof,logl,likelihood,counts,weight,chain); 
-            
-            if ~input.good % add burn and good columns to the table
-                burn = [p.burn]';
-                good = [p.good]'; 
-                T2 = table(burn, good); 
-                T = [T,T2]; 
-            end
-            
-        end
-        
         function val = getResult(obj, name, skip_burn, chain_num)
             
             if nargin<3 || isempty(skip_burn)
@@ -273,34 +241,38 @@ classdef MCMC < handle
                 
                 val = obj.results;
                 
-                if skip_burn
-                    val = val(val.burn==0,:);
-                end
+                val = reshape(val.(name), [obj.num_steps, obj.num_chains]);  
                 
-                if ~isempty(chain_num)
-                    val = val(ismember(val.chain, chain_num),:);
-                end
-                
-                val = val.(name); 
+%                 if skip_burn
+%                     val = val(val.burn==0,:);
+%                 end
+%                 
+%                 if ~isempty(chain_num)
+%                     val = val(ismember(val.chain, chain_num),:);
+%                 end
+%                 
+%                 val = val.(name); 
                 
             elseif ~isempty(obj.points)
                 
                 val = obj.points;
-                
-                if skip_burn
-                    val = val(obj.num_burned+1:end,:); 
-                end
-                
-                if ~isempty(chain_num)
-                    val = val(:,chain_num);
-                end
-                
                 val = [val.(name)]';
                 
             else
                 val = [];
+                return;
             end
             
+             if skip_burn
+                val = val(obj.num_burned+1:end,:); 
+            end
+
+            if ~isempty(chain_num)
+                val = val(:,chain_num);
+            end
+            
+            val = val(:);
+
         end
         
         function val = getNumChains(obj)
@@ -355,10 +327,10 @@ classdef MCMC < handle
             
             if isempty(val)
                 obj.true_point = occult.Parameters.empty;
-                obj.gen.reset; 
+                obj.resetGenerator; 
             else
                 obj.true_point = val;                
-                obj.gen.reset;
+                obj.resetGenerator;
                 obj.gen.lc.pars.copy_from(val); % also update the generator so it shows the true LC if plotting before a run starts
                 obj.gen.getLightCurves;
             end
@@ -654,7 +626,7 @@ classdef MCMC < handle
             B = b'.*M;
             V = v.*M;
             
-            obj.gen.reset;
+            obj.resetGenerator;
             obj.gen.R = input.star_size;
             obj.gen.t = 0;
             obj.gen.b = B(:); % linearize to get all options
@@ -909,7 +881,7 @@ classdef MCMC < handle
                 error('Unknown initialization option "%s". Use "search", "bank" or "random" instead...', obj.initialization_method); 
             end
             
-            obj.gen.reset;
+            obj.resetGenerator;
             obj.gen.lc.pars.copy_from(obj.init_point); 
             
             obj.calcLikelihood; % get the first point likelihood/chi2
@@ -1896,6 +1868,9 @@ classdef MCMC < handle
             mode_b = fr.func(mode_r); 
             
             obj.posterior_point = occult.Parameters;
+            obj.posterior_point.f = obj.input_frame_rate;
+            obj.posterior_point.T = obj.input_exptime;
+            obj.posterior_point.W = obj.input_window;
             obj.posterior_point.R = obj.input_R;
             obj.posterior_point.r = mode_r;
             obj.posterior_point.b = mode_b;
@@ -1914,7 +1889,7 @@ classdef MCMC < handle
             margin_x = 0.025;
             margin_y = 0.12;
             ax_lc = axes('Parent', input.parent, 'Position', [P(1)+P(3)+margin_x, P(2)+P(4)+margin_y, P(3)-margin_x, P(4)-margin_y]); 
-            obj.gen.reset;
+            obj.resetGenerator;
             obj.gen.lc.pars.copy_from([obj.posterior_point, obj.true_point]); 
             obj.gen.getLightCurves; 
             t = obj.gen.lc.time;
