@@ -371,13 +371,13 @@ classdef LightCurve < handle
                 input.ax.ColorOrderIndex = ii;
                 h = plot(input.ax, obj.time, obj.flux(:,ii), '-', 'LineWidth', input.width);
                 if all(obj.pars.t==0) && all(obj.pars.R==0)
-                    h.DisplayName = sprintf('r= %4.2f | b= %4.2f | v= %4.1f', obj.pars.r(ii), obj.pars.b(ii), obj.pars.v(ii));
+                    h.DisplayName = sprintf('r= %4.2f $|$ b= %4.2f $|$ v= %4.1f', obj.pars.r(ii), obj.pars.b(ii), obj.pars.v(ii));
                 elseif all(obj.pars.t==0)
-                    h.DisplayName = sprintf('R= %4.2f | r= %4.2f | b= %4.2f | v= %4.1f', obj.pars.R(ii), obj.pars.r(ii), obj.pars.b(ii), obj.pars.v(ii));
+                    h.DisplayName = sprintf('R$_\\star$= %4.2f $|$ r= %4.2f $|$ b= %4.2f $|$ v= %4.1f', obj.pars.R(ii), obj.pars.r(ii), obj.pars.b(ii), obj.pars.v(ii));
                 elseif all(obj.pars.R==0)
-                    h.DisplayName = sprintf('r= %4.2f | b= %4.2f | v= %4.1f | t= %4.2f', obj.pars.r(ii), obj.pars.b(ii), obj.pars.v(ii), obj.pars.t(ii));
+                    h.DisplayName = sprintf('r= %4.2f $|$ b= %4.2f $|$ v= %4.1f $|$ t= %4.2f', obj.pars.r(ii), obj.pars.b(ii), obj.pars.v(ii), obj.pars.t(ii));
                 else
-                    h.DisplayName = sprintf('R= %4.2f | r= %4.2f | b= %4.2f | v= %4.1f | t= %4.2f', obj.pars.R(ii), obj.pars.r(ii), obj.pars.b(ii), obj.pars.v(ii), obj.pars.t(ii));
+                    h.DisplayName = sprintf('R$_\\star$= %4.2f $|$ r= %4.2f $|$ b= %4.2f $|$ v= %4.1f $|$ t= %4.2f', obj.pars.R(ii), obj.pars.r(ii), obj.pars.b(ii), obj.pars.v(ii), obj.pars.t(ii));
                 end
                 
                 color = h.Color;
@@ -403,7 +403,7 @@ classdef LightCurve < handle
             input.ax.FontSize = input.font_size; 
             
             if input.legend
-                legend(input.ax, 'Location', 'SouthEast');
+                legend(input.ax, 'Location', 'SouthEast', 'Interpreter', 'latex');
             end
             
             input.ax.Box = 'on';

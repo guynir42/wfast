@@ -16,6 +16,7 @@ f1.height = 18;
 g.r = 2;
 g.R = 0;
 g.b = [0 1 3]; 
+g.v = 10;
 
 g.use_source_matrix = 0;
 
@@ -82,8 +83,8 @@ ax2.XTickLabels = {};
 
 ax2.Position = ax1.Position + [0.43 0.0025 0.02 -0.0075];
 
-util.plot.inner_title(sprintf('R= %4.2f', g.R(1)), 'ax', ax1, ...
-    'Position', 'SouthWest', 'FontSize', 18); 
+util.plot.inner_title(sprintf('$R_\\star$= %4.2f', g.R(1)), 'ax', ax1, ...
+    'Position', 'SouthWest', 'FontSize', 18, 'Interpreter', 'Latex'); 
 
 % show the plots for the R=1 case
 
@@ -146,9 +147,8 @@ ax4.YAxis(2).Color = 'k';
 
 ax4.Position = ax3.Position + [0.43 0.0025 0.02 -0.0075];
 
-
-util.plot.inner_title(sprintf('R= %4.2f', g.R(1)), 'ax', ax3, ...
-    'Position', 'SouthWest', 'FontSize', 18); 
+util.plot.inner_title(sprintf('$R_\\star$= %4.2f', g.R(1)), 'ax', ax3, ...
+    'Position', 'SouthWest', 'FontSize', 18, 'Interpreter', 'Latex'); 
 
 
 %% save the results

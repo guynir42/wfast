@@ -1666,27 +1666,35 @@ classdef CurveGenerator < handle
             
         end
         
-        function showExamples(obj)
+        function showExamples(obj, varargin)
+            
+            input = util.text.InputVars;
+            input.input_var('r', 0.5:0.5:1.5); 
+            input.input_var('R', 0.5);
+            input.input_var('b', 0.5); 
+            input.input_var('v', [3, 10, 30]);
+            input.input_var('t', 0); 
+            input.scan_vars(varargin{:}); 
             
             f0 = util.plot.FigHandler('example lightcurves');
             f0.clear;
-            f0.width = 30;
-            f0.height = 14;
+            f0.width = 36;
+            f0.height = 18;
             ax = axes('Parent', f0.fig);
             
             cla(ax);
             
-            obj.R = 0;
-            obj.r = 0.5:0.5:1.5;
-            obj.b = 0.5;
-            obj.v = [3 10 30];
-            obj.t = 0;
+            obj.R = input.R;
+            obj.r = input.r;
+            obj.b = input.b;
+            obj.v = input.v;
+            obj.t = input.t;
             
             obj.getLightCurves;
             
             obj.lc.plot('width', 3);
             
-            legend(ax, 'Location', 'SouthEast');
+            legend(ax, 'Location', 'SouthEast', 'Interpreter', 'latex');
             
 %             xlabel(ax, 'Distance from center of star (FSU)'); 
 %             ylabel(ax, 'Intensity (normalized)');
@@ -1754,7 +1762,7 @@ classdef CurveGenerator < handle
             
             obj.getLightCurves;
             h = plot(ax, obj.lc.time, mean(obj.lc.flux,2), '-k', 'LineWidth', 3);
-            h.DisplayName = 'Monochrome: 550nm, R=0.0';
+            h.DisplayName = 'Monochrome: 550nm, R$_\star$=0.0';
             
             ax.NextPlot = 'add';
             
@@ -1762,7 +1770,7 @@ classdef CurveGenerator < handle
             
             obj.getLightCurves;
             h = plot(ax, obj.lc.time, mean(obj.lc.flux,2), '-r', 'LineWidth', 3);
-            h.DisplayName = 'Monochrome: 550nm, R=0.5';
+            h.DisplayName = 'Monochrome: 550nm, R$_\star$=0.5';
             
             obj.R = 0.0;
             obj.r = 0.86:0.01:1.14;
@@ -1771,20 +1779,20 @@ classdef CurveGenerator < handle
             
             obj.getLightCurves;
             h = plot(ax, obj.lc.time, mean(obj.lc.flux,2), ':k', 'LineWidth', 3);
-            h.DisplayName = 'Broadband 400-600nm, R=0.0';
+            h.DisplayName = 'Broadband 400-600nm, R$_\star$=0.0';
             
             obj.R = 0.5;
             
             obj.getLightCurves;
             h = plot(ax, obj.lc.time, mean(obj.lc.flux,2), '--g', 'LineWidth', 3);
-            h.DisplayName = 'Broadband 400-600nm, R=0.5';
+            h.DisplayName = 'Broadband 400-600nm, R$_\star$=0.5';
             
             ax.NextPlot = 'replace';
             ax.XLim = [-0.5,1.0];
             ax.YLim = [0.2 1.25];
             xlabel(ax, 'Time [seconds]');
             ylabel(ax, 'Intensity (normalized)');
-            legend(ax, 'Location', 'SouthEast');
+            legend(ax, 'Location', 'SouthEast', 'Interpreter', 'latex');
             ax.FontSize = 28;
             
         end

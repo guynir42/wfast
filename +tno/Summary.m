@@ -747,8 +747,8 @@ classdef Summary < handle
             N_R_passed = histcounts([ep.R], 'BinEdges', E_R); 
             bar(ax_R, E_R(1:end-1)+bin_size/2, N_R_passed, 'FaceColor', input.colors{2}); 
             hold(ax_R, 'off'); 
-            xlabel(ax_R, 'stellar radius R [FSU]'); 
-            ylabel(ax_R, 'number of events'); 
+            xlabel(ax_R, 'stellar radius R$_\star$ [FSU]', 'Interpreter', 'latex'); 
+            ylabel(ax_R, 'number of events', 'Interpreter', 'latex'); 
             ax_R.YScale = 'log';
             
             mn = max(floor(log10(min(N_R_passed))),-1); 
@@ -780,8 +780,8 @@ classdef Summary < handle
             N_r_passed = histcounts([ep.r], 'BinEdges', E_r); 
             bar(ax_r, E_r(1:end-1)+bin_size/2, N_r_passed, 'FaceColor', input.colors{2}); 
             hold(ax_r, 'off'); 
-            xlabel(ax_r, 'occulter radius r [FSU]'); 
-            ylabel(ax_r, 'number of events'); 
+            xlabel(ax_r, 'occulter radius r [FSU]', 'Interpreter', 'latex'); 
+            ylabel(ax_r, 'number of events', 'Interpreter', 'latex'); 
             ax_r.YScale = 'log';
             
             mn = max(floor(log10(min(N_r_passed))),-1); 
@@ -814,8 +814,8 @@ classdef Summary < handle
             N_b_passed = histcounts([ep.b], 'BinEdges', E_b); 
             bar(ax_b, E_b(1:end-1)+bin_size/2, N_b_passed, 'FaceColor', input.colors{2}); 
             hold(ax_b, 'off'); 
-            xlabel(ax_b, 'impact parameter b [FSU]'); 
-            ylabel(ax_b, 'number of events'); 
+            xlabel(ax_b, 'impact parameter b [FSU]', 'Interpreter', 'latex'); 
+            ylabel(ax_b, 'number of events', 'Interpreter', 'latex'); 
             ax_b.YScale = 'log';
             
             mn = max(floor(log10(min(N_b_passed))), -1); 
@@ -849,8 +849,8 @@ classdef Summary < handle
             N_v_passed = histcounts([ep.v], 'BinEdges', E_v); 
             bar(ax_v, E_v(1:end-1)+bin_size/2, N_v_passed, 'FaceColor', input.colors{2}); 
             hold(ax_v, 'off'); 
-            xlabel(ax_v, 'velocity v [FSU/s]'); 
-            ylabel(ax_v, 'number of events'); 
+            xlabel(ax_v, 'velocity v [FSU/s]', 'Interpreter', 'latex'); 
+            ylabel(ax_v, 'number of events', 'Interpreter', 'latex'); 
             ax_v.YScale = 'log';
             
             mn = max(floor(log10(min(N_v_passed))), -1); 
