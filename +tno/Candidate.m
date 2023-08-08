@@ -2521,6 +2521,8 @@ classdef Candidate < handle
             input.input_var('sg_order', 3); % order of the Savitzky-Golay filter
             input.input_var('sg_window', 101); % window size of the the Savitzky-Golay filter
             input.input_var('sigma', 3); % number of standard deviations for sigma-clipping
+            input.input_var('magnitudes', true); % if true, plot top panel x-axis with (instrumental) magnitudes instead of serial number
+            input.input_var('zeropoint', 18.5); % zero point (magnitude of flux=1)
             input.input_var('parent', []); % could be a figure handle, if empty use gcf
             input.input_var('font_size', 16); % for axes
             input.scan_vars(varargin{:}); 
@@ -2586,42 +2588,68 @@ classdef Candidate < handle
             
             clf(input.parent);
             
+            x_values = 1:length(N);
+            if input.magnitudes
+                median_flux = nanmedian(f, 1);
+                median_flux(median_flux <= 0) = NaN;
+                x_values = input.zeropoint - 2.5*log10(median_flux); 
+            end
+            
             if length(N) > 1
-                left = 0.13;
+                left = 0.1;
                 right = 0.02;
                 bottom = 0.13;
                 top = 0.02;
                 width = (1-left-right*2) / 2;
-                height = (1-bottom-top*2) / 2;
-                
-                ax1 = axes('Parent', input.parent, 'Position', [left, 1-top-height, 1-left-right, height]);
+                height = (1-bottom*2-top*2) / 2;
+                                
+                ax1 = axes('Parent', input.parent, 'Position', [left, 1-top-height, width, height]);
+                ax2 = axes('Parent', input.parent, 'Position', [left, bottom, width, height]); 
+                ax3 = axes('Parent', input.parent, 'Position', [0.6, bottom, 0.4, 0.6]);
+                                
+                biggest_number = 10*ceil(max(prctile(N, 99), N(star_id)*1.5)/10);
+                N_lim = N;
+                N_lim(N > biggest_number) = NaN;
+                N_over = ones(size(N)) * biggest_number + 1;
+                N_over(N <= biggest_number) = NaN;
 
-                plot(ax1, N, 'ok', 'DisplayName', 'all star outliers'); 
+                plot(ax1, x_values, N_lim, 'ok', 'DisplayName', 'all star outliers'); 
                 hold(ax1, 'on'); 
-                lims = ax1.YLim;
-                plot(ax1, [1,1]*obj.star_index, lims, '--', 'DisplayName',...
-                    'occultation star', 'LineWidth', 2); 
+                plot(ax1, x_values, N_over, '^k', 'DisplayName', sprintf('>%d outliers', biggest_number), 'MarkerFaceColor', 'k'); 
+                                    
+                lims = [0, biggest_number + 1];
+%                 plot(ax1, [1,1]*x_values(obj.star_index), lims, '--', 'DisplayName',...
+%                     'occultation star', 'LineWidth', 2); 
+                plot(ax1, x_values(obj.star_index), N(obj.star_index), 'pr', 'DisplayName',...
+                    sprintf('occultation star: %d', N(obj.star_index)), 'MarkerSize', 15, 'LineWidth', 2.0); 
                 
                 per = 90;
                 many_outliers = prctile(N, per); 
                 
                 plot_limit = prctile(N, 99); 
-                plot(ax1, [1, length(N)], [1,1].*many_outliers, ':', 'DisplayName', ...
+                plot(ax1, [1, max(x_values)], [1,1].*many_outliers, ':', 'DisplayName', ...
                     sprintf('%d%% percentile: %d', per, many_outliers), 'LineWidth', 2);
                 
                 ylabel(ax1, 'Number of outliers'); 
+                ytickformat(ax1, '%4d')
+
                 ax1.FontSize = input.font_size;
-                legend(ax1);
-                ax1.XTick = [];
+                ax1.XLim = [min(x_values), max(x_values)];
+
+                legend(ax1, 'Location', 'NorthEastOutside');
+                ax1.Position(3) = width;
+                
+                if input.magnitudes
+                    xlabel(ax1, 'Instrumental magnitude'); 
+                else
+%                     legend(ax1, 'Location', 'NorthEast');
+                    xlabel(ax1, 'Star serial number'); 
+                end
                 
                 hold(ax1, 'off'); 
                 
                 ax1.YLim = lims;
-                ax1.YLim(2) = max(plot_limit, N(star_id)*1.1);
                 
-                ax2 = axes('Parent', input.parent, 'Position', [left, bottom, width, height]); 
-                
-                ax3 = axes('Parent', input.parent, 'Position', [left+width+right, bottom, width, height]);
                 x = obj.positions(:, 1); 
                 x0 = obj.positions(obj.star_index,1); 
                 y = obj.positions(:, 2); 
@@ -2635,7 +2663,7 @@ classdef Candidate < handle
                 axis(ax3, 'square'); 
                 
                 hold(ax3, 'on'); 
-                plot(ax3, x0, y0, 'rx', 'MarkerSize', 15, 'LineWidth', 1.5); 
+                plot(ax3, x0, y0, 'rp', 'MarkerSize', 15, 'LineWidth', 2.0); 
                 hold(ax3, 'off'); 
                 ax3.CLim(2) = plot_limit;
                 xlabel(ax3, 'Outliers vs. position'); 
@@ -2660,26 +2688,54 @@ classdef Candidate < handle
             
             hold(ax2, 'on'); 
             
+            flux_lim = input.sigma.*sig(star_id);
+            centers2 = centers;
+            centers2((centers > -flux_lim) & (centers < flux_lim)) = NaN;
+            
+            bar(ax2, centers2, counts, 'EdgeColor', [0.4, 0.8, 0.4], ...
+                'FaceColor', 'none', 'LineWidth', 1.5, 'DisplayName', 'Outliers');
+            
+            
             g = exp(-0.5.*((centers - mu(star_id))/sig(star_id)).^2); 
             g = g./sum(g).*sum(counts); 
             
-            plot(ax2, centers, g, '--r', 'LineWidth', 2, 'DisplayName', ...
-                sprintf('\\mu= %4.2f | \\sigma= %4.2f', mu(star_id), sig(star_id))); 
+            fit_text = sprintf('\\mu= %4.2f | \\sigma= %4.2f', mu(star_id), sig(star_id));
+            plot(ax2, centers, g, '--r', 'LineWidth', 2, 'DisplayName', fit_text);
+            text(ax2, 0, max(counts)*2, fit_text, 'Color', 'r', 'FontSize', input.font_size, ...
+                'HorizontalAlignment', 'center'); 
             
-            ax2.YScale = 'log'; 
+            ax2.YScale = 'log';             
             
+            ax2.YTick = [1, 10, 100];
+            ax2.YTickLabels = {'1', '10', '100'};
+            ax2.YLim = [0.1, max(counts)*3];
             lims = ax2.YLim;
             
-            plot(ax2, [1,1].*input.sigma.*sig(star_id), lims, ':g', 'LineWidth', 2.5, ...
+            limit_text = sprintf('  %1.1f\\sigma ', input.sigma);
+            plot(ax2, [1,1].*flux_lim, lims, ':g', 'LineWidth', 2.5, ...
                 'DisplayName', sprintf('Limits at %d\\sigma', input.sigma));
-            plot(ax2, -[1,1].*input.sigma.*sig(star_id), lims, ':g', 'LineWidth', 2.5, ...
+            plot(ax2, -[1,1].*flux_lim, lims, ':g', 'LineWidth', 2.5, ...
                 'HandleVisibility', 'off'); 
+            text(ax2, -flux_lim, max(counts)*2, limit_text, 'Color', 'g', ...
+                'HorizontalAlignment', 'right', 'FontSize', input.font_size);
             
-            plot(ax2, [NaN, NaN], [NaN, NaN], 'Marker', 'none', 'LineStyle', 'none', ...
-                'DisplayName', sprintf('Num. outliers= %d', N(star_id)));
+            outlier_count_text = sprintf('%d outliers', N(star_id));
+            outlier_text_x = double(min(centers));
+            outlier_text_align = 'left';
+            if abs(ax2.XLim(1)) < ax2.XLim(2)
+                outlier_text_x = double(max(centers));
+                outlier_text_align = 'right';
+            end
             
-            legend(ax2, 'Location', 'South'); 
-            
+            text(ax2, outlier_text_x, 20.0, outlier_count_text, ...
+                'Color', [0.4, 0.8, 0.4], 'FontSize', input.font_size, ...
+                'HorizontalAlignment', outlier_text_align); 
+            ax2.XLim(1) = ax2.XLim(1) - 20;
+%             plot(ax2, [NaN, NaN], [NaN, NaN], 'Marker', 'none', 'LineStyle', 'none', ...
+%                 'DisplayName', outlier_count_text);
+%                         
+%             legend(ax2, 'Location', 'South'); 
+                        
             hold(ax2, 'off'); 
             
             ax2.YLim = lims;

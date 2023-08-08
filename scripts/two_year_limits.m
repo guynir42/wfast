@@ -393,7 +393,7 @@ legend(ax, 'Location', 'South');
 util.sys.print([data_dir, '/plots/velocity_prior']);
 
 
-%% calculate the limits from non-detection from the large BKO measurements
+%% calculate the limits from non-detection from the large KBO measurements
 
 overview.kbos.setup_fuentes;
 

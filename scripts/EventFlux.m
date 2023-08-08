@@ -239,7 +239,11 @@ classdef EventFlux < handle
             
         end
         
-        function fig = showOutliers(obj)
+        function fig = showOutliers(obj, use_magnitudes)
+            
+            if nargin<2 || isempty(use_magnitudes)
+                use_magnitudes = 0;
+            end
             
             obj.latest_plot_type = 'outliers'; 
             
@@ -255,7 +259,7 @@ classdef EventFlux < handle
             if idx2 > size(obj.flux, 1), idx2 = size(obj.flux, 1); end
             
             f = obj.flux(idx1:idx2, :, obj.aperture_index);
-            obj.cand.showOutlierAnalysis(f, 'parent', fh.fig, 'recalc', 1); 
+            obj.cand.showOutlierAnalysis(f, 'parent', fh.fig, 'recalc', 1, 'magnitudes', use_magnitudes); 
             
             if nargout > 0
                 fig = fh.fig;
